@@ -354,51 +354,89 @@ fn detect_react_test_issues(
     }
 }
 
+fn build_async_test_query(
+    language: &tree_sitter::Language,
+) -> Result<Query, tree_sitter::QueryError> {
+    let query_string = r#"
+    (call_expression
+      function: (identifier) @func
+      arguments: (arguments
+        (string) @test_name
+        (arrow_function
+          body: (_) @body
+        )
+      )
+    ) @test_call
+    "#;
+    Query::new(language, query_string)
+}
+
+fn extract_test_function_name<'a>(
+    match_: &tree_sitter::QueryMatch<'a, '_>,
+) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 0)
+        .map(|c| &c.node)
+}
+
+fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 1)
+        .map(|c| &c.node)
+}
+
+fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 2)
+        .map(|c| &c.node)
+}
+
+fn parse_test_name(node: Node, source: &str) -> String {
+    get_node_text(node, source)
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches('`')
+        .to_string()
+}
+
+fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
+    TestingAntiPattern::AsyncTestIssue {
+        location: SourceLocation::from_node(body_node),
+        test_name,
+        issue_type: "async operations without await or done callback".to_string(),
+    }
+}
+
 fn detect_async_test_issues(
     root: Node,
     source: &str,
     language: &tree_sitter::Language,
     issues: &mut Vec<TestingAntiPattern>,
 ) {
-    let test_query = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (arrow_function
-          async: false
-          body: (_) @body
-        )
-      )
-    ) @test_call
-    "#;
-
-    if let Ok(query) = Query::new(language, test_query) {
+    if let Ok(query) = build_async_test_query(language) {
         let mut cursor = QueryCursor::new();
         let mut matches = cursor.matches(&query, root, source.as_bytes());
 
         while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
+            if let Some(func) = extract_test_function_name(match_) {
+                let func_name = get_node_text(*func, source);
 
                 if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) = (
-                        match_.captures.iter().find(|c| c.index == 1),
-                        match_.captures.iter().find(|c| c.index == 2),
-                    ) {
-                        let test_name = get_node_text(name.node, source)
-                            .trim_matches('"')
-                            .trim_matches('\'');
-                        let body_text = get_node_text(body.node, source);
+                    if let (Some(name), Some(body)) =
+                        (extract_test_name(match_), extract_test_body(match_))
+                    {
+                        let test_name = parse_test_name(*name, source);
+                        let body_text = get_node_text(*body, source);
 
                         // Check if test contains async operations without proper handling
                         if contains_async_operations(body_text) {
-                            issues.push(TestingAntiPattern::AsyncTestIssue {
-                                location: SourceLocation::from_node(body.node),
-                                test_name: test_name.to_string(),
-                                issue_type: "async operations without await or done callback"
-                                    .to_string(),
-                            });
+                            issues.push(create_async_test_issue(*body, test_name));
                         }
                     }
                 }
@@ -681,6 +719,200 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_async_test_issues_fetch_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch without await', () => {
+                const data = fetch('/api/data');
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect fetch without await");
+
+        if let TestingAntiPattern::AsyncTestIssue {
+            test_name,
+            issue_type,
+            ..
+        } = &issues[0]
+        {
+            assert_eq!(test_name, "fetch without await");
+            assert_eq!(
+                issue_type,
+                "async operations without await or done callback"
+            );
+        } else {
+            panic!("Expected AsyncTestIssue pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_axios_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            it('axios without await', () => {
+                const response = axios.get('/api/users');
+                expect(response).toBeTruthy();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect axios without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_promise_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('Promise without await', () => {
+                const promise = new Promise((resolve) => resolve(42));
+                expect(promise).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect Promise without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_then_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('then() without await', () => {
+                getData().then(data => {
+                    expect(data).toBe(42);
+                });
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect .then() without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_with_await_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch with await', () => {
+                const data = await fetch('/api/data');
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger when await is present");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_with_done_callback_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch with done', () => {
+                fetch('/api/data').then(() => {
+                    done();
+                });
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger when done() is present");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_non_test_function_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            function helperFunction() {
+                const data = fetch('/api/data');
+                return data;
+            }
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger for non-test functions");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_no_async_operations() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('synchronous test', () => {
+                const result = 1 + 1;
+                expect(result).toBe(2);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger for synchronous tests");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_multiple_async_patterns() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('multiple async patterns', () => {
+                const data1 = fetch('/api/data1');
+                const data2 = axios.get('/api/data2');
+                const promise = new Promise((resolve) => resolve(42));
+                expect(data1).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Should detect multiple async patterns as one issue"
+        );
+    }
+
+    #[test]
     fn test_detect_missing_assertions_it_function() {
         let javascript = tree_sitter_javascript::LANGUAGE.into();
         let mut parser = Parser::new();
@@ -804,6 +1036,25 @@ mod tests {
         } else {
             panic!("Expected MissingAssertions pattern");
         }
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_ajax_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('jQuery ajax without await', () => {
+                const data = $.ajax({ url: '/api/data' });
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect $.ajax without await");
     }
 
     // Tests for detect_complex_tests
@@ -1039,6 +1290,46 @@ mod tests {
             complexity_at_boundary,
             "Boundary behavior should be consistent"
         );
+    }
+
+    #[test]
+    fn test_build_async_test_query_success() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let result = build_async_test_query(&javascript);
+        assert!(result.is_ok(), "Query construction should succeed");
+    }
+
+    #[test]
+    fn test_build_async_test_query_returns_valid_query() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let query = build_async_test_query(&javascript).unwrap();
+
+        // Verify the query has the expected capture count
+        // The query should have captures for: func, test_name, body, test_call
+        assert!(
+            query.capture_names().len() > 0,
+            "Query should have capture names"
+        );
+    }
+
+    #[test]
+    fn test_extract_test_function_name() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let func = extract_test_function_name(&match_);
+            assert!(func.is_some(), "Should extract function name");
+        } else {
+            panic!("Query should match the test code");
+        }
     }
 
     #[test]
@@ -1350,4 +1641,162 @@ mod tests {
         // Should detect at least one timing dependency (the first one found)
         assert_eq!(issues.len(), 1, "Should detect timing dependency");
     }
+=======
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let func = extract_test_function_name(&match_);
+            assert!(func.is_some(), "Should extract function name");
+        } else {
+            panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_extract_test_name() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let name = extract_test_name(&match_);
+            assert!(name.is_some(), "Should extract test name");
+        } else {
+            panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_extract_test_body() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let body = extract_test_body(&match_);
+            assert!(body.is_some(), "Should extract test body");
+        } else {
+            panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_double_quotes() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"test("example test", () => {});"#;
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with double quotes"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_single_quotes() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example test', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with single quotes"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_backticks() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test(`example test`, () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with backticks"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_async_test_issue() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('async test', () => { fetch('/api'); });";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(body_node) = extract_test_body(&match_) {
+                let issue = create_async_test_issue(*body_node, "async test".to_string());
+
+                if let TestingAntiPattern::AsyncTestIssue {
+                    test_name,
+                    issue_type,
+                    ..
+                } = issue
+                {
+                    assert_eq!(test_name, "async test");
+                    assert_eq!(
+                        issue_type,
+                        "async operations without await or done callback"
+                    );
+                } else {
+                    panic!("Expected AsyncTestIssue");
+                }
+            }
+        }
+    }
+>>>>>>> agent-mapreduce-20251020_055821_agent_7-item_7
 }
