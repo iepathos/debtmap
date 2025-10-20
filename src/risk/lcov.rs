@@ -490,62 +490,208 @@ fn normalize_function_name(name: &str) -> String {
         .replace('\'', "")
 }
 
+/// Strategy 1: Check if query path ends with LCOV path
+///
+/// This strategy handles cases where the query path is absolute and LCOV paths are relative.
+/// It's the most common case when analyzing projects with absolute file paths.
+///
+/// # Arguments
+/// * `query_path` - The path being searched for (often absolute)
+/// * `lcov_path` - The path from LCOV data (often relative)
+///
+/// # Example
+/// ```ignore
+/// use std::path::PathBuf;
+/// let query = PathBuf::from("/home/user/project/src/main.rs");
+/// let lcov = PathBuf::from("src/main.rs");
+/// // query.ends_with(&lcov) == true
+/// ```
+#[allow(dead_code)]
+fn matches_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    query_path.ends_with(lcov_path)
+}
+
+/// Strategy 2: Check if LCOV path ends with normalized query path
+///
+/// This strategy handles cases where LCOV paths are absolute but query paths are relative.
+/// Normalization removes leading "./" to enable matching.
+///
+/// # Arguments
+/// * `query_path` - The path being searched for (often relative with ./)
+/// * `lcov_path` - The path from LCOV data (often absolute)
+///
+/// # Example
+/// ```ignore
+/// use std::path::PathBuf;
+/// let query = PathBuf::from("./src/lib.rs");
+/// let lcov = PathBuf::from("/home/user/project/src/lib.rs");
+/// // lcov.ends_with("src/lib.rs") == true
+/// ```
+#[allow(dead_code)]
+fn matches_reverse_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    let normalized_query = normalize_path(query_path);
+    lcov_path.ends_with(&normalized_query)
+}
+
+/// Strategy 3: Check if normalized paths are equal
+///
+/// This strategy normalizes both paths by removing leading "./" and checks for exact equality.
+/// It's useful when both paths might have different normalization but refer to the same file.
+///
+/// # Arguments
+/// * `query_path` - The path being searched for
+/// * `lcov_path` - The path from LCOV data
+///
+/// # Example
+/// ```ignore
+/// use std::path::PathBuf;
+/// let query = PathBuf::from("src/main.rs");
+/// let lcov = PathBuf::from("./src/main.rs");
+/// // After normalization, both are "src/main.rs"
+/// ```
+#[allow(dead_code)]
+fn matches_normalized_equality_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    normalize_path(lcov_path) == normalize_path(query_path)
+}
+
+/// Apply matching strategies sequentially to find a match
+///
+/// Uses sequential iteration for smaller datasets (≤20 items) to avoid parallel overhead.
+/// Applies three matching strategies in order until a match is found.
+///
+/// # Arguments
+/// * `functions` - HashMap of file paths to function coverage data
+/// * `query_path` - The path to search for
+///
+/// # Returns
+/// Reference to function coverage data if found, None otherwise
+#[allow(dead_code)]
+fn apply_strategies_sequential<'a>(
+    functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
+    query_path: &Path,
+) -> Option<&'a Vec<FunctionCoverage>> {
+    functions
+        .iter()
+        .find(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
+        .map(|(_, funcs)| funcs)
+        .or_else(|| {
+            functions
+                .iter()
+                .find(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+        .or_else(|| {
+            functions
+                .iter()
+                .find(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+}
+
+/// Apply matching strategies in parallel to find a match
+///
+/// Uses parallel iteration for larger datasets (>20 items) to improve performance.
+/// Applies three matching strategies using rayon's parallel iterator until a match is found.
+///
+/// # Arguments
+/// * `functions` - HashMap of file paths to function coverage data
+/// * `query_path` - The path to search for
+///
+/// # Returns
+/// Reference to function coverage data if found, None otherwise
+#[allow(dead_code)]
+fn apply_strategies_parallel<'a>(
+    functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
+    query_path: &Path,
+) -> Option<&'a Vec<FunctionCoverage>> {
+    functions
+        .par_iter()
+        .find_any(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
+        .map(|(_, funcs)| funcs)
+        .or_else(|| {
+            functions
+                .par_iter()
+                .find_any(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+        .or_else(|| {
+            functions
+                .par_iter()
+                .find_any(|(lcov_path, _)| {
+                    matches_normalized_equality_strategy(query_path, lcov_path)
+                })
+                .map(|(_, funcs)| funcs)
+        })
+}
+
 /// Find functions by normalizing and matching paths
-/// This handles cases where LCOV has relative paths but queries use absolute paths, or vice versa
+///
+/// This is the main entry point for path-based function lookup. It automatically chooses
+/// between parallel and sequential search based on dataset size and applies multiple
+/// matching strategies to handle various path format combinations.
+///
+/// # Path Matching Strategies
+/// The function tries three strategies in order:
+/// 1. Suffix matching - query path ends with LCOV path
+/// 2. Reverse suffix matching - LCOV path ends with normalized query
+/// 3. Normalized equality - both paths equal after normalization
+///
+/// # Performance
+/// - Uses parallel search (rayon) for >20 items
+/// - Uses sequential search for ≤20 items to avoid parallel overhead
+///
+/// # Arguments
+/// * `functions` - HashMap mapping file paths to their function coverage data
+/// * `query_path` - The path to search for
+///
+/// # Returns
+/// Reference to the function coverage data if found, None otherwise
+///
+/// # Example
+/// ```ignore
+/// use std::collections::HashMap;
+/// use std::path::PathBuf;
+///
+/// let mut functions = HashMap::new();
+/// let coverage = vec![/* FunctionCoverage data */];
+/// functions.insert(PathBuf::from("src/main.rs"), coverage);
+///
+/// let query = PathBuf::from("./src/main.rs");
+/// // Finds the functions using normalized path matching
+/// ```
 #[allow(dead_code)]
 fn find_functions_by_path<'a>(
     functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
     query_path: &Path,
 ) -> Option<&'a Vec<FunctionCoverage>> {
-    // Strategy 1: Direct lookup (already tried by caller)
-
-    // Use parallel search for large function maps
     if functions.len() > 20 {
-        // Strategy 2: Check if query path ends with any LCOV path (parallel)
-        functions
-            .par_iter()
-            .find_any(|(lcov_path, _)| query_path.ends_with(lcov_path))
-            .map(|(_, funcs)| funcs)
-            .or_else(|| {
-                // Strategy 3: Check if any LCOV path ends with query path (parallel)
-                let normalized_query = normalize_path(query_path);
-                functions
-                    .par_iter()
-                    .find_any(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
-                    .map(|(_, funcs)| funcs)
-            })
-            .or_else(|| {
-                // Strategy 4: Strip leading ./ from either path and compare (parallel)
-                let normalized_query = normalize_path(query_path);
-                functions
-                    .par_iter()
-                    .find_any(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
-                    .map(|(_, funcs)| funcs)
-            })
+        apply_strategies_parallel(functions, query_path)
     } else {
-        // Use sequential search for smaller maps to avoid parallel overhead
-        functions
-            .iter()
-            .find(|(lcov_path, _)| query_path.ends_with(lcov_path))
-            .map(|(_, funcs)| funcs)
-            .or_else(|| {
-                let normalized_query = normalize_path(query_path);
-                functions
-                    .iter()
-                    .find(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
-                    .map(|(_, funcs)| funcs)
-            })
-            .or_else(|| {
-                let normalized_query = normalize_path(query_path);
-                functions
-                    .iter()
-                    .find(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
-                    .map(|(_, funcs)| funcs)
-            })
+        apply_strategies_sequential(functions, query_path)
     }
 }
 
 /// Normalize a path by removing leading ./ and resolving components
+///
+/// This is a pure function that standardizes path representation for matching.
+/// It's idempotent: normalizing an already-normalized path returns the same path.
+///
+/// # Arguments
+/// * `path` - The path to normalize
+///
+/// # Returns
+/// A new PathBuf with leading "./" removed
+///
+/// # Example
+/// ```ignore
+/// use std::path::PathBuf;
+///
+/// let path = PathBuf::from("./src/main.rs");
+/// // normalize_path removes the leading "./"
+/// // Result: "src/main.rs"
+///
+/// // Idempotent - normalizing again gives same result
+/// ```
 #[allow(dead_code)]
 fn normalize_path(path: &Path) -> PathBuf {
     // Convert to string, remove leading ./
@@ -729,5 +875,432 @@ end_of_record
 
         assert_eq!(data.get_overall_coverage(), 0.0);
         assert_eq!(data.functions.len(), 0);
+    }
+
+    // Tests for find_functions_by_path
+    mod find_functions_by_path_tests {
+        use super::*;
+
+        fn create_test_function_coverage(name: &str) -> Vec<FunctionCoverage> {
+            vec![FunctionCoverage {
+                name: name.to_string(),
+                start_line: 10,
+                execution_count: 5,
+                coverage_percentage: 60.0,
+                uncovered_lines: vec![12, 13],
+            }]
+        }
+
+        #[test]
+        fn test_strategy_1_suffix_matching_sequential() {
+            // Test Strategy 1: query_path.ends_with(lcov_path)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/main.rs"),
+                create_test_function_coverage("main"),
+            );
+
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "main");
+        }
+
+        #[test]
+        fn test_strategy_2_reverse_suffix_matching_sequential() {
+            // Test Strategy 2: lcov_path.ends_with(normalized_query)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("/home/user/project/src/lib.rs"),
+                create_test_function_coverage("lib_func"),
+            );
+
+            let query = PathBuf::from("./src/lib.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "lib_func");
+        }
+
+        #[test]
+        fn test_strategy_3_normalized_equality_sequential() {
+            // Test Strategy 3: normalize_path(lcov_path) == normalize_path(query_path)
+            // Sequential path (<=20 items)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("./src/utils.rs"),
+                create_test_function_coverage("util_func"),
+            );
+
+            let query = PathBuf::from("src/utils.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "util_func");
+        }
+
+        #[test]
+        fn test_strategy_1_suffix_matching_parallel() {
+            // Test Strategy 1 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target
+            functions.insert(
+                PathBuf::from("src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            let query = PathBuf::from("/home/user/project/src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_strategy_2_reverse_suffix_matching_parallel() {
+            // Test Strategy 2 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target with absolute path
+            functions.insert(
+                PathBuf::from("/home/user/project/src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            // Query with relative path
+            let query = PathBuf::from("./src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_strategy_3_normalized_equality_parallel() {
+            // Test Strategy 3 with >20 items (parallel path)
+            let mut functions = HashMap::new();
+
+            // Add 21 items to trigger parallel path
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            // Add our target with ./ prefix
+            functions.insert(
+                PathBuf::from("./src/target.rs"),
+                create_test_function_coverage("target_func"),
+            );
+
+            // Query without ./ prefix
+            let query = PathBuf::from("src/target.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "target_func");
+        }
+
+        #[test]
+        fn test_no_match_found() {
+            // Test when no strategy matches
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/main.rs"),
+                create_test_function_coverage("main"),
+            );
+
+            let query = PathBuf::from("src/different.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_empty_map() {
+            // Test with empty function map
+            let functions = HashMap::new();
+            let query = PathBuf::from("src/main.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_single_item_map() {
+            // Test edge case with exactly 1 item (sequential path)
+            let mut functions = HashMap::new();
+            functions.insert(
+                PathBuf::from("src/single.rs"),
+                create_test_function_coverage("single_func"),
+            );
+
+            let query = PathBuf::from("./src/single.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "single_func");
+        }
+
+        #[test]
+        fn test_exactly_20_items() {
+            // Test boundary case with exactly 20 items (should use sequential)
+            let mut functions = HashMap::new();
+
+            for i in 0..20 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            let query = PathBuf::from("./src/file_10.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "func_10");
+        }
+
+        #[test]
+        fn test_exactly_21_items() {
+            // Test boundary case with exactly 21 items (should use parallel)
+            let mut functions = HashMap::new();
+
+            for i in 0..21 {
+                functions.insert(
+                    PathBuf::from(format!("src/file_{}.rs", i)),
+                    create_test_function_coverage(&format!("func_{}", i)),
+                );
+            }
+
+            let query = PathBuf::from("./src/file_10.rs");
+            let result = find_functions_by_path(&functions, &query);
+
+            assert!(result.is_some());
+            assert_eq!(result.unwrap()[0].name, "func_10");
+        }
+
+        #[test]
+        fn test_normalize_path_idempotency() {
+            // Test that normalize_path is idempotent
+            let path1 = PathBuf::from("./src/main.rs");
+            let normalized1 = normalize_path(&path1);
+            let normalized2 = normalize_path(&normalized1);
+
+            assert_eq!(normalized1, normalized2);
+        }
+
+        #[test]
+        fn test_normalize_path_removes_leading_dot_slash() {
+            // Test that normalize_path removes leading ./
+            let path = PathBuf::from("./src/main.rs");
+            let normalized = normalize_path(&path);
+
+            assert_eq!(normalized, PathBuf::from("src/main.rs"));
+        }
+
+        #[test]
+        fn test_normalize_path_no_leading_dot_slash() {
+            // Test that normalize_path doesn't affect paths without leading ./
+            let path = PathBuf::from("src/main.rs");
+            let normalized = normalize_path(&path);
+
+            assert_eq!(normalized, PathBuf::from("src/main.rs"));
+        }
+    }
+
+    // Tests for extracted strategy functions
+    mod strategy_tests {
+        use super::*;
+
+        #[test]
+        fn test_matches_suffix_strategy_basic() {
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let lcov = PathBuf::from("src/main.rs");
+
+            assert!(matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_suffix_strategy_no_match() {
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let lcov = PathBuf::from("src/lib.rs");
+
+            assert!(!matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_suffix_strategy_exact_match() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("src/main.rs");
+
+            assert!(matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_basic() {
+            let query = PathBuf::from("./src/lib.rs");
+            let lcov = PathBuf::from("/home/user/project/src/lib.rs");
+
+            assert!(matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_no_match() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("/home/user/project/src/lib.rs");
+
+            assert!(!matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_with_normalization() {
+            let query = PathBuf::from("./src/utils.rs");
+            let lcov = PathBuf::from("/home/user/src/utils.rs");
+
+            assert!(matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_basic() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("./src/main.rs");
+
+            assert!(matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_both_normalized() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("./src/main.rs");
+
+            assert!(matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_no_match() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("src/lib.rs");
+
+            assert!(!matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_different_depths() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("./lib/main.rs");
+
+            assert!(!matches_normalized_equality_strategy(&query, &lcov));
+        }
+    }
+
+    // Property-based tests
+    #[cfg(test)]
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn test_normalize_path_idempotent(path in "[a-z/]+\\.rs") {
+                let path_buf = PathBuf::from(&path);
+                let normalized1 = normalize_path(&path_buf);
+                let normalized2 = normalize_path(&normalized1);
+
+                prop_assert_eq!(normalized1, normalized2);
+            }
+
+            #[test]
+            fn test_normalize_path_removes_leading_dot_slash_property(path in "[a-z/]+\\.rs") {
+                let with_dot = PathBuf::from(format!("./{}", path));
+                let without_dot = PathBuf::from(&path);
+
+                prop_assert_eq!(normalize_path(&with_dot), normalize_path(&without_dot));
+            }
+
+            #[test]
+            fn test_suffix_strategy_reflexive(path in "[a-z/]+\\.rs") {
+                let path_buf = PathBuf::from(&path);
+
+                // A path always matches itself with suffix strategy
+                prop_assert!(matches_suffix_strategy(&path_buf, &path_buf));
+            }
+
+            #[test]
+            fn test_normalized_equality_symmetric(path in "[a-z/]+\\.rs") {
+                let path1 = PathBuf::from(&path);
+                let path2 = PathBuf::from(format!("./{}", path));
+
+                // Normalized equality should be symmetric
+                prop_assert_eq!(
+                    matches_normalized_equality_strategy(&path1, &path2),
+                    matches_normalized_equality_strategy(&path2, &path1)
+                );
+            }
+
+            #[test]
+            fn test_find_functions_with_large_dataset(count in 50usize..150) {
+                // Test parallel path with varying sizes
+                let mut functions = HashMap::new();
+
+                for i in 0..count {
+                    functions.insert(
+                        PathBuf::from(format!("src/file_{}.rs", i)),
+                        vec![FunctionCoverage {
+                            name: format!("func_{}", i),
+                            start_line: 10,
+                            execution_count: 5,
+                            coverage_percentage: 60.0,
+                            uncovered_lines: vec![12, 13],
+                        }],
+                    );
+                }
+
+                // Should find the target regardless of dataset size
+                let query = PathBuf::from("./src/file_42.rs");
+                let result = find_functions_by_path(&functions, &query);
+
+                if count > 42 {
+                    prop_assert!(result.is_some());
+                    if let Some(funcs) = result {
+                        prop_assert_eq!(&funcs[0].name, "func_42");
+                    }
+                }
+            }
+
+            #[test]
+            fn test_strategies_handle_empty_paths_gracefully(s in ".*") {
+                let path1 = PathBuf::from(&s);
+                let path2 = PathBuf::from(&s);
+
+                // Should not panic with any input
+                let _ = matches_suffix_strategy(&path1, &path2);
+                let _ = matches_reverse_suffix_strategy(&path1, &path2);
+                let _ = matches_normalized_equality_strategy(&path1, &path2);
+
+                prop_assert!(true);
+            }
+        }
     }
 }

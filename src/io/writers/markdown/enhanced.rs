@@ -40,33 +40,12 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
             return Ok(());
         }
 
-        writeln!(self.writer(), "### Top {} Priority Items", top_items.len())?;
-        writeln!(self.writer())?;
-        writeln!(self.writer(), "| Rank | Score | Function | Type | Issue |")?;
-        writeln!(self.writer(), "|------|-------|----------|------|-------|")?;
-
-        for (idx, item) in top_items.iter().enumerate() {
-            let rank = idx + 1;
-            let score = format!("{:.1}", item.unified_score.final_score);
-            let location = format!("{}:{}", item.location.file.display(), item.location.line);
-            let debt_type = format_debt_type(&item.debt_type);
-            let issue = format_debt_issue(&item.debt_type);
-
-            writeln!(
-                self.writer(),
-                "| {} | {} | `{}` | {} | {} |",
-                rank,
-                score,
-                location,
-                debt_type,
-                issue
-            )?;
-        }
-        writeln!(self.writer())?;
+        let items_vec: Vec<UnifiedDebtItem> = top_items.iter().cloned().collect();
+        let table = build_priority_table(&items_vec);
+        write!(self.writer(), "{}", table)?;
 
         // Add score breakdown if verbosity is enabled
         if self.verbosity() > 0 {
-            let items_vec: Vec<UnifiedDebtItem> = top_items.iter().cloned().collect();
             self.write_score_breakdown(&items_vec)?;
         }
 
@@ -141,6 +120,70 @@ impl<W: Write> MarkdownWriter<W> {
         write!(self.writer(), "{}", breakdown)?;
         Ok(())
     }
+}
+
+// Pure functions for formatting priority table
+/// Builds the complete priority table from a list of debt items.
+///
+/// This function orchestrates the creation of a markdown-formatted table showing
+/// the top priority technical debt items. It combines the header and all rows
+/// into a single string output.
+///
+/// # Arguments
+/// * `items` - Slice of unified debt items to display in the table
+///
+/// # Returns
+/// A string containing the complete markdown table with header and all rows
+fn build_priority_table(items: &[UnifiedDebtItem]) -> String {
+    let mut table = format_priority_table_header(items.len());
+
+    for (idx, item) in items.iter().enumerate() {
+        let rank = idx + 1;
+        table.push_str(&format_priority_table_row(rank, item));
+    }
+
+    table.push('\n');
+    table
+}
+
+/// Formats the header section for the priority table.
+///
+/// Creates a markdown section header and table column headers for the priority
+/// items table.
+///
+/// # Arguments
+/// * `item_count` - Number of items to mention in the section header
+///
+/// # Returns
+/// A string containing the markdown header and table column definitions
+fn format_priority_table_header(item_count: usize) -> String {
+    format!(
+        "### Top {} Priority Items\n\n| Rank | Score | Function | Type | Issue |\n|------|-------|----------|------|-------|\n",
+        item_count
+    )
+}
+
+/// Formats a single row for the priority table.
+///
+/// Creates a markdown table row with the debt item's rank, priority score,
+/// location, type, and issue description.
+///
+/// # Arguments
+/// * `rank` - The ranking position of this item (1-indexed)
+/// * `item` - The unified debt item to format
+///
+/// # Returns
+/// A string containing the markdown table row with newline
+fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
+    let score = format!("{:.1}", item.unified_score.final_score);
+    let location = format!("{}:{}", item.location.file.display(), item.location.line);
+    let debt_type = format_debt_type(&item.debt_type);
+    let issue = format_debt_issue(&item.debt_type);
+
+    format!(
+        "| {} | {} | `{}` | {} | {} |\n",
+        rank, score, location, debt_type, issue
+    )
 }
 
 // Pure functions for formatting score breakdown
@@ -246,6 +289,83 @@ mod tests {
             god_object_indicators: None,
             tier: None,
         }
+    }
+
+    #[test]
+    fn test_build_priority_table_empty() {
+        let items: Vec<UnifiedDebtItem> = vec![];
+        let table = build_priority_table(&items);
+
+        // Empty case should still have header
+        assert!(table.contains("### Top 0 Priority Items"));
+        assert!(table.contains("| Rank | Score | Function | Type | Issue |"));
+    }
+
+    #[test]
+    fn test_build_priority_table_single_item() {
+        let items = vec![create_test_item("function_one", 9.0)];
+        let table = build_priority_table(&items);
+
+        assert!(table.contains("### Top 1 Priority Items"));
+        assert!(table.contains("| 1 |"));
+        assert!(table.contains("| 9.0 |"));
+        assert!(table.contains("| `test.rs:10` |"));
+    }
+
+    #[test]
+    fn test_build_priority_table_multiple_items() {
+        let items = vec![
+            create_test_item("function_one", 9.0),
+            create_test_item("function_two", 7.5),
+            create_test_item("function_three", 6.0),
+        ];
+        let table = build_priority_table(&items);
+
+        assert!(table.contains("### Top 3 Priority Items"));
+        assert!(table.contains("| 1 |"));
+        assert!(table.contains("| 9.0 |"));
+        assert!(table.contains("| 2 |"));
+        assert!(table.contains("| 7.5 |"));
+        assert!(table.contains("| 3 |"));
+        assert!(table.contains("| 6.0 |"));
+    }
+
+    #[test]
+    fn test_format_priority_table_header() {
+        let header = format_priority_table_header(5);
+
+        assert!(header.contains("### Top 5 Priority Items"));
+        assert!(header.contains("| Rank | Score | Function | Type | Issue |"));
+        assert!(header.contains("|------|-------|----------|------|-------|"));
+    }
+
+    #[test]
+    fn test_format_priority_table_header_single_item() {
+        let header = format_priority_table_header(1);
+
+        assert!(header.contains("### Top 1 Priority Items"));
+    }
+
+    #[test]
+    fn test_format_priority_table_row() {
+        let item = create_test_item("my_complex_function", 23.78);
+        let row = format_priority_table_row(1, &item);
+
+        assert!(row.contains("| 1 |"));
+        assert!(row.contains("| 23.8 |"));
+        assert!(row.contains("| `test.rs:10` |"));
+        assert!(row.contains("Complexity"));
+    }
+
+    #[test]
+    fn test_format_priority_table_row_formatting() {
+        let item = create_test_item("another_function", 15.5);
+        let row = format_priority_table_row(5, &item);
+
+        // Should be a proper markdown table row
+        assert!(row.starts_with("| 5 |"));
+        assert!(row.contains("| 15.5 |"));
+        assert!(row.ends_with("|\n"));
     }
 
     #[test]

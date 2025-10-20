@@ -364,6 +364,31 @@ impl PythonCircularRefDetector {
     }
 }
 
+impl PythonCircularRefDetector {
+    fn find_circular_patterns_in_methods(
+        &self,
+        class_def: &ast::StmtClassDef,
+    ) -> Vec<ResourceIssue> {
+        class_def
+            .body
+            .iter()
+            .filter_map(|stmt| {
+                // Guard clause: only process FunctionDef
+                if let Stmt::FunctionDef(func) = stmt {
+                    Some(func)
+                } else {
+                    None
+                }
+            })
+            .flat_map(|func| {
+                func.body.iter().filter_map(|func_stmt| {
+                    self.check_for_circular_pattern(func_stmt, &class_def.name)
+                })
+            })
+            .collect()
+    }
+}
+
 impl PythonResourceDetector for PythonCircularRefDetector {
     fn detect_issues(&self, module: &ast::Mod, _path: &Path) -> Vec<ResourceIssue> {
         let classes = self.analyze_classes(module);
@@ -373,18 +398,9 @@ impl PythonResourceDetector for PythonCircularRefDetector {
         if let ast::Mod::Module(module) = module {
             for stmt in &module.body {
                 if let Stmt::ClassDef(class_def) = stmt {
-                    // Check for circular reference patterns
-                    for class_stmt in &class_def.body {
-                        if let Stmt::FunctionDef(func) = class_stmt {
-                            for func_stmt in &func.body {
-                                if let Some(issue) =
-                                    self.check_for_circular_pattern(func_stmt, &class_def.name)
-                                {
-                                    issues.push(issue);
-                                }
-                            }
-                        }
-                    }
+                    // Use helper function to reduce nesting
+                    let pattern_issues = self.find_circular_patterns_in_methods(class_def);
+                    issues.extend(pattern_issues);
                 }
             }
         }
