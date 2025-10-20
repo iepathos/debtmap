@@ -588,6 +588,12 @@ pub struct TwoPassExtractor {
     cross_module_context: Option<CrossModuleContext>,
     /// Callback tracker for deferred callback resolution
     callback_tracker: crate::analysis::python_call_graph::CallbackTracker,
+    /// Observer registry for tracking observer patterns
+    observer_registry:
+        std::sync::Arc<crate::analysis::python_call_graph::observer_registry::ObserverRegistry>,
+    /// Pending for loops that may contain observer dispatches (to be resolved after all classes are processed)
+    /// Format: (for_stmt, caller_id, current_class)
+    pending_observer_dispatches: Vec<(ast::StmtFor, FunctionId, Option<String>)>,
 }
 
 /// Helper function to extract callback expression as a string
@@ -656,6 +662,10 @@ impl TwoPassExtractor {
             source_lines: Vec::new(),
             cross_module_context: None,
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
+            observer_registry: std::sync::Arc::new(
+                crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
+            ),
+            pending_observer_dispatches: Vec::new(),
         }
     }
 
@@ -673,6 +683,10 @@ impl TwoPassExtractor {
             source_lines,
             cross_module_context: None,
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
+            observer_registry: std::sync::Arc::new(
+                crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
+            ),
+            pending_observer_dispatches: Vec::new(),
         }
     }
 
@@ -690,6 +704,10 @@ impl TwoPassExtractor {
             source_lines,
             cross_module_context: Some(context),
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
+            observer_registry: std::sync::Arc::new(
+                crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
+            ),
+            pending_observer_dispatches: Vec::new(),
         }
     }
 
@@ -747,10 +765,27 @@ impl TwoPassExtractor {
             // Detect frameworks from imports
             self.type_tracker.detect_frameworks_from_imports();
 
-            // Second pass: Analyze functions and collect calls
+            // Second pass: Register observer interfaces (classes that inherit from ABC)
+            for stmt in &module.body {
+                if let ast::Stmt::ClassDef(class_def) = stmt {
+                    self.register_observer_interfaces(class_def);
+                }
+            }
+
+            // Third pass: Analyze functions and collect calls
             for stmt in &module.body {
                 self.analyze_stmt_phase_one(stmt);
             }
+
+            // Fourth pass: Register observer implementations now that all functions are in function_name_map
+            for stmt in &module.body {
+                if let ast::Stmt::ClassDef(class_def) = stmt {
+                    self.register_observer_implementations(class_def);
+                }
+            }
+
+            // Fifth pass: Resolve observer dispatches now that all implementations are registered
+            self.resolve_pending_observer_dispatches();
         }
     }
 
@@ -760,6 +795,9 @@ impl TwoPassExtractor {
             ast::Stmt::ClassDef(class_def) => {
                 // Extract class information
                 self.type_tracker.extract_class_info(class_def);
+
+                // Populate observer registry from class definition
+                self.populate_observer_registry(class_def);
 
                 let prev_class = self.current_class.clone();
                 self.current_class = Some(class_def.name.to_string());
@@ -1040,6 +1078,17 @@ impl TwoPassExtractor {
             }
             ast::Stmt::For(for_stmt) => {
                 self.analyze_expr_for_calls(&for_stmt.iter);
+
+                // Store for loop for later observer dispatch detection
+                // (after all classes and their implementations have been registered)
+                if let Some(caller) = self.current_function.clone() {
+                    self.pending_observer_dispatches.push((
+                        for_stmt.clone(),
+                        caller,
+                        self.current_class.clone(),
+                    ));
+                }
+
                 for stmt in &for_stmt.body {
                     self.analyze_stmt_in_function(stmt);
                 }
@@ -1184,6 +1233,202 @@ impl TwoPassExtractor {
                 is_imported: false,
                 import_context: None,
             },
+        }
+    }
+
+    /// Infer observer interface name from collection field name
+    ///
+    /// E.g., "listeners" -> "Listener", "observers" -> "Observer", "handlers" -> "Handler"
+    fn infer_interface_from_field_name(&self, field_name: &str) -> String {
+        // Convert plural to singular and capitalize
+        // Simple heuristic: remove trailing 's' and capitalize first letter
+        let singular = if let Some(stripped) = field_name.strip_suffix('s') {
+            stripped
+        } else {
+            field_name
+        };
+
+        // Capitalize first letter
+        let mut chars = singular.chars();
+        match chars.next() {
+            None => "Observer".to_string(), // Fallback
+            Some(first) => first.to_uppercase().chain(chars).collect(),
+        }
+    }
+
+    /// Register observer interfaces (classes that inherit from ABC) in the first pass
+    fn register_observer_interfaces(&mut self, class_def: &ast::StmtClassDef) {
+        let class_name = &class_def.name;
+
+        // Check if this class inherits from ABC (making it an observer interface)
+        let has_abc_base = class_def.bases.iter().any(|base| {
+            if let ast::Expr::Name(name) = base {
+                name.id.as_str() == "ABC"
+            } else {
+                false
+            }
+        });
+
+        // If this class inherits from ABC, register it as an observer interface
+        if has_abc_base {
+            std::sync::Arc::get_mut(&mut self.observer_registry)
+                .unwrap()
+                .register_interface(class_name);
+        }
+    }
+
+    /// Populate observer registry from class definition
+    fn populate_observer_registry(&mut self, class_def: &ast::StmtClassDef) {
+        use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
+
+        let class_name = &class_def.name;
+
+        // Check for observer collections in __init__ method
+        for stmt in &class_def.body {
+            if let ast::Stmt::FunctionDef(func_def) = stmt {
+                if func_def.name.as_str() == "__init__" {
+                    // Look for self.observers = [], self.listeners = [], etc.
+                    for init_stmt in &func_def.body {
+                        if let ast::Stmt::Assign(assign) = init_stmt {
+                            for target in &assign.targets {
+                                if let ast::Expr::Attribute(attr) = target {
+                                    if let ast::Expr::Name(name) = &*attr.value {
+                                        if name.id.as_str() == "self" {
+                                            let field_name = attr.attr.as_str();
+                                            if ObserverRegistry::is_observer_collection_name(
+                                                field_name,
+                                            ) {
+                                                // Infer interface type from field name
+                                                // e.g., "listeners" -> "Listener", "observers" -> "Observer"
+                                                let interface_name = self
+                                                    .infer_interface_from_field_name(field_name);
+
+                                                // Register the collection
+                                                std::sync::Arc::get_mut(
+                                                    &mut self.observer_registry,
+                                                )
+                                                .unwrap()
+                                                .register_collection(
+                                                    class_name,
+                                                    field_name,
+                                                    &interface_name,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Register observer implementations (concrete classes that implement observer interfaces)
+    /// This must be called after all functions are registered in function_name_map
+    fn register_observer_implementations(&mut self, class_def: &ast::StmtClassDef) {
+        let class_name = &class_def.name;
+
+        // Check if any base class is a registered observer interface
+        for base in &class_def.bases {
+            if let ast::Expr::Name(base_name) = base {
+                let interface_name = base_name.id.to_string();
+
+                // Check if the base class is a registered observer interface
+                let is_observer_impl = std::sync::Arc::get_mut(&mut self.observer_registry)
+                    .unwrap()
+                    .is_interface(&interface_name);
+
+                if is_observer_impl {
+                    // Register class-to-interface mapping
+                    std::sync::Arc::get_mut(&mut self.observer_registry)
+                        .unwrap()
+                        .register_class_interface(class_name, &interface_name);
+
+                    // Register method implementations
+                    for stmt in &class_def.body {
+                        if let ast::Stmt::FunctionDef(method_def) = stmt {
+                            // Skip __init__ and other special methods
+                            if !method_def.name.starts_with("__") {
+                                let func_name = format!("{}.{}", class_name, method_def.name);
+
+                                // Look up the FunctionId from the function_name_map to get the correct line number
+                                let func_id = if let Some(existing_id) =
+                                    self.function_name_map.get(&func_name)
+                                {
+                                    existing_id.clone()
+                                } else {
+                                    // Fallback: create a new FunctionId (shouldn't happen in normal flow)
+                                    FunctionId {
+                                        file: self.type_tracker.file_path.clone(),
+                                        name: func_name.clone(),
+                                        line: self.estimate_line_number(&func_name),
+                                    }
+                                };
+
+                                let registry_mut =
+                                    std::sync::Arc::get_mut(&mut self.observer_registry).unwrap();
+                                registry_mut.register_implementation(
+                                    &interface_name,
+                                    &method_def.name,
+                                    func_id.clone(),
+                                );
+                                // Also register under generic "Observer" for heuristic matching
+                                registry_mut.register_implementation(
+                                    "Observer",
+                                    &method_def.name,
+                                    func_id,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Resolve all pending observer dispatches after all classes have been registered
+    fn resolve_pending_observer_dispatches(&mut self) {
+        // Clone the pending dispatches to avoid borrowing issues
+        let pending = std::mem::take(&mut self.pending_observer_dispatches);
+
+        for (for_stmt, caller, current_class) in pending {
+            // Temporarily set current_class for detection
+            let saved_class = self.current_class.clone();
+            self.current_class = current_class;
+
+            self.detect_observer_dispatch(&for_stmt, &caller);
+
+            // Restore previous current_class
+            self.current_class = saved_class;
+        }
+    }
+
+    /// Detect observer dispatch patterns in for loops
+    fn detect_observer_dispatch(&mut self, for_stmt: &ast::StmtFor, caller: &FunctionId) {
+        use crate::analysis::python_call_graph::observer_dispatch::ObserverDispatchDetector;
+
+        let detector = ObserverDispatchDetector::new(self.observer_registry.clone());
+        let dispatches =
+            detector.detect_in_for_loop(for_stmt, self.current_class.as_deref(), caller);
+
+        // Store detected dispatches for resolution in phase two
+        for dispatch in dispatches {
+            // Look up implementations for this observer method
+            if let Some(interface) = &dispatch.observer_interface {
+                let impls = self
+                    .observer_registry
+                    .get_implementations(interface, &dispatch.method_name);
+                for impl_func_id in impls {
+                    // Create call edge from dispatcher to implementation
+                    self.call_graph.add_call(FunctionCall {
+                        caller: dispatch.caller_id.clone(),
+                        callee: impl_func_id.clone(),
+                        call_type: CallType::ObserverDispatch,
+                    });
+                }
+            }
         }
     }
 
