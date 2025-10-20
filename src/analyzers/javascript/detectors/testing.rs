@@ -1307,7 +1307,7 @@ mod tests {
         // Verify the query has the expected capture count
         // The query should have captures for: func, test_name, body, test_call
         assert!(
-            query.capture_names().len() > 0,
+            !query.capture_names().is_empty(),
             "Query should have capture names"
         );
     }
@@ -1325,7 +1325,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            let func = extract_test_function_name(&match_);
+            let func = extract_test_function_name(match_);
             assert!(func.is_some(), "Should extract function name");
         } else {
             panic!("Query should match the test code");
@@ -1655,7 +1655,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            let name = extract_test_name(&match_);
+            let name = extract_test_name(match_);
             assert!(name.is_some(), "Should extract test name");
         } else {
             panic!("Query should match the test code");
@@ -1675,7 +1675,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            let body = extract_test_body(&match_);
+            let body = extract_test_body(match_);
             assert!(body.is_some(), "Should extract test body");
         } else {
             panic!("Query should match the test code");
@@ -1695,7 +1695,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            if let Some(name_node) = extract_test_name(&match_) {
+            if let Some(name_node) = extract_test_name(match_) {
                 let name = parse_test_name(*name_node, source);
                 assert_eq!(
                     name, "example test",
@@ -1718,7 +1718,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            if let Some(name_node) = extract_test_name(&match_) {
+            if let Some(name_node) = extract_test_name(match_) {
                 let name = parse_test_name(*name_node, source);
                 assert_eq!(
                     name, "example test",
@@ -1741,7 +1741,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            if let Some(name_node) = extract_test_name(&match_) {
+            if let Some(name_node) = extract_test_name(match_) {
                 let name = parse_test_name(*name_node, source);
                 assert_eq!(
                     name, "example test",
@@ -1764,7 +1764,7 @@ mod tests {
         let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
 
         if let Some(match_) = matches.next() {
-            if let Some(body_node) = extract_test_body(&match_) {
+            if let Some(body_node) = extract_test_body(match_) {
                 let issue = create_async_test_issue(*body_node, "async test".to_string());
 
                 if let TestingAntiPattern::AsyncTestIssue {

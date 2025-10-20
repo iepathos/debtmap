@@ -123,7 +123,7 @@ impl ObserverDispatchDetector {
         let mut confidence: f32 = 0.85; // Base confidence
 
         // Extract field name from collection expression
-        let field_name = collection_expr.split('.').last().unwrap_or("");
+        let field_name = collection_expr.split('.').next_back().unwrap_or("");
 
         // Higher confidence for known observer collection names
         if ObserverRegistry::is_observer_collection_name(field_name) {

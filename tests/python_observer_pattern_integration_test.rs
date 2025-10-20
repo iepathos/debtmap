@@ -37,7 +37,6 @@ class ConcreteObserver(Observer):
     // Find ConcreteObserver.on_event
     let on_event_functions: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("ConcreteObserver.on_event"))
         .collect();
 
@@ -96,7 +95,6 @@ class ViewListener(Listener):
     // Find the call edge
     let view_listener_funcs: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("ViewListener.on_change"))
         .collect();
 
@@ -153,13 +151,11 @@ class HandlerB(Handler):
     // Both HandlerA.handle and HandlerB.handle should have callers
     let handler_a: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("HandlerA.handle"))
         .collect();
 
     let handler_b: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("HandlerB.handle"))
         .collect();
 
@@ -207,7 +203,6 @@ class LogCallback(Callback):
     // LogCallback.on_complete should have callers even though notification is inline
     let log_callback: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("LogCallback.on_complete"))
         .collect();
 
@@ -244,7 +239,6 @@ class DataItem:
     // (because "items" is not a recognized observer collection name)
     let data_item_funcs: Vec<_> = call_graph
         .get_all_functions()
-        .into_iter()
         .filter(|f| f.name.contains("DataItem.process"))
         .collect();
 

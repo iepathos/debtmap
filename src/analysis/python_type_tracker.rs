@@ -1242,8 +1242,8 @@ impl TwoPassExtractor {
     fn infer_interface_from_field_name(&self, field_name: &str) -> String {
         // Convert plural to singular and capitalize
         // Simple heuristic: remove trailing 's' and capitalize first letter
-        let singular = if field_name.ends_with('s') {
-            &field_name[..field_name.len() - 1]
+        let singular = if let Some(stripped) = field_name.strip_suffix('s') {
+            stripped
         } else {
             field_name
         };
@@ -1300,7 +1300,8 @@ impl TwoPassExtractor {
                                             ) {
                                                 // Infer interface type from field name
                                                 // e.g., "listeners" -> "Listener", "observers" -> "Observer"
-                                                let interface_name = self.infer_interface_from_field_name(field_name);
+                                                let interface_name = self
+                                                    .infer_interface_from_field_name(field_name);
 
                                                 // Register the collection
                                                 std::sync::Arc::get_mut(
@@ -1308,7 +1309,8 @@ impl TwoPassExtractor {
                                                 )
                                                 .unwrap()
                                                 .register_collection(
-                                                    class_name, field_name,
+                                                    class_name,
+                                                    field_name,
                                                     &interface_name,
                                                 );
                                             }
@@ -1321,7 +1323,6 @@ impl TwoPassExtractor {
                 }
             }
         }
-
     }
 
     /// Register observer implementations (concrete classes that implement observer interfaces)
@@ -1353,7 +1354,9 @@ impl TwoPassExtractor {
                                 let func_name = format!("{}.{}", class_name, method_def.name);
 
                                 // Look up the FunctionId from the function_name_map to get the correct line number
-                                let func_id = if let Some(existing_id) = self.function_name_map.get(&func_name) {
+                                let func_id = if let Some(existing_id) =
+                                    self.function_name_map.get(&func_name)
+                                {
                                     existing_id.clone()
                                 } else {
                                     // Fallback: create a new FunctionId (shouldn't happen in normal flow)
