@@ -512,6 +512,54 @@ fn matches_normalized_equality_strategy(query_path: &Path, lcov_path: &Path) -> 
     normalize_path(lcov_path) == normalize_path(query_path)
 }
 
+/// Apply matching strategies sequentially to find a match
+#[allow(dead_code)]
+fn apply_strategies_sequential<'a>(
+    functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
+    query_path: &Path,
+) -> Option<&'a Vec<FunctionCoverage>> {
+    functions
+        .iter()
+        .find(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
+        .map(|(_, funcs)| funcs)
+        .or_else(|| {
+            functions
+                .iter()
+                .find(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+        .or_else(|| {
+            functions
+                .iter()
+                .find(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+}
+
+/// Apply matching strategies in parallel to find a match
+#[allow(dead_code)]
+fn apply_strategies_parallel<'a>(
+    functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
+    query_path: &Path,
+) -> Option<&'a Vec<FunctionCoverage>> {
+    functions
+        .par_iter()
+        .find_any(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
+        .map(|(_, funcs)| funcs)
+        .or_else(|| {
+            functions
+                .par_iter()
+                .find_any(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+        .or_else(|| {
+            functions
+                .par_iter()
+                .find_any(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
+                .map(|(_, funcs)| funcs)
+        })
+}
+
 /// Find functions by normalizing and matching paths
 /// This handles cases where LCOV has relative paths but queries use absolute paths, or vice versa
 #[allow(dead_code)]
@@ -519,42 +567,10 @@ fn find_functions_by_path<'a>(
     functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
     query_path: &Path,
 ) -> Option<&'a Vec<FunctionCoverage>> {
-    // Use parallel search for large function maps
     if functions.len() > 20 {
-        functions
-            .par_iter()
-            .find_any(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
-            .map(|(_, funcs)| funcs)
-            .or_else(|| {
-                functions
-                    .par_iter()
-                    .find_any(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
-                    .map(|(_, funcs)| funcs)
-            })
-            .or_else(|| {
-                functions
-                    .par_iter()
-                    .find_any(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
-                    .map(|(_, funcs)| funcs)
-            })
+        apply_strategies_parallel(functions, query_path)
     } else {
-        // Use sequential search for smaller maps to avoid parallel overhead
-        functions
-            .iter()
-            .find(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
-            .map(|(_, funcs)| funcs)
-            .or_else(|| {
-                functions
-                    .iter()
-                    .find(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
-                    .map(|(_, funcs)| funcs)
-            })
-            .or_else(|| {
-                functions
-                    .iter()
-                    .find(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
-                    .map(|(_, funcs)| funcs)
-            })
+        apply_strategies_sequential(functions, query_path)
     }
 }
 
