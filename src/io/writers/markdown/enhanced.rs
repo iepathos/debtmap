@@ -40,10 +40,8 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
             return Ok(());
         }
 
-        writeln!(self.writer(), "### Top {} Priority Items", top_items.len())?;
-        writeln!(self.writer())?;
-        writeln!(self.writer(), "| Rank | Score | Function | Type | Issue |")?;
-        writeln!(self.writer(), "|------|-------|----------|------|-------|")?;
+        let header = format_priority_table_header(top_items.len());
+        write!(self.writer(), "{}", header)?;
 
         for (idx, item) in top_items.iter().enumerate() {
             let rank = idx + 1;
@@ -132,6 +130,14 @@ impl<W: Write> MarkdownWriter<W> {
 }
 
 // Pure functions for formatting priority table rows
+/// Formats the header section for the priority table
+fn format_priority_table_header(item_count: usize) -> String {
+    format!(
+        "### Top {} Priority Items\n\n| Rank | Score | Function | Type | Issue |\n|------|-------|----------|------|-------|\n",
+        item_count
+    )
+}
+
 /// Formats a single row for the priority table
 fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
     let score = format!("{:.1}", item.unified_score.final_score);
@@ -248,6 +254,22 @@ mod tests {
             god_object_indicators: None,
             tier: None,
         }
+    }
+
+    #[test]
+    fn test_format_priority_table_header() {
+        let header = format_priority_table_header(5);
+
+        assert!(header.contains("### Top 5 Priority Items"));
+        assert!(header.contains("| Rank | Score | Function | Type | Issue |"));
+        assert!(header.contains("|------|-------|----------|------|-------|"));
+    }
+
+    #[test]
+    fn test_format_priority_table_header_single_item() {
+        let header = format_priority_table_header(1);
+
+        assert!(header.contains("### Top 1 Priority Items"));
     }
 
     #[test]
