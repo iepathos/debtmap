@@ -6,24 +6,24 @@ use std::path::{Path, PathBuf};
 fn test_metrics_tracking_integration() {
     let mut metrics = GodObjectMetrics::new();
 
-    // Create a file with many COMPLEX functions (god object)
-    // With complexity weighting, we need actual complexity to trigger detection
+    // Create a file with many COMPLEX IMPURE functions (god object)
+    // With purity weighting, we need impure functions with actual complexity to trigger detection
     let god_object_code = r#"
-        fn function1(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function2(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function3(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function4(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function5(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function6(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function7(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function8(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function9(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function10(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function11(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function12(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function13(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function14(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
-        fn function15(x: i32) -> i32 { if x > 0 { if x > 10 { x * 2 } else { x } } else { 0 } }
+        fn function1(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function2(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function3(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function4(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function5(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function6(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function7(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function8(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function9(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function10(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function11(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function12(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function13(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function14(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
+        fn function15(x: &mut i32) { if *x > 0 { if *x > 10 { *x *= 2 } else { *x += 1 } } else { *x = 0 } }
     "#;
 
     let file = syn::parse_file(god_object_code).expect("Failed to parse");
@@ -78,9 +78,9 @@ fn test_metrics_tracking_integration() {
 fn test_multi_file_metrics_tracking() {
     let mut metrics = GodObjectMetrics::new();
 
-    // File 1: God object with complex functions
+    // File 1: God object with complex IMPURE functions
     let code1 = (0..15)
-        .map(|i| format!("fn func_{}(x: i32) -> i32 {{ if x > 0 {{ if x > 10 {{ x * 2 }} else {{ x }} }} else {{ 0 }} }}", i))
+        .map(|i| format!("fn func_{}(x: &mut i32) {{ if *x > 0 {{ if *x > 10 {{ *x *= 2 }} else {{ *x += 1 }} }} else {{ *x = 0 }} }}", i))
         .collect::<Vec<_>>()
         .join("\n");
     let file1 = syn::parse_file(&code1).expect("Failed to parse");
@@ -147,9 +147,9 @@ fn test_new_god_object_detection() {
 
     metrics.record_snapshot(PathBuf::from("growing.rs"), small_analysis);
 
-    // File grows into a god object with complex functions
+    // File grows into a god object with complex IMPURE functions
     let large_code = (0..15)
-        .map(|i| format!("fn func_{}(x: i32) -> i32 {{ if x > 0 {{ if x > 10 {{ x * 2 }} else {{ x }} }} else {{ 0 }} }}", i))
+        .map(|i| format!("fn func_{}(x: &mut i32) {{ if *x > 0 {{ if *x > 10 {{ *x *= 2 }} else {{ *x += 1 }} }} else {{ *x = 0 }} }}", i))
         .collect::<Vec<_>>()
         .join("\n");
     let large_file = syn::parse_file(&large_code).expect("Failed to parse");

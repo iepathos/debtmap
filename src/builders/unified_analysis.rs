@@ -1272,6 +1272,7 @@ fn create_god_object_analysis(
         recommended_splits: Vec::new(),
         confidence: crate::organization::GodObjectConfidence::Definite,
         responsibilities: Vec::new(),
+        purity_distribution: None,
     })
 }
 
