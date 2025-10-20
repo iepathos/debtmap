@@ -123,7 +123,17 @@ impl<W: Write> MarkdownWriter<W> {
 }
 
 // Pure functions for formatting priority table
-/// Builds the complete priority table from a list of items
+/// Builds the complete priority table from a list of debt items.
+///
+/// This function orchestrates the creation of a markdown-formatted table showing
+/// the top priority technical debt items. It combines the header and all rows
+/// into a single string output.
+///
+/// # Arguments
+/// * `items` - Slice of unified debt items to display in the table
+///
+/// # Returns
+/// A string containing the complete markdown table with header and all rows
 fn build_priority_table(items: &[UnifiedDebtItem]) -> String {
     let mut table = format_priority_table_header(items.len());
 
@@ -136,7 +146,16 @@ fn build_priority_table(items: &[UnifiedDebtItem]) -> String {
     table
 }
 
-/// Formats the header section for the priority table
+/// Formats the header section for the priority table.
+///
+/// Creates a markdown section header and table column headers for the priority
+/// items table.
+///
+/// # Arguments
+/// * `item_count` - Number of items to mention in the section header
+///
+/// # Returns
+/// A string containing the markdown header and table column definitions
 fn format_priority_table_header(item_count: usize) -> String {
     format!(
         "### Top {} Priority Items\n\n| Rank | Score | Function | Type | Issue |\n|------|-------|----------|------|-------|\n",
@@ -144,7 +163,17 @@ fn format_priority_table_header(item_count: usize) -> String {
     )
 }
 
-/// Formats a single row for the priority table
+/// Formats a single row for the priority table.
+///
+/// Creates a markdown table row with the debt item's rank, priority score,
+/// location, type, and issue description.
+///
+/// # Arguments
+/// * `rank` - The ranking position of this item (1-indexed)
+/// * `item` - The unified debt item to format
+///
+/// # Returns
+/// A string containing the markdown table row with newline
 fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
     let score = format!("{:.1}", item.unified_score.final_score);
     let location = format!("{}:{}", item.location.file.display(), item.location.line);
