@@ -371,6 +371,32 @@ fn build_async_test_query(
     Query::new(language, query_string)
 }
 
+fn extract_test_function_name<'a>(
+    match_: &tree_sitter::QueryMatch<'a, '_>,
+) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 0)
+        .map(|c| &c.node)
+}
+
+fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 1)
+        .map(|c| &c.node)
+}
+
+fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+    match_
+        .captures
+        .iter()
+        .find(|c| c.index == 2)
+        .map(|c| &c.node)
+}
+
 fn detect_async_test_issues(
     root: Node,
     source: &str,
@@ -382,23 +408,22 @@ fn detect_async_test_issues(
         let mut matches = cursor.matches(&query, root, source.as_bytes());
 
         while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
+            if let Some(func) = extract_test_function_name(match_) {
+                let func_name = get_node_text(*func, source);
 
                 if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) = (
-                        match_.captures.iter().find(|c| c.index == 1),
-                        match_.captures.iter().find(|c| c.index == 2),
-                    ) {
-                        let test_name = get_node_text(name.node, source)
+                    if let (Some(name), Some(body)) =
+                        (extract_test_name(match_), extract_test_body(match_))
+                    {
+                        let test_name = get_node_text(*name, source)
                             .trim_matches('"')
                             .trim_matches('\'');
-                        let body_text = get_node_text(body.node, source);
+                        let body_text = get_node_text(*body, source);
 
                         // Check if test contains async operations without proper handling
                         if contains_async_operations(body_text) {
                             issues.push(TestingAntiPattern::AsyncTestIssue {
-                                location: SourceLocation::from_node(body.node),
+                                location: SourceLocation::from_node(*body),
                                 test_name: test_name.to_string(),
                                 issue_type: "async operations without await or done callback"
                                     .to_string(),
@@ -850,5 +875,65 @@ mod tests {
             query.capture_names().len() > 0,
             "Query should have capture names"
         );
+    }
+
+    #[test]
+    fn test_extract_test_function_name() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let func = extract_test_function_name(&match_);
+            assert!(func.is_some(), "Should extract function name");
+        } else {
+            panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_extract_test_name() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let name = extract_test_name(&match_);
+            assert!(name.is_some(), "Should extract test name");
+        } else {
+            panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_extract_test_body() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            let body = extract_test_body(&match_);
+            assert!(body.is_some(), "Should extract test body");
+        } else {
+            panic!("Query should match the test code");
+        }
     }
 }
