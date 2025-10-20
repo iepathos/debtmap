@@ -664,7 +664,12 @@ mod tests {
         detect_complex_tests(tree.root_node(), source, &javascript, &mut issues);
         assert_eq!(issues.len(), 1, "Complex test should trigger");
 
-        if let TestingAntiPattern::ComplexTest { test_name, complexity, .. } = &issues[0] {
+        if let TestingAntiPattern::ComplexTest {
+            test_name,
+            complexity,
+            ..
+        } = &issues[0]
+        {
             assert_eq!(test_name, "complex test");
             assert!(complexity > &10, "Complexity should be > 10");
         } else {
@@ -800,14 +805,15 @@ mod tests {
         // This test verifies behavior at the boundary
         let complexity_at_boundary = if issues.is_empty() {
             true
+        } else if let TestingAntiPattern::ComplexTest { complexity, .. } = &issues[0] {
+            complexity > &10
         } else {
-            if let TestingAntiPattern::ComplexTest { complexity, .. } = &issues[0] {
-                complexity > &10
-            } else {
-                false
-            }
+            false
         };
-        assert!(complexity_at_boundary, "Boundary behavior should be consistent");
+        assert!(
+            complexity_at_boundary,
+            "Boundary behavior should be consistent"
+        );
     }
 
     #[test]
@@ -838,7 +844,11 @@ mod tests {
         let tree = parser.parse(source, None).unwrap();
         let mut issues = Vec::new();
         detect_complex_tests(tree.root_node(), source, &javascript, &mut issues);
-        assert_eq!(issues.len(), 1, "Complex test with double quotes should trigger");
+        assert_eq!(
+            issues.len(),
+            1,
+            "Complex test with double quotes should trigger"
+        );
 
         if let TestingAntiPattern::ComplexTest { test_name, .. } = &issues[0] {
             assert_eq!(test_name, "test with double quotes");
@@ -875,7 +885,11 @@ mod tests {
         let tree = parser.parse(source, None).unwrap();
         let mut issues = Vec::new();
         detect_complex_tests(tree.root_node(), source, &javascript, &mut issues);
-        assert_eq!(issues.len(), 1, "Complex test with single quotes should trigger");
+        assert_eq!(
+            issues.len(),
+            1,
+            "Complex test with single quotes should trigger"
+        );
 
         if let TestingAntiPattern::ComplexTest { test_name, .. } = &issues[0] {
             assert_eq!(test_name, "test with single quotes");
