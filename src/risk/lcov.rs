@@ -490,6 +490,28 @@ fn normalize_function_name(name: &str) -> String {
         .replace('\'', "")
 }
 
+/// Strategy 1: Check if query path ends with LCOV path
+/// Example: query="/home/user/project/src/main.rs" matches lcov="src/main.rs"
+#[allow(dead_code)]
+fn matches_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    query_path.ends_with(lcov_path)
+}
+
+/// Strategy 2: Check if LCOV path ends with normalized query path
+/// Example: lcov="/home/user/project/src/main.rs" matches query="./src/main.rs"
+#[allow(dead_code)]
+fn matches_reverse_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    let normalized_query = normalize_path(query_path);
+    lcov_path.ends_with(&normalized_query)
+}
+
+/// Strategy 3: Check if normalized paths are equal
+/// Example: lcov="./src/main.rs" matches query="src/main.rs"
+#[allow(dead_code)]
+fn matches_normalized_equality_strategy(query_path: &Path, lcov_path: &Path) -> bool {
+    normalize_path(lcov_path) == normalize_path(query_path)
+}
+
 /// Find functions by normalizing and matching paths
 /// This handles cases where LCOV has relative paths but queries use absolute paths, or vice versa
 #[allow(dead_code)]
@@ -497,49 +519,40 @@ fn find_functions_by_path<'a>(
     functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
     query_path: &Path,
 ) -> Option<&'a Vec<FunctionCoverage>> {
-    // Strategy 1: Direct lookup (already tried by caller)
-
     // Use parallel search for large function maps
     if functions.len() > 20 {
-        // Strategy 2: Check if query path ends with any LCOV path (parallel)
         functions
             .par_iter()
-            .find_any(|(lcov_path, _)| query_path.ends_with(lcov_path))
+            .find_any(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
             .map(|(_, funcs)| funcs)
             .or_else(|| {
-                // Strategy 3: Check if any LCOV path ends with query path (parallel)
-                let normalized_query = normalize_path(query_path);
                 functions
                     .par_iter()
-                    .find_any(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
+                    .find_any(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
                     .map(|(_, funcs)| funcs)
             })
             .or_else(|| {
-                // Strategy 4: Strip leading ./ from either path and compare (parallel)
-                let normalized_query = normalize_path(query_path);
                 functions
                     .par_iter()
-                    .find_any(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
+                    .find_any(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
                     .map(|(_, funcs)| funcs)
             })
     } else {
         // Use sequential search for smaller maps to avoid parallel overhead
         functions
             .iter()
-            .find(|(lcov_path, _)| query_path.ends_with(lcov_path))
+            .find(|(lcov_path, _)| matches_suffix_strategy(query_path, lcov_path))
             .map(|(_, funcs)| funcs)
             .or_else(|| {
-                let normalized_query = normalize_path(query_path);
                 functions
                     .iter()
-                    .find(|(lcov_path, _)| lcov_path.ends_with(&normalized_query))
+                    .find(|(lcov_path, _)| matches_reverse_suffix_strategy(query_path, lcov_path))
                     .map(|(_, funcs)| funcs)
             })
             .or_else(|| {
-                let normalized_query = normalize_path(query_path);
                 functions
                     .iter()
-                    .find(|(lcov_path, _)| normalize_path(lcov_path) == normalized_query)
+                    .find(|(lcov_path, _)| matches_normalized_equality_strategy(query_path, lcov_path))
                     .map(|(_, funcs)| funcs)
             })
     }
@@ -981,6 +994,91 @@ end_of_record
             let normalized = normalize_path(&path);
 
             assert_eq!(normalized, PathBuf::from("src/main.rs"));
+        }
+    }
+
+    // Tests for extracted strategy functions
+    mod strategy_tests {
+        use super::*;
+
+        #[test]
+        fn test_matches_suffix_strategy_basic() {
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let lcov = PathBuf::from("src/main.rs");
+
+            assert!(matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_suffix_strategy_no_match() {
+            let query = PathBuf::from("/home/user/project/src/main.rs");
+            let lcov = PathBuf::from("src/lib.rs");
+
+            assert!(!matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_suffix_strategy_exact_match() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("src/main.rs");
+
+            assert!(matches_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_basic() {
+            let query = PathBuf::from("./src/lib.rs");
+            let lcov = PathBuf::from("/home/user/project/src/lib.rs");
+
+            assert!(matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_no_match() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("/home/user/project/src/lib.rs");
+
+            assert!(!matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_reverse_suffix_strategy_with_normalization() {
+            let query = PathBuf::from("./src/utils.rs");
+            let lcov = PathBuf::from("/home/user/src/utils.rs");
+
+            assert!(matches_reverse_suffix_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_basic() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("./src/main.rs");
+
+            assert!(matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_both_normalized() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("./src/main.rs");
+
+            assert!(matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_no_match() {
+            let query = PathBuf::from("src/main.rs");
+            let lcov = PathBuf::from("src/lib.rs");
+
+            assert!(!matches_normalized_equality_strategy(&query, &lcov));
+        }
+
+        #[test]
+        fn test_matches_normalized_equality_strategy_different_depths() {
+            let query = PathBuf::from("./src/main.rs");
+            let lcov = PathBuf::from("./lib/main.rs");
+
+            assert!(!matches_normalized_equality_strategy(&query, &lcov));
         }
     }
 }
