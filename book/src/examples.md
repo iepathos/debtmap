@@ -61,6 +61,8 @@ debtmap analyze . --lcov target/coverage/lcov.info
 debtmap analyze . --coverage-file target/coverage/lcov.info
 ```
 
+> **Note**: `--lcov` is an alias for `--coverage-file` - both work identically.
+
 **What this does:**
 - Functions with 0% coverage and high complexity get marked as `[CRITICAL]`
 - Well-tested functions (>80% coverage) are deprioritized
@@ -81,6 +83,11 @@ debtmap analyze . --threshold-preset strict    # Strict standards
 debtmap analyze . --threshold-preset balanced  # Default balanced
 debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 ```
+
+**Preset configurations:**
+- **Strict**: Lower thresholds for high quality standards (good for new projects)
+- **Balanced**: Default thresholds suitable for typical projects
+- **Lenient**: Higher thresholds designed for legacy codebases with existing technical debt
 
 ### God Object Detection
 
@@ -461,21 +468,18 @@ debtmap:
     # Install debtmap
     - cargo install debtmap
 
-    # Run tests with coverage
+    # Run tests with coverage (generates LCOV format)
     - cargo install cargo-tarpaulin
     - cargo tarpaulin --out Lcov
 
-    # Validate with debtmap
+    # Validate with debtmap (using LCOV format)
     - debtmap validate .
-        --coverage-file cobertura.xml
+        --coverage-file lcov.info
         --format json
         --output debtmap-report.json
   artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: cobertura.xml
     paths:
+      - lcov.info
       - debtmap-report.json
     expire_in: 1 week
 ```
@@ -666,6 +670,15 @@ debtmap analyze . --format json --output-format legacy
 debtmap analyze . --format terminal
 ```
 
+**Unified vs Legacy JSON Formats:**
+
+The unified format provides a consistent structure with a `type` field to distinguish between different item types, replacing the File/Function wrapper objects used in legacy format.
+
+- **Unified format**: Cleaner schema, consistent structure across all items, easier to parse programmatically
+- **Legacy format**: Default for backward compatibility with existing tooling and scripts
+
+Use unified format for new integrations and tools. Use legacy format when working with existing debtmap analysis pipelines.
+
 ## Advanced Usage
 
 ### Context-Aware Analysis
@@ -697,13 +710,13 @@ debtmap analyze . --multi-pass --attribution
 
 ```bash
 # Show cache statistics
-debtmap cache stats
+debtmap analyze . --cache-stats
 
-# Clear cache for current project
-debtmap cache clear
+# Clear cache before analysis
+debtmap analyze . --clear-cache
 
-# Prune old cache entries
-debtmap cache prune --max-age-days 7
+# Force cache rebuild
+debtmap analyze . --force-cache-rebuild
 ```
 
 ### Aggregation Methods
@@ -811,9 +824,28 @@ dependency = 0.20    # Dependency criticality
 ```toml
 [god_object]
 enabled = true
-max_methods = 20
+
+# Rust-specific thresholds
+[god_object.rust]
+max_methods = 25
 max_fields = 15
-max_responsibilities = 5
+max_traits = 5
+max_lines = 400
+max_complexity = 50
+
+# Python-specific thresholds
+[god_object.python]
+max_methods = 20
+max_fields = 12
+max_lines = 350
+max_complexity = 45
+
+# JavaScript/TypeScript-specific thresholds
+[god_object.javascript]
+max_methods = 20
+max_fields = 12
+max_lines = 300
+max_complexity = 40
 ```
 
 ### External API Configuration
