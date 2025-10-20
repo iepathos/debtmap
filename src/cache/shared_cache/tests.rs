@@ -1156,3 +1156,62 @@ mod copy_dir_recursive_tests {
         std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
     }
 }
+
+#[cfg(test)]
+mod pure_function_tests {
+    use super::*;
+    use crate::cache::shared_cache::{build_dest_path, classify_entry, EntryType};
+
+    #[test]
+    fn test_classify_entry_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "test").unwrap();
+
+        assert_eq!(classify_entry(&file_path), EntryType::File);
+    }
+
+    #[test]
+    fn test_classify_entry_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let dir_path = temp_dir.path().join("testdir");
+        fs::create_dir(&dir_path).unwrap();
+
+        assert_eq!(classify_entry(&dir_path), EntryType::Directory);
+    }
+
+    #[test]
+    fn test_classify_entry_nonexistent() {
+        let temp_dir = TempDir::new().unwrap();
+        let nonexistent = temp_dir.path().join("nonexistent");
+
+        assert_eq!(classify_entry(&nonexistent), EntryType::Other);
+    }
+
+    #[test]
+    fn test_build_dest_path_simple() {
+        let base = Path::new("/tmp/dest");
+        let name = std::ffi::OsStr::new("file.txt");
+
+        let result = build_dest_path(base, name);
+        assert_eq!(result, Path::new("/tmp/dest/file.txt"));
+    }
+
+    #[test]
+    fn test_build_dest_path_with_spaces() {
+        let base = Path::new("/tmp/dest");
+        let name = std::ffi::OsStr::new("file with spaces.txt");
+
+        let result = build_dest_path(base, name);
+        assert_eq!(result, Path::new("/tmp/dest/file with spaces.txt"));
+    }
+
+    #[test]
+    fn test_build_dest_path_nested() {
+        let base = Path::new("/tmp/dest/nested");
+        let name = std::ffi::OsStr::new("file.txt");
+
+        let result = build_dest_path(base, name);
+        assert_eq!(result, Path::new("/tmp/dest/nested/file.txt"));
+    }
+}
