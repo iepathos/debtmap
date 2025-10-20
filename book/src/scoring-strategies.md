@@ -17,14 +17,14 @@ File-level scoring aggregates metrics across all functions in a file to identify
 ### Formula
 
 ```
-File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores
+File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores
 ```
 
 Where each factor is calculated as:
 - **Size** = `sqrt(total_lines / 100)`
 - **Complexity** = `(avg_complexity / 5.0) × sqrt(total_complexity / 50.0)`
-- **Coverage** = `(1 - coverage_percent) × 2 + 1`
-- **Density** = `max(1.0, function_count / 50)` if function_count > 50
+- **Coverage Multiplier** = `1.0 - coverage_percent`
+- **Density** = `1.0 + ((function_count - 50) × 0.02)` if function_count > 50, else 1.0
 - **GodObject** = `2.0 + god_object_score` if detected
 - **FunctionScores** = `sum(function_scores) / 10`
 
@@ -40,15 +40,17 @@ Where each factor is calculated as:
 - Balances per-function and aggregate complexity
 - Rationale: Both concentrated complexity and spread-out complexity matter
 
-**Coverage Factor**: `(1 - coverage_percent) × 2 + 1`
+**Coverage Multiplier**: `1.0 - coverage_percent`
 - Lower coverage increases score multiplicatively
-- Range: 1.0 (100% coverage) to 3.0 (0% coverage)
-- Rationale: Untested files are riskier to refactor
+- Range: 0.0 (100% coverage) to 1.0 (0% coverage)
+- Rationale: Untested files amplify existing complexity and risk
+- Note: Earlier versions used an additive "Coverage Factor" formula; current implementation uses multiplicative dampening
 
 **Density Factor**: Penalizes files with excessive function count
 - Triggers when function count > 50
-- `max(1.0, function_count / 50)`
-- Rationale: Files with 100+ functions likely violate single responsibility
+- `1.0 + ((function_count - 50) × 0.02)` for function_count > 50, else 1.0
+- Creates a gradual linear increase: 51 functions = 1.02x, 75 functions = 1.50x, 100 functions = 2.0x
+- Rationale: Files with many functions likely violate single responsibility
 
 **God Object Multiplier**: `2.0 + god_object_score` when detected
 - Applies when god object detection flags the file
@@ -107,7 +109,10 @@ debtmap analyze . --aggregate-only --format markdown -o report.md
 
 Debtmap supports multiple aggregation methods for file-level scores, configurable via CLI or configuration file.
 
-**Weighted Sum (Default)**
+#### Weighted Sum (Default)
+
+**Formula**: `Σ(function_score × complexity_weight × coverage_weight)`
+
 ```bash
 debtmap analyze . --aggregation-method weighted_sum
 ```
@@ -117,36 +122,70 @@ Or via configuration:
 [aggregation]
 method = "weighted_sum"
 ```
-- Weights functions by complexity and coverage
-- Emphasizes high-impact functions
-- Best for most use cases
 
-**Simple Sum**
+**Characteristics**:
+- Weights functions by their complexity and coverage gaps
+- Emphasizes high-impact functions over trivial ones
+- Best for most use cases where you want to focus on significant issues
+
+**Best for**: Standard codebases where you want proportional emphasis on complex, untested code
+
+#### Simple Sum
+
+**Formula**: `Σ(function_scores)`
+
 ```toml
 [aggregation]
 method = "sum"
 ```
-- Adds all function scores directly
-- Treats all functions equally
-- Useful for broad overview
 
-**Logarithmic Sum**
+**Characteristics**:
+- Adds all function scores directly without weighting
+- Treats all functions equally regardless of complexity
+- Useful for broad overview and trend analysis
+
+**Best for**: Getting a raw count-based view of technical debt across all functions
+
+#### Logarithmic Sum
+
+**Formula**: `log(1 + Σ(function_scores))`
+
 ```toml
 [aggregation]
 method = "logarithmic_sum"
 ```
-- Dampens impact of many small issues
-- `log(1 + sum_of_scores)`
-- Useful for legacy codebases with many minor issues
 
-**Max Plus Average**
+**Characteristics**:
+- Dampens impact of many small issues to prevent score explosion
+- Prevents files with hundreds of minor issues from dominating
+- Creates more balanced comparisons across files of different sizes
+
+**Best for**: Legacy codebases with many small issues where you want to avoid extreme scores
+
+#### Max Plus Average
+
+**Formula**: `max_score × 0.6 + avg_score × 0.4`
+
 ```toml
 [aggregation]
 method = "max_plus_average"
 ```
-- Considers worst function plus average of others
-- `max_score × 0.6 + average_score × 0.4`
-- Balances worst-case and typical-case analysis
+
+**Characteristics**:
+- Considers worst function (60%) plus average of all functions (40%)
+- Balances worst-case and typical-case scenarios
+- Highlights files with both a critical hot spot and general issues
+
+**Best for**: Identifying files with concentrated complexity alongside general code quality concerns
+
+#### Choosing an Aggregation Method
+
+| Codebase Type | Recommended Method | Rationale |
+|---------------|-------------------|-----------|
+| New/Modern | `weighted_sum` | Proportional emphasis on real issues |
+| Legacy with many small issues | `logarithmic_sum` | Prevents score explosion |
+| Mixed quality | `max_plus_average` | Balances hot spots with overall quality |
+| Trend analysis | `sum` | Simple, consistent metric over time |
 
 ### Configuration
 
@@ -169,11 +208,14 @@ Function-level scoring identifies specific functions needing attention for targe
 ### Formula
 
 ```
-Function Score = (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15)
-Final Score = Base Score × Role Multiplier
+Base Score = (Complexity × 0.40) + (Dependency × 0.20)
+Coverage Multiplier = 1.0 - coverage_percent
+Final Score = Base Score × Coverage Multiplier × Role Multiplier
 ```
 
-**Note**: These weights are configurable via the `[scoring]` section in `.debtmap.toml`. See [Configuration](#configuration) below.
+**Note**: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights for complexity and dependency are configurable via the `[scoring]` section in `.debtmap.toml`. See [Configuration](#configuration) below.
+
+**Migration Note**: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.
 
 ### Metrics
 
@@ -197,14 +239,16 @@ Final Score = Base Score × Role Multiplier
 
 Functions are classified by role, and each role receives a multiplier based on its architectural importance:
 
-- **Entry points**: 1.5x - Public APIs, main functions, HTTP handlers
-- **Pure logic / Business logic**: 1.2x-1.3x - Core business rules and algorithms (multiplier increases with complexity)
-- **Orchestrator**: 0.8x - Functions that coordinate other functions
-- **IO wrapper**: 0.5x - Simple file/network I/O wrappers
-- **Pattern match**: 0.6x - Functions primarily doing pattern matching
-- **Utility**: 0.5x - Helper functions and utilities
+| Role | Multiplier | Description |
+|------|------------|-------------|
+| **Pure logic** | 1.2x | Core business rules and algorithms |
+| **Unknown** | 1.0x | Functions without clear classification |
+| **Entry point** | 0.9x | Public APIs, main functions, HTTP handlers |
+| **Orchestrator** | 0.8x | Functions that coordinate other functions |
+| **IO wrapper** | 0.7x | Simple file/network I/O wrappers |
+| **Pattern match** | 0.6x | Functions primarily doing pattern matching |
 
-**Note**: Role multipliers are configurable via the `[role_multipliers]` section in `.debtmap.toml`.
+**Note**: Role multipliers are configurable via the `[role_multipliers]` section in `.debtmap.toml`. The multipliers have been rebalanced to be less extreme than earlier versions - pure logic was reduced from 1.5x to 1.2x, while orchestrator and IO wrapper were increased to better reflect their importance in modern codebases.
 
 ### Use Cases
 
@@ -244,20 +288,38 @@ debtmap analyze . --filter Performance --context --top 10
 
 ### Configuration
 
-```toml
-[scoring]
-coverage = 0.50              # Weight for coverage gaps (default)
-complexity = 0.35            # Weight for complexity (default)
-dependency = 0.15            # Weight for dependency impact (default)
+Complete configuration file example (`.debtmap.toml`):
 
+```toml
+# Scoring weights (current model uses coverage as multiplier, not additive)
+[scoring]
+complexity = 0.40            # Weight for complexity in base score
+dependency = 0.20            # Weight for dependency impact in base score
+
+# Role multipliers (applied to final score)
 [role_multipliers]
-entry_point = 1.5
-business_logic = 1.2
-pure_logic = 1.2
-orchestrator = 0.8
-io_wrapper = 0.7
-utility = 0.5
+pure_logic = 1.2             # Core business rules
+unknown = 1.0                # Unclassified functions
+entry_point = 0.9            # Public APIs, main functions
+orchestrator = 0.8           # Coordination functions
+io_wrapper = 0.7             # File/network I/O wrappers
+pattern_match = 0.6          # Pattern matching functions
+
+# Aggregation settings (for file-level scoring)
+[aggregation]
+method = "weighted_sum"      # Options: weighted_sum, sum, logarithmic_sum, max_plus_average
+min_problematic = 3          # Minimum number of problematic functions to report file
+
+# Normalization settings
+[normalization]
+linear_threshold = 10.0      # Scores below this use linear scaling
+logarithmic_threshold = 100.0 # Scores above this use logarithmic dampening
+sqrt_multiplier = 3.33       # Applied to mid-range scores
+log_multiplier = 10.0        # Applied to high scores
+show_raw_scores = true       # Display both normalized and raw scores
 ```
+
+**Note**: The configuration file must be named `.debtmap.toml` and placed in your project root.
 
 ## When to Use Each Approach
 
@@ -365,17 +427,33 @@ normalize_results() - Score: 7.5 (0% coverage)
 
 Both scoring approaches normalize to a 0-10 scale for consistency.
 
-### Normalization Strategy
+### Normalization Strategies
+
+**Default: Linear Clamping**
+
+The default normalization uses simple linear clamping:
+
+```rust
+score_normalized = raw_score.clamp(0.0, 100.0)
+```
+
+This ensures scores stay within the expected range without additional transformations.
+
+**Advanced: Multi-Phase Normalization**
+
+For more sophisticated normalization, debtmap provides `normalize_final_score_with_metadata` which uses different scaling for different score ranges:
 
 ```rust
 score_normalized = if raw_score < 10.0 {
     raw_score  // Linear below 10
 } else if raw_score < 100.0 {
-    sqrt(raw_score) × 3.33  // Square root 10-100
+    10.0 + (raw_score - 10.0).sqrt() × 3.33  // Square root 10-100
 } else {
-    log10(raw_score) × 10.0  // Logarithmic above 100
+    41.59 + (raw_score / 100.0).ln() × 10.0  // Logarithmic above 100
 }
 ```
+
+This multi-phase approach dampens extreme values while preserving distinctions in the normal range.
 
 ### Configuration
 
