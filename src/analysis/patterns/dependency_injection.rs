@@ -115,6 +115,43 @@ impl DependencyInjectionRecognizer {
             .collect()
     }
 
+    /// Build a PatternInstance for a dependency injection pattern
+    ///
+    /// Creates a pattern instance with the appropriate confidence level,
+    /// implementations, and reasoning based on the injection types detected.
+    fn build_pattern_instance(
+        class: &ClassDef,
+        has_constructor: bool,
+        has_decorator: bool,
+        has_setter: bool,
+        confidence: f32,
+        implementations: Vec<Implementation>,
+    ) -> PatternInstance {
+        let mut injection_types = Vec::new();
+        if has_constructor {
+            injection_types.push("constructor");
+        }
+        if has_decorator {
+            injection_types.push("decorator");
+        }
+        if has_setter {
+            injection_types.push("setter");
+        }
+
+        PatternInstance {
+            pattern_type: PatternType::DependencyInjection,
+            confidence,
+            base_class: Some(class.name.clone()),
+            implementations,
+            usage_sites: Vec::new(),
+            reasoning: format!(
+                "Class {} uses dependency injection via {}",
+                class.name,
+                injection_types.join(" and ")
+            ),
+        }
+    }
+
     /// Calculate confidence based on evidence strength
     fn calculate_confidence(
         &self,
@@ -182,29 +219,14 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
                     let implementations =
                         Self::collect_injection_implementations(class, &file_metrics.path);
 
-                    let mut injection_types = Vec::new();
-                    if has_constructor {
-                        injection_types.push("constructor");
-                    }
-                    if has_decorator {
-                        injection_types.push("decorator");
-                    }
-                    if has_setter {
-                        injection_types.push("setter");
-                    }
-
-                    patterns.push(PatternInstance {
-                        pattern_type: PatternType::DependencyInjection,
+                    patterns.push(Self::build_pattern_instance(
+                        class,
+                        has_constructor,
+                        has_decorator,
+                        has_setter,
                         confidence,
-                        base_class: Some(class.name.clone()),
                         implementations,
-                        usage_sites: Vec::new(),
-                        reasoning: format!(
-                            "Class {} uses dependency injection via {}",
-                            class.name,
-                            injection_types.join(" and ")
-                        ),
-                    });
+                    ));
                 }
             }
         }
@@ -471,6 +493,93 @@ mod tests {
         let path = PathBuf::from("test.py");
         let implementations = DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
         assert_eq!(implementations.len(), 0);
+    }
+
+    #[test]
+    fn test_build_pattern_instance_constructor_only() {
+        let class = create_class_with_constructor_injection();
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            true,
+            false,
+            false,
+            0.8,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.8);
+        assert!(pattern.reasoning.contains("constructor"));
+        assert!(!pattern.reasoning.contains("decorator"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_decorator_only() {
+        let class = create_class_with_decorator_injection();
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            false,
+            true,
+            false,
+            0.9,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.9);
+        assert!(pattern.reasoning.contains("decorator"));
+        assert!(!pattern.reasoning.contains("constructor"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_setter_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            false,
+            false,
+            true,
+            0.7,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.7);
+        assert!(pattern.reasoning.contains("setter"));
+        assert!(!pattern.reasoning.contains("constructor"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_multiple_types() {
+        let class = ClassDef {
+            name: "FullServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            true,
+            true,
+            true,
+            0.95,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.95);
+        assert!(pattern.reasoning.contains("constructor"));
+        assert!(pattern.reasoning.contains("decorator"));
+        assert!(pattern.reasoning.contains("setter"));
     }
 
     #[test]
