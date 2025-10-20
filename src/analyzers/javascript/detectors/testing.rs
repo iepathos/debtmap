@@ -614,4 +614,208 @@ mod tests {
         detect_snapshot_overuse(tree.root_node(), source, &javascript, &mut issues);
         assert_eq!(issues.len(), 0, "No snapshots should not trigger");
     }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_settimeout() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('delayed test', () => {
+                setTimeout(() => {
+                    expect(result).toBe(42);
+                }, 1000);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect setTimeout dependency");
+
+        if let TestingAntiPattern::TimingDependentTest {
+            test_name,
+            timing_type,
+            ..
+        } = &issues[0]
+        {
+            assert_eq!(test_name, "delayed test");
+            assert_eq!(timing_type, "setTimeout");
+        } else {
+            panic!("Expected TimingDependentTest pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_setinterval() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('interval test', () => {
+                const interval = setInterval(() => {
+                    expect(value).toBeGreaterThan(0);
+                }, 500);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect setInterval dependency");
+
+        if let TestingAntiPattern::TimingDependentTest { timing_type, .. } = &issues[0] {
+            assert_eq!(timing_type, "setInterval");
+        } else {
+            panic!("Expected TimingDependentTest pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_date_now() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('date test', () => {
+                const now = Date.now();
+                expect(now).toBeGreaterThan(0);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect Date.now() dependency");
+
+        if let TestingAntiPattern::TimingDependentTest { timing_type, .. } = &issues[0] {
+            assert_eq!(timing_type, "Date dependency");
+        } else {
+            panic!("Expected TimingDependentTest pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_math_random() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('random test', () => {
+                const value = Math.random();
+                expect(value).toBeLessThan(1);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect Math.random() dependency");
+
+        if let TestingAntiPattern::TimingDependentTest { timing_type, .. } = &issues[0] {
+            assert_eq!(timing_type, "random values");
+        } else {
+            panic!("Expected TimingDependentTest pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_performance_now() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('performance test', () => {
+                const start = performance.now();
+                doWork();
+                const end = performance.now();
+                expect(end - start).toBeLessThan(1000);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Should detect performance.now() dependency"
+        );
+
+        if let TestingAntiPattern::TimingDependentTest { timing_type, .. } = &issues[0] {
+            assert_eq!(timing_type, "performance timing");
+        } else {
+            panic!("Expected TimingDependentTest pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_no_timing_dependencies() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('clean test', () => {
+                const result = add(2, 3);
+                expect(result).toBe(5);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not detect any timing dependencies");
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_non_test_function() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            helper('not a test', () => {
+                setTimeout(() => {
+                    console.log('delayed');
+                }, 1000);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Should not detect timing issues in non-test functions"
+        );
+    }
+
+    #[test]
+    fn test_detect_timing_dependent_tests_multiple_timing_types() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('mixed timing test', () => {
+                const now = Date.now();
+                setTimeout(() => {
+                    expect(Date.now() - now).toBeGreaterThan(100);
+                }, 100);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_timing_dependent_tests(tree.root_node(), source, &javascript, &mut issues);
+        // Should detect at least one timing dependency (the first one found)
+        assert_eq!(issues.len(), 1, "Should detect timing dependency");
+    }
 }
