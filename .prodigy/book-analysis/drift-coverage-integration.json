@@ -1,0 +1,175 @@
+{
+  "chapter_id": "coverage-integration",
+  "chapter_title": "Coverage Integration",
+  "chapter_file": "book/src/coverage-integration.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely missing from the book. Coverage integration is a core feature of Debtmap that enables risk-based prioritization by correlating complexity metrics with test coverage. This is a major documentation gap that prevents users from leveraging one of Debtmap's most powerful capabilities.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "The coverage-integration.md chapter file does not exist and is not referenced in SUMMARY.md",
+      "should_add": "Create comprehensive chapter covering all coverage integration features documented in the codebase",
+      "fix_suggestion": "Create new chapter in book/src/coverage-integration.md and add to SUMMARY.md under Advanced Topics section",
+      "source_reference": "features.json:risk_assessment.coverage_integration"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "LCOV Format Support",
+      "description": "No documentation explaining LCOV format support and why it's the standard format",
+      "should_add": "Document that LCOV is a universal coverage format supported across languages and tools. Explain the format structure and how Debtmap parses it.",
+      "fix_suggestion": "Add section explaining LCOV format, its ubiquity, and example of LCOV file structure with DA: (line data) and FN: (function name) records",
+      "source_reference": "features.json:320-331, src/coverage/lcov_parser.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Tool Integration Guide",
+      "description": "No step-by-step guide for generating coverage with different tools",
+      "should_add": "Detailed setup instructions for: cargo-tarpaulin (Rust), jest (JS/TS), pytest (Python), go test with gocover-cobertura (Go)",
+      "fix_suggestion": "Create subsections for each language with exact commands, configuration examples, and common pitfalls. Include full workflow from test execution to debtmap analysis.",
+      "source_reference": "features.json:325-330"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Transitive Coverage Propagation",
+      "description": "No explanation of how coverage propagates through the call graph",
+      "should_add": "Document transitive coverage formula: 'Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)'. Explain that functions called by well-tested code have reduced urgency.",
+      "fix_suggestion": "Add section with diagram showing how coverage flows from entry points through call graph. Include examples of how a 0% direct coverage function can have high transitive coverage if called only by well-tested functions.",
+      "source_reference": "features.json:390-394, src/analysis/risk/coverage_propagation.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Coverage Index Performance",
+      "description": "No documentation of coverage index performance characteristics",
+      "should_add": "Document performance metrics: O(n) index build (~20-30ms for 5000 functions), O(1) exact lookup (~0.5μs), O(log n) fallback lookup (~5-8μs), ~200 bytes per record, thread-safe with Arc<CoverageIndex>",
+      "fix_suggestion": "Add performance section explaining that coverage integration adds minimal overhead (~2.5x baseline, target ≤3x) and is optimized for parallel access in large codebases.",
+      "source_reference": "features.json:332-338"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Coverage Factor in Scoring",
+      "description": "No explanation of how coverage affects unified debt scores",
+      "should_add": "Document that coverage contributes 40% to unified score, formula: 10 × (1 - coverage_percentage) × complexity_weight. Special cases: test functions get 0 (don't need coverage), no coverage data assumes worst case (10).",
+      "fix_suggestion": "Add section explaining coverage factor calculation with examples showing score changes at different coverage levels (0%, 50%, 100%)",
+      "source_reference": "features.json:358-366"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Coverage Dampening",
+      "description": "No explanation of how coverage dampens overall debt scores",
+      "should_add": "Document formula: Final Score = Base Score × (1.0 - coverage_percentage). Show examples: 100% coverage → 0.0 multiplier (near-zero debt), 50% → 0.5 multiplier (moderate), 0% → 1.0 multiplier (full score)",
+      "fix_suggestion": "Add section with concrete examples showing how well-tested complex code gets deprioritized while untested complex code rises to the top",
+      "source_reference": "features.json:403-413"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "CLI Options Reference",
+      "description": "No comprehensive reference for coverage-related CLI options",
+      "should_add": "Document all options: --coverage-file / --lcov (primary), --enable-context, --context-providers, --disable-context. Note that --lcov is an alias.",
+      "fix_suggestion": "Add CLI options section with detailed explanations of each flag and when to use them. Cross-reference with cli-reference.md.",
+      "source_reference": "features.json:26-31"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Troubleshooting Coverage Correlation",
+      "description": "Coverage troubleshooting is scattered in troubleshooting.md, not consolidated in coverage chapter",
+      "should_add": "Consolidate coverage-specific troubleshooting: path mismatches, LCOV format issues, coverage not correlating with functions, using -vv for debugging",
+      "fix_suggestion": "Add troubleshooting section covering: verifying LCOV format (head coverage.info), ensuring path matching (relative to project root), using -vv to see coverage lookup details, handling missing coverage data",
+      "source_reference": "features.json:736-738, book/src/troubleshooting.md:138-153"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Best Practices",
+      "description": "No guidance on when and how to use coverage integration effectively",
+      "should_add": "Best practices for coverage-based analysis workflow: when to use --lcov, prioritizing testing efforts, focusing on high-complexity untested code, using coverage to validate refactoring impact",
+      "fix_suggestion": "Add best practices section covering: generating coverage before analysis, interpreting risk scores, combining coverage with tiered prioritization, coverage-based sprint planning",
+      "source_reference": "features.json:642-678"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Language-Specific Examples",
+      "description": "No complete end-to-end examples for each supported language",
+      "should_add": "Full examples showing: 1) Generate coverage with language-specific tool, 2) Verify LCOV output, 3) Run debtmap with --lcov, 4) Interpret results",
+      "fix_suggestion": "Add subsection for each language (Rust, Python, JS/TS, Go) with complete workflow including tool installation, configuration, execution, and analysis",
+      "source_reference": "features.json:325-330"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Context Providers",
+      "description": "Brief mention of context providers but no explanation of how they interact with coverage",
+      "should_add": "Document that context providers (critical_path, dependency, git_history) can be combined with coverage for more nuanced risk assessment",
+      "fix_suggestion": "Add section explaining how coverage complements other context providers and when to enable each",
+      "source_reference": "features.json:419-423"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Validate Command Coverage Support",
+      "description": "No mention that validate command supports coverage integration for risk-based validation",
+      "should_add": "Document that validate command accepts --coverage-file for risk-based quality gates",
+      "fix_suggestion": "Add note that coverage can be used in CI pipelines with validate command to fail builds based on untested complex code",
+      "source_reference": "features.json:89, cli-reference.md"
+    },
+    {
+      "type": "scattered_information",
+      "severity": "medium",
+      "section": "Current State",
+      "description": "Coverage information is scattered across getting-started.md, cli-reference.md, and troubleshooting.md without a comprehensive guide",
+      "current_content": "getting-started.md mentions tarpaulin briefly (lines 15-18, 91-97), cli-reference.md lists flags (line 81, 198, 259), troubleshooting.md has one section on coverage issues (lines 138-153)",
+      "should_be": "Consolidated coverage integration guide with cross-references to scattered mentions",
+      "fix_suggestion": "Create comprehensive chapter and update other chapters to reference it for detailed coverage information",
+      "source_reference": "book/src/getting-started.md, book/src/cli-reference.md, book/src/troubleshooting.md"
+    }
+  ],
+  "positive_aspects": [
+    "Coverage is briefly mentioned in getting-started.md for quick onboarding",
+    "CLI reference documents the flags accurately",
+    "Troubleshooting has a section on coverage correlation issues",
+    "Features.json provides comprehensive ground truth for implementation"
+  ],
+  "improvement_suggestions": [
+    "Create dedicated coverage-integration.md chapter under Advanced Topics in SUMMARY.md",
+    "Structure chapter with clear sections: Introduction, LCOV Format, Tool Integration (per language), Performance, Scoring Impact, Transitive Coverage, Troubleshooting, Best Practices",
+    "Include visual diagrams showing coverage propagation through call graph",
+    "Add concrete examples with actual coverage percentages and resulting scores",
+    "Cross-reference from other chapters (getting-started, scoring-strategies, tiered-prioritization) to coverage-integration chapter",
+    "Include FAQ section addressing common coverage questions (e.g., 'Why does my 100% covered function still show up?', 'What's the difference between direct and transitive coverage?')",
+    "Add table comparing coverage tools across languages with pros/cons",
+    "Include example LCOV file snippet with annotations explaining each line type (SF:, FN:, FNDA:, DA:, LH:, LF:)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-20",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [],
+    "topics_missing": [
+      "LCOV format support",
+      "Generating coverage with cargo-tarpaulin",
+      "Coverage for other languages (pytest, jest, go test)",
+      "Coverage index performance",
+      "Transitive coverage propagation",
+      "Troubleshooting coverage correlation",
+      "Best practices"
+    ],
+    "validation_focus": "Coverage setup, tool integration, and troubleshooting are missing for all supported languages",
+    "existing_mentions": {
+      "getting-started.md": "Brief mentions of tarpaulin and --lcov flag (8 lines)",
+      "cli-reference.md": "Flag documentation only (7 occurrences)",
+      "troubleshooting.md": "One section on coverage correlation issues (15 lines)"
+    },
+    "estimated_chapter_length": "2000-2500 words (similar to scoring-strategies.md or tiered-prioritization.md)",
+    "urgency": "High - Coverage integration is a differentiating feature that's inadequately documented"
+  }
+}

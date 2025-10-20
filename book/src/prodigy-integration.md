@@ -46,12 +46,20 @@ All changes happen in **isolated git worktrees**:
 ### Install Prodigy
 
 ```bash
-# Install Prodigy CLI
+# Install Prodigy from GitHub repository
+cargo install --git https://github.com/iepathos/prodigy prodigy
+
+# Or if available on crates.io:
 cargo install prodigy
 
 # Verify installation
 prodigy --version
 ```
+
+**Requirements:**
+- Rust 1.70 or later
+- Git (for worktree management)
+- Anthropic API key for Claude access
 
 ### Configure Claude API
 
@@ -141,20 +149,21 @@ Create a workflow file `workflows/debtmap.yml`:
 ### 2. Run Workflow
 
 ```bash
-# Run with worktree, auto-confirm, 5 iterations
-prodigy cook workflows/debtmap.yml -wyn 5
+# Run with auto-confirm, 5 iterations
+prodigy run workflows/debtmap.yml -yn 5
 
 # Run with custom iteration count
-prodigy cook workflows/debtmap.yml -wyn 10
+prodigy run workflows/debtmap.yml -yn 10
 
 # Run single iteration for testing
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 ```
 
 **Command Flags:**
-- `-w` - Create an isolated git worktree for changes
-- `-y` - Auto-confirm workflow steps (skip prompts)
-- `-n 5` - Run workflow for up to 5 iterations
+- `-y` (`--yes`) - Auto-confirm workflow steps (skip prompts)
+- `-n 5` (`--max-iterations 5`) - Run workflow for up to 5 iterations
+
+**Note**: Worktrees are managed separately via the `prodigy worktree` command. In MapReduce mode, Prodigy automatically creates isolated worktrees for each parallel agent.
 
 ### 3. Review Results
 
@@ -172,6 +181,96 @@ Coverage Improved: 45% → 72% (+27%)
 ✅ All validations passed
 ```
 
+## Useful Prodigy Commands
+
+Beyond `prodigy run`, several commands help manage workflows and sessions:
+
+### Resume Interrupted Workflows
+
+```bash
+# Resume an interrupted sequential workflow
+prodigy resume <SESSION_ID>
+
+# Resume an interrupted MapReduce job
+prodigy resume-job <JOB_ID>
+
+# List all sessions to find the SESSION_ID
+prodigy sessions
+```
+
+**When to use**: If a workflow is interrupted (Ctrl-C, system crash, network issues), you can resume from the last checkpoint rather than starting over.
+
+### View Checkpoints
+
+```bash
+# List all available checkpoints
+prodigy checkpoints
+
+# List checkpoints for specific session
+prodigy checkpoints --session <SESSION_ID>
+```
+
+**When to use**: To see available restore points for interrupted workflows.
+
+### Manage Worktrees
+
+```bash
+# List all Prodigy worktrees
+prodigy worktree list
+
+# Clean up old worktrees
+prodigy worktree clean
+
+# Remove specific worktree
+prodigy worktree remove <SESSION_ID>
+```
+
+**When to use**: MapReduce workflows create many worktrees. Clean them up periodically to save disk space.
+
+### Monitor MapReduce Progress
+
+```bash
+# View progress of running MapReduce job
+prodigy progress <JOB_ID>
+
+# View events and logs from MapReduce job
+prodigy events <JOB_ID>
+
+# Filter events by type
+prodigy events <JOB_ID> --type agent_started
+prodigy events <JOB_ID> --type agent_completed
+prodigy events <JOB_ID> --type agent_failed
+```
+
+**When to use**: Monitor long-running MapReduce jobs to see how many agents have completed, which are still running, and which have failed.
+
+### Manage Dead Letter Queue
+
+```bash
+# View failed MapReduce items in DLQ
+prodigy dlq list <JOB_ID>
+
+# Retry failed items from DLQ
+prodigy dlq retry <JOB_ID> <ITEM_ID>
+
+# Remove items from DLQ
+prodigy dlq remove <JOB_ID> <ITEM_ID>
+```
+
+**When to use**: When some MapReduce agents fail, their items go to the Dead Letter Queue. You can retry them individually or investigate why they failed.
+
+### Session Management
+
+```bash
+# List all workflow sessions
+prodigy sessions
+
+# Clean up old sessions
+prodigy clean
+```
+
+**When to use**: View history of workflow runs and clean up old data.
+
 ## Workflow Configuration
 
 Prodigy workflows are defined as YAML lists of steps. Each step can be either a `shell` command or a `claude` slash command.
@@ -183,12 +282,14 @@ Prodigy workflows are defined as YAML lists of steps. Each step can be either a 
 Execute shell commands directly:
 
 ```yaml
+# Simple shell command
 - shell: "cargo test"
-```
 
-With error handling:
+# With timeout (in seconds)
+- shell: "just coverage-lcov"
+  timeout: 900  # 15 minutes
 
-```yaml
+# With error handling
 - shell: "just test"
   on_failure:
     claude: "/prodigy-debug-test-failure --output ${shell.output}"
@@ -196,15 +297,47 @@ With error handling:
     fail_workflow: true
 ```
 
+**Shell Command Fields:**
+- `shell`: Command to execute (string)
+- `timeout`: Maximum execution time in seconds (optional)
+- `on_failure`: Error handler configuration (optional)
+  - `claude`: Slash command to run on failure
+  - `max_attempts`: Maximum retry attempts
+  - `fail_workflow`: If true, fail entire workflow after max attempts
+
 #### Claude Commands
 
 Execute Claude Code slash commands:
 
 ```yaml
+# Simple Claude command
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+
+# With output capture (makes command output available in ${shell.output})
 - claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
   capture_output: true
+
+# With commit requirement (workflow fails if no git commit made)
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
   commit_required: true
+
+# With timeout and validation
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+  timeout: 1800  # 30 minutes
+  validate:
+    commands:
+      - shell: "cargo test"
+    result_file: ".prodigy/validation.json"
+    threshold: 75
 ```
+
+**Claude Command Fields:**
+- `claude`: Slash command to execute (string)
+- `capture_output`: If true, command output is available in `${shell.output}` variable (optional)
+- `commit_required`: If true, workflow fails if command doesn't create a git commit (optional)
+- `timeout`: Maximum execution time in seconds (optional)
+- `validate`: Validation configuration (optional, see Step-Level Validation below)
 
 ### Step-Level Validation
 
@@ -399,31 +532,264 @@ Target selection happens through the debtmap analysis and slash commands, not th
 
 To focus on specific debt types or modules, modify the slash commands or create custom commands in `.claude/commands/`
 
-## Map-Reduce Workflows
+## MapReduce Workflows
 
-Prodigy supports map-reduce workflows for processing multiple items in parallel. This is useful for large-scale refactoring tasks.
+Prodigy supports MapReduce workflows for processing multiple items in parallel. This is powerful for large-scale refactoring where you want to fix many debt items simultaneously.
 
-### When to Use Map-Reduce
+### When to Use MapReduce
 
-- Processing multiple independent debt items simultaneously
+- Processing multiple independent debt items simultaneously (e.g., refactor 10 high-complexity functions in parallel)
 - Applying the same fix pattern across many files
 - Large-scale codebase cleanup tasks
+- Situations where sequential iteration would be too slow
 
-### Map-Reduce Structure
+### MapReduce vs Sequential Workflows
 
-The exact syntax for map-reduce workflows in Prodigy may differ from sequential workflows. Consult the Prodigy documentation for current map-reduce syntax and examples.
+**Sequential Workflow** (`-n 5`):
+- Runs entire workflow N times in sequence
+- Fixes one item per iteration
+- Each iteration re-analyzes the codebase
+- Total time: N × workflow_duration
+
+**MapReduce Workflow**:
+- Processes multiple items in parallel in a single run
+- Setup phase runs once
+- Map phase spawns N parallel agents (each in isolated worktree)
+- Reduce phase aggregates results
+- Total time: setup + max(map_agent_durations) + reduce
+
+### Complete MapReduce Example
+
+Create `workflows/debtmap-reduce.yml`:
+
+```yaml
+name: debtmap-parallel-elimination
+mode: mapreduce
+
+# Setup phase: Analyze the codebase and generate debt items
+setup:
+  timeout: 900  # 15 minutes for coverage generation
+  commands:
+    # Generate coverage data with tarpaulin
+    - shell: "just coverage-lcov"
+
+    # Run debtmap with coverage data to establish baseline
+    - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+
+# Map phase: Process each debt item in parallel with planning and validation
+map:
+  # Input configuration - debtmap-before.json contains items array
+  input: .prodigy/debtmap-before.json
+  json_path: "$.items[*]"
+
+  # Commands to execute for each debt item
+  agent_template:
+    # Phase 1: Create implementation plan
+    - claude: "/prodigy-debtmap-plan --item '${item}' --output .prodigy/plan-${item_id}.md"
+      capture_output: true
+      validate:
+        commands:
+          - claude: "/prodigy-validate-debtmap-plan --item '${item}' --plan .prodigy/plan-${item_id}.md --output .prodigy/validation-${item_id}.json"
+        result_file: ".prodigy/validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md"
+          max_attempts: 3
+          fail_workflow: false
+
+    # Phase 2: Execute the plan
+    - claude: "/prodigy-debtmap-implement --plan .prodigy/plan-${item_id}.md"
+      commit_required: true
+      validate:
+        commands:
+          - shell: "just coverage-lcov"
+          - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+          - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
+        result_file: ".prodigy/debtmap-validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
+              commit_required: true
+            - shell: "just coverage-lcov"
+            - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+            - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          max_attempts: 5
+          fail_workflow: true
+
+    # Phase 3: Verify tests pass
+    - shell: "just test"
+      on_failure:
+        claude: "/prodigy-debug-test-failure --output ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
+
+    # Phase 4: Check formatting and linting
+    - shell: "just fmt-check && just lint"
+      on_failure:
+        claude: "/prodigy-lint ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
+
+  # Parallelization settings
+  max_parallel: 5  # Run up to 5 agents in parallel
+
+  # Filter and sort items
+  filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
+  sort_by: "File.score DESC, Function.unified_score.final_score DESC"
+  max_items: 10  # Limit to 10 items per run
+
+# Reduce phase: Aggregate results and verify overall improvements
+reduce:
+  # Phase 1: Run final tests across all changes
+  - shell: "just test"
+    on_failure:
+      claude: "/prodigy-debug-test-failure --output ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
+
+  # Phase 2: Check formatting and linting
+  - shell: "just fmt-check && just lint"
+    on_failure:
+      claude: "/prodigy-lint ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
+
+  # Phase 3: Re-run debtmap to measure cumulative improvements
+  - shell: "just coverage-lcov"
+  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+
+  # Phase 4: Create final commit with summary
+  - write_file:
+      path: ".prodigy/map-results.json"
+      content: "${map.results}"
+      format: json
+      create_dirs: true
+
+  - claude: |
+      /prodigy-compare-debt-results \
+        --before .prodigy/debtmap-before.json \
+        --after .prodigy/debtmap-after.json \
+        --map-results-file .prodigy/map-results.json \
+        --successful ${map.successful} \
+        --failed ${map.failed} \
+        --total ${map.total}
+    commit_required: true
+```
+
+### Running MapReduce Workflows
+
+```bash
+# Run MapReduce workflow (single execution processes multiple items in parallel)
+prodigy run workflows/debtmap-reduce.yml
+
+# Run with auto-confirm
+prodigy run workflows/debtmap-reduce.yml -y
+```
+
+**Note**: MapReduce workflows don't typically use `-n` for iterations. Instead, they process multiple items in a single run through parallel map agents.
+
+### MapReduce Configuration Options
+
+#### Top-Level Fields
+
+- `name`: Workflow name (string)
+- `mode: mapreduce`: Enables MapReduce mode (required)
+- `setup`: Commands to run once before map phase
+- `map`: Map phase configuration
+- `reduce`: Commands to run after all map agents complete
+
+#### Setup Phase Fields
+
+- `timeout`: Maximum time in seconds for setup phase
+- `commands`: List of shell or claude commands to run
+
+#### Map Phase Fields
+
+- `input`: Path to JSON file containing items to process
+- `json_path`: JSONPath expression to extract items array (e.g., `$.items[*]`)
+- `agent_template`: List of commands to run for each item (each item gets its own agent in an isolated worktree)
+- `max_parallel`: Maximum number of agents to run concurrently
+- `filter`: Expression to filter which items to process (e.g., `"score >= 10"`)
+- `sort_by`: Expression to sort items (e.g., `"score DESC"`)
+- `max_items`: Limit total items processed
+
+#### MapReduce-Specific Variables
+
+Available in `agent_template` commands:
+
+- `${item}`: The full JSON object for current item
+- `${item_id}`: Unique ID for current item (auto-generated)
+- `${validation.gaps}`: List of validation gaps from failed validation
+- `${validation.attempt_number}`: Current retry attempt number (1, 2, 3, etc.)
+- `${shell.output}`: Output from previous shell command
+- `${map.results}`: All map agent results (available in reduce phase)
+- `${map.successful}`: Count of successful map agents (reduce phase)
+- `${map.failed}`: Count of failed map agents (reduce phase)
+- `${map.total}`: Total number of map agents (reduce phase)
+
+### MapReduce Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Setup Phase (main worktree)                            │
+│ - Generate coverage data                               │
+│ - Run debtmap analysis                                 │
+│ - Output: .prodigy/debtmap-before.json                 │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│ Map Phase (parallel worktrees)                         │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ Agent 1      │  │ Agent 2      │  │ Agent 3      │ │
+│  │ Item #1      │  │ Item #2      │  │ Item #3      │ │
+│  │ Worktree A   │  │ Worktree B   │  │ Worktree C   │ │
+│  │              │  │              │  │              │ │
+│  │ Plan → Fix   │  │ Plan → Fix   │  │ Plan → Fix   │ │
+│  │ → Validate   │  │ → Validate   │  │ → Validate   │ │
+│  │ → Test       │  │ → Test       │  │ → Test       │ │
+│  │ → Commit     │  │ → Commit     │  │ → Commit     │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐                   │
+│  │ Agent 4      │  │ Agent 5      │                   │
+│  │ Item #4      │  │ Item #5      │                   │
+│  │ Worktree D   │  │ Worktree E   │                   │
+│  │              │  │              │                   │
+│  │ Plan → Fix   │  │ Plan → Fix   │                   │
+│  │ → Validate   │  │ → Validate   │                   │
+│  │ → Test       │  │ → Test       │                   │
+│  │ → Commit     │  │ → Commit     │                   │
+│  └──────────────┘  └──────────────┘                   │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│ Reduce Phase (main worktree)                           │
+│ - Merge all agent worktrees                            │
+│ - Run final tests on merged code                       │
+│ - Run final linting                                    │
+│ - Re-analyze with debtmap                              │
+│ - Generate summary commit                              │
+└─────────────────────────────────────────────────────────┘
+```
 
 **Key Concepts:**
-- **Map phase**: Process items in parallel using multiple agents
-- **Reduce phase**: Aggregate results and ensure consistency
-- **Isolation**: Each map agent works in its own worktree
-- **Validation**: All changes must pass validation before merging
+- **Isolation**: Each map agent works in its own git worktree
+- **Parallelism**: Multiple agents process different items simultaneously
+- **Validation**: Each agent validates its changes independently
+- **Merging**: Reduce phase merges all successful agent worktrees
+- **Final Validation**: Reduce phase ensures merged code passes all tests
 
 ## Iteration Strategy
 
 ### How Iterations Work
 
-When you run `prodigy cook workflows/debtmap.yml -wyn 5`, the workflow executes up to 5 times:
+When you run `prodigy run workflows/debtmap.yml -yn 5`, the workflow executes up to 5 times:
 
 1. **Iteration 1**:
    - Analyze codebase with debtmap
@@ -445,13 +811,13 @@ Iterations are controlled via the `-n` flag:
 
 ```bash
 # Single iteration (testing)
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 
 # Standard run (5 iterations)
-prodigy cook workflows/debtmap.yml -wyn 5
+prodigy run workflows/debtmap.yml -yn 5
 
 # Deep cleanup (10+ iterations)
-prodigy cook workflows/debtmap.yml -wyn 20
+prodigy run workflows/debtmap.yml -yn 20
 ```
 
 ### What Happens Each Iteration
@@ -637,7 +1003,7 @@ jobs:
       - name: Run Prodigy workflow
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: prodigy cook workflows/debtmap.yml -wyn 5
+        run: prodigy run workflows/debtmap.yml -yn 5
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v5
@@ -662,7 +1028,7 @@ prodigy-debt-reduction:
     - cargo install prodigy
     - cargo install debtmap
     - cargo install just
-    - prodigy cook workflows/debtmap.yml -wyn 5
+    - prodigy run workflows/debtmap.yml -yn 5
   artifacts:
     paths:
       - .prodigy/debtmap-*.json
@@ -672,7 +1038,7 @@ prodigy-debt-reduction:
 ### Important CI Considerations
 
 - **API Keys**: Store `ANTHROPIC_API_KEY` as a secret
-- **Worktrees**: The `-w` flag creates isolated worktrees automatically
+- **Worktrees**: MapReduce mode creates isolated worktrees automatically for parallel processing
 - **Dependencies**: Install `prodigy`, `debtmap`, and `just` (or your build tool)
 - **Timeout**: CI jobs may need extended timeout for multiple iterations
 - **Review**: Always create a PR for human review before merging automated changes
@@ -684,10 +1050,10 @@ prodigy-debt-reduction:
 Begin with low iteration counts:
 ```bash
 # First run: 1 iteration to test workflow
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 
 # Standard run: 3-5 iterations
-prodigy cook workflows/debtmap.yml -wyn 5
+prodigy run workflows/debtmap.yml -yn 5
 ```
 
 ### 2. Focus on High-Priority Items
@@ -842,6 +1208,154 @@ debtmap analyze . --lcov target/coverage/lcov.info
 - Check Claude API connectivity
 - Monitor worktree for progress: `cd ~/.prodigy/worktrees/session-xxx && git log`
 
+### MapReduce-Specific Troubleshooting
+
+#### Resuming Failed MapReduce Jobs
+
+**Issue**: MapReduce job was interrupted or failed
+
+**Solution**:
+```bash
+# Find the job ID from recent sessions
+prodigy sessions
+
+# Resume the MapReduce job from checkpoint
+prodigy resume-job <JOB_ID>
+```
+
+The job will resume from where it left off, skipping already-completed items.
+
+#### Checking MapReduce Progress
+
+**Issue**: Want to monitor long-running MapReduce job
+
+**Solution**:
+```bash
+# View overall progress
+prodigy progress <JOB_ID>
+
+# View detailed events
+prodigy events <JOB_ID>
+
+# Filter for specific event types
+prodigy events <JOB_ID> --type agent_completed
+prodigy events <JOB_ID> --type agent_failed
+```
+
+**Output example**:
+```
+MapReduce Job: job-abc123
+Status: running
+Progress: 7/10 items (70%)
+- Completed: 5
+- Running: 2
+- Failed: 3
+```
+
+#### Managing Failed MapReduce Items
+
+**Issue**: Some agents failed, items in Dead Letter Queue
+
+**Solution**:
+```bash
+# View failed items
+prodigy dlq list <JOB_ID>
+
+# Review why an item failed (check events)
+prodigy events <JOB_ID> --item <ITEM_ID>
+
+# Retry specific failed item
+prodigy dlq retry <JOB_ID> <ITEM_ID>
+
+# Remove unfixable items from DLQ
+prodigy dlq remove <JOB_ID> <ITEM_ID>
+```
+
+**Common failure reasons**:
+- Validation threshold not met after max_attempts
+- Tests fail and can't be fixed automatically
+- Merge conflicts with other agents' changes
+- Timeout exceeded for complex refactoring
+
+#### Cleaning Up MapReduce Worktrees
+
+**Issue**: Disk space consumed by many MapReduce worktrees
+
+**Solution**:
+```bash
+# List all worktrees
+prodigy worktree list
+
+# Clean up completed job worktrees
+prodigy worktree clean
+
+# Remove specific session's worktrees
+prodigy worktree remove <SESSION_ID>
+
+# Manual cleanup (if Prodigy commands don't work)
+rm -rf ~/.prodigy/worktrees/session-xxx
+```
+
+**When to clean**:
+- After successful job completion and merge
+- When disk space is low
+- After abandoned or failed jobs
+
+#### MapReduce Merge Conflicts
+
+**Issue**: Reduce phase fails due to merge conflicts between agent worktrees
+
+**Possible Causes**:
+- Multiple agents modified overlapping code
+- Agents made conflicting architectural changes
+- Shared dependencies updated differently
+
+**Solution**:
+```bash
+# Review which agents succeeded
+prodigy events <JOB_ID> --type agent_completed
+
+# Check merge conflicts
+cd ~/.prodigy/worktrees/session-xxx
+git status
+
+# Manually resolve conflicts
+# Edit conflicting files
+git add .
+git commit -m "Resolve MapReduce merge conflicts"
+
+# Resume the job
+prodigy resume-job <JOB_ID>
+```
+
+**Prevention**:
+- Use `filter` to ensure agents work on independent items
+- Reduce `max_parallel` to minimize conflicts
+- Design debt items to be truly independent
+
+#### Understanding MapReduce Variables
+
+If you're debugging workflow files, these variables are available:
+
+**In map phase (agent_template)**:
+- `${item}`: Full JSON of current item being processed
+- `${item_id}`: Unique ID for current item
+- `${validation.gaps}`: Validation gaps from validation result
+- `${validation.attempt_number}`: Current retry attempt (1, 2, 3...)
+- `${shell.output}`: Output from previous shell command
+
+**In reduce phase**:
+- `${map.results}`: All map agent results as JSON
+- `${map.successful}`: Count of successful agents
+- `${map.failed}`: Count of failed agents
+- `${map.total}`: Total number of agents
+
+**Example debug command**:
+```yaml
+# In agent_template, log the item being processed
+- shell: "echo 'Processing item: ${item_id}' >> .prodigy/debug.log"
+```
+
 ## Example Workflows
 
 ### Full Repository Cleanup
@@ -850,10 +1364,10 @@ For comprehensive debt reduction, use a higher iteration count:
 
 ```bash
 # Run 10 iterations for deeper cleanup
-prodigy cook workflows/debtmap.yml -wyn 10
+prodigy run workflows/debtmap.yml -yn 10
 
 # Run 20 iterations for major refactoring
-prodigy cook workflows/debtmap.yml -wyn 20
+prodigy run workflows/debtmap.yml -yn 20
 ```
 
 The workflow automatically:
@@ -882,7 +1396,7 @@ Create a custom workflow file for focused improvements:
 
 Run with:
 ```bash
-prodigy cook workflows/add-tests.yml -wyn 5
+prodigy run workflows/add-tests.yml -yn 5
 ```
 
 ### Targeted Module Cleanup

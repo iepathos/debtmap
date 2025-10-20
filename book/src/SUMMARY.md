@@ -9,15 +9,21 @@
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide.md)
 - [Configuration](configuration.md)
-- [Cache Management](cache-management.md)
+- [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
 
 # Advanced Topics
 
 - [Architecture](architecture.md)
-- [Tiered Prioritization](tiered-prioritization.md)
-- [Scoring Strategies](scoring-strategies.md)
+- [Cache Management](cache-management.md)
+- [Context Providers](context-providers.md)
+- [Coverage Integration](coverage-integration.md)
+- [Entropy Analysis](entropy-analysis.md)
+- [God Object Detection](god-object-detection.md)
+- [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
+- [Scoring Strategies](scoring-strategies.md)
+- [Tiered Prioritization](tiered-prioritization.md)
 
 # Reference
 

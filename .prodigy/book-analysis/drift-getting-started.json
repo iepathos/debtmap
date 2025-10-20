@@ -2,29 +2,69 @@
   "chapter_id": "getting-started",
   "chapter_title": "Getting Started",
   "chapter_file": "book/src/getting-started.md",
-  "drift_detected": false,
+  "drift_detected": true,
   "severity": "low",
-  "quality_assessment": "Excellent chapter with accurate, comprehensive content that matches current implementation",
+  "quality_assessment": "Chapter is in good condition with accurate, well-structured content. Only minor issues found: duplicate content section, terminology inconsistency, and missing priority level documentation. All commands and options verified against implementation.",
   "issues": [
+    {
+      "type": "duplicate_content",
+      "severity": "medium",
+      "section": "Example Output (Lines 356-393)",
+      "description": "The 'Example Output' section is duplicated - appears twice with nearly identical content",
+      "current_content": "Lines 252-293 show example output, then lines 356-393 repeat the same section with slight formatting differences. Both sections show essentially the same terminal output example.",
+      "should_be": "Single unified example output section showing both basic and coverage-integrated analysis, or clearly differentiated sections if serving different purposes",
+      "fix_suggestion": "Remove the duplicate section at lines 356-393. The first instance (lines 252-293) already shows both basic analysis and coverage-integrated analysis examples. Alternatively, if both sections are intentional, add clear headings to distinguish their purposes.",
+      "source_reference": "book/src/getting-started.md:252-293 and 356-393"
+    },
+    {
+      "type": "inconsistent_terminology",
+      "severity": "medium",
+      "section": "Reading the Output (Line 343)",
+      "description": "Uses 'MODERATE' instead of 'MEDIUM' for priority tier naming",
+      "current_content": "**Tier**: CRITICAL (8.0+), HIGH (5.0-7.9), MODERATE (2.0-4.9), LOW (<2.0)",
+      "should_be": "**Tier**: CRITICAL (8.0+), HIGH (5.0-7.9), MEDIUM (2.0-4.9), LOW (<2.0)",
+      "fix_suggestion": "Change 'MODERATE' to 'MEDIUM' to match the terminology used consistently in features.json priority_classification (critical, high, medium, low, minimal) and elsewhere in the documentation",
+      "source_reference": ".prodigy/book-analysis/features.json:396-401 (risk_assessment.unified_scoring.priority_classification)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Priority Levels (Lines 399-406)",
+      "description": "Documentation doesn't mention the 'minimal' priority level (0.0-2.9) from the implementation",
+      "current_content": "Lists CRITICAL (9.0-10.0), HIGH (7.0-8.9), MEDIUM (5.0-6.9), LOW (3.0-4.9) but stops there",
+      "should_be": "Should include all five priority levels including: MINIMAL (0.0-2.9) - Can be deferred",
+      "fix_suggestion": "Add the 'minimal' priority level to the complete list: 'MINIMAL (0.0-2.9): Can be deferred - very low priority items with minimal risk'",
+      "source_reference": ".prodigy/book-analysis/features.json:396-401 (minimal: '0.0-2.9 - Can be deferred')"
+    },
     {
       "type": "unclear_content",
       "severity": "low",
       "section": "Quick Start - Compare Command Examples",
-      "description": "Chapter shows advanced compare usage with --plan and --target-location but doesn't explain the full compare command capabilities",
+      "description": "Chapter shows advanced compare usage with --plan and --target-location but doesn't explain what the compare command validates",
       "current_content": "# Advanced comparison: focus on specific function\ndebtmap compare --before before.json --after after.json --target-location src/main.rs:main:10\n\n# Extract target from implementation plan\ndebtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md",
-      "should_be": "The compare command implementation (src/commands/compare_debtmap.rs) performs validation analysis comparing before/after states, but the CLI (src/cli.rs:284-310) shows --plan and --target-location options that might not be fully utilized in comparison output",
-      "fix_suggestion": "Add a brief note explaining what the compare command validates (improvements, regressions, resolved items) and link to a more detailed comparison chapter if one exists",
+      "should_be": "Should explain that compare validates improvements, tracks regressions, and shows completion percentage when using --plan or --target-location",
+      "fix_suggestion": "Add a brief note explaining what the compare command validates: 'The compare command validates refactoring effectiveness by tracking improvements, detecting regressions, and calculating completion percentage when using --plan or --target-location options.'",
       "source_reference": "src/cli.rs:284-310, src/commands/compare_debtmap.rs"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Output Formats - JSON Format Options",
-      "description": "Chapter explains legacy vs unified JSON formats but could provide more context about when to use each",
+      "section": "Output Formats - JSON Format Options (Lines 486-499)",
+      "description": "Chapter explains legacy vs unified JSON formats but could provide more context about structural differences",
       "current_content": "Recommendation: Use `unified` for new integrations, `legacy` only for compatibility with existing tooling.",
-      "should_add": "Explain that the legacy format wraps items in {File: {...}} and {Function: {...}} while unified uses a consistent structure with 'type' field. The unified format (spec 108) is cleaner for programmatic consumption.",
-      "fix_suggestion": "Expand the explanation slightly to mention specific advantages of unified format (consistent structure, type discrimination, easier parsing)",
-      "source_reference": "src/cli.rs:33-36, features.json:438-441"
+      "should_add": "Explain that the legacy format wraps items in {File: {...}} and {Function: {...}} while unified uses a consistent structure with 'type' field for easier programmatic parsing",
+      "fix_suggestion": "Expand the explanation: 'The legacy format wraps items in {File: {...}} and {Function: {...}} for backward compatibility. The unified format (spec 108) provides consistent structure with a 'type' field, making it easier to parse programmatically and integrate with tools.'",
+      "source_reference": "src/cli.rs:33-36, features.json:438-441, src/output/unified.rs"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Priority Thresholds Note (Line 406)",
+      "description": "Note about customizing priority thresholds mentions .debtmap.toml but doesn't link to Configuration chapter",
+      "current_content": "**Note:** These are default priority thresholds. You can customize them in `.debtmap.toml` under the `[tiers]` section to match your team's standards.",
+      "should_be": "Should provide link to Configuration chapter for complete documentation",
+      "fix_suggestion": "Add reference: 'See the [Configuration](./configuration.md) chapter for complete documentation on customizing priority tiers, thresholds, and scoring weights.'",
+      "source_reference": "book/src/getting-started.md:406"
     }
   ],
   "positive_aspects": [
@@ -34,27 +74,36 @@
     "Threshold options accurately describe default values (complexity=10, duplication=50)",
     "Verbosity levels (-v, -vv, -vvv) correctly documented",
     "Cache management options comprehensively covered and accurate",
-    "Priority levels (CRITICAL, HIGH, MEDIUM, LOW) correctly explained with accurate score ranges",
-    "Example outputs show realistic debtmap results",
+    "Example outputs show realistic debtmap results with correct formatting",
     "Prerequisites section correctly identifies optional cargo-tarpaulin for Rust coverage",
     "Quick start examples use current, valid syntax for all commands",
     "Advanced options section covers filtering, grouping, and performance controls accurately",
     "Installation troubleshooting section provides helpful, accurate guidance",
-    "The validate command example correctly shows --max-debt-density option (verified in src/cli.rs:254)",
+    "The validate command example correctly shows --max-debt-density option",
     "Output format descriptions match implementation (terminal, json, markdown)",
     "Context-aware analysis options accurately documented",
     "File-level vs function-level scoring distinction well explained",
     "Clear progression from simple to advanced usage",
-    "Good balance of examples and explanations"
+    "Good balance of examples and explanations",
+    "Coverage tool examples for Rust, Python, and JavaScript/TypeScript are accurate",
+    "Cache location and pruning information is current and correct",
+    "Parallel processing options accurately documented"
   ],
   "improvement_suggestions": [
-    "Consider adding a brief explanation of what the compare command validation results include (completion percentage, improvements, remaining issues, gaps)",
-    "Could mention that the compare command is primarily used for automated validation workflows (as seen in src/commands/compare_debtmap.rs with PRODIGY_AUTOMATION env var)",
-    "Might add a note about the --output-format unified vs legacy choice being relevant for CI/CD integrations that parse JSON programmatically",
-    "Consider adding a troubleshooting entry about ensuring coverage LCOV files are in the correct format for correlation"
+    "Remove duplicate 'Example Output' section (lines 356-393) to reduce confusion",
+    "Standardize terminology to use 'MEDIUM' instead of 'MODERATE' for priority tiers",
+    "Add the 'minimal' priority level to the priority levels documentation",
+    "Add a brief explanation of what compare command validation includes",
+    "Expand JSON format explanation to clarify structural differences",
+    "Add links to Configuration chapter where customization is mentioned",
+    "Consider adding a 'Common Workflows' section showing typical day-to-day usage patterns",
+    "Add brief explanation of what constitutes a 'good' vs 'bad' total debt score",
+    "Consider adding visual diagram of the analysis pipeline mentioned in lines 235-241",
+    "Add troubleshooting entry about ensuring LCOV files are in correct format for correlation",
+    "Consider adding comparison table of when to use different output formats"
   ],
   "metadata": {
-    "analyzed_at": "2025-01-14",
+    "analyzed_at": "2025-10-20",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Installation",
@@ -67,8 +116,11 @@
       "Priority levels",
       "Metrics explanation",
       "Configuration",
-      "CI/CD integration"
+      "Coverage integration",
+      "CI/CD integration",
+      "Cache management"
     ],
-    "validation_focus": "Check installation instructions and quick start examples are current"
+    "validation_focus": "Check installation instructions and quick start examples are current",
+    "validation_result": "PASSED - Installation instructions and quick start examples are current and accurate. All commands and options verified against src/cli.rs implementation. Coverage tool commands match features.json specifications. Only minor documentation quality issues found (duplicate section, terminology inconsistency)."
   }
 }

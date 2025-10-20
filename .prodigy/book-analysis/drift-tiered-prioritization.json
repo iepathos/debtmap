@@ -1,0 +1,106 @@
+{
+  "chapter_id": "tiered-prioritization",
+  "chapter_title": "Tiered Prioritization",
+  "chapter_file": "book/src/tiered-prioritization.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter has accurate high-level content but contains incorrect TOML configuration syntax that won't work. The nested [tiers.tier_weights] format shown in examples doesn't match actual implementation which uses flat fields.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Configuration - Tier Weight Customization",
+      "description": "Chapter shows nested [tiers.tier_weights] TOML table, but implementation expects flat fields directly in [tiers]",
+      "current_content": "[tiers.tier_weights]\nt1 = 1.5\nt2 = 1.0\nt3 = 0.7\nt4 = 0.3",
+      "should_be": "[tiers]\nt1_weight = 1.5\nt2_weight = 1.0\nt3_weight = 0.7\nt4_weight = 0.3",
+      "fix_suggestion": "Update all TOML examples to use flat field names (t1_weight, t2_weight, t3_weight, t4_weight) directly in [tiers] section, not nested [tiers.tier_weights]",
+      "source_reference": "src/priority/tiers.rs:62-86 TierConfig struct with flat fields"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Configuration - Default Tier Thresholds",
+      "description": "Example shows nested tier_weights section which won't parse correctly",
+      "current_content": "# Tier weights\n[tiers.tier_weights]\nt1 = 1.5    # Critical architecture\nt2 = 1.0    # Complex untested\nt3 = 0.7    # Testing gaps\nt4 = 0.3    # Maintenance",
+      "should_be": "[tiers]\n# Tier weights\nt1_weight = 1.5    # Critical architecture\nt2_weight = 1.0    # Complex untested\nt3_weight = 0.7    # Testing gaps\nt4_weight = 0.3    # Maintenance",
+      "fix_suggestion": "Flatten the tier_weights into the main [tiers] section using correct field names with _weight suffix",
+      "source_reference": "src/priority/tiers.rs:75-85 shows t1_weight, t2_weight, t3_weight, t4_weight fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Chapter doesn't show complete working example with all threshold and weight fields together",
+      "should_add": "Add a complete [tiers] section example showing all available fields: t2_complexity_threshold, t2_dependency_threshold, t3_complexity_threshold, show_t4_in_main_report, t1_weight, t2_weight, t3_weight, t4_weight",
+      "fix_suggestion": "Add a 'Complete Configuration Example' subsection showing all [tiers] fields in one place with explanatory comments",
+      "source_reference": "src/priority/tiers.rs:62-86 TierConfig struct definition"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "Chapter doesn't document the preset configurations available",
+      "should_add": "Document that TierConfig has strict(), balanced(), and lenient() preset configurations available programmatically",
+      "fix_suggestion": "Add note that these are the default values and mention that presets exist in the codebase",
+      "source_reference": "src/priority/tiers.rs:104-128 shows strict(), balanced(), lenient() methods"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Tier 1: Critical Architecture",
+      "description": "Chapter mentions god objects and complexity but doesn't explain the exact criteria for Tier 1 classification",
+      "should_add": "Clarify that Tier 1 includes: GodObject debt type, GodModule debt type, and ComplexityHotspot with cyclomatic > 50",
+      "fix_suggestion": "Add a 'Tier 1 Classification Criteria' subsection explaining the exact conditions from is_architectural_issue()",
+      "source_reference": "src/priority/tiers.rs:151-159 is_architectural_issue() function"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Tier 2: Complex Untested",
+      "description": "Chapter doesn't fully explain all criteria for Tier 2 classification",
+      "should_add": "Document that Tier 2 includes TestingGap items meeting ANY of: cyclomatic >= t2_complexity_threshold (15), total_dependencies >= t2_dependency_threshold (10), OR is an EntryPoint function",
+      "fix_suggestion": "Expand 'Tier 2: Complex Untested' section with complete classification logic including the OR conditions",
+      "source_reference": "src/priority/tiers.rs:161-183 is_complex_untested() function shows OR logic"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Use Cases - Sprint Planning",
+      "description": "Example commands use --filter Architecture but this isn't fully explained in context of tiers",
+      "current_content": "debtmap analyze . --filter Architecture --top 5",
+      "fix_suggestion": "Add note that --filter operates independently of tier classification - tiers are about prioritization within results, filters are about selecting debt categories",
+      "source_reference": "Tiers are applied after filtering in the output pipeline"
+    }
+  ],
+  "positive_aspects": [
+    "Clear explanation of the four-tier strategy and rationale",
+    "Good descriptions of when to address each tier",
+    "Helpful concrete examples for each tier",
+    "Well-structured use cases section",
+    "Good best practices guidance",
+    "Terminal output example is clear and illustrative",
+    "Troubleshooting section addresses common issues"
+  ],
+  "improvement_suggestions": [
+    "Fix all TOML configuration examples to use correct flat field syntax",
+    "Add a 'Complete Configuration Example' showing all fields in correct format",
+    "Add subsection explaining exact classification criteria for each tier",
+    "Clarify relationship between tiers and other filtering/scoring mechanisms",
+    "Add note that tier classification happens automatically - not user-controlled",
+    "Consider adding example showing before/after of tier configuration changes",
+    "Link to configuration.md chapter for more details on [tiers] section"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-13",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Tier 1: Critical Architecture",
+      "Tier 2: Complex Untested",
+      "Tier 3: Testing Gaps",
+      "Tier 4: Maintenance",
+      "Tier weights and configuration",
+      "Customizing tier thresholds"
+    ],
+    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples"
+  }
+}

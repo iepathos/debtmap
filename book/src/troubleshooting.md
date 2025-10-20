@@ -6,7 +6,7 @@ Common issues and solutions for using debtmap effectively.
 
 If you're experiencing problems, try these first:
 
-1. **Analysis is slow**: Check `--cache-stats`, ensure caching is enabled, adjust threads with `-j`
+1. **Analysis is slow**: Check `--cache-stats`, ensure caching is enabled, adjust threads with `--jobs`
 2. **Parse errors**: Use `--semantic-off` for faster fallback mode or exclude problematic files
 3. **No output**: Increase verbosity with `-v` or lower `--min-priority`
 4. **Cache corruption**: Run with `--clear-cache` to rebuild
@@ -175,9 +175,25 @@ debtmap --filter "complexity,debt"
 
 **Problem**: JSON output parsing errors or unexpected structure
 
+**Understanding the Two Formats**:
+
+**Legacy format** wraps items in variant-specific objects:
+```json
+{"File": {"path": "src/main.rs", "score": 7.5, ...}}
+{"Function": {"name": "parse", "score": 8.2, ...}}
+```
+
+**Unified format** uses consistent structure with `type` field:
+```json
+{"type": "File", "path": "src/main.rs", "score": 7.5, ...}
+{"type": "Function", "name": "parse", "score": 8.2, ...}
+```
+
+The unified format is **recommended** for parsing and tool integration as it provides a consistent structure across all item types.
+
 **Solutions**:
 ```bash
-# Use unified JSON format (consistent structure)
+# Use unified JSON format (consistent structure, recommended)
 debtmap --format json --output-format unified
 
 # Legacy format (default, uses {File: {...}} structure)
@@ -189,6 +205,8 @@ debtmap --format json | jq .
 # Write to file for easier inspection
 debtmap --format json --output results.json
 ```
+
+See the [Configuration/Output Formats](./configuration.md#output-formats) chapter for detailed JSON structure documentation.
 
 ### Context Provider Errors
 
@@ -440,6 +458,43 @@ debtmap
 # Migrate existing cache
 debtmap --migrate-cache
 ```
+
+### Cache Pruning Configuration
+
+Debtmap automatically manages cache size and age to prevent unbounded growth:
+
+**Environment Variables**:
+```bash
+# Enable/disable automatic cache pruning (default: true)
+export DEBTMAP_CACHE_AUTO_PRUNE=true
+
+# Maximum cache size in bytes (default: 1GB)
+export DEBTMAP_CACHE_MAX_SIZE=1073741824
+
+# Maximum cache entry age in days (default: 30)
+export DEBTMAP_CACHE_MAX_AGE_DAYS=30
+
+# Maximum number of cache entries (default: 10000)
+export DEBTMAP_CACHE_MAX_ENTRIES=10000
+
+# Percentage of entries to remove when pruning (default: 0.25)
+export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25
+
+# Pruning strategy: lru, lfu, fifo, age_based (default: lru)
+export DEBTMAP_CACHE_STRATEGY=lru
+```
+
+**Pruning Strategies**:
+- **LRU (Least Recently Used)**: Removes oldest accessed entries (recommended for general use)
+- **LFU (Least Frequently Used)**: Removes least accessed entries (best for stable workloads)
+- **FIFO (First In First Out)**: Removes oldest created entries (simple, useful for testing)
+- **Age-based**: Removes entries older than MAX_AGE_DAYS (useful for compliance requirements)
+
+**Performance Implications**:
+- LRU/LFU provide better cache hit rates than FIFO
+- Age-based strategy ensures data freshness but may reduce hit rate
+- Adjust MAX_SIZE based on available disk space and project count
+- Lower PRUNE_PERCENTAGE means more frequent but smaller cleanup operations
 
 ### Cache Strategies
 
@@ -751,6 +806,136 @@ debtmap
 - `--no-aggregation`: See individual functions/classes only
 - Default: Full picture with both levels
 
+### Tiered Prioritization Issues
+
+**Overview**: Debtmap uses a 4-tier system to classify technical debt items by priority:
+
+**Tier Classification**:
+- **Tier 1 (Critical Architecture)**: High complexity, low coverage, high dependencies, entry points
+- **Tier 2 (Complex Untested)**: Significant complexity or coverage gaps
+- **Tier 3 (Testing Gaps)**: Moderate issues that need attention
+- **Tier 4 (Maintenance)**: Low-priority items, routine maintenance
+
+**Tier Weights**:
+- Tier 1: 1.5× multiplier (highest priority)
+- Tier 2: 1.0× multiplier (standard priority)
+- Tier 3: 0.7× multiplier (reduced priority)
+- Tier 4: 0.3× multiplier (lowest priority)
+
+**Configuration**:
+```toml
+# In .debtmap.toml
+[tiers]
+# Tier 2 requires EITHER high complexity OR high dependencies
+t2_complexity_threshold = 15
+t2_dependency_threshold = 10
+
+# Tier 3 requires moderate complexity
+t3_complexity_threshold = 8
+
+# Control Tier 4 visibility in main report
+show_t4_in_main_report = false
+```
+
+**Common Issues**:
+
+**Q: Why is my item in Tier 3 instead of Tier 2?**
+
+A: Check if it meets Tier 2 thresholds:
+```bash
+# See tier classification with verbosity
+debtmap -v
+
+# Check current thresholds
+cat .debtmap.toml | grep -A 5 "\[tiers\]"
+
+# Lower thresholds to promote more items to Tier 2
+# In .debtmap.toml:
+# t2_complexity_threshold = 10  (default: 15)
+# t2_dependency_threshold = 5   (default: 10)
+```
+
+**Q: How do I hide Tier 4 items from the main report?**
+
+A: Use the `show_t4_in_main_report` configuration:
+```toml
+# In .debtmap.toml
+[tiers]
+show_t4_in_main_report = false
+```
+
+Tier 4 items will still appear in detailed output but won't clutter the main summary.
+
+### File-Level Scoring Issues
+
+**Overview**: Debtmap aggregates function/class scores into file-level scores using a multi-factor formula.
+
+**File Score Formula**:
+```
+File Score = size_factor × complexity_factor × coverage_factor ×
+             density_factor × god_object_multiplier × function_scores
+```
+
+**Factors**:
+- **size_factor**: Based on lines of code (larger files = higher factor)
+- **complexity_factor**: Average complexity across functions
+- **coverage_factor**: File-level test coverage (from LCOV file)
+- **density_factor**: Penalizes files with >50 functions (indicates code smell)
+- **god_object_multiplier**: 1.5× for files exceeding god object thresholds
+
+**Aggregation Methods**:
+```bash
+# Weighted sum (default) - considers complexity weights
+debtmap --aggregation-method weighted_sum
+
+# Simple sum - adds all function scores
+debtmap --aggregation-method sum
+
+# Logarithmic sum - dampens very high scores
+debtmap --aggregation-method logarithmic_sum
+
+# Max plus average - highlights worst function + context
+debtmap --aggregation-method max_plus_average
+```
+
+**When to use each method**:
+- **weighted_sum**: Default, balances individual and collective impact
+- **sum**: When you want raw cumulative debt
+- **logarithmic_sum**: For very large files to prevent score explosion
+- **max_plus_average**: Focus on worst offender while considering overall file health
+
+**Aggregation Control Flags**:
+```bash
+# Show only aggregated file-level scores
+debtmap --aggregate-only
+
+# Disable file-level aggregation entirely
+debtmap --no-aggregation
+
+# Default: show both individual items and file aggregates
+debtmap
+```
+
+**Troubleshooting High File Scores**:
+
+**Q: Why does this file have such a high score?**
+
+A: Check contributing factors with verbosity:
+```bash
+# See file-level score breakdown
+debtmap path/to/file.rs -vv
+
+# Look for:
+# - High function count (density_factor kicks in at 50+)
+# - God object detection (1.5× multiplier)
+# - Low coverage (high coverage_factor)
+# - Large file size (size_factor)
+# - Multiple high-complexity functions
+
+# Disable god object detection if false positive
+debtmap --no-god-object path/to/file.rs
+```
+
 ### Combining Advanced Flags
 
 ```bash
@@ -1029,8 +1214,34 @@ Some advanced language features may show as "Unsupported":
 
 ### False Positives
 
+Reduce false positives for validation functions and repetitive code patterns using entropy analysis:
+
+**Enable and Configure Entropy Analysis**:
+```toml
+# In .debtmap.toml
+[entropy]
+enabled = true                    # Enable entropy-based dampening
+weight = 0.3                      # Weight in complexity adjustment (0.0-1.0)
+min_tokens = 50                   # Minimum tokens for entropy calculation
+pattern_threshold = 0.7           # Pattern similarity threshold (0.0-1.0)
+use_classification = true         # Enable advanced token classification
+entropy_threshold = 0.5           # Entropy level for dampening (0.0-1.0)
+branch_threshold = 0.8            # Branch similarity threshold (0.0-1.0)
+max_combined_reduction = 0.5      # Max reduction percentage (0.0-1.0)
+```
+
+**When to Adjust Parameters**:
+- **Increase `pattern_threshold`** (e.g., 0.8-0.9): Be more strict, reduce dampening for truly unique code
+- **Decrease `entropy_threshold`** (e.g., 0.3-0.4): Apply dampening more broadly to catch more repetitive patterns
+- **Increase `weight`** (e.g., 0.4-0.5): Make entropy have stronger impact on final scores
+- **Increase `min_tokens`** (e.g., 100): Only apply entropy analysis to larger functions
+- **Increase `branch_threshold`** (e.g., 0.9): Be more strict about branching pattern similarity
+
+Entropy analysis can reduce false positives by up to 70% for validation functions, error handling, and other repetitive patterns.
+
+**Other False Positive Reduction Strategies**:
 ```bash
-# Reduce false positives with context
+# Use context-aware analysis
 debtmap --context
 
 # Adjust thresholds
@@ -1434,15 +1645,64 @@ debtmap src/specific/module
 # include = ["src/**/*.rs"]
 ```
 
+**Q: How is the 0-10 priority score calculated?**
+
+A: Debtmap uses a multi-factor unified scoring formula to compute priority scores:
+
+**Base Score Formula**:
+```
+Base Score = (Complexity Factor × 0.40) +
+             (Coverage Factor × 0.40) +
+             (Dependency Factor × 0.20)
+```
+
+**Where**:
+- **Complexity Factor**: Normalized cognitive complexity (0.0-10.0 scale)
+- **Coverage Factor**: `(1 - coverage_percentage) × 2 + 1` (ranges from 1.0-3.0)
+- **Dependency Factor**: Based on incoming/outgoing dependencies and coupling
+
+**Role Multipliers** adjust the base score by function role:
+- **Entry points**: 1.5× (critical path, highest priority)
+- **Business logic**: 1.2× (core functionality)
+- **Data access**: 1.0× (important but stable)
+- **Infrastructure**: 0.8× (lower priority)
+- **Utilities**: 0.5× (minimal priority)
+- **Test code**: 0.1× (lowest priority)
+
+**Final Score**:
+```
+Final Score = Base Score × Role Multiplier
+```
+
+This ensures functions are prioritized by true impact, not just raw complexity. Entry points with high complexity and low coverage get the highest scores, while well-tested utility functions get lower scores.
+
+**Example**:
+- Function with complexity=20, coverage=0%, dependencies=5, role=entry_point
+- Complexity factor: 8.0 (normalized)
+- Coverage factor: 3.0 (untested)
+- Dependency factor: 2.5 (moderate coupling)
+- Base score: (8.0 × 0.40) + (3.0 × 0.40) + (2.5 × 0.20) = 4.9
+- Final score: 4.9 × 1.5 (entry point) = **7.35**
+
+```bash
+# See score breakdown with verbosity
+debtmap -v
+
+# See detailed factor calculations
+debtmap -vv
+```
+
 ### Coverage and Testing
 
 **Q: How does coverage affect scores?**
 
-A: Coverage dampens scores to surface untested code:
-- Formula: `score_multiplier = 1.0 - coverage`
-- 0% coverage → full score (highest priority)
-- 100% coverage → score multiplied by 0 (lowest priority)
-- Untested complex code rises to the top
+A: Coverage is integrated into the unified scoring system as a factor:
+- **Coverage Factor Formula**: `(1 - coverage_percentage) × 2 + 1`
+- This factor is weighted at 40% in the unified scoring formula
+- **Base Score** = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)
+- **Final Score** = Base Score × Role Multiplier
+
+This means untested code (0% coverage) gets the highest coverage factor (3.0), while fully tested code (100% coverage) gets the lowest (1.0), ensuring untested complex code rises to the top.
 
 ```bash
 # Use coverage file
@@ -1451,6 +1711,8 @@ debtmap --coverage-file coverage.info
 # See coverage impact
 debtmap --coverage-file coverage.info -v
 ```
+
+See the FAQ entry "How is the 0-10 priority score calculated?" for complete scoring formula details.
 
 ### Context and Analysis
 
