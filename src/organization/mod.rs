@@ -1,18 +1,25 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod complexity_weighting;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
 
 pub use god_object_analysis::{
-    calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
-    recommend_module_splits, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    ModuleSplit,
+    calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
+    group_methods_by_responsibility, recommend_module_splits, GodObjectAnalysis,
+    GodObjectConfidence, GodObjectThresholds, ModuleSplit,
 };
 
 pub use god_object_metrics::{
     FileMetricHistory, FileTrend, GodObjectMetrics, GodObjectSnapshot, MetricsSummary,
     TrendDirection,
+};
+
+pub use complexity_weighting::{
+    aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_penalty,
+    calculate_complexity_weight, ComplexityWeight, ComplexityWeightedAnalysis,
+    FunctionComplexityInfo,
 };
 
 #[derive(Debug, Clone, PartialEq)]
