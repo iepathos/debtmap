@@ -1,0 +1,117 @@
+{
+  "chapter_id": "scoring-strategies",
+  "chapter_title": "Scoring Strategies",
+  "chapter_file": "book/src/scoring-strategies.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter provides comprehensive coverage of scoring strategies with mostly accurate information. However, several implementation details have drifted from the documented formulas, particularly in normalization, role multipliers, and function-level scoring weights. The chapter excels at explaining use cases and when to use each approach.",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Function-Level Scoring Formula (line 172)",
+      "description": "Chapter states function score formula uses weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15), but actual implementation uses different weights and a coverage multiplier approach",
+      "current_content": "Function Score = (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15)\nFinal Score = Base Score × Role Multiplier",
+      "should_be": "Base Score = (Complexity × 0.40) + (Dependency × 0.20)\nFinal Score = Base Score × Coverage Multiplier × Role Multiplier\nwhere Coverage Multiplier = 1.0 - coverage_percent",
+      "fix_suggestion": "Update formula to reflect spec 122 changes where coverage acts as a dampening multiplier rather than an additive factor. The implementation changed from additive (50/35/15) to multiplicative with rebalanced weights (40/40/20 for complexity/coverage/dependency in the deprecated model, and coverage-as-multiplier in the current model).",
+      "source_reference": "src/priority/scoring/calculation.rs:68-82 (calculate_base_score_with_coverage_multiplier), src/config.rs:121-139 (default weights)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Role Multipliers (lines 198-208)",
+      "description": "Role multiplier values documented in chapter differ from actual implementation defaults",
+      "current_content": "Entry points: 1.5x\nPure logic / Business logic: 1.2x-1.3x\nOrchestrator: 0.8x\nIO wrapper: 0.5x\nPattern match: 0.6x\nUtility: 0.5x",
+      "should_be": "Entry points: 0.9x (reduced from 0.8x)\nPure logic: 1.2x (reduced from 1.5x)\nOrchestrator: 0.8x (increased from 0.6x)\nIO wrapper: 0.7x (increased from 0.5x)\nPattern match: 0.6x (increased from 0.4x)\nUnknown: 1.0x",
+      "fix_suggestion": "Update role multiplier table to match actual implementation in config.rs. Note that the multipliers were rebalanced to be less extreme - pure logic was reduced from 1.5 to 1.2, orchestrator increased from 0.6 to 0.8, etc. Also add 'Unknown' role which defaults to 1.0x.",
+      "source_reference": "src/config.rs:182-200 (RoleMultipliers defaults)"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Score Normalization (lines 370-378)",
+      "description": "Normalization formula shown uses logarithmic scaling that differs from actual implementation",
+      "current_content": "score_normalized = if raw_score < 10.0 {\n    raw_score  // Linear below 10\n} else if raw_score < 100.0 {\n    sqrt(raw_score) × 3.33  // Square root 10-100\n} else {\n    log10(raw_score) × 10.0  // Logarithmic above 100\n}",
+      "should_be": "Current implementation uses simple linear clamping:\nscore.clamp(0.0, 100.0)\n\nThere's also normalize_final_score_with_metadata that uses:\n- Linear for < 10: raw_score\n- Square root for 10-100: 10.0 + (raw_score - 10.0).sqrt() * 3.33\n- Logarithmic for 100+: 41.59 + (raw_score / 100.0).ln() * 10.0",
+      "fix_suggestion": "Update normalization section to clarify that the default normalize_final_score uses simple linear clamping to 0-100 range. The complex multi-phase normalization (linear/sqrt/log) is available via normalize_final_score_with_metadata but may not be the default behavior. Verify which normalization is actually used in production output.",
+      "source_reference": "src/priority/scoring/calculation.rs:185-214 (normalize_final_score_with_metadata and normalize_final_score)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Configuration Examples",
+      "description": "Chapter shows TOML configuration for aggregation methods and role multipliers, but doesn't show the actual config file name or full structure",
+      "should_add": "Clarify that configuration file is named `.debtmap.toml` (not debtmap.yml as shown in some examples). Show complete config structure with [scoring], [role_multipliers], [aggregation], and [normalization] sections together.",
+      "fix_suggestion": "Add a comprehensive configuration example showing all related sections:\n```toml\n# .debtmap.toml\n[scoring]\ncoverage = 0.50\ncomplexity = 0.35\ndependency = 0.15\n\n[role_multipliers]\npure_logic = 1.2\norchestrator = 0.8\nio_wrapper = 0.7\nentry_point = 0.9\npattern_match = 0.6\nunknown = 1.0\n\n[aggregation]\nmethod = \"weighted_sum\"\nmin_problematic = 3\n\n[normalization]\nlinear_threshold = 10.0\nlogarithmic_threshold = 100.0\nsqrt_multiplier = 3.33\nlog_multiplier = 10.0\nshow_raw_scores = true\n```",
+      "source_reference": "src/config.rs (ScoringWeights, RoleMultipliers)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "File-Level Scoring Formula",
+      "description": "Density factor calculation in chapter uses max(1.0, function_count / 50) but implementation uses a different formula",
+      "current_content": "Density Factor: max(1.0, function_count / 50) if function_count > 50",
+      "should_be": "Density Factor: 1.0 + ((function_count - 50) * 0.02) if function_count > 50, else 1.0",
+      "fix_suggestion": "Update density factor formula to match implementation. The actual formula adds 0.02 per function above 50, creating a gradual linear increase rather than a jump to function_count/50.",
+      "source_reference": "src/priority/file_metrics.rs:91-95 (density_factor calculation)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Aggregation Methods",
+      "description": "Chapter lists aggregation methods but doesn't fully explain when each is most appropriate or their mathematical formulas",
+      "should_add": "Add detailed formulas for each aggregation method:\n- weighted_sum: Σ(function_score * complexity_weight * coverage_weight)\n- sum: Σ(function_scores)\n- logarithmic_sum: log(1 + Σ(function_scores))\n- max_plus_average: max_score * 0.6 + avg_score * 0.4\n\nAlso explain: weighted_sum emphasizes high-impact functions, logarithmic_sum is best for legacy codebases with many small issues to avoid explosion, max_plus_average balances worst-case with typical-case.",
+      "fix_suggestion": "Expand the aggregation methods section with mathematical formulas and decision criteria. Add a comparison table showing which method to use based on codebase characteristics (new vs legacy, concentrated vs distributed issues, etc.).",
+      "source_reference": "book/src/scoring-strategies.md:110-150 (existing aggregation section)"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Coverage Factor vs Coverage Multiplier",
+      "description": "Chapter uses 'Coverage Factor' terminology which is deprecated in favor of 'Coverage Multiplier' (spec 122)",
+      "current_content": "Coverage Factor: (1 - coverage_percent) × 2 + 1",
+      "should_be": "Coverage Multiplier: 1.0 - coverage_percent (applied multiplicatively, not additively)",
+      "fix_suggestion": "Update terminology throughout to use 'Coverage Multiplier' instead of 'Coverage Factor'. Clarify that coverage now dampens the base score rather than adding to it. The old additive model (Coverage Factor) is deprecated.",
+      "source_reference": "src/priority/scoring/calculation.rs:8-21 (calculate_coverage_multiplier), src/priority/scoring/calculation.rs:24-52 (deprecated calculate_coverage_factor)"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent use case explanations for when to use file-level vs function-level scoring",
+    "Clear examples showing both scoring approaches applied to the same codebase",
+    "Comprehensive command examples for each use case",
+    "Good progression from concepts to practical application",
+    "Helpful comparison examples showing how different scores lead to different refactoring decisions",
+    "Well-structured sections with clear headings",
+    "Strong focus on practical workflow integration",
+    "Good explanation of god object detection in file-level scoring"
+  ],
+  "improvement_suggestions": [
+    "Add a migration note explaining changes from the old additive coverage model to the new multiplicative model",
+    "Include a troubleshooting section for score interpretation (e.g., 'Why is my well-tested complex function getting a low score?')",
+    "Add visual examples showing how score normalization affects different raw score ranges",
+    "Clarify the relationship between coverage dampening and the scoring weights",
+    "Add examples showing the same function scored with different role classifications",
+    "Include a section on score stability - how much do scores change with small code changes?",
+    "Add guidance on calibrating role multipliers for different project types",
+    "Show before/after examples of how configuration changes affect output"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-20",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [
+      "File-level scoring",
+      "Function-level scoring",
+      "When to use each approach",
+      "Aggregation methods",
+      "Score normalization",
+      "Use case comparison"
+    ],
+    "validation_focus": "Check that file-level and function-level scoring differences are explained with use cases",
+    "implementation_files_reviewed": [
+      "src/priority/scoring/calculation.rs",
+      "src/priority/file_metrics.rs",
+      "src/priority/debt_aggregator.rs",
+      "src/config.rs"
+    ]
+  }
+}
