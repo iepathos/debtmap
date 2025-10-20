@@ -1,8 +1,9 @@
 use super::{
-    aggregate_weighted_complexity, calculate_avg_complexity, calculate_god_object_score,
-    calculate_god_object_score_weighted, determine_confidence, group_methods_by_responsibility,
-    FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds, MaintainabilityImpact,
-    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+    aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_weight,
+    calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
+    group_methods_by_responsibility, FunctionComplexityInfo, GodObjectAnalysis,
+    GodObjectThresholds, MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector,
+    PurityAnalyzer, PurityDistribution, PurityLevel, ResponsibilityGroup,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
@@ -108,12 +109,28 @@ impl GodObjectDetector {
         let responsibility_groups = group_methods_by_responsibility(&all_methods);
         let responsibility_count = responsibility_groups.len();
 
-        // Calculate complexity-weighted metrics
+        // Calculate complexity-weighted metrics (without purity)
         let weighted_method_count = aggregate_weighted_complexity(&visitor.function_complexity);
         let avg_complexity = calculate_avg_complexity(&visitor.function_complexity);
 
-        // Use weighted scoring if we have complexity data, otherwise fall back to raw count
-        let god_object_score = if !visitor.function_complexity.is_empty() {
+        // Calculate purity-weighted metrics
+        let (purity_weighted_count, purity_distribution) = if !visitor.function_items.is_empty() {
+            Self::calculate_purity_weights(&visitor.function_items, &visitor.function_complexity)
+        } else {
+            (weighted_method_count, None)
+        };
+
+        // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
+        let god_object_score = if purity_distribution.is_some() {
+            calculate_god_object_score_weighted(
+                purity_weighted_count,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                avg_complexity,
+                &thresholds,
+            )
+        } else if !visitor.function_complexity.is_empty() {
             calculate_god_object_score_weighted(
                 weighted_method_count,
                 total_fields,
@@ -172,7 +189,72 @@ impl GodObjectDetector {
             recommended_splits,
             confidence,
             responsibilities,
+            purity_distribution,
         }
+    }
+
+    /// Calculate purity-weighted function contributions
+    ///
+    /// Combines complexity weighting with purity weighting to produce a total weight
+    /// for each function. Pure functions contribute less to god object score.
+    fn calculate_purity_weights(
+        function_items: &[syn::ItemFn],
+        function_complexity: &[FunctionComplexityInfo],
+    ) -> (f64, Option<PurityDistribution>) {
+        if function_items.is_empty() {
+            return (0.0, None);
+        }
+
+        // Build a map of function names to complexity for quick lookup
+        let complexity_map: HashMap<String, u32> = function_complexity
+            .iter()
+            .map(|f| (f.name.clone(), f.cyclomatic_complexity))
+            .collect();
+
+        let mut pure_count = 0;
+        let mut probably_pure_count = 0;
+        let mut impure_count = 0;
+        let mut pure_weight = 0.0;
+        let mut probably_pure_weight = 0.0;
+        let mut impure_weight = 0.0;
+
+        // Analyze each function for purity and calculate combined weights
+        for func in function_items {
+            let name = func.sig.ident.to_string();
+            let purity_level = PurityAnalyzer::analyze(func);
+            let complexity = complexity_map.get(&name).copied().unwrap_or(1);
+
+            let complexity_weight = calculate_complexity_weight(complexity);
+            let purity_weight_multiplier = purity_level.weight_multiplier();
+            let total_weight = complexity_weight * purity_weight_multiplier;
+
+            match purity_level {
+                PurityLevel::Pure => {
+                    pure_count += 1;
+                    pure_weight += total_weight;
+                }
+                PurityLevel::ProbablyPure => {
+                    probably_pure_count += 1;
+                    probably_pure_weight += total_weight;
+                }
+                PurityLevel::Impure => {
+                    impure_count += 1;
+                    impure_weight += total_weight;
+                }
+            }
+        }
+
+        let total_weighted = pure_weight + probably_pure_weight + impure_weight;
+        let distribution = PurityDistribution {
+            pure_count,
+            probably_pure_count,
+            impure_count,
+            pure_weight_contribution: pure_weight,
+            probably_pure_weight_contribution: probably_pure_weight,
+            impure_weight_contribution: impure_weight,
+        };
+
+        (total_weighted, Some(distribution))
     }
 
     #[allow(dead_code)]
@@ -438,10 +520,23 @@ struct Responsibility {
     cohesion_score: f64,
 }
 
+/// Represents weighted contribution of a function to god object score
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct FunctionWeight {
+    pub name: String,
+    pub complexity: u32,
+    pub purity_level: PurityLevel,
+    pub complexity_weight: f64,
+    pub purity_weight: f64,
+    pub total_weight: f64,
+}
+
 struct TypeVisitor {
     types: HashMap<String, TypeAnalysis>,
     standalone_functions: Vec<String>,
     function_complexity: Vec<FunctionComplexityInfo>,
+    function_items: Vec<syn::ItemFn>,
     location_extractor: Option<UnifiedLocationExtractor>,
 }
 
@@ -451,6 +546,7 @@ impl TypeVisitor {
             types: HashMap::new(),
             standalone_functions: Vec::new(),
             function_complexity: Vec::new(),
+            function_items: Vec::new(),
             location_extractor,
         }
     }
@@ -617,6 +713,9 @@ impl<'ast> Visit<'ast> for TypeVisitor {
         // Extract complexity information
         let complexity_info = self.extract_function_complexity(node);
         self.function_complexity.push(complexity_info);
+
+        // Store the function item for purity analysis
+        self.function_items.push(node.clone());
     }
 }
 
