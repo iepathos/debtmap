@@ -25,8 +25,8 @@ setup:
   - shell: "mkdir -p $ANALYSIS_DIR"
 
   # Step 1: Analyze codebase for workflow features, command types, and configuration
+  # Note: May not commit if features haven't changed since last analysis
   - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
-    commit_required: true
 
   # Step 2: Detect documentation gaps and create missing chapters
   # Note: May not commit if no gaps found, which is a successful outcome
