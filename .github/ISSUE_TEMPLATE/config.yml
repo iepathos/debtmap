@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/iepathos/debtmap/discussions
+    about: Ask questions and discuss debtmap with the community
+  - name: Documentation
+    url: https://iepathos.github.io/debtmap/
+    about: Read the full documentation for guides and tutorials
+  - name: Contributing Guide
+    url: https://github.com/iepathos/debtmap/blob/master/CONTRIBUTING.md
+    about: Learn how to contribute to debtmap
