@@ -3,157 +3,103 @@
   "chapter_title": "Configuration",
   "chapter_file": "book/src/configuration.md",
   "drift_detected": true,
-  "severity": "medium",
-  "quality_assessment": "Chapter is comprehensive and well-structured, but contains several documented features that don't exist in config.rs, and has minor inconsistencies with actual implementation defaults",
+  "severity": "low",
+  "quality_assessment": "Chapter is comprehensive and highly accurate. Configuration documentation closely matches implementation in src/config.rs. All major configuration sections are documented with correct field names, default values, and examples. Only minor discrepancies exist with format specification and a few outdated comments showing old defaults.",
   "issues": [
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Config Files - debtmap init",
-      "description": "Chapter documents 'debtmap init' command but implementation details not verified in main.rs CLI",
-      "should_add": "Verify that 'debtmap init' command exists and creates .debtmap.toml as documented",
-      "fix_suggestion": "Check src/main.rs and src/commands/ for init command implementation",
-      "source_reference": "book/src/configuration.md:12-15"
-    },
     {
       "type": "outdated_information",
       "severity": "low",
       "section": "Role Multipliers - Default Values",
-      "description": "Chapter shows old default multiplier values that differ from implementation",
-      "current_content": "pure_logic = 1.2 (Chapter says default: 1.5 in comment)\norchestrator = 0.8 (Chapter says default: 0.6 in comment)\nio_wrapper = 0.7 (Chapter says default: 0.5 in comment)\nentry_point = 0.9 (Chapter says default: 0.8 in comment)\npattern_match = 0.6 (Chapter says default: 0.4 in comment)",
-      "should_be": "Update chapter comments to reflect actual implementation defaults:\npure_logic = 1.2 (was 1.5)\norchestrator = 0.8 (was 0.6)\nio_wrapper = 0.7 (was 0.5)\nentry_point = 0.9 (was 0.8)\npattern_match = 0.6 (was 0.4)",
-      "fix_suggestion": "Remove confusing '(default: X.X)' comments showing old values, just show current defaults",
-      "source_reference": "src/config.rs:182-204"
-    },
-    {
-      "type": "missing_implementation",
-      "severity": "medium",
-      "section": "Exclusion Patterns - Function Name Exclusion",
-      "description": "Chapter documents [ignore.functions] patterns configuration, but this is not found in DebtmapConfig struct",
-      "current_content": "[ignore.functions]\npatterns = [\n    \"setup_test_*\",\n    \"mock_*\",\n    ...\n]",
-      "should_be": "Either implement FunctionIgnoreConfig in src/config.rs or remove this section from docs",
-      "fix_suggestion": "Add 'pub functions: Option<FunctionIgnoreConfig>' to IgnoreConfig struct, or document that function filtering is handled differently",
-      "source_reference": "book/src/configuration.md:231-261, src/config.rs:927-929"
-    },
-    {
-      "type": "missing_implementation",
-      "severity": "high",
-      "section": "Advanced Configuration - Pattern-Based Adjustments",
-      "description": "Chapter extensively documents [patterns.detectors], [patterns.builders], [patterns.matching], etc. configuration sections, but these PatternConfig structs are not found in config.rs",
-      "current_content": "[patterns.detectors]\nname_patterns = [\"detect_*\", \"check_*\"]\ncomplexity_adjustment = 0.7\n\n[patterns.builders]\nname_patterns = [\"*Builder\", \"with_*\"]\ncomplexity_adjustment = 0.8",
-      "should_be": "Either:\n1. Implement PatternConfig structs in src/config.rs with fields for name_patterns, complexity_adjustment, cognitive_adjustment, orchestration_threshold, minimum_complexity\n2. Or document that pattern adjustments are hard-coded in src/complexity/patterns.rs and not configurable",
-      "fix_suggestion": "Check if pattern adjustments are actually configurable. If not, either implement configuration support or update chapter to explain that these are hard-coded analysis rules, not user-configurable settings",
-      "source_reference": "book/src/configuration.md:330-372, src/config.rs (no PatternConfig found)"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Entropy Configuration - Default Values",
-      "description": "Chapter shows entropy weight default as 0.5, but implementation shows 1.0",
-      "current_content": "weight = 0.5  # Weight in complexity adjustment (0.0-1.0) (line 314)",
-      "should_be": "weight = 1.0  # Weight in complexity adjustment (0.0-1.0)",
-      "fix_suggestion": "Update example to show default_entropy_weight() returns 1.0, not 0.5",
-      "source_reference": "src/config.rs:890-891, book/src/configuration.md:314"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Entropy Configuration - min_tokens",
-      "description": "Chapter shows min_tokens default as 10, but implementation shows 20",
-      "current_content": "min_tokens = 10  # Minimum tokens for analysis (line 315)",
-      "should_be": "min_tokens = 20  # Minimum tokens for analysis",
-      "fix_suggestion": "Update example to reflect default_entropy_min_tokens() returns 20",
-      "source_reference": "src/config.rs:894-895, book/src/configuration.md:315"
+      "description": "Chapter shows old default multiplier values in comments that differ from current implementation",
+      "current_content": "pure_logic = 1.2        # Prioritize pure computation (default: 1.2)\norchestrator = 0.8      # Reduce for delegation functions (default: 0.8)\nio_wrapper = 0.7        # Reduce for I/O wrappers (default: 0.7)\nentry_point = 0.9       # Slight reduction for main/CLI (default: 0.9)\npattern_match = 0.6     # Reduce for pattern matching (default: 0.6)",
+      "should_be": "Current values ARE correct (1.2, 0.8, 0.7, 0.9, 0.6) and match implementation. The comments showing '(default: X.X)' are accurate.",
+      "fix_suggestion": "No change needed - verification shows chapter is accurate. Implementation shows pure_logic: 1.2 (line 183), orchestrator: 0.8 (line 186), io_wrapper: 0.7 (line 190), entry_point: 0.9 (line 194), pattern_match: 0.6 (line 198).",
+      "source_reference": "src/config.rs:182-204, book/src/configuration.md:84-89"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Thresholds Configuration - Missing Fields",
-      "description": "Chapter shows basic thresholds but doesn't mention all fields in ThresholdsConfig struct",
-      "should_add": "Document that thresholds section can also include: minimum_debt_score, minimum_cyclomatic_complexity, minimum_cognitive_complexity, minimum_risk_score",
-      "fix_suggestion": "The chapter does document these fields in 'Minimum Thresholds' section (lines 126-136), so this is actually complete. No action needed.",
-      "source_reference": "src/config.rs:656-680, book/src/configuration.md:126-136"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Display Configuration - Missing default",
-      "description": "Chapter doesn't explicitly state the default value for tiered display",
-      "should_add": "Explicitly state that tiered display is enabled by default (default: true)",
-      "fix_suggestion": "Update line 269 to include '(default: true)' comment",
-      "source_reference": "src/config.rs:554-555, book/src/configuration.md:269"
-    },
-    {
-      "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "Output Configuration",
-      "description": "Chapter documents output.default_format config but doesn't explain all supported format values beyond the three examples",
-      "should_add": "Document complete list of supported output formats and reference the OutputFormat enum",
-      "fix_suggestion": "Verify all supported formats in src/output/mod.rs and document them",
-      "source_reference": "book/src/configuration.md:276-288"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Configuration Structure - Missing Fields",
-      "description": "DebtmapConfig has fields not documented in chapter: loc, tiers, complexity_thresholds",
-      "should_add": "Document these additional configuration sections:\n- [loc] for lines of code counting configuration\n- [tiers] for tier configuration\n- [complexity_thresholds] for enhanced complexity detection",
-      "fix_suggestion": "Add subsections documenting these configuration options, or note if they are internal/advanced features",
-      "source_reference": "src/config.rs:621-627"
+      "section": "Advanced Configuration - LOC, Tiers, Complexity Thresholds",
+      "description": "Chapter mentions [loc], [tiers], and [complexity_thresholds] sections exist but doesn't provide full details",
+      "current_content": "Lines 415-421: 'Debtmap supports additional advanced configuration options: [loc], [tiers], [complexity_thresholds]... Most users won't need to configure them explicitly.'",
+      "should_be": "This is acceptable - chapter acknowledges their existence and notes they have sensible defaults",
+      "fix_suggestion": "Current approach is good - mentions advanced options without overwhelming users. Could add link to API documentation for full details if needed.",
+      "source_reference": "book/src/configuration.md:415-421, src/config.rs:673-678"
     },
     {
       "type": "unclear_content",
       "severity": "low",
-      "section": "Validation Thresholds - max_total_debt_score comment",
-      "description": "Comment in chapter says 'Note: Uses unified scoring where each item is capped at 10.0' but this is implementation detail that may confuse users",
-      "should_clarify": "Explain what 'unified scoring' means or simplify the explanation",
-      "fix_suggestion": "Replace with simpler explanation: 'Maximum total debt score across all items (default: 1000). Each debt item contributes a score from 0-10.'",
-      "source_reference": "book/src/configuration.md:697-700"
+      "section": "Config Files - Format Support",
+      "description": "Chapter consistently shows .debtmap.toml examples, but features.json indicates 'YAML or JSON' support",
+      "current_content": "All examples use TOML format (.debtmap.toml)",
+      "should_be": "Clarify which format(s) are actually supported. Implementation loads .debtmap.toml via toml::from_str, but features.json suggests YAML/JSON support.",
+      "fix_suggestion": "Verify if YAML/JSON formats are supported. If only TOML is supported, update features.json. If multiple formats are supported, add note about format precedence.",
+      "source_reference": "src/config.rs:1017 uses toml::from_str, features.json:408 states 'YAML or JSON configuration file'"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of major configuration sections",
-    "Excellent examples showing complete configuration files",
-    "Good organization with clear sections for different config categories",
-    "Helpful best practices section for different use cases (strict standards, legacy codebases, open source libraries)",
-    "Thorough troubleshooting section",
-    "Good explanation of validation rules and automatic normalization",
-    "Clear documentation of scoring weights with validation rules",
-    "Well-structured entropy configuration section",
-    "Good examples of language-specific configuration",
-    "Helpful CLI integration section showing flag overrides"
+    "Excellent comprehensive coverage of all configuration sections",
+    "All struct field names match implementation exactly (ScoringWeights, RoleMultipliers, ThresholdsConfig, etc.)",
+    "Default values are accurate throughout (scoring weights: 0.50/0.35/0.15, entropy enabled: true, god object enabled: true)",
+    "Validation rules correctly documented (weights must sum to 1.0 ± 0.001 tolerance)",
+    "Normalization behavior accurately explained with examples",
+    "Complete and accurate ValidationThresholds documentation with all 8 fields",
+    "God object thresholds for all languages (Rust, Python, JavaScript) match implementation exactly",
+    "Entropy configuration section is comprehensive with all 10+ fields documented correctly",
+    "Context-aware detection configuration matches ContextConfig struct completely",
+    "Error handling configuration accurately documents all detection flags",
+    "Language-specific features configuration is accurate (Rust dead code detection: false by default)",
+    "Display configuration matches DisplayConfig struct (tiered: true, items_per_tier: 5)",
+    "Role coverage weights section is complete and accurate",
+    "Orchestrator detection configuration is documented (though not in original analysis)",
+    "Ignore patterns documentation matches IgnoreConfig with correct glob syntax examples",
+    "CLI integration section accurately shows flag overrides",
+    "Troubleshooting section addresses real configuration issues",
+    "Best practices section provides practical examples for different scenarios",
+    "Complete example configuration at the end demonstrates working TOML syntax"
   ],
   "improvement_suggestions": [
-    "Verify and document or remove pattern-based adjustment configuration (sections 330-372) - this appears to be the biggest drift issue",
-    "Clarify function name exclusion patterns ([ignore.functions]) - verify if this is implemented or planned",
-    "Update default values to match implementation exactly (role multipliers, entropy weight, entropy min_tokens)",
-    "Add documentation for missing config fields: loc, tiers, complexity_thresholds",
-    "Consider adding a 'Configuration Reference' table listing all top-level sections with brief descriptions",
-    "Add note about which features are stable vs experimental",
-    "Consider adding migration guide if pattern-based adjustments were removed or changed",
-    "Verify 'debtmap init' command exists and works as documented"
+    "Clarify configuration file format support (TOML only vs TOML/YAML/JSON)",
+    "Add explicit mention that .debtmap.toml is loaded via directory traversal (up to 10 parent directories)",
+    "Consider adding a 'Quick Reference' table at the beginning listing all top-level sections",
+    "Add note about environment variables (DEBTMAP_CACHE_DIR, DEBTMAP_CONTEXT_AWARE from features.json)",
+    "Consider adding validation command example if one exists for checking config syntax",
+    "Add note about configuration precedence: CLI flags > config file > defaults",
+    "Could add 'see also' links to related chapters at section level, not just at end"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-13",
-    "feature_inventory": "N/A - analyzed directly against src/config.rs implementation",
+    "analyzed_at": "2025-10-20",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
     "topics_covered": [
       "Config files",
       "Scoring weights",
       "Role multipliers",
+      "Role coverage weights",
+      "Orchestrator detection",
       "Thresholds",
+      "Minimum thresholds",
       "Validation thresholds",
       "Language configuration",
       "Exclusion patterns",
       "Display configuration",
       "Output configuration",
       "Normalization",
-      "Context-aware detection",
-      "Entropy configuration",
-      "Pattern adjustments",
+      "Entropy-based complexity",
       "God object detection",
-      "Error handling",
-      "External API configuration"
+      "Context-aware detection",
+      "Error handling detection",
+      "External API configuration",
+      "LOC counting",
+      "Tiers",
+      "Complexity thresholds",
+      "CLI integration",
+      "Configuration validation",
+      "Best practices for different scenarios",
+      "Troubleshooting"
     ],
-    "validation_focus": "Check config options match implementation in src/config/"
+    "validation_focus": "Check config options match implementation in src/config/",
+    "implementation_files_verified": [
+      "src/config.rs (complete verification of all structs and defaults)"
+    ]
   }
 }
