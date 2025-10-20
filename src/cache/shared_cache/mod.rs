@@ -12,6 +12,43 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 // Types now imported from other modules
 
+/// Type of directory entry for classification
+#[derive(Debug, PartialEq)]
+pub(crate) enum EntryType {
+    File,
+    Directory,
+    Other,
+}
+
+/// Classify a path as file, directory, or other
+pub(crate) fn classify_entry(path: &Path) -> EntryType {
+    if path.is_file() {
+        EntryType::File
+    } else if path.is_dir() {
+        EntryType::Directory
+    } else {
+        EntryType::Other
+    }
+}
+
+/// Build destination path from base and entry name
+pub(crate) fn build_dest_path(dest: &Path, entry_name: &std::ffi::OsStr) -> PathBuf {
+    dest.join(entry_name)
+}
+
+/// Copy a single file with error context
+pub(crate) fn copy_file_entry(src: &Path, dest: &Path) -> Result<()> {
+    fs::copy(src, dest)
+        .with_context(|| format!("Failed to copy file from {:?} to {:?}", src, dest))?;
+    Ok(())
+}
+
+/// Create a directory with error context
+pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest).with_context(|| format!("Failed to create directory {:?}", dest))?;
+    Ok(())
+}
+
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
@@ -706,16 +743,22 @@ impl SharedCache {
     fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
         #[allow(clippy::only_used_in_recursion)]
         let _ = self; // Silence clippy warning
-        for entry in fs::read_dir(src)? {
+        for entry in
+            fs::read_dir(src).with_context(|| format!("Failed to read directory {:?}", src))?
+        {
             let entry = entry?;
             let path = entry.path();
-            let dest_path = dest.join(entry.file_name());
+            let dest_path = build_dest_path(dest, &entry.file_name());
 
-            if path.is_file() {
-                fs::copy(&path, &dest_path)?;
-            } else if path.is_dir() {
-                fs::create_dir_all(&dest_path)?;
-                self.copy_dir_recursive(&path, &dest_path)?;
+            match classify_entry(&path) {
+                EntryType::File => copy_file_entry(&path, &dest_path)?,
+                EntryType::Directory => {
+                    copy_dir_entry(&dest_path)?;
+                    self.copy_dir_recursive(&path, &dest_path)?;
+                }
+                EntryType::Other => {
+                    // Skip other entry types (symlinks, etc.)
+                }
             }
         }
         Ok(())
