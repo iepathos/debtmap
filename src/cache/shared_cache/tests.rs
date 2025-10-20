@@ -809,3 +809,350 @@ fn test_cleanup_pure_functions_behavior() {
     assert_eq!(keys_to_remove_multiple[0], "oldest");
     assert_eq!(keys_to_remove_multiple[1], "middle");
 }
+
+// Tests for copy_dir_recursive
+#[cfg(test)]
+mod copy_dir_recursive_tests {
+    use super::*;
+    use std::fs;
+
+    fn create_test_cache() -> (SharedCache, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_var("DEBTMAP_CACHE_DIR", temp_dir.path().to_str().unwrap());
+        std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
+
+        let cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
+        (cache, temp_dir)
+    }
+
+    fn create_test_file(dir: &Path, name: &str, content: &str) {
+        fs::write(dir.join(name), content).unwrap();
+    }
+
+    fn create_test_dir(base: &Path, name: &str) -> PathBuf {
+        let path = base.join(name);
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_copy_single_file() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source directory with a single file
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "file.txt", "test content");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify the file was copied
+        let dest_file = dest_dir.join("file.txt");
+        assert!(dest_file.exists());
+        let content = fs::read_to_string(dest_file).unwrap();
+        assert_eq!(content, "test content");
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_directory_with_multiple_files() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source directory with multiple files
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "file1.txt", "content 1");
+        create_test_file(&src_dir, "file2.txt", "content 2");
+        create_test_file(&src_dir, "file3.txt", "content 3");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify all files were copied
+        assert!(dest_dir.join("file1.txt").exists());
+        assert!(dest_dir.join("file2.txt").exists());
+        assert!(dest_dir.join("file3.txt").exists());
+
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("file1.txt")).unwrap(),
+            "content 1"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("file2.txt")).unwrap(),
+            "content 2"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("file3.txt")).unwrap(),
+            "content 3"
+        );
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_nested_directories() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create nested directory structure
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "root.txt", "root content");
+
+        let level1 = create_test_dir(&src_dir, "level1");
+        create_test_file(&level1, "level1.txt", "level1 content");
+
+        let level2 = create_test_dir(&level1, "level2");
+        create_test_file(&level2, "level2.txt", "level2 content");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory recursively
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify nested structure was copied
+        assert!(dest_dir.join("root.txt").exists());
+        assert!(dest_dir.join("level1").exists());
+        assert!(dest_dir.join("level1/level1.txt").exists());
+        assert!(dest_dir.join("level1/level2").exists());
+        assert!(dest_dir.join("level1/level2/level2.txt").exists());
+
+        // Verify content
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("root.txt")).unwrap(),
+            "root content"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("level1/level1.txt")).unwrap(),
+            "level1 content"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("level1/level2/level2.txt")).unwrap(),
+            "level2 content"
+        );
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_empty_directory() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create empty source directory
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the empty directory (should succeed with no operations)
+        let result = cache.copy_dir_recursive(&src_dir, &dest_dir);
+        assert!(result.is_ok());
+
+        // Verify destination exists and is empty
+        assert!(dest_dir.exists());
+        let entries: Vec<_> = fs::read_dir(&dest_dir).unwrap().collect();
+        assert_eq!(entries.len(), 0);
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_error_source_not_found() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Try to copy from non-existent source
+        let src_dir = temp_dir.path().join("nonexistent");
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Should fail with error
+        let result = cache.copy_dir_recursive(&src_dir, &dest_dir);
+        assert!(result.is_err());
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_mixed_files_and_directories() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source with mixed content
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "file1.txt", "file content 1");
+
+        let subdir1 = create_test_dir(&src_dir, "subdir1");
+        create_test_file(&subdir1, "file2.txt", "file content 2");
+
+        create_test_file(&src_dir, "file3.txt", "file content 3");
+
+        let subdir2 = create_test_dir(&src_dir, "subdir2");
+        create_test_file(&subdir2, "file4.txt", "file content 4");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify structure
+        assert!(dest_dir.join("file1.txt").exists());
+        assert!(dest_dir.join("file3.txt").exists());
+        assert!(dest_dir.join("subdir1").is_dir());
+        assert!(dest_dir.join("subdir1/file2.txt").exists());
+        assert!(dest_dir.join("subdir2").is_dir());
+        assert!(dest_dir.join("subdir2/file4.txt").exists());
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_deeply_nested_structure() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create deeply nested structure (5 levels)
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        let mut current_dir = src_dir.clone();
+
+        for i in 1..=5 {
+            create_test_file(&current_dir, &format!("file_{}.txt", i), &format!("content {}", i));
+            current_dir = create_test_dir(&current_dir, &format!("level{}", i));
+        }
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the deeply nested directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify the deepest file exists
+        assert!(dest_dir.join("level1/level2/level3/level4/level5").exists());
+
+        // Verify files at each level
+        for i in 1..=5 {
+            let mut path = dest_dir.clone();
+            for j in 1..i {
+                path = path.join(format!("level{}", j));
+            }
+            path = path.join(format!("file_{}.txt", i));
+            assert!(path.exists(), "File should exist at: {:?}", path);
+        }
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_preserves_file_contents() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source with various file types and contents
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "text.txt", "Simple text content");
+        create_test_file(&src_dir, "empty.txt", "");
+        create_test_file(&src_dir, "multiline.txt", "Line 1\nLine 2\nLine 3");
+
+        // Binary-like content
+        let binary_content = "Binary\0content\nwith\0nulls";
+        fs::write(src_dir.join("binary.dat"), binary_content).unwrap();
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify all contents match exactly
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("text.txt")).unwrap(),
+            "Simple text content"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("empty.txt")).unwrap(),
+            ""
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("multiline.txt")).unwrap(),
+            "Line 1\nLine 2\nLine 3"
+        );
+        assert_eq!(
+            fs::read(dest_dir.join("binary.dat")).unwrap(),
+            binary_content.as_bytes()
+        );
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_with_empty_subdirectories() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source with empty subdirectories
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+        create_test_file(&src_dir, "root.txt", "root");
+
+        let empty_dir1 = create_test_dir(&src_dir, "empty1");
+        let _ = empty_dir1; // Silence unused warning
+
+        let subdir = create_test_dir(&src_dir, "subdir");
+        create_test_file(&subdir, "file.txt", "content");
+
+        let empty_dir2 = create_test_dir(&subdir, "empty2");
+        let _ = empty_dir2; // Silence unused warning
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify structure including empty directories
+        assert!(dest_dir.join("root.txt").exists());
+        assert!(dest_dir.join("empty1").is_dir());
+        assert!(dest_dir.join("subdir").is_dir());
+        assert!(dest_dir.join("subdir/file.txt").exists());
+        assert!(dest_dir.join("subdir/empty2").is_dir());
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+
+    #[test]
+    fn test_copy_handles_special_filenames() {
+        let (cache, temp_dir) = create_test_cache();
+
+        // Create source with various filename patterns
+        let src_dir = create_test_dir(temp_dir.path(), "source");
+
+        // Various special but valid filenames
+        create_test_file(&src_dir, "file with spaces.txt", "spaces");
+        create_test_file(&src_dir, "file-with-dashes.txt", "dashes");
+        create_test_file(&src_dir, "file_with_underscores.txt", "underscores");
+        create_test_file(&src_dir, "file.multiple.dots.txt", "dots");
+
+        // Create destination directory
+        let dest_dir = create_test_dir(temp_dir.path(), "destination");
+
+        // Copy the directory
+        cache.copy_dir_recursive(&src_dir, &dest_dir).unwrap();
+
+        // Verify all files were copied correctly
+        assert!(dest_dir.join("file with spaces.txt").exists());
+        assert!(dest_dir.join("file-with-dashes.txt").exists());
+        assert!(dest_dir.join("file_with_underscores.txt").exists());
+        assert!(dest_dir.join("file.multiple.dots.txt").exists());
+
+        std::env::remove_var("DEBTMAP_CACHE_DIR");
+        std::env::remove_var("DEBTMAP_CACHE_AUTO_PRUNE");
+    }
+}
