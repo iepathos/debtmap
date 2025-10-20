@@ -1,0 +1,158 @@
+{
+  "chapter_id": "context-providers",
+  "chapter_title": "Context Providers",
+  "chapter_file": "book/src/context-providers.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter is completely missing from the book despite being a fully implemented feature with CLI integration and references in other chapters. This is a critical documentation gap that will prevent users from understanding and using context-aware risk analysis.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "Chapter file does not exist in book/src/ directory. Feature is fully implemented and referenced elsewhere but has no dedicated documentation.",
+      "should_add": "Complete chapter explaining context providers feature",
+      "fix_suggestion": "Create book/src/context-providers.md with comprehensive documentation covering: overview, each provider type (critical_path, dependency, git_history), configuration, CLI usage, use cases, and examples",
+      "source_reference": "src/risk/context/mod.rs, src/cli.rs:64-73"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Context Provider Overview",
+      "description": "No explanation of what context providers are and why they're useful",
+      "should_add": "Introduction explaining context providers enhance risk analysis by incorporating additional factors beyond complexity and coverage",
+      "fix_suggestion": "Add overview section explaining the ContextProvider trait, ContextAggregator architecture, and how context influences risk scoring (contextual_risk = base_risk * (1.0 + context_contribution))",
+      "source_reference": "src/risk/context/mod.rs:10-23, features.json:419-423"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Critical Path Provider",
+      "description": "No documentation for critical_path provider",
+      "should_add": "Detailed explanation of critical path detection including entry point identification, path weighting, and user-facing detection",
+      "fix_suggestion": "Document how critical path provider identifies functions on critical execution paths, explain entry_points detection, path_weight calculation, and is_user_facing flag. Include examples showing how entry points and API handlers get elevated priority.",
+      "source_reference": "src/risk/context/critical_path.rs, src/risk/context/mod.rs:46-50"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Dependency Provider",
+      "description": "No documentation for dependency provider",
+      "should_add": "Explanation of dependency chain analysis and blast radius calculation",
+      "fix_suggestion": "Document how dependency provider analyzes call graph relationships, calculates propagated_risk through dependency chains, identifies dependents, and computes blast_radius (impact scope). Explain how high-dependency functions get elevated risk scores.",
+      "source_reference": "src/risk/context/dependency.rs, src/risk/context/mod.rs:51-56"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Git History Provider",
+      "description": "No documentation for git_history provider",
+      "should_add": "Explanation of version control history integration",
+      "fix_suggestion": "Document how git_history provider uses VCS data to detect change_frequency, bug_density, age_days, and author_count. Explain why frequently-changed code with multiple authors indicates higher risk. Include troubleshooting for non-git repos.",
+      "source_reference": "src/risk/context/git_history.rs, src/risk/context/mod.rs:57-62"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Enabling Context Providers",
+      "description": "No documentation on how to enable and configure providers",
+      "should_add": "CLI usage instructions for enabling context-aware analysis",
+      "fix_suggestion": "Document CLI flags: --context/--enable-context to enable all providers, --context-providers critical_path,dependency,git_history to enable specific ones, --disable-context to exclude specific providers. Include practical examples.",
+      "source_reference": "src/cli.rs:64-73, book/src/cli-reference.md:82-84"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Context Details Structure",
+      "description": "No documentation of ContextDetails enum and data structures",
+      "should_add": "Reference documentation for context data structures",
+      "fix_suggestion": "Document ContextDetails enum variants (CriticalPath, DependencyChain, Historical, Business) with field explanations. This helps users understand JSON output when using --format json.",
+      "source_reference": "src/risk/context/mod.rs:44-68"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Context Weighting",
+      "description": "No explanation of how provider weights affect scoring",
+      "should_add": "Explanation of provider weight system and contribution calculation",
+      "fix_suggestion": "Document that each provider has a weight (0.0-1.0) and contribution score, with formula: total_contribution = Σ(contribution × weight). Explain how contextual_risk = base_risk × (1.0 + total_contribution).",
+      "source_reference": "src/risk/context/mod.rs:167-172, src/risk/context/mod.rs:189-192"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Use Cases and Examples",
+      "description": "No practical examples showing when to use different providers",
+      "should_add": "Real-world scenarios demonstrating provider value",
+      "fix_suggestion": "Add examples: (1) Use critical_path for API prioritization, (2) Use git_history to find change-prone code, (3) Use dependency to identify architectural impact, (4) Combine all providers for comprehensive risk assessment. Include sample output.",
+      "source_reference": "book/src/examples.md:204-207, book/src/cli-reference.md:347-353"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Performance Considerations",
+      "description": "No guidance on performance impact of context providers",
+      "should_add": "Performance characteristics and optimization tips",
+      "fix_suggestion": "Document that context providers add overhead (especially git_history for large repos). Recommend starting with dependency and critical_path only, add git_history if change patterns matter. Mention caching behavior.",
+      "source_reference": "book/src/troubleshooting.md:593-597"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Troubleshooting Context Providers",
+      "description": "No dedicated troubleshooting guidance for context provider issues",
+      "should_add": "Common issues and solutions section",
+      "fix_suggestion": "Cover: (1) Git errors → disable git_history, (2) Dependency analysis failures → disable dependency, (3) Performance issues → use fewer providers, (4) Debugging with -vvv flag. Link to troubleshooting chapter for details.",
+      "source_reference": "book/src/troubleshooting.md:478-568"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Business Context Provider",
+      "description": "Business priority/impact context defined in code but not implemented",
+      "should_add": "Note about future Business context provider",
+      "fix_suggestion": "Add note that Business context provider (for priority/impact annotations) is planned but not yet implemented. Currently available: critical_path, dependency, git_history.",
+      "source_reference": "src/risk/context/mod.rs:63-68"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Context Aggregator Architecture",
+      "description": "No explanation of aggregation and caching mechanism",
+      "should_add": "Technical details about context aggregation",
+      "fix_suggestion": "Optional advanced section explaining ContextAggregator caches results by file:function key, iterates through enabled providers, and combines contexts into ContextMap. Useful for developers extending debtmap.",
+      "source_reference": "src/risk/context/mod.rs:87-138"
+    }
+  ],
+  "positive_aspects": [
+    "Feature is well-implemented with clean trait-based architecture",
+    "CLI integration is complete and follows existing flag patterns",
+    "Other chapters correctly reference the feature",
+    "Troubleshooting chapter has good context provider coverage",
+    "Examples chapter shows practical usage patterns"
+  ],
+  "improvement_suggestions": [
+    "Create dedicated chapter as specified in SUMMARY.md or other chapter cross-references",
+    "Include visual diagram showing how context flows from providers → aggregator → risk adjustment",
+    "Add table comparing the three providers (what they detect, when to use, performance impact)",
+    "Show before/after examples demonstrating how context changes prioritization",
+    "Include configuration file examples for persistent context provider settings",
+    "Add section on interpreting context contribution in verbose output (-v flag)",
+    "Consider adding provider-specific configuration options in .debtmap.toml"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-20",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [],
+    "validation_focus": "Check that all context providers are documented with configuration and use cases",
+    "implementation_status": "fully_implemented",
+    "documentation_status": "missing",
+    "references_in_other_chapters": [
+      "book/src/cli-reference.md:82-84, 191-195, 347-353",
+      "book/src/troubleshooting.md:115-125, 478-568",
+      "book/src/examples.md:204-207, 673-683",
+      "book/src/configuration.md:435",
+      "book/src/scoring-strategies.md:242"
+    ]
+  }
+}
