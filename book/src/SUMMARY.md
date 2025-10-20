@@ -9,6 +9,7 @@
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide.md)
 - [Configuration](configuration.md)
+- [Cache Management](cache-management.md)
 - [Output Formats](output-formats.md)
 
 # Advanced Topics
