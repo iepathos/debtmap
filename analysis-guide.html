@@ -487,8 +487,70 @@ mod user_service {
     // ... 20+ more functions
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>When detected</strong>: Pattern analysis for responsibility clustering
+<p><strong>When detected</strong>: Complexity-weighted scoring system (see detailed explanation below)
 <strong>Action</strong>: Split into focused modules (parser, validator, repository, notifier)</p>
+<h4 id="complexity-weighted-god-object-detection"><a class="header" href="#complexity-weighted-god-object-detection">Complexity-Weighted God Object Detection</a></h4>
+<p>Debtmap uses <strong>complexity-weighted scoring</strong> for god object detection to reduce false positives on well-refactored code. This ensures that a file with 100 simple helper functions doesn’t rank higher than a file with 10 complex functions.</p>
+<p><strong>The Problem:</strong></p>
+<p>Traditional god object detection counts methods:</p>
+<ul>
+<li>File A: 100 methods (average complexity: 1.5) → Flagged as god object</li>
+<li>File B: 10 methods (average complexity: 17.0) → Not flagged</li>
+</ul>
+<p>But File A might be a well-organized utility module with many small helpers, while File B is truly problematic with highly complex functions that need refactoring.</p>
+<p><strong>The Solution:</strong></p>
+<p>Debtmap weights each function by its cyclomatic complexity using this formula:</p>
+<pre><code>weight = (max(1, complexity) / 3)^1.5
+</code></pre>
+<p><strong>Weight Examples:</strong></p>
+<ul>
+<li>Simple helper (complexity 1): weight ≈ 0.19</li>
+<li>Baseline function (complexity 3): weight = 1.0</li>
+<li>Moderate function (complexity 9): weight ≈ 5.2</li>
+<li>Complex function (complexity 17): weight ≈ 13.5</li>
+<li>Critical function (complexity 33): weight ≈ 36.5</li>
+</ul>
+<p><strong>God Object Score Calculation:</strong></p>
+<pre><code>weighted_method_count = sum(weight for each function)
+complexity_penalty = 0.7 if avg_complexity &lt; 3, 1.0 if 3-10, 1.5 if &gt; 10
+
+god_object_score = (
+    (weighted_method_count / threshold) * 40% +
+    (field_count / threshold) * 20% +
+    (responsibility_count / threshold) * 15% +
+    (lines_of_code / 500) * 25%
+) * complexity_penalty
+</code></pre>
+<p><strong>Threshold</strong>: God object detected if <code>score &gt;= 70.0</code></p>
+<p><strong>Real-World Example:</strong></p>
+<pre><code>shared_cache.rs:
+  - 100 functions, average complexity: 1.5
+  - Weighted score: ~19.0 (100 * 0.19)
+  - God object score: 45.2
+  - Result: Not a god object ✓
+
+legacy_parser.rs:
+  - 10 functions, average complexity: 17.0
+  - Weighted score: ~135.0 (10 * 13.5)
+  - God object score: 87.3
+  - Result: God object detected ✓
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li><strong>Reduces false positives</strong> on utility modules with many simple functions</li>
+<li><strong>Focuses attention</strong> on truly problematic complex modules</li>
+<li><strong>Rewards good refactoring</strong> - breaking large functions into small helpers improves score</li>
+<li><strong>Aligns with reality</strong> - complexity matters more than count for maintainability</li>
+</ul>
+<p><strong>How to View:</strong></p>
+<p>When Debtmap detects a god object, the output includes:</p>
+<ul>
+<li>Raw method count</li>
+<li>Weighted method count</li>
+<li>Average complexity</li>
+<li>God object score</li>
+<li>Recommended module splits based on responsibility clustering</li>
+</ul>
 <p><strong>MagicValues</strong>: Unexplained literals</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {

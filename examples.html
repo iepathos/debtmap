@@ -264,6 +264,46 @@ debtmap analyze . --no-god-object
 <li>God object score (0-100%)</li>
 <li>Recommendations for splitting</li>
 </ul>
+<h4 id="purity-weighted-god-object-scoring"><a class="header" href="#purity-weighted-god-object-scoring">Purity-Weighted God Object Scoring</a></h4>
+<p>Debtmap uses purity analysis to distinguish functional programming patterns from actual god objects. Enable verbose mode to see purity distribution:</p>
+<pre><code class="language-bash"># See purity distribution in god object analysis
+debtmap analyze . -v
+</code></pre>
+<p><strong>Example Output:</strong></p>
+<pre><code>GOD OBJECT ANALYSIS: src/core/processor.rs
+  Total functions: 107
+  PURITY DISTRIBUTION:
+    Pure: 70 functions (65%) → complexity weight: 6.3
+    Impure: 37 functions (35%) → complexity weight: 14.0
+    Total weighted complexity: 20.3
+  God object score: 12.0 (threshold: 70.0)
+  Status: ✓ Not a god object (functional design)
+</code></pre>
+<p>This shows:</p>
+<ul>
+<li><strong>Pure functions</strong> (no side effects, immutable) receive 0.3× weight</li>
+<li><strong>Impure functions</strong> (I/O, mutations, side effects) receive 1.0× weight</li>
+<li>Functional modules with many pure helpers avoid false positives</li>
+<li>Focus shifts to modules with excessive stateful code</li>
+</ul>
+<p><strong>Why This Matters:</strong></p>
+<p>Without purity weighting:</p>
+<pre><code>Module with 100 pure helpers → Flagged as god object ❌
+</code></pre>
+<p>With purity weighting:</p>
+<pre><code>Module with 100 pure helpers → Normal (functional design) ✅
+Module with 100 impure functions → God object detected ✅
+</code></pre>
+<p><strong>Compare Two Modules:</strong></p>
+<p>Functional module (70 pure, 30 impure):</p>
+<pre><code>Pure:    70 × 0.3 = 21.0
+Impure:  30 × 1.0 = 30.0
+Score: 35.0 → Not a god object ✓
+</code></pre>
+<p>Procedural module (100 impure):</p>
+<pre><code>Impure: 100 × 1.0 = 100.0
+Score: 125.0 → God object detected ✗
+</code></pre>
 <h3 id="filtering-and-focusing"><a class="header" href="#filtering-and-focusing">Filtering and Focusing</a></h3>
 <pre><code class="language-bash"># Analyze only Rust files
 debtmap analyze . --languages rust
