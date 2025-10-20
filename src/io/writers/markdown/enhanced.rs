@@ -47,20 +47,8 @@ impl<W: Write> EnhancedMarkdownWriter for MarkdownWriter<W> {
 
         for (idx, item) in top_items.iter().enumerate() {
             let rank = idx + 1;
-            let score = format!("{:.1}", item.unified_score.final_score);
-            let location = format!("{}:{}", item.location.file.display(), item.location.line);
-            let debt_type = format_debt_type(&item.debt_type);
-            let issue = format_debt_issue(&item.debt_type);
-
-            writeln!(
-                self.writer(),
-                "| {} | {} | `{}` | {} | {} |",
-                rank,
-                score,
-                location,
-                debt_type,
-                issue
-            )?;
+            let row = format_priority_table_row(rank, item);
+            write!(self.writer(), "{}", row)?;
         }
         writeln!(self.writer())?;
 
@@ -141,6 +129,20 @@ impl<W: Write> MarkdownWriter<W> {
         write!(self.writer(), "{}", breakdown)?;
         Ok(())
     }
+}
+
+// Pure functions for formatting priority table rows
+/// Formats a single row for the priority table
+fn format_priority_table_row(rank: usize, item: &UnifiedDebtItem) -> String {
+    let score = format!("{:.1}", item.unified_score.final_score);
+    let location = format!("{}:{}", item.location.file.display(), item.location.line);
+    let debt_type = format_debt_type(&item.debt_type);
+    let issue = format_debt_issue(&item.debt_type);
+
+    format!(
+        "| {} | {} | `{}` | {} | {} |\n",
+        rank, score, location, debt_type, issue
+    )
 }
 
 // Pure functions for formatting score breakdown
@@ -246,6 +248,28 @@ mod tests {
             god_object_indicators: None,
             tier: None,
         }
+    }
+
+    #[test]
+    fn test_format_priority_table_row() {
+        let item = create_test_item("my_complex_function", 23.78);
+        let row = format_priority_table_row(1, &item);
+
+        assert!(row.contains("| 1 |"));
+        assert!(row.contains("| 23.8 |"));
+        assert!(row.contains("| `test.rs:10` |"));
+        assert!(row.contains("Complexity"));
+    }
+
+    #[test]
+    fn test_format_priority_table_row_formatting() {
+        let item = create_test_item("another_function", 15.5);
+        let row = format_priority_table_row(5, &item);
+
+        // Should be a proper markdown table row
+        assert!(row.starts_with("| 5 |"));
+        assert!(row.contains("| 15.5 |"));
+        assert!(row.ends_with("|\n"));
     }
 
     #[test]
