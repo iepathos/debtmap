@@ -365,7 +365,10 @@ impl PythonCircularRefDetector {
 }
 
 impl PythonCircularRefDetector {
-    fn find_circular_patterns_in_methods(&self, class_def: &ast::StmtClassDef) -> Vec<ResourceIssue> {
+    fn find_circular_patterns_in_methods(
+        &self,
+        class_def: &ast::StmtClassDef,
+    ) -> Vec<ResourceIssue> {
         class_def
             .body
             .iter()
@@ -378,11 +381,9 @@ impl PythonCircularRefDetector {
                 }
             })
             .flat_map(|func| {
-                func.body
-                    .iter()
-                    .filter_map(|func_stmt| {
-                        self.check_for_circular_pattern(func_stmt, &class_def.name)
-                    })
+                func.body.iter().filter_map(|func_stmt| {
+                    self.check_for_circular_pattern(func_stmt, &class_def.name)
+                })
             })
             .collect()
     }
