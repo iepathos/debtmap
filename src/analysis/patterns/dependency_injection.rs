@@ -8,6 +8,7 @@
 
 use super::{Implementation, PatternInstance, PatternRecognizer, PatternType};
 use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use std::path::Path;
 
 pub struct DependencyInjectionRecognizer;
 
@@ -69,6 +70,89 @@ impl DependencyInjectionRecognizer {
         })
     }
 
+    /// Count the number of injection decorators in a class
+    ///
+    /// This includes both class-level decorators and method-level decorators.
+    /// Returns the total count of decorators that indicate dependency injection.
+    fn count_injection_decorators(class: &ClassDef) -> usize {
+        class
+            .decorators
+            .iter()
+            .filter(|d| Self::is_injection_decorator(d))
+            .count()
+            + class
+                .methods
+                .iter()
+                .flat_map(|m| &m.decorators)
+                .filter(|d| Self::is_injection_decorator(d))
+                .count()
+    }
+
+    /// Collect implementation details for methods that use dependency injection
+    ///
+    /// Returns a vector of implementations for methods that either:
+    /// - Are the `__init__` constructor
+    /// - Have injection decorators
+    fn collect_injection_implementations(
+        class: &ClassDef,
+        file_path: &Path,
+    ) -> Vec<Implementation> {
+        class
+            .methods
+            .iter()
+            .filter(|method| {
+                method.name == "__init__"
+                    || method
+                        .decorators
+                        .iter()
+                        .any(|d| Self::is_injection_decorator(d))
+            })
+            .map(|method| Implementation {
+                file: file_path.to_path_buf(),
+                class_name: Some(class.name.clone()),
+                function_name: method.name.clone(),
+                line: method.line,
+            })
+            .collect()
+    }
+
+    /// Build a PatternInstance for a dependency injection pattern
+    ///
+    /// Creates a pattern instance with the appropriate confidence level,
+    /// implementations, and reasoning based on the injection types detected.
+    fn build_pattern_instance(
+        class: &ClassDef,
+        has_constructor: bool,
+        has_decorator: bool,
+        has_setter: bool,
+        confidence: f32,
+        implementations: Vec<Implementation>,
+    ) -> PatternInstance {
+        let mut injection_types = Vec::new();
+        if has_constructor {
+            injection_types.push("constructor");
+        }
+        if has_decorator {
+            injection_types.push("decorator");
+        }
+        if has_setter {
+            injection_types.push("setter");
+        }
+
+        PatternInstance {
+            pattern_type: PatternType::DependencyInjection,
+            confidence,
+            base_class: Some(class.name.clone()),
+            implementations,
+            usage_sites: Vec::new(),
+            reasoning: format!(
+                "Class {} uses dependency injection via {}",
+                class.name,
+                injection_types.join(" and ")
+            ),
+        }
+    }
+
     /// Calculate confidence based on evidence strength
     fn calculate_confidence(
         &self,
@@ -115,77 +199,43 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
     fn detect(&self, file_metrics: &FileMetrics) -> Vec<PatternInstance> {
         let mut patterns = Vec::new();
 
-        if let Some(classes) = &file_metrics.classes {
-            for class in classes {
-                let has_constructor = self.uses_constructor_injection(class);
-                let has_decorator = self.uses_decorator_injection(class);
-                let has_setter = self.uses_setter_injection(class);
+        // Guard clause: early return if no classes
+        let Some(classes) = &file_metrics.classes else {
+            return patterns;
+        };
 
-                // Count injection decorators
-                let decorator_count = class
-                    .decorators
-                    .iter()
-                    .filter(|d| Self::is_injection_decorator(d))
-                    .count()
-                    + class
-                        .methods
-                        .iter()
-                        .flat_map(|m| &m.decorators)
-                        .filter(|d| Self::is_injection_decorator(d))
-                        .count();
+        for class in classes {
+            let has_constructor = self.uses_constructor_injection(class);
+            let has_decorator = self.uses_decorator_injection(class);
+            let has_setter = self.uses_setter_injection(class);
 
-                if has_constructor || has_decorator || has_setter {
-                    let confidence = self.calculate_confidence(
-                        has_constructor,
-                        has_decorator,
-                        has_setter,
-                        decorator_count,
-                    );
-
-                    // Collect implementations (methods with injection decorators)
-                    let implementations: Vec<Implementation> = class
-                        .methods
-                        .iter()
-                        .filter(|method| {
-                            method.name == "__init__"
-                                || method
-                                    .decorators
-                                    .iter()
-                                    .any(|d| Self::is_injection_decorator(d))
-                        })
-                        .map(|method| Implementation {
-                            file: file_metrics.path.clone(),
-                            class_name: Some(class.name.clone()),
-                            function_name: method.name.clone(),
-                            line: method.line,
-                        })
-                        .collect();
-
-                    let mut injection_types = Vec::new();
-                    if has_constructor {
-                        injection_types.push("constructor");
-                    }
-                    if has_decorator {
-                        injection_types.push("decorator");
-                    }
-                    if has_setter {
-                        injection_types.push("setter");
-                    }
-
-                    patterns.push(PatternInstance {
-                        pattern_type: PatternType::DependencyInjection,
-                        confidence,
-                        base_class: Some(class.name.clone()),
-                        implementations,
-                        usage_sites: Vec::new(),
-                        reasoning: format!(
-                            "Class {} uses dependency injection via {}",
-                            class.name,
-                            injection_types.join(" and ")
-                        ),
-                    });
-                }
+            // Guard clause: skip if no injection detected
+            if !has_constructor && !has_decorator && !has_setter {
+                continue;
             }
+
+            // Count injection decorators
+            let decorator_count = Self::count_injection_decorators(class);
+
+            let confidence = self.calculate_confidence(
+                has_constructor,
+                has_decorator,
+                has_setter,
+                decorator_count,
+            );
+
+            // Collect implementations (methods with injection decorators)
+            let implementations =
+                Self::collect_injection_implementations(class, &file_metrics.path);
+
+            patterns.push(Self::build_pattern_instance(
+                class,
+                has_constructor,
+                has_decorator,
+                has_setter,
+                confidence,
+                implementations,
+            ));
         }
 
         patterns
@@ -290,6 +340,267 @@ mod tests {
         assert!(!DependencyInjectionRecognizer::is_injection_decorator(
             "property"
         ));
+    }
+
+    #[test]
+    fn test_count_injection_decorators_none() {
+        let class = ClassDef {
+            name: "PlainClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            0
+        );
+    }
+
+    #[test]
+    fn test_count_injection_decorators_class_level_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec!["inject".to_string(), "autowired".to_string()],
+            line: 1,
+        };
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
+    }
+
+    #[test]
+    fn test_count_injection_decorators_method_level_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![
+                MethodDef {
+                    name: "method1".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["inject".to_string()],
+                    overrides_base: false,
+                    line: 5,
+                },
+                MethodDef {
+                    name: "method2".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["provide".to_string()],
+                    overrides_base: false,
+                    line: 10,
+                },
+            ],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
+    }
+
+    #[test]
+    fn test_count_injection_decorators_both_levels() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![MethodDef {
+                name: "method1".to_string(),
+                is_abstract: false,
+                decorators: vec!["inject".to_string()],
+                overrides_base: false,
+                line: 5,
+            }],
+            is_abstract: false,
+            decorators: vec!["autowired".to_string()],
+            line: 1,
+        };
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
+    }
+
+    #[test]
+    fn test_collect_injection_implementations_with_init() {
+        let class = ClassDef {
+            name: "UserService".to_string(),
+            base_classes: vec![],
+            methods: vec![MethodDef {
+                name: "__init__".to_string(),
+                is_abstract: false,
+                decorators: vec![],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: false,
+            decorators: vec![],
+            line: 5,
+        };
+        let path = PathBuf::from("test.py");
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        assert_eq!(implementations.len(), 1);
+        assert_eq!(implementations[0].function_name, "__init__");
+        assert_eq!(implementations[0].line, 10);
+    }
+
+    #[test]
+    fn test_collect_injection_implementations_with_decorators() {
+        let class = ClassDef {
+            name: "PaymentProcessor".to_string(),
+            base_classes: vec![],
+            methods: vec![
+                MethodDef {
+                    name: "process".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["inject".to_string()],
+                    overrides_base: false,
+                    line: 20,
+                },
+                MethodDef {
+                    name: "validate".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["autowired".to_string()],
+                    overrides_base: false,
+                    line: 30,
+                },
+            ],
+            is_abstract: false,
+            decorators: vec![],
+            line: 15,
+        };
+        let path = PathBuf::from("test.py");
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        assert_eq!(implementations.len(), 2);
+        assert_eq!(implementations[0].function_name, "process");
+        assert_eq!(implementations[1].function_name, "validate");
+    }
+
+    #[test]
+    fn test_collect_injection_implementations_with_both() {
+        let class = create_class_with_constructor_injection();
+        let path = PathBuf::from("test.py");
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        assert_eq!(implementations.len(), 1);
+        assert_eq!(implementations[0].function_name, "__init__");
+    }
+
+    #[test]
+    fn test_collect_injection_implementations_with_neither() {
+        let class = ClassDef {
+            name: "PlainClass".to_string(),
+            base_classes: vec![],
+            methods: vec![MethodDef {
+                name: "do_something".to_string(),
+                is_abstract: false,
+                decorators: vec!["property".to_string()],
+                overrides_base: false,
+                line: 10,
+            }],
+            is_abstract: false,
+            decorators: vec![],
+            line: 5,
+        };
+        let path = PathBuf::from("test.py");
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        assert_eq!(implementations.len(), 0);
+    }
+
+    #[test]
+    fn test_build_pattern_instance_constructor_only() {
+        let class = create_class_with_constructor_injection();
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            true,
+            false,
+            false,
+            0.8,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.8);
+        assert!(pattern.reasoning.contains("constructor"));
+        assert!(!pattern.reasoning.contains("decorator"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_decorator_only() {
+        let class = create_class_with_decorator_injection();
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            false,
+            true,
+            false,
+            0.9,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.9);
+        assert!(pattern.reasoning.contains("decorator"));
+        assert!(!pattern.reasoning.contains("constructor"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_setter_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            false,
+            false,
+            true,
+            0.7,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.7);
+        assert!(pattern.reasoning.contains("setter"));
+        assert!(!pattern.reasoning.contains("constructor"));
+    }
+
+    #[test]
+    fn test_build_pattern_instance_multiple_types() {
+        let class = ClassDef {
+            name: "FullServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        let implementations = vec![];
+        let pattern = DependencyInjectionRecognizer::build_pattern_instance(
+            &class,
+            true,
+            true,
+            true,
+            0.95,
+            implementations,
+        );
+        assert_eq!(pattern.pattern_type, PatternType::DependencyInjection);
+        assert_eq!(pattern.confidence, 0.95);
+        assert!(pattern.reasoning.contains("constructor"));
+        assert!(pattern.reasoning.contains("decorator"));
+        assert!(pattern.reasoning.contains("setter"));
     }
 
     #[test]
