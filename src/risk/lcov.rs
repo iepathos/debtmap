@@ -1097,4 +1097,93 @@ end_of_record
             assert!(!matches_normalized_equality_strategy(&query, &lcov));
         }
     }
+
+    // Property-based tests
+    #[cfg(test)]
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn test_normalize_path_idempotent(path in "[a-z/]+\\.rs") {
+                let path_buf = PathBuf::from(&path);
+                let normalized1 = normalize_path(&path_buf);
+                let normalized2 = normalize_path(&normalized1);
+
+                prop_assert_eq!(normalized1, normalized2);
+            }
+
+            #[test]
+            fn test_normalize_path_removes_leading_dot_slash_property(path in "[a-z/]+\\.rs") {
+                let with_dot = PathBuf::from(format!("./{}", path));
+                let without_dot = PathBuf::from(&path);
+
+                prop_assert_eq!(normalize_path(&with_dot), normalize_path(&without_dot));
+            }
+
+            #[test]
+            fn test_suffix_strategy_reflexive(path in "[a-z/]+\\.rs") {
+                let path_buf = PathBuf::from(&path);
+
+                // A path always matches itself with suffix strategy
+                prop_assert!(matches_suffix_strategy(&path_buf, &path_buf));
+            }
+
+            #[test]
+            fn test_normalized_equality_symmetric(path in "[a-z/]+\\.rs") {
+                let path1 = PathBuf::from(&path);
+                let path2 = PathBuf::from(format!("./{}", path));
+
+                // Normalized equality should be symmetric
+                prop_assert_eq!(
+                    matches_normalized_equality_strategy(&path1, &path2),
+                    matches_normalized_equality_strategy(&path2, &path1)
+                );
+            }
+
+            #[test]
+            fn test_find_functions_with_large_dataset(count in 50usize..150) {
+                // Test parallel path with varying sizes
+                let mut functions = HashMap::new();
+
+                for i in 0..count {
+                    functions.insert(
+                        PathBuf::from(format!("src/file_{}.rs", i)),
+                        vec![FunctionCoverage {
+                            name: format!("func_{}", i),
+                            start_line: 10,
+                            execution_count: 5,
+                            coverage_percentage: 60.0,
+                            uncovered_lines: vec![12, 13],
+                        }],
+                    );
+                }
+
+                // Should find the target regardless of dataset size
+                let query = PathBuf::from("./src/file_42.rs");
+                let result = find_functions_by_path(&functions, &query);
+
+                if count > 42 {
+                    prop_assert!(result.is_some());
+                    if let Some(funcs) = result {
+                        prop_assert_eq!(&funcs[0].name, "func_42");
+                    }
+                }
+            }
+
+            #[test]
+            fn test_strategies_handle_empty_paths_gracefully(s in ".*") {
+                let path1 = PathBuf::from(&s);
+                let path2 = PathBuf::from(&s);
+
+                // Should not panic with any input
+                let _ = matches_suffix_strategy(&path1, &path2);
+                let _ = matches_reverse_suffix_strategy(&path1, &path2);
+                let _ = matches_normalized_equality_strategy(&path1, &path2);
+
+                prop_assert!(true);
+            }
+        }
+    }
 }
