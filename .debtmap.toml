@@ -3,9 +3,9 @@
 [scoring]
 # Weights for different scoring factors (must sum to 1.0)
 # Using weighted sum model for clear, predictable scoring
-coverage = 0.50      # Weight for test coverage gaps (50% - prioritize untested code)
-complexity = 0.35    # Weight for code complexity (35% - identify complex areas)
-dependency = 0.15    # Weight for dependency criticality (15% - consider impact radius)
+#coverage = 0.50      # Weight for test coverage gaps (50% - prioritize untested code)
+#complexity = 0.35    # Weight for code complexity (35% - identify complex areas)
+#dependency = 0.15    # Weight for dependency criticality (15% - consider impact radius)
 
 [thresholds]
 complexity = 10
