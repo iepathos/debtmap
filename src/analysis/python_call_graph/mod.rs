@@ -20,6 +20,8 @@ mod event_tracking;
 mod function_detection;
 pub mod import_tracker;
 pub mod namespace;
+pub mod observer_dispatch;
+pub mod observer_registry;
 
 #[allow(unused_imports)]
 use crate::priority::call_graph::{CallGraph, FunctionId};

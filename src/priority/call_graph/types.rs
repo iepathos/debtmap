@@ -28,6 +28,8 @@ pub enum CallType {
     Pipeline,
     Async,
     Callback,
+    /// Dynamic dispatch through observer pattern
+    ObserverDispatch,
 }
 
 /// Main call graph structure containing nodes and edges
