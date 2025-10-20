@@ -100,7 +100,15 @@ debtmap validate <PATH> [OPTIONS]
 **Description:**
 Similar to `analyze` but enforces thresholds defined in configuration file. Returns non-zero exit code if thresholds are exceeded, making it suitable for CI/CD integration.
 
-The `validate` command supports a focused subset of `analyze` options, primarily for output control, coverage integration, context-aware analysis, and display filtering. The validate command does not support `--threshold-complexity`, `--threshold-duplication`, or `--threshold-preset` flags (these are analyze-only). Instead, configure thresholds in the `.debtmap.toml` config file. Performance options like `--jobs`, `--cache-*`, and `--languages` are also not available in validate.
+The `validate` command supports a focused subset of `analyze` options, primarily for output control, coverage integration, context-aware analysis, and display filtering.
+
+**Note:** The following `analyze` options are NOT available in the `validate` command:
+- `--threshold-complexity`, `--threshold-duplication`, `--threshold-preset` (configure these in `.debtmap.toml` instead)
+- `--jobs`, `--no-parallel` (performance tuning)
+- `--cache-*` options (caching control)
+- `--languages` (language filtering)
+
+Configure analysis thresholds in your `.debtmap.toml` configuration file for use with the `validate` command.
 
 **Exit Codes:**
 - `0` - Success (no errors, all thresholds passed)
