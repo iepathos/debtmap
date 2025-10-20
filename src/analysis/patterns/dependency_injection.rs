@@ -8,6 +8,7 @@
 
 use super::{Implementation, PatternInstance, PatternRecognizer, PatternType};
 use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
+use std::path::Path;
 
 pub struct DependencyInjectionRecognizer;
 
@@ -94,7 +95,7 @@ impl DependencyInjectionRecognizer {
     /// - Have injection decorators
     fn collect_injection_implementations(
         class: &ClassDef,
-        file_path: &std::path::PathBuf,
+        file_path: &Path,
     ) -> Vec<Implementation> {
         class
             .methods
@@ -107,7 +108,7 @@ impl DependencyInjectionRecognizer {
                         .any(|d| Self::is_injection_decorator(d))
             })
             .map(|method| Implementation {
-                file: file_path.clone(),
+                file: file_path.to_path_buf(),
                 class_name: Some(class.name.clone()),
                 function_name: method.name.clone(),
                 line: method.line,
