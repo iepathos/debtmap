@@ -69,6 +69,24 @@ impl DependencyInjectionRecognizer {
         })
     }
 
+    /// Count the number of injection decorators in a class
+    ///
+    /// This includes both class-level decorators and method-level decorators.
+    /// Returns the total count of decorators that indicate dependency injection.
+    fn count_injection_decorators(class: &ClassDef) -> usize {
+        class
+            .decorators
+            .iter()
+            .filter(|d| Self::is_injection_decorator(d))
+            .count()
+            + class
+                .methods
+                .iter()
+                .flat_map(|m| &m.decorators)
+                .filter(|d| Self::is_injection_decorator(d))
+                .count()
+    }
+
     /// Calculate confidence based on evidence strength
     fn calculate_confidence(
         &self,
@@ -122,17 +140,7 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
                 let has_setter = self.uses_setter_injection(class);
 
                 // Count injection decorators
-                let decorator_count = class
-                    .decorators
-                    .iter()
-                    .filter(|d| Self::is_injection_decorator(d))
-                    .count()
-                    + class
-                        .methods
-                        .iter()
-                        .flat_map(|m| &m.decorators)
-                        .filter(|d| Self::is_injection_decorator(d))
-                        .count();
+                let decorator_count = Self::count_injection_decorators(class);
 
                 if has_constructor || has_decorator || has_setter {
                     let confidence = self.calculate_confidence(
@@ -290,6 +298,81 @@ mod tests {
         assert!(!DependencyInjectionRecognizer::is_injection_decorator(
             "property"
         ));
+    }
+
+    #[test]
+    fn test_count_injection_decorators_none() {
+        let class = ClassDef {
+            name: "PlainClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 0);
+    }
+
+    #[test]
+    fn test_count_injection_decorators_class_level_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![],
+            is_abstract: false,
+            decorators: vec!["inject".to_string(), "autowired".to_string()],
+            line: 1,
+        };
+        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
+    }
+
+    #[test]
+    fn test_count_injection_decorators_method_level_only() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![
+                MethodDef {
+                    name: "method1".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["inject".to_string()],
+                    overrides_base: false,
+                    line: 5,
+                },
+                MethodDef {
+                    name: "method2".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["provide".to_string()],
+                    overrides_base: false,
+                    line: 10,
+                },
+            ],
+            is_abstract: false,
+            decorators: vec![],
+            line: 1,
+        };
+        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
+    }
+
+    #[test]
+    fn test_count_injection_decorators_both_levels() {
+        let class = ClassDef {
+            name: "ServiceClass".to_string(),
+            base_classes: vec![],
+            methods: vec![
+                MethodDef {
+                    name: "method1".to_string(),
+                    is_abstract: false,
+                    decorators: vec!["inject".to_string()],
+                    overrides_base: false,
+                    line: 5,
+                },
+            ],
+            is_abstract: false,
+            decorators: vec!["autowired".to_string()],
+            line: 1,
+        };
+        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
     }
 
     #[test]
