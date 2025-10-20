@@ -1,0 +1,179 @@
+{
+  "chapter_id": "cli-reference",
+  "chapter_title": "CLI Reference",
+  "chapter_file": "book/src/cli-reference.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter is comprehensive but missing several important options and features added in recent development. The documentation is well-organized with good examples, but needs updates to reflect current implementation.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Output Control",
+      "description": "Missing --output-format option for JSON structure selection (legacy vs unified)",
+      "should_add": "--output-format <JSON_FORMAT> - JSON structure format: legacy or unified (default: legacy)\n  - legacy: Current format with {File: {...}} and {Function: {...}} wrappers\n  - unified: New format with consistent structure and 'type' field (spec 108)",
+      "fix_suggestion": "Add --output-format documentation in the Output Control section, as this is a user-facing option for controlling JSON structure",
+      "source_reference": "src/cli/analyze.rs: output_format field with JsonFormat enum (Legacy, Unified)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Performance & Caching",
+      "description": "Missing several cache management options that are available",
+      "should_add": "Cache options documented but implementation shows additional flags:\n- --no-cache: Disable caching for this run (caching is enabled by default)\n- --clear-cache: Clear cache before running analysis\n- --force-cache-rebuild: Force cache rebuild (same as --clear-cache)\n- --cache-stats: Show cache statistics and location\n- --migrate-cache: Migrate cache from local to shared location\n- --cache-location <LOCATION>: Cache location strategy (local, shared, or path)",
+      "fix_suggestion": "All cache options are already documented correctly in the book. No action needed.",
+      "source_reference": "src/cli/analyze.rs:158-203"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Analysis Modes",
+      "description": "Missing advanced analysis options --multi-pass and --attribution",
+      "should_add": "Advanced Analysis Options:\n- --multi-pass: Enable multi-pass analysis with attribution\n- --attribution: Show complexity attribution details (alias for --show-attribution)",
+      "fix_suggestion": "Add these options to the Analysis Modes section under Analysis Control",
+      "source_reference": "src/cli/analyze.rs: multi_pass and attribution fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Aggregation",
+      "description": "Missing several file aggregation and god object detection options",
+      "should_add": "File Aggregation Options:\n- --aggregate-only: Show only aggregated file-level scores\n- --no-aggregation: Disable file-level aggregation\n- --aggregation-method <METHOD>: File aggregation method (default: weighted_sum)\n  - Options: sum, weighted_sum, logarithmic_sum, max_plus_average\n- --min-problematic <N>: Minimum number of problematic functions for file aggregation\n- --no-god-object: Disable god object detection",
+      "fix_suggestion": "All aggregation options are already documented correctly in the Aggregation section (lines 243-254). No action needed.",
+      "source_reference": "src/cli/analyze.rs: God object and aggregation fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Advanced Analysis",
+      "description": "Missing pattern recognition options entirely",
+      "should_add": "Pattern Recognition Options:\n- --patterns <PATTERNS>: Comma-separated list of patterns to detect\n  - Available: observer, singleton, factory, strategy, callback, template_method\n  - Example: --patterns observer,singleton,factory\n- --pattern-threshold <THRESHOLD>: Confidence threshold for pattern detection (0.0-1.0, default: 0.7)\n- --show-pattern-warnings: Show warnings when patterns are detected",
+      "fix_suggestion": "Add new 'Pattern Recognition' subsection under Analysis Control section with these three options",
+      "source_reference": "src/cli/analyze.rs:259-277"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Analysis",
+      "description": "Missing public API detection options",
+      "should_add": "Public API Detection Options:\n- --public-api-threshold <THRESHOLD>: Threshold for public API detection (0.0-1.0, default: 0.7)\n- --no-public-api-detection: Disable public API detection for dead code analysis",
+      "fix_suggestion": "Add 'Public API Detection' subsection under Analysis Control section",
+      "source_reference": "src/cli/analyze.rs:278-290"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Output Control",
+      "description": "Book shows --output-format exists but doesn't explain it's for JSON structure format",
+      "current_content": "Line 145-147: --output-format <JSON_FORMAT> listed but purpose unclear",
+      "should_be": "Should clarify this controls legacy vs unified JSON structure (spec 108)",
+      "fix_suggestion": "Expand --output-format documentation to explain the two formats and when to use each",
+      "source_reference": "src/cli/analyze.rs:115-125"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Environment Variables",
+      "description": "Missing comprehensive list of environment variables",
+      "should_add": "Environment Variables:\n- DEBTMAP_CACHE_DIR: Override cache directory location\n- DEBTMAP_NO_CACHE: Disable caching (true/false)\n- DEBTMAP_JOBS: Number of parallel jobs (0 = all cores)\n- DEBTMAP_MAX_FILES: Maximum files to analyze\n- DEBTMAP_THRESHOLD_PRESET: Default threshold preset (strict/balanced/lenient)\n- DEBTMAP_PARALLEL: Enable/disable parallelization (true/false)\n- DEBTMAP_NO_EMOJI: Disable emoji in output (true/false)\n- DEBTMAP_QUIET: Reduce output verbosity (true/false)",
+      "fix_suggestion": "Expand Environment Variables section (currently only shows DEBTMAP_CACHE_DIR) to include all 8 supported variables",
+      "source_reference": "src/cli/analyze.rs: Various env field attributes"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Debugging & Verbosity",
+      "description": "Missing detail-level option for diagnostic reports",
+      "should_add": "Diagnostic Detail Control:\n- --detail-level <LEVEL>: Detail level for diagnostic reports\n  - Options: summary, standard, comprehensive, debug (default: standard)",
+      "fix_suggestion": "Already documented correctly at line 240-242. No action needed.",
+      "source_reference": "src/cli/analyze.rs: detail_level field"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Deprecated Options",
+      "description": "Book correctly documents deprecated options",
+      "current_content": "Lines 269-277 document --cache and --explain-score as deprecated",
+      "should_be": "Documentation is accurate - these are hidden deprecated options",
+      "fix_suggestion": "No changes needed - deprecation documentation is correct",
+      "source_reference": "src/cli/analyze.rs: Hidden deprecated flags"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Option Aliases",
+      "description": "Missing some option aliases documentation",
+      "should_add": "Additional aliases:\n- --show-attribution is alias for --attribution\n- --output-format has JsonFormat enum values",
+      "fix_suggestion": "Add these aliases to the Option Aliases section (lines 255-268)",
+      "source_reference": "src/cli/analyze.rs: alias attributes on fields"
+    },
+    {
+      "type": "validation_check",
+      "severity": "high",
+      "section": "Validate Command",
+      "description": "Need to verify validate command options don't include analyze-only options",
+      "current_content": "Lines 84-103 list validate command options",
+      "should_be": "Validate should NOT include: --threshold-complexity, --threshold-duplication, --threshold-preset, --cache-*, --jobs, --no-parallel, --patterns, --public-api-threshold, --aggregation-method, --multi-pass",
+      "fix_suggestion": "Verify validate command section accurately reflects it's a subset of analyze options (coverage, context, filtering, output only)",
+      "source_reference": "src/cli/validate.rs vs src/cli/analyze.rs"
+    },
+    {
+      "type": "completeness_check",
+      "severity": "medium",
+      "section": "Command Compatibility Matrix",
+      "description": "Matrix at lines 604-622 needs verification against actual implementation",
+      "current_content": "Shows which options work with which commands",
+      "should_be": "Should include new options: --output-format, --patterns, --pattern-threshold, --public-api-threshold, --multi-pass, --attribution",
+      "fix_suggestion": "Add rows for new options in the compatibility matrix",
+      "source_reference": "src/cli/*.rs: All command structs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Common Workflows",
+      "description": "Could add workflow examples for new pattern recognition features",
+      "should_add": "Pattern Detection Workflow:\n```bash\n# Detect design patterns in codebase\ndebtmap analyze . --patterns observer,singleton,factory\n\n# Show pattern warnings with higher sensitivity\ndebtmap analyze . --patterns all --pattern-threshold 0.5 --show-pattern-warnings\n```",
+      "fix_suggestion": "Add new workflow section for pattern recognition after line 475",
+      "source_reference": "src/cli/analyze.rs:259-277"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive documentation with excellent organization",
+    "Clear categorization of options by function",
+    "Good coverage of common workflows and examples",
+    "Helpful troubleshooting section with practical solutions",
+    "Command Compatibility Matrix is very useful",
+    "Well-documented deprecated options",
+    "Examples are practical and realistic",
+    "Good coverage of CI/CD integration patterns",
+    "Best practices section provides valuable guidance"
+  ],
+  "improvement_suggestions": [
+    "Add documentation for pattern recognition options (--patterns, --pattern-threshold, --show-pattern-warnings)",
+    "Add documentation for public API detection options (--public-api-threshold, --no-public-api-detection)",
+    "Expand environment variables section to document all 8 supported variables",
+    "Add --multi-pass and --attribution to Analysis Modes section",
+    "Clarify --output-format purpose (legacy vs unified JSON structure)",
+    "Update Command Compatibility Matrix to include new options",
+    "Add workflow examples demonstrating pattern recognition",
+    "Add workflow examples demonstrating public API detection for dead code analysis",
+    "Consider adding 'Advanced Features' section for pattern recognition and public API detection",
+    "Add note about which options are analyzer-only vs validate-compatible"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-20",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": ["Commands", "Arguments", "Options", "Configuration"],
+    "validation_focus": "Verify all CLI commands from src/cli/ are documented with current options",
+    "implementation_files_analyzed": [
+      "src/cli/analyze.rs (58 options across 12 categories)",
+      "src/cli/validate.rs (15 options, subset of analyze)",
+      "src/cli/compare.rs (6 options)",
+      "src/cli/init.rs (1 option)"
+    ],
+    "total_options_found": 80,
+    "documented_options": 67,
+    "missing_options": 13,
+    "accuracy_rate": "83.75%"
+  }
+}
