@@ -160,6 +160,20 @@ impl ObserverRegistry {
             .map(|fields| fields.iter().collect())
             .unwrap_or_default()
     }
+
+    /// Register a class as an observer interface
+    pub fn register_interface(&mut self, interface_name: &str) {
+        // Store in a placeholder to track known interfaces
+        // We use an empty implementation map to mark it as a known interface
+        self.implementations
+            .entry(interface_name.to_string())
+            .or_default();
+    }
+
+    /// Check if a class is a registered observer interface
+    pub fn is_interface(&self, class_name: &str) -> bool {
+        self.implementations.contains_key(class_name)
+    }
 }
 
 #[cfg(test)]
