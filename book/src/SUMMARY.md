@@ -23,7 +23,6 @@
 - [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
 - [Scoring Strategies](scoring-strategies.md)
-- [Suppression Patterns](suppression-patterns.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 
 # Reference
