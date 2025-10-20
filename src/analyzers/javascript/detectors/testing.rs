@@ -614,4 +614,195 @@ mod tests {
         detect_snapshot_overuse(tree.root_node(), source, &javascript, &mut issues);
         assert_eq!(issues.len(), 0, "No snapshots should not trigger");
     }
+
+    // Tests for detect_missing_assertions
+    #[test]
+    fn test_detect_missing_assertions_no_test_functions() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            function normalFunction() {
+                console.log("not a test");
+            }
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "No test functions should result in no issues"
+        );
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_test_with_expect() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('should pass', () => {
+                expect(true).toBe(true);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Test with expect should not be flagged");
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_test_without_assertions() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('empty test', () => {
+                console.log("this is empty");
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Test without assertions should be flagged");
+
+        if let TestingAntiPattern::MissingAssertions { test_name, .. } = &issues[0] {
+            assert_eq!(test_name, "empty test");
+        } else {
+            panic!("Expected MissingAssertions pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_it_function() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            it('should work', () => {
+                expect(result).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "it() with expect should not be flagged");
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_assert_style() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test("assert test", () => {
+                assert.equal(actual, expected);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Test with assert should not be flagged");
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_should_style() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('should style', () => {
+                result.should.equal(expected);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Test with should style should not be flagged"
+        );
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_multiple_tests() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('test with assertion', () => {
+                expect(1).toBe(1);
+            });
+
+            test('test without assertion', () => {
+                doSomething();
+            });
+
+            it('another without assertion', () => {
+                setupSomething();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 2, "Should flag 2 tests without assertions");
+
+        let test_names: Vec<&str> = issues
+            .iter()
+            .filter_map(|issue| {
+                if let TestingAntiPattern::MissingAssertions { test_name, .. } = issue {
+                    Some(test_name.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        assert!(test_names.contains(&"test without assertion"));
+        assert!(test_names.contains(&"another without assertion"));
+    }
+
+    #[test]
+    fn test_detect_missing_assertions_single_quoted_test_name() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('single quoted name', () => {
+                doSomething();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_missing_assertions(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Should detect test with single quoted name"
+        );
+
+        if let TestingAntiPattern::MissingAssertions { test_name, .. } = &issues[0] {
+            assert_eq!(test_name, "single quoted name", "Should remove quotes");
+        } else {
+            panic!("Expected MissingAssertions pattern");
+        }
+    }
 }
