@@ -1,0 +1,167 @@
+{
+  "chapter_id": "entropy-analysis",
+  "chapter_title": "Entropy Analysis",
+  "chapter_file": "book/src/entropy-analysis.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter does not exist in the book, but entropy analysis is a major feature with extensive implementation and documentation in docs/entropy.md. This represents complete absence of user-facing documentation for a significant feature.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "The entropy-analysis.md chapter file does not exist in book/src/, but entropy analysis is a fully implemented feature with comprehensive technical documentation",
+      "current_content": "File does not exist",
+      "should_be": "Complete chapter explaining entropy analysis to end users, covering all topics from features.json",
+      "fix_suggestion": "Create book/src/entropy-analysis.md by adapting content from docs/entropy.md for end-user audience. Add to book/src/SUMMARY.md. Structure should include: Overview, How It Works, Configuration, Examples, Use Cases, and Troubleshooting",
+      "source_reference": "docs/entropy.md (comprehensive technical documentation exists), src/complexity/entropy_analysis.rs, src/complexity/entropy_core.rs, src/complexity/entropy_traits.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Shannon Entropy Calculation",
+      "description": "Shannon entropy calculation algorithm not documented in book",
+      "should_add": "Explain Shannon entropy formula H(X) = -Σ p(xi) * log2(p(xi)), what it measures (randomness/variety in code patterns), and how it helps distinguish genuinely complex code from pattern-based code",
+      "fix_suggestion": "Add section explaining entropy calculation in user-friendly terms with examples showing high vs low entropy code",
+      "source_reference": "docs/entropy.md:9-23, src/complexity/entropy_analysis.rs:106-161 (calculate_weighted_entropy)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Pattern Repetition Detection",
+      "description": "Pattern repetition detection mechanism not explained",
+      "should_add": "Document how pattern extraction works, frequency analysis of AST patterns, and repetition score calculation. Include examples of detected patterns (if-stmt, match-N, call-functionName, return)",
+      "fix_suggestion": "Add section showing how repetitive patterns are detected and how they reduce false positives in validation functions and dispatchers",
+      "source_reference": "docs/entropy.md:25-37, src/complexity/entropy_analysis.rs:21-73 (detect_repetitive_sequences, calculate_repetition_score)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Branch Similarity Analysis",
+      "description": "Branch similarity analysis for conditionals not documented",
+      "should_add": "Explain how similar branches are detected in if/else and match/switch statements, including token sequence extraction and pairwise comparison. Show examples like validation chains and dispatchers",
+      "fix_suggestion": "Add section with visual examples showing high similarity cases (validation chains) vs low similarity cases (business logic)",
+      "source_reference": "docs/entropy.md:39-51, src/complexity/entropy_traits.rs:86-123 (sequence_similarity)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Token Classification",
+      "description": "Token categorization and weighting system not explained",
+      "should_add": "Document token categories (Keyword, Operator, Identifier, Literal, ControlFlow, FunctionCall) and their weights for entropy calculation",
+      "fix_suggestion": "Add section explaining how different token types are weighted and why (e.g., ControlFlow=1.2, Keyword=1.0, Identifier=0.5, Literal=0.3)",
+      "source_reference": "src/complexity/entropy_core.rs:18-27 (TokenCategory), src/complexity/entropy_traits.rs:14-54 (GenericToken with weights)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Effective Complexity Adjustment",
+      "description": "How effective complexity is calculated and applied not documented",
+      "should_add": "Explain the formula: effective_complexity = 1.0 - (simplicity_factor * 0.9), where simplicity_factor combines token entropy, pattern repetition, and branch similarity. Show how this produces multiplier between 0.1 and 1.0",
+      "fix_suggestion": "Add section with step-by-step calculation example showing traditional complexity vs entropy-adjusted complexity",
+      "source_reference": "docs/entropy.md:52-63, src/complexity/entropy_core.rs:143-145 (adjust_complexity calculation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration Options",
+      "description": "Entropy configuration options not documented in book",
+      "should_add": "Document all entropy config options: enabled (bool), weight (0.0-1.0), min_tokens (default 20), pattern_threshold (default 0.7), entropy_threshold (default 0.4), max_entropy_reduction (default 0.15)",
+      "fix_suggestion": "Add configuration section with .debtmap.toml example and explanation of each setting",
+      "source_reference": "src/config.rs:882-939 (EntropyConfig struct), docs/entropy.md:66-86 (configuration guidelines)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "False Positive Reduction Examples",
+      "description": "Real-world examples of false positive reduction not shown",
+      "should_add": "Include concrete before/after examples: validation functions (complexity 5→1.5), business logic (8→7.2, minimal reduction), dispatchers (7→2.8). Show the entropy metrics for each",
+      "fix_suggestion": "Add examples section with side-by-side comparison of traditional vs entropy-adjusted scores",
+      "source_reference": "docs/entropy.md:87-176 (three detailed examples with metrics)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Performance and Caching",
+      "description": "Token caching and performance characteristics not mentioned",
+      "should_add": "Document LRU cache with configurable size, cache hit/miss tracking, performance overhead (~10% first run, <1% cached), and memory usage",
+      "fix_suggestion": "Add performance section explaining caching benefits and how to monitor cache effectiveness",
+      "source_reference": "docs/entropy.md:177-204, src/complexity/entropy_core.rs:82-116 (UniversalEntropyCalculator with cache)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Language Support Status",
+      "description": "Which languages support entropy analysis not clear",
+      "should_add": "Clarify that Rust, JavaScript/TypeScript have full support; Python support may be partial or planned",
+      "fix_suggestion": "Add language support matrix showing entropy analysis availability per language",
+      "source_reference": "docs/entropy.md:206-221 (language support section)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Interpretation Guidelines",
+      "description": "How to interpret entropy scores and metrics not provided",
+      "should_add": "Add guidelines: token_entropy <0.4 = repetitive patterns, pattern_repetition >0.6 = structural repetition, branch_similarity >0.7 = similar branches, effective_complexity <0.5 = pattern-based code",
+      "fix_suggestion": "Add interpretation guide with thresholds and what they mean for code quality",
+      "source_reference": "docs/entropy.md:232-261 (interpreting results section)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "When to Use Entropy Analysis",
+      "description": "Best practices for enabling and tuning entropy analysis missing",
+      "should_add": "Document when to enable (validation functions, dispatchers, config parsers, false positive issues), tuning recommendations (start with defaults, monitor results, adjust weight), and limitations (small functions, mathematical code, intentional repetition)",
+      "fix_suggestion": "Add best practices section with decision tree for when entropy analysis is beneficial",
+      "source_reference": "docs/entropy.md:263-285 (best practices section)"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive technical documentation exists in docs/entropy.md with detailed explanations",
+    "Well-structured implementation across multiple modules (entropy_analysis.rs, entropy_core.rs, entropy_traits.rs)",
+    "Extensive test coverage (entropy_tests.rs, entropy_integration_tests.rs, entropy_framework_test.rs)",
+    "Configuration system is fully implemented with sensible defaults",
+    "Clear examples and formulas in technical documentation"
+  ],
+  "improvement_suggestions": [
+    "Migrate content from docs/entropy.md to book/src/entropy-analysis.md, adapting technical content for end-user audience",
+    "Add chapter to book/src/SUMMARY.md in appropriate section (likely under 'Advanced Analysis' or 'Features')",
+    "Include visual diagrams showing entropy calculation flow",
+    "Add interactive examples with expected output showing entropy metrics",
+    "Cross-reference with CLI reference for --entropy flags",
+    "Include troubleshooting section for common entropy-related issues",
+    "Add links to related chapters (configuration, analysis-guide)",
+    "Consider adding a 'Quick Start' section for users new to entropy analysis"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-20",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [
+      "Shannon entropy calculation",
+      "Pattern repetition detection",
+      "Branch similarity analysis",
+      "Token classification",
+      "Effective complexity adjustment",
+      "Configuration options",
+      "False positive reduction"
+    ],
+    "validation_focus": "Check that entropy analysis algorithm, components, and configuration are documented with examples",
+    "implementation_files": [
+      "src/complexity/entropy_analysis.rs",
+      "src/complexity/entropy_core.rs",
+      "src/complexity/entropy_traits.rs",
+      "src/analyzers/javascript/entropy.rs",
+      "src/config.rs (lines 882-939)"
+    ],
+    "existing_documentation": [
+      "docs/entropy.md (comprehensive technical guide)"
+    ],
+    "test_files": [
+      "tests/entropy_tests.rs",
+      "tests/entropy_integration_tests.rs",
+      "tests/entropy_framework_test.rs",
+      "tests/python_entropy_test.rs",
+      "tests/apply_entropy_dampening_tests.rs"
+    ]
+  }
+}
