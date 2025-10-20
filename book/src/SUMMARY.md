@@ -14,6 +14,7 @@
 # Advanced Topics
 
 - [Architecture](architecture.md)
+- [Entropy Analysis](entropy-analysis.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 - [Scoring Strategies](scoring-strategies.md)
 - [Prodigy Integration](prodigy-integration.md)
