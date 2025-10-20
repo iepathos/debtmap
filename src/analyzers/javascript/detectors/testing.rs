@@ -1641,20 +1641,6 @@ mod tests {
         // Should detect at least one timing dependency (the first one found)
         assert_eq!(issues.len(), 1, "Should detect timing dependency");
     }
-=======
-        let source = "test('example', () => {});";
-        let tree = parser.parse(source, None).unwrap();
-        let query = build_async_test_query(&javascript).unwrap();
-        let mut cursor = tree_sitter::QueryCursor::new();
-        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
-
-        if let Some(match_) = matches.next() {
-            let func = extract_test_function_name(&match_);
-            assert!(func.is_some(), "Should extract function name");
-        } else {
-            panic!("Query should match the test code");
-        }
-    }
 
     #[test]
     fn test_extract_test_name() {
@@ -1798,5 +1784,4 @@ mod tests {
             }
         }
     }
->>>>>>> agent-mapreduce-20251020_055821_agent_7-item_7
 }
