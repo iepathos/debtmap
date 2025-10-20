@@ -45,8 +45,7 @@ pub(crate) fn copy_file_entry(src: &Path, dest: &Path) -> Result<()> {
 
 /// Create a directory with error context
 pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
-    fs::create_dir_all(dest)
-        .with_context(|| format!("Failed to create directory {:?}", dest))?;
+    fs::create_dir_all(dest).with_context(|| format!("Failed to create directory {:?}", dest))?;
     Ok(())
 }
 
@@ -744,8 +743,8 @@ impl SharedCache {
     fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
         #[allow(clippy::only_used_in_recursion)]
         let _ = self; // Silence clippy warning
-        for entry in fs::read_dir(src)
-            .with_context(|| format!("Failed to read directory {:?}", src))?
+        for entry in
+            fs::read_dir(src).with_context(|| format!("Failed to read directory {:?}", src))?
         {
             let entry = entry?;
             let path = entry.path();

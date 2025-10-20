@@ -1024,7 +1024,11 @@ mod copy_dir_recursive_tests {
         let mut current_dir = src_dir.clone();
 
         for i in 1..=5 {
-            create_test_file(&current_dir, &format!("file_{}.txt", i), &format!("content {}", i));
+            create_test_file(
+                &current_dir,
+                &format!("file_{}.txt", i),
+                &format!("content {}", i),
+            );
             current_dir = create_test_dir(&current_dir, &format!("level{}", i));
         }
 
@@ -1076,10 +1080,7 @@ mod copy_dir_recursive_tests {
             fs::read_to_string(dest_dir.join("text.txt")).unwrap(),
             "Simple text content"
         );
-        assert_eq!(
-            fs::read_to_string(dest_dir.join("empty.txt")).unwrap(),
-            ""
-        );
+        assert_eq!(fs::read_to_string(dest_dir.join("empty.txt")).unwrap(), "");
         assert_eq!(
             fs::read_to_string(dest_dir.join("multiline.txt")).unwrap(),
             "Line 1\nLine 2\nLine 3"
