@@ -1,0 +1,41 @@
+name: Question
+description: Ask a question about debtmap usage
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about how to use debtmap? We're here to help!
+
+        **Note**: For general discussions or open-ended topics, consider using [GitHub Discussions](https://github.com/iepathos/debtmap/discussions) instead.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know about debtmap?
+      placeholder: "How do I configure debtmap to ignore test files?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to accomplish? Providing context helps us give better answers.
+      placeholder: "I'm trying to analyze a Rust project with extensive integration tests..."
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: Have you tried any solutions already? What documentation have you consulted?
+      placeholder: "I looked at the configuration guide and tried adding patterns to .debtmap.toml..."
+
+  - type: input
+    id: debtmap-version
+    attributes:
+      label: Debtmap Version
+      description: Output of `debtmap --version`
+      placeholder: "debtmap 0.2.8"
