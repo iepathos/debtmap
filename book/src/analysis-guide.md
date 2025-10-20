@@ -278,6 +278,15 @@ pub enum DebtCategory {
 | AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency | Performance | Runtime efficiency, resource usage |
 | Risk, Duplication, ErrorSwallowing | CodeQuality | Maintainability, reliability |
 
+**Language-Specific Debt Patterns:**
+
+Some debt patterns only apply to languages with specific features:
+- **BlockingIO, AsyncMisuse**: Async-capable languages (Rust, JavaScript, TypeScript)
+- **AllocationInefficiency, ResourceLeak**: Languages with manual memory management (Rust)
+- **Error handling patterns**: Vary by language error model (Result in Rust, exceptions in Python/JS)
+
+Debtmap automatically applies only the relevant debt patterns for each language during analysis.
+
 ### Examples by Category
 
 #### Architecture Debt
@@ -624,11 +633,11 @@ Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
 Uncovered complex code scores higher than uncovered simple code. Coverage dampens the score - well-tested code gets lower scores.
 
 **Dependency Factor** (0-10 scale):
-Based on call graph analysis:
-- High upstream caller count (many functions depend on this): 8-10
-- On critical paths from entry points: 7-9
-- Moderate dependencies: 4-6
-- Isolated utilities: 1-3
+Based on call graph analysis with specific thresholds:
+- **High impact** (score 8-10): 5+ upstream callers, or on critical path from entry point (adds 2-3 points)
+- **Moderate impact** (score 4-6): 2-4 upstream callers
+- **Low impact** (score 1-3): 0-1 upstream callers
+- **Critical path bonus**: Being on a critical path from an entry point adds 2-3 points to the base dependency score
 
 #### Default Weights
 
@@ -887,8 +896,14 @@ Debtmap provides codebase-wide risk metrics:
 - **Needs attention**: Many Critical/High priority functions
 - **Technical debt**: High codebase risk score
 
-**Note on well-tested functions:**
-In unified scoring, well-tested complex code simply scores low (0-2.9 Minimal or 3-4.9 Low) due to coverage dampening - it's not a separate category. The `minimal_count` in the distribution represents functions with unified scores 0-2.9, which includes well-tested complex code.
+**Note on minimal_count and well-tested functions:**
+
+In unified scoring, `minimal_count` represents all functions scoring 0-2.9, which naturally includes:
+- Simple utility functions
+- Helper functions with low complexity
+- **Well-tested complex code** that scores low due to coverage dampening
+
+This is not a special category but an **outcome** of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk. These functions are correctly de-prioritized because they're well-managed, not because they need special handling.
 
 ### Testing Recommendations
 
@@ -1005,6 +1020,31 @@ debtmap analyze . --format markdown --output report.md
   }
 }
 ```
+
+#### JSON Output Format Variants
+
+Debtmap supports two JSON output format variants for different integration needs:
+
+**Legacy Format (default):**
+- Uses wrapper objects: `{"File": {...}}` and `{"Function": {...}}`
+- Compatible with existing tooling and scripts
+- Shown in the JSON structure example above
+
+**Unified Format (spec 108 - future enhancement):**
+- Uses consistent structure with `"type"` field discriminator
+- Simpler parsing for new integrations
+- Example structure:
+```json
+{
+  "type": "function",
+  "name": "process_data",
+  "file": "src/main.rs",
+  "line": 42,
+  "metrics": { /* ... */ }
+}
+```
+
+**Note:** The unified format is currently an internal representation. If you need this format exposed as a CLI option, please open a feature request on GitHub. The legacy format remains the stable default for all current integrations.
 
 ### Reading Function Metrics
 
@@ -1703,9 +1743,11 @@ This classification feeds directly into the unified scoring system's role multip
 
 Debtmap's `Language` enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.
 
+Files with extensions like `.cpp` (C++), `.java`, `.go`, `.rb` (Ruby), `.php`, `.cs` (C#), `.swift`, `.kt` (Kotlin), `.scala`, and others are silently filtered during discovery.
+
 **File filtering behavior:**
 - Discovery scans project for files matching supported extensions
-- Unsupported files (`.cpp`, `.java`, `.go`, etc.) are skipped silently
+- Unsupported files are skipped silently (no warnings or errors)
 - No analysis, metrics, or debt patterns are generated for filtered files
 - Use `--languages` flag to explicitly control which languages to analyze
 
@@ -2276,6 +2318,10 @@ Debtmap parses LCOV coverage data for risk analysis:
 - Target overhead: ≤3x (maintained through optimizations)
 - Example timing: 53ms baseline → 130ms with coverage (2.45x overhead)
 - Overhead includes index build + lookups + coverage propagation
+
+**When to use coverage integration:**
+- **Skip coverage** (faster iteration): For rapid development iteration or quick local checks, omit `--lcov` to get baseline results 2.5x faster
+- **Include coverage** (comprehensive analysis): Use coverage integration for final validation, sprint planning, and CI/CD gates where comprehensive risk analysis is needed
 
 **Thread Safety:**
 - Coverage index wrapped in `Arc<CoverageIndex>` for lock-free parallel access
