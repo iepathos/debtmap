@@ -8,6 +8,13 @@
       "validation": "Ensure introduction covers project purpose and main features"
     },
     {
+      "id": "why-debtmap",
+      "title": "Why Debtmap?",
+      "file": "book/src/why-debtmap.md",
+      "topics": ["Entropy analysis explanation", "Coverage-risk correlation", "Comparison with alternatives", "Performance advantages", "Unique features", "When to use debtmap"],
+      "validation": "Verify entropy analysis is explained with visual examples, comparison table matches reality, performance claims are accurate"
+    },
+    {
       "id": "getting-started",
       "title": "Getting Started",
       "file": "book/src/getting-started.md",
@@ -43,11 +50,25 @@
       "validation": "Verify output format documentation matches src/io/ implementation"
     },
     {
+      "id": "architecture",
+      "title": "Architecture",
+      "file": "book/src/architecture.md",
+      "topics": ["Analysis pipeline", "Parser layer", "Metric extraction", "Call graph construction", "Entropy analysis", "Risk scoring system", "Output formatting", "Data flow"],
+      "validation": "Check architecture diagram reflects implementation in src/analyzers/, src/analysis/, src/risk/. Verify pipeline stages match actual code flow."
+    },
+    {
       "id": "examples",
       "title": "Examples",
       "file": "book/src/examples.md",
       "topics": ["Analyzing Rust projects", "Python analysis", "JavaScript/TypeScript", "CI integration"],
       "validation": "Ensure examples use current CLI syntax and options"
+    },
+    {
+      "id": "faq",
+      "title": "FAQ",
+      "file": "book/src/faq.md",
+      "topics": ["Feature questions", "Coverage integration", "Language support", "Comparison questions", "Usage questions", "Configuration", "CI/CD integration", "Troubleshooting"],
+      "validation": "Ensure FAQ covers common objections and links to detailed chapters. Verify technical answers are accurate and cite sources where appropriate."
     },
     {
       "id": "troubleshooting",

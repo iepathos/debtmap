@@ -1,6 +1,7 @@
 # Summary
 
 [Introduction](introduction.md)
+[Why Debtmap?](why-debtmap.md)
 
 # User Guide
 
@@ -12,6 +13,7 @@
 
 # Advanced Topics
 
+- [Architecture](architecture.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 - [Scoring Strategies](scoring-strategies.md)
 - [Prodigy Integration](prodigy-integration.md)
@@ -19,4 +21,5 @@
 # Reference
 
 - [Examples](examples.md)
+- [FAQ](faq.md)
 - [Troubleshooting](troubleshooting.md)
