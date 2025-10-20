@@ -554,6 +554,166 @@ The weighted approach correctly identifies `legacy_parser.rs` as the real proble
 
 **Testing**: Comprehensive unit tests validate the weighting formula and ensure that files with many simple functions score significantly lower than files with fewer complex functions.
 
+### Purity-Weighted God Object Scoring
+
+**Design Problem**: Traditional complexity-weighted scoring treats all functions equally regardless of their design quality. A module with 100 pure, composable helper functions (functional programming style) should not be penalized as heavily as a module with 100 stateful, side-effecting functions (procedural style).
+
+**Solution**: DebtMap extends complexity-weighted scoring with purity analysis, applying differential weights to pure vs impure functions. This rewards functional programming patterns while still identifying truly problematic god objects.
+
+#### Purity Analysis Architecture
+
+**Location**: `src/organization/purity_analyzer.rs`
+
+**Analysis Pipeline**:
+```
+Function AST
+    ↓
+Analyze Signature (parameters, return type)
+    ↓
+Analyze Body (side effects, mutations, I/O)
+    ↓
+Determine Purity Classification
+    ↓
+Apply Purity Weight to Complexity Score
+```
+
+**Classification Algorithm**:
+
+The purity analyzer examines both function signatures and implementations:
+
+1. **Signature Analysis**:
+   - Mutable parameters (`&mut`) → Impure
+   - No return value → Likely impure (unless proven otherwise)
+   - Return type suggests computation → Potentially pure
+
+2. **Body Analysis** (detects side effects):
+   - File I/O operations (`std::fs`, `tokio::fs`)
+   - Network calls (`reqwest`, `hyper`, sockets)
+   - Database access (SQL, ORM operations)
+   - Global state mutation (static mut, unsafe)
+   - Logging/printing (`println!`, `log::`)
+   - System calls (`std::process`, `Command`)
+   - Random number generation
+   - Time/clock access
+
+3. **Purity Determination**:
+   - **Pure**: No detected side effects, immutable parameters, returns value
+   - **Impure**: Any side effect detected or mutable state access
+
+#### Purity Weights
+
+Pure functions receive a reduced weight multiplier:
+
+```rust
+// From src/organization/purity_analyzer.rs
+const PURE_FUNCTION_WEIGHT: f64 = 0.3;    // 30% weight
+const IMPURE_FUNCTION_WEIGHT: f64 = 1.0;  // 100% weight (baseline)
+```
+
+**Rationale**:
+- **Pure functions** are easier to test, reason about, and maintain
+- **Many small pure helpers** indicate good functional decomposition
+- **Impure functions** carry inherent complexity beyond their cyclomatic complexity
+
+#### Integration with God Object Detection
+
+The god object detector applies purity weights during weighted complexity calculation:
+
+```rust
+// Pseudo-code from god_object_detector.rs
+for function in functions {
+    complexity_weight = calculate_complexity_weight(function.complexity);
+    purity_weight = if is_pure(function) { 0.3 } else { 1.0 };
+    total_weighted_complexity += complexity_weight * purity_weight;
+}
+```
+
+**Combined Weighting**:
+- Simple pure function (complexity 1): `0.19 × 0.3 = 0.057`
+- Simple impure function (complexity 1): `0.19 × 1.0 = 0.19`
+- Complex pure function (complexity 17): `13.5 × 0.3 = 4.05`
+- Complex impure function (complexity 17): `13.5 × 1.0 = 13.5`
+
+#### Example Scenario
+
+**Functional Module** (70 pure helpers, 30 impure orchestrators):
+```
+Pure functions:    70 × avg_weight(2.0) × 0.3 = 42.0
+Impure functions:  30 × avg_weight(8.0) × 1.0 = 240.0
+Total weighted: 282.0
+God object score: ~45.0 (below threshold)
+```
+
+**Procedural Module** (100 impure functions):
+```
+Impure functions:  100 × avg_weight(8.0) × 1.0 = 800.0
+Total weighted: 800.0
+God object score: ~125.0 (god object detected)
+```
+
+The functional module avoids god object classification despite having more total functions, because its pure helpers contribute minimally to the weighted score.
+
+#### Benefits
+
+- **Rewards functional programming**: Modules using functional patterns score lower
+- **Penalizes stateful design**: Modules with many side effects score higher
+- **Accurate problem detection**: Focuses on truly problematic modules, not well-refactored functional code
+- **Encourages refactoring**: Incentivizes extracting pure functions from complex impure ones
+
+#### Verbose Output
+
+When running with `--verbose`, the god object analysis includes purity distribution:
+
+```
+GOD OBJECT ANALYSIS: src/core/processor.rs
+  Total functions: 107
+  PURITY DISTRIBUTION:
+    Pure: 70 functions (65%) → complexity weight: 6.3
+    Impure: 37 functions (35%) → complexity weight: 14.0
+    Total weighted complexity: 20.3
+  God object score: 12.0 (threshold: 70.0)
+  Status: ✓ Not a god object (functional design)
+```
+
+#### Data Flow
+
+The purity analysis integrates into the existing analysis pipeline:
+
+```
+File Analysis
+    ↓
+Extract Functions
+    ↓
+Calculate Cyclomatic Complexity (existing)
+    ↓
+[NEW] Perform Purity Analysis
+    ↓
+[NEW] Apply Purity Weights
+    ↓
+Calculate Weighted Complexity
+    ↓
+God Object Detection
+    ↓
+Generate Report
+```
+
+#### Testing
+
+**Unit Tests** (`src/organization/purity_analyzer.rs`):
+- Pure function detection accuracy
+- Impure function detection (all side effect types)
+- Edge cases (empty functions, trait implementations)
+
+**Integration Tests** (`tests/purity_weighted_god_object.rs`):
+- Functional modules score lower than procedural modules
+- Purity distribution appears in verbose output
+- God object threshold calibration with purity weights
+
+**Property Tests**:
+- Purity classification is deterministic
+- Pure function weight < Impure function weight (always)
+- Total weighted complexity >= raw complexity count
+
 ## Dependencies
 
 ### Core Dependencies

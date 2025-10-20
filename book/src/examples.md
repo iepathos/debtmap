@@ -100,6 +100,61 @@ God objects are flagged with detailed metrics:
 - God object score (0-100%)
 - Recommendations for splitting
 
+#### Purity-Weighted God Object Scoring
+
+Debtmap uses purity analysis to distinguish functional programming patterns from actual god objects. Enable verbose mode to see purity distribution:
+
+```bash
+# See purity distribution in god object analysis
+debtmap analyze . -v
+```
+
+**Example Output:**
+```
+GOD OBJECT ANALYSIS: src/core/processor.rs
+  Total functions: 107
+  PURITY DISTRIBUTION:
+    Pure: 70 functions (65%) → complexity weight: 6.3
+    Impure: 37 functions (35%) → complexity weight: 14.0
+    Total weighted complexity: 20.3
+  God object score: 12.0 (threshold: 70.0)
+  Status: ✓ Not a god object (functional design)
+```
+
+This shows:
+- **Pure functions** (no side effects, immutable) receive 0.3× weight
+- **Impure functions** (I/O, mutations, side effects) receive 1.0× weight
+- Functional modules with many pure helpers avoid false positives
+- Focus shifts to modules with excessive stateful code
+
+**Why This Matters:**
+
+Without purity weighting:
+```
+Module with 100 pure helpers → Flagged as god object ❌
+```
+
+With purity weighting:
+```
+Module with 100 pure helpers → Normal (functional design) ✅
+Module with 100 impure functions → God object detected ✅
+```
+
+**Compare Two Modules:**
+
+Functional module (70 pure, 30 impure):
+```
+Pure:    70 × 0.3 = 21.0
+Impure:  30 × 1.0 = 30.0
+Score: 35.0 → Not a god object ✓
+```
+
+Procedural module (100 impure):
+```
+Impure: 100 × 1.0 = 100.0
+Score: 125.0 → God object detected ✗
+```
+
 ### Filtering and Focusing
 
 ```bash

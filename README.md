@@ -163,11 +163,81 @@ Debtmap includes sophisticated god object detection that identifies classes and 
 - **Field count** - Number of fields/attributes
 - **Responsibility count** - Number of distinct responsibilities (grouped by method naming patterns)
 - **Lines of code** - Overall size of the class/module
+- **Complexity-weighted scoring** - Weighs complex functions more heavily than simple ones
+- **Purity-weighted scoring** - Rewards functional programming patterns
 
-God objects are flagged in both terminal and markdown output with detailed metrics:
-- Number of methods, fields, and responsibilities
-- God object score (0-100%)
-- Recommendations for splitting into smaller, focused modules
+### Purity-Weighted Scoring
+
+Debtmap uses **purity analysis** to distinguish between well-refactored functional code and genuinely problematic god objects. This prevents false positives on modules with many small, pure helper functions.
+
+#### How Purity Weighting Works
+
+When calculating god object scores, debtmap:
+
+1. **Analyzes each function** to determine if it's pure or impure:
+   - **Pure functions**: No side effects, no I/O, immutable parameters, deterministic
+   - **Impure functions**: File I/O, network calls, database access, mutable state, logging
+
+2. **Applies differential weights**:
+   - **Pure functions**: 0.3× weight (30% contribution)
+   - **Impure functions**: 1.0× weight (100% contribution)
+
+3. **Combines with complexity weighting**:
+   ```
+   Total Score = Σ(complexity_weight × purity_weight)
+   ```
+
+#### Why This Matters
+
+**Functional Programming Patterns** often create many small, composable helper functions. Without purity weighting:
+- ❌ A module with 70 pure helpers + 30 orchestrators → Flagged as god object
+- ❌ Encourages keeping code monolithic instead of decomposing
+
+With purity weighting:
+- ✅ Pure helpers contribute minimally to the score
+- ✅ Focus shifts to modules with many stateful, side-effecting functions
+- ✅ Rewards good functional decomposition
+
+#### Example Comparison
+
+**Functional Module** (70 pure helpers + 30 impure orchestrators):
+```
+Pure functions:    70 × 0.3 = 21.0 weighted
+Impure functions:  30 × 1.0 = 30.0 weighted
+Total: 51.0 → Score: 35.0 (✓ Not a god object)
+```
+
+**Procedural Module** (100 impure functions):
+```
+Impure functions: 100 × 1.0 = 100.0 weighted
+Total: 100.0 → Score: 125.0 (✗ God object detected)
+```
+
+The functional module avoids false positive detection despite having more total functions.
+
+#### Verbose Output
+
+When running with `--verbose` (`-v`), god object analysis shows purity distribution:
+
+```bash
+debtmap analyze . -v
+
+GOD OBJECT ANALYSIS: src/core/processor.rs
+  Total functions: 107
+  PURITY DISTRIBUTION:
+    Pure: 70 functions (65%) → complexity weight: 6.3
+    Impure: 37 functions (35%) → complexity weight: 14.0
+    Total weighted complexity: 20.3
+  God object score: 12.0 (threshold: 70.0)
+  Status: ✓ Not a god object (functional design)
+```
+
+This output helps you understand:
+- How many functions are pure vs impure
+- Relative contribution of each category to the score
+- Whether your functional refactoring efforts are recognized
+
+### Configuration
 
 You can configure god object thresholds in `.debtmap.toml`:
 
