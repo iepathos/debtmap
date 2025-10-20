@@ -1215,3 +1215,67 @@ mod pure_function_tests {
         assert_eq!(result, Path::new("/tmp/dest/nested/file.txt"));
     }
 }
+
+#[cfg(test)]
+mod io_function_tests {
+    use super::*;
+    use crate::cache::shared_cache::{copy_dir_entry, copy_file_entry};
+
+    #[test]
+    fn test_copy_file_entry_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("source.txt");
+        let dest = temp_dir.path().join("dest.txt");
+
+        fs::write(&src, "test content").unwrap();
+
+        let result = copy_file_entry(&src, &dest);
+        assert!(result.is_ok());
+        assert!(dest.exists());
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "test content");
+    }
+
+    #[test]
+    fn test_copy_file_entry_source_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let src = temp_dir.path().join("nonexistent.txt");
+        let dest = temp_dir.path().join("dest.txt");
+
+        let result = copy_file_entry(&src, &dest);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_copy_dir_entry_success() {
+        let temp_dir = TempDir::new().unwrap();
+        let dest = temp_dir.path().join("newdir");
+
+        let result = copy_dir_entry(&dest);
+        assert!(result.is_ok());
+        assert!(dest.exists());
+        assert!(dest.is_dir());
+    }
+
+    #[test]
+    fn test_copy_dir_entry_nested() {
+        let temp_dir = TempDir::new().unwrap();
+        let dest = temp_dir.path().join("nested").join("dirs").join("deep");
+
+        let result = copy_dir_entry(&dest);
+        assert!(result.is_ok());
+        assert!(dest.exists());
+        assert!(dest.is_dir());
+    }
+
+    #[test]
+    fn test_copy_dir_entry_already_exists() {
+        let temp_dir = TempDir::new().unwrap();
+        let dest = temp_dir.path().join("existing");
+
+        fs::create_dir(&dest).unwrap();
+
+        let result = copy_dir_entry(&dest);
+        assert!(result.is_ok());
+        assert!(dest.exists());
+    }
+}

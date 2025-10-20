@@ -36,6 +36,20 @@ pub(crate) fn build_dest_path(dest: &Path, entry_name: &std::ffi::OsStr) -> Path
     dest.join(entry_name)
 }
 
+/// Copy a single file with error context
+pub(crate) fn copy_file_entry(src: &Path, dest: &Path) -> Result<()> {
+    fs::copy(src, dest)
+        .with_context(|| format!("Failed to copy file from {:?} to {:?}", src, dest))?;
+    Ok(())
+}
+
+/// Create a directory with error context
+pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest)
+        .with_context(|| format!("Failed to create directory {:?}", dest))?;
+    Ok(())
+}
+
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
@@ -730,17 +744,17 @@ impl SharedCache {
     fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
         #[allow(clippy::only_used_in_recursion)]
         let _ = self; // Silence clippy warning
-        for entry in fs::read_dir(src)? {
+        for entry in fs::read_dir(src)
+            .with_context(|| format!("Failed to read directory {:?}", src))?
+        {
             let entry = entry?;
             let path = entry.path();
             let dest_path = build_dest_path(dest, &entry.file_name());
 
             match classify_entry(&path) {
-                EntryType::File => {
-                    fs::copy(&path, &dest_path)?;
-                }
+                EntryType::File => copy_file_entry(&path, &dest_path)?,
                 EntryType::Directory => {
-                    fs::create_dir_all(&dest_path)?;
+                    copy_dir_entry(&dest_path)?;
                     self.copy_dir_recursive(&path, &dest_path)?;
                 }
                 EntryType::Other => {
