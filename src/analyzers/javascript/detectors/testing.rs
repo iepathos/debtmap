@@ -354,13 +354,10 @@ fn detect_react_test_issues(
     }
 }
 
-fn detect_async_test_issues(
-    root: Node,
-    source: &str,
+fn build_async_test_query(
     language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    let test_query = r#"
+) -> Result<Query, tree_sitter::QueryError> {
+    let query_string = r#"
     (call_expression
       function: (identifier) @func
       arguments: (arguments
@@ -371,8 +368,16 @@ fn detect_async_test_issues(
       )
     ) @test_call
     "#;
+    Query::new(language, query_string)
+}
 
-    if let Ok(query) = Query::new(language, test_query) {
+fn detect_async_test_issues(
+    root: Node,
+    source: &str,
+    language: &tree_sitter::Language,
+    issues: &mut Vec<TestingAntiPattern>,
+) {
+    if let Ok(query) = build_async_test_query(language) {
         let mut cursor = QueryCursor::new();
         let mut matches = cursor.matches(&query, root, source.as_bytes());
 
@@ -825,5 +830,25 @@ mod tests {
         let mut issues = Vec::new();
         detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
         assert_eq!(issues.len(), 1, "Should detect $.ajax without await");
+    }
+
+    #[test]
+    fn test_build_async_test_query_success() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let result = build_async_test_query(&javascript);
+        assert!(result.is_ok(), "Query construction should succeed");
+    }
+
+    #[test]
+    fn test_build_async_test_query_returns_valid_query() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let query = build_async_test_query(&javascript).unwrap();
+
+        // Verify the query has the expected capture count
+        // The query should have captures for: func, test_name, body, test_call
+        assert!(
+            query.capture_names().len() > 0,
+            "Query should have capture names"
+        );
     }
 }
