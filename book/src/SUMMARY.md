@@ -9,6 +9,7 @@
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide.md)
 - [Configuration](configuration.md)
+- [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
 
 # Advanced Topics
