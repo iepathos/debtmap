@@ -397,6 +397,14 @@ fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a
         .map(|c| &c.node)
 }
 
+fn parse_test_name(node: Node, source: &str) -> String {
+    get_node_text(node, source)
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches('`')
+        .to_string()
+}
+
 fn detect_async_test_issues(
     root: Node,
     source: &str,
@@ -415,16 +423,14 @@ fn detect_async_test_issues(
                     if let (Some(name), Some(body)) =
                         (extract_test_name(match_), extract_test_body(match_))
                     {
-                        let test_name = get_node_text(*name, source)
-                            .trim_matches('"')
-                            .trim_matches('\'');
+                        let test_name = parse_test_name(*name, source);
                         let body_text = get_node_text(*body, source);
 
                         // Check if test contains async operations without proper handling
                         if contains_async_operations(body_text) {
                             issues.push(TestingAntiPattern::AsyncTestIssue {
                                 location: SourceLocation::from_node(*body),
-                                test_name: test_name.to_string(),
+                                test_name,
                                 issue_type: "async operations without await or done callback"
                                     .to_string(),
                             });
@@ -934,6 +940,75 @@ mod tests {
             assert!(body.is_some(), "Should extract test body");
         } else {
             panic!("Query should match the test code");
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_double_quotes() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"test("example test", () => {});"#;
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with double quotes"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_single_quotes() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test('example test', () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with single quotes"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_test_name_backticks() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "test(`example test`, () => {});";
+        let tree = parser.parse(source, None).unwrap();
+        let query = build_async_test_query(&javascript).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+
+        if let Some(match_) = matches.next() {
+            if let Some(name_node) = extract_test_name(&match_) {
+                let name = parse_test_name(*name_node, source);
+                assert_eq!(
+                    name, "example test",
+                    "Should parse test name with backticks"
+                );
+            }
         }
     }
 }
