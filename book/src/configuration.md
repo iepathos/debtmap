@@ -4,6 +4,8 @@ Debtmap is highly configurable through a `.debtmap.toml` file. This chapter expl
 
 ## Config Files
 
+Debtmap uses **TOML format** for configuration files (`.debtmap.toml`). TOML provides a clear, readable syntax well-suited for configuration.
+
 ### Creating a Configuration File
 
 Debtmap looks for a `.debtmap.toml` file in the current directory and up to 10 parent directories. To create an initial configuration:
@@ -438,7 +440,15 @@ debtmap analyze --context
 debtmap analyze --format json
 ```
 
-CLI flags take precedence over `.debtmap.toml` settings, allowing per-run customization.
+### Configuration Precedence
+
+Debtmap resolves configuration values in the following order (highest to lowest priority):
+
+1. **CLI flags** - Command-line arguments (e.g., `--threshold-complexity 15`)
+2. **Configuration file** - Settings from `.debtmap.toml`
+3. **Built-in defaults** - Debtmap's sensible default values
+
+This allows you to set project-wide defaults in `.debtmap.toml` while customizing specific runs with CLI flags.
 
 ## Configuration Validation
 
