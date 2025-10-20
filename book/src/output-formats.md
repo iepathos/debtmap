@@ -148,7 +148,10 @@ Plain mode:
 - Uses ASCII box-drawing characters
 - Machine-parseable structure
 
-> **Note:** Terminal output formatting (colors, symbols, etc.) can be customized internally via `FormattingConfig`. These customization options are currently not exposed through the CLI interface.
+> **Note:** Terminal output formatting can be customized via `FormattingConfig`, which controls color mode and emoji mode. The `--plain` flag uses this configuration to disable both colors and emoji. Additionally, you can control formatting through environment variables:
+> - `NO_COLOR=1` - Disables colors (per [no-color.org](https://no-color.org) standard)
+> - `CLICOLOR=0` - Disables colors
+> - `CLICOLOR_FORCE=1` - Forces colors even when output is not a terminal
 
 ### Verbosity Levels
 
