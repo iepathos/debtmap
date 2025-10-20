@@ -198,37 +198,43 @@ impl PatternRecognizer for DependencyInjectionRecognizer {
     fn detect(&self, file_metrics: &FileMetrics) -> Vec<PatternInstance> {
         let mut patterns = Vec::new();
 
-        if let Some(classes) = &file_metrics.classes {
-            for class in classes {
-                let has_constructor = self.uses_constructor_injection(class);
-                let has_decorator = self.uses_decorator_injection(class);
-                let has_setter = self.uses_setter_injection(class);
+        // Guard clause: early return if no classes
+        let Some(classes) = &file_metrics.classes else {
+            return patterns;
+        };
 
-                // Count injection decorators
-                let decorator_count = Self::count_injection_decorators(class);
+        for class in classes {
+            let has_constructor = self.uses_constructor_injection(class);
+            let has_decorator = self.uses_decorator_injection(class);
+            let has_setter = self.uses_setter_injection(class);
 
-                if has_constructor || has_decorator || has_setter {
-                    let confidence = self.calculate_confidence(
-                        has_constructor,
-                        has_decorator,
-                        has_setter,
-                        decorator_count,
-                    );
-
-                    // Collect implementations (methods with injection decorators)
-                    let implementations =
-                        Self::collect_injection_implementations(class, &file_metrics.path);
-
-                    patterns.push(Self::build_pattern_instance(
-                        class,
-                        has_constructor,
-                        has_decorator,
-                        has_setter,
-                        confidence,
-                        implementations,
-                    ));
-                }
+            // Guard clause: skip if no injection detected
+            if !has_constructor && !has_decorator && !has_setter {
+                continue;
             }
+
+            // Count injection decorators
+            let decorator_count = Self::count_injection_decorators(class);
+
+            let confidence = self.calculate_confidence(
+                has_constructor,
+                has_decorator,
+                has_setter,
+                decorator_count,
+            );
+
+            // Collect implementations (methods with injection decorators)
+            let implementations =
+                Self::collect_injection_implementations(class, &file_metrics.path);
+
+            patterns.push(Self::build_pattern_instance(
+                class,
+                has_constructor,
+                has_decorator,
+                has_setter,
+                confidence,
+                implementations,
+            ));
         }
 
         patterns
@@ -345,7 +351,10 @@ mod tests {
             decorators: vec![],
             line: 1,
         };
-        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 0);
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            0
+        );
     }
 
     #[test]
@@ -358,7 +367,10 @@ mod tests {
             decorators: vec!["inject".to_string(), "autowired".to_string()],
             line: 1,
         };
-        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
     }
 
     #[test]
@@ -386,7 +398,10 @@ mod tests {
             decorators: vec![],
             line: 1,
         };
-        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
     }
 
     #[test]
@@ -394,20 +409,21 @@ mod tests {
         let class = ClassDef {
             name: "ServiceClass".to_string(),
             base_classes: vec![],
-            methods: vec![
-                MethodDef {
-                    name: "method1".to_string(),
-                    is_abstract: false,
-                    decorators: vec!["inject".to_string()],
-                    overrides_base: false,
-                    line: 5,
-                },
-            ],
+            methods: vec![MethodDef {
+                name: "method1".to_string(),
+                is_abstract: false,
+                decorators: vec!["inject".to_string()],
+                overrides_base: false,
+                line: 5,
+            }],
             is_abstract: false,
             decorators: vec!["autowired".to_string()],
             line: 1,
         };
-        assert_eq!(DependencyInjectionRecognizer::count_injection_decorators(&class), 2);
+        assert_eq!(
+            DependencyInjectionRecognizer::count_injection_decorators(&class),
+            2
+        );
     }
 
     #[test]
@@ -427,7 +443,8 @@ mod tests {
             line: 5,
         };
         let path = PathBuf::from("test.py");
-        let implementations = DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
         assert_eq!(implementations.len(), 1);
         assert_eq!(implementations[0].function_name, "__init__");
         assert_eq!(implementations[0].line, 10);
@@ -459,7 +476,8 @@ mod tests {
             line: 15,
         };
         let path = PathBuf::from("test.py");
-        let implementations = DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
         assert_eq!(implementations.len(), 2);
         assert_eq!(implementations[0].function_name, "process");
         assert_eq!(implementations[1].function_name, "validate");
@@ -469,7 +487,8 @@ mod tests {
     fn test_collect_injection_implementations_with_both() {
         let class = create_class_with_constructor_injection();
         let path = PathBuf::from("test.py");
-        let implementations = DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
         assert_eq!(implementations.len(), 1);
         assert_eq!(implementations[0].function_name, "__init__");
     }
@@ -491,7 +510,8 @@ mod tests {
             line: 5,
         };
         let path = PathBuf::from("test.py");
-        let implementations = DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
+        let implementations =
+            DependencyInjectionRecognizer::collect_injection_implementations(&class, &path);
         assert_eq!(implementations.len(), 0);
     }
 
