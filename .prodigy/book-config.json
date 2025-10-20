@@ -34,6 +34,11 @@
       "area": "configuration",
       "source_files": ["src/config/"],
       "feature_categories": ["config_options", "file_formats", "defaults"]
+    },
+    {
+      "area": "architecture",
+      "source_files": ["src/analyzers/", "src/analysis/", "src/risk/", "src/priority/"],
+      "feature_categories": ["architecture", "data_flow", "pipelines", "system_design"]
     }
   ],
   "chapter_file": "workflows/data/debtmap-chapters.json",
@@ -41,6 +46,7 @@
     "include_examples": true,
     "include_best_practices": true,
     "include_troubleshooting": true,
+    "include_faq": true,
     "analyze_dependencies": false,
     "extract_code_comments": true,
     "include_performance_notes": true

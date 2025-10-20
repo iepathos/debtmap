@@ -247,6 +247,104 @@ Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
 - **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS, `%LOCALAPPDATA%/debtmap` on Windows
 - **What's cached**: Parsed ASTs and computed metrics for each file
 - **Invalidation**: Cache is automatically invalidated when files are modified
+
+### Example Output
+
+When you run `debtmap analyze .`, you'll see output like this:
+
+```
+════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+════════════════════════════════════════════
+
+📊 ANALYSIS SUMMARY
+   Files analyzed: 47
+   Total functions: 234
+   Debt items found: 12
+   Analysis time: 3.2s
+
+🎯 TOP 5 RECOMMENDATIONS
+
+#1 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/parser.rs:38 parse_input()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: -3.7 risk reduction
+├─ WHY: Complex logic (cyclo=12) with 0% coverage
+└─ DETAILS: Function has 12 decision points with no test coverage.
+            Untested error paths could cause production failures.
+
+#2 SCORE: 7.2 [HIGH]
+├─ TEST GAP: ./src/analyzer/complexity.rs:145 calculate_entropy()
+├─ ACTION: Add 4 unit tests for edge cases
+├─ IMPACT: -2.8 risk reduction
+├─ WHY: Medium complexity (cyclo=8) with 35% coverage
+└─ DETAILS: Missing tests for error conditions and boundary cases.
+
+#3 SCORE: 5.8 [HIGH]
+├─ COMPLEXITY: ./src/io/formatter.rs:89 format_output()
+├─ ACTION: Extract 3 functions from 16 branches
+├─ IMPACT: -2.1 risk reduction
+├─ WHY: High complexity (cyclo=16, entropy=0.75)
+└─ DETAILS: Function handles multiple output formats with nested conditionals.
+            Consider extracting format-specific logic.
+
+════════════════════════════════════════════
+```
+
+With coverage integration (`--lcov`), you'll see more detailed test gap analysis:
+
+```bash
+debtmap analyze . --lcov target/coverage/lcov.info --top 3
+```
+
+```
+════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+    (Coverage-Integrated Analysis)
+════════════════════════════════════════════
+
+📊 ANALYSIS SUMMARY
+   Files analyzed: 47
+   Coverage: 68.5% lines, 54.2% branches
+   Critical gaps: 3
+   High-priority gaps: 7
+
+🎯 TOP 3 CRITICAL GAPS
+
+#1 SCORE: 9.1 [CRITICAL]
+├─ TEST GAP: ./src/core/state_machine.rs:67 transition_state()
+├─ COVERAGE: 0% (0/8 branches covered)
+├─ COMPLEXITY: 15 (high entropy: 0.82)
+├─ ACTION: Add 8 unit tests covering all state transitions
+├─ IMPACT: -4.5 risk reduction
+├─ WHY: Core business logic with complex branching, completely untested
+└─ CALL GRAPH: Called from 12 different code paths
+                5 of those callers are also untested
+
+#2 SCORE: 8.4 [CRITICAL]
+├─ TEST GAP: ./src/parser.rs:38 parse_input()
+├─ COVERAGE: 25% (2/8 branches covered)
+├─ COMPLEXITY: 12 (medium entropy: 0.61)
+├─ ACTION: Add 6 tests for untested error paths
+├─ IMPACT: -3.2 risk reduction
+└─ MISSING BRANCHES:
+    • Line 45: Error path for invalid syntax
+    • Line 52: Error path for unexpected EOF
+    • Line 58: Error path for malformed input
+    • Line 63: Edge case: empty input
+    • Line 68: Edge case: very large input
+    • Line 72: Edge case: special characters
+
+════════════════════════════════════════════
+```
+
+**Reading the output:**
+- **Score**: Risk score from 0-10 (higher = more urgent)
+- **Tier**: CRITICAL (8.0+), HIGH (5.0-7.9), MODERATE (2.0-4.9), LOW (<2.0)
+- **Location**: File path, line number, and function name
+- **Action**: Specific steps to address the issue
+- **Impact**: Estimated risk reduction from taking action
+- **Why**: Rationale explaining why this is flagged
 - **Management**: Use `--clear-cache` to clear, `--no-cache` to skip, or `--cache-stats` to view statistics
 
 **Language support**:
