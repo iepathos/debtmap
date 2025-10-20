@@ -1,42 +1,141 @@
 {
-  "analysis_date": "2025-10-14T21:26:50Z",
-  "project": "Debtmap",
-  "features_analyzed": 21,
+  "analysis_date": "2025-10-20T10:11:20Z",
+  "project_name": "Debtmap",
+  "features_analyzed": 12,
   "documented_topics": 11,
-  "gaps_found": 0,
-  "gaps": [],
-  "actions_taken": [],
-  "summary": {
-    "documented_feature_areas": [
-      "CLI commands (analyze, init, validate, compare)",
-      "Core analysis capabilities (complexity metrics, debt patterns)",
-      "Risk assessment and scoring",
-      "Output formats (terminal, JSON, markdown)",
-      "Configuration options and customization",
-      "Tiered prioritization system",
-      "File-level and function-level scoring strategies",
-      "Prodigy workflow integration",
-      "Troubleshooting and FAQ",
-      "Comprehensive examples"
-    ],
-    "coverage_analysis": {
-      "cli_commands": "Fully documented in cli-reference.md and examples.md",
-      "core_analysis": "Fully documented in analysis-guide.md with detailed metrics",
-      "debt_detection": "Comprehensive coverage in analysis-guide.md",
-      "risk_assessment": "Extensive documentation in analysis-guide.md",
-      "output_formats": "Complete chapter dedicated to output-formats.md",
-      "configuration": "Dedicated configuration.md chapter with all options",
-      "tiered_prioritization": "Dedicated tiered-prioritization.md chapter",
-      "scoring_strategies": "Dedicated scoring-strategies.md chapter",
-      "prodigy_workflows": "Documented in prodigy-integration.md",
-      "troubleshooting": "Comprehensive troubleshooting.md chapter",
-      "examples": "Extensive examples.md with real-world usage"
+  "gaps_found": 7,
+  "gaps": [
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "cache_management",
+      "feature_description": "Intelligent cache system for speeding up repeated analyses",
+      "recommended_chapter_id": "cache-management",
+      "recommended_title": "Cache Management",
+      "recommended_location": "book/src/cache-management.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "parallel_processing",
+      "feature_description": "Parallel processing with Rayon for high-performance analysis",
+      "recommended_chapter_id": "parallel-processing",
+      "recommended_title": "Parallel Processing",
+      "recommended_location": "book/src/parallel-processing.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "entropy_based_analysis",
+      "feature_description": "Entropy-based complexity analysis to reduce false positives",
+      "recommended_chapter_id": "entropy-analysis",
+      "recommended_title": "Entropy Analysis",
+      "recommended_location": "book/src/entropy-analysis.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "coverage_integration",
+      "feature_description": "LCOV coverage integration for risk-based analysis",
+      "recommended_chapter_id": "coverage-integration",
+      "recommended_title": "Coverage Integration",
+      "recommended_location": "book/src/coverage-integration.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "god_object_detection",
+      "feature_description": "God object detection with responsibility analysis",
+      "recommended_chapter_id": "god-object-detection",
+      "recommended_title": "God Object Detection",
+      "recommended_location": "book/src/god-object-detection.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "suppression",
+      "feature_description": "Inline comment and config-based debt suppression",
+      "recommended_chapter_id": "suppression-patterns",
+      "recommended_title": "Suppression Patterns",
+      "recommended_location": "book/src/suppression-patterns.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "context_providers",
+      "feature_description": "Context-aware analysis with critical path, dependency, and git history providers",
+      "recommended_chapter_id": "context-providers",
+      "recommended_title": "Context Providers",
+      "recommended_location": "book/src/context-providers.md"
     }
-  },
-  "conclusion": "All major feature areas from features.json are comprehensively documented across the 11 existing chapters. No documentation gaps detected.",
-  "recommendations": [
-    "Continue to validate documentation accuracy during map phase",
-    "Ensure examples use current CLI syntax",
-    "Keep documentation synchronized with code changes"
+  ],
+  "actions_taken": [
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "cache-management",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/cache-management.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "parallel-processing",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/parallel-processing.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "entropy-analysis",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/entropy-analysis.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "coverage-integration",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/coverage-integration.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "god-object-detection",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/god-object-detection.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "suppression-patterns",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/suppression-patterns.md"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "context-providers",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/context-providers.md"
+    },
+    {
+      "action": "updated_summary",
+      "file_path": "book/src/SUMMARY.md"
+    }
   ]
 }
