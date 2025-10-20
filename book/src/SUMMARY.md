@@ -14,6 +14,7 @@
 # Advanced Topics
 
 - [Architecture](architecture.md)
+- [Coverage Integration](coverage-integration.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 - [Scoring Strategies](scoring-strategies.md)
 - [Prodigy Integration](prodigy-integration.md)
