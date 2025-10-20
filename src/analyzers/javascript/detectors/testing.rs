@@ -366,7 +366,6 @@ fn detect_async_test_issues(
       arguments: (arguments
         (string) @test_name
         (arrow_function
-          async: false
           body: (_) @body
         )
       )
@@ -613,5 +612,218 @@ mod tests {
         let mut issues = Vec::new();
         detect_snapshot_overuse(tree.root_node(), source, &javascript, &mut issues);
         assert_eq!(issues.len(), 0, "No snapshots should not trigger");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_fetch_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch without await', () => {
+                const data = fetch('/api/data');
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect fetch without await");
+
+        if let TestingAntiPattern::AsyncTestIssue {
+            test_name,
+            issue_type,
+            ..
+        } = &issues[0]
+        {
+            assert_eq!(test_name, "fetch without await");
+            assert_eq!(
+                issue_type,
+                "async operations without await or done callback"
+            );
+        } else {
+            panic!("Expected AsyncTestIssue pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_axios_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            it('axios without await', () => {
+                const response = axios.get('/api/users');
+                expect(response).toBeTruthy();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect axios without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_promise_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('Promise without await', () => {
+                const promise = new Promise((resolve) => resolve(42));
+                expect(promise).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect Promise without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_then_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('then() without await', () => {
+                getData().then(data => {
+                    expect(data).toBe(42);
+                });
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect .then() without await");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_with_await_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch with await', () => {
+                const data = await fetch('/api/data');
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger when await is present");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_with_done_callback_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('fetch with done', () => {
+                fetch('/api/data').then(() => {
+                    done();
+                });
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger when done() is present");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_non_test_function_should_not_trigger() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            function helperFunction() {
+                const data = fetch('/api/data');
+                return data;
+            }
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger for non-test functions");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_no_async_operations() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('synchronous test', () => {
+                const result = 1 + 1;
+                expect(result).toBe(2);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Should not trigger for synchronous tests");
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_multiple_async_patterns() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('multiple async patterns', () => {
+                const data1 = fetch('/api/data1');
+                const data2 = axios.get('/api/data2');
+                const promise = new Promise((resolve) => resolve(42));
+                expect(data1).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Should detect multiple async patterns as one issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_async_test_issues_ajax_without_await() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('jQuery ajax without await', () => {
+                const data = $.ajax({ url: '/api/data' });
+                expect(data).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_async_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 1, "Should detect $.ajax without await");
     }
 }
