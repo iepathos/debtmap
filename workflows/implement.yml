@@ -1,33 +1,42 @@
 # implement.yml - Configuration for implementing specifications with validation
 
 # Commands to execute for each specification
-# Implement the spec using the $ARG variable which contains:
-# - The spec ID extracted from filename when using --map
-# - The direct argument value when using --args
+commands:
+  # Step 1: Implement the specification
+  - claude: "/prodigy-implement-spec $ARG"
+    commit_required: true
+    validate:
+      claude: "/prodigy-validate-spec $ARG --output .prodigy/validation-result.json"
+      result_file: ".prodigy/validation-result.json"  # Where Prodigy reads validation results from
+      threshold: 100  # Spec must be 100% implemented (default)
+      on_incomplete:
+        claude: "/prodigy-complete-spec $ARG --gaps ${validation.gaps}"
+        max_attempts: 5
+        fail_workflow: false  # Continue even if we can't reach 100%
+        commit_required: true  # Require commit to verify fixes were made
 
-# Step 1: Implement the specification
-- claude: "/prodigy-implement-spec $ARG"
-  commit_required: true
-  validate:
-    claude: "/prodigy-validate-spec $ARG --output .prodigy/validation-result.json"
-    result_file: ".prodigy/validation-result.json"  # Where Prodigy reads validation results from
-    threshold: 100  # Spec must be 100% implemented (default)
-    on_incomplete:
-      claude: "/prodigy-complete-spec $ARG --gaps ${validation.gaps}"
-      max_attempts: 3
-      fail_workflow: false  # Continue even if we can't reach 100%
-      commit_required: true  # Require commit to verify fixes were made
+  # Step 2: Run tests to verify implementation
+  - shell: "just test"
+    on_failure:
+      claude: "/prodigy-debug-test-failure --spec $ARG --output ${shell.output}"
+      max_attempts: 5
+      fail_workflow: false  # Continue workflow even if tests can't be fixed
 
-# Step 2: Run tests to verify implementation
-- shell: "just test"
-  on_failure:
-    claude: "/prodigy-debug-test-failure --spec $ARG --output ${shell.output}"
-    max_attempts: 3
-    fail_workflow: false  # Continue workflow even if tests can't be fixed
+  # Step 3: Run linting and formatting after implementation
+  - shell: "just fmt-check && just lint"
+    on_failure:
+      claude: "/prodigy-lint ${shell.output}"
+      max_attempts: 5
+      fail_workflow: false
 
-# Step 3: Run linting and formatting after implementation
-- shell: "just fmt-check && just lint"
-  on_failure:
-    claude: "/prodigy-lint ${shell.output}"
-    max_attempts: 3
-    fail_workflow: false
+# Custom merge workflow - ensures clean integration back to master
+merge:
+  # Step 1: Fetch latest changes and merge master into worktree
+  - shell: "git fetch origin"
+  - claude: "/prodigy-merge-master"  # Handles merge conflicts if any
+
+  # Step 2: Run CI checks and fix any issues
+  - claude: "/prodigy-ci"
+
+  # Step 3: Merge worktree back to master
+  - claude: "/prodigy-merge-worktree ${merge.source_branch}"
