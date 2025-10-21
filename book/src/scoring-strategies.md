@@ -250,6 +250,94 @@ Functions are classified by role, and each role receives a multiplier based on i
 
 **Note**: Role multipliers are configurable via the `[role_multipliers]` section in `.debtmap.toml`. The multipliers have been rebalanced to be less extreme than earlier versions - pure logic was reduced from 1.5x to 1.2x, while orchestrator and IO wrapper were increased to better reflect their importance in modern codebases.
 
+### Constructor Detection
+
+Debtmap includes intelligent constructor detection to prevent false positives where trivial initialization functions are misclassified as critical business logic.
+
+**Problem**: Simple constructors like `new()`, `default()`, or `from_config()` often have low complexity but were being flagged as high-priority pure logic functions.
+
+**Solution**: Constructor detection automatically identifies and classifies these functions as `IOWrapper` (low priority) instead of `PureLogic` (high priority).
+
+**Detection Criteria**:
+
+A function is considered a simple constructor if it meets ALL of the following:
+
+1. **Name matches a constructor pattern** (configurable):
+   - Exact match: `new`, `default`, `empty`, `zero`, `any`
+   - Prefix match: `from_*`, `with_*`, `create_*`, `make_*`, `build_*`, `of_*`
+
+2. **Low cyclomatic complexity** (≤ 2 by default)
+3. **Short length** (< 15 lines by default)
+4. **Minimal nesting** (≤ 1 level by default)
+5. **Low cognitive complexity** (≤ 3 by default)
+
+**Example**:
+
+```rust
+// Simple constructor - detected and classified as IOWrapper
+fn new() -> Self {
+    Self {
+        field1: 0,
+        field2: String::new(),
+    }
+}
+
+// Complex factory - NOT detected as constructor, remains PureLogic
+fn create_with_validation(data: Data) -> Result<Self> {
+    validate(&data)?;
+    // ... 30 lines of logic
+    Ok(Self { ... })
+}
+```
+
+**Configuration**:
+
+Constructor detection is fully configurable in `.debtmap.toml`:
+
+```toml
+[classification.constructors]
+# Constructor name patterns
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "create_",
+    "make_",
+    "build_",
+    "of_",
+    "empty",
+    "zero",
+    "any",
+]
+
+# Complexity thresholds
+max_cyclomatic = 2     # Maximum cyclomatic complexity
+max_cognitive = 3      # Maximum cognitive complexity
+max_length = 15        # Maximum lines
+max_nesting = 1        # Maximum nesting depth
+```
+
+**Customization Example**:
+
+To add custom constructor patterns or adjust thresholds:
+
+```toml
+[classification.constructors]
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "init_",        # Add custom pattern
+    "setup_",       # Add custom pattern
+]
+max_cyclomatic = 3    # Allow slightly more complex constructors
+max_length = 20       # Allow longer constructors
+```
+
+This feature is part of spec 117 and helps reduce false positives in priority scoring.
+
 ### Use Cases
 
 **1. Identifying Specific Hot Spots**

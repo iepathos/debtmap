@@ -32,6 +32,11 @@ fn classify_by_rules(
         return Some(FunctionRole::EntryPoint);
     }
 
+    // Check for constructors BEFORE pattern matching (Spec 117)
+    if is_simple_constructor(func) {
+        return Some(FunctionRole::IOWrapper);
+    }
+
     // Check for pattern matching functions (like detect_file_type)
     if is_pattern_matching_function(func, func_id) {
         return Some(FunctionRole::PatternMatch);
@@ -53,6 +58,54 @@ fn classify_by_rules(
 // Pure function to check if a function is an entry point
 fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+}
+
+/// Detect simple constructor functions to prevent false positive classifications.
+///
+/// A function is considered a simple constructor if it meets ALL criteria:
+/// - Has a constructor-like name (new, default, from_*, with_*, etc.)
+/// - Low cyclomatic complexity (≤ 2)
+/// - Short length (< 15 lines)
+/// - Minimal nesting (≤ 1 level)
+/// - Low cognitive complexity (≤ 3)
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Simple constructor - matches
+/// fn new() -> Self { Self { field: 0 } }
+///
+/// // Complex factory - does NOT match
+/// fn create_with_validation(data: Data) -> Result<Self> {
+///     validate(data)?;
+///     // ... 30 lines of logic
+///     Ok(Self { ... })
+/// }
+/// ```
+///
+/// # False Positive Prevention
+///
+/// This function specifically addresses the false positive in ContextMatcher::any()
+/// where a trivial 9-line constructor was classified as CRITICAL business logic.
+fn is_simple_constructor(func: &FunctionMetrics) -> bool {
+    // Get constructor detection configuration
+    let config = crate::config::get_constructor_detection_config();
+
+    // Name-based detection using configurable patterns
+    let name_lower = func.name.to_lowercase();
+    let matches_constructor_name = config.patterns.iter().any(|pattern| {
+        name_lower == *pattern || name_lower.starts_with(pattern) || name_lower.ends_with(pattern)
+    });
+
+    // Complexity-based filtering using configurable thresholds
+    let is_simple = func.cyclomatic <= config.max_cyclomatic
+        && func.length < config.max_length
+        && func.nesting <= config.max_nesting;
+
+    // Structural pattern: low cognitive complexity suggests simple initialization
+    let is_initialization = func.cognitive <= config.max_cognitive;
+
+    matches_constructor_name && is_simple && is_initialization
 }
 
 // Pure function to check if a function is a pattern matching function
@@ -768,6 +821,164 @@ mod tests {
             role,
             FunctionRole::PureLogic,
             "Function with complexity > 5 should be PureLogic, not Orchestrator"
+        );
+    }
+
+    #[test]
+    fn test_simple_constructor_detection() {
+        // Test: ContextMatcher::any() case (spec 117)
+        let func = create_test_metrics("any", 1, 0, 9);
+        assert!(
+            is_simple_constructor(&func),
+            "any() should be detected as constructor"
+        );
+
+        // Test: Standard new() constructor
+        let func = create_test_metrics("new", 1, 0, 5);
+        assert!(
+            is_simple_constructor(&func),
+            "new() should be detected as constructor"
+        );
+
+        // Test: from_* constructor
+        let func = create_test_metrics("from_config", 1, 0, 8);
+        assert!(
+            is_simple_constructor(&func),
+            "from_config() should be detected as constructor"
+        );
+
+        // Test: with_* constructor
+        let func = create_test_metrics("with_defaults", 2, 1, 12);
+        assert!(
+            is_simple_constructor(&func),
+            "with_defaults() should be detected as constructor"
+        );
+
+        // Test: Complex factory should NOT match
+        let func = create_test_metrics("create_complex", 8, 12, 50);
+        assert!(
+            !is_simple_constructor(&func),
+            "Complex function should NOT be detected as constructor"
+        );
+
+        // Test: Long function should NOT match
+        let func = create_test_metrics("new_complex", 2, 2, 25);
+        assert!(
+            !is_simple_constructor(&func),
+            "Long function should NOT be detected as constructor"
+        );
+
+        // Test: High cognitive complexity should NOT match
+        let func = create_test_metrics("new_with_logic", 2, 8, 10);
+        assert!(
+            !is_simple_constructor(&func),
+            "High cognitive complexity should NOT be detected as constructor"
+        );
+    }
+
+    #[test]
+    fn test_constructor_classification_precedence() {
+        let graph = CallGraph::new();
+        let func = create_test_metrics("any", 1, 0, 9);
+        let func_id = FunctionId {
+            file: PathBuf::from("context/rules.rs"),
+            name: "any".to_string(),
+            line: 52,
+        };
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::IOWrapper,
+            "Simple constructor should be classified as IOWrapper, not PureLogic"
+        );
+    }
+
+    #[test]
+    fn test_constructor_name_patterns() {
+        // Test exact matches
+        assert!(is_simple_constructor(&create_test_metrics("new", 1, 0, 5)));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "default", 1, 0, 5
+        )));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "empty", 1, 0, 5
+        )));
+        assert!(is_simple_constructor(&create_test_metrics("zero", 1, 0, 5)));
+
+        // Test prefix matches
+        assert!(is_simple_constructor(&create_test_metrics(
+            "from_str", 1, 0, 8
+        )));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "with_capacity",
+            2,
+            1,
+            10
+        )));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "create_default",
+            1,
+            0,
+            7
+        )));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "make_instance",
+            1,
+            0,
+            6
+        )));
+        assert!(is_simple_constructor(&create_test_metrics(
+            "build_config",
+            2,
+            2,
+            12
+        )));
+
+        // Test non-constructor names
+        let func = create_test_metrics("calculate_score", 1, 0, 5);
+        assert!(
+            !is_simple_constructor(&func),
+            "Non-constructor name should not match"
+        );
+    }
+
+    #[test]
+    fn test_constructor_complexity_thresholds() {
+        // Test at threshold boundaries
+        let func = create_test_metrics("new", 2, 3, 14);
+        assert!(
+            is_simple_constructor(&func),
+            "At threshold limits should match"
+        );
+
+        // Test just over cyclomatic threshold
+        let func = create_test_metrics("new", 3, 2, 10);
+        assert!(
+            !is_simple_constructor(&func),
+            "Over cyclomatic threshold should not match"
+        );
+
+        // Test just over cognitive threshold
+        let func = create_test_metrics("new", 1, 4, 10);
+        assert!(
+            !is_simple_constructor(&func),
+            "Over cognitive threshold should not match"
+        );
+
+        // Test just over length threshold
+        let func = create_test_metrics("new", 1, 2, 15);
+        assert!(
+            !is_simple_constructor(&func),
+            "Over length threshold should not match"
+        );
+
+        // Test nesting threshold
+        let mut func = create_test_metrics("new", 1, 2, 10);
+        func.nesting = 2;
+        assert!(
+            !is_simple_constructor(&func),
+            "Over nesting threshold should not match"
         );
     }
 }
