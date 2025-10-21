@@ -753,7 +753,7 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "{} {} cyclomatic={} (adj:{}), branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "{} {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 formatter.emoji("├─", "-"),
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
@@ -767,7 +767,7 @@ fn format_complexity_summary(
         } else {
             writeln!(
                 output,
-                "{} {} cyclomatic={}, branches={}, cognitive={}, nesting={}",
+                "{} {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
                 formatter.emoji("├─", "-"),
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),

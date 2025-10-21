@@ -136,7 +136,7 @@ pub fn format_difficulty(difficulty: &Difficulty) -> &'static str {
 }
 
 pub fn format_complexity_info(branch_count: u32, cognitive_load: u32) -> String {
-    format!("branches={branch_count}, cognitive={cognitive_load}")
+    format!("est_branches={branch_count}, cognitive={cognitive_load}")
 }
 
 pub fn format_dependency_info(dependencies_count: usize, dependents_count: usize) -> String {

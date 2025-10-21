@@ -52,11 +52,14 @@ fn test_format_difficulty_all_levels() {
 
 #[test]
 fn test_format_complexity_info() {
-    assert_eq!(format_complexity_info(0, 0), "branches=0, cognitive=0");
-    assert_eq!(format_complexity_info(5, 10), "branches=5, cognitive=10");
+    assert_eq!(format_complexity_info(0, 0), "est_branches=0, cognitive=0");
+    assert_eq!(
+        format_complexity_info(5, 10),
+        "est_branches=5, cognitive=10"
+    );
     assert_eq!(
         format_complexity_info(100, 200),
-        "branches=100, cognitive=200"
+        "est_branches=100, cognitive=200"
     );
 }
 
@@ -120,7 +123,7 @@ fn test_format_recommendations_with_single_item() {
     assert!(result.contains("Risk: HIGH (8.5)"));
     assert!(result.contains("Impact: -2%")); // 2.5 rounds down to 2
     assert!(result.contains("Complexity: simple"));
-    assert!(result.contains("branches=3, cognitive=5"));
+    assert!(result.contains("est_branches=3, cognitive=5"));
     assert!(result.contains("0 upstream, 0 downstream"));
     assert!(result.contains("Test rationale"));
 }
