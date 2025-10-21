@@ -30,18 +30,18 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 
 📖 **Read more:** [Why Debtmap?](https://iepathos.github.io/debtmap/why-debtmap.html)
 
-## How Debtmap Compares
+## What Makes Debtmap Different
 
-| Feature | Debtmap | SonarQube | CodeClimate | cargo-geiger | clippy |
-|---------|---------|-----------|-------------|--------------|--------|
-| **Speed** | ⚡ Fast (Rust) | 🐌 Slow (JVM) | 🐌 Slow (Ruby) | ⚡ Fast (Rust) | ⚡ Fast (Rust) |
-| **Entropy Analysis** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Coverage Integration** | ✅ LCOV | ⚠️ Enterprise only | ❌ No | ❌ No | ❌ No |
-| **False Positives** | 🟢 Low (70% reduction) | 🔴 High | 🟡 Medium | 🟢 Low | 🟡 Medium |
-| **Rust Support** | ✅ Full AST analysis | ⚠️ Basic | ⚠️ Basic | ✅ Security focus | ✅ Lints only |
-| **Cost** | 🆓 Free & Open Source | 💰 Enterprise pricing | 💰 Paid tiers | 🆓 Free | 🆓 Free |
-| **Actionable Recommendations** | ✅ Specific with impact metrics | ⚠️ Generic warnings | ⚠️ Generic warnings | ❌ Detection only | ⚠️ Generic suggestions |
-| **Coverage-Risk Correlation** | ✅ Unique feature | ❌ No | ❌ No | ❌ No | ❌ No |
+| Capability | Debtmap Approach |
+|-----------|------------------|
+| **Complexity Analysis** | Entropy-based analysis distinguishes genuine complexity from repetitive patterns |
+| **Risk Prioritization** | Correlates complexity with test coverage to identify truly risky code |
+| **Recommendations** | Quantified impact metrics ("Add 6 tests, -3.7 risk reduction") |
+| **Speed** | Rust-based parallel processing for 10-100x faster analysis |
+| **Coverage Integration** | Works with any LCOV-compatible coverage tool |
+| **Cost** | Free, open source, MIT licensed |
+
+**Key Differentiator**: Debtmap is the only tool that combines entropy-based complexity analysis with coverage-risk correlation to reduce false positives and prioritize testing efforts.
 
 ## Documentation
 
