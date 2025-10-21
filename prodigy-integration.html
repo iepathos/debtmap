@@ -218,12 +218,21 @@
 </ul>
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
 <h3 id="install-prodigy"><a class="header" href="#install-prodigy">Install Prodigy</a></h3>
-<pre><code class="language-bash"># Install Prodigy CLI
+<pre><code class="language-bash"># Install Prodigy from GitHub repository
+cargo install --git https://github.com/iepathos/prodigy prodigy
+
+# Or if available on crates.io:
 cargo install prodigy
 
 # Verify installation
 prodigy --version
 </code></pre>
+<p><strong>Requirements:</strong></p>
+<ul>
+<li>Rust 1.70 or later</li>
+<li>Git (for worktree management)</li>
+<li>Anthropic API key for Claude access</li>
+</ul>
 <h3 id="configure-claude-api"><a class="header" href="#configure-claude-api">Configure Claude API</a></h3>
 <pre><code class="language-bash"># Set Claude API key
 export ANTHROPIC_API_KEY="your-api-key-here"
@@ -299,21 +308,21 @@ debtmap --version
     fail_workflow: true
 </code></pre>
 <h3 id="2-run-workflow"><a class="header" href="#2-run-workflow">2. Run Workflow</a></h3>
-<pre><code class="language-bash"># Run with worktree, auto-confirm, 5 iterations
-prodigy cook workflows/debtmap.yml -wyn 5
+<pre><code class="language-bash"># Run with auto-confirm, 5 iterations
+prodigy run workflows/debtmap.yml -yn 5
 
 # Run with custom iteration count
-prodigy cook workflows/debtmap.yml -wyn 10
+prodigy run workflows/debtmap.yml -yn 10
 
 # Run single iteration for testing
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 </code></pre>
 <p><strong>Command Flags:</strong></p>
 <ul>
-<li><code>-w</code> - Create an isolated git worktree for changes</li>
-<li><code>-y</code> - Auto-confirm workflow steps (skip prompts)</li>
-<li><code>-n 5</code> - Run workflow for up to 5 iterations</li>
+<li><code>-y</code> (<code>--yes</code>) - Auto-confirm workflow steps (skip prompts)</li>
+<li><code>-n 5</code> (<code>--max-iterations 5</code>) - Run workflow for up to 5 iterations</li>
 </ul>
+<p><strong>Note</strong>: Worktrees are managed separately via the <code>prodigy worktree</code> command. In MapReduce mode, Prodigy automatically creates isolated worktrees for each parallel agent.</p>
 <h3 id="3-review-results"><a class="header" href="#3-review-results">3. Review Results</a></h3>
 <p>Prodigy creates a detailed report:</p>
 <pre><code>📊 WORKFLOW SUMMARY
@@ -327,26 +336,132 @@ Coverage Improved: 45% → 72% (+27%)
 
 ✅ All validations passed
 </code></pre>
+<h2 id="useful-prodigy-commands"><a class="header" href="#useful-prodigy-commands">Useful Prodigy Commands</a></h2>
+<p>Beyond <code>prodigy run</code>, several commands help manage workflows and sessions:</p>
+<h3 id="resume-interrupted-workflows"><a class="header" href="#resume-interrupted-workflows">Resume Interrupted Workflows</a></h3>
+<pre><code class="language-bash"># Resume an interrupted sequential workflow
+prodigy resume &lt;SESSION_ID&gt;
+
+# Resume an interrupted MapReduce job
+prodigy resume-job &lt;JOB_ID&gt;
+
+# List all sessions to find the SESSION_ID
+prodigy sessions
+</code></pre>
+<p><strong>When to use</strong>: If a workflow is interrupted (Ctrl-C, system crash, network issues), you can resume from the last checkpoint rather than starting over.</p>
+<h3 id="view-checkpoints"><a class="header" href="#view-checkpoints">View Checkpoints</a></h3>
+<pre><code class="language-bash"># List all available checkpoints
+prodigy checkpoints
+
+# List checkpoints for specific session
+prodigy checkpoints --session &lt;SESSION_ID&gt;
+</code></pre>
+<p><strong>When to use</strong>: To see available restore points for interrupted workflows.</p>
+<h3 id="manage-worktrees"><a class="header" href="#manage-worktrees">Manage Worktrees</a></h3>
+<pre><code class="language-bash"># List all Prodigy worktrees
+prodigy worktree list
+
+# Clean up old worktrees
+prodigy worktree clean
+
+# Remove specific worktree
+prodigy worktree remove &lt;SESSION_ID&gt;
+</code></pre>
+<p><strong>When to use</strong>: MapReduce workflows create many worktrees. Clean them up periodically to save disk space.</p>
+<h3 id="monitor-mapreduce-progress"><a class="header" href="#monitor-mapreduce-progress">Monitor MapReduce Progress</a></h3>
+<pre><code class="language-bash"># View progress of running MapReduce job
+prodigy progress &lt;JOB_ID&gt;
+
+# View events and logs from MapReduce job
+prodigy events &lt;JOB_ID&gt;
+
+# Filter events by type
+prodigy events &lt;JOB_ID&gt; --type agent_started
+prodigy events &lt;JOB_ID&gt; --type agent_completed
+prodigy events &lt;JOB_ID&gt; --type agent_failed
+</code></pre>
+<p><strong>When to use</strong>: Monitor long-running MapReduce jobs to see how many agents have completed, which are still running, and which have failed.</p>
+<h3 id="manage-dead-letter-queue"><a class="header" href="#manage-dead-letter-queue">Manage Dead Letter Queue</a></h3>
+<pre><code class="language-bash"># View failed MapReduce items in DLQ
+prodigy dlq list &lt;JOB_ID&gt;
+
+# Retry failed items from DLQ
+prodigy dlq retry &lt;JOB_ID&gt; &lt;ITEM_ID&gt;
+
+# Remove items from DLQ
+prodigy dlq remove &lt;JOB_ID&gt; &lt;ITEM_ID&gt;
+</code></pre>
+<p><strong>When to use</strong>: When some MapReduce agents fail, their items go to the Dead Letter Queue. You can retry them individually or investigate why they failed.</p>
+<h3 id="session-management"><a class="header" href="#session-management">Session Management</a></h3>
+<pre><code class="language-bash"># List all workflow sessions
+prodigy sessions
+
+# Clean up old sessions
+prodigy clean
+</code></pre>
+<p><strong>When to use</strong>: View history of workflow runs and clean up old data.</p>
 <h2 id="workflow-configuration"><a class="header" href="#workflow-configuration">Workflow Configuration</a></h2>
 <p>Prodigy workflows are defined as YAML lists of steps. Each step can be either a <code>shell</code> command or a <code>claude</code> slash command.</p>
 <h3 id="workflow-step-types"><a class="header" href="#workflow-step-types">Workflow Step Types</a></h3>
 <h4 id="shell-commands"><a class="header" href="#shell-commands">Shell Commands</a></h4>
 <p>Execute shell commands directly:</p>
-<pre><code class="language-yaml">- shell: "cargo test"
-</code></pre>
-<p>With error handling:</p>
-<pre><code class="language-yaml">- shell: "just test"
+<pre><code class="language-yaml"># Simple shell command
+- shell: "cargo test"
+
+# With timeout (in seconds)
+- shell: "just coverage-lcov"
+  timeout: 900  # 15 minutes
+
+# With error handling
+- shell: "just test"
   on_failure:
     claude: "/prodigy-debug-test-failure --output ${shell.output}"
     max_attempts: 5
     fail_workflow: true
 </code></pre>
+<p><strong>Shell Command Fields:</strong></p>
+<ul>
+<li><code>shell</code>: Command to execute (string)</li>
+<li><code>timeout</code>: Maximum execution time in seconds (optional)</li>
+<li><code>on_failure</code>: Error handler configuration (optional)
+<ul>
+<li><code>claude</code>: Slash command to run on failure</li>
+<li><code>max_attempts</code>: Maximum retry attempts</li>
+<li><code>fail_workflow</code>: If true, fail entire workflow after max attempts</li>
+</ul>
+</li>
+</ul>
 <h4 id="claude-commands"><a class="header" href="#claude-commands">Claude Commands</a></h4>
 <p>Execute Claude Code slash commands:</p>
-<pre><code class="language-yaml">- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+<pre><code class="language-yaml"># Simple Claude command
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
+
+# With output capture (makes command output available in ${shell.output})
+- claude: "/prodigy-debtmap-plan --before .prodigy/debtmap-before.json --output .prodigy/IMPLEMENTATION_PLAN.md"
   capture_output: true
+
+# With commit requirement (workflow fails if no git commit made)
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
   commit_required: true
+
+# With timeout and validation
+- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
+  commit_required: true
+  timeout: 1800  # 30 minutes
+  validate:
+    commands:
+      - shell: "cargo test"
+    result_file: ".prodigy/validation.json"
+    threshold: 75
 </code></pre>
+<p><strong>Claude Command Fields:</strong></p>
+<ul>
+<li><code>claude</code>: Slash command to execute (string)</li>
+<li><code>capture_output</code>: If true, command output is available in <code>${shell.output}</code> variable (optional)</li>
+<li><code>commit_required</code>: If true, workflow fails if command doesn’t create a git commit (optional)</li>
+<li><code>timeout</code>: Maximum execution time in seconds (optional)</li>
+<li><code>validate</code>: Validation configuration (optional, see Step-Level Validation below)</li>
+</ul>
 <h3 id="step-level-validation"><a class="header" href="#step-level-validation">Step-Level Validation</a></h3>
 <p>Steps can include validation that must pass:</p>
 <pre><code class="language-yaml">- claude: "/prodigy-debtmap-implement --plan .prodigy/IMPLEMENTATION_PLAN.md"
@@ -497,26 +612,249 @@ Coverage Improved: 45% → 72% (+27%)
 </ul>
 <h3 id="customizing-target-selection"><a class="header" href="#customizing-target-selection">Customizing Target Selection</a></h3>
 <p>To focus on specific debt types or modules, modify the slash commands or create custom commands in <code>.claude/commands/</code></p>
-<h2 id="map-reduce-workflows"><a class="header" href="#map-reduce-workflows">Map-Reduce Workflows</a></h2>
-<p>Prodigy supports map-reduce workflows for processing multiple items in parallel. This is useful for large-scale refactoring tasks.</p>
-<h3 id="when-to-use-map-reduce"><a class="header" href="#when-to-use-map-reduce">When to Use Map-Reduce</a></h3>
+<h2 id="mapreduce-workflows"><a class="header" href="#mapreduce-workflows">MapReduce Workflows</a></h2>
+<p>Prodigy supports MapReduce workflows for processing multiple items in parallel. This is powerful for large-scale refactoring where you want to fix many debt items simultaneously.</p>
+<h3 id="when-to-use-mapreduce"><a class="header" href="#when-to-use-mapreduce">When to Use MapReduce</a></h3>
 <ul>
-<li>Processing multiple independent debt items simultaneously</li>
+<li>Processing multiple independent debt items simultaneously (e.g., refactor 10 high-complexity functions in parallel)</li>
 <li>Applying the same fix pattern across many files</li>
 <li>Large-scale codebase cleanup tasks</li>
+<li>Situations where sequential iteration would be too slow</li>
 </ul>
-<h3 id="map-reduce-structure"><a class="header" href="#map-reduce-structure">Map-Reduce Structure</a></h3>
-<p>The exact syntax for map-reduce workflows in Prodigy may differ from sequential workflows. Consult the Prodigy documentation for current map-reduce syntax and examples.</p>
+<h3 id="mapreduce-vs-sequential-workflows"><a class="header" href="#mapreduce-vs-sequential-workflows">MapReduce vs Sequential Workflows</a></h3>
+<p><strong>Sequential Workflow</strong> (<code>-n 5</code>):</p>
+<ul>
+<li>Runs entire workflow N times in sequence</li>
+<li>Fixes one item per iteration</li>
+<li>Each iteration re-analyzes the codebase</li>
+<li>Total time: N × workflow_duration</li>
+</ul>
+<p><strong>MapReduce Workflow</strong>:</p>
+<ul>
+<li>Processes multiple items in parallel in a single run</li>
+<li>Setup phase runs once</li>
+<li>Map phase spawns N parallel agents (each in isolated worktree)</li>
+<li>Reduce phase aggregates results</li>
+<li>Total time: setup + max(map_agent_durations) + reduce</li>
+</ul>
+<h3 id="complete-mapreduce-example"><a class="header" href="#complete-mapreduce-example">Complete MapReduce Example</a></h3>
+<p>Create <code>workflows/debtmap-reduce.yml</code>:</p>
+<pre><code class="language-yaml">name: debtmap-parallel-elimination
+mode: mapreduce
+
+# Setup phase: Analyze the codebase and generate debt items
+setup:
+  timeout: 900  # 15 minutes for coverage generation
+  commands:
+    # Generate coverage data with tarpaulin
+    - shell: "just coverage-lcov"
+
+    # Run debtmap with coverage data to establish baseline
+    - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
+
+# Map phase: Process each debt item in parallel with planning and validation
+map:
+  # Input configuration - debtmap-before.json contains items array
+  input: .prodigy/debtmap-before.json
+  json_path: "$.items[*]"
+
+  # Commands to execute for each debt item
+  agent_template:
+    # Phase 1: Create implementation plan
+    - claude: "/prodigy-debtmap-plan --item '${item}' --output .prodigy/plan-${item_id}.md"
+      capture_output: true
+      validate:
+        commands:
+          - claude: "/prodigy-validate-debtmap-plan --item '${item}' --plan .prodigy/plan-${item_id}.md --output .prodigy/validation-${item_id}.json"
+        result_file: ".prodigy/validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-revise-debtmap-plan --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md"
+          max_attempts: 3
+          fail_workflow: false
+
+    # Phase 2: Execute the plan
+    - claude: "/prodigy-debtmap-implement --plan .prodigy/plan-${item_id}.md"
+      commit_required: true
+      validate:
+        commands:
+          - shell: "just coverage-lcov"
+          - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+          - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
+        result_file: ".prodigy/debtmap-validation-${item_id}.json"
+        threshold: 75
+        on_incomplete:
+          commands:
+            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
+              commit_required: true
+            - shell: "just coverage-lcov"
+            - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
+            - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
+          max_attempts: 5
+          fail_workflow: true
+
+    # Phase 3: Verify tests pass
+    - shell: "just test"
+      on_failure:
+        claude: "/prodigy-debug-test-failure --output ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
+
+    # Phase 4: Check formatting and linting
+    - shell: "just fmt-check &amp;&amp; just lint"
+      on_failure:
+        claude: "/prodigy-lint ${shell.output}"
+        max_attempts: 5
+        fail_workflow: true
+
+  # Parallelization settings
+  max_parallel: 5  # Run up to 5 agents in parallel
+
+  # Filter and sort items
+  filter: "File.score &gt;= 10 OR Function.unified_score.final_score &gt;= 10"
+  sort_by: "File.score DESC, Function.unified_score.final_score DESC"
+  max_items: 10  # Limit to 10 items per run
+
+# Reduce phase: Aggregate results and verify overall improvements
+reduce:
+  # Phase 1: Run final tests across all changes
+  - shell: "just test"
+    on_failure:
+      claude: "/prodigy-debug-test-failure --output ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
+
+  # Phase 2: Check formatting and linting
+  - shell: "just fmt-check &amp;&amp; just lint"
+    on_failure:
+      claude: "/prodigy-lint ${shell.output}"
+      max_attempts: 5
+      fail_workflow: true
+
+  # Phase 3: Re-run debtmap to measure cumulative improvements
+  - shell: "just coverage-lcov"
+  - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
+
+  # Phase 4: Create final commit with summary
+  - write_file:
+      path: ".prodigy/map-results.json"
+      content: "${map.results}"
+      format: json
+      create_dirs: true
+
+  - claude: |
+      /prodigy-compare-debt-results \
+        --before .prodigy/debtmap-before.json \
+        --after .prodigy/debtmap-after.json \
+        --map-results-file .prodigy/map-results.json \
+        --successful ${map.successful} \
+        --failed ${map.failed} \
+        --total ${map.total}
+    commit_required: true
+</code></pre>
+<h3 id="running-mapreduce-workflows"><a class="header" href="#running-mapreduce-workflows">Running MapReduce Workflows</a></h3>
+<pre><code class="language-bash"># Run MapReduce workflow (single execution processes multiple items in parallel)
+prodigy run workflows/debtmap-reduce.yml
+
+# Run with auto-confirm
+prodigy run workflows/debtmap-reduce.yml -y
+</code></pre>
+<p><strong>Note</strong>: MapReduce workflows don’t typically use <code>-n</code> for iterations. Instead, they process multiple items in a single run through parallel map agents.</p>
+<h3 id="mapreduce-configuration-options"><a class="header" href="#mapreduce-configuration-options">MapReduce Configuration Options</a></h3>
+<h4 id="top-level-fields"><a class="header" href="#top-level-fields">Top-Level Fields</a></h4>
+<ul>
+<li><code>name</code>: Workflow name (string)</li>
+<li><code>mode: mapreduce</code>: Enables MapReduce mode (required)</li>
+<li><code>setup</code>: Commands to run once before map phase</li>
+<li><code>map</code>: Map phase configuration</li>
+<li><code>reduce</code>: Commands to run after all map agents complete</li>
+</ul>
+<h4 id="setup-phase-fields"><a class="header" href="#setup-phase-fields">Setup Phase Fields</a></h4>
+<ul>
+<li><code>timeout</code>: Maximum time in seconds for setup phase</li>
+<li><code>commands</code>: List of shell or claude commands to run</li>
+</ul>
+<h4 id="map-phase-fields"><a class="header" href="#map-phase-fields">Map Phase Fields</a></h4>
+<ul>
+<li><code>input</code>: Path to JSON file containing items to process</li>
+<li><code>json_path</code>: JSONPath expression to extract items array (e.g., <code>$.items[*]</code>)</li>
+<li><code>agent_template</code>: List of commands to run for each item (each item gets its own agent in an isolated worktree)</li>
+<li><code>max_parallel</code>: Maximum number of agents to run concurrently</li>
+<li><code>filter</code>: Expression to filter which items to process (e.g., <code>"score &gt;= 10"</code>)</li>
+<li><code>sort_by</code>: Expression to sort items (e.g., <code>"score DESC"</code>)</li>
+<li><code>max_items</code>: Limit total items processed</li>
+</ul>
+<h4 id="mapreduce-specific-variables"><a class="header" href="#mapreduce-specific-variables">MapReduce-Specific Variables</a></h4>
+<p>Available in <code>agent_template</code> commands:</p>
+<ul>
+<li><code>${item}</code>: The full JSON object for current item</li>
+<li><code>${item_id}</code>: Unique ID for current item (auto-generated)</li>
+<li><code>${validation.gaps}</code>: List of validation gaps from failed validation</li>
+<li><code>${validation.attempt_number}</code>: Current retry attempt number (1, 2, 3, etc.)</li>
+<li><code>${shell.output}</code>: Output from previous shell command</li>
+<li><code>${map.results}</code>: All map agent results (available in reduce phase)</li>
+<li><code>${map.successful}</code>: Count of successful map agents (reduce phase)</li>
+<li><code>${map.failed}</code>: Count of failed map agents (reduce phase)</li>
+<li><code>${map.total}</code>: Total number of map agents (reduce phase)</li>
+</ul>
+<h3 id="mapreduce-architecture"><a class="header" href="#mapreduce-architecture">MapReduce Architecture</a></h3>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│ Setup Phase (main worktree)                            │
+│ - Generate coverage data                               │
+│ - Run debtmap analysis                                 │
+│ - Output: .prodigy/debtmap-before.json                 │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│ Map Phase (parallel worktrees)                         │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
+│  │ Agent 1      │  │ Agent 2      │  │ Agent 3      │ │
+│  │ Item #1      │  │ Item #2      │  │ Item #3      │ │
+│  │ Worktree A   │  │ Worktree B   │  │ Worktree C   │ │
+│  │              │  │              │  │              │ │
+│  │ Plan → Fix   │  │ Plan → Fix   │  │ Plan → Fix   │ │
+│  │ → Validate   │  │ → Validate   │  │ → Validate   │ │
+│  │ → Test       │  │ → Test       │  │ → Test       │ │
+│  │ → Commit     │  │ → Commit     │  │ → Commit     │ │
+│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐                   │
+│  │ Agent 4      │  │ Agent 5      │                   │
+│  │ Item #4      │  │ Item #5      │                   │
+│  │ Worktree D   │  │ Worktree E   │                   │
+│  │              │  │              │                   │
+│  │ Plan → Fix   │  │ Plan → Fix   │                   │
+│  │ → Validate   │  │ → Validate   │                   │
+│  │ → Test       │  │ → Test       │                   │
+│  │ → Commit     │  │ → Commit     │                   │
+│  └──────────────┘  └──────────────┘                   │
+└─────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│ Reduce Phase (main worktree)                           │
+│ - Merge all agent worktrees                            │
+│ - Run final tests on merged code                       │
+│ - Run final linting                                    │
+│ - Re-analyze with debtmap                              │
+│ - Generate summary commit                              │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
 <p><strong>Key Concepts:</strong></p>
 <ul>
-<li><strong>Map phase</strong>: Process items in parallel using multiple agents</li>
-<li><strong>Reduce phase</strong>: Aggregate results and ensure consistency</li>
-<li><strong>Isolation</strong>: Each map agent works in its own worktree</li>
-<li><strong>Validation</strong>: All changes must pass validation before merging</li>
+<li><strong>Isolation</strong>: Each map agent works in its own git worktree</li>
+<li><strong>Parallelism</strong>: Multiple agents process different items simultaneously</li>
+<li><strong>Validation</strong>: Each agent validates its changes independently</li>
+<li><strong>Merging</strong>: Reduce phase merges all successful agent worktrees</li>
+<li><strong>Final Validation</strong>: Reduce phase ensures merged code passes all tests</li>
 </ul>
 <h2 id="iteration-strategy"><a class="header" href="#iteration-strategy">Iteration Strategy</a></h2>
 <h3 id="how-iterations-work"><a class="header" href="#how-iterations-work">How Iterations Work</a></h3>
-<p>When you run <code>prodigy cook workflows/debtmap.yml -wyn 5</code>, the workflow executes up to 5 times:</p>
+<p>When you run <code>prodigy run workflows/debtmap.yml -yn 5</code>, the workflow executes up to 5 times:</p>
 <ol>
 <li>
 <p><strong>Iteration 1</strong>:</p>
@@ -543,13 +881,13 @@ Coverage Improved: 45% → 72% (+27%)
 <h3 id="controlling-iterations"><a class="header" href="#controlling-iterations">Controlling Iterations</a></h3>
 <p>Iterations are controlled via the <code>-n</code> flag:</p>
 <pre><code class="language-bash"># Single iteration (testing)
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 
 # Standard run (5 iterations)
-prodigy cook workflows/debtmap.yml -wyn 5
+prodigy run workflows/debtmap.yml -yn 5
 
 # Deep cleanup (10+ iterations)
-prodigy cook workflows/debtmap.yml -wyn 20
+prodigy run workflows/debtmap.yml -yn 20
 </code></pre>
 <h3 id="what-happens-each-iteration"><a class="header" href="#what-happens-each-iteration">What Happens Each Iteration</a></h3>
 <p>Each iteration runs the <strong>entire workflow from start to finish</strong>:</p>
@@ -703,7 +1041,7 @@ jobs:
       - name: Run Prodigy workflow
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: prodigy cook workflows/debtmap.yml -wyn 5
+        run: prodigy run workflows/debtmap.yml -yn 5
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v5
@@ -725,7 +1063,7 @@ jobs:
     - cargo install prodigy
     - cargo install debtmap
     - cargo install just
-    - prodigy cook workflows/debtmap.yml -wyn 5
+    - prodigy run workflows/debtmap.yml -yn 5
   artifacts:
     paths:
       - .prodigy/debtmap-*.json
@@ -734,7 +1072,7 @@ jobs:
 <h3 id="important-ci-considerations"><a class="header" href="#important-ci-considerations">Important CI Considerations</a></h3>
 <ul>
 <li><strong>API Keys</strong>: Store <code>ANTHROPIC_API_KEY</code> as a secret</li>
-<li><strong>Worktrees</strong>: The <code>-w</code> flag creates isolated worktrees automatically</li>
+<li><strong>Worktrees</strong>: MapReduce mode creates isolated worktrees automatically for parallel processing</li>
 <li><strong>Dependencies</strong>: Install <code>prodigy</code>, <code>debtmap</code>, and <code>just</code> (or your build tool)</li>
 <li><strong>Timeout</strong>: CI jobs may need extended timeout for multiple iterations</li>
 <li><strong>Review</strong>: Always create a PR for human review before merging automated changes</li>
@@ -743,10 +1081,10 @@ jobs:
 <h3 id="1-start-small"><a class="header" href="#1-start-small">1. Start Small</a></h3>
 <p>Begin with low iteration counts:</p>
 <pre><code class="language-bash"># First run: 1 iteration to test workflow
-prodigy cook workflows/debtmap.yml -wyn 1
+prodigy run workflows/debtmap.yml -yn 1
 
 # Standard run: 3-5 iterations
-prodigy cook workflows/debtmap.yml -wyn 5
+prodigy run workflows/debtmap.yml -yn 5
 </code></pre>
 <h3 id="2-focus-on-high-priority-items"><a class="header" href="#2-focus-on-high-priority-items">2. Focus on High-Priority Items</a></h3>
 <p>The debtmap analysis automatically prioritizes by:</p>
@@ -872,14 +1210,140 @@ debtmap analyze . --lcov target/coverage/lcov.info
 <li>Check Claude API connectivity</li>
 <li>Monitor worktree for progress: <code>cd ~/.prodigy/worktrees/session-xxx &amp;&amp; git log</code></li>
 </ul>
+<h3 id="mapreduce-specific-troubleshooting"><a class="header" href="#mapreduce-specific-troubleshooting">MapReduce-Specific Troubleshooting</a></h3>
+<h4 id="resuming-failed-mapreduce-jobs"><a class="header" href="#resuming-failed-mapreduce-jobs">Resuming Failed MapReduce Jobs</a></h4>
+<p><strong>Issue</strong>: MapReduce job was interrupted or failed</p>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># Find the job ID from recent sessions
+prodigy sessions
+
+# Resume the MapReduce job from checkpoint
+prodigy resume-job &lt;JOB_ID&gt;
+</code></pre>
+<p>The job will resume from where it left off, skipping already-completed items.</p>
+<h4 id="checking-mapreduce-progress"><a class="header" href="#checking-mapreduce-progress">Checking MapReduce Progress</a></h4>
+<p><strong>Issue</strong>: Want to monitor long-running MapReduce job</p>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># View overall progress
+prodigy progress &lt;JOB_ID&gt;
+
+# View detailed events
+prodigy events &lt;JOB_ID&gt;
+
+# Filter for specific event types
+prodigy events &lt;JOB_ID&gt; --type agent_completed
+prodigy events &lt;JOB_ID&gt; --type agent_failed
+</code></pre>
+<p><strong>Output example</strong>:</p>
+<pre><code>MapReduce Job: job-abc123
+Status: running
+Progress: 7/10 items (70%)
+- Completed: 5
+- Running: 2
+- Failed: 3
+</code></pre>
+<h4 id="managing-failed-mapreduce-items"><a class="header" href="#managing-failed-mapreduce-items">Managing Failed MapReduce Items</a></h4>
+<p><strong>Issue</strong>: Some agents failed, items in Dead Letter Queue</p>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># View failed items
+prodigy dlq list &lt;JOB_ID&gt;
+
+# Review why an item failed (check events)
+prodigy events &lt;JOB_ID&gt; --item &lt;ITEM_ID&gt;
+
+# Retry specific failed item
+prodigy dlq retry &lt;JOB_ID&gt; &lt;ITEM_ID&gt;
+
+# Remove unfixable items from DLQ
+prodigy dlq remove &lt;JOB_ID&gt; &lt;ITEM_ID&gt;
+</code></pre>
+<p><strong>Common failure reasons</strong>:</p>
+<ul>
+<li>Validation threshold not met after max_attempts</li>
+<li>Tests fail and can’t be fixed automatically</li>
+<li>Merge conflicts with other agents’ changes</li>
+<li>Timeout exceeded for complex refactoring</li>
+</ul>
+<h4 id="cleaning-up-mapreduce-worktrees"><a class="header" href="#cleaning-up-mapreduce-worktrees">Cleaning Up MapReduce Worktrees</a></h4>
+<p><strong>Issue</strong>: Disk space consumed by many MapReduce worktrees</p>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># List all worktrees
+prodigy worktree list
+
+# Clean up completed job worktrees
+prodigy worktree clean
+
+# Remove specific session's worktrees
+prodigy worktree remove &lt;SESSION_ID&gt;
+
+# Manual cleanup (if Prodigy commands don't work)
+rm -rf ~/.prodigy/worktrees/session-xxx
+</code></pre>
+<p><strong>When to clean</strong>:</p>
+<ul>
+<li>After successful job completion and merge</li>
+<li>When disk space is low</li>
+<li>After abandoned or failed jobs</li>
+</ul>
+<h4 id="mapreduce-merge-conflicts"><a class="header" href="#mapreduce-merge-conflicts">MapReduce Merge Conflicts</a></h4>
+<p><strong>Issue</strong>: Reduce phase fails due to merge conflicts between agent worktrees</p>
+<p><strong>Possible Causes</strong>:</p>
+<ul>
+<li>Multiple agents modified overlapping code</li>
+<li>Agents made conflicting architectural changes</li>
+<li>Shared dependencies updated differently</li>
+</ul>
+<p><strong>Solution</strong>:</p>
+<pre><code class="language-bash"># Review which agents succeeded
+prodigy events &lt;JOB_ID&gt; --type agent_completed
+
+# Check merge conflicts
+cd ~/.prodigy/worktrees/session-xxx
+git status
+
+# Manually resolve conflicts
+# Edit conflicting files
+git add .
+git commit -m "Resolve MapReduce merge conflicts"
+
+# Resume the job
+prodigy resume-job &lt;JOB_ID&gt;
+</code></pre>
+<p><strong>Prevention</strong>:</p>
+<ul>
+<li>Use <code>filter</code> to ensure agents work on independent items</li>
+<li>Reduce <code>max_parallel</code> to minimize conflicts</li>
+<li>Design debt items to be truly independent</li>
+</ul>
+<h4 id="understanding-mapreduce-variables"><a class="header" href="#understanding-mapreduce-variables">Understanding MapReduce Variables</a></h4>
+<p>If you’re debugging workflow files, these variables are available:</p>
+<p><strong>In map phase (agent_template)</strong>:</p>
+<ul>
+<li><code>${item}</code>: Full JSON of current item being processed</li>
+<li><code>${item_id}</code>: Unique ID for current item</li>
+<li><code>${validation.gaps}</code>: Validation gaps from validation result</li>
+<li><code>${validation.attempt_number}</code>: Current retry attempt (1, 2, 3…)</li>
+<li><code>${shell.output}</code>: Output from previous shell command</li>
+</ul>
+<p><strong>In reduce phase</strong>:</p>
+<ul>
+<li><code>${map.results}</code>: All map agent results as JSON</li>
+<li><code>${map.successful}</code>: Count of successful agents</li>
+<li><code>${map.failed}</code>: Count of failed agents</li>
+<li><code>${map.total}</code>: Total number of agents</li>
+</ul>
+<p><strong>Example debug command</strong>:</p>
+<pre><code class="language-yaml"># In agent_template, log the item being processed
+- shell: "echo 'Processing item: ${item_id}' &gt;&gt; .prodigy/debug.log"
+</code></pre>
 <h2 id="example-workflows"><a class="header" href="#example-workflows">Example Workflows</a></h2>
 <h3 id="full-repository-cleanup"><a class="header" href="#full-repository-cleanup">Full Repository Cleanup</a></h3>
 <p>For comprehensive debt reduction, use a higher iteration count:</p>
 <pre><code class="language-bash"># Run 10 iterations for deeper cleanup
-prodigy cook workflows/debtmap.yml -wyn 10
+prodigy run workflows/debtmap.yml -yn 10
 
 # Run 20 iterations for major refactoring
-prodigy cook workflows/debtmap.yml -wyn 20
+prodigy run workflows/debtmap.yml -yn 20
 </code></pre>
 <p>The workflow automatically:</p>
 <ol>
@@ -903,7 +1367,7 @@ prodigy cook workflows/debtmap.yml -wyn 20
 # ... rest of standard workflow steps
 </code></pre>
 <p>Run with:</p>
-<pre><code class="language-bash">prodigy cook workflows/add-tests.yml -wyn 5
+<pre><code class="language-bash">prodigy run workflows/add-tests.yml -yn 5
 </code></pre>
 <h3 id="targeted-module-cleanup"><a class="header" href="#targeted-module-cleanup">Targeted Module Cleanup</a></h3>
 <p>Create a custom slash command to focus on specific modules:</p>
@@ -929,11 +1393,11 @@ Arguments: --module &lt;module_name&gt;
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="scoring-strategies.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="parallel-processing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="examples.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="scoring-strategies.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -943,11 +1407,11 @@ Arguments: --module &lt;module_name&gt;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="scoring-strategies.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="parallel-processing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="examples.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="scoring-strategies.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

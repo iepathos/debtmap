@@ -181,6 +181,7 @@
                         <h1 id="configuration"><a class="header" href="#configuration">Configuration</a></h1>
 <p>Debtmap is highly configurable through a <code>.debtmap.toml</code> file. This chapter explains how to customize Debtmap’s behavior for your project’s specific needs.</p>
 <h2 id="config-files"><a class="header" href="#config-files">Config Files</a></h2>
+<p>Debtmap uses <strong>TOML format</strong> for configuration files (<code>.debtmap.toml</code>). TOML provides a clear, readable syntax well-suited for configuration.</p>
 <h3 id="creating-a-configuration-file"><a class="header" href="#creating-a-configuration-file">Creating a Configuration File</a></h3>
 <p>Debtmap looks for a <code>.debtmap.toml</code> file in the current directory and up to 10 parent directories. To create an initial configuration:</p>
 <pre><code class="language-bash">debtmap init
@@ -514,7 +515,14 @@ debtmap analyze --context
 # Override output format
 debtmap analyze --format json
 </code></pre>
-<p>CLI flags take precedence over <code>.debtmap.toml</code> settings, allowing per-run customization.</p>
+<h3 id="configuration-precedence"><a class="header" href="#configuration-precedence">Configuration Precedence</a></h3>
+<p>Debtmap resolves configuration values in the following order (highest to lowest priority):</p>
+<ol>
+<li><strong>CLI flags</strong> - Command-line arguments (e.g., <code>--threshold-complexity 15</code>)</li>
+<li><strong>Configuration file</strong> - Settings from <code>.debtmap.toml</code></li>
+<li><strong>Built-in defaults</strong> - Debtmap’s sensible default values</li>
+</ol>
+<p>This allows you to set project-wide defaults in <code>.debtmap.toml</code> while customizing specific runs with CLI flags.</p>
 <h2 id="configuration-validation"><a class="header" href="#configuration-validation">Configuration Validation</a></h2>
 <h3 id="automatic-validation"><a class="header" href="#automatic-validation">Automatic Validation</a></h3>
 <p>Debtmap automatically validates your configuration when loading:</p>
@@ -718,7 +726,7 @@ patterns = [
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="output-formats.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="suppression-patterns.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -732,7 +740,7 @@ patterns = [
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="output-formats.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="suppression-patterns.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

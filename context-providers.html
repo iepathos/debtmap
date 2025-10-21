@@ -1,0 +1,893 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Context Providers - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="context-providers"><a class="header" href="#context-providers">Context Providers</a></h1>
+<p>Context providers enhance debtmap’s risk analysis by incorporating additional factors beyond complexity and test coverage. They analyze critical execution paths, dependency relationships, and version control history to provide a more comprehensive understanding of technical risk.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Context providers implement the <code>ContextProvider</code> trait, which gathers risk-relevant information about functions and modules. Each provider analyzes a specific dimension of risk:</p>
+<ul>
+<li><strong>Critical Path Provider</strong>: Identifies functions on critical execution paths</li>
+<li><strong>Dependency Provider</strong>: Analyzes call graph relationships and blast radius</li>
+<li><strong>Git History Provider</strong>: Integrates version control history for change patterns</li>
+</ul>
+<p>Context providers help debtmap understand:</p>
+<ul>
+<li>Which code paths are most critical</li>
+<li>How functions depend on each other</li>
+<li>Which code changes most frequently</li>
+<li>Where bugs are likely to occur</li>
+</ul>
+<p>This context-aware analysis improves prioritization accuracy and reduces false positives.</p>
+<p>The <code>ContextAggregator</code> combines context from multiple enabled providers and adjusts risk scores using the formula:</p>
+<pre><code>contextual_risk = base_risk × (1.0 + context_contribution)
+</code></pre>
+<p>Where <code>context_contribution</code> is the weighted sum of all provider contributions:</p>
+<pre><code>context_contribution = Σ(provider.contribution × provider.weight)
+</code></pre>
+<h2 id="critical-path-provider"><a class="header" href="#critical-path-provider">Critical Path Provider</a></h2>
+<p>The Critical Path provider identifies functions that lie on critical execution paths through your application. Functions on these paths have elevated risk because failures directly impact user-facing functionality.</p>
+<h3 id="entry-point-detection"><a class="header" href="#entry-point-detection">Entry Point Detection</a></h3>
+<p>The provider automatically detects entry points based on function names and file paths:</p>
+<div class="table-wrapper"><table><thead><tr><th>Entry Type</th><th>Weight</th><th>Detection Pattern</th><th>User-Facing</th></tr></thead><tbody>
+<tr><td>Main</td><td>10.0</td><td>Function named <code>main</code></td><td>Yes</td></tr>
+<tr><td>API Endpoint</td><td>8.0</td><td><code>handle_*</code>, <code>*_handler</code>, <code>get_*</code>, <code>post_*</code> in <code>api/</code>, <code>handler/</code>, <code>route/</code> paths</td><td>Yes</td></tr>
+<tr><td>CLI Command</td><td>7.0</td><td><code>cmd_*</code>, <code>command_*</code>, <code>*_command</code> in <code>cli/</code>, <code>command/</code> paths</td><td>Yes</td></tr>
+<tr><td>Web Handler</td><td>7.0</td><td>Functions with <code>route</code>, <code>handler</code> in <code>web/</code>, <code>http/</code> paths</td><td>Yes</td></tr>
+<tr><td>Event Handler</td><td>5.0</td><td><code>on_*</code>, <code>*_listener</code>, contains <code>event</code></td><td>No</td></tr>
+<tr><td>Test Entry</td><td>2.0</td><td><code>test_*</code>, in <code>test/</code> paths</td><td>No</td></tr>
+</tbody></table>
+</div>
+<p><strong>What it detects:</strong></p>
+<ul>
+<li>Entry points (main functions, CLI handlers, API endpoints)</li>
+<li>Error handling paths</li>
+<li>Data processing pipelines</li>
+<li>Resource initialization</li>
+</ul>
+<h3 id="path-weighting"><a class="header" href="#path-weighting">Path Weighting</a></h3>
+<p>Functions on critical paths receive contribution scores based on:</p>
+<ul>
+<li><strong>Path weight</strong>: The maximum entry point weight leading to the function</li>
+<li><strong>User-facing flag</strong>: Doubles contribution for user-facing paths</li>
+</ul>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Example: Function on main entry path (weight 10.0, user-facing)
+contribution = (10.0 / 10.0) × 2.0 = 2.0
+
+// Example: Function on event handler path (weight 5.0, non-user-facing)
+contribution = (5.0 / 10.0) × 1.0 = 0.5
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Impact on scoring:</strong></p>
+<ul>
+<li>Functions on critical paths get higher priority</li>
+<li>Entry point multiplier: 1.5x</li>
+<li>Business logic multiplier: 1.2x</li>
+</ul>
+<h3 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h3>
+<ul>
+<li><strong>API prioritization</strong>: Identify critical endpoints that need careful review</li>
+<li><strong>Refactoring safety</strong>: Avoid breaking user-facing execution paths</li>
+<li><strong>Test coverage</strong>: Ensure critical paths have adequate test coverage</li>
+</ul>
+<h3 id="enable"><a class="header" href="#enable">Enable</a></h3>
+<pre><code class="language-bash">debtmap analyze . --context-providers critical_path
+</code></pre>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-toml">[analysis]
+context_providers = ["critical_path"]
+
+[context.critical_path]
+# Multiplier for entry points (default: 1.5)
+entry_point_multiplier = 1.5
+
+# Multiplier for business logic (default: 1.2)
+business_logic_multiplier = 1.2
+</code></pre>
+<h2 id="dependency-provider"><a class="header" href="#dependency-provider">Dependency Provider</a></h2>
+<p>The Dependency provider analyzes call graph relationships to identify functions with high architectural impact. It calculates how changes propagate through the dependency graph and determines the blast radius of modifications.</p>
+<h3 id="dependency-chain-analysis"><a class="header" href="#dependency-chain-analysis">Dependency Chain Analysis</a></h3>
+<p>The provider builds a dependency graph where:</p>
+<ul>
+<li><strong>Modules</strong> contain functions and have intrinsic risk scores</li>
+<li><strong>Edges</strong> represent dependencies with coupling strength (0.0-1.0)</li>
+<li><strong>Risk propagation</strong> flows through dependencies using iterative refinement</li>
+</ul>
+<p><strong>What it detects:</strong></p>
+<ul>
+<li>Upstream dependencies (functions this function calls)</li>
+<li>Downstream dependencies (functions that call this function)</li>
+<li>Transitive dependencies through the call graph</li>
+<li>Dependency criticality</li>
+</ul>
+<h3 id="blast-radius-calculation"><a class="header" href="#blast-radius-calculation">Blast Radius Calculation</a></h3>
+<p>The blast radius represents how many modules would be affected by changes to a function:</p>
+<div class="table-wrapper"><table><thead><tr><th>Blast Radius</th><th>Contribution</th><th>Impact Level</th></tr></thead><tbody>
+<tr><td>&gt; 10 modules</td><td>1.5</td><td>Critical dependency affecting many modules</td></tr>
+<tr><td>6-10 modules</td><td>1.0</td><td>Important dependency with moderate impact</td></tr>
+<tr><td>3-5 modules</td><td>0.5</td><td>Limited dependency impact</td></tr>
+<tr><td>≤ 2 modules</td><td>0.2</td><td>Minimal or isolated component</td></tr>
+</tbody></table>
+</div>
+<h3 id="risk-propagation-formula"><a class="header" href="#risk-propagation-formula">Risk Propagation Formula</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>propagated_risk = base_risk × criticality_factor + dependency_risk
+
+where:
+  criticality_factor = 1.0 + min(0.5, dependents.len() × 0.1)
+  dependency_risk = Σ(dependency.risk × coupling_strength × 0.3)
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Impact on scoring:</strong></p>
+<pre><code>dependency_factor = normalized_to_0_10(upstream + downstream)
+
+Ranges:
+- Entry points: 8-10 (critical path)
+- Business logic: 6-8 (core functionality)
+- Data access: 5-7 (important but stable)
+- Utilities: 3-5 (lower priority)
+- Test helpers: 1-3 (lowest priority)
+</code></pre>
+<h3 id="use-cases-1"><a class="header" href="#use-cases-1">Use Cases</a></h3>
+<ul>
+<li><strong>Architectural refactoring</strong>: Identify high-impact modules to refactor carefully</li>
+<li><strong>Change impact analysis</strong>: Understand downstream effects of modifications</li>
+<li><strong>Module decoupling</strong>: Find tightly coupled modules with high blast radius</li>
+</ul>
+<h3 id="enable-1"><a class="header" href="#enable-1">Enable</a></h3>
+<pre><code class="language-bash">debtmap analyze . --context-providers dependency
+</code></pre>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-toml">[analysis]
+context_providers = ["dependency"]
+
+[context.dependency]
+# Include transitive dependencies (default: true)
+include_transitive = true
+
+# Maximum depth for transitive analysis (default: 5)
+max_depth = 5
+</code></pre>
+<h2 id="git-history-provider"><a class="header" href="#git-history-provider">Git History Provider</a></h2>
+<p>The Git History provider integrates version control data to detect change-prone code and bug patterns. Files with frequent changes and bug fixes indicate higher maintenance risk.</p>
+<h3 id="metrics-collected"><a class="header" href="#metrics-collected">Metrics Collected</a></h3>
+<p>The provider analyzes Git history to calculate:</p>
+<ul>
+<li><strong>Change frequency</strong>: Commits per month (recent activity indicator)</li>
+<li><strong>Bug density</strong>: Ratio of bug fix commits to total commits</li>
+<li><strong>Age</strong>: Days since first commit (maturity indicator)</li>
+<li><strong>Author count</strong>: Number of unique contributors (complexity indicator)</li>
+</ul>
+<p><strong>What it analyzes:</strong></p>
+<ul>
+<li>Commit frequency per file/function</li>
+<li>Bug fix patterns (commits with “fix” in message)</li>
+<li>Code churn (lines added/removed)</li>
+<li>Recent activity</li>
+</ul>
+<h3 id="risk-classification"><a class="header" href="#risk-classification">Risk Classification</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Category</th><th>Conditions</th><th>Contribution</th><th>Explanation</th></tr></thead><tbody>
+<tr><td>Very unstable</td><td>freq &gt; 5.0 AND bug_density &gt; 0.3</td><td>2.0</td><td>High churn with many bug fixes</td></tr>
+<tr><td>Moderately unstable</td><td>freq &gt; 2.0 OR bug_density &gt; 0.2</td><td>1.0</td><td>Frequent changes or bug-prone</td></tr>
+<tr><td>Slightly unstable</td><td>freq &gt; 1.0 OR bug_density &gt; 0.1</td><td>0.5</td><td>Some instability</td></tr>
+<tr><td>Stable</td><td>freq ≤ 1.0 AND bug_density ≤ 0.1</td><td>0.1</td><td>Low change rate, few bugs</td></tr>
+</tbody></table>
+</div>
+<h3 id="bug-fix-detection"><a class="header" href="#bug-fix-detection">Bug Fix Detection</a></h3>
+<p>The provider identifies bug fixes by searching commit messages for patterns:</p>
+<pre><code class="language-bash">git log --grep=fix --grep=bug --grep=Fix --grep=Bug -- &lt;file&gt;
+</code></pre>
+<h3 id="stability-score"><a class="header" href="#stability-score">Stability Score</a></h3>
+<p>Stability is calculated using weighted factors:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>stability = (churn_factor × 0.4) + (bug_factor × 0.4) + (age_factor × 0.2)
+
+where:
+  churn_factor = 1.0 / (1.0 + monthly_churn)
+  bug_factor = 1.0 - (bug_fixes / total_commits)
+  age_factor = min(1.0, age_days / 365.0)
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Impact on scoring:</strong></p>
+<ul>
+<li>High-churn functions get higher priority</li>
+<li>Recently fixed bugs indicate risk areas</li>
+<li>Stable code (no recent changes) gets lower priority</li>
+</ul>
+<h3 id="use-cases-2"><a class="header" href="#use-cases-2">Use Cases</a></h3>
+<ul>
+<li><strong>Find change-prone code</strong>: Identify files that change frequently and need attention</li>
+<li><strong>Detect bug hotspots</strong>: Locate areas with high bug fix rates</li>
+<li><strong>Prioritize refactoring</strong>: Target unstable code for improvement</li>
+<li><strong>Team collaboration patterns</strong>: Files touched by many authors may need better documentation</li>
+</ul>
+<h3 id="enable-2"><a class="header" href="#enable-2">Enable</a></h3>
+<pre><code class="language-bash">debtmap analyze . --context-providers git_history
+</code></pre>
+<p><strong>Configuration:</strong></p>
+<pre><code class="language-toml">[analysis]
+context_providers = ["git_history"]
+
+[context.git_history]
+# Commits to analyze (default: 100)
+max_commits = 100
+
+# Time range in days (default: 90)
+time_range_days = 90
+
+# Minimum commits to consider "high churn" (default: 10)
+high_churn_threshold = 10
+</code></pre>
+<h3 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h3>
+<p><strong>Git repository not found</strong>: The provider requires a Git repository. If analysis fails:</p>
+<pre><code class="language-bash"># Verify you're in a git repository
+git rev-parse --git-dir
+
+# If not a git repo, initialize one or disable git_history provider
+debtmap analyze --disable-context git_history
+</code></pre>
+<p><strong>Performance issues</strong>: Git history analysis can be slow for large repositories:</p>
+<pre><code class="language-bash"># Use only lightweight providers
+debtmap analyze --context-providers critical_path,dependency
+</code></pre>
+<h2 id="enabling-context-providers"><a class="header" href="#enabling-context-providers">Enabling Context Providers</a></h2>
+<p>Context-aware analysis is disabled by default. Enable it using CLI flags:</p>
+<h3 id="enable-all-providers"><a class="header" href="#enable-all-providers">Enable All Providers</a></h3>
+<pre><code class="language-bash"># Enable all available context providers
+debtmap analyze --context
+# or
+debtmap analyze --enable-context
+</code></pre>
+<h3 id="enable-specific-providers"><a class="header" href="#enable-specific-providers">Enable Specific Providers</a></h3>
+<pre><code class="language-bash"># Enable only critical_path and dependency
+debtmap analyze --context-providers critical_path,dependency
+
+# Enable only git_history
+debtmap analyze --context-providers git_history
+
+# Enable all three explicitly
+debtmap analyze --context-providers critical_path,dependency,git_history
+</code></pre>
+<h3 id="disable-specific-providers"><a class="header" href="#disable-specific-providers">Disable Specific Providers</a></h3>
+<pre><code class="language-bash"># Enable context but disable git_history (useful for non-git repos)
+debtmap analyze --context --disable-context git_history
+
+# Enable context but disable dependency analysis
+debtmap analyze --context --disable-context dependency
+</code></pre>
+<h3 id="enabling-multiple-providers"><a class="header" href="#enabling-multiple-providers">Enabling Multiple Providers</a></h3>
+<p>Combine providers for comprehensive analysis:</p>
+<pre><code class="language-bash">debtmap analyze . --context-providers critical_path,dependency,git_history
+</code></pre>
+<p>Or via config:</p>
+<pre><code class="language-toml">[analysis]
+context_providers = ["critical_path", "dependency", "git_history"]
+</code></pre>
+<h2 id="provider-weights"><a class="header" href="#provider-weights">Provider Weights</a></h2>
+<p>Each provider has a weight that determines its influence on the final risk score:</p>
+<div class="table-wrapper"><table><thead><tr><th>Provider</th><th>Weight</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>critical_path</td><td>1.5</td><td>Critical paths have high impact on users</td></tr>
+<tr><td>dependency_risk</td><td>1.2</td><td>Architectural dependencies affect many modules</td></tr>
+<tr><td>git_history</td><td>1.0</td><td>Historical patterns indicate future risk</td></tr>
+</tbody></table>
+</div>
+<p>The total context contribution is calculated as:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>total_contribution = Σ(contribution_i × weight_i)
+
+Example with all providers:
+  critical_path: 2.0 × 1.5 = 3.0
+  dependency:    1.0 × 1.2 = 1.2
+  git_history:   0.5 × 1.0 = 0.5
+  ────────────────────────────
+  total_contribution = 4.7
+
+contextual_risk = base_risk × (1.0 + 4.7) = base_risk × 5.7
+<span class="boring">}</span></code></pre></pre>
+<h2 id="how-context-affects-scoring"><a class="header" href="#how-context-affects-scoring">How Context Affects Scoring</a></h2>
+<h3 id="base-scoring-no-context"><a class="header" href="#base-scoring-no-context">Base Scoring (No Context)</a></h3>
+<pre><code>Base Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)
+</code></pre>
+<h3 id="with-context-providers"><a class="header" href="#with-context-providers">With Context Providers</a></h3>
+<pre><code>Context-Adjusted Score = Base Score × Role Multiplier × Churn Multiplier
+
+Role Multiplier (from critical path &amp; dependency analysis):
+- Entry points: 1.5x
+- Business logic: 1.2x
+- Data access: 1.0x
+- Infrastructure: 0.8x
+- Utilities: 0.5x
+- Test code: 0.1x
+
+Churn Multiplier (from git history):
+- High churn (10+ commits/month): 1.3x
+- Medium churn (5-10 commits/month): 1.1x
+- Low churn (1-5 commits/month): 1.0x
+- Stable (0 commits/6 months): 0.8x
+</code></pre>
+<h2 id="context-details-structure"><a class="header" href="#context-details-structure">Context Details Structure</a></h2>
+<p>When using <code>--format json</code>, context information is included in the output. The <code>ContextDetails</code> enum contains provider-specific data:</p>
+<h3 id="criticalpath"><a class="header" href="#criticalpath">CriticalPath</a></h3>
+<pre><code class="language-json">{
+  "provider": "critical_path",
+  "weight": 1.5,
+  "contribution": 2.0,
+  "details": {
+    "CriticalPath": {
+      "entry_points": ["main (Main)", "handle_request (ApiEndpoint)"],
+      "path_weight": 10.0,
+      "is_user_facing": true
+    }
+  }
+}
+</code></pre>
+<h3 id="dependencychain"><a class="header" href="#dependencychain">DependencyChain</a></h3>
+<pre><code class="language-json">{
+  "provider": "dependency_risk",
+  "weight": 1.2,
+  "contribution": 1.5,
+  "details": {
+    "DependencyChain": {
+      "depth": 3,
+      "propagated_risk": 8.5,
+      "dependents": ["module_a", "module_b", "module_c"],
+      "blast_radius": 12
+    }
+  }
+}
+</code></pre>
+<h3 id="historical"><a class="header" href="#historical">Historical</a></h3>
+<pre><code class="language-json">{
+  "provider": "git_history",
+  "weight": 1.0,
+  "contribution": 1.0,
+  "details": {
+    "Historical": {
+      "change_frequency": 3.5,
+      "bug_density": 0.25,
+      "age_days": 180,
+      "author_count": 5
+    }
+  }
+}
+</code></pre>
+<h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
+<h3 id="example-1-entry-point-vs-utility"><a class="header" href="#example-1-entry-point-vs-utility">Example 1: Entry Point vs Utility</a></h3>
+<p><strong>Without context providers:</strong></p>
+<pre><code>Function: main() - Entry point
+Complexity: 8
+Coverage: 50%
+Score: 6.0 [MEDIUM]
+
+Function: format_string() - Utility
+Complexity: 8
+Coverage: 50%
+Score: 6.0 [MEDIUM]
+</code></pre>
+<p>Both functions have the same score.</p>
+<p><strong>With context providers:</strong></p>
+<pre><code>Function: main() - Entry point
+Complexity: 8
+Coverage: 50%
+Base Score: 6.0
+Role Multiplier: 1.5x (entry point)
+Final Score: 9.0 [CRITICAL]
+
+Function: format_string() - Utility
+Complexity: 8
+Coverage: 50%
+Base Score: 6.0
+Role Multiplier: 0.5x (utility)
+Final Score: 3.0 [LOW]
+</code></pre>
+<p>Entry point is prioritized over utility.</p>
+<h3 id="example-2-high-churn-function"><a class="header" href="#example-2-high-churn-function">Example 2: High-Churn Function</a></h3>
+<p><strong>Without git history:</strong></p>
+<pre><code>Function: process_payment()
+Complexity: 12
+Coverage: 60%
+Score: 7.5 [HIGH]
+</code></pre>
+<p><strong>With git history:</strong></p>
+<pre><code>Function: process_payment()
+Complexity: 12
+Coverage: 60%
+Base Score: 7.5
+Churn: 15 commits in last month (bug fixes)
+Churn Multiplier: 1.3x
+Final Score: 9.75 [CRITICAL]
+</code></pre>
+<p>High-churn function is elevated to critical.</p>
+<h3 id="example-3-stable-well-tested-code"><a class="header" href="#example-3-stable-well-tested-code">Example 3: Stable Well-Tested Code</a></h3>
+<p><strong>Without context:</strong></p>
+<pre><code>Function: legacy_parser()
+Complexity: 15
+Coverage: 95%
+Score: 3.5 [LOW]
+</code></pre>
+<p><strong>With context:</strong></p>
+<pre><code>Function: legacy_parser()
+Complexity: 15
+Coverage: 95%
+Base Score: 3.5
+Churn: 0 commits in last 2 years
+Churn Multiplier: 0.8x
+Role: Data access (stable)
+Role Multiplier: 1.0x
+Final Score: 2.8 [LOW]
+</code></pre>
+<p>Stable, well-tested code gets even lower priority.</p>
+<h3 id="example-4-api-endpoint-prioritization"><a class="header" href="#example-4-api-endpoint-prioritization">Example 4: API Endpoint Prioritization</a></h3>
+<p>Analyze a web service to identify critical API endpoints:</p>
+<pre><code class="language-bash">debtmap analyze --context-providers critical_path --format json
+</code></pre>
+<p>Functions on API endpoint paths will receive elevated risk scores. Use this to prioritize code review and testing for user-facing functionality.</p>
+<h3 id="example-5-finding-change-prone-code"><a class="header" href="#example-5-finding-change-prone-code">Example 5: Finding Change-Prone Code</a></h3>
+<p>Identify files with high change frequency and bug fixes:</p>
+<pre><code class="language-bash">debtmap analyze --context-providers git_history --top 20
+</code></pre>
+<p>This highlights unstable areas of the codebase that may benefit from refactoring or increased test coverage.</p>
+<h3 id="example-6-architectural-impact-analysis"><a class="header" href="#example-6-architectural-impact-analysis">Example 6: Architectural Impact Analysis</a></h3>
+<p>Find high-impact modules with large blast radius:</p>
+<pre><code class="language-bash">debtmap analyze --context-providers dependency --format json | \
+  jq '.[] | select(.blast_radius &gt; 10)'
+</code></pre>
+<p>Use this to identify architectural choke points that require careful change management.</p>
+<h3 id="example-7-comprehensive-risk-assessment"><a class="header" href="#example-7-comprehensive-risk-assessment">Example 7: Comprehensive Risk Assessment</a></h3>
+<p>Combine all providers for holistic risk analysis:</p>
+<pre><code class="language-bash">debtmap analyze --context -v
+</code></pre>
+<p>The verbose output shows how each provider contributes to the final risk score:</p>
+<pre><code>function: process_payment
+  base_risk: 5.0
+  critical_path: +3.0 (on main path, user-facing)
+  dependency: +1.2 (12 dependent modules)
+  git_history: +1.0 (3.5 changes/month, 0.25 bug density)
+  ──────────────────
+  contextual_risk: 26.0
+</code></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Configure context providers in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[analysis]
+# Enable context-aware analysis (default: true)
+enable_context = true
+
+# Specify which providers to use
+context_providers = ["critical_path", "dependency", "git_history"]
+
+# Disable specific providers
+# disable_context = ["git_history"]
+
+[context.git_history]
+# Commits to analyze (default: 100)
+max_commits = 100
+
+# Time range in days (default: 90)
+time_range_days = 90
+
+# Minimum commits to consider "high churn" (default: 10)
+high_churn_threshold = 10
+
+[context.critical_path]
+# Multiplier for entry points (default: 1.5)
+entry_point_multiplier = 1.5
+
+# Multiplier for business logic (default: 1.2)
+business_logic_multiplier = 1.2
+
+[context.dependency]
+# Include transitive dependencies (default: true)
+include_transitive = true
+
+# Maximum depth for transitive analysis (default: 5)
+max_depth = 5
+</code></pre>
+<h2 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h2>
+<p>Context providers add computational overhead to analysis:</p>
+<p><strong>Impact on analysis time:</strong></p>
+<ul>
+<li>Critical path: +10-15% (fast - call graph traversal)</li>
+<li>Dependency: +20-30% (moderate - iterative risk propagation)</li>
+<li>Git history: +30-50% (slow for large repos - multiple git commands per file)</li>
+</ul>
+<p><strong>Combined overhead:</strong> ~60-80% increase in analysis time</p>
+<h3 id="optimization-tips"><a class="header" href="#optimization-tips">Optimization Tips</a></h3>
+<ol>
+<li><strong>Start minimal</strong>: Use <code>--context-providers critical_path,dependency</code> initially</li>
+<li><strong>Add git_history selectively</strong>: Enable for critical modules only</li>
+<li><strong>Use caching</strong>: The <code>ContextAggregator</code> caches results by <code>file:function</code> key</li>
+<li><strong>Profile with verbose flags</strong>: Use <code>-vvv</code> to see provider execution times</li>
+</ol>
+<h3 id="for-large-projects"><a class="header" href="#for-large-projects">For Large Projects</a></h3>
+<pre><code class="language-bash"># Disable git history for faster analysis
+debtmap analyze . --disable-context git_history
+
+# Or disable all context
+debtmap analyze . --no-context-aware
+</code></pre>
+<h3 id="for-cicd"><a class="header" href="#for-cicd">For CI/CD</a></h3>
+<pre><code class="language-bash"># Full analysis with context (run nightly)
+debtmap analyze . --context-providers critical_path,dependency,git_history
+
+# Fast analysis without context (run on every commit)
+debtmap analyze . --no-context-aware
+</code></pre>
+<h3 id="when-to-use-each-provider"><a class="header" href="#when-to-use-each-provider">When to Use Each Provider</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Scenario</th><th>Recommended Providers</th></tr></thead><tbody>
+<tr><td>API service refactoring</td><td><code>critical_path</code></td></tr>
+<tr><td>Legacy codebase analysis</td><td><code>git_history</code></td></tr>
+<tr><td>Microservice boundaries</td><td><code>dependency</code></td></tr>
+<tr><td>Pre-release risk review</td><td>All providers (<code>--context</code>)</td></tr>
+<tr><td>CI/CD integration</td><td><code>critical_path,dependency</code> (faster)</td></tr>
+</tbody></table>
+</div>
+<h2 id="troubleshooting-1"><a class="header" href="#troubleshooting-1">Troubleshooting</a></h2>
+<h3 id="git-history-analysis-slow"><a class="header" href="#git-history-analysis-slow">Git History Analysis Slow</a></h3>
+<p><strong>Issue:</strong> Analysis takes much longer with git history enabled</p>
+<p><strong>Solutions:</strong></p>
+<p><strong>Reduce commit history:</strong></p>
+<pre><code class="language-toml">[context.git_history]
+max_commits = 50
+time_range_days = 30
+</code></pre>
+<p><strong>Use shallow clone in CI:</strong></p>
+<pre><code class="language-bash">git clone --depth 50 repo.git
+debtmap analyze . --context-providers critical_path,dependency
+</code></pre>
+<h3 id="incorrect-role-classification"><a class="header" href="#incorrect-role-classification">Incorrect Role Classification</a></h3>
+<p><strong>Issue:</strong> Function classified as wrong role (e.g., utility instead of business logic)</p>
+<p><strong>Possible causes:</strong></p>
+<ol>
+<li>Function naming doesn’t match patterns</li>
+<li>Call graph analysis incomplete</li>
+<li>Function is misplaced in codebase</li>
+</ol>
+<p><strong>Solutions:</strong></p>
+<p><strong>Check with verbose output:</strong></p>
+<pre><code class="language-bash">debtmap analyze . -vv | grep "Role classification"
+</code></pre>
+<p><strong>Manually verify call graph:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --show-call-graph
+</code></pre>
+<h3 id="context-providers-not-available"><a class="header" href="#context-providers-not-available">Context Providers Not Available</a></h3>
+<p><strong>Issue:</strong> <code>--context-providers</code> flag not recognized</p>
+<p><strong>Solution:</strong> Ensure you’re using a recent version:</p>
+<pre><code class="language-bash">debtmap --version
+# Should be 0.2.0 or later
+</code></pre>
+<p>Update debtmap:</p>
+<pre><code class="language-bash">cargo install debtmap --force
+</code></pre>
+<h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
+<p><strong>Issue</strong>: Context providers not affecting scores</p>
+<p><strong>Solution</strong>: Ensure providers are enabled with <code>--context</code> or <code>--context-providers</code></p>
+<pre><code class="language-bash"># Wrong: context flag missing
+debtmap analyze
+
+# Correct: context enabled
+debtmap analyze --context
+</code></pre>
+<hr />
+<p><strong>Issue</strong>: Git history provider fails with “Not a git repository”</p>
+<p><strong>Solution</strong>: Disable git_history if not using version control</p>
+<pre><code class="language-bash">debtmap analyze --context --disable-context git_history
+</code></pre>
+<hr />
+<p><strong>Issue</strong>: Dependency analysis errors</p>
+<p><strong>Solution</strong>: Check for circular dependencies or disable dependency provider</p>
+<pre><code class="language-bash">debtmap analyze --context --disable-context dependency
+</code></pre>
+<hr />
+<p><strong>Issue</strong>: Slow analysis with all providers</p>
+<p><strong>Solution</strong>: Use selective providers or increase verbosity to identify bottlenecks</p>
+<pre><code class="language-bash"># Faster: skip git_history
+debtmap analyze --context-providers critical_path,dependency
+
+# Debug: see provider execution times
+debtmap analyze --context -vvv
+</code></pre>
+<hr />
+<p>For more troubleshooting guidance, see the <a href="troubleshooting.html">Troubleshooting</a> chapter.</p>
+<h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
+<h3 id="interpreting-context-contribution"><a class="header" href="#interpreting-context-contribution">Interpreting Context Contribution</a></h3>
+<p>Enable verbose output to see detailed context contributions:</p>
+<pre><code class="language-bash">debtmap analyze --context -v
+</code></pre>
+<p>Each function shows:</p>
+<ul>
+<li>Base risk score from complexity/coverage</li>
+<li>Individual provider contributions</li>
+<li>Total contextual risk score</li>
+<li>Provider-specific explanations</li>
+</ul>
+<h3 id="architecture-exploration"><a class="header" href="#architecture-exploration">Architecture Exploration</a></h3>
+<p>The <code>ContextAggregator</code> caches context by <code>file:function</code> key. This enables efficient re-analysis:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut aggregator = ContextAggregator::new()
+    .with_provider(Box::new(CriticalPathProvider::new(analyzer)))
+    .with_provider(Box::new(DependencyRiskProvider::new(graph)))
+    .with_provider(Box::new(GitHistoryProvider::new(repo_root)?));
+
+let context = aggregator.analyze(&amp;target);
+let contribution = context.total_contribution();
+<span class="boring">}</span></code></pre></pre>
+<h3 id="custom-provider-implementation"><a class="header" href="#custom-provider-implementation">Custom Provider Implementation</a></h3>
+<p>Advanced users can implement custom context providers by implementing the <code>ContextProvider</code> trait:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait ContextProvider: Send + Sync {
+    fn name(&amp;self) -&gt; &amp;str;
+    fn gather(&amp;self, target: &amp;AnalysisTarget) -&gt; Result&lt;Context&gt;;
+    fn weight(&amp;self) -&gt; f64;
+    fn explain(&amp;self, context: &amp;Context) -&gt; String;
+}
+<span class="boring">}</span></code></pre></pre>
+<p>See <a href="https://github.com/your-repo/debtmap/blob/main/src/risk/context/mod.rs">src/risk/context/mod.rs</a> for implementation examples.</p>
+<h2 id="future-enhancements"><a class="header" href="#future-enhancements">Future Enhancements</a></h2>
+<h3 id="business-context-provider-planned"><a class="header" href="#business-context-provider-planned">Business Context Provider (Planned)</a></h3>
+<p>A Business context provider is defined but not yet implemented. It will support:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>Business {
+    priority: Priority,      // Critical, High, Medium, Low
+    impact: Impact,          // Revenue, UserExperience, Security, Compliance
+    annotations: Vec&lt;String&gt; // Custom business metadata
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This will allow manual prioritization based on business requirements through code annotations or configuration files.</p>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Use all providers for comprehensive analysis</strong> - Especially for production code</li>
+<li><strong>Disable git history in CI</strong> - Use shallow clones or disable for speed</li>
+<li><strong>Verify role classifications</strong> - Use <code>-vv</code> to see how functions are classified</li>
+<li><strong>Tune multipliers for your project</strong> - Adjust in config based on architecture</li>
+<li><strong>Combine with coverage data</strong> - Context providers enhance coverage-based risk analysis</li>
+</ol>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>Context providers transform debtmap from a static complexity analyzer into a comprehensive risk assessment tool. By combining:</p>
+<ul>
+<li><strong>Critical path analysis</strong> for user impact</li>
+<li><strong>Dependency analysis</strong> for architectural risk</li>
+<li><strong>Git history analysis</strong> for maintenance patterns</li>
+</ul>
+<p>You gain actionable insights for prioritizing technical debt and refactoring efforts. Start with <code>--context</code> to enable all providers, then refine based on your project’s needs.</p>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="analysis-guide.html">Analysis Guide</a> - Core analysis concepts</li>
+<li><a href="analysis-guide.html#risk-assessment">Risk Assessment</a> - Risk scoring methodology</li>
+<li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
+<li><a href="parallel-processing.html">Parallel Processing</a> - Performance optimization</li>
+<li><a href="troubleshooting.html">Troubleshooting</a> - Common issues and solutions</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="cache-management.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="coverage-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="cache-management.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="coverage-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

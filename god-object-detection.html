@@ -1,0 +1,682 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>God Object Detection - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h1>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Debtmap includes sophisticated god object detection that identifies files and types that have grown too large and taken on too many responsibilities. God objects (also called “god classes” or “god modules”) are a significant source of technical debt as they:</p>
+<ul>
+<li>Violate the Single Responsibility Principle</li>
+<li>Become difficult to maintain and test</li>
+<li>Create bottlenecks in development</li>
+<li>Increase the risk of bugs due to high coupling</li>
+<li>Have high coupling with many other modules</li>
+<li>Are hard to test effectively</li>
+</ul>
+<p>This chapter explains how Debtmap identifies god objects, calculates their scores, and provides actionable refactoring recommendations.</p>
+<h2 id="detection-criteria"><a class="header" href="#detection-criteria">Detection Criteria</a></h2>
+<p>A file or type is classified as a god object based on five key metrics:</p>
+<ol>
+<li><strong>Method Count</strong> - Total number of methods/functions</li>
+<li><strong>Field Count</strong> - Number of struct/class fields</li>
+<li><strong>Responsibility Count</strong> - Distinct responsibilities inferred from method names (max_traits in config)</li>
+<li><strong>Lines of Code</strong> - Total lines in the file</li>
+<li><strong>Complexity Sum</strong> - Combined cyclomatic complexity of all functions</li>
+</ol>
+<h3 id="language-specific-thresholds"><a class="header" href="#language-specific-thresholds">Language-Specific Thresholds</a></h3>
+<h4 id="rust"><a class="header" href="#rust">Rust</a></h4>
+<ul>
+<li><strong>Max Methods</strong>: 20 (includes both impl methods and standalone functions)</li>
+<li><strong>Max Fields</strong>: 15</li>
+<li><strong>Max Responsibilities</strong>: 5</li>
+<li><strong>Max Lines</strong>: 1000</li>
+<li><strong>Max Complexity</strong>: 200</li>
+</ul>
+<h4 id="python"><a class="header" href="#python">Python</a></h4>
+<ul>
+<li><strong>Max Methods</strong>: 15</li>
+<li><strong>Max Fields</strong>: 10</li>
+<li><strong>Max Responsibilities</strong>: 3</li>
+<li><strong>Max Lines</strong>: 500</li>
+<li><strong>Max Complexity</strong>: 150</li>
+</ul>
+<h4 id="javascripttypescript"><a class="header" href="#javascripttypescript">JavaScript/TypeScript</a></h4>
+<ul>
+<li><strong>Max Methods</strong>: 15</li>
+<li><strong>Max Fields</strong>: 20</li>
+<li><strong>Max Responsibilities</strong>: 3</li>
+<li><strong>Max Lines</strong>: 500</li>
+<li><strong>Max Complexity</strong>: 150</li>
+</ul>
+<p>These thresholds can be customized per-language in your <code>.debtmap.toml</code> configuration file.</p>
+<h2 id="file-level-aggregation"><a class="header" href="#file-level-aggregation">File-Level Aggregation</a></h2>
+<p>An important feature of Debtmap’s god object detection is its <strong>file-level aggregation strategy</strong>. When analyzing a file, Debtmap:</p>
+<ol>
+<li>Finds the largest type (struct/class) by <code>method_count + field_count × 2</code></li>
+<li>Counts standalone functions in the file</li>
+<li>Combines them: <code>total_methods = type_methods + standalone_functions</code></li>
+</ol>
+<p>This means files with many standalone functions (like <code>rust_call_graph.rs</code> with 270 functions) will be detected as god objects even without a large type. This is crucial for identifying:</p>
+<ul>
+<li>Pure functional modules with excessive functions</li>
+<li>Utility files that have grown too large</li>
+<li>Mixed paradigm files (structs + many helper functions)</li>
+</ul>
+<p><strong>Example:</strong> A file containing a struct with 15 methods plus 10 standalone functions will be analyzed as having 25 total methods, likely triggering god object detection.</p>
+<p>See <code>src/organization/god_object_detector.rs:66-97</code> for implementation details.</p>
+<h2 id="confidence-levels"><a class="header" href="#confidence-levels">Confidence Levels</a></h2>
+<p>Debtmap assigns confidence levels based on how many thresholds are violated:</p>
+<ul>
+<li><strong>Definite</strong> (5 violations) - Clear god object requiring immediate refactoring</li>
+<li><strong>Probable</strong> (3-4 violations) - Likely god object that should be refactored</li>
+<li><strong>Possible</strong> (1-2 violations) - Potential god object worth reviewing</li>
+<li><strong>NotGodObject</strong> (0 violations) - Within acceptable limits</li>
+</ul>
+<p>The final determination also requires <code>god_object_score &gt;= 70.0</code>. Both criteria must be met for a definite god object classification.</p>
+<p>See <code>src/organization/god_object_analysis.rs:229-270</code> and <code>src/organization/god_object_detector.rs:152-163</code>.</p>
+<h2 id="scoring-algorithms"><a class="header" href="#scoring-algorithms">Scoring Algorithms</a></h2>
+<p>Debtmap provides three scoring algorithms to accommodate different analysis needs.</p>
+<h3 id="simple-scoring"><a class="header" href="#simple-scoring">Simple Scoring</a></h3>
+<p>The base scoring algorithm calculates god object score using four factors:</p>
+<pre><code>method_factor = min(method_count / max_methods, 3.0)
+field_factor = min(field_count / max_fields, 3.0)
+responsibility_factor = min(responsibility_count / 3, 3.0)
+size_factor = min(lines_of_code / max_lines, 3.0)
+
+base_score = method_factor × field_factor × responsibility_factor × size_factor
+</code></pre>
+<p><strong>Score Enforcement:</strong></p>
+<ul>
+<li>If <code>violation_count &gt; 0</code>: <code>final_score = max(base_score × 50 × violation_count, 100)</code></li>
+<li>Else: <code>final_score = base_score × 10</code></li>
+</ul>
+<p>The minimum score of 100 ensures that any god object receives sufficient priority in the technical debt analysis.</p>
+<h3 id="complexity-weighted-scoring"><a class="header" href="#complexity-weighted-scoring">Complexity-Weighted Scoring</a></h3>
+<p>Unlike raw method counting, this algorithm weights each method by its cyclomatic complexity. This ensures that 100 simple functions (complexity 1-3) score better than 10 highly complex functions (complexity 17+).</p>
+<p>The formula is similar to simple scoring, but uses <code>weighted_method_count</code> (sum of complexity weights) instead of raw counts:</p>
+<pre><code>method_factor = min(weighted_method_count / max_methods, 3.0)
+</code></pre>
+<p>Additionally, a <strong>complexity factor</strong> is applied:</p>
+<ul>
+<li>Average complexity &lt; 3.0: <code>0.7</code> (reward simple functions)</li>
+<li>Average complexity &gt; 10.0: <code>1.5</code> (penalize complex functions)</li>
+<li>Otherwise: <code>1.0</code></li>
+</ul>
+<p>The final score becomes:</p>
+<pre><code>final_score = max(base_score × 50 × complexity_factor × violation_count, 100)
+</code></pre>
+<p>This approach better reflects the true maintainability burden of a large module.</p>
+<p>See <code>src/organization/god_object_analysis.rs:142-209</code>.</p>
+<h3 id="purity-weighted-scoring-advanced"><a class="header" href="#purity-weighted-scoring-advanced">Purity-Weighted Scoring (Advanced)</a></h3>
+<p><strong>Available for Rust only</strong> (requires <code>syn::ItemFn</code> analysis)</p>
+<p>This advanced scoring variant reduces the impact of pure functions, preventing pure functional modules from being unfairly penalized. The algorithm:</p>
+<ol>
+<li>
+<p>Analyzes each function for purity using three levels:</p>
+<ul>
+<li><strong>Pure</strong> (no side effects): weight multiplier <code>0.3</code></li>
+<li><strong>Probably Pure</strong> (likely no side effects): weight multiplier <code>0.5</code></li>
+<li><strong>Impure</strong> (has side effects): weight multiplier <code>1.0</code></li>
+</ul>
+</li>
+<li>
+<p>Combines complexity and purity weights:</p>
+<pre><code>total_weight = complexity_weight × purity_multiplier
+</code></pre>
+</li>
+<li>
+<p>Tracks the <code>PurityDistribution</code>:</p>
+<ul>
+<li><code>pure_count</code>, <code>probably_pure_count</code>, <code>impure_count</code></li>
+<li><code>pure_weight_contribution</code>, <code>probably_pure_weight_contribution</code>, <code>impure_weight_contribution</code></li>
+</ul>
+</li>
+</ol>
+<p>This approach dramatically reduces scores for files with many pure helper functions while still flagging stateful god objects.</p>
+<p>See <code>src/organization/god_object_detector.rs:196-258</code> and <code>src/organization/purity_analyzer.rs</code>.</p>
+<h2 id="responsibility-detection"><a class="header" href="#responsibility-detection">Responsibility Detection</a></h2>
+<p>Responsibilities are inferred from method names using common prefixes. Debtmap recognizes 28 standard prefixes grouped into 10 categories:</p>
+<div class="table-wrapper"><table><thead><tr><th>Prefix(es)</th><th>Responsibility Category</th></tr></thead><tbody>
+<tr><td><code>get</code>, <code>set</code></td><td>Data Access</td></tr>
+<tr><td><code>calculate</code>, <code>compute</code></td><td>Computation</td></tr>
+<tr><td><code>validate</code>, <code>check</code>, <code>verify</code>, <code>ensure</code></td><td>Validation</td></tr>
+<tr><td><code>save</code>, <code>load</code>, <code>store</code>, <code>retrieve</code>, <code>fetch</code></td><td>Persistence</td></tr>
+<tr><td><code>create</code>, <code>build</code>, <code>new</code>, <code>make</code>, <code>init</code></td><td>Construction</td></tr>
+<tr><td><code>send</code>, <code>receive</code>, <code>handle</code>, <code>manage</code></td><td>Communication</td></tr>
+<tr><td><code>update</code>, <code>modify</code>, <code>change</code>, <code>edit</code></td><td>Modification</td></tr>
+<tr><td><code>delete</code>, <code>remove</code>, <code>clear</code>, <code>reset</code></td><td>Deletion</td></tr>
+<tr><td><code>is</code>, <code>has</code>, <code>can</code>, <code>should</code>, <code>will</code></td><td>State Query</td></tr>
+<tr><td><code>process</code>, <code>transform</code></td><td>Processing</td></tr>
+</tbody></table>
+</div>
+<p><strong>Fallback:</strong> If a prefix doesn’t match any category, Debtmap creates a default responsibility: <code>"{Prefix} Operations"</code> (with capitalized first letter).</p>
+<p>Responsibility count directly affects:</p>
+<ul>
+<li>God object scoring (via <code>responsibility_factor</code>)</li>
+<li>Refactoring recommendations (methods grouped by responsibility)</li>
+</ul>
+<p>See <code>src/organization/god_object_detector.rs:378-454</code>.</p>
+<h2 id="examples-and-case-studies"><a class="header" href="#examples-and-case-studies">Examples and Case Studies</a></h2>
+<h3 id="example-1-large-rust-module"><a class="header" href="#example-1-large-rust-module">Example 1: Large Rust Module</a></h3>
+<p><strong>File:</strong> <code>rust_call_graph.rs</code> with 270 standalone functions</p>
+<p><strong>Detection:</strong></p>
+<ul>
+<li><strong>Is God Object:</strong> Yes</li>
+<li><strong>Method Count:</strong> 270</li>
+<li><strong>Field Count:</strong> 0 (no struct)</li>
+<li><strong>Responsibilities:</strong> 8</li>
+<li><strong>Confidence:</strong> Definite</li>
+<li><strong>Score:</strong> &gt;1000 (severe violation)</li>
+</ul>
+<p><strong>Recommendation:</strong> Break into multiple focused modules:</p>
+<ul>
+<li><code>CallGraphBuilder</code> (construction methods)</li>
+<li><code>CallGraphAnalyzer</code> (analysis methods)</li>
+<li><code>CallGraphFormatter</code> (output methods)</li>
+</ul>
+<h3 id="example-2-complex-python-class"><a class="header" href="#example-2-complex-python-class">Example 2: Complex Python Class</a></h3>
+<p><strong>File:</strong> <code>data_manager.py</code> with class containing 25 methods and 12 fields</p>
+<p><strong>Detection:</strong></p>
+<ul>
+<li><strong>Is God Object:</strong> Yes</li>
+<li><strong>Method Count:</strong> 25</li>
+<li><strong>Field Count:</strong> 12</li>
+<li><strong>Responsibilities:</strong> 6 (Data Access, Validation, Persistence, etc.)</li>
+<li><strong>Confidence:</strong> Probable</li>
+<li><strong>Score:</strong> ~150-200</li>
+</ul>
+<p><strong>Recommendation:</strong> Split by responsibility:</p>
+<ul>
+<li><code>DataAccessLayer</code> (get/set methods)</li>
+<li><code>DataValidator</code> (validate/check methods)</li>
+<li><code>DataPersistence</code> (save/load methods)</li>
+</ul>
+<h3 id="example-3-mixed-paradigm-file"><a class="header" href="#example-3-mixed-paradigm-file">Example 3: Mixed Paradigm File</a></h3>
+<p><strong>File:</strong> <code>utils.rs</code> with small struct (5 methods, 3 fields) + 20 standalone functions</p>
+<p><strong>Detection:</strong></p>
+<ul>
+<li><strong>Is God Object:</strong> Yes</li>
+<li><strong>Total Methods:</strong> 25 (5 + 20)</li>
+<li><strong>Field Count:</strong> 3</li>
+<li><strong>Confidence:</strong> Probable</li>
+<li><strong>Score:</strong> ~120</li>
+</ul>
+<p><strong>Note:</strong> Without file-level aggregation, this would be missed. The struct alone is fine, but combined with standalone functions, it indicates an overgrown utility module.</p>
+<h2 id="refactoring-recommendations"><a class="header" href="#refactoring-recommendations">Refactoring Recommendations</a></h2>
+<p>When <code>is_god_object = true</code>, Debtmap generates <strong>recommended module splits</strong> using the <code>recommend_module_splits</code> function. This feature:</p>
+<ol>
+<li>
+<p>Groups methods by their inferred responsibilities</p>
+</li>
+<li>
+<p>Creates a <code>ModuleSplit</code> for each responsibility group containing:</p>
+<ul>
+<li><code>suggested_name</code> (e.g., “DataAccessManager”, “ValidationManager”)</li>
+<li><code>methods_to_move</code> (list of method names)</li>
+<li><code>responsibility</code> (category name)</li>
+<li><code>estimated_lines</code> (approximate LOC for the new module)</li>
+</ul>
+</li>
+<li>
+<p>Orders splits by cohesion (most focused responsibility groups first)</p>
+</li>
+</ol>
+<p><strong>Example output:</strong></p>
+<pre><code>Recommended Splits:
+  1. DataAccessManager (12 methods, ~150 lines)
+  2. ValidationManager (8 methods, ~100 lines)
+  3. PersistenceManager (5 methods, ~75 lines)
+</code></pre>
+<p>This provides an actionable roadmap for breaking down god objects into focused, single-responsibility modules.</p>
+<p>See <code>src/organization/god_object_detector.rs:165-177</code> and <code>src/organization/god_object_analysis.rs:40-45</code>.</p>
+<h3 id="code-examples"><a class="header" href="#code-examples">Code Examples</a></h3>
+<h4 id="split-by-responsibility"><a class="header" href="#split-by-responsibility">Split by Responsibility</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Before: UserManager (god object)
+struct UserManager { ... }
+
+// After: Split into focused modules
+struct AuthService { ... }
+struct ProfileService { ... }
+struct PermissionService { ... }
+struct NotificationService { ... }
+<span class="boring">}</span></code></pre></pre>
+<h4 id="extract-common-functionality"><a class="header" href="#extract-common-functionality">Extract Common Functionality</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Extract shared dependencies
+struct ServiceContext {
+    db: Database,
+    cache: Cache,
+    logger: Logger,
+}
+
+// Each service gets a reference
+struct AuthService&lt;'a&gt; {
+    context: &amp;'a ServiceContext,
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="use-composition"><a class="header" href="#use-composition">Use Composition</a></h4>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Compose services instead of inheriting
+struct UserFacade {
+    auth: AuthService,
+    profile: ProfileService,
+    permissions: PermissionService,
+}
+
+impl UserFacade {
+    fn login(&amp;mut self, credentials: Credentials) -&gt; Result&lt;Session&gt; {
+        self.auth.login(credentials)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="toml-configuration"><a class="header" href="#toml-configuration">TOML Configuration</a></h3>
+<p>Add a <code>[god_object_detection]</code> section to your <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[god_object_detection]
+enabled = true
+
+[god_object_detection.rust]
+max_methods = 20
+max_fields = 15
+max_traits = 5      # max_traits = max responsibilities
+max_lines = 1000
+max_complexity = 200
+
+[god_object_detection.python]
+max_methods = 15
+max_fields = 10
+max_traits = 3
+max_lines = 500
+max_complexity = 150
+
+[god_object_detection.javascript]
+max_methods = 15
+max_fields = 20
+max_traits = 3
+max_lines = 500
+max_complexity = 150
+</code></pre>
+<p><strong>Note:</strong> <code>enabled</code> defaults to <code>true</code>. Set to <code>false</code> to disable god object detection entirely (equivalent to <code>--no-god-object</code> CLI flag).</p>
+<p>See <code>src/config.rs:500-582</code>.</p>
+<h3 id="tuning-for-your-project"><a class="header" href="#tuning-for-your-project">Tuning for Your Project</a></h3>
+<p><strong>Strict mode (smaller modules):</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_methods = 15
+max_fields = 10
+max_traits = 3
+</code></pre>
+<p><strong>Lenient mode (larger modules acceptable):</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_methods = 30
+max_fields = 20
+max_traits = 7
+</code></pre>
+<h3 id="cli-options"><a class="header" href="#cli-options">CLI Options</a></h3>
+<p>Debtmap provides several CLI flags to control god object detection behavior:</p>
+<h4 id="--no-god-object"><a class="header" href="#--no-god-object"><code>--no-god-object</code></a></h4>
+<p>Disables god object detection entirely.</p>
+<pre><code class="language-bash">debtmap analyze . --no-god-object
+</code></pre>
+<p><strong>Use case:</strong> When you only want function-level complexity analysis without file-level aggregation.</p>
+<h4 id="--aggregate-only"><a class="header" href="#--aggregate-only"><code>--aggregate-only</code></a></h4>
+<p>Shows only file-level god object scores, hiding individual function details.</p>
+<pre><code class="language-bash">debtmap analyze . --aggregate-only
+</code></pre>
+<p><strong>Use case:</strong> High-level overview of which files are god objects without function-by-function breakdowns.</p>
+<h4 id="--no-aggregation"><a class="header" href="#--no-aggregation"><code>--no-aggregation</code></a></h4>
+<p>Disables file-level aggregation, showing only individual function metrics.</p>
+<pre><code class="language-bash">debtmap analyze . --no-aggregation
+</code></pre>
+<p><strong>Use case:</strong> Detailed function-level analysis without combining into file scores.</p>
+<h4 id="--aggregation-method-method"><a class="header" href="#--aggregation-method-method"><code>--aggregation-method &lt;METHOD&gt;</code></a></h4>
+<p>Chooses how to combine function scores into file-level scores:</p>
+<ul>
+<li><code>sum</code> - Add all function scores</li>
+<li><code>weighted_sum</code> - Weight by complexity (default)</li>
+<li><code>logarithmic_sum</code> - Logarithmic scaling for large files</li>
+<li><code>max_plus_average</code> - Max score + average of others</li>
+</ul>
+<pre><code class="language-bash">debtmap analyze . --aggregation-method logarithmic_sum
+</code></pre>
+<h4 id="--min-problematic-n"><a class="header" href="#--min-problematic-n"><code>--min-problematic &lt;N&gt;</code></a></h4>
+<p>Sets minimum number of problematic functions required for file-level aggregation.</p>
+<pre><code class="language-bash">debtmap analyze . --min-problematic 3
+</code></pre>
+<p><strong>Use case:</strong> Avoid flagging files with only 1-2 complex functions as god objects.</p>
+<p>See <code>features.json:65-71</code> and <code>features.json:507-512</code>.</p>
+<h2 id="output-display"><a class="header" href="#output-display">Output Display</a></h2>
+<h3 id="file-level-display"><a class="header" href="#file-level-display">File-Level Display</a></h3>
+<p>When a god object is detected, Debtmap displays:</p>
+<pre><code>⚠️ God Object: 270 methods, 0 fields, 8 responsibilities
+Score: 1350 (Confidence: Definite)
+</code></pre>
+<h3 id="function-level-display"><a class="header" href="#function-level-display">Function-Level Display</a></h3>
+<p>Within a god object file, individual functions show:</p>
+<pre><code>├─ ⚠️ God Object: 45 methods, 20 fields, 5 responsibilities
+│      Score: 250 (Confidence: Probable)
+</code></pre>
+<p>The <code>⚠️ God Object</code> indicator makes it immediately clear which files need architectural refactoring.</p>
+<h2 id="integration-with-file-level-scoring"><a class="header" href="#integration-with-file-level-scoring">Integration with File-Level Scoring</a></h2>
+<p>God object detection affects the overall technical debt prioritization through a <strong>god object multiplier</strong>:</p>
+<pre><code>god_object_multiplier = 2.0 + normalized_god_object_score
+</code></pre>
+<p>Where <code>normalized_god_object_score</code> is scaled to 0-1 range.</p>
+<p>This means:</p>
+<ol>
+<li>God objects receive <strong>2-3× higher priority</strong> in debt rankings</li>
+<li>Functions within god objects may inherit elevated scores due to architectural concerns</li>
+<li>The cascading impact ensures god objects surface in the “top 10 most problematic” lists</li>
+</ol>
+<p>This integration ensures that architectural debt (god objects) is weighted appropriately alongside function-level complexity.</p>
+<p>See <code>features.json:570</code> and file-level scoring documentation.</p>
+<h2 id="metrics-tracking-advanced"><a class="header" href="#metrics-tracking-advanced">Metrics Tracking (Advanced)</a></h2>
+<p>For teams tracking god object evolution over time, Debtmap provides <code>GodObjectMetrics</code> with:</p>
+<ul>
+<li><strong>Snapshots</strong> - Historical god object data per file</li>
+<li><strong>Trends</strong> - Improving/Stable/Worsening classification (based on ±10 point score changes)</li>
+<li><strong>New God Objects</strong> - Files that crossed the threshold</li>
+<li><strong>Resolved God Objects</strong> - Files that were refactored below thresholds</li>
+</ul>
+<p>This enables longitudinal analysis: “Are we reducing god objects sprint-over-sprint?”</p>
+<p>See <code>src/organization/god_object_metrics.rs:1-228</code>.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="why-is-my-functional-module-flagged-as-a-god-object"><a class="header" href="#why-is-my-functional-module-flagged-as-a-god-object">“Why is my functional module flagged as a god object?”</a></h3>
+<p><strong>Answer:</strong> Debtmap aggregates standalone functions with struct methods. A file with 100 pure helper functions will be flagged, even though each function is simple.</p>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li>Use <strong>purity-weighted scoring</strong> (Rust only) via complexity-weighted analysis - pure functions contribute 0.3× weight</li>
+<li>Split the module into smaller, focused utility modules</li>
+<li>Use <code>--min-problematic</code> to raise the threshold for file-level aggregation</li>
+</ol>
+<h3 id="my-god-object-score-seems-too-high"><a class="header" href="#my-god-object-score-seems-too-high">“My god object score seems too high”</a></h3>
+<p><strong>Answer:</strong> The scoring algorithm uses exponential scaling (<code>base_score × 50 × violation_count</code>) to ensure god objects are prioritized.</p>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li>Check the violation count - 5 violations means severe issues</li>
+<li>Review each metric - are method count, field count, responsibilities, LOC, and complexity all high?</li>
+<li>Consider if the score accurately reflects maintainability burden</li>
+</ol>
+<h3 id="can-i-disable-god-object-detection-for-specific-files"><a class="header" href="#can-i-disable-god-object-detection-for-specific-files">“Can I disable god object detection for specific files?”</a></h3>
+<p><strong>Answer:</strong> Currently, god object detection is global. However, you can:</p>
+<ol>
+<li>Use <code>--no-god-object</code> to disable entirely</li>
+<li>Use <code>--no-aggregation</code> to skip file-level analysis</li>
+<li>Adjust thresholds in <code>.debtmap.toml</code> to be more lenient</li>
+</ol>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<p>To avoid god objects:</p>
+<ol>
+<li><strong>Follow Single Responsibility Principle</strong> - Each module should have one clear purpose</li>
+<li><strong>Regular Refactoring</strong> - Split modules before they reach thresholds</li>
+<li><strong>Monitor Growth</strong> - Track method and field counts as modules evolve</li>
+<li><strong>Use Composition</strong> - Prefer smaller, composable units over large monoliths</li>
+<li><strong>Clear Boundaries</strong> - Define clear module interfaces and responsibilities</li>
+<li><strong>Leverage Purity</strong> - Keep pure functions separate from stateful logic (reduces scores in Rust)</li>
+<li><strong>Set Project Thresholds</strong> - Customize <code>.debtmap.toml</code> to match your team’s standards</li>
+</ol>
+<h2 id="configuration-tradeoffs"><a class="header" href="#configuration-tradeoffs">Configuration Tradeoffs</a></h2>
+<p><strong>Strict Thresholds</strong> (e.g., Rust: 10 methods):</p>
+<ul>
+<li>✅ Catch problems early</li>
+<li>✅ Enforce strong modularity</li>
+<li>❌ May flag legitimate large modules</li>
+<li>❌ More noise in reports</li>
+</ul>
+<p><strong>Lenient Thresholds</strong> (e.g., Rust: 50 methods):</p>
+<ul>
+<li>✅ Reduce false positives</li>
+<li>✅ Focus on egregious violations</li>
+<li>❌ Miss real god objects</li>
+<li>❌ Allow technical debt to grow</li>
+</ul>
+<p><strong>Recommended:</strong> Start with defaults, then adjust based on your codebase’s characteristics. Use metrics tracking to monitor trends over time.</p>
+<h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
+<ul>
+<li><a href="./file-level-scoring.html">File-Level Scoring</a> - How god objects affect overall file scores</li>
+<li><a href="./configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
+<li><a href="./cli-reference.html">CLI Reference</a> - All command-line options</li>
+<li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - How god objects are prioritized</li>
+</ul>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>God object detection is a powerful architectural analysis feature that:</p>
+<ul>
+<li>Identifies files/types violating single responsibility principle</li>
+<li>Provides multiple scoring algorithms (simple, complexity-weighted, purity-weighted)</li>
+<li>Generates actionable refactoring recommendations</li>
+<li>Integrates with file-level scoring for holistic debt prioritization</li>
+<li>Supports customization via TOML config and CLI flags</li>
+</ul>
+<p>By combining quantitative metrics (method count, LOC, complexity) with qualitative analysis (responsibility detection, purity), Debtmap helps teams systematically address architectural debt.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="entropy-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="parallel-processing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="entropy-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="parallel-processing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

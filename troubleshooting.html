@@ -183,7 +183,7 @@
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
 <ol>
-<li><strong>Analysis is slow</strong>: Check <code>--cache-stats</code>, ensure caching is enabled, adjust threads with <code>-j</code></li>
+<li><strong>Analysis is slow</strong>: Check <code>--cache-stats</code>, ensure caching is enabled, adjust threads with <code>--jobs</code></li>
 <li><strong>Parse errors</strong>: Use <code>--semantic-off</code> for faster fallback mode or exclude problematic files</li>
 <li><strong>No output</strong>: Increase verbosity with <code>-v</code> or lower <code>--min-priority</code></li>
 <li><strong>Cache corruption</strong>: Run with <code>--clear-cache</code> to rebuild</li>
@@ -321,8 +321,18 @@ debtmap --filter "complexity,debt"
 </code></pre>
 <h3 id="json-format-issues"><a class="header" href="#json-format-issues">JSON Format Issues</a></h3>
 <p><strong>Problem</strong>: JSON output parsing errors or unexpected structure</p>
+<p><strong>Understanding the Two Formats</strong>:</p>
+<p><strong>Legacy format</strong> wraps items in variant-specific objects:</p>
+<pre><code class="language-json">{"File": {"path": "src/main.rs", "score": 7.5, ...}}
+{"Function": {"name": "parse", "score": 8.2, ...}}
+</code></pre>
+<p><strong>Unified format</strong> uses consistent structure with <code>type</code> field:</p>
+<pre><code class="language-json">{"type": "File", "path": "src/main.rs", "score": 7.5, ...}
+{"type": "Function", "name": "parse", "score": 8.2, ...}
+</code></pre>
+<p>The unified format is <strong>recommended</strong> for parsing and tool integration as it provides a consistent structure across all item types.</p>
 <p><strong>Solutions</strong>:</p>
-<pre><code class="language-bash"># Use unified JSON format (consistent structure)
+<pre><code class="language-bash"># Use unified JSON format (consistent structure, recommended)
 debtmap --format json --output-format unified
 
 # Legacy format (default, uses {File: {...}} structure)
@@ -334,6 +344,7 @@ debtmap --format json | jq .
 # Write to file for easier inspection
 debtmap --format json --output results.json
 </code></pre>
+<p>See the <a href="./configuration.html#output-formats">Configuration/Output Formats</a> chapter for detailed JSON structure documentation.</p>
 <h3 id="context-provider-errors"><a class="header" href="#context-provider-errors">Context Provider Errors</a></h3>
 <p><strong>Problem</strong>: Errors with critical_path, dependency, or git_history providers</p>
 <p><strong>Solutions</strong>:</p>
@@ -539,6 +550,41 @@ debtmap
 # Migrate existing cache
 debtmap --migrate-cache
 </code></pre>
+<h3 id="cache-pruning-configuration"><a class="header" href="#cache-pruning-configuration">Cache Pruning Configuration</a></h3>
+<p>Debtmap automatically manages cache size and age to prevent unbounded growth:</p>
+<p><strong>Environment Variables</strong>:</p>
+<pre><code class="language-bash"># Enable/disable automatic cache pruning (default: true)
+export DEBTMAP_CACHE_AUTO_PRUNE=true
+
+# Maximum cache size in bytes (default: 1GB)
+export DEBTMAP_CACHE_MAX_SIZE=1073741824
+
+# Maximum cache entry age in days (default: 30)
+export DEBTMAP_CACHE_MAX_AGE_DAYS=30
+
+# Maximum number of cache entries (default: 10000)
+export DEBTMAP_CACHE_MAX_ENTRIES=10000
+
+# Percentage of entries to remove when pruning (default: 0.25)
+export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25
+
+# Pruning strategy: lru, lfu, fifo, age_based (default: lru)
+export DEBTMAP_CACHE_STRATEGY=lru
+</code></pre>
+<p><strong>Pruning Strategies</strong>:</p>
+<ul>
+<li><strong>LRU (Least Recently Used)</strong>: Removes oldest accessed entries (recommended for general use)</li>
+<li><strong>LFU (Least Frequently Used)</strong>: Removes least accessed entries (best for stable workloads)</li>
+<li><strong>FIFO (First In First Out)</strong>: Removes oldest created entries (simple, useful for testing)</li>
+<li><strong>Age-based</strong>: Removes entries older than MAX_AGE_DAYS (useful for compliance requirements)</li>
+</ul>
+<p><strong>Performance Implications</strong>:</p>
+<ul>
+<li>LRU/LFU provide better cache hit rates than FIFO</li>
+<li>Age-based strategy ensures data freshness but may reduce hit rate</li>
+<li>Adjust MAX_SIZE based on available disk space and project count</li>
+<li>Lower PRUNE_PERCENTAGE means more frequent but smaller cleanup operations</li>
+</ul>
 <h3 id="cache-strategies"><a class="header" href="#cache-strategies">Cache Strategies</a></h3>
 <p><strong>Local cache</strong> (<code>.debtmap/cache</code>):</p>
 <ul>
@@ -786,6 +832,116 @@ debtmap
 <li><code>--no-aggregation</code>: See individual functions/classes only</li>
 <li>Default: Full picture with both levels</li>
 </ul>
+<h3 id="tiered-prioritization-issues"><a class="header" href="#tiered-prioritization-issues">Tiered Prioritization Issues</a></h3>
+<p><strong>Overview</strong>: Debtmap uses a 4-tier system to classify technical debt items by priority:</p>
+<p><strong>Tier Classification</strong>:</p>
+<ul>
+<li><strong>Tier 1 (Critical Architecture)</strong>: High complexity, low coverage, high dependencies, entry points</li>
+<li><strong>Tier 2 (Complex Untested)</strong>: Significant complexity or coverage gaps</li>
+<li><strong>Tier 3 (Testing Gaps)</strong>: Moderate issues that need attention</li>
+<li><strong>Tier 4 (Maintenance)</strong>: Low-priority items, routine maintenance</li>
+</ul>
+<p><strong>Tier Weights</strong>:</p>
+<ul>
+<li>Tier 1: 1.5× multiplier (highest priority)</li>
+<li>Tier 2: 1.0× multiplier (standard priority)</li>
+<li>Tier 3: 0.7× multiplier (reduced priority)</li>
+<li>Tier 4: 0.3× multiplier (lowest priority)</li>
+</ul>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml"># In .debtmap.toml
+[tiers]
+# Tier 2 requires EITHER high complexity OR high dependencies
+t2_complexity_threshold = 15
+t2_dependency_threshold = 10
+
+# Tier 3 requires moderate complexity
+t3_complexity_threshold = 8
+
+# Control Tier 4 visibility in main report
+show_t4_in_main_report = false
+</code></pre>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Why is my item in Tier 3 instead of Tier 2?</strong></p>
+<p>A: Check if it meets Tier 2 thresholds:</p>
+<pre><code class="language-bash"># See tier classification with verbosity
+debtmap -v
+
+# Check current thresholds
+cat .debtmap.toml | grep -A 5 "\[tiers\]"
+
+# Lower thresholds to promote more items to Tier 2
+# In .debtmap.toml:
+# t2_complexity_threshold = 10  (default: 15)
+# t2_dependency_threshold = 5   (default: 10)
+</code></pre>
+<p><strong>Q: How do I hide Tier 4 items from the main report?</strong></p>
+<p>A: Use the <code>show_t4_in_main_report</code> configuration:</p>
+<pre><code class="language-toml"># In .debtmap.toml
+[tiers]
+show_t4_in_main_report = false
+</code></pre>
+<p>Tier 4 items will still appear in detailed output but won’t clutter the main summary.</p>
+<h3 id="file-level-scoring-issues"><a class="header" href="#file-level-scoring-issues">File-Level Scoring Issues</a></h3>
+<p><strong>Overview</strong>: Debtmap aggregates function/class scores into file-level scores using a multi-factor formula.</p>
+<p><strong>File Score Formula</strong>:</p>
+<pre><code>File Score = size_factor × complexity_factor × coverage_factor ×
+             density_factor × god_object_multiplier × function_scores
+</code></pre>
+<p><strong>Factors</strong>:</p>
+<ul>
+<li><strong>size_factor</strong>: Based on lines of code (larger files = higher factor)</li>
+<li><strong>complexity_factor</strong>: Average complexity across functions</li>
+<li><strong>coverage_factor</strong>: File-level test coverage (from LCOV file)</li>
+<li><strong>density_factor</strong>: Penalizes files with &gt;50 functions (indicates code smell)</li>
+<li><strong>god_object_multiplier</strong>: 1.5× for files exceeding god object thresholds</li>
+</ul>
+<p><strong>Aggregation Methods</strong>:</p>
+<pre><code class="language-bash"># Weighted sum (default) - considers complexity weights
+debtmap --aggregation-method weighted_sum
+
+# Simple sum - adds all function scores
+debtmap --aggregation-method sum
+
+# Logarithmic sum - dampens very high scores
+debtmap --aggregation-method logarithmic_sum
+
+# Max plus average - highlights worst function + context
+debtmap --aggregation-method max_plus_average
+</code></pre>
+<p><strong>When to use each method</strong>:</p>
+<ul>
+<li><strong>weighted_sum</strong>: Default, balances individual and collective impact</li>
+<li><strong>sum</strong>: When you want raw cumulative debt</li>
+<li><strong>logarithmic_sum</strong>: For very large files to prevent score explosion</li>
+<li><strong>max_plus_average</strong>: Focus on worst offender while considering overall file health</li>
+</ul>
+<p><strong>Aggregation Control Flags</strong>:</p>
+<pre><code class="language-bash"># Show only aggregated file-level scores
+debtmap --aggregate-only
+
+# Disable file-level aggregation entirely
+debtmap --no-aggregation
+
+# Default: show both individual items and file aggregates
+debtmap
+</code></pre>
+<p><strong>Troubleshooting High File Scores</strong>:</p>
+<p><strong>Q: Why does this file have such a high score?</strong></p>
+<p>A: Check contributing factors with verbosity:</p>
+<pre><code class="language-bash"># See file-level score breakdown
+debtmap path/to/file.rs -vv
+
+# Look for:
+# - High function count (density_factor kicks in at 50+)
+# - God object detection (1.5× multiplier)
+# - Low coverage (high coverage_factor)
+# - Large file size (size_factor)
+# - Multiple high-complexity functions
+
+# Disable god object detection if false positive
+debtmap --no-god-object path/to/file.rs
+</code></pre>
 <h3 id="combining-advanced-flags"><a class="header" href="#combining-advanced-flags">Combining Advanced Flags</a></h3>
 <pre><code class="language-bash"># Comprehensive analysis with all features
 debtmap --multi-pass --attribution --context -vv
@@ -1001,7 +1157,30 @@ debtmap
 <li>Report unsupported patterns as feature requests</li>
 </ul>
 <h3 id="false-positives"><a class="header" href="#false-positives">False Positives</a></h3>
-<pre><code class="language-bash"># Reduce false positives with context
+<p>Reduce false positives for validation functions and repetitive code patterns using entropy analysis:</p>
+<p><strong>Enable and Configure Entropy Analysis</strong>:</p>
+<pre><code class="language-toml"># In .debtmap.toml
+[entropy]
+enabled = true                    # Enable entropy-based dampening
+weight = 0.3                      # Weight in complexity adjustment (0.0-1.0)
+min_tokens = 50                   # Minimum tokens for entropy calculation
+pattern_threshold = 0.7           # Pattern similarity threshold (0.0-1.0)
+use_classification = true         # Enable advanced token classification
+entropy_threshold = 0.5           # Entropy level for dampening (0.0-1.0)
+branch_threshold = 0.8            # Branch similarity threshold (0.0-1.0)
+max_combined_reduction = 0.5      # Max reduction percentage (0.0-1.0)
+</code></pre>
+<p><strong>When to Adjust Parameters</strong>:</p>
+<ul>
+<li><strong>Increase <code>pattern_threshold</code></strong> (e.g., 0.8-0.9): Be more strict, reduce dampening for truly unique code</li>
+<li><strong>Decrease <code>entropy_threshold</code></strong> (e.g., 0.3-0.4): Apply dampening more broadly to catch more repetitive patterns</li>
+<li><strong>Increase <code>weight</code></strong> (e.g., 0.4-0.5): Make entropy have stronger impact on final scores</li>
+<li><strong>Increase <code>min_tokens</code></strong> (e.g., 100): Only apply entropy analysis to larger functions</li>
+<li><strong>Increase <code>branch_threshold</code></strong> (e.g., 0.9): Be more strict about branching pattern similarity</li>
+</ul>
+<p>Entropy analysis can reduce false positives by up to 70% for validation functions, error handling, and other repetitive patterns.</p>
+<p><strong>Other False Positive Reduction Strategies</strong>:</p>
+<pre><code class="language-bash"># Use context-aware analysis
 debtmap --context
 
 # Adjust thresholds
@@ -1325,21 +1504,64 @@ debtmap src/specific/module
 # .debtmap/config.toml:
 # include = ["src/**/*.rs"]
 </code></pre>
+<p><strong>Q: How is the 0-10 priority score calculated?</strong></p>
+<p>A: Debtmap uses a multi-factor unified scoring formula to compute priority scores:</p>
+<p><strong>Base Score Formula</strong>:</p>
+<pre><code>Base Score = (Complexity Factor × 0.40) +
+             (Coverage Factor × 0.40) +
+             (Dependency Factor × 0.20)
+</code></pre>
+<p><strong>Where</strong>:</p>
+<ul>
+<li><strong>Complexity Factor</strong>: Normalized cognitive complexity (0.0-10.0 scale)</li>
+<li><strong>Coverage Factor</strong>: <code>(1 - coverage_percentage) × 2 + 1</code> (ranges from 1.0-3.0)</li>
+<li><strong>Dependency Factor</strong>: Based on incoming/outgoing dependencies and coupling</li>
+</ul>
+<p><strong>Role Multipliers</strong> adjust the base score by function role:</p>
+<ul>
+<li><strong>Entry points</strong>: 1.5× (critical path, highest priority)</li>
+<li><strong>Business logic</strong>: 1.2× (core functionality)</li>
+<li><strong>Data access</strong>: 1.0× (important but stable)</li>
+<li><strong>Infrastructure</strong>: 0.8× (lower priority)</li>
+<li><strong>Utilities</strong>: 0.5× (minimal priority)</li>
+<li><strong>Test code</strong>: 0.1× (lowest priority)</li>
+</ul>
+<p><strong>Final Score</strong>:</p>
+<pre><code>Final Score = Base Score × Role Multiplier
+</code></pre>
+<p>This ensures functions are prioritized by true impact, not just raw complexity. Entry points with high complexity and low coverage get the highest scores, while well-tested utility functions get lower scores.</p>
+<p><strong>Example</strong>:</p>
+<ul>
+<li>Function with complexity=20, coverage=0%, dependencies=5, role=entry_point</li>
+<li>Complexity factor: 8.0 (normalized)</li>
+<li>Coverage factor: 3.0 (untested)</li>
+<li>Dependency factor: 2.5 (moderate coupling)</li>
+<li>Base score: (8.0 × 0.40) + (3.0 × 0.40) + (2.5 × 0.20) = 4.9</li>
+<li>Final score: 4.9 × 1.5 (entry point) = <strong>7.35</strong></li>
+</ul>
+<pre><code class="language-bash"># See score breakdown with verbosity
+debtmap -v
+
+# See detailed factor calculations
+debtmap -vv
+</code></pre>
 <h3 id="coverage-and-testing"><a class="header" href="#coverage-and-testing">Coverage and Testing</a></h3>
 <p><strong>Q: How does coverage affect scores?</strong></p>
-<p>A: Coverage dampens scores to surface untested code:</p>
+<p>A: Coverage is integrated into the unified scoring system as a factor:</p>
 <ul>
-<li>Formula: <code>score_multiplier = 1.0 - coverage</code></li>
-<li>0% coverage → full score (highest priority)</li>
-<li>100% coverage → score multiplied by 0 (lowest priority)</li>
-<li>Untested complex code rises to the top</li>
+<li><strong>Coverage Factor Formula</strong>: <code>(1 - coverage_percentage) × 2 + 1</code></li>
+<li>This factor is weighted at 40% in the unified scoring formula</li>
+<li><strong>Base Score</strong> = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)</li>
+<li><strong>Final Score</strong> = Base Score × Role Multiplier</li>
 </ul>
+<p>This means untested code (0% coverage) gets the highest coverage factor (3.0), while fully tested code (100% coverage) gets the lowest (1.0), ensuring untested complex code rises to the top.</p>
 <pre><code class="language-bash"># Use coverage file
 debtmap --coverage-file coverage.info
 
 # See coverage impact
 debtmap --coverage-file coverage.info -v
 </code></pre>
+<p>See the FAQ entry “How is the 0-10 priority score calculated?” for complete scoring formula details.</p>
 <h3 id="context-and-analysis"><a class="header" href="#context-and-analysis">Context and Analysis</a></h3>
 <p><strong>Q: What are context providers?</strong></p>
 <p>A: Additional analysis for prioritization:</p>
@@ -1519,7 +1741,7 @@ File bug report with debug output</li>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="examples.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="faq.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -1530,7 +1752,7 @@ File bug report with debug output</li>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="examples.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="faq.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

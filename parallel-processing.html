@@ -1,0 +1,997 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Parallel Processing - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="parallel-processing"><a class="header" href="#parallel-processing">Parallel Processing</a></h1>
+<p>Debtmap leverages Rust’s powerful parallel processing capabilities to analyze large codebases efficiently. Built on Rayon for data parallelism and DashMap for lock-free concurrent data structures, debtmap achieves 10-100x faster performance than Java/Python-based competitors.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Debtmap’s parallel processing architecture uses a three-phase approach:</p>
+<ol>
+<li><strong>Parallel File Parsing</strong> - Parse source files concurrently across all available CPU cores</li>
+<li><strong>Parallel Multi-File Extraction</strong> - Extract call graphs from parsed files in parallel</li>
+<li><strong>Parallel Enhanced Analysis</strong> - Analyze trait dispatch, function pointers, and framework patterns</li>
+</ol>
+<p>This parallel pipeline is controlled by CLI flags that let you tune performance for your environment.</p>
+<h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
+<p><strong>Typical analysis times:</strong></p>
+<ul>
+<li>Small project (1k-5k LOC): &lt;1 second</li>
+<li>Medium project (10k-50k LOC): 2-8 seconds</li>
+<li>Large project (100k-500k LOC): 10-45 seconds</li>
+</ul>
+<p><strong>Comparison with other tools (medium-sized Rust project, ~50k LOC):</strong></p>
+<ul>
+<li>SonarQube: 3-4 minutes</li>
+<li>CodeClimate: 2-3 minutes</li>
+<li>Debtmap: 5-8 seconds</li>
+</ul>
+<h2 id="cli-flags-for-parallelization"><a class="header" href="#cli-flags-for-parallelization">CLI Flags for Parallelization</a></h2>
+<p>Debtmap provides two flags to control parallel processing behavior:</p>
+<h3 id="jobs---j"><a class="header" href="#jobs---j">–jobs / -j</a></h3>
+<p>Control the number of worker threads for parallel processing:</p>
+<pre><code class="language-bash"># Use all available CPU cores (default)
+debtmap analyze --jobs 0
+
+# Limit to 4 threads
+debtmap analyze --jobs 4
+debtmap analyze -j 4
+</code></pre>
+<p><strong>Behavior:</strong></p>
+<ul>
+<li><code>--jobs 0</code> (default): Auto-detects available CPU cores using <code>std::thread::available_parallelism()</code>. Falls back to 4 threads if detection fails.</li>
+<li><code>--jobs N</code>: Explicitly sets the thread pool to N threads.</li>
+</ul>
+<p><strong>When to use:</strong></p>
+<ul>
+<li>Use <code>--jobs 0</code> for maximum performance on developer workstations</li>
+<li>Use <code>--jobs 1-4</code> in memory-constrained environments like CI/CD</li>
+<li>Use <code>--jobs 1</code> for deterministic analysis order during debugging</li>
+</ul>
+<p><strong>Environment Variable:</strong></p>
+<p>You can also set the default via the <code>RAYON_NUM_THREADS</code> or <code>DEBTMAP_JOBS</code> environment variable:</p>
+<pre><code class="language-bash">export RAYON_NUM_THREADS=4
+debtmap analyze  # Uses 4 threads
+</code></pre>
+<p>The CLI flag takes precedence over the environment variable.</p>
+<h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
+<p>Disable parallel call graph construction entirely:</p>
+<pre><code class="language-bash">debtmap analyze --no-parallel
+</code></pre>
+<p><strong>When to use:</strong></p>
+<ul>
+<li><strong>Debugging concurrency issues</strong>: Isolate whether a problem is parallelism-related</li>
+<li><strong>Memory-constrained environments</strong>: Parallel processing increases memory usage</li>
+<li><strong>Deterministic analysis</strong>: Ensures consistent ordering for reproducibility</li>
+</ul>
+<p><strong>Performance Impact:</strong></p>
+<p>Disabling parallelization significantly increases analysis time:</p>
+<ul>
+<li>Small projects (&lt; 100 files): 2-3x slower</li>
+<li>Medium projects (100-1000 files): 5-10x slower</li>
+<li>Large projects (&gt; 1000 files): 10-50x slower</li>
+</ul>
+<p>For more details on both flags, see the <a href="./cli-reference.html#performance--caching">CLI Reference</a>.</p>
+<h2 id="rayon-parallel-iterators"><a class="header" href="#rayon-parallel-iterators">Rayon Parallel Iterators</a></h2>
+<p>Debtmap uses <a href="https://docs.rs/rayon">Rayon</a>, a data parallelism library for Rust, to parallelize file processing operations.</p>
+<h3 id="thread-pool-configuration"><a class="header" href="#thread-pool-configuration">Thread Pool Configuration</a></h3>
+<p>The global Rayon thread pool is configured at startup based on the <code>--jobs</code> parameter:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/builders/parallel_call_graph.rs:46-52
+if self.config.num_threads &gt; 0 {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(self.config.num_threads)
+        .build_global()
+        .ok(); // Ignore if already configured
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This configures Rayon to use a specific number of worker threads for all parallel operations throughout the analysis.</p>
+<h3 id="worker-thread-selection"><a class="header" href="#worker-thread-selection">Worker Thread Selection</a></h3>
+<p>The <code>get_worker_count()</code> function determines how many threads to use:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/main.rs:660-669
+fn get_worker_count(jobs: usize) -&gt; usize {
+    if jobs == 0 {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)  // Fallback if detection fails
+    } else {
+        jobs  // Use explicit value
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Auto-detection behavior:</strong></p>
+<ul>
+<li>Queries the OS for available parallelism (CPU cores)</li>
+<li>Respects cgroup limits in containers (Docker, Kubernetes)</li>
+<li>Falls back to 4 threads if detection fails (rare)</li>
+</ul>
+<p><strong>Manual configuration:</strong></p>
+<ul>
+<li>Useful in shared environments (CI/CD, shared build servers)</li>
+<li>Prevents resource contention with other processes</li>
+<li>Enables reproducible benchmarking</li>
+</ul>
+<h3 id="parallel-file-processing"><a class="header" href="#parallel-file-processing">Parallel File Processing</a></h3>
+<p><strong>Phase 1: Parallel File Parsing</strong></p>
+<p>Files are parsed concurrently using Rayon’s parallel iterators:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/builders/parallel_call_graph.rs:98-128
+let parsed_files: Vec&lt;_&gt; = rust_files
+    .par_iter()  // Convert to parallel iterator
+    .filter_map(|file_path| {
+        let content = io::read_file(file_path).ok()?;
+
+        // Update progress atomically
+        parallel_graph.stats().increment_files();
+
+        Some((file_path.clone(), content))
+    })
+    .collect();
+<span class="boring">}</span></code></pre></pre>
+<p>Key features:</p>
+<ul>
+<li><code>.par_iter()</code> converts a sequential iterator to a parallel one</li>
+<li>Each file is read independently on a worker thread</li>
+<li>Progress tracking uses atomic counters (see <a href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a>)</li>
+</ul>
+<p><strong>Phase 2: Parallel Multi-File Extraction</strong></p>
+<p>Files are grouped into chunks for optimal parallelization:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/builders/parallel_call_graph.rs:130-161
+let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
+
+parsed_files.par_chunks(chunk_size).for_each(|chunk| {
+    // Parse syn files within each chunk
+    let parsed_chunk: Vec&lt;_&gt; = chunk
+        .iter()
+        .filter_map(|(path, content)| {
+            syn::parse_file(content)
+                .ok()
+                .map(|parsed| (parsed, path.clone()))
+        })
+        .collect();
+
+    if !parsed_chunk.is_empty() {
+        // Extract call graph for this chunk
+        let chunk_graph = extract_call_graph_multi_file(&amp;parsed_chunk);
+
+        // Merge into main graph concurrently
+        parallel_graph.merge_concurrent(chunk_graph);
+    }
+});
+<span class="boring">}</span></code></pre></pre>
+<p>This chunking strategy balances parallelism with overhead:</p>
+<ul>
+<li>Minimum chunk size of 10 files prevents excessive overhead</li>
+<li>Dynamic chunk sizing based on available threads</li>
+<li>Each chunk produces a local call graph that’s merged concurrently</li>
+</ul>
+<p><strong>Phase 3: Enhanced Analysis</strong></p>
+<p>The third phase analyzes trait dispatch, function pointers, and framework patterns. This phase is currently sequential due to complex shared state requirements, but benefits from the parallel foundation built in phases 1-2.</p>
+<h3 id="parallel-architecture"><a class="header" href="#parallel-architecture">Parallel Architecture</a></h3>
+<p>Debtmap processes files in parallel using Rayon’s parallel iterators:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>files.par_iter()
+    .map(|file| analyze_file(file))
+    .collect()
+<span class="boring">}</span></code></pre></pre>
+<p>Each file is:</p>
+<ol>
+<li>Parsed independently</li>
+<li>Analyzed for complexity</li>
+<li>Scored and prioritized</li>
+</ol>
+<h2 id="dashmap-for-lock-free-concurrency"><a class="header" href="#dashmap-for-lock-free-concurrency">DashMap for Lock-Free Concurrency</a></h2>
+<p>Debtmap uses <a href="https://docs.rs/dashmap">DashMap</a>, a concurrent hash map implementation, for lock-free data structures during parallel call graph construction.</p>
+<h3 id="why-dashmap"><a class="header" href="#why-dashmap">Why DashMap?</a></h3>
+<p>Traditional approaches to concurrent hash maps use a single <code>Mutex&lt;HashMap&gt;</code>, which creates contention:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ Traditional approach - serializes all access
+let map = Arc&lt;Mutex&lt;HashMap&lt;K, V&gt;&gt;&gt;;
+
+// Thread 1 blocks Thread 2, even for reads
+let val = map.lock().unwrap().get(&amp;key);
+<span class="boring">}</span></code></pre></pre>
+<p>DashMap provides <strong>lock-free reads</strong> and <strong>fine-grained write locking</strong> through internal sharding:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ✅ DashMap approach - concurrent reads, fine-grained writes
+let map = Arc&lt;DashMap&lt;K, V&gt;&gt;;
+
+// Multiple threads can read concurrently without blocking
+let val = map.get(&amp;key);
+
+// Writes only lock the specific shard, not the whole map
+map.insert(key, value);
+<span class="boring">}</span></code></pre></pre>
+<h3 id="parallelcallgraph-implementation"><a class="header" href="#parallelcallgraph-implementation">ParallelCallGraph Implementation</a></h3>
+<p>The <code>ParallelCallGraph</code> uses DashMap for all concurrent data structures:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:49-56
+pub struct ParallelCallGraph {
+    nodes: Arc&lt;DashMap&lt;FunctionId, NodeInfo&gt;&gt;,      // Functions
+    edges: Arc&lt;DashSet&lt;FunctionCall&gt;&gt;,              // Calls
+    caller_index: Arc&lt;DashMap&lt;FunctionId, DashSet&lt;FunctionId&gt;&gt;&gt;,  // Who calls this?
+    callee_index: Arc&lt;DashMap&lt;FunctionId, DashSet&lt;FunctionId&gt;&gt;&gt;,  // Who does this call?
+    stats: Arc&lt;ParallelStats&gt;,                      // Atomic counters
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Key components:</strong></p>
+<ol>
+<li><strong>nodes</strong>: Maps function identifiers to metadata (complexity, lines, flags)</li>
+<li><strong>edges</strong>: Set of all function calls (deduplicated automatically)</li>
+<li><strong>caller_index</strong>: Reverse index for “who calls this function?”</li>
+<li><strong>callee_index</strong>: Forward index for “what does this function call?”</li>
+<li><strong>stats</strong>: Atomic counters for progress tracking</li>
+</ol>
+<h3 id="concurrent-operations"><a class="header" href="#concurrent-operations">Concurrent Operations</a></h3>
+<p><strong>Adding Functions Concurrently</strong></p>
+<p>Multiple analyzer threads can add functions simultaneously:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:78-96
+pub fn add_function(
+    &amp;self,
+    id: FunctionId,
+    is_entry_point: bool,
+    is_test: bool,
+    complexity: u32,
+    lines: usize,
+) {
+    let node_info = NodeInfo {
+        id: id.clone(),
+        is_entry_point,
+        is_test,
+        complexity,
+        lines,
+    };
+    self.nodes.insert(id, node_info);
+    self.stats.add_nodes(1);  // Atomic increment
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Atomicity guarantees:</strong></p>
+<ul>
+<li><code>DashMap::insert()</code> is atomic - no data races</li>
+<li><code>AtomicUsize</code> counters can be incremented from multiple threads safely</li>
+<li>No locks required for reading existing nodes</li>
+</ul>
+<p><strong>Adding Calls Concurrently</strong></p>
+<p>Function calls are added with automatic deduplication:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:98-117
+pub fn add_call(&amp;self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
+    let call = FunctionCall {
+        caller: caller.clone(),
+        callee: callee.clone(),
+        call_type,
+    };
+
+    if self.edges.insert(call) {  // DashSet deduplicates automatically
+        // Update indices concurrently
+        self.caller_index
+            .entry(caller.clone())
+            .or_default()
+            .insert(callee.clone());
+
+        self.callee_index.entry(callee).or_default().insert(caller);
+
+        self.stats.add_edges(1);  // Only increment if actually inserted
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Deduplication:</strong></p>
+<ul>
+<li><code>DashSet::insert()</code> returns <code>true</code> only for new items</li>
+<li>Duplicate calls from multiple threads are safely ignored</li>
+<li>Indices are updated atomically using <code>entry()</code> API</li>
+</ul>
+<h3 id="shared-read-only-data"><a class="header" href="#shared-read-only-data">Shared Read-Only Data</a></h3>
+<p>Analysis configuration and indexes are shared across threads:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let coverage_index = Arc::new(build_coverage_index());
+
+// All threads share the same index
+files.par_iter()
+    .map(|file| analyze_with_coverage(file, &amp;coverage_index))
+<span class="boring">}</span></code></pre></pre>
+<h3 id="memory-overhead"><a class="header" href="#memory-overhead">Memory Overhead</a></h3>
+<p>DashMap uses internal sharding for parallelism, which has a memory overhead:</p>
+<ul>
+<li><strong>DashMap overhead</strong>: ~2x the memory of a regular <code>HashMap</code> due to sharding</li>
+<li><strong>DashSet overhead</strong>: Similar to DashMap</li>
+<li><strong>Benefit</strong>: Enables concurrent access without contention</li>
+<li><strong>Trade-off</strong>: Debtmap prioritizes speed over memory for large codebases</li>
+</ul>
+<p>For memory-constrained environments, use <code>--jobs 2-4</code> or <code>--no-parallel</code> to reduce parallel overhead.</p>
+<h2 id="parallel-call-graph-statistics"><a class="header" href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a></h2>
+<p>Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads.</p>
+<h3 id="parallelstats-structure"><a class="header" href="#parallelstats-structure">ParallelStats Structure</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:7-47
+pub struct ParallelStats {
+    pub total_nodes: AtomicUsize,      // Functions processed
+    pub total_edges: AtomicUsize,      // Calls discovered
+    pub files_processed: AtomicUsize,  // Files completed
+    pub total_files: AtomicUsize,      // Total files to process
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Atomic operations:</strong></p>
+<ul>
+<li><code>fetch_add()</code> - Atomically increment counters from any thread</li>
+<li><code>load()</code> - Read current value without blocking</li>
+<li><code>Ordering::Relaxed</code> - Sufficient for statistics (no synchronization needed)</li>
+</ul>
+<h3 id="progress-tracking"><a class="header" href="#progress-tracking">Progress Tracking</a></h3>
+<p>Progress ratio calculation for long-running analysis:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:38-46
+pub fn progress_ratio(&amp;self) -&gt; f64 {
+    let processed = self.files_processed.load(Ordering::Relaxed) as f64;
+    let total = self.total_files.load(Ordering::Relaxed) as f64;
+    if total &gt; 0.0 {
+        processed / total
+    } else {
+        0.0
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This enables progress callbacks during analysis:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/builders/parallel_call_graph.rs:110-121
+parallel_graph.stats().increment_files();
+if let Some(ref callback) = self.config.progress_callback {
+    let processed = parallel_graph
+        .stats()
+        .files_processed
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let total = parallel_graph
+        .stats()
+        .total_files
+        .load(std::sync::atomic::Ordering::Relaxed);
+    callback(processed, total);
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="log-output-format"><a class="header" href="#log-output-format">Log Output Format</a></h3>
+<p>After analysis completes, debtmap reports final statistics:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/builders/parallel_call_graph.rs:84-92
+log::info!(
+    "Parallel call graph complete: {} nodes, {} edges, {} files processed",
+    stats.total_nodes.load(std::sync::atomic::Ordering::Relaxed),
+    stats.total_edges.load(std::sync::atomic::Ordering::Relaxed),
+    stats
+        .files_processed
+        .load(std::sync::atomic::Ordering::Relaxed),
+);
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Example output:</strong></p>
+<pre><code>INFO - Processing 1247 Rust files in parallel
+INFO - Progress: 100/1247 files processed
+INFO - Progress: 500/1247 files processed
+INFO - Progress: 1000/1247 files processed
+INFO - Parallel call graph complete: 8942 nodes, 23451 edges, 1247 files processed
+</code></pre>
+<h2 id="concurrent-merging"><a class="header" href="#concurrent-merging">Concurrent Merging</a></h2>
+<p>The <code>merge_concurrent()</code> method combines call graphs from different analysis phases using parallel iteration.</p>
+<h3 id="implementation"><a class="header" href="#implementation">Implementation</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:119-138
+pub fn merge_concurrent(&amp;self, other: CallGraph) {
+    // Parallelize node merging
+    let nodes_vec: Vec&lt;_&gt; = other.get_all_functions().collect();
+    nodes_vec.par_iter().for_each(|func_id| {
+        if let Some((is_entry, is_test, complexity, lines)) = other.get_function_info(func_id) {
+            self.add_function((*func_id).clone(), is_entry, is_test, complexity, lines);
+        }
+    });
+
+    // Parallelize edge merging
+    let calls_vec: Vec&lt;_&gt; = other.get_all_calls();
+    calls_vec.par_iter().for_each(|call| {
+        self.add_call(
+            call.caller.clone(),
+            call.callee.clone(),
+            call.call_type.clone(),
+        );
+    });
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Extract all nodes and edges from the source <code>CallGraph</code></li>
+<li>Use <code>par_iter()</code> to merge nodes in parallel</li>
+<li>Use <code>par_iter()</code> to merge edges in parallel</li>
+<li>DashMap/DashSet automatically handle concurrent insertions</li>
+</ol>
+<h3 id="converting-between-representations"><a class="header" href="#converting-between-representations">Converting Between Representations</a></h3>
+<p>Debtmap uses two call graph representations:</p>
+<ul>
+<li><strong>ParallelCallGraph</strong>: Concurrent data structures (DashMap/DashSet) for parallel construction</li>
+<li><strong>CallGraph</strong>: Sequential data structures (HashMap/HashSet) for analysis algorithms</li>
+</ul>
+<p>Conversion happens at phase boundaries:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// From src/priority/parallel_call_graph.rs:140-162
+pub fn to_call_graph(&amp;self) -&gt; CallGraph {
+    let mut call_graph = CallGraph::new();
+
+    // Add all nodes
+    for entry in self.nodes.iter() {
+        let node = entry.value();
+        call_graph.add_function(
+            node.id.clone(),
+            node.is_entry_point,
+            node.is_test,
+            node.complexity,
+            node.lines,
+        );
+    }
+
+    // Add all edges
+    for call in self.edges.iter() {
+        call_graph.add_call(call.clone());
+    }
+
+    call_graph
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Why two representations?</strong></p>
+<ul>
+<li><strong>ParallelCallGraph</strong>: Optimized for concurrent writes during construction</li>
+<li><strong>CallGraph</strong>: Optimized for graph algorithms (PageRank, connectivity, transitive reduction)</li>
+<li>Conversion overhead is negligible compared to analysis time</li>
+</ul>
+<h2 id="performance-tuning"><a class="header" href="#performance-tuning">Performance Tuning</a></h2>
+<h3 id="optimal-thread-count"><a class="header" href="#optimal-thread-count">Optimal Thread Count</a></h3>
+<p><strong>General rule:</strong> Use physical core count, not logical cores.</p>
+<pre><code class="language-bash"># Check physical core count
+lscpu | grep "Core(s) per socket"
+
+# macOS
+sysctl hw.physicalcpu
+</code></pre>
+<p><strong>Recommended settings:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>System</th><th>Cores</th><th>Recommended –jobs</th></tr></thead><tbody>
+<tr><td>Laptop</td><td>4</td><td>Default or 4</td></tr>
+<tr><td>Desktop</td><td>8</td><td>Default</td></tr>
+<tr><td>Workstation</td><td>16+</td><td>Default</td></tr>
+<tr><td>CI/CD</td><td>Varies</td><td>2-4 (shared resources)</td></tr>
+</tbody></table>
+</div>
+<h3 id="memory-considerations"><a class="header" href="#memory-considerations">Memory Considerations</a></h3>
+<p>Each thread requires memory for:</p>
+<ul>
+<li>AST parsing (~1-5 MB per file)</li>
+<li>Analysis state (~500 KB per file)</li>
+<li>Temporary buffers</li>
+</ul>
+<p><strong>Memory usage estimate:</strong></p>
+<pre><code>Total Memory ≈ (Thread Count) × (Average File Size) × 2-3
+</code></pre>
+<p><strong>Example (50 files, average 10 KB each, 8 threads):</strong></p>
+<pre><code>Memory ≈ 8 × 10 KB × 3 = 240 KB (negligible)
+</code></pre>
+<p>For very large files (&gt;1 MB), consider reducing thread count.</p>
+<h3 id="memory-vs-speed-tradeoffs"><a class="header" href="#memory-vs-speed-tradeoffs">Memory vs Speed Tradeoffs</a></h3>
+<p>Parallel processing uses more memory:</p>
+<div class="table-wrapper"><table><thead><tr><th>Configuration</th><th>Memory Overhead</th><th>Speed Benefit</th></tr></thead><tbody>
+<tr><td><code>--no-parallel</code></td><td>Baseline</td><td>Baseline</td></tr>
+<tr><td><code>--jobs 1</code></td><td>+10% (data structures)</td><td>1x</td></tr>
+<tr><td><code>--jobs 4</code></td><td>+30% (+ worker buffers)</td><td>4-6x</td></tr>
+<tr><td><code>--jobs 8</code></td><td>+50% (+ worker buffers)</td><td>6-10x</td></tr>
+<tr><td><code>--jobs 16</code></td><td>+80% (+ worker buffers)</td><td>10-15x</td></tr>
+</tbody></table>
+</div>
+<p><strong>Memory overhead sources:</strong></p>
+<ul>
+<li>DashMap internal sharding (~2x HashMap)</li>
+<li>Per-worker thread stacks and buffers</li>
+<li>Parallel iterator intermediates</li>
+</ul>
+<h3 id="io-bound-vs-cpu-bound"><a class="header" href="#io-bound-vs-cpu-bound">I/O Bound vs CPU Bound</a></h3>
+<p><strong>CPU-bound analysis (default):</strong></p>
+<ul>
+<li>Complexity calculations</li>
+<li>Pattern detection</li>
+<li>Risk scoring</li>
+</ul>
+<p>Parallel processing provides 4-8x speedup.</p>
+<p><strong>I/O-bound operations:</strong></p>
+<ul>
+<li>Reading files from disk</li>
+<li>Loading coverage data</li>
+</ul>
+<p>Limited speedup from parallelism (1.5-2x).</p>
+<p><strong>If analysis is I/O-bound:</strong></p>
+<ol>
+<li>Move cache to SSD</li>
+<li>Reduce thread count (less I/O contention)</li>
+<li>Use <code>--max-files</code> to limit scope</li>
+</ol>
+<h2 id="scaling-strategies"><a class="header" href="#scaling-strategies">Scaling Strategies</a></h2>
+<h3 id="small-projects-10k-loc"><a class="header" href="#small-projects-10k-loc">Small Projects (&lt;10k LOC)</a></h3>
+<pre><code class="language-bash"># Default settings are fine
+debtmap analyze .
+</code></pre>
+<p>Parallel overhead may exceed benefits. Consider <code>--no-parallel</code> if analysis is &lt;1 second.</p>
+<h3 id="medium-projects-10k-100k-loc"><a class="header" href="#medium-projects-10k-100k-loc">Medium Projects (10k-100k LOC)</a></h3>
+<pre><code class="language-bash"># Use all cores
+debtmap analyze .
+</code></pre>
+<p>Optimal parallel efficiency. Expect 4-8x speedup from parallelism.</p>
+<h3 id="large-projects-100k-loc"><a class="header" href="#large-projects-100k-loc">Large Projects (&gt;100k LOC)</a></h3>
+<pre><code class="language-bash"># Use all cores with optimized cache
+export DEBTMAP_CACHE_MAX_SIZE=5368709120  # 5GB
+debtmap analyze . --jobs 0  # 0 = all cores
+</code></pre>
+<p>Maximize cache size to avoid re-analysis.</p>
+<h3 id="cicd-environments"><a class="header" href="#cicd-environments">CI/CD Environments</a></h3>
+<pre><code class="language-bash"># Limit threads to avoid resource contention
+debtmap analyze . --jobs 2
+</code></pre>
+<p>CI environments often limit CPU cores per job.</p>
+<h3 id="scaling-behavior"><a class="header" href="#scaling-behavior">Scaling Behavior</a></h3>
+<p>Debtmap’s parallel processing scales with CPU core count:</p>
+<p><strong>Strong Scaling (Fixed Problem Size):</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>CPU Cores</th><th>Speedup</th><th>Efficiency</th></tr></thead><tbody>
+<tr><td>1</td><td>1x</td><td>100%</td></tr>
+<tr><td>2</td><td>1.8x</td><td>90%</td></tr>
+<tr><td>4</td><td>3.4x</td><td>85%</td></tr>
+<tr><td>8</td><td>6.2x</td><td>78%</td></tr>
+<tr><td>16</td><td>10.5x</td><td>66%</td></tr>
+<tr><td>32</td><td>16.8x</td><td>53%</td></tr>
+</tbody></table>
+</div>
+<p>Efficiency decreases at higher core counts due to:</p>
+<ul>
+<li>Synchronization overhead (atomic operations, DashMap locking)</li>
+<li>Memory bandwidth saturation</li>
+<li>Diminishing returns from Amdahl’s law (sequential portions)</li>
+</ul>
+<p><strong>Weak Scaling (Problem Size Grows with Cores):</strong></p>
+<p>Debtmap maintains high efficiency when problem size scales with core count, making it ideal for analyzing larger codebases on more powerful machines.</p>
+<h2 id="tuning-guidelines"><a class="header" href="#tuning-guidelines">Tuning Guidelines</a></h2>
+<p><strong>Development Workstations:</strong></p>
+<pre><code class="language-bash"># Use all cores for maximum speed
+debtmap analyze --jobs 0
+</code></pre>
+<p><strong>CI/CD Environments:</strong></p>
+<pre><code class="language-bash"># Limit threads to avoid resource contention
+debtmap analyze --jobs 2
+
+# Or disable parallelism on very constrained runners
+debtmap analyze --no-parallel
+</code></pre>
+<p><strong>Containers:</strong></p>
+<pre><code class="language-bash"># Auto-detection respects cgroup limits
+debtmap analyze --jobs 0
+
+# Or explicitly match container CPU allocation
+debtmap analyze --jobs 4
+</code></pre>
+<p><strong>Benchmarking:</strong></p>
+<pre><code class="language-bash"># Use fixed thread count for reproducible results
+debtmap analyze --jobs 8
+</code></pre>
+<h2 id="profiling-and-debugging"><a class="header" href="#profiling-and-debugging">Profiling and Debugging</a></h2>
+<h3 id="measure-analysis-time"><a class="header" href="#measure-analysis-time">Measure Analysis Time</a></h3>
+<pre><code class="language-bash">time debtmap analyze .
+</code></pre>
+<h3 id="disable-parallelism-for-debugging"><a class="header" href="#disable-parallelism-for-debugging">Disable Parallelism for Debugging</a></h3>
+<pre><code class="language-bash">debtmap analyze . --no-parallel -vv
+</code></pre>
+<p>Single-threaded mode with verbose output for debugging.</p>
+<h3 id="profile-thread-usage"><a class="header" href="#profile-thread-usage">Profile Thread Usage</a></h3>
+<p>Use system tools to monitor thread usage:</p>
+<pre><code class="language-bash"># Linux
+htop
+
+# macOS
+Activity Monitor (View &gt; CPU Usage &gt; Show Threads)
+</code></pre>
+<p>Look for:</p>
+<ul>
+<li>All cores at ~100% utilization (optimal)</li>
+<li>Some cores idle (I/O bound or insufficient work)</li>
+<li>Excessive context switching (too many threads)</li>
+</ul>
+<h3 id="finding-optimal-settings"><a class="header" href="#finding-optimal-settings">Finding Optimal Settings</a></h3>
+<p><strong>Finding the optimal setting:</strong></p>
+<pre><code class="language-bash"># Benchmark different configurations
+time debtmap analyze --jobs 0  # Auto
+time debtmap analyze --jobs 4  # 4 threads
+time debtmap analyze --jobs 8  # 8 threads
+time debtmap analyze --no-parallel  # Sequential
+</code></pre>
+<p>Monitor memory usage during analysis:</p>
+<pre><code class="language-bash"># Monitor peak memory usage
+/usr/bin/time -v debtmap analyze --jobs 8
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Use default settings</strong> - Debtmap auto-detects optimal thread count</li>
+<li><strong>Limit threads in CI</strong> - Use <code>--jobs 2</code> or <code>--jobs 4</code> in shared environments</li>
+<li><strong>Profile before tuning</strong> - Measure actual performance impact</li>
+<li><strong>Consider I/O</strong> - If using slow storage, reduce thread count</li>
+<li><strong>Cache aggressively</strong> - Large caches reduce repeated work</li>
+</ol>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="analysis-is-slow-despite-parallelism"><a class="header" href="#analysis-is-slow-despite-parallelism">Analysis is Slow Despite Parallelism</a></h3>
+<p><strong>Possible causes:</strong></p>
+<ol>
+<li>I/O bottleneck (slow disk)</li>
+<li>Cache disabled or cleared</li>
+<li>Excessive cache pruning</li>
+<li>Memory pressure (swapping)</li>
+</ol>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Move cache to SSD</li>
+<li>Increase <code>DEBTMAP_CACHE_MAX_SIZE</code></li>
+<li>Reduce thread count to avoid memory pressure</li>
+</ul>
+<h3 id="slow-analysis-performance"><a class="header" href="#slow-analysis-performance">Slow Analysis Performance</a></h3>
+<p>If analysis is slower than expected:</p>
+<ol>
+<li>
+<p><strong>Check thread count:</strong></p>
+<pre><code class="language-bash"># Ensure you're using all cores
+debtmap analyze --jobs 0 -vv | grep "threads"
+</code></pre>
+</li>
+<li>
+<p><strong>Check I/O bottleneck:</strong></p>
+<pre><code class="language-bash"># Use iotop or similar to check disk saturation
+# SSD storage significantly improves performance
+</code></pre>
+</li>
+<li>
+<p><strong>Check memory pressure:</strong></p>
+<pre><code class="language-bash"># Monitor memory usage during analysis
+top -p $(pgrep debtmap)
+</code></pre>
+</li>
+<li>
+<p><strong>Try different thread counts:</strong></p>
+<pre><code class="language-bash"># Sometimes less threads = less contention
+debtmap analyze --jobs 4
+</code></pre>
+</li>
+</ol>
+<h3 id="high-cpu-usage-but-no-progress"><a class="header" href="#high-cpu-usage-but-no-progress">High CPU Usage But No Progress</a></h3>
+<p><strong>Possible cause:</strong> Analyzing very complex files (large ASTs)</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Reduce thread count to avoid memory thrashing
+debtmap analyze . --jobs 2
+</code></pre>
+<h3 id="high-memory-usage"><a class="header" href="#high-memory-usage">High Memory Usage</a></h3>
+<p>If debtmap uses too much memory:</p>
+<ol>
+<li>
+<p><strong>Reduce parallelism:</strong></p>
+<pre><code class="language-bash">debtmap analyze --jobs 2
+</code></pre>
+</li>
+<li>
+<p><strong>Disable parallel call graph:</strong></p>
+<pre><code class="language-bash">debtmap analyze --no-parallel
+</code></pre>
+</li>
+<li>
+<p><strong>Analyze subdirectories separately:</strong></p>
+<pre><code class="language-bash"># Process codebase in chunks
+debtmap analyze src/module1
+debtmap analyze src/module2
+</code></pre>
+</li>
+</ol>
+<h3 id="inconsistent-results-between-runs"><a class="header" href="#inconsistent-results-between-runs">Inconsistent Results Between Runs</a></h3>
+<p><strong>Possible cause:</strong> Non-deterministic parallel aggregation (rare)</p>
+<p><strong>Solution:</strong></p>
+<pre><code class="language-bash"># Use single-threaded mode
+debtmap analyze . --no-parallel
+</code></pre>
+<p>If results differ, report as a bug.</p>
+<h3 id="debugging-concurrency-issues"><a class="header" href="#debugging-concurrency-issues">Debugging Concurrency Issues</a></h3>
+<p>If you suspect a concurrency bug:</p>
+<ol>
+<li>
+<p><strong>Run sequentially to isolate:</strong></p>
+<pre><code class="language-bash">debtmap analyze --no-parallel
+</code></pre>
+</li>
+<li>
+<p><strong>Use deterministic mode:</strong></p>
+<pre><code class="language-bash"># Single-threaded = deterministic order
+debtmap analyze --jobs 1
+</code></pre>
+</li>
+<li>
+<p><strong>Enable verbose logging:</strong></p>
+<pre><code class="language-bash">debtmap analyze -vvv --no-parallel &gt; debug.log 2&gt;&amp;1
+</code></pre>
+</li>
+<li>
+<p><strong>Report the issue:</strong>
+If behavior differs between <code>--no-parallel</code> and parallel mode, please <a href="https://github.com/yourusername/debtmap/issues">report it</a> with:</p>
+<ul>
+<li>Command used</li>
+<li>Platform (OS, CPU core count)</li>
+<li>Debtmap version</li>
+<li>Minimal reproduction case</li>
+</ul>
+</li>
+</ol>
+<h3 id="thread-contention-warning"><a class="header" href="#thread-contention-warning">Thread Contention Warning</a></h3>
+<p>If you see warnings about thread contention:</p>
+<pre><code>WARN - High contention detected on parallel call graph
+</code></pre>
+<p>This indicates too many threads competing for locks. Try:</p>
+<pre><code class="language-bash"># Reduce thread count
+debtmap analyze --jobs 4
+</code></pre>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="./cli-reference.html#performance--caching">CLI Reference - Performance &amp; Caching</a> - Complete flag documentation</li>
+<li><a href="cache-management.html">Cache Management</a> - Cache configuration for performance</li>
+<li><a href="configuration.html">Configuration</a> - Project-specific settings</li>
+<li><a href="troubleshooting.html">Troubleshooting</a> - General troubleshooting guide</li>
+<li><a href="./troubleshooting.html#slow-analysis-performance">Troubleshooting - Slow Analysis</a> - Performance debugging guide</li>
+<li><a href="./troubleshooting.html#high-memory-usage">Troubleshooting - High Memory Usage</a> - Memory optimization tips</li>
+<li><a href="./faq.html">FAQ - Reducing Parallelism</a> - Common questions about parallel processing</li>
+<li><a href="./architecture.html">Architecture</a> - High-level system design</li>
+</ul>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>Debtmap’s parallel processing architecture provides:</p>
+<ul>
+<li><strong>10-100x speedup</strong> over sequential analysis using Rayon parallel iterators</li>
+<li><strong>Lock-free concurrency</strong> with DashMap for minimal contention</li>
+<li><strong>Flexible configuration</strong> via <code>--jobs</code> and <code>--no-parallel</code> flags</li>
+<li><strong>Automatic thread pool tuning</strong> that respects system resources</li>
+<li><strong>Production-grade reliability</strong> with atomic progress tracking and concurrent merging</li>
+</ul>
+<p>The three-phase parallel pipeline (parse → extract → analyze) maximizes parallelism while maintaining correctness through carefully designed concurrent data structures.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="god-object-detection.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="prodigy-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="god-object-detection.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="prodigy-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

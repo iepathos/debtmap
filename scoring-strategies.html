@@ -190,14 +190,14 @@
 <h2 id="file-level-scoring"><a class="header" href="#file-level-scoring">File-Level Scoring</a></h2>
 <p>File-level scoring aggregates metrics across all functions in a file to identify architectural problems and module-level refactoring opportunities.</p>
 <h3 id="formula"><a class="header" href="#formula">Formula</a></h3>
-<pre><code>File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores
+<pre><code>File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores
 </code></pre>
 <p>Where each factor is calculated as:</p>
 <ul>
 <li><strong>Size</strong> = <code>sqrt(total_lines / 100)</code></li>
 <li><strong>Complexity</strong> = <code>(avg_complexity / 5.0) × sqrt(total_complexity / 50.0)</code></li>
-<li><strong>Coverage</strong> = <code>(1 - coverage_percent) × 2 + 1</code></li>
-<li><strong>Density</strong> = <code>max(1.0, function_count / 50)</code> if function_count &gt; 50</li>
+<li><strong>Coverage Multiplier</strong> = <code>1.0 - coverage_percent</code></li>
+<li><strong>Density</strong> = <code>1.0 + ((function_count - 50) × 0.02)</code> if function_count &gt; 50, else 1.0</li>
 <li><strong>GodObject</strong> = <code>2.0 + god_object_score</code> if detected</li>
 <li><strong>FunctionScores</strong> = <code>sum(function_scores) / 10</code></li>
 </ul>
@@ -214,17 +214,19 @@
 <li>Balances per-function and aggregate complexity</li>
 <li>Rationale: Both concentrated complexity and spread-out complexity matter</li>
 </ul>
-<p><strong>Coverage Factor</strong>: <code>(1 - coverage_percent) × 2 + 1</code></p>
+<p><strong>Coverage Multiplier</strong>: <code>1.0 - coverage_percent</code></p>
 <ul>
 <li>Lower coverage increases score multiplicatively</li>
-<li>Range: 1.0 (100% coverage) to 3.0 (0% coverage)</li>
-<li>Rationale: Untested files are riskier to refactor</li>
+<li>Range: 0.0 (100% coverage) to 1.0 (0% coverage)</li>
+<li>Rationale: Untested files amplify existing complexity and risk</li>
+<li>Note: Earlier versions used an additive “Coverage Factor” formula; current implementation uses multiplicative dampening</li>
 </ul>
 <p><strong>Density Factor</strong>: Penalizes files with excessive function count</p>
 <ul>
 <li>Triggers when function count &gt; 50</li>
-<li><code>max(1.0, function_count / 50)</code></li>
-<li>Rationale: Files with 100+ functions likely violate single responsibility</li>
+<li><code>1.0 + ((function_count - 50) × 0.02)</code> for function_count &gt; 50, else 1.0</li>
+<li>Creates a gradual linear increase: 51 functions = 1.02x, 75 functions = 1.50x, 100 functions = 2.0x</li>
+<li>Rationale: Files with many functions likely violate single responsibility</li>
 </ul>
 <p><strong>God Object Multiplier</strong>: <code>2.0 + god_object_score</code> when detected</p>
 <ul>
@@ -271,45 +273,65 @@ debtmap analyze . --aggregate-only --format markdown -o report.md
 </code></pre>
 <h3 id="aggregation-methods"><a class="header" href="#aggregation-methods">Aggregation Methods</a></h3>
 <p>Debtmap supports multiple aggregation methods for file-level scores, configurable via CLI or configuration file.</p>
-<p><strong>Weighted Sum (Default)</strong></p>
+<h4 id="weighted-sum-default"><a class="header" href="#weighted-sum-default">Weighted Sum (Default)</a></h4>
+<p><strong>Formula</strong>: <code>Σ(function_score × complexity_weight × coverage_weight)</code></p>
 <pre><code class="language-bash">debtmap analyze . --aggregation-method weighted_sum
 </code></pre>
 <p>Or via configuration:</p>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
 </code></pre>
+<p><strong>Characteristics</strong>:</p>
 <ul>
-<li>Weights functions by complexity and coverage</li>
-<li>Emphasizes high-impact functions</li>
-<li>Best for most use cases</li>
+<li>Weights functions by their complexity and coverage gaps</li>
+<li>Emphasizes high-impact functions over trivial ones</li>
+<li>Best for most use cases where you want to focus on significant issues</li>
 </ul>
-<p><strong>Simple Sum</strong></p>
+<p><strong>Best for</strong>: Standard codebases where you want proportional emphasis on complex, untested code</p>
+<h4 id="simple-sum"><a class="header" href="#simple-sum">Simple Sum</a></h4>
+<p><strong>Formula</strong>: <code>Σ(function_scores)</code></p>
 <pre><code class="language-toml">[aggregation]
 method = "sum"
 </code></pre>
+<p><strong>Characteristics</strong>:</p>
 <ul>
-<li>Adds all function scores directly</li>
-<li>Treats all functions equally</li>
-<li>Useful for broad overview</li>
+<li>Adds all function scores directly without weighting</li>
+<li>Treats all functions equally regardless of complexity</li>
+<li>Useful for broad overview and trend analysis</li>
 </ul>
-<p><strong>Logarithmic Sum</strong></p>
+<p><strong>Best for</strong>: Getting a raw count-based view of technical debt across all functions</p>
+<h4 id="logarithmic-sum"><a class="header" href="#logarithmic-sum">Logarithmic Sum</a></h4>
+<p><strong>Formula</strong>: <code>log(1 + Σ(function_scores))</code></p>
 <pre><code class="language-toml">[aggregation]
 method = "logarithmic_sum"
 </code></pre>
+<p><strong>Characteristics</strong>:</p>
 <ul>
-<li>Dampens impact of many small issues</li>
-<li><code>log(1 + sum_of_scores)</code></li>
-<li>Useful for legacy codebases with many minor issues</li>
+<li>Dampens impact of many small issues to prevent score explosion</li>
+<li>Prevents files with hundreds of minor issues from dominating</li>
+<li>Creates more balanced comparisons across files of different sizes</li>
 </ul>
-<p><strong>Max Plus Average</strong></p>
+<p><strong>Best for</strong>: Legacy codebases with many small issues where you want to avoid extreme scores</p>
+<h4 id="max-plus-average"><a class="header" href="#max-plus-average">Max Plus Average</a></h4>
+<p><strong>Formula</strong>: <code>max_score × 0.6 + avg_score × 0.4</code></p>
 <pre><code class="language-toml">[aggregation]
 method = "max_plus_average"
 </code></pre>
+<p><strong>Characteristics</strong>:</p>
 <ul>
-<li>Considers worst function plus average of others</li>
-<li><code>max_score × 0.6 + average_score × 0.4</code></li>
-<li>Balances worst-case and typical-case analysis</li>
+<li>Considers worst function (60%) plus average of all functions (40%)</li>
+<li>Balances worst-case and typical-case scenarios</li>
+<li>Highlights files with both a critical hot spot and general issues</li>
 </ul>
+<p><strong>Best for</strong>: Identifying files with concentrated complexity alongside general code quality concerns</p>
+<h4 id="choosing-an-aggregation-method"><a class="header" href="#choosing-an-aggregation-method">Choosing an Aggregation Method</a></h4>
+<div class="table-wrapper"><table><thead><tr><th>Codebase Type</th><th>Recommended Method</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>New/Modern</td><td><code>weighted_sum</code></td><td>Proportional emphasis on real issues</td></tr>
+<tr><td>Legacy with many small issues</td><td><code>logarithmic_sum</code></td><td>Prevents score explosion</td></tr>
+<tr><td>Mixed quality</td><td><code>max_plus_average</code></td><td>Balances hot spots with overall quality</td></tr>
+<tr><td>Trend analysis</td><td><code>sum</code></td><td>Simple, consistent metric over time</td></tr>
+</tbody></table>
+</div>
 <h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
@@ -324,10 +346,12 @@ max_responsibilities = 5
 <h2 id="function-level-scoring"><a class="header" href="#function-level-scoring">Function-Level Scoring</a></h2>
 <p>Function-level scoring identifies specific functions needing attention for targeted improvements.</p>
 <h3 id="formula-1"><a class="header" href="#formula-1">Formula</a></h3>
-<pre><code>Function Score = (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15)
-Final Score = Base Score × Role Multiplier
+<pre><code>Base Score = (Complexity × 0.40) + (Dependency × 0.20)
+Coverage Multiplier = 1.0 - coverage_percent
+Final Score = Base Score × Coverage Multiplier × Role Multiplier
 </code></pre>
-<p><strong>Note</strong>: These weights are configurable via the <code>[scoring]</code> section in <code>.debtmap.toml</code>. See <a href="#configuration">Configuration</a> below.</p>
+<p><strong>Note</strong>: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights for complexity and dependency are configurable via the <code>[scoring]</code> section in <code>.debtmap.toml</code>. See <a href="#configuration">Configuration</a> below.</p>
+<p><strong>Migration Note</strong>: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.</p>
 <h3 id="metrics"><a class="header" href="#metrics">Metrics</a></h3>
 <p><strong>Cyclomatic Complexity</strong></p>
 <ul>
@@ -351,15 +375,16 @@ Final Score = Base Score × Role Multiplier
 </ul>
 <p><strong>Role Multiplier</strong></p>
 <p>Functions are classified by role, and each role receives a multiplier based on its architectural importance:</p>
-<ul>
-<li><strong>Entry points</strong>: 1.5x - Public APIs, main functions, HTTP handlers</li>
-<li><strong>Pure logic / Business logic</strong>: 1.2x-1.3x - Core business rules and algorithms (multiplier increases with complexity)</li>
-<li><strong>Orchestrator</strong>: 0.8x - Functions that coordinate other functions</li>
-<li><strong>IO wrapper</strong>: 0.5x - Simple file/network I/O wrappers</li>
-<li><strong>Pattern match</strong>: 0.6x - Functions primarily doing pattern matching</li>
-<li><strong>Utility</strong>: 0.5x - Helper functions and utilities</li>
-</ul>
-<p><strong>Note</strong>: Role multipliers are configurable via the <code>[role_multipliers]</code> section in <code>.debtmap.toml</code>.</p>
+<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Multiplier</th><th>Description</th></tr></thead><tbody>
+<tr><td><strong>Pure logic</strong></td><td>1.2x</td><td>Core business rules and algorithms</td></tr>
+<tr><td><strong>Unknown</strong></td><td>1.0x</td><td>Functions without clear classification</td></tr>
+<tr><td><strong>Entry point</strong></td><td>0.9x</td><td>Public APIs, main functions, HTTP handlers</td></tr>
+<tr><td><strong>Orchestrator</strong></td><td>0.8x</td><td>Functions that coordinate other functions</td></tr>
+<tr><td><strong>IO wrapper</strong></td><td>0.7x</td><td>Simple file/network I/O wrappers</td></tr>
+<tr><td><strong>Pattern match</strong></td><td>0.6x</td><td>Functions primarily doing pattern matching</td></tr>
+</tbody></table>
+</div>
+<p><strong>Note</strong>: Role multipliers are configurable via the <code>[role_multipliers]</code> section in <code>.debtmap.toml</code>. The multipliers have been rebalanced to be less extreme than earlier versions - pure logic was reduced from 1.5x to 1.2x, while orchestrator and IO wrapper were increased to better reflect their importance in modern codebases.</p>
 <h3 id="use-cases-1"><a class="header" href="#use-cases-1">Use Cases</a></h3>
 <p><strong>1. Identifying Specific Hot Spots</strong></p>
 <pre><code class="language-bash"># Show top 20 functions needing attention
@@ -385,19 +410,35 @@ debtmap analyze . --lcov coverage.lcov --filter Testing --top 15
 debtmap analyze . --filter Performance --context --top 10
 </code></pre>
 <h3 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h3>
-<pre><code class="language-toml">[scoring]
-coverage = 0.50              # Weight for coverage gaps (default)
-complexity = 0.35            # Weight for complexity (default)
-dependency = 0.15            # Weight for dependency impact (default)
+<p>Complete configuration file example (<code>.debtmap.toml</code>):</p>
+<pre><code class="language-toml"># Scoring weights (current model uses coverage as multiplier, not additive)
+[scoring]
+complexity = 0.40            # Weight for complexity in base score
+dependency = 0.20            # Weight for dependency impact in base score
 
+# Role multipliers (applied to final score)
 [role_multipliers]
-entry_point = 1.5
-business_logic = 1.2
-pure_logic = 1.2
-orchestrator = 0.8
-io_wrapper = 0.7
-utility = 0.5
+pure_logic = 1.2             # Core business rules
+unknown = 1.0                # Unclassified functions
+entry_point = 0.9            # Public APIs, main functions
+orchestrator = 0.8           # Coordination functions
+io_wrapper = 0.7             # File/network I/O wrappers
+pattern_match = 0.6          # Pattern matching functions
+
+# Aggregation settings (for file-level scoring)
+[aggregation]
+method = "weighted_sum"      # Options: weighted_sum, sum, logarithmic_sum, max_plus_average
+min_problematic = 3          # Minimum number of problematic functions to report file
+
+# Normalization settings
+[normalization]
+linear_threshold = 10.0      # Scores below this use linear scaling
+logarithmic_threshold = 100.0 # Scores above this use logarithmic dampening
+sqrt_multiplier = 3.33       # Applied to mid-range scores
+log_multiplier = 10.0        # Applied to high scores
+show_raw_scores = true       # Display both normalized and raw scores
 </code></pre>
+<p><strong>Note</strong>: The configuration file must be named <code>.debtmap.toml</code> and placed in your project root.</p>
 <h2 id="when-to-use-each-approach"><a class="header" href="#when-to-use-each-approach">When to Use Each Approach</a></h2>
 <h3 id="use-file-level-scoring-when"><a class="header" href="#use-file-level-scoring-when">Use File-Level Scoring When:</a></h3>
 <p>✅ Planning architectural refactoring
@@ -470,17 +511,27 @@ normalize_results() - Score: 7.5 (0% coverage)
 <p><strong>Decision</strong>: Both file and functions need work. <strong>Solution</strong>: Add tests first (function-level), then consider splitting if complexity persists (file-level).</p>
 <h2 id="score-normalization"><a class="header" href="#score-normalization">Score Normalization</a></h2>
 <p>Both scoring approaches normalize to a 0-10 scale for consistency.</p>
-<h3 id="normalization-strategy"><a class="header" href="#normalization-strategy">Normalization Strategy</a></h3>
+<h3 id="normalization-strategies"><a class="header" href="#normalization-strategies">Normalization Strategies</a></h3>
+<p><strong>Default: Linear Clamping</strong></p>
+<p>The default normalization uses simple linear clamping:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>score_normalized = raw_score.clamp(0.0, 100.0)
+<span class="boring">}</span></code></pre></pre>
+<p>This ensures scores stay within the expected range without additional transformations.</p>
+<p><strong>Advanced: Multi-Phase Normalization</strong></p>
+<p>For more sophisticated normalization, debtmap provides <code>normalize_final_score_with_metadata</code> which uses different scaling for different score ranges:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>score_normalized = if raw_score &lt; 10.0 {
     raw_score  // Linear below 10
 } else if raw_score &lt; 100.0 {
-    sqrt(raw_score) × 3.33  // Square root 10-100
+    10.0 + (raw_score - 10.0).sqrt() × 3.33  // Square root 10-100
 } else {
-    log10(raw_score) × 10.0  // Logarithmic above 100
+    41.59 + (raw_score / 100.0).ln() × 10.0  // Logarithmic above 100
 }
 <span class="boring">}</span></code></pre></pre>
+<p>This multi-phase approach dampens extreme values while preserving distinctions in the normal range.</p>
 <h3 id="configuration-2"><a class="header" href="#configuration-2">Configuration</a></h3>
 <pre><code class="language-toml">[normalization]
 linear_threshold = 10.0       # Scores below this use linear scaling (1:1 mapping)
@@ -553,11 +604,11 @@ minimum_debt_score = 3.0
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="tiered-prioritization.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="prodigy-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="prodigy-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="tiered-prioritization.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -567,11 +618,11 @@ minimum_debt_score = 3.0
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="tiered-prioritization.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="prodigy-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="prodigy-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="tiered-prioritization.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

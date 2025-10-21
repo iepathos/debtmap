@@ -265,7 +265,15 @@ Creates a <code>debtmap.toml</code> configuration file in the current directory 
 </ul>
 <p><strong>Description:</strong>
 Similar to <code>analyze</code> but enforces thresholds defined in configuration file. Returns non-zero exit code if thresholds are exceeded, making it suitable for CI/CD integration.</p>
-<p>The <code>validate</code> command supports a focused subset of <code>analyze</code> options, primarily for output control, coverage integration, context-aware analysis, and display filtering. The validate command does not support <code>--threshold-complexity</code>, <code>--threshold-duplication</code>, or <code>--threshold-preset</code> flags (these are analyze-only). Instead, configure thresholds in the <code>.debtmap.toml</code> config file. Performance options like <code>--jobs</code>, <code>--cache-*</code>, and <code>--languages</code> are also not available in validate.</p>
+<p>The <code>validate</code> command supports a focused subset of <code>analyze</code> options, primarily for output control, coverage integration, context-aware analysis, and display filtering.</p>
+<p><strong>Note:</strong> The following <code>analyze</code> options are NOT available in the <code>validate</code> command:</p>
+<ul>
+<li><code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code> (configure these in <code>.debtmap.toml</code> instead)</li>
+<li><code>--jobs</code>, <code>--no-parallel</code> (performance tuning)</li>
+<li><code>--cache-*</code> options (caching control)</li>
+<li><code>--languages</code> (language filtering)</li>
+</ul>
+<p>Configure analysis thresholds in your <code>.debtmap.toml</code> configuration file for use with the <code>validate</code> command.</p>
 <p><strong>Exit Codes:</strong></p>
 <ul>
 <li><code>0</code> - Success (no errors, all thresholds passed)</li>

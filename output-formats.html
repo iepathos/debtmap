@@ -309,7 +309,12 @@ debtmap analyze . --plain
 <li>Machine-parseable structure</li>
 </ul>
 <blockquote>
-<p><strong>Note:</strong> Terminal output formatting (colors, symbols, etc.) can be customized internally via <code>FormattingConfig</code>. These customization options are currently not exposed through the CLI interface.</p>
+<p><strong>Note:</strong> Terminal output formatting can be customized via <code>FormattingConfig</code>, which controls color mode and emoji mode. The <code>--plain</code> flag uses this configuration to disable both colors and emoji. Additionally, you can control formatting through environment variables:</p>
+<ul>
+<li><code>NO_COLOR=1</code> - Disables colors (per <a href="https://no-color.org">no-color.org</a> standard)</li>
+<li><code>CLICOLOR=0</code> - Disables colors</li>
+<li><code>CLICOLOR_FORCE=1</code> - Forces colors even when output is not a terminal</li>
+</ul>
 </blockquote>
 <h3 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h3>
 <p>Control detail level with <code>-v</code> flags (can be repeated):</p>
@@ -1222,11 +1227,11 @@ fi
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="suppression-patterns.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="tiered-prioritization.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="architecture.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -1236,11 +1241,11 @@ fi
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="suppression-patterns.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="tiered-prioritization.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="architecture.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

@@ -1,0 +1,477 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Cache Management - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h1>
+<p>Debtmap includes a comprehensive caching system designed to significantly speed up repeated analyses, particularly beneficial for large codebases and CI/CD pipelines. The cache stores parsed ASTs, call graphs, analysis results, and file metrics to avoid redundant computation.</p>
+<h2 id="cache-location-and-configuration"><a class="header" href="#cache-location-and-configuration">Cache Location and Configuration</a></h2>
+<p>Debtmap uses a platform-specific, XDG-compliant cache directory structure by default. The cache location is determined by the following priority order:</p>
+<ol>
+<li><strong><code>DEBTMAP_CACHE_DIR</code></strong> environment variable (if set)</li>
+<li><strong><code>XDG_CACHE_HOME/debtmap</code></strong> (if XDG_CACHE_HOME is set)</li>
+<li><strong>Platform-specific defaults:</strong>
+<ul>
+<li>macOS: <code>~/Library/Caches/debtmap</code></li>
+<li>Linux: <code>~/.cache/debtmap</code></li>
+<li>Windows: <code>%LOCALAPPDATA%\debtmap</code></li>
+</ul>
+</li>
+<li><strong>Fallback:</strong> System temporary directory</li>
+</ol>
+<h3 id="cache-strategy"><a class="header" href="#cache-strategy">Cache Strategy</a></h3>
+<p>Debtmap supports two cache storage strategies:</p>
+<ul>
+<li><strong>Shared (default)</strong>: Stores cache in XDG-compliant shared directory</li>
+<li><strong>Custom</strong>: Stores cache in user-specified location via <code>DEBTMAP_CACHE_DIR</code></li>
+</ul>
+<h3 id="project-identification"><a class="header" href="#project-identification">Project Identification</a></h3>
+<p>To ensure cache isolation between different projects, debtmap generates a unique project ID using:</p>
+<ol>
+<li><strong>Git remote URL hash</strong> (preferred): SHA256 hash (first 16 characters) of the git remote origin URL</li>
+<li><strong>Absolute path hash</strong> (fallback): SHA256 hash (first 16 characters) of the project’s absolute path</li>
+</ol>
+<p>This ensures that different projects never share cached data, even when analyzed from the same machine.</p>
+<h2 id="cache-directory-structure"><a class="header" href="#cache-directory-structure">Cache Directory Structure</a></h2>
+<p>The cache directory contains several subdirectories, each serving a specific purpose:</p>
+<pre><code>debtmap/
+└── projects/
+    └── &lt;project-id&gt;/
+        ├── call_graphs/     # Cached call graph data
+        ├── analysis/        # Cached analysis results
+        ├── metadata/        # Cache metadata and indices
+        ├── temp/            # Temporary files during analysis
+        └── file_metrics/    # Cached file-level metrics
+</code></pre>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<p>Debtmap provides extensive cache configuration through environment variables:</p>
+<div class="table-wrapper"><table><thead><tr><th>Variable</th><th>Description</th><th>Default</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>DEBTMAP_CACHE_DIR</code></td><td>Custom cache directory path</td><td>Platform-specific</td><td><code>/tmp/my-cache</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_AUTO_PRUNE</code></td><td>Enable automatic cache pruning</td><td><code>true</code></td><td><code>true</code> or <code>false</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_MAX_SIZE</code></td><td>Maximum cache size in bytes</td><td><code>1073741824</code> (1GB)</td><td><code>524288000</code> (500MB)</td></tr>
+<tr><td><code>DEBTMAP_CACHE_MAX_AGE_DAYS</code></td><td>Maximum age for cache entries</td><td><code>30</code></td><td><code>7</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_MAX_ENTRIES</code></td><td>Maximum number of cache entries</td><td><code>10000</code></td><td><code>5000</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_PRUNE_PERCENTAGE</code></td><td>Percentage to remove when pruning (0.0-1.0)</td><td><code>0.25</code> (25%)</td><td><code>0.3</code> (30%)</td></tr>
+<tr><td><code>DEBTMAP_CACHE_STRATEGY</code></td><td>Pruning strategy (lru, lfu, fifo, age)</td><td><code>lru</code></td><td><code>lfu</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_SYNC_PRUNE</code></td><td>Use synchronous pruning (blocks)</td><td><code>false</code></td><td><code>true</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_SCOPE</code></td><td>Branch-specific cache scope</td><td>None</td><td><code>feature-branch</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="configuration-examples"><a class="header" href="#configuration-examples">Configuration Examples</a></h3>
+<pre><code class="language-bash"># Use a custom cache location
+export DEBTMAP_CACHE_DIR=/mnt/fast-ssd/debtmap-cache
+
+# Configure cache limits for CI environment
+export DEBTMAP_CACHE_MAX_SIZE=524288000  # 500MB
+export DEBTMAP_CACHE_MAX_AGE_DAYS=7      # 1 week
+export DEBTMAP_CACHE_STRATEGY=lru
+
+# Disable auto-pruning (manual control)
+export DEBTMAP_CACHE_AUTO_PRUNE=false
+
+# Branch-specific caching
+export DEBTMAP_CACHE_SCOPE="$(git branch --show-current)"
+</code></pre>
+<h2 id="command-line-options"><a class="header" href="#command-line-options">Command Line Options</a></h2>
+<p>Debtmap provides several CLI flags for cache management:</p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>--no-cache</code></td><td>Disable caching for this run (caching is enabled by default)</td></tr>
+<tr><td><code>--clear-cache</code></td><td>Clear cache before running analysis</td></tr>
+<tr><td><code>--force-cache-rebuild</code></td><td>Force cache rebuild (same as <code>--clear-cache</code>)</td></tr>
+<tr><td><code>--cache-stats</code></td><td>Show cache statistics and location</td></tr>
+<tr><td><code>--migrate-cache</code></td><td>Migrate cache from local to shared location</td></tr>
+<tr><td><code>--cache-location &lt;path&gt;</code></td><td>Specify custom cache location for this run</td></tr>
+</tbody></table>
+</div>
+<h3 id="cli-examples"><a class="header" href="#cli-examples">CLI Examples</a></h3>
+<pre><code class="language-bash"># Run analysis without using cache
+debtmap --no-cache
+
+# Clear cache and rebuild from scratch
+debtmap --clear-cache
+
+# View cache statistics
+debtmap --cache-stats
+
+# Use custom cache location for this run
+debtmap --cache-location /tmp/temp-cache
+
+# Migrate existing cache to shared location
+debtmap --migrate-cache
+</code></pre>
+<h2 id="automatic-pruning-strategies"><a class="header" href="#automatic-pruning-strategies">Automatic Pruning Strategies</a></h2>
+<p>Debtmap automatically prunes the cache when configured limits are exceeded. Four pruning strategies are available:</p>
+<h3 id="lru-least-recently-used---default"><a class="header" href="#lru-least-recently-used---default">LRU (Least Recently Used) - Default</a></h3>
+<p>Removes entries that haven’t been accessed recently. Best for general-purpose usage where recently analyzed code is more likely to be analyzed again.</p>
+<p><strong>When to use:</strong> Default choice for most development workflows and CI pipelines.</p>
+<pre><code class="language-bash">export DEBTMAP_CACHE_STRATEGY=lru
+</code></pre>
+<h3 id="lfu-least-frequently-used"><a class="header" href="#lfu-least-frequently-used">LFU (Least Frequently Used)</a></h3>
+<p>Removes entries with the lowest access count. Best when certain files are analyzed repeatedly while others are analyzed infrequently.</p>
+<p><strong>When to use:</strong> Projects with stable core modules that are analyzed frequently and peripheral code that changes rarely.</p>
+<pre><code class="language-bash">export DEBTMAP_CACHE_STRATEGY=lfu
+</code></pre>
+<h3 id="fifo-first-in-first-out"><a class="header" href="#fifo-first-in-first-out">FIFO (First In First Out)</a></h3>
+<p>Removes the oldest entries by creation time. Simpler strategy that doesn’t consider access patterns.</p>
+<p><strong>When to use:</strong> When you want predictable cache behavior or are testing cache performance.</p>
+<pre><code class="language-bash">export DEBTMAP_CACHE_STRATEGY=fifo
+</code></pre>
+<h3 id="age-based-only"><a class="header" href="#age-based-only">Age-Based Only</a></h3>
+<p>Only removes entries older than <code>DEBTMAP_CACHE_MAX_AGE_DAYS</code>. Does not prune based on size or entry count limits.</p>
+<p><strong>When to use:</strong> When disk space is not a concern but you want to ensure cache freshness.</p>
+<pre><code class="language-bash">export DEBTMAP_CACHE_STRATEGY=age
+</code></pre>
+<h2 id="default-configuration"><a class="header" href="#default-configuration">Default Configuration</a></h2>
+<p>When no environment variables are set, debtmap uses the following defaults:</p>
+<ul>
+<li><strong>Max size:</strong> 1GB (1,073,741,824 bytes)</li>
+<li><strong>Max age:</strong> 30 days</li>
+<li><strong>Max entries:</strong> 10,000 entries</li>
+<li><strong>Prune percentage:</strong> 25% (removes 25% of entries when limit is hit)</li>
+<li><strong>Strategy:</strong> LRU (Least Recently Used)</li>
+<li><strong>Auto-prune:</strong> Enabled</li>
+</ul>
+<h3 id="pruning-triggers"><a class="header" href="#pruning-triggers">Pruning Triggers</a></h3>
+<p>Automatic pruning is triggered when:</p>
+<ol>
+<li><strong>Cache size exceeds max_size_bytes</strong> - Immediate pruning</li>
+<li><strong>Entry count exceeds max_entries</strong> - Immediate pruning</li>
+<li><strong>Entries older than max_age_days exist</strong> - Periodic pruning (checked daily)</li>
+</ol>
+<p>When pruning is triggered, debtmap removes enough entries to bring the cache below the configured limits, plus an additional buffer (based on prune_percentage) to avoid frequent pruning.</p>
+<h2 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h2>
+<h3 id="cache-benefits"><a class="header" href="#cache-benefits">Cache Benefits</a></h3>
+<p>The cache system provides significant performance improvements:</p>
+<ul>
+<li><strong>Parsed ASTs:</strong> Avoid re-parsing source files that haven’t changed</li>
+<li><strong>Call graphs:</strong> Reuse expensive call graph computation</li>
+<li><strong>Analysis results:</strong> Skip redundant metric calculations</li>
+<li><strong>File metrics:</strong> Cache file-level complexity scores</li>
+</ul>
+<p><strong>Performance impact:</strong> Cache hits can reduce analysis time by 50-90% for large codebases, depending on the number of changed files.</p>
+<h3 id="best-practices-for-ci-environments"><a class="header" href="#best-practices-for-ci-environments">Best Practices for CI Environments</a></h3>
+<pre><code class="language-bash"># Example CI configuration for fast builds
+export DEBTMAP_CACHE_DIR=/ci-cache/debtmap
+export DEBTMAP_CACHE_MAX_SIZE=2147483648  # 2GB for CI
+export DEBTMAP_CACHE_MAX_AGE_DAYS=14      # 2 weeks
+export DEBTMAP_CACHE_STRATEGY=lru
+
+# Run analysis with cache
+debtmap --cache-stats  # Show cache hit rate
+</code></pre>
+<h3 id="background-vs-synchronous-pruning"><a class="header" href="#background-vs-synchronous-pruning">Background vs Synchronous Pruning</a></h3>
+<p>By default, cache pruning runs in a background thread, allowing analysis to continue without waiting for cleanup. This is optimal for development and CI environments.</p>
+<p>For testing or when you need deterministic behavior, use synchronous pruning:</p>
+<pre><code class="language-bash">export DEBTMAP_CACHE_SYNC_PRUNE=true
+</code></pre>
+<p><strong>Synchronous pruning:</strong> Blocks during cleanup, ensuring cache is pruned before analysis continues. Used automatically in test environments.</p>
+<p><strong>Background pruning (default):</strong> Spawns a separate thread for non-blocking cleanup. Analysis proceeds immediately while cleanup happens in parallel.</p>
+<h2 id="troubleshooting-cache-issues"><a class="header" href="#troubleshooting-cache-issues">Troubleshooting Cache Issues</a></h2>
+<h3 id="cache-taking-too-much-disk-space"><a class="header" href="#cache-taking-too-much-disk-space">Cache Taking Too Much Disk Space</a></h3>
+<p><strong>Problem:</strong> Cache directory is consuming excessive disk space.</p>
+<p><strong>Solutions:</strong></p>
+<pre><code class="language-bash"># Option 1: Reduce max cache size
+export DEBTMAP_CACHE_MAX_SIZE=524288000  # 500MB
+
+# Option 2: Clear cache manually
+debtmap --clear-cache
+
+# Option 3: Reduce max age
+export DEBTMAP_CACHE_MAX_AGE_DAYS=7
+
+# Option 4: Inspect current cache usage
+debtmap --cache-stats
+</code></pre>
+<h3 id="stale-cache-causing-incorrect-results"><a class="header" href="#stale-cache-causing-incorrect-results">Stale Cache Causing Incorrect Results</a></h3>
+<p><strong>Problem:</strong> Cache contains outdated data, causing analysis to report incorrect results.</p>
+<p><strong>Solutions:</strong></p>
+<pre><code class="language-bash"># Force cache rebuild
+debtmap --force-cache-rebuild
+
+# Or disable cache for this run
+debtmap --no-cache
+</code></pre>
+<h3 id="permission-errors"><a class="header" href="#permission-errors">Permission Errors</a></h3>
+<p><strong>Problem:</strong> Cannot write to cache directory.</p>
+<p><strong>Solutions:</strong></p>
+<pre><code class="language-bash"># Use a custom cache location with proper permissions
+export DEBTMAP_CACHE_DIR=$HOME/.local/cache/debtmap
+
+# Or check permissions on the default cache directory
+ls -la $(debtmap --cache-stats | grep "Cache location")
+</code></pre>
+<h3 id="inspecting-cache-statistics"><a class="header" href="#inspecting-cache-statistics">Inspecting Cache Statistics</a></h3>
+<p>Use <code>--cache-stats</code> to inspect cache health:</p>
+<pre><code class="language-bash">debtmap --cache-stats
+</code></pre>
+<p>This displays:</p>
+<ul>
+<li>Cache location path</li>
+<li>Total cache size</li>
+<li>Number of cached entries</li>
+<li>Cache hit rate (if available)</li>
+<li>Last pruning timestamp</li>
+</ul>
+<h3 id="debug-cache-issues"><a class="header" href="#debug-cache-issues">Debug Cache Issues</a></h3>
+<p>To debug cache-related issues, check:</p>
+<ol>
+<li>
+<p><strong>Cache directory exists and is writable:</strong></p>
+<pre><code class="language-bash">ls -la ~/.cache/debtmap  # Linux
+ls -la ~/Library/Caches/debtmap  # macOS
+</code></pre>
+</li>
+<li>
+<p><strong>Environment variables are set correctly:</strong></p>
+<pre><code class="language-bash">env | grep DEBTMAP_CACHE
+</code></pre>
+</li>
+<li>
+<p><strong>Project ID generation:</strong>
+Cache keys are based on project ID. Verify your project has a stable git remote or path.</p>
+</li>
+<li>
+<p><strong>File timestamps:</strong>
+Cache invalidation relies on file modification times. Ensure your build system doesn’t modify timestamps unexpectedly.</p>
+</li>
+</ol>
+<h2 id="cache-migration"><a class="header" href="#cache-migration">Cache Migration</a></h2>
+<p>If you previously used a local cache strategy and want to migrate to the shared XDG-compliant location:</p>
+<pre><code class="language-bash">debtmap --migrate-cache
+</code></pre>
+<p>This command:</p>
+<ol>
+<li>Identifies the old cache location</li>
+<li>Creates the new shared cache directory</li>
+<li>Copies cache data preserving metadata</li>
+<li>Verifies the migration was successful</li>
+</ol>
+<p>After migration, you can safely delete the old cache directory.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="context-providers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="context-providers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

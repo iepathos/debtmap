@@ -385,6 +385,96 @@ Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
 <li><strong>Cache location</strong>: <code>XDG_CACHE_HOME/debtmap</code> on Linux, <code>~/Library/Caches/debtmap</code> on macOS, <code>%LOCALAPPDATA%/debtmap</code> on Windows</li>
 <li><strong>What’s cached</strong>: Parsed ASTs and computed metrics for each file</li>
 <li><strong>Invalidation</strong>: Cache is automatically invalidated when files are modified</li>
+</ul>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<p>When you run <code>debtmap analyze .</code>, you’ll see output like this:</p>
+<pre><code>════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+════════════════════════════════════════════
+
+📊 ANALYSIS SUMMARY
+   Files analyzed: 47
+   Total functions: 234
+   Debt items found: 12
+   Analysis time: 3.2s
+
+🎯 TOP 5 RECOMMENDATIONS
+
+#1 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/parser.rs:38 parse_input()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: -3.7 risk reduction
+├─ WHY: Complex logic (cyclo=12) with 0% coverage
+└─ DETAILS: Function has 12 decision points with no test coverage.
+            Untested error paths could cause production failures.
+
+#2 SCORE: 7.2 [HIGH]
+├─ TEST GAP: ./src/analyzer/complexity.rs:145 calculate_entropy()
+├─ ACTION: Add 4 unit tests for edge cases
+├─ IMPACT: -2.8 risk reduction
+├─ WHY: Medium complexity (cyclo=8) with 35% coverage
+└─ DETAILS: Missing tests for error conditions and boundary cases.
+
+#3 SCORE: 5.8 [HIGH]
+├─ COMPLEXITY: ./src/io/formatter.rs:89 format_output()
+├─ ACTION: Extract 3 functions from 16 branches
+├─ IMPACT: -2.1 risk reduction
+├─ WHY: High complexity (cyclo=16, entropy=0.75)
+└─ DETAILS: Function handles multiple output formats with nested conditionals.
+            Consider extracting format-specific logic.
+
+════════════════════════════════════════════
+</code></pre>
+<p>With coverage integration (<code>--lcov</code>), you’ll see more detailed test gap analysis:</p>
+<pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info --top 3
+</code></pre>
+<pre><code>════════════════════════════════════════════
+    PRIORITY TECHNICAL DEBT FIXES
+    (Coverage-Integrated Analysis)
+════════════════════════════════════════════
+
+📊 ANALYSIS SUMMARY
+   Files analyzed: 47
+   Coverage: 68.5% lines, 54.2% branches
+   Critical gaps: 3
+   High-priority gaps: 7
+
+🎯 TOP 3 CRITICAL GAPS
+
+#1 SCORE: 9.1 [CRITICAL]
+├─ TEST GAP: ./src/core/state_machine.rs:67 transition_state()
+├─ COVERAGE: 0% (0/8 branches covered)
+├─ COMPLEXITY: 15 (high entropy: 0.82)
+├─ ACTION: Add 8 unit tests covering all state transitions
+├─ IMPACT: -4.5 risk reduction
+├─ WHY: Core business logic with complex branching, completely untested
+└─ CALL GRAPH: Called from 12 different code paths
+                5 of those callers are also untested
+
+#2 SCORE: 8.4 [CRITICAL]
+├─ TEST GAP: ./src/parser.rs:38 parse_input()
+├─ COVERAGE: 25% (2/8 branches covered)
+├─ COMPLEXITY: 12 (medium entropy: 0.61)
+├─ ACTION: Add 6 tests for untested error paths
+├─ IMPACT: -3.2 risk reduction
+└─ MISSING BRANCHES:
+    • Line 45: Error path for invalid syntax
+    • Line 52: Error path for unexpected EOF
+    • Line 58: Error path for malformed input
+    • Line 63: Edge case: empty input
+    • Line 68: Edge case: very large input
+    • Line 72: Edge case: special characters
+
+════════════════════════════════════════════
+</code></pre>
+<p><strong>Reading the output:</strong></p>
+<ul>
+<li><strong>Score</strong>: Risk score from 0-10 (higher = more urgent)</li>
+<li><strong>Tier</strong>: CRITICAL (8.0+), HIGH (5.0-7.9), MODERATE (2.0-4.9), LOW (&lt;2.0)</li>
+<li><strong>Location</strong>: File path, line number, and function name</li>
+<li><strong>Action</strong>: Specific steps to address the issue</li>
+<li><strong>Impact</strong>: Estimated risk reduction from taking action</li>
+<li><strong>Why</strong>: Rationale explaining why this is flagged</li>
 <li><strong>Management</strong>: Use <code>--clear-cache</code> to clear, <code>--no-cache</code> to skip, or <code>--cache-stats</code> to view statistics</li>
 </ul>
 <p><strong>Language support</strong>:</p>
@@ -393,7 +483,7 @@ Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
 <li><strong>Python</strong>: Partial support (complexity metrics, basic debt detection)</li>
 <li><strong>JavaScript/TypeScript</strong>: Partial support (complexity metrics, basic debt detection)</li>
 </ul>
-<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<h3 id="example-output-1"><a class="header" href="#example-output-1">Example Output</a></h3>
 <p>When you run <code>debtmap analyze .</code>, you’ll see output like this:</p>
 <pre><code>════════════════════════════════════════════
     PRIORITY TECHNICAL DEBT FIXES
@@ -588,7 +678,7 @@ debtmap analyze . --lcov coverage/lcov.info
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="why-debtmap.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -602,7 +692,7 @@ debtmap analyze . --lcov coverage/lcov.info
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="why-debtmap.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

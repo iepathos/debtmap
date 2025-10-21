@@ -458,6 +458,14 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
 <tr><td>Risk, Duplication, ErrorSwallowing</td><td>CodeQuality</td><td>Maintainability, reliability</td></tr>
 </tbody></table>
 </div>
+<p><strong>Language-Specific Debt Patterns:</strong></p>
+<p>Some debt patterns only apply to languages with specific features:</p>
+<ul>
+<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust, JavaScript, TypeScript)</li>
+<li><strong>AllocationInefficiency, ResourceLeak</strong>: Languages with manual memory management (Rust)</li>
+<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust, exceptions in Python/JS)</li>
+</ul>
+<p>Debtmap automatically applies only the relevant debt patterns for each language during analysis.</p>
 <h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
 <h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
 <p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
@@ -767,12 +775,12 @@ Final Score = Base Score × Role Multiplier
 </code></pre>
 <p>Uncovered complex code scores higher than uncovered simple code. Coverage dampens the score - well-tested code gets lower scores.</p>
 <p><strong>Dependency Factor</strong> (0-10 scale):
-Based on call graph analysis:</p>
+Based on call graph analysis with specific thresholds:</p>
 <ul>
-<li>High upstream caller count (many functions depend on this): 8-10</li>
-<li>On critical paths from entry points: 7-9</li>
-<li>Moderate dependencies: 4-6</li>
-<li>Isolated utilities: 1-3</li>
+<li><strong>High impact</strong> (score 8-10): 5+ upstream callers, or on critical path from entry point (adds 2-3 points)</li>
+<li><strong>Moderate impact</strong> (score 4-6): 2-4 upstream callers</li>
+<li><strong>Low impact</strong> (score 1-3): 0-1 upstream callers</li>
+<li><strong>Critical path bonus</strong>: Being on a critical path from an entry point adds 2-3 points to the base dependency score</li>
 </ul>
 <h4 id="default-weights"><a class="header" href="#default-weights">Default Weights</a></h4>
 <p>The scoring formula uses configurable weights (default values shown):</p>
@@ -999,8 +1007,14 @@ Calculation:
 <li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
 <li><strong>Technical debt</strong>: High codebase risk score</li>
 </ul>
-<p><strong>Note on well-tested functions:</strong>
-In unified scoring, well-tested complex code simply scores low (0-2.9 Minimal or 3-4.9 Low) due to coverage dampening - it’s not a separate category. The <code>minimal_count</code> in the distribution represents functions with unified scores 0-2.9, which includes well-tested complex code.</p>
+<p><strong>Note on minimal_count and well-tested functions:</strong></p>
+<p>In unified scoring, <code>minimal_count</code> represents all functions scoring 0-2.9, which naturally includes:</p>
+<ul>
+<li>Simple utility functions</li>
+<li>Helper functions with low complexity</li>
+<li><strong>Well-tested complex code</strong> that scores low due to coverage dampening</li>
+</ul>
+<p>This is not a special category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk. These functions are correctly de-prioritized because they’re well-managed, not because they need special handling.</p>
 <h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
 <p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis:</p>
 <pre><code class="language-json">{
@@ -1098,6 +1112,29 @@ In unified scoring, well-tested complex code simply scores low (0-2.9 Minimal or
   }
 }
 </code></pre>
+<h4 id="json-output-format-variants"><a class="header" href="#json-output-format-variants">JSON Output Format Variants</a></h4>
+<p>Debtmap supports two JSON output format variants for different integration needs:</p>
+<p><strong>Legacy Format (default):</strong></p>
+<ul>
+<li>Uses wrapper objects: <code>{"File": {...}}</code> and <code>{"Function": {...}}</code></li>
+<li>Compatible with existing tooling and scripts</li>
+<li>Shown in the JSON structure example above</li>
+</ul>
+<p><strong>Unified Format (spec 108 - future enhancement):</strong></p>
+<ul>
+<li>Uses consistent structure with <code>"type"</code> field discriminator</li>
+<li>Simpler parsing for new integrations</li>
+<li>Example structure:</li>
+</ul>
+<pre><code class="language-json">{
+  "type": "function",
+  "name": "process_data",
+  "file": "src/main.rs",
+  "line": 42,
+  "metrics": { /* ... */ }
+}
+</code></pre>
+<p><strong>Note:</strong> The unified format is currently an internal representation. If you need this format exposed as a CLI option, please open a feature request on GitHub. The legacy format remains the stable default for all current integrations.</p>
 <h3 id="reading-function-metrics"><a class="header" href="#reading-function-metrics">Reading Function Metrics</a></h3>
 <p><strong>Key fields:</strong></p>
 <ul>
@@ -1750,10 +1787,11 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 </ul>
 <p><strong>Unsupported Languages:</strong></p>
 <p>Debtmap’s <code>Language</code> enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
+<p>Files with extensions like <code>.cpp</code> (C++), <code>.java</code>, <code>.go</code>, <code>.rb</code> (Ruby), <code>.php</code>, <code>.cs</code> (C#), <code>.swift</code>, <code>.kt</code> (Kotlin), <code>.scala</code>, and others are silently filtered during discovery.</p>
 <p><strong>File filtering behavior:</strong></p>
 <ul>
 <li>Discovery scans project for files matching supported extensions</li>
-<li>Unsupported files (<code>.cpp</code>, <code>.java</code>, <code>.go</code>, etc.) are skipped silently</li>
+<li>Unsupported files are skipped silently (no warnings or errors)</li>
 <li>No analysis, metrics, or debt patterns are generated for filtered files</li>
 <li>Use <code>--languages</code> flag to explicitly control which languages to analyze</li>
 </ul>
@@ -2288,6 +2326,11 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
 <li>Target overhead: ≤3x (maintained through optimizations)</li>
 <li>Example timing: 53ms baseline → 130ms with coverage (2.45x overhead)</li>
 <li>Overhead includes index build + lookups + coverage propagation</li>
+</ul>
+<p><strong>When to use coverage integration:</strong></p>
+<ul>
+<li><strong>Skip coverage</strong> (faster iteration): For rapid development iteration or quick local checks, omit <code>--lcov</code> to get baseline results 2.5x faster</li>
+<li><strong>Include coverage</strong> (comprehensive analysis): Use coverage integration for final validation, sprint planning, and CI/CD gates where comprehensive risk analysis is needed</li>
 </ul>
 <p><strong>Thread Safety:</strong></p>
 <ul>

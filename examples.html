@@ -231,6 +231,9 @@ debtmap analyze . --lcov target/coverage/lcov.info
 # Or use the shorter alias
 debtmap analyze . --coverage-file target/coverage/lcov.info
 </code></pre>
+<blockquote>
+<p><strong>Note</strong>: <code>--lcov</code> is an alias for <code>--coverage-file</code> - both work identically.</p>
+</blockquote>
 <p><strong>What this does:</strong></p>
 <ul>
 <li>Functions with 0% coverage and high complexity get marked as <code>[CRITICAL]</code></li>
@@ -249,6 +252,12 @@ debtmap analyze . --threshold-preset strict    # Strict standards
 debtmap analyze . --threshold-preset balanced  # Default balanced
 debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 </code></pre>
+<p><strong>Preset configurations:</strong></p>
+<ul>
+<li><strong>Strict</strong>: Lower thresholds for high quality standards (good for new projects)</li>
+<li><strong>Balanced</strong>: Default thresholds suitable for typical projects</li>
+<li><strong>Lenient</strong>: Higher thresholds designed for legacy codebases with existing technical debt</li>
+</ul>
 <h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
 <p>Identify classes and modules with too many responsibilities:</p>
 <pre><code class="language-bash"># Standard analysis includes god object detection
@@ -558,21 +567,18 @@ jobs:
     # Install debtmap
     - cargo install debtmap
 
-    # Run tests with coverage
+    # Run tests with coverage (generates LCOV format)
     - cargo install cargo-tarpaulin
     - cargo tarpaulin --out Lcov
 
-    # Validate with debtmap
+    # Validate with debtmap (using LCOV format)
     - debtmap validate .
-        --coverage-file cobertura.xml
+        --coverage-file lcov.info
         --format json
         --output debtmap-report.json
   artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: cobertura.xml
     paths:
+      - lcov.info
       - debtmap-report.json
     expire_in: 1 week
 </code></pre>
@@ -729,6 +735,13 @@ debtmap analyze . --format json --output-format legacy
 # Output format options: terminal, json, markdown
 debtmap analyze . --format terminal
 </code></pre>
+<p><strong>Unified vs Legacy JSON Formats:</strong></p>
+<p>The unified format provides a consistent structure with a <code>type</code> field to distinguish between different item types, replacing the File/Function wrapper objects used in legacy format.</p>
+<ul>
+<li><strong>Unified format</strong>: Cleaner schema, consistent structure across all items, easier to parse programmatically</li>
+<li><strong>Legacy format</strong>: Default for backward compatibility with existing tooling and scripts</li>
+</ul>
+<p>Use unified format for new integrations and tools. Use legacy format when working with existing debtmap analysis pipelines.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
 <h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
 <p>Enable advanced context providers for more accurate prioritization:</p>
@@ -750,13 +763,13 @@ debtmap analyze . --multi-pass --attribution
 </code></pre>
 <h3 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h3>
 <pre><code class="language-bash"># Show cache statistics
-debtmap cache stats
+debtmap analyze . --cache-stats
 
-# Clear cache for current project
-debtmap cache clear
+# Clear cache before analysis
+debtmap analyze . --clear-cache
 
-# Prune old cache entries
-debtmap cache prune --max-age-days 7
+# Force cache rebuild
+debtmap analyze . --force-cache-rebuild
 </code></pre>
 <h3 id="aggregation-methods"><a class="header" href="#aggregation-methods">Aggregation Methods</a></h3>
 <pre><code class="language-bash"># Use logarithmic sum for aggregation
@@ -837,9 +850,28 @@ dependency = 0.20    # Dependency criticality
 <h3 id="god-object-detection-tuning"><a class="header" href="#god-object-detection-tuning">God Object Detection Tuning</a></h3>
 <pre><code class="language-toml">[god_object]
 enabled = true
-max_methods = 20
+
+# Rust-specific thresholds
+[god_object.rust]
+max_methods = 25
 max_fields = 15
-max_responsibilities = 5
+max_traits = 5
+max_lines = 400
+max_complexity = 50
+
+# Python-specific thresholds
+[god_object.python]
+max_methods = 20
+max_fields = 12
+max_lines = 350
+max_complexity = 45
+
+# JavaScript/TypeScript-specific thresholds
+[god_object.javascript]
+max_methods = 20
+max_fields = 12
+max_lines = 300
+max_complexity = 40
 </code></pre>
 <h3 id="external-api-configuration"><a class="header" href="#external-api-configuration">External API Configuration</a></h3>
 <p>For libraries (not CLI tools):</p>
@@ -1020,11 +1052,11 @@ debtmap compare \
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="prodigy-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="tiered-prioritization.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="troubleshooting.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="faq.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -1034,11 +1066,11 @@ debtmap compare \
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="prodigy-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="tiered-prioritization.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="troubleshooting.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="faq.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

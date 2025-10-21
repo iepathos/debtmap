@@ -1,0 +1,694 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Coverage Integration - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h1>
+<p>Coverage integration is one of Debtmap’s most powerful capabilities, enabling <strong>risk-based prioritization</strong> by correlating complexity metrics with test coverage. This helps you identify truly risky code—functions that are both complex and untested—rather than just highlighting complex but well-tested functions.</p>
+<h2 id="why-coverage-matters"><a class="header" href="#why-coverage-matters">Why Coverage Matters</a></h2>
+<p>Without coverage data, complexity analysis shows you <em>what’s complex</em>, but not <em>what’s risky</em>. A complex function with 100% test coverage poses far less risk than a simple function with 0% coverage on a critical path.</p>
+<p>Coverage integration transforms Debtmap from a complexity analyzer into a <strong>risk assessment tool</strong>:</p>
+<ul>
+<li><strong>Prioritize testing efforts</strong>: Focus on high-complexity functions with low coverage</li>
+<li><strong>Validate refactoring safety</strong>: See which complex code is already protected by tests</li>
+<li><strong>Risk-based sprint planning</strong>: Surface truly risky code ahead of well-tested complexity</li>
+<li><strong>Quantify risk reduction</strong>: Measure how coverage improvements reduce project risk</li>
+</ul>
+<h2 id="lcov-format-the-universal-standard"><a class="header" href="#lcov-format-the-universal-standard">LCOV Format: The Universal Standard</a></h2>
+<p>Debtmap uses the <strong>LCOV format</strong> for coverage data. LCOV is a language-agnostic standard supported by virtually all coverage tools across all major languages.</p>
+<h3 id="why-lcov"><a class="header" href="#why-lcov">Why LCOV?</a></h3>
+<ul>
+<li><strong>Universal compatibility</strong>: Works with Rust, Python, JavaScript, TypeScript, Go, and more</li>
+<li><strong>Tool independence</strong>: Not tied to any specific test framework</li>
+<li><strong>Simple text format</strong>: Easy to inspect and debug</li>
+<li><strong>Widely supported</strong>: Generated by most modern coverage tools</li>
+</ul>
+<h3 id="lcov-file-structure"><a class="header" href="#lcov-file-structure">LCOV File Structure</a></h3>
+<p>An LCOV file contains line-by-line coverage information:</p>
+<pre><code class="language-lcov">SF:src/analyzer.rs
+FN:42,calculate_complexity
+FNDA:15,calculate_complexity
+DA:42,15
+DA:43,15
+DA:44,12
+DA:45,0
+LH:3
+LF:4
+end_of_record
+</code></pre>
+<ul>
+<li><code>SF:</code> - Source file path</li>
+<li><code>FN:</code> - Function name and starting line</li>
+<li><code>FNDA:</code> - Function execution count</li>
+<li><code>DA:</code> - Line execution data (line number, hit count)</li>
+<li><code>LH:</code> - Lines hit</li>
+<li><code>LF:</code> - Lines found (total)</li>
+</ul>
+<h2 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h2>
+<h3 id="rust-cargo-tarpaulin"><a class="header" href="#rust-cargo-tarpaulin">Rust: cargo-tarpaulin</a></h3>
+<p><strong>Installation:</strong></p>
+<pre><code class="language-bash">cargo install cargo-tarpaulin
+</code></pre>
+<p><strong>Generate LCOV:</strong></p>
+<pre><code class="language-bash">cargo tarpaulin --out lcov --output-dir target/coverage
+</code></pre>
+<p><strong>Analyze with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
+</code></pre>
+<p><strong>Common Issues:</strong></p>
+<ul>
+<li>Ensure tests compile before running tarpaulin</li>
+<li>Use <code>--ignore-tests</code> if tests themselves show up in coverage</li>
+<li>Check paths match your project structure (relative to project root)</li>
+</ul>
+<h3 id="javascripttypescript-jest"><a class="header" href="#javascripttypescript-jest">JavaScript/TypeScript: Jest</a></h3>
+<p><strong>Configuration (package.json or jest.config.js):</strong></p>
+<pre><code class="language-json">{
+  "jest": {
+    "coverageReporters": ["lcov", "text"]
+  }
+}
+</code></pre>
+<p><strong>Generate Coverage:</strong></p>
+<pre><code class="language-bash">npm test -- --coverage
+</code></pre>
+<p><strong>Analyze with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage/lcov.info
+</code></pre>
+<h3 id="python-pytest-cov"><a class="header" href="#python-pytest-cov">Python: pytest-cov</a></h3>
+<p><strong>Installation:</strong></p>
+<pre><code class="language-bash">pip install pytest-cov
+</code></pre>
+<p><strong>Generate LCOV:</strong></p>
+<pre><code class="language-bash">pytest --cov=src --cov-report=lcov
+</code></pre>
+<p><strong>Analyze with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov
+</code></pre>
+<h3 id="go-go-test-with-gocover-cobertura"><a class="header" href="#go-go-test-with-gocover-cobertura">Go: go test with gocover-cobertura</a></h3>
+<p><strong>Generate Coverage:</strong></p>
+<pre><code class="language-bash">go test -coverprofile=coverage.out ./...
+gocover-cobertura &lt; coverage.out &gt; coverage.xml
+# Convert to LCOV using lcov tools
+</code></pre>
+<p><strong>Note</strong>: Go’s native coverage format requires conversion. Most CI systems support LCOV conversion plugins.</p>
+<h2 id="how-coverage-affects-scoring"><a class="header" href="#how-coverage-affects-scoring">How Coverage Affects Scoring</a></h2>
+<p>Coverage data impacts Debtmap’s unified scoring system in two ways: the <strong>coverage factor</strong> and <strong>coverage dampening</strong>.</p>
+<h3 id="coverage-factor-40-weight"><a class="header" href="#coverage-factor-40-weight">Coverage Factor (40% Weight)</a></h3>
+<p>The coverage factor contributes <strong>40%</strong> to the unified debt score:</p>
+<pre><code>Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
+</code></pre>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>0% coverage → Factor = 10.0 (maximum penalty)</li>
+<li>50% coverage → Factor = 5.0 (moderate penalty)</li>
+<li>100% coverage → Factor = 0.0 (no penalty)</li>
+</ul>
+<p><strong>Special Cases:</strong></p>
+<ul>
+<li><strong>Test functions</strong>: Coverage factor = 0 (tests don’t need their own coverage)</li>
+<li><strong>No coverage data</strong>: Assumes worst case (factor = 10.0)</li>
+<li><strong>Entry points</strong>: Weighted at 0.6x (entry points naturally have low coverage)</li>
+</ul>
+<h3 id="coverage-dampening-score-multiplier"><a class="header" href="#coverage-dampening-score-multiplier">Coverage Dampening (Score Multiplier)</a></h3>
+<p>After base scores are calculated, coverage <em>dampens</em> the final debt score:</p>
+<pre><code>Final Score = Base Score × (1.0 - coverage_percentage)
+</code></pre>
+<p><strong>Examples:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Base Score</th><th>Coverage</th><th>Multiplier</th><th>Final Score</th><th>Priority</th></tr></thead><tbody>
+<tr><td>8.5</td><td>100%</td><td>0.0</td><td>0.0</td><td>Minimal (well-tested)</td></tr>
+<tr><td>8.5</td><td>50%</td><td>0.5</td><td>4.25</td><td>Medium</td></tr>
+<tr><td>8.5</td><td>0%</td><td>1.0</td><td>8.5</td><td>High (untested)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Key Insight</strong>: Complex but well-tested code automatically drops in priority, while untested complex code rises to the top.</p>
+<p><strong>Invariant</strong>: Total debt score with coverage ≤ total debt score without coverage.</p>
+<h2 id="transitive-coverage-propagation"><a class="header" href="#transitive-coverage-propagation">Transitive Coverage Propagation</a></h2>
+<p>Debtmap doesn’t just look at <em>direct</em> coverage—it propagates coverage through the <strong>call graph</strong> using transitive analysis.</p>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
+<p>A function’s effective coverage considers:</p>
+<ol>
+<li><strong>Direct coverage</strong>: Lines executed by tests</li>
+<li><strong>Caller coverage</strong>: Coverage of functions that call this function</li>
+</ol>
+<pre><code>Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
+</code></pre>
+<h3 id="why-it-matters"><a class="header" href="#why-it-matters">Why It Matters</a></h3>
+<p>A function with 0% direct coverage might have high transitive coverage if it’s only called by well-tested functions:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// direct_coverage = 0%
+// But called only by `process_request` (100% coverage)
+// → transitive_coverage = 85%
+fn validate_input(data: &amp;str) -&gt; bool {
+    data.len() &gt; 0
+}
+
+// direct_coverage = 100%
+fn process_request(input: String) -&gt; Result&lt;()&gt; {
+    if !validate_input(&amp;input) {
+        return Err("Invalid");
+    }
+    // ...
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Effect</strong>: <code>validate_input</code> has reduced urgency because it’s only reachable through well-tested code paths.</p>
+<h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
+<p>Coverage integration is highly optimized for large codebases:</p>
+<ul>
+<li><strong>Index Build</strong>: O(n), ~20-30ms for 5,000 functions</li>
+<li><strong>Exact Lookup</strong>: O(1), ~0.5μs per lookup</li>
+<li><strong>Fallback Lookup</strong>: O(log n), ~5-8μs when exact match fails</li>
+<li><strong>Memory Usage</strong>: ~200 bytes per record (~2MB for 5,000 functions)</li>
+<li><strong>Thread Safety</strong>: Lock-free parallel access via <code>Arc&lt;CoverageIndex&gt;</code></li>
+<li><strong>Analysis Overhead</strong>: ~2.5x baseline (target: ≤3x)</li>
+</ul>
+<p><strong>Result</strong>: Coverage integration adds minimal overhead even on projects with thousands of functions.</p>
+<h2 id="cli-options-reference"><a class="header" href="#cli-options-reference">CLI Options Reference</a></h2>
+<h3 id="primary-coverage-options"><a class="header" href="#primary-coverage-options">Primary Coverage Options</a></h3>
+<pre><code class="language-bash"># Provide LCOV coverage file
+debtmap analyze . --coverage-file path/to/lcov.info
+
+# Shorthand alias
+debtmap analyze . --lcov path/to/lcov.info
+</code></pre>
+<h3 id="context-providers"><a class="header" href="#context-providers">Context Providers</a></h3>
+<p>Coverage can be combined with other context providers for nuanced risk assessment:</p>
+<pre><code class="language-bash"># Enable all context providers (includes coverage propagation)
+debtmap analyze . --lcov coverage.info --enable-context
+
+# Specify specific providers
+debtmap analyze . --lcov coverage.info \
+  --context-providers critical_path,dependency,git_history
+
+# Disable specific providers
+debtmap analyze . --lcov coverage.info \
+  --disable-context git_history
+</code></pre>
+<p><strong>Available Context Providers</strong>:</p>
+<ul>
+<li><code>critical_path</code>: Identifies functions on critical execution paths</li>
+<li><code>dependency</code>: Analyzes dependency relationships and impact</li>
+<li><code>git_history</code>: Uses change frequency from version control</li>
+</ul>
+<p>See <a href="scoring-strategies.html">Scoring Strategies</a> for details on how these combine.</p>
+<h3 id="validate-command-support"><a class="header" href="#validate-command-support">Validate Command Support</a></h3>
+<p>The <code>validate</code> command also supports coverage integration for risk-based quality gates:</p>
+<pre><code class="language-bash"># Fail CI builds if untested complex code exceeds thresholds
+debtmap validate . --lcov coverage.info --max-debt-density 50
+</code></pre>
+<p>See <a href="cli-reference.html">CLI Reference</a> for complete validation options.</p>
+<h2 id="troubleshooting-coverage-integration"><a class="header" href="#troubleshooting-coverage-integration">Troubleshooting Coverage Integration</a></h2>
+<h3 id="coverage-not-correlating-with-functions"><a class="header" href="#coverage-not-correlating-with-functions">Coverage Not Correlating with Functions</a></h3>
+<p><strong>Symptoms</strong>:</p>
+<ul>
+<li>Debtmap shows 0% coverage for all functions</li>
+<li>Warning: “No coverage data correlated with analyzed functions”</li>
+</ul>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li><strong>Verify LCOV Format</strong>:</li>
+</ol>
+<pre><code class="language-bash">head coverage.info
+# Should show: SF:, FN:, DA: lines
+</code></pre>
+<ol start="2">
+<li><strong>Check Path Matching</strong>:
+Coverage file paths must be relative to project root:</li>
+</ol>
+<pre><code class="language-bash"># Good: SF:src/analyzer.rs
+# Bad:  SF:/home/user/project/src/analyzer.rs
+</code></pre>
+<ol start="3">
+<li><strong>Enable Verbose Logging</strong>:</li>
+</ol>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.info -vv
+</code></pre>
+<p>This shows coverage lookup details for each function.</p>
+<ol start="4">
+<li><strong>Verify Coverage Tool Output</strong>:</li>
+</ol>
+<pre><code class="language-bash"># Ensure your coverage tool generated line data (DA: records)
+grep "^DA:" coverage.info | head
+</code></pre>
+<h3 id="functions-still-show-up-despite-100-coverage"><a class="header" href="#functions-still-show-up-despite-100-coverage">Functions Still Show Up Despite 100% Coverage</a></h3>
+<p><strong>This is expected behavior</strong> when:</p>
+<ul>
+<li>Function has high complexity (cyclomatic &gt; 10)</li>
+<li>Function has other debt issues (duplication, nesting, etc.)</li>
+<li>You’re viewing function-level output (coverage dampens but doesn’t eliminate)</li>
+</ul>
+<p><strong>Coverage reduces priority but doesn’t hide issues</strong>. Use filters to focus:</p>
+<pre><code class="language-bash"># Show only critical and high priority items
+debtmap analyze . --lcov coverage.info --min-priority high
+
+# Show top 10 most urgent items
+debtmap analyze . --lcov coverage.info --top 10
+</code></pre>
+<h3 id="coverage-file-path-issues"><a class="header" href="#coverage-file-path-issues">Coverage File Path Issues</a></h3>
+<p><strong>Problem</strong>: Can’t find coverage file</p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Use absolute path
+debtmap analyze . --lcov /absolute/path/to/coverage.info
+
+# Or ensure relative path is from project root
+debtmap analyze . --lcov ./target/coverage/lcov.info
+</code></pre>
+<h3 id="lcov-format-errors"><a class="header" href="#lcov-format-errors">LCOV Format Errors</a></h3>
+<p><strong>Problem</strong>: “Invalid LCOV format” error</p>
+<p><strong>Causes</strong>:</p>
+<ul>
+<li>Non-LCOV format (Cobertura XML, JaCoCo, etc.)</li>
+<li>Corrupted file</li>
+<li>Wrong file encoding</li>
+</ul>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify your coverage tool is configured for LCOV output</li>
+<li>Check for binary/encoding issues: <code>file coverage.info</code></li>
+<li>Regenerate coverage with explicit LCOV format flag</li>
+</ul>
+<p>See <a href="troubleshooting.html">Troubleshooting</a> for more debugging tips.</p>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="analysis-workflow"><a class="header" href="#analysis-workflow">Analysis Workflow</a></h3>
+<ol>
+<li>
+<p><strong>Generate Coverage Before Analysis</strong>:</p>
+<pre><code class="language-bash"># Rust example
+cargo tarpaulin --out lcov --output-dir target/coverage
+debtmap analyze . --lcov target/coverage/lcov.info
+</code></pre>
+</li>
+<li>
+<p><strong>Use Coverage for Sprint Planning</strong>:</p>
+<pre><code class="language-bash"># Focus on untested complex code
+debtmap analyze . --lcov coverage.info --top 20
+</code></pre>
+</li>
+<li>
+<p><strong>Combine with Tiered Prioritization</strong>:
+Coverage automatically feeds into <a href="tiered-prioritization.html">Tiered Prioritization</a>:</p>
+<ul>
+<li><strong>Tier 1</strong>: Architectural issues (less affected by coverage)</li>
+<li><strong>Tier 2</strong>: Complex untested code (coverage &lt; 50%, complexity &gt; 15)</li>
+<li><strong>Tier 3</strong>: Testing gaps (coverage &lt; 80%, complexity 10-15)</li>
+</ul>
+</li>
+<li>
+<p><strong>Validate Refactoring Impact</strong>:</p>
+<pre><code class="language-bash"># Before refactoring
+debtmap analyze . --lcov coverage-before.info -o before.json
+
+# After refactoring
+debtmap analyze . --lcov coverage-after.info -o after.json
+
+# Compare
+debtmap compare --before before.json --after after.json
+</code></pre>
+</li>
+</ol>
+<h3 id="testing-strategy"><a class="header" href="#testing-strategy">Testing Strategy</a></h3>
+<p><strong>Prioritize testing based on risk</strong>:</p>
+<ol>
+<li>
+<p><strong>High Complexity + Low Coverage = Highest Priority</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.info \
+  --filter Risk --min-priority high
+</code></pre>
+</li>
+<li>
+<p><strong>Focus on Business Logic</strong>:
+Entry points and infrastructure code have natural coverage patterns. Focus unit tests on business logic functions.</p>
+</li>
+<li>
+<p><strong>Use Dependency Analysis</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.info \
+  --context-providers dependency -vv
+</code></pre>
+<p>Tests high-dependency functions first—they have the most impact.</p>
+</li>
+<li>
+<p><strong>Don’t Over-Test Entry Points</strong>:
+Entry points (main, handlers) are better tested with integration tests, not unit tests. Debtmap weights their coverage factor at 0.6x to account for this.</p>
+</li>
+</ol>
+<h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
+<p>In <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[scoring]
+# Adjust coverage weight if your project prioritizes coverage differently
+coverage = 0.40  # Default: 40%
+complexity = 0.40
+dependency = 0.20
+
+[thresholds]
+# Set minimum risk score to filter low-priority items
+minimum_risk_score = 15.0
+
+# Skip simple functions even if uncovered
+minimum_cyclomatic_complexity = 5
+</code></pre>
+<p>See <a href="configuration.html">Configuration</a> for complete options.</p>
+<h3 id="ci-integration"><a class="header" href="#ci-integration">CI Integration</a></h3>
+<p><strong>Example GitHub Actions Workflow</strong>:</p>
+<pre><code class="language-yaml">- name: Generate Coverage
+  run: cargo tarpaulin --out lcov --output-dir target/coverage
+
+- name: Analyze with Debtmap
+  run: |
+    debtmap analyze . \
+      --lcov target/coverage/lcov.info \
+      --format json \
+      --output debtmap-report.json
+
+- name: Validate Quality Gates
+  run: |
+    debtmap validate . \
+      --lcov target/coverage/lcov.info \
+      --max-debt-density 50
+</code></pre>
+<p><strong>Quality Gate Strategy</strong>:</p>
+<ul>
+<li>Fail builds on new critical debt (Tier 1 architectural issues)</li>
+<li>Warn on new high-priority untested code (Tier 2)</li>
+<li>Track coverage trends over time with <code>compare</code> command</li>
+</ul>
+<h2 id="complete-language-examples"><a class="header" href="#complete-language-examples">Complete Language Examples</a></h2>
+<h3 id="rust-end-to-end"><a class="header" href="#rust-end-to-end">Rust End-to-End</a></h3>
+<pre><code class="language-bash"># 1. Generate coverage
+cargo tarpaulin --out lcov --output-dir target/coverage
+
+# 2. Verify LCOV output
+head target/coverage/lcov.info
+
+# 3. Run Debtmap with coverage
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# 4. Interpret results (look for [UNTESTED] markers on high-complexity functions)
+</code></pre>
+<h3 id="javascripttypescript-end-to-end"><a class="header" href="#javascripttypescript-end-to-end">JavaScript/TypeScript End-to-End</a></h3>
+<pre><code class="language-bash"># 1. Configure Jest for LCOV (in package.json or jest.config.js)
+# "coverageReporters": ["lcov", "text"]
+
+# 2. Generate coverage
+npm test -- --coverage
+
+# 3. Verify LCOV output
+head coverage/lcov.info
+
+# 4. Run Debtmap
+debtmap analyze . --lcov coverage/lcov.info --languages javascript,typescript
+</code></pre>
+<h3 id="python-end-to-end"><a class="header" href="#python-end-to-end">Python End-to-End</a></h3>
+<pre><code class="language-bash"># 1. Install pytest-cov
+pip install pytest-cov
+
+# 2. Generate LCOV coverage
+pytest --cov=src --cov-report=lcov
+
+# 3. Verify output
+head coverage.lcov
+
+# 4. Run Debtmap
+debtmap analyze . --lcov coverage.lcov --languages python
+</code></pre>
+<h3 id="go-end-to-end"><a class="header" href="#go-end-to-end">Go End-to-End</a></h3>
+<pre><code class="language-bash"># 1. Generate native coverage
+go test -coverprofile=coverage.out ./...
+
+# 2. Convert to LCOV (requires gocover-cobertura or similar)
+# Note: This step is tool-dependent
+
+# 3. Run Debtmap
+debtmap analyze . --lcov coverage.lcov --languages go
+</code></pre>
+<h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>
+<h3 id="why-does-my-100-covered-function-still-show-up"><a class="header" href="#why-does-my-100-covered-function-still-show-up">Why does my 100% covered function still show up?</a></h3>
+<p>Coverage dampens debt scores but doesn’t eliminate debt. A function with cyclomatic complexity 25 and 100% coverage still represents technical debt—it’s just lower priority than untested complex code.</p>
+<p><strong>Use filters to focus on high-priority items</strong>:</p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.info --top 10
+</code></pre>
+<h3 id="whats-the-difference-between-direct-and-transitive-coverage"><a class="header" href="#whats-the-difference-between-direct-and-transitive-coverage">What’s the difference between direct and transitive coverage?</a></h3>
+<ul>
+<li><strong>Direct coverage</strong>: Lines executed directly by tests</li>
+<li><strong>Transitive coverage</strong>: Coverage considering call graph (functions called by well-tested code)</li>
+</ul>
+<p>Transitive coverage reduces urgency for functions only reachable through well-tested paths.</p>
+<h3 id="should-i-test-everything-to-100-coverage"><a class="header" href="#should-i-test-everything-to-100-coverage">Should I test everything to 100% coverage?</a></h3>
+<p><strong>No.</strong> Use Debtmap’s risk scores to prioritize:</p>
+<ol>
+<li>Test high-complexity, low-coverage functions first</li>
+<li>Entry points are better tested with integration tests</li>
+<li>Simple utility functions (complexity &lt; 5) may not need dedicated unit tests</li>
+</ol>
+<p>Debtmap helps you achieve <strong>optimal coverage</strong>, not maximal coverage.</p>
+<h3 id="how-do-i-debug-coverage-correlation-issues"><a class="header" href="#how-do-i-debug-coverage-correlation-issues">How do I debug coverage correlation issues?</a></h3>
+<p>Use verbose logging:</p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.info -vv
+</code></pre>
+<p>This shows:</p>
+<ul>
+<li>Coverage file parsing details</li>
+<li>Function-to-coverage correlation attempts</li>
+<li>Path matching diagnostics</li>
+</ul>
+<h3 id="can-i-use-coverage-with-validate-command"><a class="header" href="#can-i-use-coverage-with-validate-command">Can I use coverage with validate command?</a></h3>
+<p>Yes! The <code>validate</code> command supports <code>--lcov</code> for risk-based quality gates:</p>
+<pre><code class="language-bash">debtmap validate . --lcov coverage.info --max-debt-density 50
+</code></pre>
+<p>See <a href="cli-reference.html#validate-command">CLI Reference</a> for details.</p>
+<h2 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h2>
+<ul>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - Deep dive into how coverage affects unified scoring</li>
+<li><a href="tiered-prioritization.html">Tiered Prioritization</a> - How coverage fits into tiered priority levels</li>
+<li><a href="cli-reference.html">CLI Reference</a> - Complete coverage option documentation</li>
+<li><a href="configuration.html">Configuration</a> - Customizing coverage scoring weights</li>
+<li><a href="troubleshooting.html">Troubleshooting</a> - More debugging tips for coverage issues</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="context-providers.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="entropy-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="context-providers.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="entropy-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
