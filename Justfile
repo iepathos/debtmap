@@ -275,6 +275,8 @@ ci:
      export RUST_BACKTRACE=1 && \
      echo "Running tests..." && \
      cargo nextest run --all-features && \
+     echo "Running doc tests..." && \
+     cargo test --doc && \
      echo "Running clippy..." && \
      cargo clippy --all-targets --all-features -- -D warnings && \
      echo "Checking formatting..." && \
