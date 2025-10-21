@@ -15,9 +15,34 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! use debtmap::debt::public_api_detector::{PublicApiDetector, PublicApiConfig};
+//! use debtmap::debt::public_api_detector::{PublicApiDetector, PublicApiConfig, FunctionDef, FileContext, Language};
+//! use std::collections::HashMap;
+//! use std::path::PathBuf;
 //!
 //! let detector = PublicApiDetector::new(PublicApiConfig::default());
+//!
+//! let function = FunctionDef {
+//!     name: "my_function".to_string(),
+//!     docstring: Some("A public API function".to_string()),
+//!     parameters: vec![],
+//!     return_type: Some("str".to_string()),
+//!     decorators: vec![],
+//!     is_method: false,
+//!     class_name: None,
+//!     line: 10,
+//!     visibility: None,
+//!     is_trait_impl: false,
+//! };
+//!
+//! let context = FileContext {
+//!     file_path: PathBuf::from("example.py"),
+//!     language: Language::Python,
+//!     module_all: None,
+//!     functions: HashMap::new(),
+//!     used_functions: vec![],
+//!     init_exports: vec![],
+//! };
+//!
 //! let score = detector.is_public_api(&function, &context);
 //!
 //! if score.is_public {
