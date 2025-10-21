@@ -363,7 +363,7 @@ reconcile_state():
 - Entropy-adjusted complexity: 9
 - Assessment: High risk - genuinely complex logic
 </code></pre>
-<p>This approach <strong>reduces false positives by 60-75%</strong> compared to traditional cyclomatic complexity metrics.</p>
+<p>This approach <strong>significantly reduces false positives</strong> compared to traditional cyclomatic complexity metrics by recognizing that repetitive patterns are easier to understand than diverse, complex logic.</p>
 <h3 id="2-coverage-risk-correlation"><a class="header" href="#2-coverage-risk-correlation">2. Coverage-Risk Correlation</a></h3>
 <p>Debtmap is the only Rust analysis tool that natively combines code complexity with test coverage to compute risk scores.</p>
 <p><strong>Why this matters:</strong></p>
@@ -388,13 +388,8 @@ fn apply_migrations(db: &amp;mut Database) -&gt; Result&lt;()&gt; {
 }
 <span class="boring">}</span></code></pre></pre>
 <p>Debtmap integrates with LCOV coverage data to automatically prioritize Function B over Function A, even though A is more complex. This is because the risk is about <strong>untested complexity</strong>, not just complexity alone.</p>
-<p><strong>Comparison:</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Tool</th><th>Complexity</th><th>Coverage</th><th>Risk Score</th></tr></thead><tbody>
-<tr><td>SonarQube</td><td>✅</td><td>⚠️ (Enterprise only)</td><td>❌</td></tr>
-<tr><td>CodeClimate</td><td>✅</td><td>⚠️ (Separate)</td><td>❌</td></tr>
-<tr><td>Debtmap</td><td>✅</td><td>✅ (Built-in)</td><td>✅</td></tr>
-</tbody></table>
-</div>
+<p><strong>What makes this unique:</strong></p>
+<p>Debtmap is the only Rust-focused tool that natively combines complexity analysis with LCOV coverage data to compute risk scores. While other tools support coverage reporting, they don’t correlate it with complexity metrics to prioritize technical debt and testing efforts.</p>
 <h3 id="3-actionable-recommendations"><a class="header" href="#3-actionable-recommendations">3. Actionable Recommendations</a></h3>
 <p>Most tools tell you <strong>what</strong> is wrong. Debtmap tells you <strong>what to do about it</strong> and <strong>what impact it will have</strong>.</p>
 <p><strong>Compare:</strong></p>
@@ -438,14 +433,14 @@ fn calculate_risk_score(metrics: &amp;Metrics) -&gt; f64 {
 Priority: HIGH (called from untested code path)
 </code></pre>
 <h3 id="5-performance"><a class="header" href="#5-performance">5. Performance</a></h3>
-<p>Debtmap is written in Rust and uses parallel processing for analysis. This makes it <strong>10-100x faster</strong> than JVM-based tools like SonarQube.</p>
-<p><strong>Benchmark (medium-sized Rust project, ~50k LOC):</strong></p>
+<p>Debtmap is written in Rust and uses parallel processing for analysis. Being a native Rust binary with no JVM overhead, it’s designed for fast local development workflow integration.</p>
+<p><strong>Typical analysis time:</strong></p>
 <ul>
-<li>SonarQube: 3-4 minutes</li>
-<li>CodeClimate: 2-3 minutes</li>
-<li>Debtmap: 5-8 seconds</li>
+<li>Small project (~10k LOC): 1-2 seconds</li>
+<li>Medium project (~50k LOC): 5-8 seconds</li>
+<li>Large project (~200k LOC): 20-30 seconds</li>
 </ul>
-<p>This speed advantage means you can run debtmap in your local development workflow without breaking flow, not just in CI.</p>
+<p>This speed means you can run debtmap in your local development workflow without breaking flow, not just in CI.</p>
 <h2 id="when-to-use-debtmap-vs-alternatives"><a class="header" href="#when-to-use-debtmap-vs-alternatives">When to Use Debtmap vs Alternatives</a></h2>
 <p>Debtmap isn’t meant to replace all other tools—it complements them. Here’s when to use what:</p>
 <div class="table-wrapper"><table><thead><tr><th>Use Case</th><th>Recommended Tool</th><th>Why</th></tr></thead><tbody>
