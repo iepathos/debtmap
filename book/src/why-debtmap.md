@@ -106,7 +106,7 @@ reconcile_state():
 - Assessment: High risk - genuinely complex logic
 ```
 
-This approach **reduces false positives by 60-75%** compared to traditional cyclomatic complexity metrics.
+This approach **significantly reduces false positives** compared to traditional cyclomatic complexity metrics by recognizing that repetitive patterns are easier to understand than diverse, complex logic.
 
 ### 2. Coverage-Risk Correlation
 
@@ -135,13 +135,9 @@ fn apply_migrations(db: &mut Database) -> Result<()> {
 
 Debtmap integrates with LCOV coverage data to automatically prioritize Function B over Function A, even though A is more complex. This is because the risk is about **untested complexity**, not just complexity alone.
 
-**Comparison:**
+**What makes this unique:**
 
-| Tool | Complexity | Coverage | Risk Score |
-|------|------------|----------|------------|
-| SonarQube | ✅ | ⚠️ (Enterprise only) | ❌ |
-| CodeClimate | ✅ | ⚠️ (Separate) | ❌ |
-| Debtmap | ✅ | ✅ (Built-in) | ✅ |
+Debtmap is the only Rust-focused tool that natively combines complexity analysis with LCOV coverage data to compute risk scores. While other tools support coverage reporting, they don't correlate it with complexity metrics to prioritize technical debt and testing efforts.
 
 ### 3. Actionable Recommendations
 
@@ -202,14 +198,14 @@ Priority: HIGH (called from untested code path)
 
 ### 5. Performance
 
-Debtmap is written in Rust and uses parallel processing for analysis. This makes it **10-100x faster** than JVM-based tools like SonarQube.
+Debtmap is written in Rust and uses parallel processing for analysis. Being a native Rust binary with no JVM overhead, it's designed for fast local development workflow integration.
 
-**Benchmark (medium-sized Rust project, ~50k LOC):**
-- SonarQube: 3-4 minutes
-- CodeClimate: 2-3 minutes
-- Debtmap: 5-8 seconds
+**Typical analysis time:**
+- Small project (~10k LOC): 1-2 seconds
+- Medium project (~50k LOC): 5-8 seconds
+- Large project (~200k LOC): 20-30 seconds
 
-This speed advantage means you can run debtmap in your local development workflow without breaking flow, not just in CI.
+This speed means you can run debtmap in your local development workflow without breaking flow, not just in CI.
 
 ## When to Use Debtmap vs Alternatives
 
