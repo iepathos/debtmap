@@ -71,7 +71,7 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,ignore
 /// // Simple constructor - matches
 /// fn new() -> Self { Self { field: 0 } }
 ///
@@ -88,22 +88,22 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 /// This function specifically addresses the false positive in ContextMatcher::any()
 /// where a trivial 9-line constructor was classified as CRITICAL business logic.
 fn is_simple_constructor(func: &FunctionMetrics) -> bool {
-    // Name-based detection
-    let name_lower = func.name.to_lowercase();
-    let constructor_patterns = [
-        "new", "default", "from_", "with_", "create_", "make_", "build_", "of_", "empty", "zero",
-        "any",
-    ];
+    // Get constructor detection configuration
+    let config = crate::config::get_constructor_detection_config();
 
-    let matches_constructor_name = constructor_patterns.iter().any(|pattern| {
+    // Name-based detection using configurable patterns
+    let name_lower = func.name.to_lowercase();
+    let matches_constructor_name = config.patterns.iter().any(|pattern| {
         name_lower == *pattern || name_lower.starts_with(pattern) || name_lower.ends_with(pattern)
     });
 
-    // Complexity-based filtering
-    let is_simple = func.cyclomatic <= 2 && func.length < 15 && func.nesting <= 1;
+    // Complexity-based filtering using configurable thresholds
+    let is_simple = func.cyclomatic <= config.max_cyclomatic
+        && func.length < config.max_length
+        && func.nesting <= config.max_nesting;
 
     // Structural pattern: low cognitive complexity suggests simple initialization
-    let is_initialization = func.cognitive <= 3;
+    let is_initialization = func.cognitive <= config.max_cognitive;
 
     matches_constructor_name && is_simple && is_initialization
 }

@@ -255,6 +255,30 @@ pub struct OrchestratorDetectionConfig {
     pub cognitive_weight: f64,
 }
 
+/// Constructor detection configuration (spec 117)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstructorDetectionConfig {
+    /// Name patterns for constructor functions
+    #[serde(default = "default_constructor_patterns")]
+    pub patterns: Vec<String>,
+
+    /// Maximum cyclomatic complexity for simple constructors (default: 2)
+    #[serde(default = "default_constructor_max_cyclomatic")]
+    pub max_cyclomatic: u32,
+
+    /// Maximum cognitive complexity for simple constructors (default: 3)
+    #[serde(default = "default_constructor_max_cognitive")]
+    pub max_cognitive: u32,
+
+    /// Maximum lines for simple constructors (default: 15)
+    #[serde(default = "default_constructor_max_length")]
+    pub max_length: usize,
+
+    /// Maximum nesting depth for simple constructors (default: 1)
+    #[serde(default = "default_constructor_max_nesting")]
+    pub max_nesting: u32,
+}
+
 impl Default for OrchestratorDetectionConfig {
     fn default() -> Self {
         Self {
@@ -280,6 +304,50 @@ fn default_orchestrator_min_meaningful_callees() -> usize {
 
 fn default_orchestrator_cognitive_weight() -> f64 {
     0.7 // 70% weight for cognitive complexity in orchestrators
+}
+
+impl Default for ConstructorDetectionConfig {
+    fn default() -> Self {
+        Self {
+            patterns: default_constructor_patterns(),
+            max_cyclomatic: default_constructor_max_cyclomatic(),
+            max_cognitive: default_constructor_max_cognitive(),
+            max_length: default_constructor_max_length(),
+            max_nesting: default_constructor_max_nesting(),
+        }
+    }
+}
+
+fn default_constructor_patterns() -> Vec<String> {
+    vec![
+        "new".to_string(),
+        "default".to_string(),
+        "from_".to_string(),
+        "with_".to_string(),
+        "create_".to_string(),
+        "make_".to_string(),
+        "build_".to_string(),
+        "of_".to_string(),
+        "empty".to_string(),
+        "zero".to_string(),
+        "any".to_string(),
+    ]
+}
+
+fn default_constructor_max_cyclomatic() -> u32 {
+    2
+}
+
+fn default_constructor_max_cognitive() -> u32 {
+    3
+}
+
+fn default_constructor_max_length() -> usize {
+    15
+}
+
+fn default_constructor_max_nesting() -> u32 {
+    1
 }
 
 impl Default for RoleCoverageWeights {
@@ -689,6 +757,18 @@ pub struct DebtmapConfig {
     #[serde(default)]
     pub orchestration_adjustment:
         Option<crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig>,
+
+    /// Constructor detection configuration (spec 117)
+    #[serde(default, rename = "classification")]
+    pub classification: Option<ClassificationConfig>,
+}
+
+/// Classification configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ClassificationConfig {
+    /// Constructor detection configuration
+    #[serde(default)]
+    pub constructors: Option<ConstructorDetectionConfig>,
 }
 
 impl DebtmapConfig {
@@ -1354,6 +1434,15 @@ pub fn get_orchestration_adjustment_config(
     get_config()
         .orchestration_adjustment
         .clone()
+        .unwrap_or_default()
+}
+
+/// Get constructor detection configuration (spec 117)
+pub fn get_constructor_detection_config() -> ConstructorDetectionConfig {
+    get_config()
+        .classification
+        .as_ref()
+        .and_then(|c| c.constructors.clone())
         .unwrap_or_default()
 }
 

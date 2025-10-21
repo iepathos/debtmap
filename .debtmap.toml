@@ -136,10 +136,35 @@ orchestration_threshold = 6  # Need at least 6 delegations
 complexity_adjustment = 0.7  # Reduce complexity score by 30%
 
 # God Object detection configuration
+# Constructor detection configuration (spec 117)
+[classification.constructors]
+# Constructor name patterns for simple initialization functions
+# These patterns help prevent false positives where trivial constructors
+# are classified as critical business logic
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "create_",
+    "make_",
+    "build_",
+    "of_",
+    "empty",
+    "zero",
+    "any",
+]
+
+# Complexity thresholds for constructor classification
+max_cyclomatic = 2            # Maximum cyclomatic complexity for simple constructors
+max_cognitive = 3             # Maximum cognitive complexity for simple constructors
+max_length = 15               # Maximum lines for simple constructors
+max_nesting = 1               # Maximum nesting depth for simple constructors
+
 [god_object]
 enabled = true                # Enable god object detection
 max_methods = 20              # Maximum methods before considering a god object
-max_fields = 15               # Maximum fields before considering a god object  
+max_fields = 15               # Maximum fields before considering a god object
 max_responsibilities = 5      # Maximum distinct responsibilities
 score_threshold = 50.0        # Minimum score to flag as god object
 
