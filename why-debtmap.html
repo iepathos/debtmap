@@ -348,28 +348,87 @@ Priority: HIGH (called from untested code path)
 <li>Large project (~200k LOC): 20-30 seconds</li>
 </ul>
 <p>This speed means you can run debtmap in your local development workflow without breaking flow, not just in CI.</p>
-<h2 id="when-to-use-debtmap-vs-alternatives"><a class="header" href="#when-to-use-debtmap-vs-alternatives">When to Use Debtmap vs Alternatives</a></h2>
-<p>Debtmap isn’t meant to replace all other tools—it complements them. Here’s when to use what:</p>
-<div class="table-wrapper"><table><thead><tr><th>Use Case</th><th>Recommended Tool</th><th>Why</th></tr></thead><tbody>
-<tr><td>Fast local Rust analysis</td><td><strong>Debtmap</strong></td><td>Native Rust, entropy analysis, coverage integration</td></tr>
-<tr><td>Idiomatic Rust linting</td><td><strong>clippy</strong></td><td>Rust-specific patterns and best practices</td></tr>
-<tr><td>Security vulnerability scanning</td><td><strong>cargo-audit</strong> / <strong>cargo-geiger</strong></td><td>Dependency vulnerabilities and unsafe code</td></tr>
-<tr><td>Enterprise multi-language</td><td><strong>SonarQube</strong></td><td>Broad language support, centralized dashboards</td></tr>
-<tr><td>Simple code smell detection</td><td><strong>CodeClimate</strong></td><td>Easy setup, broad plugin ecosystem</td></tr>
-<tr><td>Test coverage reporting</td><td><strong>tarpaulin</strong> + Debtmap</td><td>Coverage generation + risk analysis</td></tr>
+<h2 id="what-problem-does-debtmap-solve"><a class="header" href="#what-problem-does-debtmap-solve">What Problem Does Debtmap Solve?</a></h2>
+<p>Debtmap addresses a gap that existing tools don’t fill: <strong>quantified technical debt prioritization with actionable refactoring guidance</strong>.</p>
+<h3 id="the-gap-in-existing-tools"><a class="header" href="#the-gap-in-existing-tools">The Gap in Existing Tools</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Tool Type</th><th>What It Does</th><th>What It Doesn’t Do</th></tr></thead><tbody>
+<tr><td><strong>Linters</strong> (clippy, ESLint)</td><td>Find code style issues and common mistakes</td><td>Don’t quantify risk or prioritize by impact</td></tr>
+<tr><td><strong>Complexity Analyzers</strong> (SonarQube, CodeClimate)</td><td>Flag complex code</td><td>Don’t correlate with test coverage or provide refactoring impact estimates</td></tr>
+<tr><td><strong>Coverage Tools</strong> (tarpaulin, codecov)</td><td>Show what code is tested</td><td>Don’t identify which untested code is most risky</td></tr>
 </tbody></table>
 </div>
-<p><strong>Recommended workflow:</strong></p>
+<p><strong>Note:</strong> Debtmap is not a security scanner. Use tools like <code>cargo-audit</code> and <code>cargo-geiger</code> for security vulnerability detection. Debtmap focuses on technical debt prioritization, though complex untested code can sometimes harbor security issues.</p>
+<p><strong>What Debtmap uniquely provides:</strong></p>
 <ol>
-<li><strong>Development loop:</strong> Run <code>clippy</code> and <code>debtmap</code> locally before commits</li>
-<li><strong>PR validation:</strong> Run <code>clippy</code>, <code>cargo test</code>, <code>debtmap validate</code> in CI</li>
-<li><strong>Weekly reviews:</strong> Use debtmap to identify high-priority refactoring targets</li>
-<li><strong>Security audits:</strong> Use <code>cargo-audit</code> and <code>cargo-geiger</code> periodically</li>
+<li><strong>Quantified Debt Scoring</strong> - Not just “this is complex,” but “this scores 8.9/10 on risk”</li>
+<li><strong>Coverage-Risk Correlation</strong> - Identifies untested complex code, not just complex code</li>
+<li><strong>Impact Quantification</strong> - “Adding 6 tests will reduce risk by 3.7 points”</li>
+<li><strong>Actionable Recommendations</strong> - Specific refactoring suggestions with effort estimates</li>
+<li><strong>Dependency-Aware Prioritization</strong> - Prioritizes code that impacts many other functions</li>
 </ol>
-<h2 id="should-i-replace-x-with-debtmap"><a class="header" href="#should-i-replace-x-with-debtmap">Should I Replace X with Debtmap?</a></h2>
-<p><strong>Replacing clippy?</strong> No. Use both. Clippy catches idiomatic issues and common mistakes. Debtmap prioritizes technical debt based on risk.</p>
-<p><strong>Replacing SonarQube?</strong> Maybe. If you’re working on a Rust-only project and need fast local analysis with coverage integration, yes. If you need multi-language support or enterprise features, no.</p>
-<p><strong>Replacing test coverage tools?</strong> No. Debtmap integrates with coverage tools (like tarpaulin) but doesn’t replace them. Use tarpaulin to generate coverage, then use debtmap to prioritize gaps.</p>
+<h3 id="debtmap-vs-traditional-tools"><a class="header" href="#debtmap-vs-traditional-tools">Debtmap vs Traditional Tools</a></h3>
+<p><strong>SonarQube / CodeClimate:</strong></p>
+<ul>
+<li><strong>They say:</strong> “Function has complexity 15 (threshold exceeded)”</li>
+<li><strong>Debtmap says:</strong> “Add 8 tests (-5.2 risk). Extract validation logic to reduce complexity by 60%”</li>
+</ul>
+<p><strong>Coverage Tools (tarpaulin, codecov):</strong></p>
+<ul>
+<li><strong>They say:</strong> “67% line coverage, 54% branch coverage”</li>
+<li><strong>Debtmap says:</strong> “3 critical gaps: untested complex functions that are called from 12+ code paths”</li>
+</ul>
+<p><strong>Linters (clippy):</strong></p>
+<ul>
+<li><strong>They say:</strong> “Consider using Iterator::any() instead of a for loop”</li>
+<li><strong>Debtmap says:</strong> “This function has high cognitive complexity (12) and is called by 8 untested modules - prioritize adding tests before refactoring”</li>
+</ul>
+<h3 id="when-to-use-debtmap"><a class="header" href="#when-to-use-debtmap">When to Use Debtmap</a></h3>
+<p><strong>Use Debtmap when you need to:</strong></p>
+<ul>
+<li>Decide which technical debt to tackle first (limited time/resources)</li>
+<li>Identify critical testing gaps (high-complexity, zero-coverage code)</li>
+<li>Quantify the impact of refactoring efforts</li>
+<li>Reduce false positives from repetitive validation code</li>
+<li>Prioritize refactoring based on risk, not just complexity</li>
+<li>Get specific, actionable recommendations with effort estimates</li>
+</ul>
+<p><strong>Use other tools for different needs:</strong></p>
+<ul>
+<li><strong>clippy</strong> - Catch Rust idiom violations and common mistakes</li>
+<li><strong>tarpaulin</strong> - Generate LCOV coverage data (Debtmap analyzes it)</li>
+<li><strong>SonarQube</strong> - Multi-language analysis with centralized dashboards</li>
+</ul>
+<p><strong>Security is a separate concern:</strong></p>
+<ul>
+<li><strong>cargo-audit</strong> - Find known vulnerabilities in dependencies</li>
+<li><strong>cargo-geiger</strong> - Detect unsafe code usage</li>
+<li>Debtmap doesn’t scan for security issues, though complex code may harbor security risks</li>
+</ul>
+<h3 id="recommended-workflow"><a class="header" href="#recommended-workflow">Recommended Workflow</a></h3>
+<p>Debtmap works <strong>alongside</strong> existing tools, not instead of them:</p>
+<pre><code class="language-bash"># 1. Local development loop (before commit)
+cargo fmt                    # Format code
+cargo clippy                 # Check idioms and common issues
+cargo test                   # Run tests
+debtmap analyze .            # Identify new technical debt
+
+# 2. CI/CD pipeline (PR validation)
+cargo test --all-features    # Full test suite
+cargo clippy -- -D warnings  # Fail on warnings
+debtmap validate .           # Enforce debt thresholds
+
+# 3. Weekly planning (prioritize work)
+cargo tarpaulin --out lcov   # Generate coverage
+debtmap analyze . --lcov lcov.info --top 20
+# Review top 20 debt items, plan sprint work
+
+# 4. Monthly review (track trends)
+debtmap analyze . --format json --output debt-$(date +%Y%m).json
+debtmap compare --before debt-202410.json --after debt-202411.json
+</code></pre>
+<h3 id="the-bottom-line"><a class="header" href="#the-bottom-line">The Bottom Line</a></h3>
+<p><strong>Debtmap isn’t a replacement for linters or coverage tools.</strong> It solves a different problem: turning raw complexity and coverage data into <strong>prioritized, actionable technical debt recommendations</strong>.</p>
+<p>If you’re asking “Where should I focus my refactoring efforts?” or “Which code needs tests most urgently?”, that’s what Debtmap is built for.</p>
 <h2 id="key-differentiators"><a class="header" href="#key-differentiators">Key Differentiators</a></h2>
 <ol>
 <li><strong>Entropy analysis</strong> - Reduces false positives from repetitive code</li>
