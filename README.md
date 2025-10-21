@@ -184,8 +184,8 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 
 ### Language Support
 - [x] Rust - Full support with AST parsing and macro expansion
-- [x] Python - Full support via rustpython-parser
-- [x] JavaScript/TypeScript - Full support via tree-sitter
+- [ ] Python - Full support via rustpython-parser
+- [ ] JavaScript/TypeScript - Full support via tree-sitter
 - [ ] Go - Planned
 - [ ] C/C++ - Planned
 - [ ] C# - Planned
@@ -201,7 +201,6 @@ Debtmap includes Python parsing functionality via `rustpython-parser`, which dep
 - [x] Code organization assessment
 - [x] Testing quality evaluation
 - [ ] Historical trend tracking
-- [ ] Automated refactoring suggestions
 
 ### Integrations
 - [ ] GitHub Actions marketplace
