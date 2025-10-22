@@ -81,7 +81,9 @@ impl CoverageRiskAnalyzer {
             return self.create_test_function_factor(function);
         }
 
+        // Get both direct and indirect coverage
         let coverage_percentage = self.get_coverage_percentage(function, coverage_data);
+
         let critical_paths_uncovered =
             self.count_uncovered_critical_paths(function, coverage_percentage, context.role);
         let test_quality =

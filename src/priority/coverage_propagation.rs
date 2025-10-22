@@ -1,6 +1,7 @@
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::risk::lcov::LcovData;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet as StdHashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransitiveCoverage {
@@ -8,6 +9,38 @@ pub struct TransitiveCoverage {
     pub transitive: f64,
     pub propagated_from: Vec<FunctionId>,
     pub uncovered_lines: Vec<usize>,
+}
+
+/// Extended coverage information including indirect coverage from tested callers
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteCoverage {
+    /// Direct coverage from tests (lcov data)
+    pub direct_coverage: f64,
+
+    /// Indirect coverage from tested callers
+    pub indirect_coverage: f64,
+
+    /// Combined effective coverage
+    pub effective_coverage: f64,
+
+    /// Callers contributing to indirect coverage
+    pub coverage_sources: Vec<CoverageSource>,
+}
+
+/// Represents a caller that contributes to indirect coverage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoverageSource {
+    /// Function providing coverage
+    pub caller: FunctionId,
+
+    /// Coverage percentage of caller
+    pub caller_coverage: f64,
+
+    /// Number of hops from tested code
+    pub distance: u32,
+
+    /// Discounted coverage contribution
+    pub contributed_coverage: f64,
 }
 
 pub fn calculate_transitive_coverage(
@@ -147,6 +180,131 @@ pub fn propagate_coverage_through_graph(
     }
 
     result
+}
+
+/// Calculate indirect coverage from tested callers (caller → callee propagation)
+///
+/// This implements the algorithm from spec 120 to detect functions that are
+/// well-tested indirectly through their callers, reducing false positives.
+pub fn calculate_indirect_coverage(
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+    coverage: &LcovData,
+) -> CompleteCoverage {
+    let direct_coverage = get_function_coverage(func_id, coverage);
+
+    // If already well-tested directly, skip indirect calculation
+    // Note: direct_coverage is a fraction (0.0-1.0), so 0.8 = 80%
+    if direct_coverage >= 0.8 {
+        return CompleteCoverage {
+            direct_coverage,
+            indirect_coverage: 0.0,
+            effective_coverage: direct_coverage,
+            coverage_sources: vec![],
+        };
+    }
+
+    // Find all callers and recursively analyze their coverage
+    let callers = call_graph.get_callers(func_id);
+    if callers.is_empty() {
+        return CompleteCoverage {
+            direct_coverage,
+            indirect_coverage: 0.0,
+            effective_coverage: direct_coverage,
+            coverage_sources: vec![],
+        };
+    }
+
+    let sources =
+        analyze_caller_coverage(&callers, call_graph, coverage, 0, &mut StdHashSet::new());
+
+    let indirect_coverage = aggregate_indirect_coverage(&sources);
+    let effective_coverage = combine_coverages(direct_coverage, indirect_coverage);
+
+    CompleteCoverage {
+        direct_coverage,
+        indirect_coverage,
+        effective_coverage,
+        coverage_sources: sources,
+    }
+}
+
+/// Analyze coverage contribution from callers (recursive with depth limit)
+fn analyze_caller_coverage(
+    callers: &[FunctionId],
+    call_graph: &CallGraph,
+    coverage: &LcovData,
+    depth: u32,
+    visited: &mut StdHashSet<FunctionId>,
+) -> Vec<CoverageSource> {
+    const MAX_DEPTH: u32 = 3;
+    const DISTANCE_DISCOUNT: f64 = 0.7; // 70% per hop
+
+    if depth >= MAX_DEPTH {
+        return vec![];
+    }
+
+    let mut sources = vec![];
+
+    for caller in callers {
+        // Prevent infinite loops in circular call graphs
+        if visited.contains(caller) {
+            continue;
+        }
+        visited.insert(caller.clone());
+
+        // Get caller's direct coverage
+        let caller_coverage = get_function_coverage(caller, coverage);
+
+        // Well-tested caller (≥80%) contributes to indirect coverage
+        // Note: caller_coverage is a fraction (0.0-1.0), so 0.8 = 80%
+        if caller_coverage >= 0.8 {
+            let discount = DISTANCE_DISCOUNT.powi(depth as i32);
+            sources.push(CoverageSource {
+                caller: caller.clone(),
+                caller_coverage,
+                distance: depth,
+                contributed_coverage: caller_coverage * discount,
+            });
+        } else if depth < MAX_DEPTH - 1 {
+            // Recursively check caller's callers
+            let upstream_callers = call_graph.get_callers(caller);
+            sources.extend(analyze_caller_coverage(
+                &upstream_callers,
+                call_graph,
+                coverage,
+                depth + 1,
+                visited,
+            ));
+        }
+
+        visited.remove(caller);
+    }
+
+    sources
+}
+
+/// Aggregate indirect coverage from multiple sources
+///
+/// Takes maximum contribution to avoid double-counting
+fn aggregate_indirect_coverage(sources: &[CoverageSource]) -> f64 {
+    if sources.is_empty() {
+        return 0.0;
+    }
+
+    // Take maximum contribution (not sum, to avoid double-counting)
+    sources
+        .iter()
+        .map(|s| s.contributed_coverage)
+        .fold(0.0, f64::max)
+}
+
+/// Combine direct and indirect coverage
+///
+/// Indirect coverage fills the gap left by direct coverage
+fn combine_coverages(direct: f64, indirect: f64) -> f64 {
+    // Take maximum (indirect doesn't add to direct, it fills the gap)
+    direct.max(indirect)
 }
 
 #[cfg(test)]
@@ -389,6 +547,223 @@ mod tests {
             urgency_90 > urgency_100,
             "Scores should decrease as coverage increases"
         );
+    }
+
+    #[test]
+    fn test_indirect_coverage_single_hop() {
+        let mut call_graph = CallGraph::new();
+        let mut coverage = LcovData::default();
+
+        // Setup: F called by C (C has 90% coverage)
+        let func_f = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "f".to_string(),
+            line: 10,
+        };
+        let caller_c = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "c".to_string(),
+            line: 50,
+        };
+
+        call_graph.add_function(func_f.clone(), false, false, 5, 20);
+        call_graph.add_function(caller_c.clone(), false, false, 8, 40);
+        call_graph.add_call(crate::priority::call_graph::FunctionCall {
+            caller: caller_c.clone(),
+            callee: func_f.clone(),
+            call_type: crate::priority::call_graph::CallType::Direct,
+        });
+
+        // Mock coverage data: C has 90% coverage
+        // Note: LcovData stores coverage as percentage (0-100), not fraction
+        let funcs = vec![FunctionCoverage {
+            name: "c".to_string(),
+            start_line: 50,
+            execution_count: 10,
+            coverage_percentage: 90.0,
+            uncovered_lines: vec![],
+        }];
+        coverage.functions.insert(PathBuf::from("test.rs"), funcs);
+        coverage.build_index();
+
+        let complete_coverage = calculate_indirect_coverage(&func_f, &call_graph, &coverage);
+
+        // F should have ~0.9 indirect coverage (0.9 × 0.7^0 = 0.9, distance=0)
+        // Coverage is returned as fraction (0.0-1.0), not percentage
+        assert!(
+            (complete_coverage.indirect_coverage - 0.9).abs() < 0.01,
+            "Expected ~0.9 indirect coverage, got {}",
+            complete_coverage.indirect_coverage
+        );
+        assert_eq!(complete_coverage.coverage_sources.len(), 1);
+        assert_eq!(complete_coverage.coverage_sources[0].distance, 0);
+    }
+
+    #[test]
+    fn test_indirect_coverage_multi_hop() {
+        let mut call_graph = CallGraph::new();
+        let mut coverage = LcovData::default();
+
+        // Setup: F ← C1 ← C2 (C2 has 95% coverage)
+        let func_f = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "f".to_string(),
+            line: 10,
+        };
+        let caller_c1 = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "c1".to_string(),
+            line: 50,
+        };
+        let caller_c2 = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "c2".to_string(),
+            line: 80,
+        };
+
+        call_graph.add_function(func_f.clone(), false, false, 5, 20);
+        call_graph.add_function(caller_c1.clone(), false, false, 8, 40);
+        call_graph.add_function(caller_c2.clone(), false, false, 10, 50);
+
+        call_graph.add_call(crate::priority::call_graph::FunctionCall {
+            caller: caller_c1.clone(),
+            callee: func_f.clone(),
+            call_type: crate::priority::call_graph::CallType::Direct,
+        });
+        call_graph.add_call(crate::priority::call_graph::FunctionCall {
+            caller: caller_c2.clone(),
+            callee: caller_c1.clone(),
+            call_type: crate::priority::call_graph::CallType::Direct,
+        });
+
+        // Mock coverage: only C2 has coverage (95%)
+        let funcs = vec![FunctionCoverage {
+            name: "c2".to_string(),
+            start_line: 80,
+            execution_count: 10,
+            coverage_percentage: 95.0,
+            uncovered_lines: vec![],
+        }];
+        coverage.functions.insert(PathBuf::from("test.rs"), funcs);
+        coverage.build_index();
+
+        let complete_coverage = calculate_indirect_coverage(&func_f, &call_graph, &coverage);
+
+        // Expected: F gets 0.95 × 0.7^1 = 0.665 from C2 (distance 1 from F)
+        // Coverage is returned as fraction (0.0-1.0), not percentage
+        let expected = 0.95 * 0.7_f64.powi(1);
+        assert!(
+            (complete_coverage.indirect_coverage - expected).abs() < 0.01,
+            "Expected ~{} indirect coverage, got {}",
+            expected,
+            complete_coverage.indirect_coverage
+        );
+        assert_eq!(complete_coverage.coverage_sources.len(), 1);
+        assert_eq!(complete_coverage.coverage_sources[0].distance, 1);
+    }
+
+    #[test]
+    fn test_depth_limit_prevents_deep_recursion() {
+        let mut call_graph = CallGraph::new();
+        let mut coverage = LcovData::default();
+
+        // Setup: Chain of 5 functions (exceeds MAX_DEPTH=3)
+        // F ← C1 ← C2 ← C3 ← C4 (C4 has 100% coverage)
+        let functions = [("f", 10), ("c1", 20), ("c2", 30), ("c3", 40), ("c4", 50)];
+
+        let func_ids: Vec<FunctionId> = functions
+            .iter()
+            .map(|(name, line)| FunctionId {
+                file: PathBuf::from("test.rs"),
+                name: name.to_string(),
+                line: *line,
+            })
+            .collect();
+
+        // Add all functions
+        for func_id in &func_ids {
+            call_graph.add_function(func_id.clone(), false, false, 5, 20);
+        }
+
+        // Add call chain
+        for i in 0..func_ids.len() - 1 {
+            call_graph.add_call(crate::priority::call_graph::FunctionCall {
+                caller: func_ids[i + 1].clone(),
+                callee: func_ids[i].clone(),
+                call_type: crate::priority::call_graph::CallType::Direct,
+            });
+        }
+
+        // Mock coverage: only C4 has coverage
+        let funcs = vec![FunctionCoverage {
+            name: "c4".to_string(),
+            start_line: 50,
+            execution_count: 10,
+            coverage_percentage: 100.0,
+            uncovered_lines: vec![],
+        }];
+        coverage.functions.insert(PathBuf::from("test.rs"), funcs);
+        coverage.build_index();
+
+        let complete_coverage = calculate_indirect_coverage(&func_ids[0], &call_graph, &coverage);
+
+        // Should not reach C4 because it's at distance 4 (exceeds MAX_DEPTH=3)
+        // So indirect coverage should be 0
+        assert_eq!(
+            complete_coverage.indirect_coverage, 0.0,
+            "Should not propagate beyond MAX_DEPTH"
+        );
+        assert_eq!(complete_coverage.coverage_sources.len(), 0);
+    }
+
+    #[test]
+    fn test_direct_coverage_skips_indirect() {
+        let call_graph = CallGraph::new();
+        let mut coverage = LcovData::default();
+
+        let func_f = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "f".to_string(),
+            line: 10,
+        };
+
+        // F already has 85% direct coverage
+        let funcs = vec![FunctionCoverage {
+            name: "f".to_string(),
+            start_line: 10,
+            execution_count: 10,
+            coverage_percentage: 85.0,
+            uncovered_lines: vec![],
+        }];
+        coverage.functions.insert(PathBuf::from("test.rs"), funcs);
+        coverage.build_index();
+
+        let complete_coverage = calculate_indirect_coverage(&func_f, &call_graph, &coverage);
+
+        // Should skip indirect calculation since direct >= 0.8 (80%)
+        // Coverage is returned as fraction (0.0-1.0), so 85% = 0.85
+        assert_eq!(complete_coverage.direct_coverage, 0.85);
+        assert_eq!(complete_coverage.indirect_coverage, 0.0);
+        assert_eq!(complete_coverage.effective_coverage, 0.85);
+        assert_eq!(complete_coverage.coverage_sources.len(), 0);
+    }
+
+    #[test]
+    fn test_no_callers_zero_indirect() {
+        let call_graph = CallGraph::new();
+        let coverage = LcovData::default();
+
+        let func_f = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "orphan".to_string(),
+            line: 10,
+        };
+
+        let complete_coverage = calculate_indirect_coverage(&func_f, &call_graph, &coverage);
+
+        // Function with no callers should have 0 indirect coverage
+        assert_eq!(complete_coverage.indirect_coverage, 0.0);
+        assert_eq!(complete_coverage.coverage_sources.len(), 0);
     }
 
     #[test]
