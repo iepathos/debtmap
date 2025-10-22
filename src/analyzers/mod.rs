@@ -21,6 +21,7 @@ pub mod python_purity;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod rust_constructor_detector;
+pub mod rust_data_flow_analyzer;
 pub mod rust_enum_converter_detector;
 pub mod signature_extractor;
 pub mod test_detector;

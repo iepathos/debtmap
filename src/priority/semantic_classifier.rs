@@ -1,6 +1,7 @@
 use crate::analyzers::rust_constructor_detector::{
     analyze_function_body, extract_return_type, ConstructorReturnType,
 };
+use crate::analyzers::rust_data_flow_analyzer::analyze_data_flow;
 use crate::analyzers::rust_enum_converter_detector::is_enum_converter;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
@@ -55,6 +56,23 @@ fn classify_by_rules(
     // This should come after enum converter detection but before pattern matching
     if is_accessor_method(func, syn_func) {
         return Some(FunctionRole::IOWrapper);
+    }
+
+    // Check for data flow classification (Spec 126) - only if enabled and AST available
+    if let Some(syn_func) = syn_func {
+        let config = crate::config::get_data_flow_classification_config();
+
+        if config.enabled {
+            let profile = analyze_data_flow(syn_func);
+
+            // Only classify if high confidence
+            if profile.confidence >= config.min_confidence
+                && profile.transformation_ratio >= config.min_transformation_ratio
+                && profile.business_logic_ratio < config.max_business_logic_ratio
+            {
+                return Some(FunctionRole::Orchestrator);
+            }
+        }
     }
 
     // Check for pattern matching functions (like detect_file_type)
