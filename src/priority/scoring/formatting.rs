@@ -195,10 +195,16 @@ pub(super) fn analyze_uncovered_lines(
 
     // Provide specific guidance based on the function characteristics
     if func.cyclomatic > 5 {
+        // Use helper function from recommendation_helpers for consistent path count formatting
+        let path_text = if func.cyclomatic == 1 {
+            "single execution path".to_string()
+        } else {
+            format!("{} execution paths", func.cyclomatic)
+        };
         recommendations.push(format!(
-            "Focus on testing {} decision points to cover all {} execution paths",
+            "Focus on testing {} decision points to cover {}",
             func.cyclomatic - 1,
-            func.cyclomatic
+            path_text
         ));
     }
 
