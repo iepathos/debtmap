@@ -1473,7 +1473,7 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
     }
 
     Some(format!(
-        "{} cyclomatic={}, branches={}, cognitive={}, nesting={}",
+        "{} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
         "├─ COMPLEXITY:".bright_blue(),
         format!("{}", context.complexity_info.cyclomatic).yellow(),
         format!("{}", context.complexity_info.branch_count).yellow(),

@@ -129,7 +129,15 @@ fn generate_zero_coverage_complex_recommendation(
     func: &FunctionMetrics,
 ) -> (String, String, Vec<String>) {
     let test_cases_needed = cyclomatic.max(5);
-    let branches = func.nesting.max(1) * cyclomatic / 3; // Estimate branches from complexity
+
+    // Estimate branch count from nesting and cyclomatic complexity.
+    //
+    // This is a HEURISTIC approximation, not a precise count of conditional
+    // branches from AST analysis. Use cyclomatic complexity for accurate
+    // decision point counting.
+    //
+    // Formula: max(nesting, 1) × cyclomatic ÷ 3
+    let est_branches = func.nesting.max(1) * cyclomatic / 3;
 
     (
         format!(
@@ -141,7 +149,7 @@ fn generate_zero_coverage_complex_recommendation(
              With cyclomatic complexity {} and cognitive complexity {}, \
              approximately {} branches are uncovered. This is CRITICAL risk. \
              Minimum {} test cases urgently needed.",
-            role_str, cyclomatic, cognitive, branches, test_cases_needed
+            role_str, cyclomatic, cognitive, est_branches, test_cases_needed
         ),
         vec![
             "IMMEDIATE ACTION REQUIRED:".to_string(),
@@ -204,16 +212,23 @@ fn generate_zero_coverage_recommendation(
 ) -> (String, String, Vec<String>) {
     let role_display = get_role_display_name(role);
     let test_cases_needed = cyclomatic.max(3);
-    let branches = func.nesting.max(1) * 2; // Estimate branches from nesting
+
+    // Estimate branch count from nesting depth.
+    //
+    // This is a HEURISTIC approximation for simpler functions,
+    // not a precise count from AST analysis.
+    //
+    // Formula: max(nesting, 1) × 2
+    let est_branches = func.nesting.max(1) * 2;
 
     (
         "⚠️ URGENT: Add tests for completely untested function (0% coverage)".to_string(),
         format!(
             "UNTESTED CODE: This {} has never been tested. \
-             With {} branches and complexity {}/{}, this represents high risk. \
+             With ~{} estimated branches and complexity {}/{}, this represents high risk. \
              Minimum {} test cases needed.",
             role_display.to_lowercase(),
-            branches,
+            est_branches,
             cyclomatic,
             cognitive,
             test_cases_needed
