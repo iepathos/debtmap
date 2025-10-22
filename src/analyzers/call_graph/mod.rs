@@ -155,28 +155,45 @@ impl CallGraphExtractor {
         caller: FunctionId,
         callee_name: String,
         call_type: CallType,
+        call_site_type: call_resolution::CallSiteType,
         same_file_hint: bool,
     ) {
         self.unresolved_calls.push(UnresolvedCall {
             caller,
             callee_name,
             call_type,
+            call_site_type,
             same_file_hint,
         });
     }
 
     /// Process a function call
-    fn process_call(&mut self, name: String, same_file_hint: bool) {
+    fn process_call(
+        &mut self,
+        name: String,
+        call_site_type: call_resolution::CallSiteType,
+        same_file_hint: bool,
+    ) {
         if let Some(current_fn) = &self.current_function {
             let call_type = CallResolver::classify_call_type(&name);
             let resolved_name = CallResolver::resolve_self_type(&name, &self.current_impl_type);
 
-            self.add_unresolved_call(current_fn.clone(), resolved_name, call_type, same_file_hint);
+            self.add_unresolved_call(
+                current_fn.clone(),
+                resolved_name,
+                call_type,
+                call_site_type,
+                same_file_hint,
+            );
         }
     }
 
-    /// Construct a method name from components
-    fn construct_method_name(&mut self, receiver: &Expr, method: &syn::Ident) -> (String, bool) {
+    /// Construct a method name from components and classify call site
+    fn construct_method_name(
+        &mut self,
+        receiver: &Expr,
+        method: &syn::Ident,
+    ) -> (String, call_resolution::CallSiteType, bool) {
         let method_name = method.to_string();
 
         // Get receiver type
@@ -188,6 +205,18 @@ impl CallGraphExtractor {
                 .map(|t| t.type_name)
         };
 
+        // Determine call site type
+        let call_site_type = if CallResolver::is_std_trait_method(&method_name) {
+            call_resolution::CallSiteType::TraitMethod {
+                trait_name: CallResolver::infer_trait_name(&method_name),
+                receiver_type: receiver_type.clone(),
+            }
+        } else {
+            call_resolution::CallSiteType::Instance {
+                receiver_type: receiver_type.clone(),
+            }
+        };
+
         let full_name = CallResolver::construct_method_name(
             receiver_type,
             &method_name,
@@ -197,7 +226,7 @@ impl CallGraphExtractor {
         let same_file_hint =
             CallResolver::is_self_receiver(receiver) && self.current_impl_type.is_some();
 
-        (full_name, same_file_hint)
+        (full_name, call_site_type, same_file_hint)
     }
 
     /// Handle macro expression
@@ -221,7 +250,7 @@ impl CallGraphExtractor {
         if let Expr::Path(path_expr) = expr {
             if let Some(func_name) = GraphBuilder::extract_function_name_from_path(&path_expr.path)
             {
-                self.process_call(func_name, true);
+                self.process_call(func_name, call_resolution::CallSiteType::Static, true);
             }
         }
     }
@@ -256,7 +285,9 @@ impl CallGraphExtractor {
             {
                 let same_file_hint =
                     CallResolver::is_same_file_call(&func_name, &self.current_impl_type);
-                self.process_call(func_name, same_file_hint);
+                // Static calls use Expr::Call syntax
+                let call_site_type = call_resolution::CallSiteType::Static;
+                self.process_call(func_name, call_site_type, same_file_hint);
             }
         }
 
@@ -271,8 +302,9 @@ impl CallGraphExtractor {
         method: &syn::Ident,
         args: &syn::punctuated::Punctuated<Expr, syn::token::Comma>,
     ) {
-        let (method_name, same_file_hint) = self.construct_method_name(receiver, method);
-        self.process_call(method_name, same_file_hint);
+        let (method_name, call_site_type, same_file_hint) =
+            self.construct_method_name(receiver, method);
+        self.process_call(method_name, call_site_type, same_file_hint);
 
         self.visit_expr(receiver);
         self.process_arguments(args);

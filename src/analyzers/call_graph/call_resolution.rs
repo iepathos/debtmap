@@ -18,12 +18,32 @@ impl<T> FunctionalPipe<T> for T {
     }
 }
 
+/// Call site type categorization for method disambiguation
+#[derive(Debug, Clone, PartialEq)]
+pub enum CallSiteType {
+    /// Static/associated function: Type::function()
+    Static,
+
+    /// Instance method call: receiver.method()
+    Instance { receiver_type: Option<String> },
+
+    /// Trait method call (known trait): receiver.trait_method()
+    TraitMethod {
+        trait_name: String,
+        receiver_type: Option<String>,
+    },
+
+    /// Call through function pointer or closure
+    Indirect,
+}
+
 /// Represents an unresolved function call that needs to be resolved in phase 2
 #[derive(Debug, Clone)]
 pub struct UnresolvedCall {
     pub caller: FunctionId,
     pub callee_name: String,
     pub call_type: CallType,
+    pub call_site_type: CallSiteType,
     pub same_file_hint: bool, // Hint that this is likely a same-file call
 }
 
@@ -66,6 +86,35 @@ impl<'a> CallResolver<'a> {
 
     /// Resolve an unresolved call to a concrete function - now O(1) lookup!
     pub fn resolve_call(&self, call: &UnresolvedCall) -> Option<FunctionId> {
+        // Exclude standard library trait methods from the call graph
+        if let CallSiteType::TraitMethod { trait_name, .. } = &call.call_site_type {
+            // Exclude known std traits
+            if matches!(
+                trait_name.as_str(),
+                "Iterator"
+                    | "Option"
+                    | "Clone"
+                    | "ToString"
+                    | "Display"
+                    | "Default"
+                    | "Hash"
+                    | "IteratorOrOption"
+            ) {
+                return None;
+            }
+        }
+
+        // For instance calls with unknown receiver type, exclude if it's a std method
+        if let CallSiteType::Instance {
+            receiver_type: None,
+        } = &call.call_site_type
+        {
+            if Self::is_std_trait_method(&call.callee_name) {
+                // Conservative: assume it's a std library method
+                return None;
+            }
+        }
+
         let normalized_name = Self::normalize_path_prefix(&call.callee_name);
 
         // Fast O(1) lookup instead of O(n) linear search
@@ -78,12 +127,114 @@ impl<'a> CallResolver<'a> {
             }
         })?;
 
-        // Filter candidates that actually match the call pattern
-        let matching_candidates: Vec<FunctionId> = candidates
-            .iter()
-            .filter(|func| Self::is_function_match(func, &normalized_name, &call.callee_name))
-            .cloned()
-            .collect();
+        // Filter candidates based on call site type
+        let matching_candidates: Vec<FunctionId> = match &call.call_site_type {
+            CallSiteType::Static => {
+                // Static calls: require exact or qualified match
+                candidates
+                    .iter()
+                    .filter(|func| {
+                        Self::is_exact_match(&func.name, &normalized_name)
+                            || Self::is_exact_match(&func.name, &call.callee_name)
+                            || Self::is_qualified_match(&func.name, &normalized_name)
+                            || Self::is_qualified_match(&func.name, &call.callee_name)
+                    })
+                    .cloned()
+                    .collect()
+            }
+            CallSiteType::Instance {
+                receiver_type: Some(recv_type),
+            } => {
+                // Instance call with known receiver: match Type::method
+                let expected_name = format!(
+                    "{}::{}",
+                    recv_type,
+                    call.callee_name
+                        .split("::")
+                        .last()
+                        .unwrap_or(&call.callee_name)
+                );
+                candidates
+                    .iter()
+                    .filter(|func| {
+                        func.name == expected_name
+                            || func.name.starts_with(&format!("{}::", recv_type))
+                    })
+                    .cloned()
+                    .collect()
+            }
+            CallSiteType::Instance {
+                receiver_type: None,
+            } => {
+                // Instance call with unknown receiver: be conservative
+                // Only exclude if it looks like a std trait method
+                if Self::is_std_trait_method(&call.callee_name) {
+                    return None;
+                }
+
+                if call.same_file_hint {
+                    // Only match same-file functions
+                    candidates
+                        .iter()
+                        .filter(|func| {
+                            func.file == *self.current_file
+                                && Self::is_function_match(
+                                    func,
+                                    &normalized_name,
+                                    &call.callee_name,
+                                )
+                        })
+                        .cloned()
+                        .collect()
+                } else {
+                    // For non-std methods with unknown receiver, use base name matching
+                    // This preserves existing behavior for user-defined methods
+                    candidates
+                        .iter()
+                        .filter(|func| {
+                            Self::is_function_match(func, &normalized_name, &call.callee_name)
+                        })
+                        .cloned()
+                        .collect()
+                }
+            }
+            CallSiteType::TraitMethod { receiver_type, .. } => {
+                // Trait method call - try to resolve by receiver type
+                if let Some(recv_type) = receiver_type {
+                    let expected_name = format!(
+                        "{}::{}",
+                        recv_type,
+                        call.callee_name
+                            .split("::")
+                            .last()
+                            .unwrap_or(&call.callee_name)
+                    );
+                    candidates
+                        .iter()
+                        .filter(|func| func.name == expected_name)
+                        .cloned()
+                        .collect()
+                } else if call.same_file_hint {
+                    candidates
+                        .iter()
+                        .filter(|func| func.file == *self.current_file)
+                        .cloned()
+                        .collect()
+                } else {
+                    return None;
+                }
+            }
+            CallSiteType::Indirect => {
+                // Indirect call - use existing logic but prefer same-file
+                candidates
+                    .iter()
+                    .filter(|func| {
+                        Self::is_function_match(func, &normalized_name, &call.callee_name)
+                    })
+                    .cloned()
+                    .collect()
+            }
+        };
 
         if matching_candidates.is_empty() {
             return None;
@@ -354,6 +505,56 @@ impl<'a> CallResolver<'a> {
             format!("{}::{}", recv_type, method_name)
         } else {
             method_name.to_string()
+        }
+    }
+
+    /// Check if a method name belongs to a standard library trait
+    pub fn is_std_trait_method(method_name: &str) -> bool {
+        matches!(
+            method_name,
+            // Iterator methods
+            "any" | "all" | "map" | "filter" | "fold" | "reduce" |
+            "collect" | "find" | "position" | "enumerate" | "zip" |
+            "chain" | "flat_map" | "flatten" | "skip" | "take" |
+            "cloned" | "copied" | "cycle" | "rev" | "peekable" |
+            "for_each" | "nth" | "last" | "step_by" | "scan" |
+            "fuse" | "inspect" | "partition" | "try_fold" | "try_for_each" |
+
+            // Option/Result methods
+            "unwrap" | "expect" | "unwrap_or" | "unwrap_or_else" |
+            "and_then" | "or_else" | "is_some" | "is_none" |
+            "is_ok" | "is_err" | "as_ref" | "as_mut" | "ok" | "err" |
+            "transpose" | "unwrap_or_default" |
+
+            // Common trait methods
+            "clone" | "to_string" | "to_owned" | "into" | "from" |
+            "default" | "eq" | "ne" | "cmp" | "partial_cmp" |
+            "hash" | "fmt" | "display"
+        )
+    }
+
+    /// Infer trait name from method name
+    pub fn infer_trait_name(method_name: &str) -> String {
+        match method_name {
+            "any" | "all" | "filter" | "fold" | "reduce" | "collect" | "find" | "position"
+            | "enumerate" | "zip" | "chain" | "flat_map" | "flatten" | "skip" | "take"
+            | "cloned" | "copied" | "cycle" | "rev" | "peekable" | "for_each" | "nth" | "last"
+            | "step_by" | "scan" | "fuse" | "inspect" | "partition" | "try_fold"
+            | "try_for_each" => "Iterator".to_string(),
+
+            "map" => "IteratorOrOption".to_string(), // Ambiguous
+
+            "unwrap" | "expect" | "unwrap_or" | "unwrap_or_else" | "and_then" | "or_else"
+            | "is_some" | "is_none" | "is_ok" | "is_err" | "as_ref" | "as_mut" | "ok" | "err"
+            | "transpose" | "unwrap_or_default" => "Option".to_string(),
+
+            "clone" => "Clone".to_string(),
+            "to_string" | "display" => "ToString".to_string(),
+            "fmt" => "Display".to_string(),
+            "default" => "Default".to_string(),
+            "hash" => "Hash".to_string(),
+
+            _ => "Unknown".to_string(),
         }
     }
 }
