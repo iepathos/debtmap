@@ -256,6 +256,7 @@ pub struct OrchestratorDetectionConfig {
 }
 
 /// Constructor detection configuration (spec 117, enhanced by spec 122)
+/// Also used for enum converter detection (spec 124)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstructorDetectionConfig {
     /// Name patterns for constructor functions
@@ -266,7 +267,8 @@ pub struct ConstructorDetectionConfig {
     #[serde(default = "default_constructor_max_cyclomatic")]
     pub max_cyclomatic: u32,
 
-    /// Maximum cognitive complexity for simple constructors (default: 3)
+    /// Maximum cognitive complexity for simple constructors and enum converters (default: 3)
+    /// Used by spec 124 to filter enum converters
     #[serde(default = "default_constructor_max_cognitive")]
     pub max_cognitive: u32,
 
