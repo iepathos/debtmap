@@ -365,43 +365,51 @@ impl TypeTracker {
 
     /// Resolve function call return type
     fn resolve_function_call_type(&self, call_expr: &ExprCall) -> Option<ResolvedType> {
-        let registry = self.function_registry.as_ref()?;
         let func_path = Self::extract_function_path(&call_expr.func)?;
 
-        // Try to resolve the function
-        if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
-            let type_name = self.resolve_type_name(&return_info);
-            return Some(Self::create_resolved_type(
-                type_name,
-                TypeSource::FunctionReturn,
-                return_info.generic_args.clone(),
-            ));
-        }
-
-        // Check if it's a constructor pattern (Type::new, Type::default, etc.)
+        // Check if it's a constructor pattern FIRST (before requiring registry)
+        // This handles Type::new(), Type::default(), etc. even without full type information
         if let Some((type_name, method_name)) = Self::parse_function_path(&func_path) {
             if Self::is_constructor_method(&method_name) {
-                // Check if this is a known method
-                if let Some(return_info) = registry.resolve_method_return(&type_name, &method_name)
-                {
-                    let resolved_type_name = if return_info.is_self {
-                        type_name
-                    } else {
-                        return_info.type_name.clone()
-                    };
-                    return Some(Self::create_resolved_type(
-                        resolved_type_name,
-                        TypeSource::Constructor,
-                        return_info.generic_args.clone(),
-                    ));
-                } else if matches!(method_name.as_str(), "new" | "default") {
-                    // Assume it returns the type itself for common constructors
+                // If we have a registry, check if it has specific return type info
+                if let Some(registry) = &self.function_registry {
+                    if let Some(return_info) =
+                        registry.resolve_method_return(&type_name, &method_name)
+                    {
+                        let resolved_type_name = if return_info.is_self {
+                            type_name
+                        } else {
+                            return_info.type_name.clone()
+                        };
+                        return Some(Self::create_resolved_type(
+                            resolved_type_name,
+                            TypeSource::Constructor,
+                            return_info.generic_args.clone(),
+                        ));
+                    }
+                }
+
+                // For common constructors (new, default), assume they return the type itself
+                // This is a reasonable heuristic that works in most cases
+                if matches!(method_name.as_str(), "new" | "default" | "from") {
                     return Some(Self::create_resolved_type(
                         type_name,
                         TypeSource::Constructor,
                         Vec::new(),
                     ));
                 }
+            }
+        }
+
+        // Try to resolve via registry (if available)
+        if let Some(registry) = &self.function_registry {
+            if let Some(return_info) = registry.resolve_function_return(&func_path, &[]) {
+                let type_name = self.resolve_type_name(&return_info);
+                return Some(Self::create_resolved_type(
+                    type_name,
+                    TypeSource::FunctionReturn,
+                    return_info.generic_args.clone(),
+                ));
             }
         }
 
