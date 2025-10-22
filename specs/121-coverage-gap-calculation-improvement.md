@@ -772,26 +772,6 @@ proptest! {
 }
 ```
 
-### Integration Tests
-
-**Regression Test**:
-```rust
-#[test]
-fn test_context_matcher_any_gap_reporting() {
-    let analysis = analyze_with_coverage("src/context/rules.rs", "coverage.info");
-
-    let any_func = analysis.find_function("any", 52);
-    let gap_info = any_func.unwrap().coverage_gap;
-
-    // Should report precise gap, not "100%"
-    assert!(gap_info.gap.percentage() < 20.0, "Should report small gap, not 100%");
-    assert_eq!(gap_info.severity, GapSeverity::Small);
-
-    let display = gap_info.gap.format();
-    assert!(display.contains("1 line uncovered") || display.contains("11% gap"));
-}
-```
-
 ## Documentation Requirements
 
 ### User Documentation
