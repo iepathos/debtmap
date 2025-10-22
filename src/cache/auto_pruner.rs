@@ -360,7 +360,11 @@ impl AutoPruner {
 
     /// Pure function: Check if removal targets are met
     fn are_removal_targets_met(removed: (usize, u64), targets: (usize, u64)) -> bool {
-        removed.0 >= targets.0 && removed.1 >= targets.1
+        // If both targets are set (non-zero), both must be met
+        // If only one target is set, only that one must be met
+        let count_met = targets.0 == 0 || removed.0 >= targets.0;
+        let size_met = targets.1 == 0 || removed.1 >= targets.1;
+        count_met && size_met
     }
 
     /// Pure function: Determine if we should continue removing entries
