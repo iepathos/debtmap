@@ -360,7 +360,100 @@ fn default_constructor_max_nesting() -> u32 {
 }
 
 fn default_constructor_ast_detection() -> bool {
-    true // Enabled by default for better accuracy (spec 122)
+    true
+}
+
+// Accessor detection config defaults (spec 125)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccessorDetectionConfig {
+    /// Enable accessor method detection
+    #[serde(default = "default_accessor_enabled")]
+    pub enabled: bool,
+
+    /// Single-word accessor names
+    #[serde(default = "default_accessor_single_word_patterns")]
+    pub single_word_patterns: Vec<String>,
+
+    /// Prefix patterns for accessors
+    #[serde(default = "default_accessor_prefix_patterns")]
+    pub prefix_patterns: Vec<String>,
+
+    /// Maximum cyclomatic complexity
+    #[serde(default = "default_accessor_max_cyclomatic")]
+    pub max_cyclomatic: u32,
+
+    /// Maximum cognitive complexity
+    #[serde(default = "default_accessor_max_cognitive")]
+    pub max_cognitive: u32,
+
+    /// Maximum function length
+    #[serde(default = "default_accessor_max_length")]
+    pub max_length: usize,
+
+    /// Maximum nesting depth
+    #[serde(default = "default_accessor_max_nesting")]
+    pub max_nesting: u32,
+}
+
+impl Default for AccessorDetectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_accessor_enabled(),
+            single_word_patterns: default_accessor_single_word_patterns(),
+            prefix_patterns: default_accessor_prefix_patterns(),
+            max_cyclomatic: default_accessor_max_cyclomatic(),
+            max_cognitive: default_accessor_max_cognitive(),
+            max_length: default_accessor_max_length(),
+            max_nesting: default_accessor_max_nesting(),
+        }
+    }
+}
+
+fn default_accessor_enabled() -> bool {
+    true
+}
+
+fn default_accessor_single_word_patterns() -> Vec<String> {
+    vec![
+        "id".to_string(),
+        "name".to_string(),
+        "value".to_string(),
+        "kind".to_string(),
+        "type".to_string(),
+        "status".to_string(),
+        "code".to_string(),
+        "key".to_string(),
+        "index".to_string(),
+    ]
+}
+
+fn default_accessor_prefix_patterns() -> Vec<String> {
+    vec![
+        "get_".to_string(),
+        "is_".to_string(),
+        "has_".to_string(),
+        "can_".to_string(),
+        "should_".to_string(),
+        "as_".to_string(),
+        "to_".to_string(),
+        "into_".to_string(),
+    ]
+}
+
+fn default_accessor_max_cyclomatic() -> u32 {
+    2
+}
+
+fn default_accessor_max_cognitive() -> u32 {
+    1
+}
+
+fn default_accessor_max_length() -> usize {
+    10
+}
+
+fn default_accessor_max_nesting() -> u32 {
+    1
 }
 
 impl Default for RoleCoverageWeights {
@@ -782,6 +875,10 @@ pub struct ClassificationConfig {
     /// Constructor detection configuration
     #[serde(default)]
     pub constructors: Option<ConstructorDetectionConfig>,
+
+    /// Accessor detection configuration (spec 125)
+    #[serde(default)]
+    pub accessors: Option<AccessorDetectionConfig>,
 }
 
 impl DebtmapConfig {
@@ -1456,6 +1553,15 @@ pub fn get_constructor_detection_config() -> ConstructorDetectionConfig {
         .classification
         .as_ref()
         .and_then(|c| c.constructors.clone())
+        .unwrap_or_default()
+}
+
+/// Get accessor detection configuration (spec 125)
+pub fn get_accessor_detection_config() -> AccessorDetectionConfig {
+    get_config()
+        .classification
+        .as_ref()
+        .and_then(|c| c.accessors.clone())
         .unwrap_or_default()
 }
 

@@ -51,6 +51,12 @@ fn classify_by_rules(
         }
     }
 
+    // Check for accessor methods (Spec 125)
+    // This should come after enum converter detection but before pattern matching
+    if is_accessor_method(func, syn_func) {
+        return Some(FunctionRole::IOWrapper);
+    }
+
     // Check for pattern matching functions (like detect_file_type)
     if is_pattern_matching_function(func, func_id) {
         return Some(FunctionRole::PatternMatch);
@@ -225,6 +231,179 @@ fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn
 /// ```
 fn is_enum_converter_enhanced(func: &FunctionMetrics, syn_func: &syn::ItemFn) -> bool {
     is_enum_converter(func, syn_func)
+}
+
+/// Detect simple accessor/getter methods (spec 125)
+///
+/// Identifies simple accessor and getter methods that should be classified as
+/// IOWrapper instead of PureLogic to reduce their priority score.
+///
+/// # Detection Strategy
+///
+/// 1. Check name matches accessor patterns (id, name, get_*, is_*, etc.)
+/// 2. Verify low complexity (cyclomatic ≤ 2, cognitive ≤ 1)
+/// 3. Check function is short (< 10 lines, nesting ≤ 1)
+/// 4. If AST available, verify body is simple accessor pattern
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Detected as accessor
+/// pub fn id(&self) -> UserId { self.id }
+/// pub fn name(&self) -> &str { &self.name }
+/// pub fn is_active(&self) -> bool { matches!(self.status, Status::Active) }
+///
+/// // NOT detected (complex logic)
+/// pub fn calculate_total(&self) -> f64 {
+///     self.items.iter().map(|i| i.price).sum()
+/// }
+/// ```
+fn is_accessor_method(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) -> bool {
+    let config = crate::config::get_accessor_detection_config();
+
+    // Check if accessor detection is enabled
+    if !config.enabled {
+        return false;
+    }
+
+    // Check name matches accessor pattern
+    if !matches_accessor_name(&func.name, &config) {
+        return false;
+    }
+
+    // Check complexity is minimal
+    if func.cyclomatic > config.max_cyclomatic
+        || func.cognitive > config.max_cognitive
+        || func.length >= config.max_length
+        || func.nesting > config.max_nesting
+    {
+        return false;
+    }
+
+    // If AST available, verify body is simple
+    if let Some(syn_func) = syn_func {
+        if !is_simple_accessor_body(syn_func) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Check if name matches accessor patterns
+fn matches_accessor_name(name: &str, config: &crate::config::AccessorDetectionConfig) -> bool {
+    let name_lower = name.to_lowercase();
+
+    // Single-word accessors
+    if config.single_word_patterns.contains(&name_lower) {
+        return true;
+    }
+
+    // Prefix patterns
+    if config
+        .prefix_patterns
+        .iter()
+        .any(|p| name_lower.starts_with(p))
+    {
+        return true;
+    }
+
+    false
+}
+
+/// Check if function body is simple accessor pattern (AST analysis)
+fn is_simple_accessor_body(syn_func: &syn::ItemFn) -> bool {
+    // Function should take &self (not &mut self)
+    if !has_immutable_self_receiver(syn_func) {
+        return false;
+    }
+
+    // Single statement or expression
+    let stmts = &syn_func.block.stmts;
+    if stmts.is_empty() {
+        return false;
+    }
+
+    // Check for simple patterns
+    match stmts.len() {
+        1 => {
+            // Single expression: self.field, &self.field, self.field.clone()
+            match &stmts[0] {
+                syn::Stmt::Expr(expr, _) => is_simple_accessor_expr(expr),
+                _ => false,
+            }
+        }
+        2 => {
+            // Let binding + return: let x = self.field; x
+            // This is acceptable for accessors
+            is_simple_binding_pattern(stmts)
+        }
+        _ => false, // Multiple statements - too complex
+    }
+}
+
+/// Check if expression is simple accessor pattern
+fn is_simple_accessor_expr(expr: &syn::Expr) -> bool {
+    match expr {
+        // Direct field access: self.field
+        syn::Expr::Field(field_expr) => {
+            matches!(&*field_expr.base, syn::Expr::Path(path)
+                if path.path.is_ident("self"))
+        }
+
+        // Reference to field: &self.field
+        syn::Expr::Reference(ref_expr) => is_simple_accessor_expr(&ref_expr.expr),
+
+        // Method call on field: self.field.clone()
+        syn::Expr::MethodCall(method_call) => {
+            // Must be called on self.field
+            is_simple_accessor_expr(&method_call.receiver)
+                // Common accessor methods
+                && is_simple_accessor_method(&method_call.method)
+        }
+
+        // Simple match or if (for bool accessors)
+        syn::Expr::Match(_) | syn::Expr::If(_) => {
+            // Already validated by complexity metrics
+            // If cognitive ≤ 1, it's simple enough
+            true
+        }
+
+        _ => false,
+    }
+}
+
+/// Check if method is a simple accessor method
+fn is_simple_accessor_method(method: &syn::Ident) -> bool {
+    matches!(
+        method.to_string().as_str(),
+        "clone" | "to_string" | "as_ref" | "as_str" | "as_bytes" | "copied"
+    )
+}
+
+/// Check if function has immutable self receiver
+fn has_immutable_self_receiver(syn_func: &syn::ItemFn) -> bool {
+    if let Some(syn::FnArg::Receiver(receiver)) = syn_func.sig.inputs.first() {
+        receiver.mutability.is_none()
+    } else {
+        false
+    }
+}
+
+/// Check if statements follow simple binding pattern
+fn is_simple_binding_pattern(stmts: &[syn::Stmt]) -> bool {
+    if stmts.len() != 2 {
+        return false;
+    }
+
+    // First statement should be a let binding
+    let _binding = match &stmts[0] {
+        syn::Stmt::Local(_) => true,
+        _ => return false,
+    };
+
+    // Second statement should be an expression (return value)
+    matches!(&stmts[1], syn::Stmt::Expr(_, _))
 }
 
 // Pure function to check if a function is a pattern matching function
@@ -1340,6 +1519,283 @@ mod tests {
         assert!(
             is_constructor_enhanced(&func, None),
             "Should fallback to name-based when AST unavailable"
+        );
+    }
+
+    // Accessor detection tests (spec 125)
+
+    #[test]
+    fn test_simple_field_accessor_detected() {
+        let metrics = create_test_metrics("id", 1, 0, 3);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "id() should be detected as accessor"
+        );
+
+        let metrics = create_test_metrics("get_name", 1, 0, 5);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "get_name() should be detected as accessor"
+        );
+    }
+
+    #[test]
+    fn test_bool_accessor_detected() {
+        let metrics = create_test_metrics("is_active", 2, 1, 8);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "is_active() should be detected as accessor"
+        );
+
+        let metrics = create_test_metrics("has_permission", 2, 0, 5);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "has_permission() should be detected as accessor"
+        );
+    }
+
+    #[test]
+    fn test_converter_method_detected() {
+        let metrics = create_test_metrics("as_str", 1, 0, 3);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "as_str() should be detected as accessor"
+        );
+
+        let metrics = create_test_metrics("to_string", 1, 0, 4);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "to_string() should be detected as accessor"
+        );
+    }
+
+    #[test]
+    fn test_complex_method_not_detected_as_accessor() {
+        // High complexity despite accessor name
+        let metrics = create_test_metrics("get_value", 5, 3, 20);
+        assert!(
+            !is_accessor_method(&metrics, None),
+            "Complex method should not be detected as accessor"
+        );
+    }
+
+    #[test]
+    fn test_business_logic_not_misclassified_as_accessor() {
+        // Business logic method
+        let metrics = create_test_metrics("calculate_total", 4, 2, 15);
+        assert!(
+            !is_accessor_method(&metrics, None),
+            "Business logic should not be detected as accessor"
+        );
+    }
+
+    #[test]
+    fn test_ast_body_validation_for_accessor() {
+        use syn::parse_quote;
+
+        let code: syn::ItemFn = parse_quote! {
+            pub fn id(&self) -> u32 {
+                self.id
+            }
+        };
+
+        assert!(
+            is_simple_accessor_body(&code),
+            "Simple field access should be valid accessor body"
+        );
+    }
+
+    #[test]
+    fn test_accessor_side_effect_rejected() {
+        use syn::parse_quote;
+
+        let code: syn::ItemFn = parse_quote! {
+            pub fn get_value(&self) -> i32 {
+                self.counter.fetch_add(1, Ordering::SeqCst);
+                self.value
+            }
+        };
+
+        assert!(
+            !is_simple_accessor_body(&code),
+            "Accessor with side effects should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_accessor_classification_integration() {
+        let graph = CallGraph::new();
+
+        // Simple accessor should be IOWrapper
+        let func = create_test_metrics("id", 1, 0, 3);
+        let func_id = FunctionId {
+            file: PathBuf::from("user.rs"),
+            name: "id".to_string(),
+            line: 10,
+        };
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::IOWrapper,
+            "Simple accessor should be classified as IOWrapper"
+        );
+    }
+
+    #[test]
+    fn test_accessor_with_reference_return() {
+        use syn::parse_quote;
+
+        let code: syn::ItemFn = parse_quote! {
+            pub fn name(&self) -> &str {
+                &self.name
+            }
+        };
+
+        assert!(
+            is_simple_accessor_body(&code),
+            "Reference to field should be valid accessor body"
+        );
+    }
+
+    #[test]
+    fn test_accessor_with_method_call() {
+        use syn::parse_quote;
+
+        let code: syn::ItemFn = parse_quote! {
+            pub fn name(&self) -> String {
+                self.name.clone()
+            }
+        };
+
+        assert!(
+            is_simple_accessor_body(&code),
+            "Field with .clone() should be valid accessor body"
+        );
+    }
+
+    #[test]
+    fn test_accessor_single_word_patterns() {
+        // Test all single-word patterns
+        for name in &[
+            "id", "name", "value", "kind", "type", "status", "code", "key", "index",
+        ] {
+            let metrics = create_test_metrics(name, 1, 0, 3);
+            assert!(
+                is_accessor_method(&metrics, None),
+                "{} should be detected as accessor",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_accessor_prefix_patterns() {
+        // Test all prefix patterns
+        for (name, expected) in &[
+            ("get_value", true),
+            ("is_active", true),
+            ("has_data", true),
+            ("can_execute", true),
+            ("should_run", true),
+            ("as_str", true),
+            ("to_string", true),
+            ("into_iter", true),
+        ] {
+            let metrics = create_test_metrics(name, 1, 0, 5);
+            assert_eq!(
+                is_accessor_method(&metrics, None),
+                *expected,
+                "{} accessor detection mismatch",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_accessor_complexity_thresholds() {
+        // At threshold (should pass)
+        let metrics = create_test_metrics("get_value", 2, 1, 9);
+        assert!(
+            is_accessor_method(&metrics, None),
+            "At threshold should be detected"
+        );
+
+        // Over cyclomatic threshold (should fail)
+        let metrics = create_test_metrics("get_value", 3, 1, 9);
+        assert!(
+            !is_accessor_method(&metrics, None),
+            "Over cyclomatic threshold should not be detected"
+        );
+
+        // Over cognitive threshold (should fail)
+        let metrics = create_test_metrics("get_value", 2, 2, 9);
+        assert!(
+            !is_accessor_method(&metrics, None),
+            "Over cognitive threshold should not be detected"
+        );
+
+        // Over length threshold (should fail)
+        let metrics = create_test_metrics("get_value", 2, 1, 10);
+        assert!(
+            !is_accessor_method(&metrics, None),
+            "At or over length threshold should not be detected"
+        );
+    }
+
+    #[test]
+    fn test_accessor_requires_immutable_self() {
+        use syn::parse_quote;
+
+        // Immutable self - should pass
+        let code: syn::ItemFn = parse_quote! {
+            pub fn value(&self) -> i32 {
+                self.value
+            }
+        };
+
+        assert!(
+            is_simple_accessor_body(&code),
+            "Immutable self should be valid"
+        );
+
+        // Mutable self - should fail
+        let code: syn::ItemFn = parse_quote! {
+            pub fn value(&mut self) -> i32 {
+                self.value
+            }
+        };
+
+        assert!(
+            !is_simple_accessor_body(&code),
+            "Mutable self should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_accessor_precedence_in_classification() {
+        use syn::parse_quote;
+
+        let graph = CallGraph::new();
+
+        let code: syn::ItemFn = parse_quote! {
+            pub fn id(&self) -> u32 {
+                self.id
+            }
+        };
+
+        let func = create_test_metrics("id", 1, 0, 3);
+        let func_id = FunctionId {
+            file: PathBuf::from("test.rs"),
+            name: "id".to_string(),
+            line: 10,
+        };
+
+        let role = classify_by_rules(&func, &func_id, &graph, Some(&code));
+        assert_eq!(
+            role,
+            Some(FunctionRole::IOWrapper),
+            "Accessor should be classified as IOWrapper"
         );
     }
 }
