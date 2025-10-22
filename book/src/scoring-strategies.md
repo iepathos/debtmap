@@ -296,6 +296,11 @@ Constructor detection is fully configurable in `.debtmap.toml`:
 
 ```toml
 [classification.constructors]
+# Enable AST-based constructor detection (default: true)
+# When enabled, uses Abstract Syntax Tree analysis for accurate detection
+# Disable only if experiencing performance issues with very large codebases
+ast_detection = true
+
 # Constructor name patterns
 patterns = [
     "new",
@@ -324,6 +329,8 @@ To add custom constructor patterns or adjust thresholds:
 
 ```toml
 [classification.constructors]
+ast_detection = true      # Keep AST detection enabled (recommended)
+
 patterns = [
     "new",
     "default",
@@ -334,6 +341,14 @@ patterns = [
 ]
 max_cyclomatic = 3    # Allow slightly more complex constructors
 max_length = 20       # Allow longer constructors
+```
+
+To disable AST-based detection (if experiencing performance issues):
+
+```toml
+[classification.constructors]
+ast_detection = false     # Fall back to pattern-only matching
+# Note: May reduce detection accuracy but improves performance
 ```
 
 This feature is part of spec 117 and helps reduce false positives in priority scoring.

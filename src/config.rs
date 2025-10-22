@@ -255,7 +255,7 @@ pub struct OrchestratorDetectionConfig {
     pub cognitive_weight: f64,
 }
 
-/// Constructor detection configuration (spec 117)
+/// Constructor detection configuration (spec 117, enhanced by spec 122)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstructorDetectionConfig {
     /// Name patterns for constructor functions
@@ -277,6 +277,12 @@ pub struct ConstructorDetectionConfig {
     /// Maximum nesting depth for simple constructors (default: 1)
     #[serde(default = "default_constructor_max_nesting")]
     pub max_nesting: u32,
+
+    /// Enable AST-based constructor detection (spec 122)
+    /// When enabled, analyzes function return types and body patterns
+    /// to detect non-standard constructors (default: true)
+    #[serde(default = "default_constructor_ast_detection")]
+    pub ast_detection: bool,
 }
 
 impl Default for OrchestratorDetectionConfig {
@@ -314,6 +320,7 @@ impl Default for ConstructorDetectionConfig {
             max_cognitive: default_constructor_max_cognitive(),
             max_length: default_constructor_max_length(),
             max_nesting: default_constructor_max_nesting(),
+            ast_detection: default_constructor_ast_detection(),
         }
     }
 }
@@ -348,6 +355,10 @@ fn default_constructor_max_length() -> usize {
 
 fn default_constructor_max_nesting() -> u32 {
     1
+}
+
+fn default_constructor_ast_detection() -> bool {
+    true // Enabled by default for better accuracy (spec 122)
 }
 
 impl Default for RoleCoverageWeights {

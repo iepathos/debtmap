@@ -142,3 +142,7 @@ harness = false
 [[bench]]
 name = "python_import_resolution_bench"
 harness = false
+
+[[bench]]
+name = "constructor_detection_bench"
+harness = false
