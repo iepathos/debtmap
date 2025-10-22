@@ -215,6 +215,84 @@ Number of lines in a function. Long functions often violate single responsibilit
 - Often violates single responsibility
 - Difficult to reuse
 
+### Constructor Detection
+
+Debtmap identifies constructor functions using AST-based analysis (Spec 122), which goes beyond simple name-based detection to catch non-standard constructor patterns.
+
+**Detection Strategy:**
+
+1. **Return Type Analysis**: Functions returning `Self`, `Result<Self>`, or `Option<Self>`
+2. **Body Pattern Analysis**: Struct initialization or simple field assignments
+3. **Complexity Check**: Low cyclomatic complexity (≤5), no loops, minimal branching
+
+**Why AST-based detection?**
+
+Name-based detection (looking for `new`, `new_*`, `from_*`) misses non-standard constructors:
+
+```rust
+// Caught by name-based detection
+fn new() -> Self {
+    Self { timeout: 30 }
+}
+
+// Missed by name-based, caught by AST detection
+pub fn create_default_client() -> Self {
+    Self { timeout: Duration::from_secs(30) }
+}
+
+pub fn initialized() -> Self {
+    Self::new()
+}
+```
+
+**Builder vs Constructor:**
+
+AST analysis distinguishes between constructors and builder methods:
+
+```rust
+// Constructor: creates new instance
+pub fn new(timeout: u32) -> Self {
+    Self { timeout }
+}
+
+// Builder method: modifies existing instance (NOT a constructor)
+pub fn set_timeout(mut self, timeout: Duration) -> Self {
+    self.timeout = timeout;
+    self  // Returns modified self, not new instance
+}
+```
+
+**Detection Criteria:**
+
+A function is classified as a constructor if:
+- Returns `Self`, `Result<Self>`, or `Option<Self>`
+- Contains struct initialization (`Self { ... }`) without loops
+- OR delegates to another constructor (`Self::new()`) with minimal logic
+
+**Fallback Behavior:**
+
+If AST parsing fails (syntax errors, unsupported language), Debtmap gracefully falls back to name-based detection (Spec 117):
+- `new`, `new_*`
+- `try_new*`
+- `from_*`
+
+This ensures analysis always completes, even on partially broken code.
+
+**Performance:**
+
+AST-based detection adds < 5% overhead compared to name-only detection. See benchmarks:
+
+```bash
+cargo bench --bench constructor_detection_bench
+```
+
+**Why it matters:**
+
+Accurately identifying constructors helps:
+- Exclude them from complexity thresholds (constructors naturally have high complexity)
+- Focus refactoring on business logic, not initialization code
+- Understand initialization patterns across the codebase
+
 ## Debt Patterns
 
 Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
