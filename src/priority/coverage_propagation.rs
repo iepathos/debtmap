@@ -1,106 +1,105 @@
-///! Indirect coverage detection through call graph analysis (Spec 120)
-///!
-///! This module implements algorithms to detect functions that are indirectly covered
-///! through their well-tested callers, reducing false positives in testing gap detection.
-///!
-///! # Algorithm Overview
-///!
-///! The indirect coverage algorithm propagates test coverage from well-tested functions
-///! (≥80% coverage) to their callees through the call graph. Coverage contributions are
-///! discounted by distance to account for reduced confidence at each hop.
-///!
-///! ## Key Concepts
-///!
-///! - **Direct Coverage**: Coverage from tests directly targeting a function
-///! - **Indirect Coverage**: Coverage from tests targeting functions that call this function
-///! - **Effective Coverage**: Maximum of direct and indirect coverage
-///! - **Distance Discount**: 70% per hop (e.g., 2 hops = 0.7² = 49% of caller's coverage)
-///!
-///! ## Example
-///!
-///! Given this call chain: `test_c()` → `c()` [90% coverage] → `f()` [0% direct]
-///!
-///! Function `f()`:
-///! - Direct coverage: 0%
-///! - Indirect coverage: 90% × 0.7⁰ = 90% (distance 0, one hop from caller)
-///! - Effective coverage: max(0%, 90%) = 90%
-///!
-///! With a longer chain: `test_b()` → `b()` [95% coverage] → `c()` [10%] → `f()` [0%]
-///!
-///! Function `f()`:
-///! - Direct coverage: 0%
-///! - Indirect from c: 10% × 0.7⁰ = 10%
-///! - Indirect from b: 95% × 0.7¹ = 66.5% (distance 1, two hops from caller)
-///! - Effective coverage: max(0%, 66.5%) = 66.5%
-///!
-///! ## Design Decisions
-///!
-///! 1. **Well-Tested Threshold (80%)**: Functions must have ≥80% direct coverage to
-///!    contribute to indirect coverage. This ensures high confidence in the test suite.
-///!
-///! 2. **Distance Discount (70% per hop)**: Each level of indirection reduces contribution
-///!    by 30%, reflecting decreased confidence. After 3 hops, contribution drops below
-///!    practical significance (~34%).
-///!
-///! 3. **Maximum Distance (3 hops)**: Limits recursion depth to prevent exponential
-///!    complexity and filter out weak indirect coverage signals.
-///!
-///! 4. **Circular Dependency Handling**: Uses a visited set to prevent infinite loops
-///!    in circular call graphs.
-///!
-///! 5. **Maximum Aggregation**: Takes the maximum contribution from multiple sources
-///!    rather than summing to avoid double-counting coverage.
-///!
-///! ## Usage
-///!
-///! ```rust,ignore
-///! use debtmap::priority::coverage_propagation::calculate_indirect_coverage;
-///! use debtmap::priority::call_graph::{CallGraph, FunctionId};
-///! use debtmap::risk::lcov::LcovData;
-///! use std::path::PathBuf;
-///!
-///! let call_graph = CallGraph::new();
-///! let coverage = LcovData::default();
-///!
-///! let func_id = FunctionId {
-///!     file: PathBuf::from("src/lib.rs"),
-///!     name: "my_function".to_string(),
-///!     line: 42,
-///! };
-///!
-///! let complete = calculate_indirect_coverage(&func_id, &call_graph, &coverage);
-///! println!("Direct: {:.1}%, Indirect: {:.1}%, Effective: {:.1}%",
-///!          complete.direct_coverage * 100.0,
-///!          complete.indirect_coverage * 100.0,
-///!          complete.effective_coverage * 100.0);
-///!
-///! for source in &complete.coverage_sources {
-///!     println!("  From {} @ distance {}: {:.1}%",
-///!              source.caller.name,
-///!              source.distance,
-///!              source.contributed_coverage * 100.0);
-///! }
-///! ```
-///!
-///! ## Configuration
-///!
-///! The algorithm uses these tunable constants (defined in `analyze_caller_coverage`):
-///!
-///! - `MAX_DEPTH = 3`: Maximum call chain depth to traverse
-///! - `DISTANCE_DISCOUNT = 0.7`: Coverage discount per hop (70%)
-///! - Well-tested threshold: 0.8 (80% coverage)
-///!
-///! To adjust these, modify the constants in the function implementation.
-///!
-///! ## Performance
-///!
-///! - **Time Complexity**: O(V + E × D) where V = vertices (functions), E = edges (calls),
-///!   D = max depth. Bounded by MAX_DEPTH to prevent exponential growth.
-///! - **Space Complexity**: O(D) for the visited set during recursion.
-///!
-///! The algorithm is efficient for typical codebases but may be slower on very dense
-///! call graphs with many highly-connected functions.
-
+//! Indirect coverage detection through call graph analysis (Spec 120)
+//!
+//! This module implements algorithms to detect functions that are indirectly covered
+//! through their well-tested callers, reducing false positives in testing gap detection.
+//!
+//! # Algorithm Overview
+//!
+//! The indirect coverage algorithm propagates test coverage from well-tested functions
+//! (≥80% coverage) to their callees through the call graph. Coverage contributions are
+//! discounted by distance to account for reduced confidence at each hop.
+//!
+//! ## Key Concepts
+//!
+//! - **Direct Coverage**: Coverage from tests directly targeting a function
+//! - **Indirect Coverage**: Coverage from tests targeting functions that call this function
+//! - **Effective Coverage**: Maximum of direct and indirect coverage
+//! - **Distance Discount**: 70% per hop (e.g., 2 hops = 0.7² = 49% of caller's coverage)
+//!
+//! ## Example
+//!
+//! Given this call chain: `test_c()` → `c()` [90% coverage] → `f()` [0% direct]
+//!
+//! Function `f()`:
+//! - Direct coverage: 0%
+//! - Indirect coverage: 90% × 0.7⁰ = 90% (distance 0, one hop from caller)
+//! - Effective coverage: max(0%, 90%) = 90%
+//!
+//! With a longer chain: `test_b()` → `b()` [95% coverage] → `c()` [10%] → `f()` [0%]
+//!
+//! Function `f()`:
+//! - Direct coverage: 0%
+//! - Indirect from c: 10% × 0.7⁰ = 10%
+//! - Indirect from b: 95% × 0.7¹ = 66.5% (distance 1, two hops from caller)
+//! - Effective coverage: max(0%, 66.5%) = 66.5%
+//!
+//! ## Design Decisions
+//!
+//! 1. **Well-Tested Threshold (80%)**: Functions must have ≥80% direct coverage to
+//!    contribute to indirect coverage. This ensures high confidence in the test suite.
+//!
+//! 2. **Distance Discount (70% per hop)**: Each level of indirection reduces contribution
+//!    by 30%, reflecting decreased confidence. After 3 hops, contribution drops below
+//!    practical significance (~34%).
+//!
+//! 3. **Maximum Distance (3 hops)**: Limits recursion depth to prevent exponential
+//!    complexity and filter out weak indirect coverage signals.
+//!
+//! 4. **Circular Dependency Handling**: Uses a visited set to prevent infinite loops
+//!    in circular call graphs.
+//!
+//! 5. **Maximum Aggregation**: Takes the maximum contribution from multiple sources
+//!    rather than summing to avoid double-counting coverage.
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use debtmap::priority::coverage_propagation::calculate_indirect_coverage;
+//! use debtmap::priority::call_graph::{CallGraph, FunctionId};
+//! use debtmap::risk::lcov::LcovData;
+//! use std::path::PathBuf;
+//!
+//! let call_graph = CallGraph::new();
+//! let coverage = LcovData::default();
+//!
+//! let func_id = FunctionId {
+//!     file: PathBuf::from("src/lib.rs"),
+//!     name: "my_function".to_string(),
+//!     line: 42,
+//! };
+//!
+//! let complete = calculate_indirect_coverage(&func_id, &call_graph, &coverage);
+//! println!("Direct: {:.1}%, Indirect: {:.1}%, Effective: {:.1}%",
+//!          complete.direct_coverage * 100.0,
+//!          complete.indirect_coverage * 100.0,
+//!          complete.effective_coverage * 100.0);
+//!
+//! for source in &complete.coverage_sources {
+//!     println!("  From {} @ distance {}: {:.1}%",
+//!              source.caller.name,
+//!              source.distance,
+//!              source.contributed_coverage * 100.0);
+//! }
+//! ```
+//!
+//! ## Configuration
+//!
+//! The algorithm uses these tunable constants (defined in `analyze_caller_coverage`):
+//!
+//! - `MAX_DEPTH = 3`: Maximum call chain depth to traverse
+//! - `DISTANCE_DISCOUNT = 0.7`: Coverage discount per hop (70%)
+//! - Well-tested threshold: 0.8 (80% coverage)
+//!
+//! To adjust these, modify the constants in the function implementation.
+//!
+//! ## Performance
+//!
+//! - **Time Complexity**: O(V + E × D) where V = vertices (functions), E = edges (calls),
+//!   D = max depth. Bounded by MAX_DEPTH to prevent exponential growth.
+//! - **Space Complexity**: O(D) for the visited set during recursion.
+//!
+//! The algorithm is efficient for typical codebases but may be slower on very dense
+//! call graphs with many highly-connected functions.
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::risk::lcov::LcovData;
 use serde::{Deserialize, Serialize};

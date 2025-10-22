@@ -85,7 +85,7 @@ impl CoverageRiskAnalyzer {
         }
 
         // Calculate both direct and indirect coverage using spec 120 algorithm
-        let (coverage_percentage, effective_coverage) = if let Some(coverage) = coverage_data {
+        let (_coverage_percentage, effective_coverage) = if let Some(coverage) = coverage_data {
             let func_id = FunctionId {
                 file: function.file.clone(),
                 name: function.function.clone(),
@@ -174,20 +174,6 @@ impl CoverageRiskAnalyzer {
             remediation_actions: vec![],
             weight: 0.0,
             confidence: 1.0,
-        }
-    }
-
-    fn get_coverage_percentage(
-        &self,
-        function: &FunctionAnalysis,
-        coverage_data: Option<&LcovData>,
-    ) -> f64 {
-        if let Some(coverage) = coverage_data {
-            coverage
-                .get_function_coverage_with_line(&function.file, &function.function, function.line)
-                .unwrap_or(0.0)
-        } else {
-            0.0 // No coverage data means untested
         }
     }
 
