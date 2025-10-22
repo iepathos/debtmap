@@ -2,6 +2,8 @@ use super::{
     ComparisonResult, CoverageEvidence, RemediationAction, RiskEvidence, RiskFactor, RiskSeverity,
     RiskType, TestQuality, TestType,
 };
+use crate::priority::call_graph::{CallGraph, FunctionId};
+use crate::priority::coverage_propagation::calculate_indirect_coverage;
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::FunctionAnalysis;
 use crate::risk::evidence::RiskContext;
@@ -75,42 +77,62 @@ impl CoverageRiskAnalyzer {
         function: &FunctionAnalysis,
         context: &RiskContext,
         coverage_data: Option<&LcovData>,
+        call_graph: &CallGraph,
     ) -> RiskFactor {
         // Test functions don't need coverage themselves
         if function.is_test {
             return self.create_test_function_factor(function);
         }
 
-        let coverage_percentage = self.get_coverage_percentage(function, coverage_data);
+        // Calculate both direct and indirect coverage using spec 120 algorithm
+        let (_coverage_percentage, effective_coverage) = if let Some(coverage) = coverage_data {
+            let func_id = FunctionId {
+                file: function.file.clone(),
+                name: function.function.clone(),
+                line: function.line,
+            };
+
+            let complete_coverage = calculate_indirect_coverage(&func_id, call_graph, coverage);
+
+            // Convert from fraction (0.0-1.0) to percentage (0.0-100.0)
+            let direct_pct = complete_coverage.direct_coverage * 100.0;
+            let effective_pct = complete_coverage.effective_coverage * 100.0;
+
+            (direct_pct, effective_pct)
+        } else {
+            (0.0, 0.0)
+        };
+
+        // Use effective coverage (including indirect) for risk calculations
         let critical_paths_uncovered =
-            self.count_uncovered_critical_paths(function, coverage_percentage, context.role);
+            self.count_uncovered_critical_paths(function, effective_coverage, context.role);
         let test_quality =
-            self.assess_test_quality(coverage_percentage, function.cyclomatic_complexity);
+            self.assess_test_quality(effective_coverage, function.cyclomatic_complexity);
 
         // Role-adjusted coverage thresholds
         let adjusted_thresholds = self.adjust_for_role(&context.role);
 
         let coverage_score = self.calculate_coverage_risk(
-            coverage_percentage,
+            effective_coverage,
             critical_paths_uncovered,
             &test_quality,
             &adjusted_thresholds,
         );
 
-        let comparison = self.compare_to_baseline(coverage_percentage, &context.role);
+        let comparison = self.compare_to_baseline(effective_coverage, &context.role);
 
         let evidence = CoverageEvidence {
-            coverage_percentage,
+            coverage_percentage: effective_coverage,
             critical_paths_uncovered,
             test_count: self
-                .estimate_test_count(coverage_percentage, function.cyclomatic_complexity),
+                .estimate_test_count(effective_coverage, function.cyclomatic_complexity),
             test_quality,
             comparison_to_baseline: comparison,
         };
 
         let severity = self.classify_coverage_severity(coverage_score, &adjusted_thresholds);
         let remediation_actions = self.get_coverage_actions(
-            coverage_percentage,
+            effective_coverage,
             function.cyclomatic_complexity,
             critical_paths_uncovered,
             &severity,
@@ -119,7 +141,7 @@ impl CoverageRiskAnalyzer {
 
         RiskFactor {
             risk_type: RiskType::Coverage {
-                coverage_percentage,
+                coverage_percentage: effective_coverage,
                 critical_paths_uncovered,
                 test_quality,
             },
@@ -128,7 +150,7 @@ impl CoverageRiskAnalyzer {
             evidence: RiskEvidence::Coverage(evidence),
             remediation_actions,
             weight: Self::classify_role_weight(&context.role),
-            confidence: Self::classify_confidence_from_coverage(coverage_percentage),
+            confidence: Self::classify_confidence_from_coverage(effective_coverage),
         }
     }
 
@@ -152,20 +174,6 @@ impl CoverageRiskAnalyzer {
             remediation_actions: vec![],
             weight: 0.0,
             confidence: 1.0,
-        }
-    }
-
-    fn get_coverage_percentage(
-        &self,
-        function: &FunctionAnalysis,
-        coverage_data: Option<&LcovData>,
-    ) -> f64 {
-        if let Some(coverage) = coverage_data {
-            coverage
-                .get_function_coverage_with_line(&function.file, &function.function, function.line)
-                .unwrap_or(0.0)
-        } else {
-            0.0 // No coverage data means untested
         }
     }
 
