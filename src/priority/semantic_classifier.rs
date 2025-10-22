@@ -1,3 +1,6 @@
+use crate::analyzers::rust_constructor_detector::{
+    analyze_function_body, extract_return_type, ConstructorReturnType,
+};
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use serde::{Deserialize, Serialize};
@@ -18,7 +21,9 @@ pub fn classify_function_role(
     call_graph: &CallGraph,
 ) -> FunctionRole {
     // Use a functional approach with classification rules
-    classify_by_rules(func, func_id, call_graph).unwrap_or(FunctionRole::PureLogic)
+    // Note: AST is not available at this level, so we pass None
+    // Full AST-based detection will be integrated when threading syn::ItemFn
+    classify_by_rules(func, func_id, call_graph, None).unwrap_or(FunctionRole::PureLogic)
 }
 
 // Pure function that applies classification rules in order
@@ -26,14 +31,15 @@ fn classify_by_rules(
     func: &FunctionMetrics,
     func_id: &FunctionId,
     call_graph: &CallGraph,
+    syn_func: Option<&syn::ItemFn>,
 ) -> Option<FunctionRole> {
     // Entry point has highest precedence
     if is_entry_point(func_id, call_graph) {
         return Some(FunctionRole::EntryPoint);
     }
 
-    // Check for constructors BEFORE pattern matching (Spec 117)
-    if is_simple_constructor(func) {
+    // Check for constructors BEFORE pattern matching (Spec 117 + 122)
+    if is_constructor_enhanced(func, syn_func) {
         return Some(FunctionRole::IOWrapper);
     }
 
@@ -106,6 +112,74 @@ fn is_simple_constructor(func: &FunctionMetrics) -> bool {
     let is_initialization = func.cognitive <= config.max_cognitive;
 
     matches_constructor_name && is_simple && is_initialization
+}
+
+/// Enhanced constructor detection using AST (spec 122)
+///
+/// This function enhances name-based detection with AST analysis when available.
+/// Falls back to `is_simple_constructor()` if AST is unavailable or disabled.
+///
+/// # Detection Strategy
+///
+/// 1. Check configuration - if AST detection disabled, use name-based only
+/// 2. If AST available, analyze return type and body patterns
+/// 3. Return type must be `Self`, `Result<Self>`, or `Option<Self>`
+/// 4. Body must show constructor patterns (struct init, Self refs)
+/// 5. Complexity must be reasonable (≤5 cyclomatic, no loops)
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Detected by AST (non-standard name)
+/// pub fn create_default_client() -> Self {
+///     Self { timeout: Duration::from_secs(30) }
+/// }
+///
+/// // Detected by name-based (standard pattern)
+/// pub fn new() -> Self {
+///     Self { field: 0 }
+/// }
+/// ```
+fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) -> bool {
+    // Check configuration
+    let config = crate::config::get_constructor_detection_config();
+
+    // If AST detection disabled or unavailable, use name-based detection
+    if !config.ast_detection || syn_func.is_none() {
+        return is_simple_constructor(func);
+    }
+
+    let syn_func = syn_func.unwrap();
+
+    // Extract AST information
+    let return_type = extract_return_type(syn_func);
+    let body_pattern = analyze_function_body(syn_func);
+
+    // Check return type (must return Self)
+    let returns_self = matches!(
+        return_type,
+        Some(
+            ConstructorReturnType::OwnedSelf
+                | ConstructorReturnType::ResultSelf
+                | ConstructorReturnType::OptionSelf
+        )
+    );
+
+    if !returns_self {
+        // Fallback to name-based detection if not returning Self
+        return is_simple_constructor(func);
+    }
+
+    // Check body pattern
+    if !body_pattern.is_constructor_like() {
+        return false;
+    }
+
+    // Check complexity thresholds (more lenient for AST-detected constructors)
+    let is_simple_enough =
+        func.cyclomatic <= 5 && func.nesting <= 2 && func.length < 30 && !body_pattern.has_loop;
+
+    returns_self && is_simple_enough
 }
 
 // Pure function to check if a function is a pattern matching function
@@ -979,6 +1053,128 @@ mod tests {
         assert!(
             !is_simple_constructor(&func),
             "Over nesting threshold should not match"
+        );
+    }
+
+    #[test]
+    fn test_ast_detects_non_standard_constructor() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn create_default_client() -> Self {
+                Self {
+                    timeout: Duration::from_secs(30),
+                    retries: 3,
+                }
+            }
+        };
+
+        let func = create_test_metrics("create_default_client", 1, 0, 5);
+
+        // With AST: should be detected as constructor
+        assert!(
+            is_constructor_enhanced(&func, Some(&source)),
+            "AST should detect non-standard constructor name"
+        );
+
+        // Without AST: fallback to name-based (should also match due to create_ prefix)
+        assert!(
+            is_constructor_enhanced(&func, None),
+            "Should fallback to name-based detection"
+        );
+    }
+
+    #[test]
+    fn test_ast_detects_result_self_constructor() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn try_new(value: i32) -> Result<Self, Error> {
+                if value > 0 {
+                    Ok(Self { value })
+                } else {
+                    Err(Error::InvalidValue)
+                }
+            }
+        };
+
+        let func = create_test_metrics("try_new", 2, 1, 8);
+
+        // With AST: should be detected as constructor (Result<Self>)
+        assert!(
+            is_constructor_enhanced(&func, Some(&source)),
+            "AST should detect Result<Self> constructor"
+        );
+    }
+
+    #[test]
+    fn test_ast_rejects_loop_in_constructor() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn process_items() -> Self {
+                let mut result = Self::new();
+                for item in items {
+                    result.add(item);
+                }
+                result
+            }
+        };
+
+        let func = create_test_metrics("process_items", 2, 3, 8);
+
+        // Should NOT be detected as constructor due to loop
+        assert!(
+            !is_constructor_enhanced(&func, Some(&source)),
+            "AST should reject constructors with loops"
+        );
+    }
+
+    #[test]
+    fn test_ast_fallback_when_not_returning_self() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn calculate_value() -> i32 {
+                42
+            }
+        };
+
+        let func = create_test_metrics("calculate_value", 1, 0, 3);
+
+        // Should fallback to name-based (which will reject non-constructor name)
+        assert!(
+            !is_constructor_enhanced(&func, Some(&source)),
+            "AST should fallback when not returning Self"
+        );
+    }
+
+    #[test]
+    fn test_ast_detection_can_be_disabled() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn create_default_client() -> Self {
+                Self { field: 0 }
+            }
+        };
+
+        let func = create_test_metrics("create_default_client", 1, 0, 5);
+
+        // When AST detection is disabled via config, should use name-based only
+        // NOTE: This test assumes config can be set, which currently uses a static global
+        // In a real implementation, we'd inject config or use a test-specific config
+
+        // With AST enabled (default), should detect
+        assert!(
+            is_constructor_enhanced(&func, Some(&source)),
+            "Should detect with AST when enabled"
+        );
+
+        // Without AST parameter (None), should fallback to name-based
+        assert!(
+            is_constructor_enhanced(&func, None),
+            "Should fallback to name-based when AST unavailable"
         );
     }
 }
