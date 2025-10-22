@@ -191,7 +191,9 @@ impl<'a> CallResolver<'a> {
                     // This preserves existing behavior for user-defined methods
                     candidates
                         .iter()
-                        .filter(|func| Self::is_function_match(func, &normalized_name, &call.callee_name))
+                        .filter(|func| {
+                            Self::is_function_match(func, &normalized_name, &call.callee_name)
+                        })
                         .cloned()
                         .collect()
                 }
