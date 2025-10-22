@@ -1,6 +1,7 @@
 use crate::analyzers::rust_constructor_detector::{
     analyze_function_body, extract_return_type, ConstructorReturnType,
 };
+use crate::analyzers::rust_enum_converter_detector::is_enum_converter;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use serde::{Deserialize, Serialize};
@@ -41,6 +42,13 @@ fn classify_by_rules(
     // Check for constructors BEFORE pattern matching (Spec 117 + 122)
     if is_constructor_enhanced(func, syn_func) {
         return Some(FunctionRole::IOWrapper);
+    }
+
+    // Check for enum converters (Spec 124)
+    if let Some(syn_func) = syn_func {
+        if is_enum_converter_enhanced(func, syn_func) {
+            return Some(FunctionRole::IOWrapper);
+        }
     }
 
     // Check for pattern matching functions (like detect_file_type)
@@ -180,6 +188,43 @@ fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn
         func.cyclomatic <= 5 && func.nesting <= 2 && func.length < 30 && !body_pattern.has_loop;
 
     returns_self && is_simple_enough
+}
+
+/// Enhanced enum converter detection using AST (spec 124)
+///
+/// This function detects simple enum-to-string converter functions that are
+/// flagged as CRITICAL but are just data accessors.
+///
+/// # Detection Strategy
+///
+/// 1. Check name matches converter patterns (name, as_str, to_*, etc.)
+/// 2. Verify low cognitive complexity (≤3)
+/// 3. Analyze function body for exhaustive match returning only literals
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Detected as enum converter
+/// impl FrameworkType {
+///     pub fn name(&self) -> &'static str {
+///         match self {
+///             FrameworkType::Django => "Django",
+///             FrameworkType::Flask => "Flask",
+///         }
+///     }
+/// }
+///
+/// // NOT detected (has function calls)
+/// impl BuiltinException {
+///     pub fn message(&self) -> String {
+///         match self {
+///             Self::ValueError => format!("Invalid value"),
+///         }
+///     }
+/// }
+/// ```
+fn is_enum_converter_enhanced(func: &FunctionMetrics, syn_func: &syn::ItemFn) -> bool {
+    is_enum_converter(func, syn_func)
 }
 
 // Pure function to check if a function is a pattern matching function
@@ -1146,6 +1191,126 @@ mod tests {
         assert!(
             !is_constructor_enhanced(&func, Some(&source)),
             "AST should fallback when not returning Self"
+        );
+    }
+
+    #[test]
+    fn test_enum_converter_framework_type_name() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn name(&self) -> &'static str {
+                match self {
+                    FrameworkType::Django => "Django",
+                    FrameworkType::Flask => "Flask",
+                    FrameworkType::PyQt => "PyQt",
+                }
+            }
+        };
+
+        let func = create_test_metrics("name", 3, 0, 7);
+
+        // Should be detected as enum converter
+        assert!(
+            is_enum_converter_enhanced(&func, &source),
+            "FrameworkType::name should be detected as enum converter"
+        );
+    }
+
+    #[test]
+    fn test_enum_converter_builtin_exception_as_str() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            fn as_str(&self) -> &str {
+                match self {
+                    Self::BaseException => "BaseException",
+                    Self::ValueError => "ValueError",
+                    Self::TypeError => "TypeError",
+                }
+            }
+        };
+
+        let func = create_test_metrics("as_str", 3, 0, 7);
+
+        // Should be detected as enum converter
+        assert!(
+            is_enum_converter_enhanced(&func, &source),
+            "BuiltinException::as_str should be detected as enum converter"
+        );
+    }
+
+    #[test]
+    fn test_enum_converter_with_function_calls_not_detected() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn process(&self) -> String {
+                match self {
+                    Variant::A => format!("A"),
+                    Variant::B => format!("B"),
+                }
+            }
+        };
+
+        let func = create_test_metrics("process", 2, 1, 7);
+
+        // Should NOT be detected (has function calls)
+        assert!(
+            !is_enum_converter_enhanced(&func, &source),
+            "Converter with function calls should NOT be detected"
+        );
+    }
+
+    #[test]
+    fn test_enum_converter_high_cognitive_complexity_rejected() {
+        use syn::parse_quote;
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn name(&self) -> &'static str {
+                match self {
+                    Type::A => "A",
+                    Type::B => "B",
+                }
+            }
+        };
+
+        let func = create_test_metrics("name", 2, 5, 7); // cognitive = 5
+
+        // Should be rejected due to high cognitive complexity
+        assert!(
+            !is_enum_converter_enhanced(&func, &source),
+            "High cognitive complexity should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_enum_converter_classification_precedence() {
+        use syn::parse_quote;
+
+        let graph = CallGraph::new();
+
+        let source: syn::ItemFn = parse_quote! {
+            pub fn name(&self) -> &'static str {
+                match self {
+                    FrameworkType::Django => "Django",
+                    FrameworkType::Flask => "Flask",
+                }
+            }
+        };
+
+        let func = create_test_metrics("name", 2, 0, 7);
+        let func_id = FunctionId {
+            file: PathBuf::from("framework.rs"),
+            name: "name".to_string(),
+            line: 10,
+        };
+
+        let role = classify_by_rules(&func, &func_id, &graph, Some(&source));
+        assert_eq!(
+            role,
+            Some(FunctionRole::IOWrapper),
+            "Enum converter should be classified as IOWrapper"
         );
     }
 
