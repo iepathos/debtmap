@@ -74,6 +74,16 @@ fn format_coverage_factor_description(
     }
 }
 
+// Pure function to get gap severity indicator based on gap percentage
+fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
+    match gap_percentage {
+        p if p <= 25.0 => "🟡 LOW",
+        p if p <= 50.0 => "🟠 MODERATE",
+        p if p <= 75.0 => "🔴 HIGH",
+        _ => "🔴🔴 CRITICAL",
+    }
+}
+
 // Pure function to classify coverage contribution
 fn classify_coverage_contribution(item: &UnifiedDebtItem) -> &'static str {
     if let Some(ref trans_cov) = item.transitive_coverage {
@@ -863,13 +873,22 @@ fn format_coverage_section(
         let coverage_status = format_coverage_status(coverage_pct);
         let uncovered_summary = format_uncovered_lines_summary(&trans_cov.uncovered_lines, 5);
 
+        // Calculate gap percentage and add severity indicator
+        let gap_pct = 100.0 - coverage_pct;
+        let gap_severity = if gap_pct > 0.0 {
+            format!(" {}", get_gap_severity_indicator(gap_pct))
+        } else {
+            String::new()
+        };
+
         writeln!(
             output,
-            "{} {} {}{}",
+            "{} {} {}{}{}",
             formatter.emoji("├─", "-"),
             "COVERAGE:".bright_blue(),
             coverage_status.bright_yellow(),
-            uncovered_summary.bright_red()
+            uncovered_summary.bright_red(),
+            gap_severity
         )
         .unwrap();
 
@@ -1118,6 +1137,29 @@ mod tests {
     use super::*;
     use crate::priority::{DebtType, UnifiedDebtItem, UnifiedScore};
     use std::path::PathBuf;
+
+    #[test]
+    fn test_get_gap_severity_indicator() {
+        // LOW: 1-25%
+        assert_eq!(get_gap_severity_indicator(0.0), "🟡 LOW");
+        assert_eq!(get_gap_severity_indicator(10.0), "🟡 LOW");
+        assert_eq!(get_gap_severity_indicator(25.0), "🟡 LOW");
+
+        // MODERATE: 26-50%
+        assert_eq!(get_gap_severity_indicator(26.0), "🟠 MODERATE");
+        assert_eq!(get_gap_severity_indicator(40.0), "🟠 MODERATE");
+        assert_eq!(get_gap_severity_indicator(50.0), "🟠 MODERATE");
+
+        // HIGH: 51-75%
+        assert_eq!(get_gap_severity_indicator(51.0), "🔴 HIGH");
+        assert_eq!(get_gap_severity_indicator(65.0), "🔴 HIGH");
+        assert_eq!(get_gap_severity_indicator(75.0), "🔴 HIGH");
+
+        // CRITICAL: 76-100%
+        assert_eq!(get_gap_severity_indicator(76.0), "🔴🔴 CRITICAL");
+        assert_eq!(get_gap_severity_indicator(90.0), "🔴🔴 CRITICAL");
+        assert_eq!(get_gap_severity_indicator(100.0), "🔴🔴 CRITICAL");
+    }
 
     #[test]
     fn test_classify_coverage_percentage() {

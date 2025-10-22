@@ -17,6 +17,7 @@
 - [Architecture](architecture.md)
 - [Cache Management](cache-management.md)
 - [Context Providers](context-providers.md)
+- [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
 - [Entropy Analysis](entropy-analysis.md)
 - [God Object Detection](god-object-detection.md)
