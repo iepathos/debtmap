@@ -2,22 +2,23 @@
 number: 122
 title: AST-Based Constructor Detection
 category: foundation
-priority: low
+priority: medium
 status: draft
-dependencies: [117]
+dependencies: []
 created: 2025-10-21
+updated: 2025-10-21
 ---
 
 # Specification 122: AST-Based Constructor Detection
 
 **Category**: foundation
-**Priority**: low
+**Priority**: medium
 **Status**: draft
-**Dependencies**: Spec 117 (Constructor Detection and Classification)
+**Dependencies**: None (builds on existing constructor detection in `src/priority/semantic_classifier.rs`)
 
 ## Context
 
-Spec 117 implements name-based constructor detection (e.g., `new`, `from_*`, `with_*`), which catches 80-90% of constructors but misses:
+The existing name-based constructor detection (implemented in `src/priority/semantic_classifier.rs:90-109`) catches 80-90% of constructors using pattern matching (e.g., `new`, `from_*`, `with_*`), but misses:
 
 1. **Non-standard names**: `create_default_client()`, `init_empty()`, `make_server()`
 2. **Builder methods**: `set_timeout()`, `add_header()` (return `Self`)
@@ -42,21 +43,43 @@ pub fn set_timeout(mut self, timeout: Duration) -> Self {
 }
 ```
 
+**Current Implementation** (`src/priority/semantic_classifier.rs:90-109`):
+```rust
+fn is_simple_constructor(func: &FunctionMetrics) -> bool {
+    let config = crate::config::get_constructor_detection_config();
+    let name_lower = func.name.to_lowercase();
+    let matches_constructor_name = config.patterns.iter().any(|pattern| {
+        name_lower == *pattern || name_lower.starts_with(pattern) || name_lower.ends_with(pattern)
+    });
+    let is_simple = func.cyclomatic <= config.max_cyclomatic
+        && func.length < config.max_length
+        && func.nesting <= config.max_nesting;
+    let is_initialization = func.cognitive <= config.max_cognitive;
+    matches_constructor_name && is_simple && is_initialization
+}
+```
+
 **Current Impact**:
 - ~10-20% of constructors still misclassified as `PureLogic`
 - False positives for builder pattern methods
 - No detection of macro-generated constructors
+- Constructors currently map to `FunctionRole::IOWrapper` (0.7x multiplier)
 
 **Why AST-Based Detection**:
 - Analyze function body structure, not just name
-- Detect `-> Self` return type
+- Detect `-> Self` return type via `syn` AST
 - Recognize struct initialization patterns
 - Identify builder pattern characteristics
-- Language-agnostic detection via tree-sitter
+- Language-specific detection using existing parsers (`syn` for Rust, `rustpython_parser` for Python)
 
 ## Objective
 
 Enhance constructor detection using AST analysis to catch non-standard constructor patterns, reducing false positive rate to <5%.
+
+**Phased Approach**:
+- **Phase 1** (This Spec): Rust-only AST detection using `syn` (integrates with existing infrastructure)
+- **Phase 2** (Future): Python/TypeScript/JavaScript support
+- **Phase 3** (Future): Builder pattern detection as separate `FunctionRole`
 
 ## Requirements
 
@@ -73,27 +96,18 @@ Enhance constructor detection using AST analysis to catch non-standard construct
 - Recognize delegation to other constructors: `Self::new()`
 - Detect minimal control flow (≤2 branches)
 
-**FR3: Language-Specific Detection**
+**FR3: Language-Specific Detection (Phase 1: Rust Only)**
 
-**Rust**:
-- `-> Self` return type
-- Struct expression `Self { ... }`
-- Tuple struct: `Self(value)`
-- Enum variant: `Self::Variant(value)`
+**Rust** (using `syn` AST):
+- `-> Self` return type via `syn::ReturnType`
+- Struct expression `Self { ... }` via `syn::ExprStruct`
+- Tuple struct: `Self(value)` via `syn::ExprCall`
+- Enum variant: `Self::Variant(value)` via `syn::ExprPath`
 
-**Python**:
-- `def __init__(self)` - already caught by name
-- `@classmethod` methods returning class instance
-- `__new__` method
-
-**TypeScript/JavaScript**:
-- `constructor()` keyword
-- Static factory methods returning class instance
-- Object literal initialization
-
-**Go**:
-- Functions returning struct pointer: `func New*() *StructName`
-- Struct literal initialization
+**Future Phases** (Python/TypeScript/JavaScript):
+- Python: `@classmethod` detection via existing `rustpython_parser`
+- TypeScript/JavaScript: Static factory methods via existing parser
+- Will be specified in separate specs when Phase 1 is validated
 
 **FR4: Complexity Thresholds**
 - Cyclomatic complexity ≤ 5 (allow some validation logic)
@@ -101,19 +115,22 @@ Enhance constructor detection using AST analysis to catch non-standard construct
 - Function length < 30 lines (more lenient than Spec 117's 15)
 - No loops (constructors shouldn't iterate)
 
-**FR5: Builder Pattern Detection**
+**FR5: Builder Pattern Detection (Phase 3 - Future)**
 - Detects methods that:
   1. Take `self` or `mut self` as receiver
   2. Return `Self` or `Self` type
   3. Modify fields and return `self`
 - Classify as `FunctionRole::Builder` (new role, 0.6x multiplier)
+- **Not included in Phase 1** - requires separate enum variant addition
 
 ### Non-Functional Requirements
 
 **NFR1: Performance**
-- AST parsing already done for complexity analysis (zero overhead)
-- Pattern matching adds < 2% overhead
-- Cache AST analysis results
+- `syn` AST already parsed in `src/analyzers/rust.rs` for complexity analysis
+- Return type extraction: traverse existing AST (minimal overhead)
+- Body pattern detection: requires additional AST walk
+- **Target**: < 5% overhead vs current name-only detection (measured via benchmarks)
+- Cache AST analysis results in `FunctionMetrics` (optional field)
 
 **NFR2: Accuracy**
 - Reduce false positives to < 5% (from ~20% with name-only)
@@ -126,22 +143,33 @@ Enhance constructor detection using AST analysis to catch non-standard construct
 - Clear documentation of detection heuristics
 
 **NFR4: Compatibility**
-- Falls back to name-based detection if AST unavailable
-- Works with all supported languages (Rust, Python, TypeScript, Go)
+- Falls back to existing `is_simple_constructor()` if AST analysis fails
+- Phase 1: Rust-only (Python/TypeScript/Go in future phases)
 - Graceful degradation for syntax errors
+- **Non-breaking**: AST detection is additive enhancement of existing behavior
+- **Enabled by default** - provides better accuracy out-of-box
+- Opt-out available via configuration if needed
 
 ## Acceptance Criteria
 
-- [x] AST-based return type analysis implemented
-- [x] Struct initialization pattern detection working
-- [x] Builder pattern methods detected and classified separately
-- [x] Language-specific constructor patterns recognized (Rust, Python, TypeScript, Go)
-- [x] False positive rate reduced to < 5% for constructor classification
-- [x] `create_default_client()` example correctly classified as constructor
-- [x] Builder methods like `set_timeout()` classified as `Builder` not `PureLogic`
-- [x] Test suite includes AST-based detection test cases
-- [x] Performance overhead < 2% compared to name-only detection
-- [x] Documentation updated with AST detection logic
+**Phase 1 (Rust-only)**:
+- [ ] AST-based return type analysis implemented for Rust using `syn`
+- [ ] Struct initialization pattern detection working (`Self { ... }`)
+- [ ] False positive rate reduced to < 10% for constructor classification (vs ~20% currently)
+- [ ] `create_default_client()` example correctly classified as constructor
+- [ ] Test suite includes AST-based detection test cases for Rust
+- [ ] Performance overhead < 5% compared to name-only detection (measured via benchmarks)
+- [ ] Configuration flag `classification.constructors.ast_detection` added (default: `true`)
+- [ ] Fallback to `is_simple_constructor()` works when AST analysis fails
+- [ ] Opt-out mechanism works when users set `ast_detection = false`
+- [ ] Documentation updated with AST detection logic
+- [ ] No breaking changes to existing JSON output schema (AST data is optional)
+
+**Future Phases** (not in this spec):
+- [ ] Builder pattern methods detected and classified separately (`FunctionRole::Builder`)
+- [ ] Python `@classmethod` constructor patterns recognized
+- [ ] TypeScript/JavaScript static factory methods recognized
+- [ ] False positive rate reduced to < 5% (ultimate goal)
 
 ## Technical Details
 
@@ -149,71 +177,113 @@ Enhance constructor detection using AST analysis to catch non-standard construct
 
 **Phase 1: AST Return Type Extraction**
 
-**File**: `src/analyzers/rust_analyzer.rs` (and similar for other languages)
+**File**: `src/analyzers/rust_constructor_detector.rs` (new module)
 
 ```rust
-use tree_sitter::{Node, Parser, Query};
+use syn::{ItemFn, ReturnType as SynReturnType, Type, TypePath};
 
-/// Extract return type from function signature
-pub fn extract_return_type(node: Node, source: &str) -> Option<ReturnType> {
-    // Find return type node in AST
-    let return_type_node = node
-        .child_by_field_name("return_type")?
-        .child_by_field_name("type")?;
-
-    let type_text = return_type_node.utf8_text(source.as_bytes()).ok()?;
-
-    // Parse return type
-    if type_text == "Self" {
-        Some(ReturnType::OwnedSelf)
-    } else if type_text.starts_with("Result<Self") {
-        Some(ReturnType::ResultSelf)
-    } else if type_text.starts_with("Option<Self") {
-        Some(ReturnType::OptionSelf)
-    } else if type_text.starts_with("&Self") || type_text.starts_with("&mut Self") {
-        Some(ReturnType::RefSelf)
-    } else {
-        Some(ReturnType::Other(type_text.to_string()))
+/// Extract return type from function signature using syn
+pub fn extract_return_type(func: &ItemFn) -> Option<ConstructorReturnType> {
+    match &func.sig.output {
+        SynReturnType::Default => None, // No return type
+        SynReturnType::Type(_, ty) => classify_return_type(ty),
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ReturnType {
+/// Classify return type for constructor detection
+fn classify_return_type(ty: &Type) -> Option<ConstructorReturnType> {
+    match ty {
+        Type::Path(type_path) => {
+            let path_str = quote::quote!(#type_path).to_string();
+
+            if path_str == "Self" {
+                Some(ConstructorReturnType::OwnedSelf)
+            } else if path_str.starts_with("Result < Self") {
+                Some(ConstructorReturnType::ResultSelf)
+            } else if path_str.starts_with("Option < Self") {
+                Some(ConstructorReturnType::OptionSelf)
+            } else {
+                Some(ConstructorReturnType::Other)
+            }
+        }
+        Type::Reference(type_ref) => {
+            if let Type::Path(path) = &*type_ref.elem {
+                let path_str = quote::quote!(#path).to_string();
+                if path_str == "Self" {
+                    return Some(ConstructorReturnType::RefSelf);
+                }
+            }
+            Some(ConstructorReturnType::Other)
+        }
+        _ => Some(ConstructorReturnType::Other),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstructorReturnType {
     OwnedSelf,          // -> Self
     ResultSelf,         // -> Result<Self, E>
     OptionSelf,         // -> Option<Self>
     RefSelf,            // -> &Self or &mut Self (builder pattern)
-    Other(String),      // Other types
+    Other,              // Other types
 }
 ```
 
 **Phase 2: Body Pattern Detection**
 
 ```rust
-/// Detect constructor patterns in function body
-pub fn analyze_function_body(node: Node, source: &str) -> BodyPattern {
-    let mut pattern = BodyPattern::default();
+use syn::{visit::Visit, Expr, ExprStruct, ExprPath, Stmt};
 
-    // Count struct initializations
-    pattern.struct_init_count = count_nodes_by_type(node, "struct_expression");
+/// Visitor to detect constructor patterns in function body
+pub struct ConstructorPatternVisitor {
+    pattern: BodyPattern,
+}
 
-    // Count Self references
-    pattern.self_refs = count_nodes_by_type(node, "self_type_identifier");
+impl ConstructorPatternVisitor {
+    pub fn new() -> Self {
+        Self {
+            pattern: BodyPattern::default(),
+        }
+    }
 
-    // Check for field assignments
-    pattern.field_assignments = count_field_assignments(node, source);
+    pub fn into_pattern(self) -> BodyPattern {
+        self.pattern
+    }
+}
 
-    // Check for control flow
-    pattern.has_if = has_node_type(node, "if_expression");
-    pattern.has_match = has_node_type(node, "match_expression");
-    pattern.has_loop = has_node_type(node, "loop_expression")
-        || has_node_type(node, "while_expression")
-        || has_node_type(node, "for_expression");
+impl<'ast> Visit<'ast> for ConstructorPatternVisitor {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            Expr::Struct(_) => {
+                self.pattern.struct_init_count += 1;
+            }
+            Expr::Path(path) => {
+                // Check for Self references
+                let path_str = quote::quote!(#path).to_string();
+                if path_str.starts_with("Self") {
+                    self.pattern.self_refs += 1;
+                }
+            }
+            Expr::If(_) => self.pattern.has_if = true,
+            Expr::Match(_) => self.pattern.has_match = true,
+            Expr::Loop(_) | Expr::While(_) | Expr::ForLoop(_) => {
+                self.pattern.has_loop = true;
+            }
+            Expr::Return(_) => self.pattern.early_returns += 1,
+            Expr::Field(_) | Expr::Assign(_) => {
+                self.pattern.field_assignments += 1;
+            }
+            _ => {}
+        }
+        syn::visit::visit_expr(self, expr);
+    }
+}
 
-    // Check for early returns
-    pattern.early_returns = count_nodes_by_type(node, "return_expression");
-
-    pattern
+/// Analyze function body for constructor patterns
+pub fn analyze_function_body(func: &ItemFn) -> BodyPattern {
+    let mut visitor = ConstructorPatternVisitor::new();
+    visitor.visit_block(&func.block);
+    visitor.into_pattern()
 }
 
 #[derive(Debug, Clone, Default)]
@@ -237,7 +307,7 @@ impl BodyPattern {
         (self.self_refs > 0 && !self.has_loop && !self.has_match && self.field_assignments == 0)
     }
 
-    /// Does this look like a builder method?
+    /// Does this look like a builder method? (Phase 3 - not implemented yet)
     pub fn is_builder_like(&self) -> bool {
         // Modifies fields and returns self
         self.field_assignments > 0
@@ -249,226 +319,238 @@ impl BodyPattern {
 
 **Phase 3: Combined Detection Logic**
 
-**File**: `src/priority/semantic_classifier.rs`
+**File**: `src/priority/semantic_classifier.rs` (modify existing `is_simple_constructor()`)
 
 ```rust
-/// Enhanced constructor detection using AST
-fn is_constructor_ast(
+/// Enhanced constructor detection using AST (enabled by default)
+fn is_constructor_enhanced(
     func: &FunctionMetrics,
-    ast_info: &Option<AstAnalysis>,
+    syn_func: Option<&syn::ItemFn>,
 ) -> bool {
-    // Fallback to name-based if no AST
-    let Some(ast) = ast_info else {
-        return is_simple_constructor(func); // Spec 117 fallback
-    };
+    // Check configuration
+    let config = crate::config::get_constructor_detection_config();
 
-    // Check return type
+    // If AST detection disabled or unavailable, use name-based detection
+    if !config.ast_detection || syn_func.is_none() {
+        return is_simple_constructor(func);
+    }
+
+    let syn_func = syn_func.unwrap();
+
+    // Extract AST information
+    let return_type = extract_return_type(syn_func);
+    let body_pattern = analyze_function_body(syn_func);
+
+    // Check return type (must return Self)
     let returns_self = matches!(
-        ast.return_type,
-        Some(ReturnType::OwnedSelf | ReturnType::ResultSelf | ReturnType::OptionSelf)
+        return_type,
+        Some(ConstructorReturnType::OwnedSelf
+            | ConstructorReturnType::ResultSelf
+            | ConstructorReturnType::OptionSelf)
     );
 
     if !returns_self {
-        return false;
+        // Fallback to name-based detection if not returning Self
+        return is_simple_constructor(func);
     }
 
     // Check body pattern
-    if !ast.body_pattern.is_constructor_like() {
+    if !body_pattern.is_constructor_like() {
         return false;
     }
 
-    // Check complexity thresholds
+    // Check complexity thresholds (more lenient for AST-detected constructors)
     let is_simple_enough = func.cyclomatic <= 5
         && func.nesting <= 2
         && func.length < 30
-        && !ast.body_pattern.has_loop;
+        && !body_pattern.has_loop;
 
     returns_self && is_simple_enough
 }
 
-/// Detect builder pattern methods
-fn is_builder_method_ast(
+// Update classify_by_rules to use enhanced detection
+fn classify_by_rules(
     func: &FunctionMetrics,
-    ast_info: &Option<AstAnalysis>,
-) -> bool {
-    let Some(ast) = ast_info else {
-        return false;
-    };
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+    syn_func: Option<&syn::ItemFn>,  // NEW parameter
+) -> Option<FunctionRole> {
+    // Entry point has highest precedence
+    if is_entry_point(func_id, call_graph) {
+        return Some(FunctionRole::EntryPoint);
+    }
 
-    // Returns Self (owned or ref)
-    let returns_self = matches!(
-        ast.return_type,
-        Some(ReturnType::OwnedSelf | ReturnType::RefSelf)
-    );
+    // Check for constructors with AST enhancement
+    if is_constructor_enhanced(func, syn_func) {
+        return Some(FunctionRole::IOWrapper);  // Phase 1: Still maps to IOWrapper
+    }
 
-    // Has self receiver (method, not associated function)
-    let has_self_receiver = ast.has_self_receiver;
-
-    // Body looks like builder pattern
-    let builder_body = ast.body_pattern.is_builder_like();
-
-    // Simple enough (no complex logic)
-    let is_simple = func.cyclomatic <= 3 && func.length < 20;
-
-    returns_self && has_self_receiver && builder_body && is_simple
+    // ... rest of classification logic unchanged
 }
 ```
 
-**Phase 4: New FunctionRole for Builders**
+**Note**: Phase 1 keeps constructors as `FunctionRole::IOWrapper`. Adding a dedicated `Constructor` variant is deferred to Phase 3 to avoid breaking changes.
+
+**Phase 4: Threading AST Through Analysis**
+
+**File**: `src/analyzers/rust.rs` (modify existing analysis)
 
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum FunctionRole {
-    PureLogic,
-    Orchestrator,
-    IOWrapper,
-    EntryPoint,
-    PatternMatch,
-    Constructor,  // From Spec 117 (optional)
-    Builder,      // NEW: Builder pattern methods
-    Unknown,
-}
+// In analyze_rust_file(), extract functions and preserve syn::ItemFn references
+fn analyze_rust_file(ast: &RustAst, ...) -> FileMetrics {
+    let source_content = read_source_content(&ast.path);
 
-impl FunctionRole {
-    pub fn multiplier(&self) -> f64 {
-        match self {
-            Self::PureLogic => 1.2,
-            Self::Orchestrator => 0.8,
-            Self::IOWrapper => 0.7,
-            Self::EntryPoint => 0.9,
-            Self::PatternMatch => 0.6,
-            Self::Constructor => 0.5,
-            Self::Builder => 0.6,  // Builder methods slightly higher than constructors
-            Self::Unknown => 1.0,
+    // Visit each function in the AST
+    let mut functions = Vec::new();
+    for item in &ast.file.items {
+        if let syn::Item::Fn(func) = item {
+            let metrics = extract_function_metrics(func, &ast.path);
+
+            // Store reference to syn::ItemFn for later AST analysis
+            // (OR: extract constructor info here and store in metrics)
+
+            functions.push(metrics);
         }
     }
+
+    // ... rest of analysis
 }
 ```
 
-**Phase 5: Language-Specific Patterns**
+**Future: Adding `FunctionRole::Constructor` and `Builder`** (Phase 3):
+- Requires enum variant addition to `src/priority/semantic_classifier.rs`
+- Breaking change to pattern matching across codebase
+- Requires migration guide for users
+- Separate spec recommended for this change
 
+**Future: Language-Specific Patterns** (Phase 2):
+
+Python constructor detection (using `rustpython_parser`):
 ```rust
-// Rust-specific
-mod rust_patterns {
-    pub fn is_rust_constructor(ast: &AstAnalysis) -> bool {
-        matches!(ast.return_type, Some(ReturnType::OwnedSelf))
-            && ast.body_pattern.struct_init_count > 0
-    }
-}
+// To be added in Phase 2
+mod python_constructor_detector {
+    use rustpython_parser::ast;
 
-// Python-specific
-mod python_patterns {
-    pub fn is_python_constructor(ast: &AstAnalysis) -> bool {
+    pub fn is_python_constructor(func: &ast::StmtFunctionDef) -> bool {
         // Check for @classmethod decorator
-        ast.decorators.contains(&"classmethod")
-            && ast.body_pattern.self_refs > 0
+        func.decorator_list.iter().any(|dec| {
+            // Check if decorator is "classmethod"
+            matches!(dec.node, ast::ExprName { id, .. } if id == "classmethod")
+        })
     }
 }
+```
 
-// TypeScript-specific
-mod typescript_patterns {
-    pub fn is_typescript_constructor(ast: &AstAnalysis) -> bool {
-        // Static factory methods returning class instance
-        ast.is_static_method && ast.return_type.is_class_instance()
-    }
-}
+TypeScript/JavaScript constructor detection:
+```rust
+// To be specified in Phase 2 spec
+// Will use existing JavaScript/TypeScript parser infrastructure
 ```
 
 ### Architecture Changes
 
-**Modified Files**:
-- `src/analyzers/rust_analyzer.rs` - Add AST pattern detection
-- `src/analyzers/python_extractor.rs` - Python constructor patterns
-- `src/analyzers/typescript_extractor.rs` - TypeScript patterns
-- `src/priority/semantic_classifier.rs` - Integrate AST-based detection
-- `src/priority/FunctionRole` enum - Add `Builder` variant
+**Modified Files** (Phase 1):
+- `src/analyzers/rust.rs` - Thread `syn::ItemFn` through to classification
+- `src/priority/semantic_classifier.rs` - Add `is_constructor_enhanced()` function
+- `src/config.rs` - Add `ast_detection` flag to `ConstructorDetectionConfig`
 
-**New Files**:
-- `src/analyzers/patterns/constructor.rs` - Constructor pattern detection
-- `src/analyzers/patterns/builder.rs` - Builder pattern detection
-- `src/analyzers/ast_info.rs` - AST analysis data structures
+**New Files** (Phase 1):
+- `src/analyzers/rust_constructor_detector.rs` - Rust constructor pattern detection using `syn`
+  - `extract_return_type()` - Parse return type from `syn::ItemFn`
+  - `analyze_function_body()` - Detect constructor body patterns
+  - `ConstructorPatternVisitor` - `syn::visit::Visit` implementation
 
-**Data Flow**:
+**Future Files** (Phase 2+):
+- `src/analyzers/python_constructor_detector.rs` - Python patterns
+- `src/analyzers/javascript_constructor_detector.rs` - JS/TS patterns
+
+**Data Flow** (Phase 1):
 ```
-Source Code
+Source Code (Rust)
     ↓
-Tree-Sitter Parser (existing)
+syn::parse_str() [existing in rust.rs]
     ↓
-AST Analysis
-    ├─ Return Type Extraction (NEW)
-    ├─ Body Pattern Detection (NEW)
+syn::File AST
+    ↓
+Extract functions → Vec<syn::ItemFn>
+    ↓
+For each function:
+    ├─ FunctionMetrics extraction (existing)
+    ├─ Return Type Analysis (NEW: extract_return_type)
+    ├─ Body Pattern Analysis (NEW: analyze_function_body)
     └─ Complexity Metrics (existing)
     ↓
-Constructor Detection
-    ├─ Name-based (Spec 117)
-    ├─ AST-based (Spec 122) ← NEW
-    └─ Combined Decision
+Classification (semantic_classifier.rs)
+    ├─ Name-based detection (existing: is_simple_constructor)
+    ├─ AST-based detection (NEW: is_constructor_enhanced)
+    └─ Combined Decision → FunctionRole::IOWrapper
     ↓
-FunctionRole Classification
+Risk Scoring (uses role multipliers)
 ```
 
 ### Data Structures
 
+**Phase 1**: No changes to `FunctionMetrics` schema (avoid breaking changes)
+
+Constructor detection is performed on-the-fly during classification using `syn::ItemFn` AST.
+
+**Future** (Phase 3): If caching AST analysis results is needed:
 ```rust
-/// Extended AST analysis for constructor detection
-#[derive(Debug, Clone)]
-pub struct AstAnalysis {
-    /// Return type of function
-    pub return_type: Option<ReturnType>,
-
-    /// Pattern analysis of function body
-    pub body_pattern: BodyPattern,
-
-    /// Has self receiver (method vs associated function)
-    pub has_self_receiver: bool,
-
-    /// Decorators (Python) or attributes (Rust)
-    pub decorators: Vec<String>,
-
-    /// Is static method (TypeScript/JavaScript)
-    pub is_static_method: bool,
+// Add optional field to FunctionMetrics (requires schema versioning)
+impl FunctionMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constructor_info: Option<ConstructorInfo>,
 }
 
-/// Store AST analysis in FunctionMetrics
-impl FunctionMetrics {
-    pub ast_analysis: Option<AstAnalysis>,  // NEW field
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstructorInfo {
+    pub detected_by_ast: bool,
+    pub return_type: String,  // "Self", "Result<Self>", etc.
+    pub struct_init_count: usize,
 }
 ```
+
+**Rationale**: Phase 1 keeps schema stable. AST analysis adds ~5% overhead, which is acceptable for on-the-fly detection.
 
 ### APIs and Interfaces
 
-**Public API**:
+**Internal API** (Phase 1 - not exposed publicly):
 ```rust
-/// Detect if function is a constructor using AST analysis
-pub fn is_constructor_ast(
-    func: &FunctionMetrics,
-    ast_info: &Option<AstAnalysis>,
-) -> ConstructorKind;
+// In src/analyzers/rust_constructor_detector.rs
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ConstructorKind {
-    NotConstructor,
-    SimpleConstructor,      // Direct initialization
-    FactoryMethod,          // Complex construction with validation
-    BuilderMethod,          // Builder pattern method
-}
+/// Extract return type from syn::ItemFn
+pub(crate) fn extract_return_type(func: &syn::ItemFn) -> Option<ConstructorReturnType>;
+
+/// Analyze function body for constructor patterns
+pub(crate) fn analyze_function_body(func: &syn::ItemFn) -> BodyPattern;
+
+// In src/priority/semantic_classifier.rs
+
+/// Enhanced constructor detection (internal)
+fn is_constructor_enhanced(
+    func: &FunctionMetrics,
+    syn_func: Option<&syn::ItemFn>,
+) -> bool;
 ```
+
+**Public API** (no changes): Constructor detection is internal to classification logic.
 
 ## Dependencies
 
-**Prerequisites**:
-- **Spec 117**: Name-based constructor detection (fallback)
-- Existing tree-sitter AST parsing
-- FunctionMetrics data structure
+**Prerequisites** (already implemented):
+- Name-based constructor detection in `src/priority/semantic_classifier.rs:90-109`
+- `syn` AST parsing in `src/analyzers/rust.rs`
+- `FunctionMetrics` data structure in `src/core/mod.rs`
+- `ConstructorDetectionConfig` in `src/config.rs`
 
 **Affected Components**:
-- AST analyzers (Rust, Python, TypeScript, Go)
-- Semantic classifier
-- Risk scoring (uses role multipliers)
+- `src/analyzers/rust.rs` - Need to pass `syn::ItemFn` to classification
+- `src/priority/semantic_classifier.rs` - Add AST-based detection
+- Risk scoring (no changes - uses existing role multipliers)
 
-**External Dependencies**:
-- tree-sitter (already used)
-- Language-specific tree-sitter grammars (already present)
+**External Dependencies** (no new dependencies):
+- `syn = "2.0"` (already in `Cargo.toml`)
+- `quote = "1.0"` (already in `Cargo.toml`)
 
 ## Testing Strategy
 
@@ -684,38 +766,45 @@ pub fn set_timeout(mut self, timeout: Duration) -> Self {
 
 ### Configuration
 
+AST-based detection is **enabled by default** for Rust code.
+
 ```toml
 [classification.constructors]
-ast_detection = true  # Enable AST-based detection
-fallback_to_name = true  # Use name-based if AST fails
+# AST detection is on by default (Phase 1: Rust only)
+# No configuration needed - just works!
+
+# To disable and use only name-based detection:
+# ast_detection = false
 ```
 ```
 
 ## Implementation Notes
 
-### Tree-Sitter Queries
+### syn AST Patterns (Phase 1: Rust)
 
-**Rust Constructor Query**:
-```scm
-(function_item
-  name: (identifier) @name
-  return_type: (type_identifier) @return
-  (#eq? @return "Self")
-  body: (block
-    (struct_expression) @struct_init))
+**Return Type Detection**:
+```rust
+// Match on syn::ReturnType to find -> Self patterns
+match &func.sig.output {
+    syn::ReturnType::Type(_, ty) => {
+        // Check if type is Self, Result<Self>, or Option<Self>
+    }
+    _ => None,
+}
 ```
 
-**Python Classmethod Query**:
-```scm
-(function_definition
-  decorators: (decorator (identifier) @decorator)
-  (#eq? @decorator "classmethod")
-  name: (identifier) @name
-  body: (block
-    (return_statement
-      (call
-        function: (attribute
-          object: (identifier) @cls)))))
+**Body Pattern Detection**:
+```rust
+// Use syn::visit::Visit to traverse function body
+impl<'ast> Visit<'ast> for ConstructorPatternVisitor {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            Expr::Struct(_) => /* Found struct initialization */,
+            Expr::Path(path) if is_self_path(path) => /* Found Self reference */,
+            // ... detect loops, if statements, etc.
+        }
+    }
+}
 ```
 
 ### Edge Cases
@@ -745,49 +834,166 @@ pub fn new(config: Config) -> Result<Self, Error> {
 
 ### Breaking Changes
 
-None - Pure enhancement.
+**Phase 1**: None - Pure enhancement
+
+- AST detection is **enabled by default** for better accuracy
+- No schema changes (no new fields in `FunctionMetrics`)
+- Constructors still map to `FunctionRole::IOWrapper` (existing behavior)
+- Falls back to name-based detection when AST analysis fails
+- **User-visible change**: Some functions may be reclassified (this is the goal - better accuracy)
 
 ### Backward Compatibility
 
-- Graceful fallback to name-based detection
-- No changes to JSON schema
-- Works with existing configuration
+**Backward compatible with caveats**:
+- Existing configurations work without modification
+- **Default behavior**: AST detection **enabled** for Rust code
+- Graceful fallback to `is_simple_constructor()` if AST fails
+- No changes to JSON output format (schema-compatible)
+- No changes to scoring multipliers (IOWrapper still 0.7x)
+- **Classification changes expected**: Better constructor detection means some functions reclassified (improved accuracy)
+
+### Configuration Migration
+
+**Existing config** (`.debtmap.toml`):
+```toml
+[classification.constructors]
+patterns = ["new", "default", "from_", "with_", "create_"]
+max_cyclomatic = 2
+max_cognitive = 3
+max_length = 15
+max_nesting = 1
+```
+
+**New config** (default behavior):
+```toml
+[classification.constructors]
+# Existing fields (unchanged)
+patterns = ["new", "default", "from_", "with_", "create_"]
+max_cyclomatic = 2
+max_cognitive = 3
+max_length = 15
+max_nesting = 1
+
+# NEW: AST-based detection (enabled by default)
+# ast_detection = true  # Default: true (Phase 1: Rust only)
+```
+
+**To disable AST detection** (use only name-based):
+```toml
+[classification.constructors]
+ast_detection = false  # Revert to name-only detection
+```
+
+**Implementation in `src/config.rs`**:
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstructorDetectionConfig {
+    // Existing fields...
+    pub patterns: Vec<String>,
+    pub max_cyclomatic: u32,
+    pub max_cognitive: u32,
+    pub max_length: usize,
+    pub max_nesting: u32,
+
+    // NEW: AST detection flag (enabled by default)
+    #[serde(default = "default_ast_detection")]
+    pub ast_detection: bool,
+}
+
+fn default_ast_detection() -> bool {
+    true  // Enabled by default
+}
+```
 
 ## Success Metrics
 
-### Quantitative Metrics
+### Quantitative Metrics (Phase 1: Rust only)
 
-- **False Positive Reduction**: 50% reduction vs name-only (from ~20% to <10%)
-- **Coverage**: Catches 95%+ of constructors (vs ~85% name-only)
-- **Performance**: <2% overhead
-- **Language Support**: Works for Rust, Python, TypeScript, Go
+- **False Positive Reduction**: 30-50% reduction vs name-only (from ~20% to <10-14%)
+- **Coverage**: Catches 90-95% of Rust constructors (vs ~80-85% name-only)
+- **Performance**: < 5% overhead (measured via benchmarks)
+- **Language Support**: Rust only (Python/TypeScript in Phase 2)
 
 ### Qualitative Metrics
 
-- **User Satisfaction**: Fewer false positives for builder methods
-- **Accuracy**: More precise classification
-- **Maintenance**: Easier to extend to new languages
+- **User Satisfaction**: Fewer false positives for non-standard constructor names
+- **Accuracy**: More precise classification for Rust code
+- **Maintenance**: Clean separation of concerns (dedicated module)
 
-### Validation
+### Validation Approach
 
-**Test Suite Results**:
-- 1000 labeled functions
-- Name-only: 85% recall, 80% precision
-- AST-based: 95% recall, 95% precision
+**Baseline Measurement**:
+1. Run debtmap on Rust codebase (e.g., debtmap itself)
+2. Manually label 100 functions as constructor/non-constructor
+3. Measure precision/recall with name-based detection
+
+**Post-Implementation**:
+1. Enable AST detection
+2. Measure precision/recall on same labeled dataset
+3. Compare false positive rates
+
+**Performance Benchmarking**:
+```bash
+# Baseline: Name-only detection
+cargo bench --bench constructor_detection -- --baseline name_only
+
+# With AST: AST-based detection
+cargo bench --bench constructor_detection -- --baseline ast_enabled
+```
+
+## Error Handling
+
+### Graceful Degradation
+
+**AST Parsing Failures**:
+```rust
+fn is_constructor_enhanced(
+    func: &FunctionMetrics,
+    syn_func: Option<&syn::ItemFn>,
+) -> bool {
+    // If syn_func is None (parsing failed), fall back to name-based
+    let Some(syn_func) = syn_func else {
+        return is_simple_constructor(func);
+    };
+
+    // If AST analysis fails for any reason, fall back
+    let Ok(return_type) = extract_return_type(syn_func) else {
+        return is_simple_constructor(func);
+    };
+
+    // Continue with AST analysis...
+}
+```
+
+**Configuration Errors**:
+- Invalid `ast_detection` value: Default to `true` (enabled by default)
+- Missing configuration: Use existing `ConstructorDetectionConfig::default()` (AST enabled)
+
+**Edge Cases**:
+- Macro-expanded code: AST may not represent source accurately → fallback
+- Generic return types: `-> T` where `T` may resolve to `Self` → not detected (acceptable)
+- Complex type aliases: `type Ret = Self; -> Ret` → not detected (Phase 2 enhancement)
 
 ## Future Enhancements
 
-### Phase 2: ML-Based Classification
-- Train on labeled dataset
-- Learn patterns from user feedback
-- Adaptive classification
+### Phase 2: Multi-Language Support (Separate Specs)
+- Python `@classmethod` detection using `rustpython_parser`
+- TypeScript/JavaScript static factories
+- Go struct initialization patterns
+- Target: <5% false positive rate across all languages
 
-### Phase 3: Cross-Language Patterns
-- Unified detection across languages
-- Learn from multi-language codebases
-- Transfer learning
+### Phase 3: Builder Pattern Detection (Separate Spec)
+- Add `FunctionRole::Builder` enum variant (breaking change)
+- Detect builder pattern methods (`set_*()`, `with_*()` returning `Self`)
+- Different multiplier (0.6x vs constructor 0.5x)
+- Requires schema versioning and migration path
 
-### Phase 4: IDE Integration
-- Real-time constructor detection
-- Inline suggestions
-- Refactoring hints
+### Phase 4: Advanced Patterns
+- Macro-generated constructors (via macro expansion analysis)
+- Generic constructor detection (`-> impl Trait`)
+- Builder pattern chains (`builder().field(x).field(y).build()`)
+
+### Phase 5: IDE Integration
+- LSP extension for real-time constructor classification
+- Inline hints showing detected role
+- Quick-fix suggestions for complex constructors
