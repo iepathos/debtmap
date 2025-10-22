@@ -46,7 +46,7 @@ impl EvidenceBasedRiskCalculator {
         let risk_factors = vec![
             self.complexity_analyzer.analyze(function, &context),
             self.coverage_analyzer
-                .analyze(function, &context, coverage_data),
+                .analyze(function, &context, coverage_data, call_graph),
             self.coupling_analyzer
                 .analyze(function, &context, call_graph),
             self.change_analyzer.analyze(function, &context),
