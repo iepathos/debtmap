@@ -186,7 +186,24 @@ impl TypeTracker {
                             });
                         }
                     }
-                    self.resolve_variable_type(&ident)
+
+                    // Try to resolve as a variable first
+                    if let Some(resolved) = self.resolve_variable_type(&ident) {
+                        return Some(resolved);
+                    }
+
+                    // If not a variable, check if it looks like a type (starts with uppercase)
+                    // This handles unit structs: `let h = Handler;` where Handler is a unit struct
+                    // But avoids treating function calls like `new()` as types
+                    if ident.chars().next()?.is_uppercase() {
+                        return Some(ResolvedType {
+                            type_name: ident,
+                            source: TypeSource::Annotation,
+                            generics: Vec::new(),
+                        });
+                    }
+
+                    None
                 } else {
                     // It's a path to a type or function
                     None
