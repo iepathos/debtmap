@@ -162,8 +162,16 @@ impl<'ast> Visit<'ast> for DataFlowVisitor {
         // I/O operations
         if matches!(
             method_name.as_str(),
-            "read" | "write" | "read_to_string" | "write_all" | "flush" | "read_line"
-                | "read_exact" | "write_fmt" | "sync_all" | "sync_data"
+            "read"
+                | "write"
+                | "read_to_string"
+                | "write_all"
+                | "flush"
+                | "read_line"
+                | "read_exact"
+                | "write_fmt"
+                | "sync_all"
+                | "sync_data"
         ) {
             self.transformation_ops += 1;
             self.patterns.push(DataFlowPattern::IOOperation {
@@ -195,14 +203,20 @@ impl<'ast> Visit<'ast> for DataFlowVisitor {
             // File operations
             if matches!(
                 path_str.as_str(),
-                "File::open" | "File::create" | "File::options" | "OpenOptions::new"
-                    | "read_to_string" | "write" | "fs::read" | "fs::write"
-                    | "fs::read_to_string" | "fs::write_all"
+                "File::open"
+                    | "File::create"
+                    | "File::options"
+                    | "OpenOptions::new"
+                    | "read_to_string"
+                    | "write"
+                    | "fs::read"
+                    | "fs::write"
+                    | "fs::read_to_string"
+                    | "fs::write_all"
             ) {
                 self.transformation_ops += 1;
-                self.patterns.push(DataFlowPattern::IOOperation {
-                    kind: path_str,
-                });
+                self.patterns
+                    .push(DataFlowPattern::IOOperation { kind: path_str });
             }
         }
 
@@ -605,10 +619,9 @@ mod tests {
 
         // Should detect file write operation
         assert!(
-            profile
-                .patterns
-                .iter()
-                .any(|p| matches!(p, DataFlowPattern::IOOperation { kind } if kind.contains("write"))),
+            profile.patterns.iter().any(
+                |p| matches!(p, DataFlowPattern::IOOperation { kind } if kind.contains("write"))
+            ),
             "Expected file write operation"
         );
     }
