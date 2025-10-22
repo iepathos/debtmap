@@ -456,6 +456,53 @@ fn default_accessor_max_nesting() -> u32 {
     1
 }
 
+// Data flow classification config (spec 126)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataFlowClassificationConfig {
+    /// Enable data flow classification (default: false - opt-in)
+    #[serde(default = "default_data_flow_enabled")]
+    pub enabled: bool,
+
+    /// Minimum confidence required (0.0 - 1.0)
+    #[serde(default = "default_data_flow_min_confidence")]
+    pub min_confidence: f64,
+
+    /// Minimum transformation ratio to classify as Orchestrator
+    #[serde(default = "default_data_flow_min_transformation_ratio")]
+    pub min_transformation_ratio: f64,
+
+    /// Maximum business logic ratio for Orchestrator classification
+    #[serde(default = "default_data_flow_max_business_logic_ratio")]
+    pub max_business_logic_ratio: f64,
+}
+
+impl Default for DataFlowClassificationConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_data_flow_enabled(),
+            min_confidence: default_data_flow_min_confidence(),
+            min_transformation_ratio: default_data_flow_min_transformation_ratio(),
+            max_business_logic_ratio: default_data_flow_max_business_logic_ratio(),
+        }
+    }
+}
+
+fn default_data_flow_enabled() -> bool {
+    false // OPT-IN (spec 126)
+}
+
+fn default_data_flow_min_confidence() -> f64 {
+    0.8
+}
+
+fn default_data_flow_min_transformation_ratio() -> f64 {
+    0.7
+}
+
+fn default_data_flow_max_business_logic_ratio() -> f64 {
+    0.3
+}
+
 impl Default for RoleCoverageWeights {
     fn default() -> Self {
         Self {
@@ -879,6 +926,10 @@ pub struct ClassificationConfig {
     /// Accessor detection configuration (spec 125)
     #[serde(default)]
     pub accessors: Option<AccessorDetectionConfig>,
+
+    /// Data flow classification configuration (spec 126)
+    #[serde(default)]
+    pub data_flow: Option<DataFlowClassificationConfig>,
 }
 
 impl DebtmapConfig {
@@ -1562,6 +1613,15 @@ pub fn get_accessor_detection_config() -> AccessorDetectionConfig {
         .classification
         .as_ref()
         .and_then(|c| c.accessors.clone())
+        .unwrap_or_default()
+}
+
+/// Get data flow classification configuration (spec 126)
+pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
+    get_config()
+        .classification
+        .as_ref()
+        .and_then(|c| c.data_flow.clone())
         .unwrap_or_default()
 }
 
