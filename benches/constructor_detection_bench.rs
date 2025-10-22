@@ -3,10 +3,11 @@
 //! Measures the overhead of AST-based detection vs name-only detection.
 //! Target: < 5% overhead for AST analysis.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::analyzers::rust_constructor_detector::{
     analyze_function_body, extract_return_type, ConstructorReturnType,
 };
+use std::hint::black_box;
 use syn::{parse_quote, ItemFn};
 
 /// Generate Rust code with various constructor patterns
@@ -194,9 +195,7 @@ fn bench_scalability(c: &mut Criterion) {
                 for func in &functions {
                     let name = func.sig.ident.to_string();
                     black_box(
-                        name == "new"
-                            || name.starts_with("new_")
-                            || name.starts_with("try_new"),
+                        name == "new" || name.starts_with("new_") || name.starts_with("try_new"),
                     );
                 }
             })
