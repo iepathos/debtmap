@@ -427,7 +427,9 @@ fn print_metrics_explanation() {
 
     println!("## Example Usage\n");
     println!("  debtmap analyze . --threshold-complexity 15    # Use measured cyclomatic");
-    println!("  debtmap analyze . --top 10                      # Uses est_branches for prioritization");
+    println!(
+        "  debtmap analyze . --top 10                      # Uses est_branches for prioritization"
+    );
     println!("  debtmap analyze . --lcov coverage.info          # Coverage vs complexity\n");
 
     println!("For more details, see: https://docs.debtmap.dev/metrics-reference\n");
