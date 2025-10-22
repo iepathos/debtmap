@@ -4,6 +4,38 @@ Common questions about debtmap's features, usage, and comparison with other tool
 
 ## Features & Capabilities
 
+### What's the difference between measured and estimated metrics?
+
+Debtmap distinguishes between two types of metrics (Spec 118):
+
+**Measured Metrics** - Precise values from AST analysis:
+- `cyclomatic_complexity`: Exact count of decision points
+- `cognitive_complexity`: Weighted readability measure
+- `nesting_depth`: Maximum nesting levels
+- `loc`: Lines of code
+- These are suitable for CI/CD quality gates and thresholds
+
+**Estimated Metrics** - Heuristic approximations:
+- `est_branches`: Estimated execution paths (formula-based)
+  - Formula: `max(nesting, 1) × cyclomatic ÷ 3`
+  - Use for: Estimating test cases needed
+  - Don't use for: Hard quality gates
+
+**Why it matters:**
+- Use **measured** metrics for thresholds and gates (precise, repeatable)
+- Use **estimated** metrics for prioritization and effort estimation (heuristic, approximate)
+
+**Example:**
+```bash
+# GOOD: Use measured metric for quality gate
+debtmap validate . --threshold-complexity 15
+
+# GOOD: Use estimated metric for test prioritization
+debtmap analyze . --top 10  # Considers est_branches for ranking
+```
+
+See [Metrics Reference](metrics-reference.md) for complete details.
+
 ### What is entropy-based complexity analysis?
 
 Entropy analysis uses information theory to distinguish between genuinely complex code and repetitive pattern-based code. Traditional cyclomatic complexity counts branches, but not all branches are equal in cognitive load.
@@ -47,6 +79,32 @@ debtmap analyze . --lcov target/coverage/lcov.info
 - C/C++ (target: Q4 2025)
 
 Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.
+
+### Why was "branches" renamed to "est_branches"?
+
+The metric was renamed in Spec 118 to make it clear that this is an **estimated** value, not a precise measurement.
+
+**Problem with old name ("branches"):**
+- Users thought it was a direct count from AST analysis (it's not)
+- Caused confusion with cyclomatic complexity (which counts actual branches)
+- Unclear that the value was formula-based
+
+**Benefits of new name ("est_branches"):**
+- The "est_" prefix makes the estimation explicit
+- Clearly distinguishes it from measured metrics
+- Sets correct user expectations
+
+**What changed:**
+- Terminal output: `branches=8` → `est_branches=8`
+- Internal variable names updated for clarity
+- Documentation updated to explain the distinction
+
+**What didn't change:**
+- The formula remains the same: `max(nesting, 1) × cyclomatic ÷ 3`
+- JSON output (this field was never serialized to JSON)
+- Scoring and prioritization logic
+
+See [Metrics Reference](metrics-reference.md#terminology-change-spec-118) for more details.
 
 ### Can I customize the complexity thresholds?
 

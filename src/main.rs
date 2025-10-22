@@ -391,6 +391,48 @@ fn create_app_container() -> Result<AppContainer> {
     Ok(container)
 }
 
+/// Print explanation of metric definitions and formulas
+fn print_metrics_explanation() {
+    println!("\n=== Debtmap Metrics Reference ===\n");
+
+    println!("## Metric Categories (Spec 118)\n");
+    println!("Debtmap distinguishes between two types of metrics:\n");
+
+    println!("### Measured Metrics");
+    println!("These metrics are directly computed from the AST (Abstract Syntax Tree):");
+    println!("  • cyclomatic_complexity: Count of decision points (if, match, while, etc.)");
+    println!("  • cognitive_complexity: Weighted measure of code understandability");
+    println!("  • nesting_depth: Maximum levels of nested control structures");
+    println!("  • loc: Lines of code in the function");
+    println!("  • parameter_count: Number of function parameters\n");
+
+    println!("### Estimated Metrics");
+    println!("These metrics are heuristic estimates, not precise AST measurements:");
+    println!("  • est_branches: Estimated execution paths (formula-based approximation)");
+    println!("    Formula: max(nesting_depth, 1) × cyclomatic_complexity ÷ 3");
+    println!("    Purpose: Estimate test cases needed for branch coverage");
+    println!("    Note: This is an ESTIMATE, not a count from the AST\n");
+
+    println!("## Why the Distinction Matters\n");
+    println!("• Measured metrics: Precise, repeatable, suitable for thresholds");
+    println!("• Estimated metrics: Approximate, useful for prioritization and heuristics");
+    println!("• Use cyclomatic_complexity for code quality gates");
+    println!("• Use est_branches for estimating testing effort\n");
+
+    println!("## Terminology Change (Spec 118)\n");
+    println!("Previously called 'branches', now renamed to 'est_branches' to:");
+    println!("  1. Make it clear this is an estimate, not a measured value");
+    println!("  2. Avoid confusion with cyclomatic complexity (actual branches)");
+    println!("  3. Set accurate expectations for users\n");
+
+    println!("## Example Usage\n");
+    println!("  debtmap analyze . --threshold-complexity 15    # Use measured cyclomatic");
+    println!("  debtmap analyze . --top 10                      # Uses est_branches for prioritization");
+    println!("  debtmap analyze . --lcov coverage.info          # Coverage vs complexity\n");
+
+    println!("For more details, see: https://docs.debtmap.dev/metrics-reference\n");
+}
+
 // Main orchestrator function
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -513,6 +555,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         patterns,
         pattern_threshold,
         show_pattern_warnings,
+        explain_metrics,
     } = command
     {
         // Apply side effects first
@@ -522,6 +565,12 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         // Handle early returns for cache operations
         if let Some(result) = handle_cache_operations(cache_stats, migrate_cache, &path)? {
             return Ok(result);
+        }
+
+        // Handle explain-metrics flag
+        if explain_metrics {
+            print_metrics_explanation();
+            return Ok(Ok(()));
         }
 
         // Build configuration from pure data transformation

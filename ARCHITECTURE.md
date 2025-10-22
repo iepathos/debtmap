@@ -218,6 +218,198 @@ The 2-line tolerance handles most real-world cases.
 - **Lazy loading**: Build index on-demand per file
 - **Persistent cache**: Serialize index to disk for faster startup
 
+## Metric Categories (Spec 118)
+
+### Overview
+
+Debtmap distinguishes between two fundamental categories of metrics to help users understand which metrics are precise measurements versus heuristic estimates. This distinction is critical for proper usage in CI/CD pipelines and decision-making.
+
+### Measured Metrics
+
+**Definition**: Metrics computed directly from Abstract Syntax Tree (AST) analysis.
+
+**Characteristics**:
+- **Deterministic**: Same code always produces the same value
+- **Precise**: Exact counts from syntax parsing, not approximations
+- **Language-specific**: Uses language parsers (syn for Rust, tree-sitter for others)
+- **Suitable for thresholds**: Reliable for quality gates and CI/CD enforcement
+
+**Examples**:
+
+| Metric | Description | Computation Method |
+|--------|-------------|-------------------|
+| `cyclomatic_complexity` | Decision point count | Count if, match, while, for, && , \|\| , ? |
+| `cognitive_complexity` | Readability measure | Weighted nesting and control flow analysis |
+| `nesting_depth` | Maximum nesting levels | Track depth during AST traversal |
+| `loc` | Lines of code | Physical line count from source |
+| `parameter_count` | Function parameters | Count items in function signature |
+
+**Usage in CI/CD**:
+```bash
+# GOOD: Use measured metrics for quality gates
+debtmap validate . --threshold-complexity 15 --max-critical 0
+
+# These thresholds are precise and repeatable
+```
+
+### Estimated Metrics
+
+**Definition**: Heuristic approximations calculated using formulas, not direct AST measurements.
+
+**Characteristics**:
+- **Heuristic**: Based on mathematical formulas and assumptions
+- **Approximate**: Close estimates, not exact counts
+- **Useful for prioritization**: Help estimate effort and risk
+- **Not suitable for hard thresholds**: Use for relative comparisons, not absolute gates
+
+**Examples**:
+
+| Metric | Formula | Purpose | Limitations |
+|--------|---------|---------|-------------|
+| `est_branches` | `max(nesting, 1) × cyclomatic ÷ 3` | Estimate test cases needed | Project-specific, not comparable across codebases |
+
+**Formula Rationale**:
+- **Nesting multiplier**: Deeper nesting creates exponentially more path combinations
+- **Cyclomatic base**: More decision points → more paths
+- **÷ 3 adjustment**: Empirical factor based on typical branch coverage patterns
+
+**Usage in Analysis**:
+```rust
+// Internal calculation (example from recommendation.rs)
+let est_branches = func.nesting.max(1) * cyclomatic / 3;
+
+// Used in recommendations:
+// "With ~12 estimated branches and complexity 15/8,
+//  this represents high risk. Minimum 8 test cases needed."
+```
+
+### Terminology Evolution
+
+#### Before Spec 118: "branches"
+- Displayed as `branches=8` in terminal output
+- Caused user confusion:
+  - Assumed to be precise AST measurement
+  - Confused with cyclomatic complexity
+  - Unclear that it was formula-based
+
+#### After Spec 118: "est_branches"
+- Renamed to `est_branches=8` to make estimation explicit
+- Benefits:
+  - **Clear intent**: "est_" prefix indicates approximation
+  - **Avoid confusion**: Distinct from cyclomatic complexity
+  - **Correct expectations**: Users know it's a heuristic
+
+**Implementation Changes**:
+```rust
+// Before (misleading):
+format!("branches={}", branch_count)
+
+// After (clear):
+format!("est_branches={}", branch_count)  // Estimation made explicit
+
+// Added documentation comments:
+// est_branches: Estimated execution paths (heuristic)
+// Formula: max(nesting, 1) × cyclomatic ÷ 3
+// Note: This is an ESTIMATE, not a count from the AST
+```
+
+### Design Principles
+
+#### Principle 1: Precision Transparency
+Users must know whether a metric is measured or estimated.
+
+**Bad**:
+```
+complexity=12, branches=8  # Ambiguous: Is "branches" measured or estimated?
+```
+
+**Good**:
+```
+cyclomatic=12, est_branches=8  # Clear: "est_" indicates estimation
+```
+
+#### Principle 2: Appropriate Usage
+Measured metrics for enforcement, estimated metrics for guidance.
+
+**Measured metrics**:
+- CI/CD quality gates
+- Code review standards
+- Cross-project comparisons
+- Compliance requirements
+
+**Estimated metrics**:
+- Prioritization heuristics
+- Effort estimation
+- Risk assessment
+- Testing guidance
+
+#### Principle 3: Formula Documentation
+All estimated metrics must document their formula and rationale.
+
+Example from `print_metrics_explanation()`:
+```rust
+println!("### Estimated Metrics");
+println!("  • est_branches: Estimated execution paths");
+println!("    Formula: max(nesting_depth, 1) × cyclomatic_complexity ÷ 3");
+println!("    Purpose: Estimate test cases needed for branch coverage");
+println!("    Note: This is an ESTIMATE, not a count from the AST");
+```
+
+### Data Flow Integration
+
+```
+File Analysis
+    ↓
+[AST Parsing]
+    ↓
+MEASURED METRICS:
+  ├─ cyclomatic_complexity (count decision points)
+  ├─ cognitive_complexity (weighted readability)
+  ├─ nesting_depth (track max nesting)
+  ├─ loc (count lines)
+  └─ parameter_count (count params)
+    ↓
+ESTIMATED METRICS:
+  └─ est_branches = f(nesting, cyclomatic)  [calculated on-demand]
+    ↓
+Risk Scoring & Prioritization
+    ↓
+Output Formatting
+  ├─ Terminal: Shows est_branches
+  ├─ JSON: Only measured metrics serialized
+  └─ Verbose: Explains formulas
+```
+
+### Future Enhancements
+
+**Planned estimated metrics**:
+- `est_test_cases`: Estimated test cases for full coverage
+- `est_effort_hours`: Estimated refactoring effort
+- `est_bug_density`: Predicted bug probability
+
+**Validation framework**:
+- Empirical validation of estimation formulas
+- A/B testing of formula variations
+- Confidence intervals for estimates
+
+**Metric metadata**:
+```rust
+pub struct MetricMetadata {
+    name: String,
+    category: MetricCategory,  // Measured | Estimated
+    formula: Option<String>,   // For estimated metrics
+    suitable_for_thresholds: bool,
+    documentation_url: String,
+}
+```
+
+### References
+
+- **User Documentation**: `book/src/metrics-reference.md`
+- **CLI Help**: `debtmap analyze --explain-metrics`
+- **FAQ**: `book/src/faq.md#measured-vs-estimated`
+- **Implementation**: `src/priority/scoring/recommendation.rs`
+
 ## Data Flow
 
 ```

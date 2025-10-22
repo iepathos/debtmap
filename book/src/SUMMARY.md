@@ -27,6 +27,7 @@
 
 # Reference
 
+- [Metrics Reference](metrics-reference.md)
 - [Examples](examples.md)
 - [FAQ](faq.md)
 - [Troubleshooting](troubleshooting.md)

@@ -230,6 +230,10 @@ pub enum Commands {
         /// Show pattern warnings for uncertain detections
         #[arg(long = "show-pattern-warnings")]
         show_pattern_warnings: bool,
+
+        /// Explain metric definitions and formulas (measured vs estimated)
+        #[arg(long = "explain-metrics")]
+        explain_metrics: bool,
     },
 
     /// Initialize configuration file
