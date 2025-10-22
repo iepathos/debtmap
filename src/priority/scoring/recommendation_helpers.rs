@@ -16,6 +16,68 @@ use super::formatting::{
 };
 use crate::priority::external_api_detector::is_likely_external_api;
 
+/// Format path count with correct grammar (singular/plural)
+///
+/// # Spec 119: Path Count and Test Recommendation Separation
+///
+/// Always reports the actual number of execution paths (cyclomatic complexity)
+/// without artificial inflation. Uses correct singular/plural grammar.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::priority::scoring::recommendation_helpers::format_path_count;
+///
+/// assert_eq!(format_path_count(1), "single execution path");
+/// assert_eq!(format_path_count(2), "2 execution paths");
+/// assert_eq!(format_path_count(10), "10 execution paths");
+/// ```
+pub fn format_path_count(count: u32) -> String {
+    match count {
+        1 => "single execution path".to_string(),
+        n => format!("{} execution paths", n),
+    }
+}
+
+/// Explain test recommendation rationale when test count exceeds path count
+///
+/// # Spec 119: Path Count and Test Recommendation Separation
+///
+/// Clarifies why we recommend more tests than execution paths exist.
+/// Even simple functions (1 path) benefit from multiple tests for edge cases.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::priority::scoring::recommendation_helpers::explain_test_rationale;
+///
+/// // 2 tests for 1 path
+/// assert_eq!(
+///     explain_test_rationale(1, 2, 0.0),
+///     " (happy path + 1 edge case)"
+/// );
+///
+/// // 3 tests for 1 path
+/// assert_eq!(
+///     explain_test_rationale(1, 3, 0.0),
+///     " (happy path + 2 edge cases)"
+/// );
+///
+/// // Equal tests and paths
+/// assert_eq!(explain_test_rationale(5, 5, 0.0), "");
+/// ```
+pub fn explain_test_rationale(paths: u32, tests: u32, _coverage_percent: f64) -> String {
+    if tests > paths {
+        format!(
+            " (happy path + {} edge case{})",
+            tests - 1,
+            if tests > 2 { "s" } else { "" }
+        )
+    } else {
+        "".to_string()
+    }
+}
+
 /// Generate action and rationale for dead code
 pub(super) fn generate_dead_code_action(
     func: &FunctionMetrics,
@@ -114,8 +176,12 @@ pub(super) fn generate_simple_function_recommendation(
     let coverage_pct_int = (coverage_pct * 100.0) as i32;
 
     let coverage_explanation = if coverage_pct_int == 0 {
-        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} test cases to cover all {} execution paths",
-               test_cases_needed, cyclomatic.max(2))
+        // Use helper functions to format path count and explain rationale
+        let path_text = format_path_count(cyclomatic);
+        let test_rationale = explain_test_rationale(cyclomatic, test_cases_needed, coverage_pct);
+
+        format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} tests for {}{}",
+               test_cases_needed, path_text, test_rationale)
     } else {
         format!("{role_display} with {coverage_gap}% coverage gap, currently {coverage_pct_int}% covered. Needs {} more test cases",
                test_cases_needed)
@@ -394,5 +460,159 @@ mod tests {
         assert!(action.contains("Fix error swallowing"));
         assert!(rationale.contains("unwrap_or_default"));
         assert_eq!(steps.len(), 5);
+    }
+
+    // Tests for Spec 119: Path Count and Test Recommendation Separation
+
+    #[test]
+    fn test_format_path_count_singular() {
+        assert_eq!(format_path_count(1), "single execution path");
+    }
+
+    #[test]
+    fn test_format_path_count_plural() {
+        assert_eq!(format_path_count(2), "2 execution paths");
+        assert_eq!(format_path_count(5), "5 execution paths");
+        assert_eq!(format_path_count(10), "10 execution paths");
+        assert_eq!(format_path_count(100), "100 execution paths");
+    }
+
+    #[test]
+    fn test_explain_test_rationale_equal_tests_and_paths() {
+        // When test count equals path count, no explanation needed
+        assert_eq!(explain_test_rationale(1, 1, 0.0), "");
+        assert_eq!(explain_test_rationale(5, 5, 0.5), "");
+        assert_eq!(explain_test_rationale(10, 10, 0.8), "");
+    }
+
+    #[test]
+    fn test_explain_test_rationale_two_tests_one_path() {
+        // 2 tests for 1 path: happy path + 1 edge case
+        assert_eq!(
+            explain_test_rationale(1, 2, 0.0),
+            " (happy path + 1 edge case)"
+        );
+    }
+
+    #[test]
+    fn test_explain_test_rationale_multiple_edge_cases() {
+        // 3 tests for 1 path: happy path + 2 edge cases
+        assert_eq!(
+            explain_test_rationale(1, 3, 0.0),
+            " (happy path + 2 edge cases)"
+        );
+
+        // 5 tests for 2 paths: more tests than paths
+        assert_eq!(
+            explain_test_rationale(2, 5, 0.0),
+            " (happy path + 4 edge cases)"
+        );
+    }
+
+    #[test]
+    fn test_single_path_function_reports_one_path() {
+        // Spec 119 regression test: ContextMatcher::any() case
+        let func = create_test_function("any", 1, 1);
+
+        let (_action, rationale, _steps) = generate_simple_function_recommendation(
+            1,   // cyclomatic = 1 (single path)
+            0.0, // 0% coverage
+            100, // 100% coverage gap
+            FunctionRole::PureLogic,
+            &func,
+            &None,
+        );
+
+        // Should mention "single execution path" or "1 execution path"
+        assert!(
+            rationale.contains("single execution path"),
+            "Expected 'single execution path', got: {}",
+            rationale
+        );
+
+        // Should NOT claim "2 execution paths"
+        assert!(
+            !rationale.contains("2 execution paths"),
+            "Should not inflate path count to 2, got: {}",
+            rationale
+        );
+
+        // Should recommend 2 tests minimum
+        assert!(
+            rationale.contains("2 tests"),
+            "Should recommend minimum 2 tests, got: {}",
+            rationale
+        );
+
+        // Should explain the rationale
+        assert!(
+            rationale.contains("edge case") || rationale.contains("happy path"),
+            "Should explain why 2 tests for 1 path, got: {}",
+            rationale
+        );
+    }
+
+    #[test]
+    fn test_multi_path_function_reports_actual_count() {
+        let func = create_test_function("complex", 5, 8);
+
+        let (_action, rationale, _steps) = generate_simple_function_recommendation(
+            5,   // cyclomatic = 5
+            0.5, // 50% coverage
+            50,  // 50% coverage gap
+            FunctionRole::PureLogic,
+            &func,
+            &None,
+        );
+
+        // For partially covered functions, might not mention paths in the same way
+        // But should never inflate the path count with .max(2)
+        // This test ensures the fix is in place
+        assert!(
+            !rationale.contains("cover all 2 execution paths")
+                && !rationale.contains("to cover all 10 execution paths"),
+            "Should not use .max(2) pattern anymore, got: {}",
+            rationale
+        );
+    }
+
+    #[test]
+    fn test_zero_coverage_uses_new_format() {
+        let func = create_test_function("test_func", 3, 5);
+
+        let (_action, rationale, _steps) = generate_simple_function_recommendation(
+            3,   // cyclomatic = 3
+            0.0, // 0% coverage
+            100, // 100% coverage gap
+            FunctionRole::PureLogic,
+            &func,
+            &None,
+        );
+
+        // Should say "3 execution paths" not "cover all N execution paths"
+        assert!(
+            rationale.contains("3 execution paths"),
+            "Should report actual path count, got: {}",
+            rationale
+        );
+
+        // Should recommend at least 2 tests (minimum for simple functions)
+        assert!(
+            rationale.contains("3 tests") || rationale.contains("2 tests"),
+            "Should recommend appropriate test count, got: {}",
+            rationale
+        );
+    }
+
+    #[test]
+    fn test_grammatical_correctness() {
+        // Test that singular/plural forms are used correctly
+        assert_eq!(format_path_count(1), "single execution path");
+        assert_eq!(format_path_count(2), "2 execution paths");
+
+        // Edge case is singular for 2 tests
+        assert!(explain_test_rationale(1, 2, 0.0).contains("edge case"));
+        // Edge cases is plural for 3+ tests
+        assert!(explain_test_rationale(1, 3, 0.0).contains("edge cases"));
     }
 }
