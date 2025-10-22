@@ -45,11 +45,28 @@ WHY: Business logic with 100% coverage gap, currently 0% covered
 - Actual gap = 11.1%, not 100%
 
 **Root Cause**:
-When lcov data has *no entry* for a function, debtmap assumes 0% coverage.
-But for constructors/simple functions, lcov might:
-1. Not instrument trivial field initialization
-2. Mark entire function as single "line"
-3. Report partial coverage (8/9 lines) but debtmap sees binary 0%/100%
+Debtmap currently calculates coverage gap using **function-level** coverage instead of **line-level** coverage:
+
+```rust
+// Current implementation (src/priority/scoring/rust_recommendations.rs:227)
+let coverage_gap = ((1.0 - coverage_percent) * 100.0) as u32;
+// coverage_percent from FNDA (function-level): 0% → gap = 100%
+```
+
+**The Problem**: Function-level coverage is binary (executed vs not executed), while line-level coverage is granular:
+
+```
+FNDA:0,any          ← Function never executed → 0% function coverage
+DA:52,0             ← 1 line uncovered
+DA:53,5, DA:54,5, ... ← 8 lines covered
+Actual gap: 1/9 = 11.1%, not 100%
+```
+
+**Why This Happens**:
+- `ContextMatcher::any()` is only called in conditional path (config parsing)
+- Tests don't set up config, so function never executes
+- FNDA shows 0 executions, but if it DID execute, most lines would be covered
+- Current gap calculation uses function-level data, missing line-level granularity
 
 **Impact**:
 - Users see "100% gap" and think "this function is completely untested"
@@ -78,7 +95,10 @@ Provide accurate, granular coverage gap reporting that distinguishes between "1 
 **FR3: Lcov Data Parsing Enhancement**
 - Parse lcov line-level coverage data (DA:line,hits)
 - Calculate uncovered lines from lcov report
-- Handle missing lcov entries (default to 100% gap with warning)
+- **Handle incomplete DA records**: If <80% of function lines have DA entries, use `Estimated` gap with warning
+- **Handle missing DA records**: If 0 DA entries exist for function, fallback to function-level coverage with `Unknown` gap
+- Warn when line data is incomplete or inconsistent with AST line count
+- Validate DA records are within expected function line range
 
 **FR4: Multi-Tier Gap Reporting**
 - **Precise**: When lcov line data available → "N lines uncovered (X%)"
@@ -178,6 +198,108 @@ impl LcovData {
 }
 ```
 
+### Line Count Determination
+
+**Challenge**: Lcov line count vs AST line count may differ due to:
+- Lcov only counting "executable" lines (excludes comments, braces)
+- Compiler optimizations removing trivial code
+- Different instrumentation granularity
+
+**Solution**: Use AST as source of truth for total lines, lcov for coverage status:
+
+```rust
+impl LcovData {
+    /// Get line-level coverage using AST line count as baseline
+    pub fn get_line_coverage(
+        &self,
+        file: &Path,
+        function: &str,
+        start_line: u32,
+        ast_line_count: u32,  // NEW: from FunctionMetrics, not lcov
+    ) -> Option<LineCoverageData> {
+        // Use AST line count as truth (total lines in function)
+        let total_lines = ast_line_count;
+
+        // Collect DA records within function's line range
+        let mut covered_lines = 0;
+        let mut uncovered_lines = Vec::new();
+        let mut line_hits = HashMap::new();
+
+        for (line_num, hit_count) in &self.line_data {
+            if *line_num >= start_line && *line_num < start_line + total_lines {
+                line_hits.insert(*line_num, *hit_count);
+
+                if *hit_count > 0 {
+                    covered_lines += 1;
+                } else {
+                    uncovered_lines.push(*line_num);
+                }
+            }
+        }
+
+        // If no DA records found, return None (fallback to function-level)
+        let da_count = covered_lines + uncovered_lines.len() as u32;
+        if da_count == 0 {
+            return None;
+        }
+
+        // If DA records cover <80% of AST lines, data is incomplete
+        let da_coverage_ratio = da_count as f64 / total_lines as f64;
+        if da_coverage_ratio < 0.8 {
+            eprintln!(
+                "Warning: Incomplete line coverage data for {}:{} ({}/{} lines have DA records)",
+                file.display(),
+                function,
+                da_count,
+                total_lines
+            );
+            // Could return Estimated gap here instead of Precise
+        }
+
+        Some(LineCoverageData {
+            total_lines,
+            covered_lines,
+            uncovered_lines,
+            line_hits,
+        })
+    }
+}
+```
+
+**Edge Case Handling**:
+
+```rust
+// Example: lcov only instruments executable lines
+// Source (9 lines total):
+pub fn any() -> Self {   // Line 52
+    Self {               // Line 53
+        role: None,      // Line 54
+        // ... (lines 55-59)
+    }                    // Line 60
+}
+
+// Lcov data (only 5 executable lines):
+DA:52,0  // Function signature - uncovered
+DA:53,0  // Struct literal start - uncovered
+DA:54,0  // Field initialization - uncovered
+DA:55,0  // Field initialization - uncovered
+DA:56,0  // Field initialization - uncovered
+// Lines 57-60 not instrumented (closing braces, whitespace)
+
+// Gap calculation options:
+// Option A: 5 uncovered / 9 total = 55.6% (uses AST total)
+// Option B: 5 uncovered / 5 instrumented = 100% (uses DA total)
+//
+// CHOSEN: Option B (only count instrumented lines for precision)
+// Gap = uncovered_lines.len() / (covered + uncovered) * 100
+//     = 5 / 5 = 100%
+```
+
+**Rationale**: We calculate gap percentage based on **instrumented lines only**, not total AST lines, because:
+- Non-instrumented lines (braces, whitespace) are not executable
+- Including them dilutes the gap percentage artificially
+- Users care about "% of executable code untested", not "% of text lines"
+
 **Phase 2: Precise Gap Calculation**
 
 **File**: `src/priority/scoring/recommendation_helpers.rs`
@@ -192,12 +314,18 @@ pub fn calculate_coverage_gap(
     // Try to get line-level data first
     if let Some(data) = coverage_data {
         if let Some(line_cov) = data.get_line_coverage(&func.file, &func.name, func.line) {
+            // Calculate gap based on instrumented lines only
+            let instrumented_lines = line_cov.covered_lines + line_cov.uncovered_lines.len() as u32;
+            let gap_percentage = if instrumented_lines > 0 {
+                (line_cov.uncovered_lines.len() as f64 / instrumented_lines as f64) * 100.0
+            } else {
+                0.0  // No instrumented lines = no gap to report
+            };
+
             return CoverageGap::Precise {
                 uncovered_lines: line_cov.uncovered_lines.clone(),
-                total_lines: line_cov.total_lines,
-                percentage: (line_cov.uncovered_lines.len() as f64
-                    / line_cov.total_lines as f64
-                    * 100.0),
+                total_lines: instrumented_lines,  // Use instrumented line count, not AST
+                percentage: gap_percentage,
             };
         }
     }
@@ -440,7 +568,12 @@ COVERAGE: 🟡 1 line uncovered (11% gap) - line 52
 - Risk scoring (uses gap percentage)
 - Output formatters
 
-**External Dependencies**: None
+**External Dependencies**:
+- `proptest` (dev dependency) - For property-based testing of gap calculations
+  ```toml
+  [dev-dependencies]
+  proptest = "1.0"
+  ```
 
 ## Testing Strategy
 
@@ -509,6 +642,133 @@ fn test_line_range_formatting() {
     // Test: Non-contiguous → "10, 15, 20"
     let lines = vec![10, 15, 20];
     assert_eq!(format_line_ranges(&lines), "10, 15, 20");
+}
+
+#[test]
+fn test_gap_calculation_with_zero_total_lines() {
+    let gap = CoverageGap::Precise {
+        uncovered_lines: vec![],
+        total_lines: 0,
+        percentage: 0.0,
+    };
+
+    // Should not panic
+    let formatted = gap.format();
+    assert_eq!(formatted, "Fully covered");
+}
+
+#[test]
+fn test_incomplete_line_data_handling() {
+    // lcov only has DA records for 3 out of 10 AST lines
+    let mut lcov_data = LcovData::new();
+    lcov_data.add_line_coverage("test.rs", 10, 0); // Uncovered
+    lcov_data.add_line_coverage("test.rs", 11, 5); // Covered
+    lcov_data.add_line_coverage("test.rs", 12, 5); // Covered
+    // Lines 13-19 missing (no DA records)
+
+    let func = create_test_function("incomplete", 10, 10); // 10 AST lines
+    let gap = calculate_coverage_gap(0.0, &func, Some(&lcov_data));
+
+    // Should warn about incomplete data and potentially return Estimated
+    // With current spec: 1 uncovered / 3 instrumented = 33.3%
+    match gap {
+        CoverageGap::Precise { percentage, .. } => {
+            assert!((percentage - 33.3).abs() < 1.0);
+        }
+        CoverageGap::Estimated { .. } => {
+            // Also acceptable if incomplete data triggers Estimated mode
+        }
+        _ => panic!("Unexpected gap type"),
+    }
+}
+```
+
+### Property-Based Tests
+
+**Test Invariants**:
+```rust
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    fn gap_percentage_always_between_0_and_100(
+        uncovered in 0u32..100,
+        covered in 0u32..100,
+    ) {
+        let total = uncovered + covered;
+        if total == 0 {
+            return Ok(()); // Skip degenerate case
+        }
+
+        let percentage = (uncovered as f64 / total as f64) * 100.0;
+        prop_assert!(percentage >= 0.0 && percentage <= 100.0);
+    }
+
+    #[test]
+    fn gap_formatting_never_panics(
+        uncovered_lines in prop::collection::vec(1u32..1000, 0..50),
+        total in 1u32..100,
+    ) {
+        let gap = CoverageGap::Precise {
+            uncovered_lines: uncovered_lines.clone(),
+            total_lines: total,
+            percentage: (uncovered_lines.len() as f64 / total as f64) * 100.0,
+        };
+
+        // Should never panic, regardless of input
+        let formatted = gap.format();
+        prop_assert!(!formatted.is_empty());
+    }
+
+    #[test]
+    fn zero_uncovered_lines_reports_full_coverage(
+        total in 1u32..100,
+    ) {
+        let gap = CoverageGap::Precise {
+            uncovered_lines: vec![],
+            total_lines: total,
+            percentage: 0.0,
+        };
+
+        prop_assert!(gap.format().contains("Fully covered"));
+    }
+
+    #[test]
+    fn all_lines_uncovered_reports_100_percent(
+        line_count in 1u32..50,
+    ) {
+        let uncovered: Vec<u32> = (1..=line_count).collect();
+        let gap = CoverageGap::Precise {
+            uncovered_lines: uncovered.clone(),
+            total_lines: line_count,
+            percentage: 100.0,
+        };
+
+        let formatted = gap.format();
+        prop_assert!(formatted.contains("100"));
+    }
+
+    #[test]
+    fn line_range_formatting_stable(
+        mut lines in prop::collection::vec(1u32..1000, 1..30),
+    ) {
+        // Remove duplicates and sort
+        lines.sort_unstable();
+        lines.dedup();
+
+        if lines.is_empty() {
+            return Ok(());
+        }
+
+        // Should format without panicking
+        let formatted = format_line_ranges(&lines);
+
+        // Should contain at least the first line number
+        prop_assert!(formatted.contains(&lines[0].to_string()));
+
+        // Should not contain invalid characters
+        prop_assert!(!formatted.contains(".."));  // No empty ranges
+    }
 }
 ```
 
@@ -601,19 +861,65 @@ DA:53,5    # Line 53 covered (5 hits)
 // 0 executable lines
 fn empty() {}
 
-// Gap: "No executable lines"
+// Lcov: No DA records
+// Gap: CoverageGap::Unknown { total_lines: 0 }
+// Display: "Coverage data unavailable (0 lines)"
 ```
 
 **Macro-Generated Code**:
 ```rust
-// Lines may not match source
-// Fallback to estimated gap
+// Lines in expanded code may not match source lines
+macro_rules! generate_fn {
+    ($name:ident) => {
+        fn $name() { /* expanded code */ }
+    }
+}
+
+// Lcov may report line numbers from expansion, not source
+// Strategy: If DA line numbers are outside function range, fallback to Estimated
 ```
 
 **Partial Lcov Data**:
 ```rust
-// Some lines have data, others don't
-// Use hybrid: precise for known, estimated for unknown
+// Example: 3 DA records for 10-line function (30% coverage)
+fn complex_function() {
+    // 10 lines of code
+}
+
+// Lcov:
+DA:100,5  // Line 100 covered
+DA:105,0  // Line 105 uncovered
+DA:109,5  // Line 109 covered
+// Lines 101-104, 106-108 missing
+
+// Strategy:
+// 1. Calculate DA coverage ratio: 3/10 = 30%
+// 2. If < 80%, log warning and use Estimated gap
+// 3. Otherwise, use Precise with available data: 1 uncovered / 3 instrumented = 33%
+```
+
+**Zero Division Prevention**:
+```rust
+// All lines optimized away or no instrumentation
+let instrumented_lines = covered + uncovered;
+if instrumented_lines == 0 {
+    return CoverageGap::Unknown { total_lines: ast_line_count };
+}
+
+// Safe to calculate percentage
+let gap_pct = (uncovered as f64 / instrumented_lines as f64) * 100.0;
+```
+
+**Inconsistent Line Ranges**:
+```rust
+// DA records outside function's line range
+fn my_func() { }  // Lines 50-55
+
+// Lcov incorrectly reports:
+DA:100,0  // Line 100 is NOT in function range!
+
+// Strategy: Filter DA records to function's line range
+// Only count DA records where: start_line <= line < start_line + length
 ```
 
 ## Migration and Compatibility
