@@ -45,7 +45,7 @@
 //! }
 //! ```
 
-use syn::{visit::Visit, BinOp, Expr, ExprBinary, ExprIf, ExprMethodCall, ItemFn, Stmt};
+use syn::{visit::Visit, BinOp, Expr, ExprBinary, ExprCall, ExprIf, ExprMethodCall, ItemFn, Stmt};
 
 #[derive(Debug, Clone)]
 pub struct DataFlowProfile {
@@ -159,6 +159,18 @@ impl<'ast> Visit<'ast> for DataFlowVisitor {
             });
         }
 
+        // I/O operations
+        if matches!(
+            method_name.as_str(),
+            "read" | "write" | "read_to_string" | "write_all" | "flush" | "read_line"
+                | "read_exact" | "write_fmt" | "sync_all" | "sync_data"
+        ) {
+            self.transformation_ops += 1;
+            self.patterns.push(DataFlowPattern::IOOperation {
+                kind: method_name.clone(),
+            });
+        }
+
         // Track iterator chains
         if self.current_chain_length > 2 {
             self.patterns.push(DataFlowPattern::IteratorChain {
@@ -167,6 +179,34 @@ impl<'ast> Visit<'ast> for DataFlowVisitor {
         }
 
         syn::visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        // Detect File::open, File::create, etc.
+        if let Expr::Path(path_expr) = &*node.func {
+            let path_str = path_expr
+                .path
+                .segments
+                .iter()
+                .map(|seg| seg.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::");
+
+            // File operations
+            if matches!(
+                path_str.as_str(),
+                "File::open" | "File::create" | "File::options" | "OpenOptions::new"
+                    | "read_to_string" | "write" | "fs::read" | "fs::write"
+                    | "fs::read_to_string" | "fs::write_all"
+            ) {
+                self.transformation_ops += 1;
+                self.patterns.push(DataFlowPattern::IOOperation {
+                    kind: path_str,
+                });
+            }
+        }
+
+        syn::visit::visit_expr_call(self, node);
     }
 
     fn visit_expr_binary(&mut self, node: &'ast ExprBinary) {
@@ -520,5 +560,115 @@ mod tests {
         assert_eq!(profile.transformation_ratio, 0.0);
         assert_eq!(profile.business_logic_ratio, 0.0);
         assert_eq!(profile.confidence, 0.0);
+    }
+
+    #[test]
+    fn test_io_operations_detected() {
+        let code: ItemFn = parse_quote! {
+            fn read_config(path: &Path) -> Result<String> {
+                let mut file = File::open(path)?;
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+                Ok(content)
+            }
+        };
+
+        let profile = analyze_data_flow(&code);
+
+        // Should detect I/O operations
+        assert!(
+            profile
+                .patterns
+                .iter()
+                .any(|p| matches!(p, DataFlowPattern::IOOperation { .. })),
+            "Expected I/O operation pattern, got patterns: {:?}",
+            profile.patterns
+        );
+
+        // I/O is data transformation
+        assert!(
+            profile.transformation_ratio > 0.0,
+            "I/O operations should contribute to transformation ratio"
+        );
+    }
+
+    #[test]
+    fn test_file_write_detected() {
+        let code: ItemFn = parse_quote! {
+            fn save_data(path: &Path, data: &str) -> Result<()> {
+                fs::write(path, data)?;
+                Ok(())
+            }
+        };
+
+        let profile = analyze_data_flow(&code);
+
+        // Should detect file write operation
+        assert!(
+            profile
+                .patterns
+                .iter()
+                .any(|p| matches!(p, DataFlowPattern::IOOperation { kind } if kind.contains("write"))),
+            "Expected file write operation"
+        );
+    }
+
+    #[test]
+    fn test_performance_overhead_under_5ms() {
+        use std::time::Instant;
+
+        // Create a large synthetic function with many operations
+        let code: ItemFn = parse_quote! {
+            fn large_function(items: Vec<ComplexData>) -> ProcessedResult {
+                let step1 = items.into_iter()
+                    .filter(|item| item.is_valid())
+                    .filter(|item| item.score > 0.5)
+                    .filter(|item| !item.is_deleted)
+                    .map(|item| item.normalize())
+                    .map(|item| item.transform())
+                    .map(|item| item.validate())
+                    .collect::<Vec<_>>();
+
+                let step2 = step1.iter()
+                    .filter(|item| item.priority > 10)
+                    .map(|item| item.clone())
+                    .collect::<Vec<_>>();
+
+                let total = step2.iter().map(|item| item.value).sum::<f64>();
+                let average = total / step2.len() as f64;
+
+                let final_items = step2.into_iter()
+                    .filter(|item| item.value > average)
+                    .map(|item| item.finalize())
+                    .collect::<Vec<_>>();
+
+                let serialized = serde_json::to_string(&final_items).unwrap();
+
+                ProcessedResult {
+                    data: serialized,
+                    count: final_items.len(),
+                    average_value: average,
+                }
+            }
+        };
+
+        // Measure analysis time
+        let start = Instant::now();
+        let _profile = analyze_data_flow(&code);
+        let duration = start.elapsed();
+
+        // Assert < 5ms overhead per function
+        assert!(
+            duration.as_millis() < 5,
+            "Analysis took {}ms, expected < 5ms",
+            duration.as_millis()
+        );
+
+        // Also test with microsecond precision for better reporting
+        println!(
+            "Data flow analysis completed in {}µs ({}ms)",
+            duration.as_micros(),
+            duration.as_millis()
+        );
     }
 }
