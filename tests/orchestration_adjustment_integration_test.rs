@@ -27,6 +27,7 @@ fn test_orchestrator_receives_reduction() {
             file: PathBuf::from("test.rs"),
             name: format!("task_{}", i),
             line: 10 + i * 10,
+            module_path: String::new(),
         };
         call_graph.add_function(callee.clone(), false, false, 5, 20);
         call_graph.add_call(FunctionCall {
@@ -221,6 +222,7 @@ fn create_test_call_graph(callee_count: usize, func_name: &str, func_line: usize
             file: PathBuf::from("test.rs"),
             name: format!("callee_{}", i),
             line: 100 + i * 10,
+            module_path: String::new(),
         };
         graph.add_function(callee.clone(), false, false, 5, 20);
         graph.add_call(FunctionCall {

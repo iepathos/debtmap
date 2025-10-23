@@ -130,11 +130,13 @@ fn bench_cross_file_resolution(c: &mut Criterion) {
                         file: PathBuf::from(format!("file{}.rs", i % 10)),
                         name: format!("caller_{}", i),
                         line: i * 10,
+                        module_path: String::new(),
                     },
                     callee: FunctionId {
                         file: PathBuf::from("unknown.rs"),
                         name: format!("unresolved_{}", i),
                         line: 0, // Line 0 indicates unresolved
+                        module_path: String::new(),
                     },
                     call_type: CallType::Direct,
                 };
