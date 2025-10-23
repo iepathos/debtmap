@@ -8,8 +8,9 @@ pub mod purity_analyzer;
 
 pub use god_object_analysis::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
-    group_methods_by_responsibility, recommend_module_splits, GodObjectAnalysis,
-    GodObjectConfidence, GodObjectThresholds, ModuleSplit, PurityDistribution,
+    group_methods_by_responsibility, recommend_module_splits, suggest_module_splits_by_domain,
+    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
+    GodObjectType, ModuleSplit, PurityDistribution, StructMetrics,
 };
 
 pub use god_object_metrics::{
