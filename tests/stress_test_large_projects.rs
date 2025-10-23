@@ -66,11 +66,7 @@ mod stress_tests {
 
         // Add all functions to the graph
         for metric in metrics {
-            let func_id = FunctionId {
-                file: metric.file.clone(),
-                name: metric.name.clone(),
-                line: metric.line,
-            };
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
 
             call_graph.add_function(
                 func_id,
@@ -88,21 +84,21 @@ mod stress_tests {
         // Add realistic call relationships
         // Each function calls 0-5 other functions
         for i in 0..metrics.len() {
-            let caller = FunctionId {
-                file: metrics[i].file.clone(),
-                name: metrics[i].name.clone(),
-                line: metrics[i].line,
-            };
+            let caller = FunctionId::new(
+                metrics[i].file.clone(),
+                metrics[i].name.clone(),
+                metrics[i].line,
+            );
 
             // Create some call relationships
             let num_calls = i % 6; // 0-5 calls per function
             for j in 0..num_calls {
                 let callee_idx = (i + j + 1) % metrics.len();
-                let callee = FunctionId {
-                    file: metrics[callee_idx].file.clone(),
-                    name: metrics[callee_idx].name.clone(),
-                    line: metrics[callee_idx].line,
-                };
+                let callee = FunctionId::new(
+                    metrics[callee_idx].file.clone(),
+                    metrics[callee_idx].name.clone(),
+                    metrics[callee_idx].line,
+                );
 
                 call_graph.add_call_parts(
                     caller.clone(),
@@ -286,11 +282,7 @@ mod stress_tests {
 
         // Add all functions
         for metric in &metrics {
-            let func_id = FunctionId {
-                file: metric.file.clone(),
-                name: metric.name.clone(),
-                line: metric.line,
-            };
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
 
             call_graph.add_function(
                 func_id,
@@ -303,20 +295,20 @@ mod stress_tests {
 
         // Create a highly connected graph - each function calls many others
         for i in 0..metrics.len() {
-            let caller = FunctionId {
-                file: metrics[i].file.clone(),
-                name: metrics[i].name.clone(),
-                line: metrics[i].line,
-            };
+            let caller = FunctionId::new(
+                metrics[i].file.clone(),
+                metrics[i].name.clone(),
+                metrics[i].line,
+            );
 
             // Each function calls up to 20 others
             for j in 1..=20 {
                 let callee_idx = (i + j * 97) % metrics.len(); // Use prime for distribution
-                let callee = FunctionId {
-                    file: metrics[callee_idx].file.clone(),
-                    name: metrics[callee_idx].name.clone(),
-                    line: metrics[callee_idx].line,
-                };
+                let callee = FunctionId::new(
+                    metrics[callee_idx].file.clone(),
+                    metrics[callee_idx].name.clone(),
+                    metrics[callee_idx].line,
+                );
 
                 call_graph.add_call_parts(caller.clone(), callee, CallType::Direct);
             }

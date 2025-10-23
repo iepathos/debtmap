@@ -817,11 +817,7 @@ mod tests {
     fn test_entry_point_classification() {
         let graph = CallGraph::new();
         let func = create_test_metrics("main", 5, 8, 50);
-        let func_id = FunctionId {
-            file: PathBuf::from("main.rs"),
-            name: "main".to_string(),
-            line: 1,
-        };
+        let func_id = FunctionId::new(PathBuf::from("main.rs"), "main".to_string(), 1);
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::EntryPoint);
@@ -831,22 +827,19 @@ mod tests {
     fn test_orchestrator_classification() {
         let mut graph = CallGraph::new();
         let func = create_test_metrics("coordinate_tasks", 2, 3, 15);
-        let func_id = FunctionId {
-            file: PathBuf::from("coord.rs"),
-            name: "coordinate_tasks".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("coord.rs"),
+            "coordinate_tasks".to_string(),
+            10,
+        );
 
         // Add the orchestrator function
         graph.add_function(func_id.clone(), false, false, 2, 15);
 
         // Add some worker functions it calls
         for i in 0..3 {
-            let worker_id = FunctionId {
-                file: PathBuf::from("worker.rs"),
-                name: format!("worker_{i}"),
-                line: i * 10,
-            };
+            let worker_id =
+                FunctionId::new(PathBuf::from("worker.rs"), format!("worker_{i}"), i * 10);
             graph.add_function(worker_id.clone(), false, false, 8, 40);
             graph.add_call(crate::priority::call_graph::FunctionCall {
                 caller: func_id.clone(),
@@ -863,11 +856,7 @@ mod tests {
     fn test_io_wrapper_classification() {
         let graph = CallGraph::new();
         let func = create_test_metrics("read_file", 1, 2, 10);
-        let func_id = FunctionId {
-            file: PathBuf::from("io.rs"),
-            name: "read_file".to_string(),
-            line: 5,
-        };
+        let func_id = FunctionId::new(PathBuf::from("io.rs"), "read_file".to_string(), 5);
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::IOWrapper);
@@ -885,11 +874,11 @@ mod tests {
         let mut func = create_test_metrics("output_unified_priorities", 12, 19, 38);
         func.nesting = 3;
 
-        let func_id = FunctionId {
-            file: PathBuf::from("main.rs"),
-            name: "output_unified_priorities".to_string(),
-            line: 861,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("main.rs"),
+            "output_unified_priorities".to_string(),
+            861,
+        );
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::IOWrapper);
@@ -904,11 +893,7 @@ mod tests {
     fn test_pure_logic_classification() {
         let graph = CallGraph::new();
         let func = create_test_metrics("calculate_risk", 8, 12, 60);
-        let func_id = FunctionId {
-            file: PathBuf::from("calc.rs"),
-            name: "calculate_risk".to_string(),
-            line: 20,
-        };
+        let func_id = FunctionId::new(PathBuf::from("calc.rs"), "calculate_risk".to_string(), 20);
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(role, FunctionRole::PureLogic);
@@ -931,26 +916,22 @@ mod tests {
 
         // Create a function like format_recommendation_box_header
         let func = create_test_metrics("format_recommendation_box_header", 1, 0, 9);
-        let func_id = FunctionId {
-            file: PathBuf::from("insights.rs"),
-            name: "format_recommendation_box_header".to_string(),
-            line: 142,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("insights.rs"),
+            "format_recommendation_box_header".to_string(),
+            142,
+        );
 
         // Add the function to the graph
         graph.add_function(func_id.clone(), false, false, 1, 9);
 
         // Add callees: calculate_dash_count and format (from macro)
-        let callee1 = FunctionId {
-            file: PathBuf::from("insights.rs"),
-            name: "calculate_dash_count".to_string(),
-            line: 138,
-        };
-        let callee2 = FunctionId {
-            file: PathBuf::from("std"),
-            name: "format".to_string(),
-            line: 1,
-        };
+        let callee1 = FunctionId::new(
+            PathBuf::from("insights.rs"),
+            "calculate_dash_count".to_string(),
+            138,
+        );
+        let callee2 = FunctionId::new(PathBuf::from("std"), "format".to_string(), 1);
 
         graph.add_function(callee1.clone(), false, false, 1, 3);
         graph.add_function(callee2.clone(), false, false, 1, 1);
@@ -987,31 +968,31 @@ mod tests {
 
         // Create an actual orchestrator function
         let func = create_test_metrics("coordinate_workflow", 2, 3, 15);
-        let func_id = FunctionId {
-            file: PathBuf::from("workflow.rs"),
-            name: "coordinate_workflow".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("workflow.rs"),
+            "coordinate_workflow".to_string(),
+            10,
+        );
 
         graph.add_function(func_id.clone(), false, false, 2, 15);
 
         // Add meaningful callees (not std library)
         // Need at least 3 for the current config settings
-        let callee1 = FunctionId {
-            file: PathBuf::from("workflow.rs"),
-            name: "process_step_one".to_string(),
-            line: 50,
-        };
-        let callee2 = FunctionId {
-            file: PathBuf::from("workflow.rs"),
-            name: "process_step_two".to_string(),
-            line: 100,
-        };
-        let callee3 = FunctionId {
-            file: PathBuf::from("workflow.rs"),
-            name: "process_step_three".to_string(),
-            line: 150,
-        };
+        let callee1 = FunctionId::new(
+            PathBuf::from("workflow.rs"),
+            "process_step_one".to_string(),
+            50,
+        );
+        let callee2 = FunctionId::new(
+            PathBuf::from("workflow.rs"),
+            "process_step_two".to_string(),
+            100,
+        );
+        let callee3 = FunctionId::new(
+            PathBuf::from("workflow.rs"),
+            "process_step_three".to_string(),
+            150,
+        );
 
         graph.add_function(callee1.clone(), false, false, 5, 30);
         graph.add_function(callee2.clone(), false, false, 5, 30);
@@ -1048,21 +1029,21 @@ mod tests {
 
         // Function with complexity 5 from Result handling (spec 117)
         let func = create_test_metrics("coordinate_tasks", 5, 3, 20);
-        let func_id = FunctionId {
-            file: PathBuf::from("tasks.rs"),
-            name: "coordinate_tasks".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("tasks.rs"),
+            "coordinate_tasks".to_string(),
+            10,
+        );
 
         graph.add_function(func_id.clone(), false, false, 5, 20);
 
         // Add 4 meaningful callees (20% of 20 lines = 4 calls for delegation ratio)
         for i in 0..4 {
-            let callee_id = FunctionId {
-                file: PathBuf::from("worker.rs"),
-                name: format!("worker_task_{}", i),
-                line: i * 20,
-            };
+            let callee_id = FunctionId::new(
+                PathBuf::from("worker.rs"),
+                format!("worker_task_{}", i),
+                i * 20,
+            );
             graph.add_function(callee_id.clone(), false, false, 8, 40);
             graph.add_call(FunctionCall {
                 caller: func_id.clone(),
@@ -1086,11 +1067,7 @@ mod tests {
 
         // Create test callees - 4 calls in 20 lines = 20% ratio
         let callees_vec: Vec<FunctionId> = (0..4)
-            .map(|i| FunctionId {
-                file: PathBuf::from("test.rs"),
-                name: format!("callee_{}", i),
-                line: i * 10,
-            })
+            .map(|i| FunctionId::new(PathBuf::from("test.rs"), format!("callee_{}", i), i * 10))
             .collect();
 
         let callees: Vec<&FunctionId> = callees_vec.iter().collect();
@@ -1109,21 +1086,14 @@ mod tests {
 
         // Function with complexity > 5 should not be orchestrator
         let func = create_test_metrics("complex_logic", 8, 10, 30);
-        let func_id = FunctionId {
-            file: PathBuf::from("logic.rs"),
-            name: "complex_logic".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("logic.rs"), "complex_logic".to_string(), 10);
 
         graph.add_function(func_id.clone(), false, false, 8, 30);
 
         // Even with callees, complexity > 5 means not orchestrator
         for i in 0..3 {
-            let callee_id = FunctionId {
-                file: PathBuf::from("worker.rs"),
-                name: format!("worker_{}", i),
-                line: i * 20,
-            };
+            let callee_id =
+                FunctionId::new(PathBuf::from("worker.rs"), format!("worker_{}", i), i * 20);
             graph.add_function(callee_id.clone(), false, false, 5, 20);
             graph.add_call(FunctionCall {
                 caller: func_id.clone(),
@@ -1196,11 +1166,7 @@ mod tests {
     fn test_constructor_classification_precedence() {
         let graph = CallGraph::new();
         let func = create_test_metrics("any", 1, 0, 9);
-        let func_id = FunctionId {
-            file: PathBuf::from("context/rules.rs"),
-            name: "any".to_string(),
-            line: 52,
-        };
+        let func_id = FunctionId::new(PathBuf::from("context/rules.rs"), "any".to_string(), 52);
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(
@@ -1497,11 +1463,7 @@ mod tests {
         };
 
         let func = create_test_metrics("name", 2, 0, 7);
-        let func_id = FunctionId {
-            file: PathBuf::from("framework.rs"),
-            name: "name".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("framework.rs"), "name".to_string(), 10);
 
         let role = classify_by_rules(&func, &func_id, &graph, Some(&source));
         assert_eq!(
@@ -1646,11 +1608,7 @@ mod tests {
 
         // Simple accessor should be IOWrapper
         let func = create_test_metrics("id", 1, 0, 3);
-        let func_id = FunctionId {
-            file: PathBuf::from("user.rs"),
-            name: "id".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("user.rs"), "id".to_string(), 10);
 
         let role = classify_function_role(&func, &func_id, &graph);
         assert_eq!(
@@ -1803,11 +1761,7 @@ mod tests {
         };
 
         let func = create_test_metrics("id", 1, 0, 3);
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "id".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "id".to_string(), 10);
 
         let role = classify_by_rules(&func, &func_id, &graph, Some(&code));
         assert_eq!(

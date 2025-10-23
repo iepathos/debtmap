@@ -569,21 +569,9 @@ mod tests {
 
         // Test the functional pipeline with owned values
         let functions = vec![
-            FunctionId {
-                file: current_file.clone(),
-                name: "simple_func".to_string(),
-                line: 10,
-            },
-            FunctionId {
-                file: current_file.clone(),
-                name: "module::complex_func".to_string(),
-                line: 20,
-            },
-            FunctionId {
-                file: PathBuf::from("other.rs"),
-                name: "other_func".to_string(),
-                line: 30,
-            },
+            FunctionId::new(current_file.clone(), "simple_func".to_string(), 10),
+            FunctionId::new(current_file.clone(), "module::complex_func".to_string(), 20),
+            FunctionId::new(PathBuf::from("other.rs"), "other_func".to_string(), 30),
         ];
 
         // Test resolution with same_file_hint
@@ -707,23 +695,16 @@ mod tests {
         let current_file = PathBuf::from("test.rs");
 
         // Mix of qualified and unqualified names
-        let simple_func = FunctionId {
-            file: current_file.clone(),
-            name: "calculate".to_string(),
-            line: 10,
-        };
+        let simple_func = FunctionId::new(current_file.clone(), "calculate".to_string(), 10);
 
-        let qualified_func = FunctionId {
-            file: current_file.clone(),
-            name: "utils::calculate".to_string(),
-            line: 20,
-        };
+        let qualified_func =
+            FunctionId::new(current_file.clone(), "utils::calculate".to_string(), 20);
 
-        let method_func = FunctionId {
-            file: current_file.clone(),
-            name: "Calculator::calculate".to_string(),
-            line: 30,
-        };
+        let method_func = FunctionId::new(
+            current_file.clone(),
+            "Calculator::calculate".to_string(),
+            30,
+        );
 
         let functions = vec![
             qualified_func.clone(),
@@ -746,21 +727,9 @@ mod tests {
 
         // Create functions with different qualification levels
         let functions = vec![
-            FunctionId {
-                file: current_file.clone(),
-                name: "func".to_string(),
-                line: 10,
-            },
-            FunctionId {
-                file: current_file.clone(),
-                name: "mod::func".to_string(),
-                line: 20,
-            },
-            FunctionId {
-                file: current_file.clone(),
-                name: "deep::mod::func".to_string(),
-                line: 30,
-            },
+            FunctionId::new(current_file.clone(), "func".to_string(), 10),
+            FunctionId::new(current_file.clone(), "mod::func".to_string(), 20),
+            FunctionId::new(current_file.clone(), "deep::mod::func".to_string(), 30),
         ];
 
         // Test that qualification preference works
@@ -770,16 +739,8 @@ mod tests {
 
         // Test generic filtering
         let generic_functions = vec![
-            FunctionId {
-                file: current_file.clone(),
-                name: "regular_func".to_string(),
-                line: 10,
-            },
-            FunctionId {
-                file: current_file.clone(),
-                name: "generic_func<T>".to_string(),
-                line: 20,
-            },
+            FunctionId::new(current_file.clone(), "regular_func".to_string(), 10),
+            FunctionId::new(current_file.clone(), "generic_func<T>".to_string(), 20),
         ];
 
         let result = CallResolver::apply_generic_preference(generic_functions.clone());

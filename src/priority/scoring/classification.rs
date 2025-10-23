@@ -651,11 +651,7 @@ mod tests {
     fn test_generate_usage_hints_public_function() {
         let func = create_test_function("test_func", Some("pub"));
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "test_func".to_string(), 10);
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -667,11 +663,7 @@ mod tests {
     fn test_generate_usage_hints_private_function() {
         let func = create_test_function("test_func", None);
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "test_func".to_string(), 10);
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -683,11 +675,7 @@ mod tests {
     fn test_generate_usage_hints_underscore_prefix() {
         let func = create_test_function("_internal_func", None);
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "_internal_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "_internal_func".to_string(), 10);
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -703,11 +691,11 @@ mod tests {
     fn test_generate_usage_hints_deprecated_name() {
         let func = create_test_function("old_deprecated_function", Some("pub"));
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "old_deprecated_function".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("test.rs"),
+            "old_deprecated_function".to_string(),
+            10,
+        );
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -720,11 +708,7 @@ mod tests {
     fn test_generate_usage_hints_legacy_function() {
         let func = create_test_function("legacy_handler", None);
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "legacy_handler".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "legacy_handler".to_string(), 10);
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -757,19 +741,19 @@ mod tests {
         };
 
         let mut call_graph = CallGraph::new();
-        let event_handler_id = FunctionId {
-            file: PathBuf::from("test_panel.py"),
-            name: "on_key_down".to_string(),
-            line: 50,
-        };
+        let event_handler_id = FunctionId::new(
+            PathBuf::from("test_panel.py"),
+            "on_key_down".to_string(),
+            50,
+        );
 
         // Simulate the event handler being bound via Bind()
         // This would normally be done by the Python call graph analyzer
-        let setup_method_id = FunctionId {
-            file: PathBuf::from("test_panel.py"),
-            name: "setup_events".to_string(),
-            line: 30,
-        };
+        let setup_method_id = FunctionId::new(
+            PathBuf::from("test_panel.py"),
+            "setup_events".to_string(),
+            30,
+        );
         call_graph.add_call(FunctionCall {
             caller: setup_method_id,
             callee: event_handler_id.clone(),
@@ -809,11 +793,11 @@ mod tests {
         };
 
         let call_graph = CallGraph::new(); // Empty call graph - no callers
-        let unused_func_id = FunctionId {
-            file: PathBuf::from("test_panel.py"),
-            name: "process_data".to_string(),
-            line: 100,
-        };
+        let unused_func_id = FunctionId::new(
+            PathBuf::from("test_panel.py"),
+            "process_data".to_string(),
+            100,
+        );
 
         // Test that an unbound function IS considered dead code
         let is_dead = is_dead_code(&unused_func, &call_graph, &unused_func_id, None);
@@ -844,18 +828,14 @@ mod tests {
         };
 
         let mut call_graph = CallGraph::new();
-        let register_id = FunctionId {
-            file: PathBuf::from("manager.py"),
-            name: "register_observer".to_string(),
-            line: 20,
-        };
+        let register_id = FunctionId::new(
+            PathBuf::from("manager.py"),
+            "register_observer".to_string(),
+            20,
+        );
 
         // Simulate a call from another file
-        let caller_id = FunctionId {
-            file: PathBuf::from("panel.py"),
-            name: "__init__".to_string(),
-            line: 10,
-        };
+        let caller_id = FunctionId::new(PathBuf::from("panel.py"), "__init__".to_string(), 10);
         call_graph.add_call(FunctionCall {
             caller: caller_id,
             callee: register_id.clone(),
@@ -871,11 +851,11 @@ mod tests {
     fn test_generate_usage_hints_multiple_indicators() {
         let func = create_test_function("_old_deprecated_helper", Some("pub"));
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "_old_deprecated_helper".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("test.rs"),
+            "_old_deprecated_helper".to_string(),
+            10,
+        );
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 
@@ -936,25 +916,25 @@ mod tests {
         let mut call_graph = CallGraph::new();
 
         // IDs for the event handlers
-        let on_paint_id = FunctionId {
-            file: PathBuf::from("conversation_panel.py"),
-            name: "on_paint".to_string(),
-            line: 544,
-        };
+        let on_paint_id = FunctionId::new(
+            PathBuf::from("conversation_panel.py"),
+            "on_paint".to_string(),
+            544,
+        );
 
-        let on_key_down_id = FunctionId {
-            file: PathBuf::from("mainwindow.py"),
-            name: "on_key_down".to_string(),
-            line: 262,
-        };
+        let on_key_down_id = FunctionId::new(
+            PathBuf::from("mainwindow.py"),
+            "on_key_down".to_string(),
+            262,
+        );
 
         // Simulate the Bind() calls that would be detected by the Python analyzer
         // e.g., self.Bind(wx.EVT_PAINT, self.on_paint)
-        let init_id = FunctionId {
-            file: PathBuf::from("conversation_panel.py"),
-            name: "__init__".to_string(),
-            line: 10,
-        };
+        let init_id = FunctionId::new(
+            PathBuf::from("conversation_panel.py"),
+            "__init__".to_string(),
+            10,
+        );
 
         call_graph.add_call(FunctionCall {
             caller: init_id.clone(),
@@ -1005,11 +985,11 @@ mod tests {
         };
 
         let mut call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("module.py"),
-            name: "xyz123_unusual".to_string(),
-            line: 100,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("module.py"),
+            "xyz123_unusual".to_string(),
+            100,
+        );
 
         // Initially no callers - should be dead code
         assert!(
@@ -1018,11 +998,7 @@ mod tests {
         );
 
         // Add a caller
-        let caller_id = FunctionId {
-            file: PathBuf::from("module.py"),
-            name: "main".to_string(),
-            line: 10,
-        };
+        let caller_id = FunctionId::new(PathBuf::from("module.py"), "main".to_string(), 10);
         call_graph.add_call(FunctionCall {
             caller: caller_id,
             callee: func_id.clone(),

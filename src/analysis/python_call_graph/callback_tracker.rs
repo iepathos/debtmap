@@ -342,10 +342,12 @@ impl CallbackTracker {
                     .get_all_functions()
                     .find(|f| f.name == *caller_func)
                     .cloned()
-                    .unwrap_or_else(|| FunctionId {
-                        name: caller_func.clone(),
-                        file: resolved.registration_point.file.clone(),
-                        line: resolved.registration_point.line,
+                    .unwrap_or_else(|| {
+                        FunctionId::new(
+                            resolved.registration_point.file.clone(),
+                            caller_func.clone(),
+                            resolved.registration_point.line,
+                        )
                     });
 
                 let call = FunctionCall {
@@ -437,11 +439,7 @@ mod tests {
         let mut tracker = CallbackTracker::new();
         let mut known_functions = HashMap::new();
 
-        let func_id = FunctionId {
-            name: "MyClass.on_click".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.py"), "MyClass.on_click".to_string(), 10);
         known_functions.insert("MyClass.on_click".to_string(), func_id.clone());
 
         let pending = PendingCallback {
@@ -479,11 +477,7 @@ mod tests {
         let mut tracker = CallbackTracker::new();
         let mut known_functions = HashMap::new();
 
-        let func_id = FunctionId {
-            name: "outer.inner".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 15,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.py"), "outer.inner".to_string(), 15);
         known_functions.insert("outer.inner".to_string(), func_id.clone());
 
         let pending = PendingCallback {

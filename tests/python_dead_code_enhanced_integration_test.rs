@@ -61,17 +61,9 @@ fn test_function_with_callers_not_dead() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let mut call_graph = CallGraph::new();
 
-    let helper_id = FunctionId {
-        name: "helper_function".to_string(),
-        file: PathBuf::from("utils.py"),
-        line: 10,
-    };
+    let helper_id = FunctionId::new(PathBuf::from("utils.py"), "helper_function".to_string(), 10);
 
-    let caller_id = FunctionId {
-        name: "main_function".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 5,
-    };
+    let caller_id = FunctionId::new(PathBuf::from("app.py"), "main_function".to_string(), 5);
 
     // Add a call from main to helper
     call_graph.add_call(FunctionCall {
@@ -237,23 +229,11 @@ fn test_complex_call_chain() {
     let analyzer = EnhancedDeadCodeAnalyzer::new();
     let mut call_graph = CallGraph::new();
 
-    let main_id = FunctionId {
-        name: "main".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 10,
-    };
+    let main_id = FunctionId::new(PathBuf::from("app.py"), "main".to_string(), 10);
 
-    let helper1_id = FunctionId {
-        name: "helper1".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 20,
-    };
+    let helper1_id = FunctionId::new(PathBuf::from("app.py"), "helper1".to_string(), 20);
 
-    let helper2_id = FunctionId {
-        name: "helper2".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 30,
-    };
+    let helper2_id = FunctionId::new(PathBuf::from("app.py"), "helper2".to_string(), 30);
 
     call_graph.add_call(FunctionCall {
         caller: main_id.clone(),
@@ -293,17 +273,9 @@ fn test_mixed_confidence_batch() {
     let mut call_graph = CallGraph::new();
 
     // Setup: main calls helper, magic method, unused private
-    let main_id = FunctionId {
-        name: "main".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 10,
-    };
+    let main_id = FunctionId::new(PathBuf::from("app.py"), "main".to_string(), 10);
 
-    let helper_id = FunctionId {
-        name: "helper".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 20,
-    };
+    let helper_id = FunctionId::new(PathBuf::from("app.py"), "helper".to_string(), 20);
 
     call_graph.add_call(FunctionCall {
         caller: main_id.clone(),

@@ -21,11 +21,7 @@ pub fn populate_call_graph_data(
         .iter()
         .enumerate()
         .map(|(idx, metric)| {
-            let func_id = FunctionId {
-                file: metric.file.clone(),
-                name: metric.name.clone(),
-                line: metric.line,
-            };
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
             (idx, func_id)
         })
         .collect();
@@ -48,11 +44,8 @@ pub fn populate_call_graph_data(
 
             // If no results and this is a Python file, try with line 0
             if upstream_callers.is_empty() && downstream_callees.is_empty() {
-                let func_id_zero_line = FunctionId {
-                    file: func_id.file.clone(),
-                    name: func_id.name.clone(),
-                    line: 0,
-                };
+                let func_id_zero_line =
+                    FunctionId::new(func_id.file.clone(), func_id.name.clone(), 0);
 
                 upstream_callers = call_graph
                     .get_callers(&func_id_zero_line)
@@ -194,11 +187,7 @@ mod tests {
         let metrics = vec![create_test_function_metric("test_func", "test.py", 10)];
         let mut call_graph = CallGraph::new();
 
-        let func_id = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "test_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.py"), "test_func".to_string(), 10);
 
         call_graph.add_function(func_id.clone(), false, false, 1, 10);
 
@@ -218,17 +207,9 @@ mod tests {
 
         let mut call_graph = CallGraph::new();
 
-        let caller_id = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "caller".to_string(),
-            line: 5,
-        };
+        let caller_id = FunctionId::new(PathBuf::from("test.py"), "caller".to_string(), 5);
 
-        let callee_id = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "callee".to_string(),
-            line: 15,
-        };
+        let callee_id = FunctionId::new(PathBuf::from("test.py"), "callee".to_string(), 15);
 
         call_graph.add_function(caller_id.clone(), false, false, 1, 10);
         call_graph.add_function(callee_id.clone(), false, false, 1, 10);
@@ -263,11 +244,11 @@ mod tests {
 
     #[test]
     fn test_format_function_name() {
-        let func_id = FunctionId {
-            file: PathBuf::from("/path/to/test.py"),
-            name: "my_function".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("/path/to/test.py"),
+            "my_function".to_string(),
+            10,
+        );
 
         let formatted = format_function_name(&func_id);
         assert_eq!(formatted, "test.py:my_function");

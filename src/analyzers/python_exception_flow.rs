@@ -566,11 +566,11 @@ impl ExceptionFlowAnalyzer {
 
         // For each function with exception flows
         for (func_name, flow) in &self.exception_flows {
-            let func_id = FunctionId {
-                name: func_name.clone(),
-                file: self.current_file.clone(),
-                line: 1, // Will be improved with line tracking
-            };
+            let func_id = FunctionId::new(
+                self.current_file.clone(),
+                func_name.clone(),
+                1, // Will be improved with line tracking
+            );
 
             // Track exceptions that propagate to callers
             let propagating_exceptions: Vec<ExceptionType> = flow

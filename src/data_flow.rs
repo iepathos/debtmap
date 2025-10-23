@@ -29,11 +29,11 @@ mod function_id_serde {
         for (key, value) in string_map {
             let parts: Vec<&str> = key.rsplitn(3, ':').collect();
             if parts.len() == 3 {
-                let func_id = FunctionId {
-                    file: parts[2].into(),
-                    name: parts[1].to_string(),
-                    line: parts[0].parse().unwrap_or(0),
-                };
+                let func_id = FunctionId::new(
+                    parts[2].into(),
+                    parts[1].to_string(),
+                    parts[0].parse().unwrap_or(0),
+                );
                 result.insert(func_id, value);
             }
         }
@@ -87,16 +87,16 @@ mod function_id_tuple_serde {
                 let parts1: Vec<&str> = parts[0].rsplitn(3, ':').collect();
                 let parts2: Vec<&str> = parts[1].rsplitn(3, ':').collect();
                 if parts1.len() == 3 && parts2.len() == 3 {
-                    let func_id1 = FunctionId {
-                        file: parts1[2].into(),
-                        name: parts1[1].to_string(),
-                        line: parts1[0].parse().unwrap_or(0),
-                    };
-                    let func_id2 = FunctionId {
-                        file: parts2[2].into(),
-                        name: parts2[1].to_string(),
-                        line: parts2[0].parse().unwrap_or(0),
-                    };
+                    let func_id1 = FunctionId::new(
+                        parts1[2].into(),
+                        parts1[1].to_string(),
+                        parts1[0].parse().unwrap_or(0),
+                    );
+                    let func_id2 = FunctionId::new(
+                        parts2[2].into(),
+                        parts2[1].to_string(),
+                        parts2[0].parse().unwrap_or(0),
+                    );
                     result.insert((func_id1, func_id2), value);
                 }
             }
@@ -328,11 +328,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_test_function_id(name: &str) -> FunctionId {
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: name.to_string(),
-            line: 1,
-        }
+        FunctionId::new(PathBuf::from("test.rs"), name.to_string(), 1)
     }
 
     #[test]

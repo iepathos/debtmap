@@ -15,16 +15,8 @@ fn test_call_graph_basic() {
 }
 
 fn create_test_functions() -> (FunctionId, FunctionId) {
-    let main_id = FunctionId {
-        file: PathBuf::from("main.rs"),
-        name: "main".to_string(),
-        line: 1,
-    };
-    let helper_id = FunctionId {
-        file: PathBuf::from("lib.rs"),
-        name: "helper".to_string(),
-        line: 10,
-    };
+    let main_id = FunctionId::new(PathBuf::from("main.rs"), "main".to_string(), 1);
+    let helper_id = FunctionId::new(PathBuf::from("lib.rs"), "helper".to_string(), 10);
     (main_id, helper_id)
 }
 
@@ -58,21 +50,9 @@ fn test_transitive_dependencies() {
 }
 
 fn create_chain_functions() -> (FunctionId, FunctionId, FunctionId) {
-    let a = FunctionId {
-        file: PathBuf::from("a.rs"),
-        name: "a".to_string(),
-        line: 1,
-    };
-    let b = FunctionId {
-        file: PathBuf::from("b.rs"),
-        name: "b".to_string(),
-        line: 1,
-    };
-    let c = FunctionId {
-        file: PathBuf::from("c.rs"),
-        name: "c".to_string(),
-        line: 1,
-    };
+    let a = FunctionId::new(PathBuf::from("a.rs"), "a".to_string(), 1);
+    let b = FunctionId::new(PathBuf::from("b.rs"), "b".to_string(), 1);
+    let c = FunctionId::new(PathBuf::from("c.rs"), "c".to_string(), 1);
     (a, b, c)
 }
 
@@ -104,21 +84,9 @@ fn test_find_function_at_location() {
 
 fn create_located_functions(file: &Path) -> Vec<FunctionId> {
     vec![
-        FunctionId {
-            file: file.to_path_buf(),
-            name: "function_one".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: file.to_path_buf(),
-            name: "function_two".to_string(),
-            line: 30,
-        },
-        FunctionId {
-            file: file.to_path_buf(),
-            name: "function_three".to_string(),
-            line: 50,
-        },
+        FunctionId::new(file.to_path_buf(), "function_one".to_string(), 10),
+        FunctionId::new(file.to_path_buf(), "function_two".to_string(), 30),
+        FunctionId::new(file.to_path_buf(), "function_three".to_string(), 50),
     ]
 }
 
@@ -168,22 +136,10 @@ fn test_delegation_detection() {
 }
 
 fn create_delegation_setup() -> (FunctionId, Vec<FunctionId>) {
-    let orchestrator = FunctionId {
-        file: PathBuf::from("orch.rs"),
-        name: "orchestrate".to_string(),
-        line: 1,
-    };
+    let orchestrator = FunctionId::new(PathBuf::from("orch.rs"), "orchestrate".to_string(), 1);
     let workers = vec![
-        FunctionId {
-            file: PathBuf::from("work.rs"),
-            name: "complex_work1".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: PathBuf::from("work.rs"),
-            name: "complex_work2".to_string(),
-            line: 20,
-        },
+        FunctionId::new(PathBuf::from("work.rs"), "complex_work1".to_string(), 10),
+        FunctionId::new(PathBuf::from("work.rs"), "complex_work2".to_string(), 20),
     ];
     (orchestrator, workers)
 }
@@ -217,21 +173,9 @@ fn test_get_transitive_callers_single_level() {
 
 fn create_caller_test_functions() -> Vec<FunctionId> {
     vec![
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_a".to_string(),
-            line: 1,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_b".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_c".to_string(),
-            line: 20,
-        },
+        FunctionId::new(PathBuf::from("test.rs"), "func_a".to_string(), 1),
+        FunctionId::new(PathBuf::from("test.rs"), "func_b".to_string(), 10),
+        FunctionId::new(PathBuf::from("test.rs"), "func_c".to_string(), 20),
     ]
 }
 
@@ -263,26 +207,10 @@ fn test_get_transitive_callers_multi_level() {
 
 fn create_caller_chain() -> Vec<FunctionId> {
     vec![
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_a".to_string(),
-            line: 1,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_b".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_c".to_string(),
-            line: 20,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_d".to_string(),
-            line: 30,
-        },
+        FunctionId::new(PathBuf::from("test.rs"), "func_a".to_string(), 1),
+        FunctionId::new(PathBuf::from("test.rs"), "func_b".to_string(), 10),
+        FunctionId::new(PathBuf::from("test.rs"), "func_c".to_string(), 20),
+        FunctionId::new(PathBuf::from("test.rs"), "func_d".to_string(), 30),
     ]
 }
 
@@ -322,21 +250,9 @@ fn test_get_transitive_callers_with_cycles() {
 
 fn create_cycle_functions() -> Vec<FunctionId> {
     vec![
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_a".to_string(),
-            line: 1,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_b".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func_c".to_string(),
-            line: 20,
-        },
+        FunctionId::new(PathBuf::from("test.rs"), "func_a".to_string(), 1),
+        FunctionId::new(PathBuf::from("test.rs"), "func_b".to_string(), 10),
+        FunctionId::new(PathBuf::from("test.rs"), "func_c".to_string(), 20),
     ]
 }
 
@@ -369,16 +285,8 @@ fn test_get_transitive_callers_no_callers() {
 }
 
 fn create_simple_pair() -> (FunctionId, FunctionId) {
-    let a = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "func_a".to_string(),
-        line: 1,
-    };
-    let b = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "func_b".to_string(),
-        line: 10,
-    };
+    let a = FunctionId::new(PathBuf::from("test.rs"), "func_a".to_string(), 1);
+    let b = FunctionId::new(PathBuf::from("test.rs"), "func_b".to_string(), 10);
     (a, b)
 }
 
@@ -404,10 +312,12 @@ fn test_get_transitive_callers_complex_graph() {
 
 fn create_complex_graph_nodes() -> Vec<FunctionId> {
     (0..6)
-        .map(|i| FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: format!("func_{}", (b'a' + i) as char),
-            line: i as usize * 10 + 1,
+        .map(|i| {
+            FunctionId::new(
+                PathBuf::from("test.rs"),
+                format!("func_{}", (b'a' + i) as char),
+                i as usize * 10 + 1,
+            )
         })
         .collect()
 }
@@ -460,16 +370,8 @@ fn test_call_graph_serialization_roundtrip() {
 }
 
 fn create_serialization_test_functions() -> (FunctionId, FunctionId) {
-    let func1 = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "main".to_string(),
-        line: 10,
-    };
-    let func2 = FunctionId {
-        file: PathBuf::from("src/lib.rs"),
-        name: "helper".to_string(),
-        line: 25,
-    };
+    let func1 = FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 10);
+    let func2 = FunctionId::new(PathBuf::from("src/lib.rs"), "helper".to_string(), 25);
     (func1, func2)
 }
 
@@ -563,11 +465,11 @@ fn verify_single_candidate_selection() {
     let caller_file = PathBuf::from("src/caller.rs");
     let other_file = PathBuf::from("src/other.rs");
 
-    let single_candidate = vec![FunctionId {
-        file: other_file.clone(),
-        name: "test_func".to_string(),
-        line: 10,
-    }];
+    let single_candidate = vec![FunctionId::new(
+        other_file.clone(),
+        "test_func".to_string(),
+        10,
+    )];
 
     let result = CallGraph::select_best_cross_file_match(
         single_candidate.clone(),
@@ -584,16 +486,8 @@ fn verify_exact_match_preference() {
     let third_file = PathBuf::from("src/third.rs");
 
     let candidates = vec![
-        FunctionId {
-            file: other_file.clone(),
-            name: "test_func".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: third_file.clone(),
-            name: "MyStruct::test_func".to_string(),
-            line: 20,
-        },
+        FunctionId::new(other_file.clone(), "test_func".to_string(), 10),
+        FunctionId::new(third_file.clone(), "MyStruct::test_func".to_string(), 20),
     ];
 
     let result = CallGraph::select_best_cross_file_match(candidates, &caller_file, "test_func");
@@ -607,16 +501,12 @@ fn verify_qualification_preference() {
     let third_file = PathBuf::from("src/third.rs");
 
     let candidates = vec![
-        FunctionId {
-            file: other_file.clone(),
-            name: "deep::module::MyStruct::method".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: third_file.clone(),
-            name: "MyStruct::method".to_string(),
-            line: 20,
-        },
+        FunctionId::new(
+            other_file.clone(),
+            "deep::module::MyStruct::method".to_string(),
+            10,
+        ),
+        FunctionId::new(third_file.clone(), "MyStruct::method".to_string(), 20),
     ];
 
     let result = CallGraph::select_best_cross_file_match(candidates, &caller_file, "method");
@@ -635,31 +525,23 @@ fn test_is_test_helper_detection() {
 
 fn create_test_helper_setup() -> Vec<FunctionId> {
     vec![
-        FunctionId {
-            file: PathBuf::from("tests/test.rs"),
-            name: "test_something".to_string(),
-            line: 10,
-        },
-        FunctionId {
-            file: PathBuf::from("tests/test.rs"),
-            name: "test_another".to_string(),
-            line: 30,
-        },
-        FunctionId {
-            file: PathBuf::from("src/lib.rs"),
-            name: "validate_initial_state".to_string(),
-            line: 100,
-        },
-        FunctionId {
-            file: PathBuf::from("src/lib.rs"),
-            name: "process_data".to_string(),
-            line: 200,
-        },
-        FunctionId {
-            file: PathBuf::from("src/main.rs"),
-            name: "main".to_string(),
-            line: 1,
-        },
+        FunctionId::new(
+            PathBuf::from("tests/test.rs"),
+            "test_something".to_string(),
+            10,
+        ),
+        FunctionId::new(
+            PathBuf::from("tests/test.rs"),
+            "test_another".to_string(),
+            30,
+        ),
+        FunctionId::new(
+            PathBuf::from("src/lib.rs"),
+            "validate_initial_state".to_string(),
+            100,
+        ),
+        FunctionId::new(PathBuf::from("src/lib.rs"), "process_data".to_string(), 200),
+        FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 1),
     ]
 }
 

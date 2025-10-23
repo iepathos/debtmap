@@ -29,11 +29,11 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         downstream_callees: None,
     };
 
-    let func_id = FunctionId {
-        file: test_func.file.clone(),
-        name: test_func.name.clone(),
-        line: test_func.line,
-    };
+    let func_id = FunctionId::new(
+        test_func.file.clone(),
+        test_func.name.clone(),
+        test_func.line,
+    );
 
     // Create a call graph
     let mut call_graph = CallGraph::new();
@@ -92,11 +92,11 @@ fn test_visit_trait_pattern_exclusion() {
         downstream_callees: None,
     };
 
-    let func_id = FunctionId {
-        file: visit_func.file.clone(),
-        name: visit_func.name.clone(),
-        line: visit_func.line,
-    };
+    let func_id = FunctionId::new(
+        visit_func.file.clone(),
+        visit_func.name.clone(),
+        visit_func.line,
+    );
 
     // Create call graph
     let mut call_graph = CallGraph::new();
@@ -141,23 +141,19 @@ fn test_get_exclusions_returns_framework_patterns() {
     let mut detector = FrameworkPatternDetector::new();
 
     // Create some test function IDs
-    let test_func_id = FunctionId {
-        file: PathBuf::from("tests/test.rs"),
-        name: "test_foo".to_string(),
-        line: 10,
-    };
+    let test_func_id = FunctionId::new(PathBuf::from("tests/test.rs"), "test_foo".to_string(), 10);
 
-    let handler_func_id = FunctionId {
-        file: PathBuf::from("src/handlers.rs"),
-        name: "handle_request".to_string(),
-        line: 20,
-    };
+    let handler_func_id = FunctionId::new(
+        PathBuf::from("src/handlers.rs"),
+        "handle_request".to_string(),
+        20,
+    );
 
-    let visit_func_id = FunctionId {
-        file: PathBuf::from("src/visitor.rs"),
-        name: "visit_expr".to_string(),
-        line: 30,
-    };
+    let visit_func_id = FunctionId::new(
+        PathBuf::from("src/visitor.rs"),
+        "visit_expr".to_string(),
+        30,
+    );
 
     // Mark functions with patterns using the add_visit_trait_function method
     // For testing purposes, we'll mark all as Visit trait implementations

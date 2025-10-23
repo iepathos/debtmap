@@ -30,11 +30,7 @@ pub fn create_unified_debt_item_enhanced(
     _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
     coverage: Option<&LcovData>,
 ) -> UnifiedDebtItem {
-    let func_id = FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    };
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
@@ -113,11 +109,7 @@ pub fn create_unified_debt_item_with_aggregator(
 
 // Pure function: Extract function ID creation
 pub(crate) fn create_function_id(func: &FunctionMetrics) -> FunctionId {
-    FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    }
+    FunctionId::new(func.file.clone(), func.name.clone(), func.line)
 }
 
 // Pure function: Calculate coverage data
@@ -320,11 +312,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> UnifiedDebtItem {
-    let func_id = FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    };
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Calculate transitive coverage if direct coverage is available
     // Use exact AST boundaries for more accurate coverage matching
@@ -415,11 +403,7 @@ pub fn create_unified_debt_item_with_data_flow(
     coverage: Option<&LcovData>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> UnifiedDebtItem {
-    let func_id = FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    };
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor

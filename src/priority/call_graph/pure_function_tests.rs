@@ -24,16 +24,8 @@ mod tests {
         let mut nodes = HashMap::new();
 
         // Create test functions with different complexities
-        let func1 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func1".to_string(),
-            line: 10,
-        };
-        let func2 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func2".to_string(),
-            line: 20,
-        };
+        let func1 = FunctionId::new(PathBuf::from("test.rs"), "func1".to_string(), 10);
+        let func2 = FunctionId::new(PathBuf::from("test.rs"), "func2".to_string(), 20);
 
         nodes.insert(
             func1.clone(),
@@ -90,16 +82,8 @@ mod tests {
 
     #[test]
     fn test_has_entry_point_caller() {
-        let func1 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "entry".to_string(),
-            line: 10,
-        };
-        let func2 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "regular".to_string(),
-            line: 20,
-        };
+        let func1 = FunctionId::new(PathBuf::from("test.rs"), "entry".to_string(), 10);
+        let func2 = FunctionId::new(PathBuf::from("test.rs"), "regular".to_string(), 20);
 
         let callers = vec![func1.clone(), func2.clone()];
 
@@ -122,21 +106,9 @@ mod tests {
         let file1 = PathBuf::from("file1.rs");
         let file2 = PathBuf::from("file2.rs");
 
-        let func1 = FunctionId {
-            file: file1.clone(),
-            name: "func1".to_string(),
-            line: 10,
-        };
-        let func2 = FunctionId {
-            file: file1.clone(),
-            name: "func2".to_string(),
-            line: 20,
-        };
-        let func3 = FunctionId {
-            file: file2.clone(),
-            name: "func3".to_string(),
-            line: 30,
-        };
+        let func1 = FunctionId::new(file1.clone(), "func1".to_string(), 10);
+        let func2 = FunctionId::new(file1.clone(), "func2".to_string(), 20);
+        let func3 = FunctionId::new(file2.clone(), "func3".to_string(), 30);
 
         nodes.insert(
             func1.clone(),
@@ -178,21 +150,9 @@ mod tests {
 
     #[test]
     fn test_find_best_line_match() {
-        let func1 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func1".to_string(),
-            line: 10,
-        };
-        let func2 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func2".to_string(),
-            line: 30,
-        };
-        let func3 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "func3".to_string(),
-            line: 50,
-        };
+        let func1 = FunctionId::new(PathBuf::from("test.rs"), "func1".to_string(), 10);
+        let func2 = FunctionId::new(PathBuf::from("test.rs"), "func2".to_string(), 30);
+        let func3 = FunctionId::new(PathBuf::from("test.rs"), "func3".to_string(), 50);
 
         let functions = vec![&func1, &func2, &func3];
 
@@ -212,11 +172,7 @@ mod tests {
     #[test]
     fn test_is_production_entry_point() {
         let node_entry = FunctionNode {
-            id: FunctionId {
-                file: PathBuf::from("test.rs"),
-                name: "entry".to_string(),
-                line: 10,
-            },
+            id: FunctionId::new(PathBuf::from("test.rs"), "entry".to_string(), 10),
             is_entry_point: true,
             is_test: false,
             complexity: 1,
@@ -224,11 +180,7 @@ mod tests {
         };
 
         let node_test = FunctionNode {
-            id: FunctionId {
-                file: PathBuf::from("test.rs"),
-                name: "test".to_string(),
-                line: 20,
-            },
+            id: FunctionId::new(PathBuf::from("test.rs"), "test".to_string(), 20),
             is_entry_point: false,
             is_test: true,
             complexity: 1,
@@ -236,11 +188,7 @@ mod tests {
         };
 
         let node_regular = FunctionNode {
-            id: FunctionId {
-                file: PathBuf::from("test.rs"),
-                name: "regular".to_string(),
-                line: 30,
-            },
+            id: FunctionId::new(PathBuf::from("test.rs"), "regular".to_string(), 30),
             is_entry_point: false,
             is_test: false,
             complexity: 1,
@@ -257,11 +205,11 @@ mod tests {
         assert!(CallGraph::is_production_entry_point(&node_regular, &[]));
 
         // Regular function with callers should not be production entry point
-        let callers = vec![FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "caller".to_string(),
-            line: 40,
-        }];
+        let callers = vec![FunctionId::new(
+            PathBuf::from("test.rs"),
+            "caller".to_string(),
+            40,
+        )];
         assert!(!CallGraph::is_production_entry_point(
             &node_regular,
             &callers

@@ -893,11 +893,7 @@ impl UnifiedAnalysis {
         use crate::priority::call_graph::FunctionId;
 
         for metric in metrics {
-            let func_id = FunctionId {
-                file: metric.file.clone(),
-                name: metric.name.clone(),
-                line: metric.line,
-            };
+            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
 
             let purity_info = PurityInfo {
                 is_pure: metric.is_pure.unwrap_or(false),

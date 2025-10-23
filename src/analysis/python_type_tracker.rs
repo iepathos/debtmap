@@ -332,11 +332,11 @@ impl PythonTypeTracker {
             match stmt {
                 ast::Stmt::FunctionDef(func_def) => {
                     let method_name = func_def.name.to_string();
-                    let func_id = FunctionId {
-                        name: format!("{}.{}", class_def.name, method_name),
-                        file: self.file_path.clone(),
-                        line: 0, // Line numbers handled by TwoPassExtractor
-                    };
+                    let func_id = FunctionId::new(
+                        self.file_path.clone(),
+                        format!("{}.{}", class_def.name, method_name),
+                        0, // Line numbers handled by TwoPassExtractor
+                    );
 
                     // Check decorators for static/class methods/properties
                     for decorator in &func_def.decorator_list {
@@ -887,11 +887,7 @@ impl TwoPassExtractor {
         // Extract line number from source if available
         let line = self.estimate_line_number(func_def.name.as_ref());
 
-        let func_id = FunctionId {
-            name: func_name.clone(),
-            file: self.type_tracker.file_path.clone(),
-            line,
-        };
+        let func_id = FunctionId::new(self.type_tracker.file_path.clone(), func_name.clone(), line);
 
         // Extract decorator names
         let decorators: Vec<&str> = func_def
@@ -973,11 +969,7 @@ impl TwoPassExtractor {
         // Extract line number from source if available
         let line = self.estimate_line_number(func_def.name.as_ref());
 
-        let func_id = FunctionId {
-            name: func_name.clone(),
-            file: self.type_tracker.file_path.clone(),
-            line,
-        };
+        let func_id = FunctionId::new(self.type_tracker.file_path.clone(), func_name.clone(), line);
 
         // Extract decorator names
         let decorators: Vec<&str> = func_def
@@ -1360,11 +1352,11 @@ impl TwoPassExtractor {
                                     existing_id.clone()
                                 } else {
                                     // Fallback: create a new FunctionId (shouldn't happen in normal flow)
-                                    FunctionId {
-                                        file: self.type_tracker.file_path.clone(),
-                                        name: func_name.clone(),
-                                        line: self.estimate_line_number(&func_name),
-                                    }
+                                    FunctionId::new(
+                                        self.type_tracker.file_path.clone(),
+                                        func_name.clone(),
+                                        self.estimate_line_number(&func_name),
+                                    )
                                 };
 
                                 let registry_mut =
@@ -1558,11 +1550,11 @@ impl TwoPassExtractor {
                                     let handler_line =
                                         self.estimate_line_number(&handler_attr.attr);
 
-                                    let handler_id = FunctionId {
-                                        name: handler_name.clone(),
-                                        file: self.type_tracker.file_path.clone(),
-                                        line: handler_line,
-                                    };
+                                    let handler_id = FunctionId::new(
+                                        self.type_tracker.file_path.clone(),
+                                        handler_name.clone(),
+                                        handler_line,
+                                    );
 
                                     // Add the handler to known functions if not already there
                                     self.known_functions.insert(handler_id.clone());
@@ -1608,11 +1600,11 @@ impl TwoPassExtractor {
     /// Analyze the main block (if __name__ == "__main__")
     fn analyze_main_block(&mut self, body: &[ast::Stmt]) {
         // Create a pseudo-function ID for the main block
-        let module_main_id = FunctionId {
-            name: "__module_main__".to_string(),
-            file: self.type_tracker.file_path.clone(),
-            line: 0,
-        };
+        let module_main_id = FunctionId::new(
+            self.type_tracker.file_path.clone(),
+            "__module_main__".to_string(),
+            0,
+        );
 
         // Add this pseudo-function to known functions
         self.known_functions.insert(module_main_id.clone());
@@ -2005,16 +1997,8 @@ def main():
         let call_graph = extractor.extract(&module);
 
         // Check that functions are registered
-        let main_id = FunctionId {
-            name: "main".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
-        let helper_id = FunctionId {
-            name: "helper".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
+        let main_id = FunctionId::new(PathBuf::from("test.py"), "main".to_string(), 0);
+        let helper_id = FunctionId::new(PathBuf::from("test.py"), "helper".to_string(), 0);
 
         assert!(call_graph.get_function_info(&main_id).is_some());
         assert!(call_graph.get_function_info(&helper_id).is_some());
@@ -2050,21 +2034,17 @@ class Calculator:
         let call_graph = extractor.extract(&module);
 
         // Check that __init__ calls reset
-        let init_id = FunctionId {
-            name: "Calculator.__init__".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
+        let init_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Calculator.__init__".to_string(),
+            0,
+        );
 
         let init_callees = call_graph.get_callees(&init_id);
         assert!(init_callees.iter().any(|f| f.name == "Calculator.reset"));
 
         // Check that add calls log
-        let add_id = FunctionId {
-            name: "Calculator.add".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
+        let add_id = FunctionId::new(PathBuf::from("test.py"), "Calculator.add".to_string(), 0);
         let add_callees = call_graph.get_callees(&add_id);
         assert!(add_callees.iter().any(|f| f.name == "Calculator.log"));
     }
@@ -2097,21 +2077,9 @@ def func_c():
         assert_eq!(extractor.known_functions.len(), 3);
 
         // Verify all functions are tracked
-        let func_a = FunctionId {
-            name: "func_a".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
-        let func_b = FunctionId {
-            name: "func_b".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
-        let func_c = FunctionId {
-            name: "func_c".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 0,
-        };
+        let func_a = FunctionId::new(PathBuf::from("test.py"), "func_a".to_string(), 0);
+        let func_b = FunctionId::new(PathBuf::from("test.py"), "func_b".to_string(), 0);
+        let func_c = FunctionId::new(PathBuf::from("test.py"), "func_c".to_string(), 0);
 
         assert!(extractor.known_functions.contains(&func_a));
         assert!(extractor.known_functions.contains(&func_b));
@@ -2315,21 +2283,21 @@ def another_helper():
         let call_graph = extractor.extract(&module);
 
         // Check that functions are registered with correct line numbers
-        let main_id = FunctionId {
-            name: "main".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 5, // main is on line 5
-        };
-        let helper_id = FunctionId {
-            name: "helper".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 2, // helper is on line 2
-        };
-        let another_helper_id = FunctionId {
-            name: "another_helper".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 9, // another_helper is on line 9
-        };
+        let main_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "main".to_string(),
+            5, // main is on line 5
+        );
+        let helper_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "helper".to_string(),
+            2, // helper is on line 2
+        );
+        let another_helper_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "another_helper".to_string(),
+            9, // another_helper is on line 9
+        );
 
         // Verify functions exist with expected line numbers
         assert!(call_graph.get_function_info(&main_id).is_some());
@@ -2373,29 +2341,29 @@ class Calculator:
         let call_graph = extractor.extract(&module);
 
         // Check that methods have correct line numbers
-        let init_id = FunctionId {
-            name: "Calculator.__init__".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 3, // __init__ is on line 3
-        };
+        let init_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Calculator.__init__".to_string(),
+            3, // __init__ is on line 3
+        );
 
-        let reset_id = FunctionId {
-            name: "Calculator.reset".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 7, // reset is on line 7
-        };
+        let reset_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Calculator.reset".to_string(),
+            7, // reset is on line 7
+        );
 
-        let add_id = FunctionId {
-            name: "Calculator.add".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 10, // add is on line 10
-        };
+        let add_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Calculator.add".to_string(),
+            10, // add is on line 10
+        );
 
-        let log_id = FunctionId {
-            name: "Calculator.log".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 14, // log is on line 14
-        };
+        let log_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Calculator.log".to_string(),
+            14, // log is on line 14
+        );
 
         // Verify all methods are tracked with correct line numbers
         assert!(call_graph.get_function_info(&init_id).is_some());

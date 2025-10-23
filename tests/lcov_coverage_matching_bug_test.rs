@@ -275,11 +275,11 @@ fn test_lcov_coverage_urgency_calculation_with_bug() {
     let call_graph = CallGraph::new();
 
     // Test 5: Coverage urgency calculation for functions that ARE covered
-    let func_id = FunctionId {
-        file: PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
-        name: "read_requirements".to_string(),
-        line: 153,
-    };
+    let func_id = FunctionId::new(
+        PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
+        "read_requirements".to_string(),
+        153,
+    );
 
     let urgency = calculate_coverage_urgency(&func_id, &call_graph, &lcov_data, 12);
 
@@ -372,11 +372,11 @@ fn test_coverage_factor_scoring_bug() {
     let call_graph = CallGraph::new();
 
     // Simulate what happens when function is not found
-    let missing_func_id = FunctionId {
-        file: PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
-        name: "nonexistent_function".to_string(),
-        line: 999,
-    };
+    let missing_func_id = FunctionId::new(
+        PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
+        "nonexistent_function".to_string(),
+        999,
+    );
 
     let missing_urgency = calculate_coverage_urgency(&missing_func_id, &call_graph, &lcov_data, 10);
 
@@ -388,11 +388,11 @@ fn test_coverage_factor_scoring_bug() {
     );
 
     // Now test with a function that exists
-    let existing_func_id = FunctionId {
-        file: PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
-        name: "read_requirements".to_string(),
-        line: 153,
-    };
+    let existing_func_id = FunctionId::new(
+        PathBuf::from("/Users/glen/memento-mori/deku_string/src/string/deku_impl.rs"),
+        "read_requirements".to_string(),
+        153,
+    );
 
     let existing_urgency =
         calculate_coverage_urgency(&existing_func_id, &call_graph, &lcov_data, 12);

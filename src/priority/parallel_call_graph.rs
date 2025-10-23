@@ -206,11 +206,7 @@ mod tests {
     use super::*;
 
     fn create_test_function_id(name: &str) -> FunctionId {
-        FunctionId {
-            file: "test.rs".into(),
-            name: name.to_string(),
-            line: 1,
-        }
+        FunctionId::new("test.rs".into(), name.to_string(), 1)
     }
 
     #[test]

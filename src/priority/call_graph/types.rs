@@ -10,6 +10,30 @@ pub struct FunctionId {
     pub file: PathBuf,
     pub name: String,
     pub line: usize,
+    #[serde(default)]
+    pub module_path: String,
+}
+
+impl FunctionId {
+    /// Create a new FunctionId
+    pub fn new(file: PathBuf, name: String, line: usize) -> Self {
+        Self {
+            file,
+            name,
+            line,
+            module_path: String::new(),
+        }
+    }
+
+    /// Create a new FunctionId with module path
+    pub fn with_module_path(file: PathBuf, name: String, line: usize, module_path: String) -> Self {
+        Self {
+            file,
+            name,
+            line,
+            module_path,
+        }
+    }
 }
 
 /// Represents a function call relationship between two functions
@@ -86,11 +110,11 @@ mod function_id_map {
         for (key, value) in string_map {
             let parts: Vec<&str> = key.rsplitn(3, ':').collect();
             if parts.len() == 3 {
-                let func_id = FunctionId {
-                    file: parts[2].into(),
-                    name: parts[1].to_string(),
-                    line: parts[0].parse().unwrap_or(0),
-                };
+                let func_id = FunctionId::new(
+                    parts[2].into(),
+                    parts[1].to_string(),
+                    parts[0].parse().unwrap_or(0),
+                );
                 result.insert(func_id, value);
             }
         }

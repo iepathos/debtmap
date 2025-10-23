@@ -138,11 +138,7 @@ pub fn calculate_unified_priority_with_debt(
     debt_aggregator: Option<&DebtAggregator>,
     has_coverage_data: bool,
 ) -> UnifiedScore {
-    let func_id = FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    };
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Check if this function is actually technical debt
     // Simple I/O wrappers, entry points, and trivial pure functions with low complexity
@@ -283,12 +279,8 @@ pub fn calculate_unified_priority_with_debt(
 
     // Add debt-based adjustments additively (not multiplicatively)
     let debt_adjustment = if let Some(aggregator) = debt_aggregator {
-        let agg_func_id = AggregatorFunctionId {
-            file: func.file.clone(),
-            name: func.name.clone(),
-            start_line: func.line,
-            end_line: func.line + func.length,
-        };
+        let agg_func_id =
+            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
         let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
 
         // Add small additive adjustments for other debt types

@@ -100,11 +100,11 @@ mod tests {
         .expect("Should find DependencyGraph::calculate_coupling_metrics method");
 
     // Create function ID for the method using the actual line number from metrics
-    let func_id = FunctionId {
-        file: path.clone(),
-        name: "DependencyGraph::calculate_coupling_metrics".to_string(),
-        line: method_func.line,
-    };
+    let func_id = FunctionId::new(
+        path.clone(),
+        "DependencyGraph::calculate_coupling_metrics".to_string(),
+        method_func.line,
+    );
 
     // Check if it's marked as dead code
     let framework_exclusions_im = HashSet::new();
@@ -203,11 +203,8 @@ pub fn use_calculator() -> i32 {
         .expect("Should find Calculator::calculate method");
 
     // Test standalone function (should be dead code)
-    let standalone_func_id = FunctionId {
-        file: path.clone(),
-        name: "calculate".to_string(),
-        line: standalone_func.line, // Use the actual line number from the analyzed function
-    };
+    let standalone_func_id =
+        FunctionId::new(path.clone(), "calculate".to_string(), standalone_func.line);
 
     // For this test, we need to bypass the language-level dead code detection setting
     // and test the core logic directly.
@@ -234,11 +231,11 @@ pub fn use_calculator() -> i32 {
     };
 
     // Test method (should NOT be dead code)
-    let method_func_id = FunctionId {
-        file: path.clone(),
-        name: "Calculator::calculate".to_string(),
-        line: method_func.line, // Use the actual line number from the analyzed function
-    };
+    let method_func_id = FunctionId::new(
+        path.clone(),
+        "Calculator::calculate".to_string(),
+        method_func.line,
+    );
 
     // Check if method would be dead code using the same logic
     let method_excluded = method_func.name == "main"

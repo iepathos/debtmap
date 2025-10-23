@@ -214,17 +214,14 @@ impl<'a> CallAnalyzer<'a> {
             let caller_line = self.function_lines.get(caller_name).copied().unwrap_or(0);
             let callee_line = self.function_lines.get(&callee_name).copied().unwrap_or(0);
 
-            let caller_id = FunctionId {
-                name: caller_name.to_string(),
-                file: file_path.to_path_buf(),
-                line: caller_line,
-            };
+            let caller_id = FunctionId::new(
+                file_path.to_path_buf(),
+                caller_name.to_string(),
+                caller_line,
+            );
 
-            let callee_id = FunctionId {
-                name: callee_name.clone(),
-                file: file_path.to_path_buf(),
-                line: callee_line,
-            };
+            let callee_id =
+                FunctionId::new(file_path.to_path_buf(), callee_name.clone(), callee_line);
 
             // Add the call edge to indicate the function is referenced
             let call = FunctionCall {

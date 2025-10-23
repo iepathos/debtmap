@@ -23,11 +23,11 @@ use std::collections::HashMap;
 /// let mut registry = ObserverRegistry::new();
 /// registry.register_collection("Subject", "observers", "Observer");
 ///
-/// let func_id = FunctionId {
-///     file: PathBuf::from("test.py"),
-///     name: "ConcreteObserver.on_event".to_string(),
-///     line: 20,
-/// };
+/// let func_id = FunctionId::new(
+///     PathBuf::from("test.py"),
+///     "ConcreteObserver.on_event".to_string(),
+///     20,
+/// );
 /// registry.register_implementation("Observer", "on_event", func_id);
 ///
 /// assert!(registry.is_observer_collection("Subject", "observers"));
@@ -206,11 +206,11 @@ mod tests {
     #[test]
     fn test_register_and_get_implementations() {
         let mut registry = ObserverRegistry::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "ConcreteObserver.on_event".to_string(),
-            line: 20,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "ConcreteObserver.on_event".to_string(),
+            20,
+        );
         registry.register_implementation("Observer", "on_event", func_id.clone());
 
         let impls = registry.get_implementations("Observer", "on_event");
@@ -222,16 +222,16 @@ mod tests {
     fn test_multiple_implementations() {
         let mut registry = ObserverRegistry::new();
 
-        let impl1 = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "Observer1.on_event".to_string(),
-            line: 10,
-        };
-        let impl2 = FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "Observer2.on_event".to_string(),
-            line: 20,
-        };
+        let impl1 = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Observer1.on_event".to_string(),
+            10,
+        );
+        let impl2 = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Observer2.on_event".to_string(),
+            20,
+        );
 
         registry.register_implementation("Observer", "on_event", impl1.clone());
         registry.register_implementation("Observer", "on_event", impl2.clone());

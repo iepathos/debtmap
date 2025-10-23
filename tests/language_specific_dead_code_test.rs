@@ -71,16 +71,12 @@ fn main() {
 
     // Create a call graph with no calls to unused_function
     let mut call_graph = CallGraph::new();
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 6,
-    };
-    let unused_id = FunctionId {
-        file: path.clone(),
-        name: "unused_function".to_string(),
-        line: unused_func.line,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 6);
+    let unused_id = FunctionId::new(
+        path.clone(),
+        "unused_function".to_string(),
+        unused_func.line,
+    );
 
     call_graph.add_function(main_id.clone(), false, false, 1, 10);
     call_graph.add_function(unused_id.clone(), false, false, 1, 10);

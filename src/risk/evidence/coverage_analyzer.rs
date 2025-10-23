@@ -86,11 +86,11 @@ impl CoverageRiskAnalyzer {
 
         // Calculate both direct and indirect coverage using spec 120 algorithm
         let (_coverage_percentage, effective_coverage) = if let Some(coverage) = coverage_data {
-            let func_id = FunctionId {
-                file: function.file.clone(),
-                name: function.function.clone(),
-                line: function.line,
-            };
+            let func_id = FunctionId::new(
+                function.file.clone(),
+                function.function.clone(),
+                function.line,
+            );
 
             let complete_coverage = calculate_indirect_coverage(&func_id, call_graph, coverage);
 

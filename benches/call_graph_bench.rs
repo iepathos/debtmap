@@ -12,26 +12,26 @@ fn create_test_graph(size: usize) -> CallGraph {
 
     // Create functions
     for i in 0..size {
-        let func_id = FunctionId {
-            file: PathBuf::from(format!("file{}.rs", i % 10)),
-            name: format!("func_{}", i),
-            line: i * 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from(format!("file{}.rs", i % 10)),
+            format!("func_{}", i),
+            i * 10,
+        );
         graph.add_function(func_id, i == 0, false, (i % 10) as u32, i * 5);
     }
 
     // Create call relationships
     for i in 0..size - 1 {
-        let caller = FunctionId {
-            file: PathBuf::from(format!("file{}.rs", i % 10)),
-            name: format!("func_{}", i),
-            line: i * 10,
-        };
-        let callee = FunctionId {
-            file: PathBuf::from(format!("file{}.rs", (i + 1) % 10)),
-            name: format!("func_{}", i + 1),
-            line: (i + 1) * 10,
-        };
+        let caller = FunctionId::new(
+            PathBuf::from(format!("file{}.rs", i % 10)),
+            format!("func_{}", i),
+            i * 10,
+        );
+        let callee = FunctionId::new(
+            PathBuf::from(format!("file{}.rs", (i + 1) % 10)),
+            format!("func_{}", i + 1),
+            (i + 1) * 10,
+        );
         graph.add_call(FunctionCall {
             caller,
             callee,
@@ -47,11 +47,8 @@ fn bench_add_function(c: &mut Criterion) {
         b.iter(|| {
             let mut graph = CallGraph::new();
             for i in 0..100 {
-                let func_id = FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: format!("func_{}", i),
-                    line: i * 10,
-                };
+                let func_id =
+                    FunctionId::new(PathBuf::from("test.rs"), format!("func_{}", i), i * 10);
                 graph.add_function(black_box(func_id), false, false, 5, 50);
             }
         });
@@ -63,16 +60,8 @@ fn bench_add_call(c: &mut Criterion) {
         let mut graph = create_test_graph(100);
         b.iter(|| {
             let call = FunctionCall {
-                caller: FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: "caller".to_string(),
-                    line: 10,
-                },
-                callee: FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: "callee".to_string(),
-                    line: 20,
-                },
+                caller: FunctionId::new(PathBuf::from("test.rs"), "caller".to_string(), 10),
+                callee: FunctionId::new(PathBuf::from("test.rs"), "callee".to_string(), 20),
                 call_type: CallType::Direct,
             };
             graph.add_call(black_box(call));
@@ -82,11 +71,7 @@ fn bench_add_call(c: &mut Criterion) {
 
 fn bench_get_callees(c: &mut Criterion) {
     let graph = create_test_graph(1000);
-    let func_id = FunctionId {
-        file: PathBuf::from("file0.rs"),
-        name: "func_0".to_string(),
-        line: 0,
-    };
+    let func_id = FunctionId::new(PathBuf::from("file0.rs"), "func_0".to_string(), 0);
 
     c.bench_function("get_callees", |b| {
         b.iter(|| {
@@ -97,11 +82,7 @@ fn bench_get_callees(c: &mut Criterion) {
 
 fn bench_transitive_callees(c: &mut Criterion) {
     let graph = create_test_graph(100);
-    let func_id = FunctionId {
-        file: PathBuf::from("file0.rs"),
-        name: "func_0".to_string(),
-        line: 0,
-    };
+    let func_id = FunctionId::new(PathBuf::from("file0.rs"), "func_0".to_string(), 0);
 
     c.bench_function("get_transitive_callees_depth_3", |b| {
         b.iter(|| {
@@ -118,11 +99,7 @@ fn bench_transitive_callees(c: &mut Criterion) {
 
 fn bench_criticality_calculation(c: &mut Criterion) {
     let graph = create_test_graph(500);
-    let func_id = FunctionId {
-        file: PathBuf::from("file5.rs"),
-        name: "func_50".to_string(),
-        line: 500,
-    };
+    let func_id = FunctionId::new(PathBuf::from("file5.rs"), "func_50".to_string(), 500);
 
     c.bench_function("calculate_criticality", |b| {
         b.iter(|| {
@@ -133,11 +110,7 @@ fn bench_criticality_calculation(c: &mut Criterion) {
 
 fn bench_delegation_detection(c: &mut Criterion) {
     let graph = create_test_graph(200);
-    let func_id = FunctionId {
-        file: PathBuf::from("file2.rs"),
-        name: "func_20".to_string(),
-        line: 200,
-    };
+    let func_id = FunctionId::new(PathBuf::from("file2.rs"), "func_20".to_string(), 200);
 
     c.bench_function("detect_delegation_pattern", |b| {
         b.iter(|| {

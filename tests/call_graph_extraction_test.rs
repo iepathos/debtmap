@@ -32,20 +32,12 @@ fn validate() {
     assert_eq!(functions.len(), 4, "Should find 4 functions");
 
     // Check main's callees
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 2,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 2);
     let main_callees = call_graph.get_callees(&main_id);
     assert_eq!(main_callees.len(), 2, "main should call 2 functions");
 
     // Check helper's callers
-    let helper_id = FunctionId {
-        file: path.clone(),
-        name: "helper".to_string(),
-        line: 7,
-    };
+    let helper_id = FunctionId::new(path.clone(), "helper".to_string(), 7);
     let helper_callers = call_graph.get_callers(&helper_id);
     assert_eq!(helper_callers.len(), 1, "helper should have 1 caller");
     assert_eq!(
@@ -223,11 +215,7 @@ fn validate(value: &i32) -> bool {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check that closure calls are detected
-    let process_id = FunctionId {
-        file: path.clone(),
-        name: "process_items".to_string(),
-        line: 2,
-    };
+    let process_id = FunctionId::new(path.clone(), "process_items".to_string(), 2);
     let process_callees = call_graph.get_callees(&process_id);
     assert!(
         process_callees.iter().any(|f| f.name == "transform"),
@@ -266,11 +254,7 @@ async fn validate_async() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check async function calls
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 2,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 2);
     let main_callees = call_graph.get_callees(&main_id);
     assert_eq!(main_callees.len(), 2, "main should call 2 async functions");
 }
@@ -303,11 +287,7 @@ fn direct_call() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Macro calls might not be detected - this is a known limitation
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 8,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 8);
     let main_callees = call_graph.get_callees(&main_id);
     // Should at least detect direct_call
     assert!(
@@ -345,11 +325,7 @@ fn validate() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check qualified path calls
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 8,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 8);
     let main_callees = call_graph.get_callees(&main_id);
     assert!(
         !main_callees.is_empty(),
@@ -384,11 +360,7 @@ fn main() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check generic function calls
-    let process_id = FunctionId {
-        file: path.clone(),
-        name: "process".to_string(),
-        line: 2,
-    };
+    let process_id = FunctionId::new(path.clone(), "process".to_string(), 2);
     let process_callees = call_graph.get_callees(&process_id);
     assert_eq!(
         process_callees.len(),
@@ -419,11 +391,7 @@ fn main() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Function pointers are hard to track statically
-    let main_id = FunctionId {
-        file: path.clone(),
-        name: "main".to_string(),
-        line: 10,
-    };
+    let main_id = FunctionId::new(path.clone(), "main".to_string(), 10);
     let main_callees = call_graph.get_callees(&main_id);
     assert!(
         main_callees.iter().any(|f| f.name == "apply_operation"),

@@ -242,16 +242,8 @@ fn test_comprehensive_validation_suite() {
     let mut call_graph = CallGraph::new();
 
     // Setup some call relationships
-    let main_id = FunctionId {
-        name: "main".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 10,
-    };
-    let helper_id = FunctionId {
-        name: "process_data".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 20,
-    };
+    let main_id = FunctionId::new(PathBuf::from("app.py"), "main".to_string(), 10);
+    let helper_id = FunctionId::new(PathBuf::from("app.py"), "process_data".to_string(), 20);
     call_graph.add_call(FunctionCall {
         caller: main_id.clone(),
         callee: helper_id.clone(),
@@ -516,16 +508,8 @@ fn test_spec_107_requirement() {
     let mut call_graph = CallGraph::new();
 
     // Setup realistic call graph
-    let main_id = FunctionId {
-        name: "main".to_string(),
-        file: PathBuf::from("app.py"),
-        line: 1,
-    };
-    let util_id = FunctionId {
-        name: "utility".to_string(),
-        file: PathBuf::from("utils.py"),
-        line: 10,
-    };
+    let main_id = FunctionId::new(PathBuf::from("app.py"), "main".to_string(), 1);
+    let util_id = FunctionId::new(PathBuf::from("utils.py"), "utility".to_string(), 10);
     call_graph.add_call(FunctionCall {
         caller: main_id,
         callee: util_id,
