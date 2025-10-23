@@ -36,7 +36,7 @@ pub enum GodObjectConfidence {
     NotGodObject, // Within acceptable limits
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ModuleSplit {
     pub suggested_name: String,
     pub methods_to_move: Vec<String>,
@@ -285,6 +285,46 @@ fn infer_responsibility_from_method(method_name: &str) -> String {
     }
 }
 
+/// Metrics for an individual struct within a file
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StructMetrics {
+    pub name: String,
+    pub method_count: usize,
+    pub field_count: usize,
+    pub responsibilities: Vec<String>,
+    pub line_span: (usize, usize),
+}
+
+/// Classification of god object types
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum GodObjectType {
+    /// Single struct with excessive methods and responsibilities
+    GodClass {
+        struct_name: String,
+        method_count: usize,
+        field_count: usize,
+        responsibilities: usize,
+    },
+    /// Multiple structs in a file that collectively exceed thresholds
+    GodModule {
+        total_structs: usize,
+        total_methods: usize,
+        largest_struct: StructMetrics,
+        suggested_splits: Vec<ModuleSplit>,
+    },
+    /// No god object detected
+    NotGodObject,
+}
+
+/// Enhanced god object analysis with struct-level detail
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancedGodObjectAnalysis {
+    pub file_metrics: GodObjectAnalysis,
+    pub per_struct_metrics: Vec<StructMetrics>,
+    pub classification: GodObjectType,
+    pub recommendation: String,
+}
+
 pub fn recommend_module_splits(
     type_name: &str,
     _methods: &[String],
@@ -308,4 +348,58 @@ pub fn recommend_module_splits(
     }
 
     recommendations
+}
+
+/// Suggest module splits based on struct name patterns (domain-based grouping)
+pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleSplit> {
+    let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
+    let mut line_estimates: HashMap<String, usize> = HashMap::new();
+
+    for struct_metrics in structs {
+        let domain = classify_struct_domain(&struct_metrics.name);
+        grouped
+            .entry(domain.clone())
+            .or_default()
+            .push(struct_metrics.name.clone());
+        *line_estimates.entry(domain).or_insert(0) +=
+            struct_metrics.line_span.1 - struct_metrics.line_span.0;
+    }
+
+    grouped
+        .into_iter()
+        .filter(|(_, structs)| structs.len() > 1)
+        .map(|(domain, structs)| {
+            let estimated_lines = line_estimates.get(&domain).copied().unwrap_or(0);
+            ModuleSplit {
+                suggested_name: format!("config/{}.rs", domain),
+                methods_to_move: structs,
+                responsibility: domain.clone(),
+                estimated_lines,
+            }
+        })
+        .collect()
+}
+
+/// Classify struct into a domain based on naming patterns
+pub fn classify_struct_domain(struct_name: &str) -> String {
+    let lower = struct_name.to_lowercase();
+
+    if lower.contains("weight")
+        || lower.contains("multiplier")
+        || lower.contains("factor")
+        || lower.contains("scoring")
+    {
+        "scoring".to_string()
+    } else if lower.contains("threshold") || lower.contains("limit") || lower.contains("bound") {
+        "thresholds".to_string()
+    } else if lower.contains("detection") || lower.contains("detector") || lower.contains("checker")
+    {
+        "detection".to_string()
+    } else if lower.contains("config") || lower.contains("settings") || lower.contains("options") {
+        "core_config".to_string()
+    } else if lower.contains("data") || lower.contains("info") || lower.contains("metrics") {
+        "data".to_string()
+    } else {
+        "misc".to_string()
+    }
 }

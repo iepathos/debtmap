@@ -388,7 +388,7 @@ fn test_call_graph_uses_qualified_names_for_methods() {
     call_graph.add_function(correct_method_name.clone(), false, false, 3, 30);
 
     // BAD: Unqualified method name
-    let incorrect_method_name = FunctionId {
+    let _incorrect_method_name = FunctionId {
         file: PathBuf::from("src/types.rs"),
         name: "process".to_string(), // Wrong: not qualified
         line: 50,
