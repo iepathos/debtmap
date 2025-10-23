@@ -444,11 +444,8 @@ impl CrossModuleAnalyzer {
             if export.is_function || export.is_class {
                 // Extract line number for the function
                 let line = self.estimate_line_number(&source_lines, &export.name);
-                let func_id = FunctionId {
-                    name: export.qualified_name.clone(),
-                    file: path.to_path_buf(),
-                    line,
-                };
+                let func_id =
+                    FunctionId::new(path.to_path_buf(), export.qualified_name.clone(), line);
                 self.context.register_function(path, &export.name, func_id);
             }
         }
@@ -489,11 +486,7 @@ mod tests {
     fn test_function_registration() {
         let mut context = CrossModuleContext::new();
         let path = Path::new("module.py");
-        let func_id = FunctionId {
-            name: "test_func".to_string(),
-            file: path.to_path_buf(),
-            line: 0,
-        };
+        let func_id = FunctionId::new(path.to_path_buf(), "test_func".to_string(), 0);
 
         context.register_function(path, "test_func", func_id.clone());
 

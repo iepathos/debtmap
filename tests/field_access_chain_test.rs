@@ -107,11 +107,11 @@ fn main() {
         .expect("Should find FrameworkPatternDetector::analyze_file");
 
     // Create function ID using actual line number
-    let analyze_file_id = FunctionId {
-        file: path.clone(),
-        name: "FrameworkPatternDetector::analyze_file".to_string(),
-        line: analyze_file_func.line,
-    };
+    let analyze_file_id = FunctionId::new(
+        path.clone(),
+        "FrameworkPatternDetector::analyze_file".to_string(),
+        analyze_file_func.line,
+    );
 
     // Check if it's incorrectly marked as dead code
     let is_dead = is_dead_code_with_exclusions(
@@ -198,11 +198,11 @@ fn main() {
         .find(|f| f.name.contains("DeepStruct::process"))
         .expect("Should find DeepStruct::process");
 
-    let process_id = FunctionId {
-        file: path.clone(),
-        name: "DeepStruct::process".to_string(),
-        line: process_func.line,
-    };
+    let process_id = FunctionId::new(
+        path.clone(),
+        "DeepStruct::process".to_string(),
+        process_func.line,
+    );
 
     let is_dead = is_dead_code_with_exclusions(
         process_func,
@@ -278,11 +278,11 @@ fn main() {
         .find(|f| f.name.contains("Worker::process"))
         .expect("Should find Worker::process");
 
-    let process_id = FunctionId {
-        file: path.clone(),
-        name: "Worker::process".to_string(),
-        line: process_func.line,
-    };
+    let process_id = FunctionId::new(
+        path.clone(),
+        "Worker::process".to_string(),
+        process_func.line,
+    );
 
     let is_dead = is_dead_code_with_exclusions(
         process_func,

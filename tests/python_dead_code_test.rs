@@ -135,11 +135,7 @@ class FileManager:
         .expect("Should find _get_connection function");
 
     // Create function ID for the method
-    let func_id = FunctionId {
-        file: path.clone(),
-        name: "FileManager._get_connection".to_string(),
-        line: 0, // We're not tracking exact line numbers yet
-    };
+    let func_id = FunctionId::new(path.clone(), "FileManager._get_connection".to_string(), 0);
 
     // Check if it's marked as dead code
     let framework_exclusions_im = HashSet::new();
@@ -216,11 +212,7 @@ class MyClass:
         .find(|f| f.name.contains("_unused_method"))
         .expect("Should find _unused_method function");
 
-    let func_id = FunctionId {
-        file: path.clone(),
-        name: "MyClass._unused_method".to_string(),
-        line: 0,
-    };
+    let func_id = FunctionId::new(path.clone(), "MyClass._unused_method".to_string(), 0);
 
     let framework_exclusions_std: std::collections::HashSet<FunctionId> =
         HashSet::new().into_iter().collect();
@@ -274,11 +266,7 @@ class ResourceManager:
         .find(|f| f.name.contains("_get_resource"))
         .expect("Should find _get_resource function");
 
-    let func_id = FunctionId {
-        file: path.clone(),
-        name: "ResourceManager._get_resource".to_string(),
-        line: 0,
-    };
+    let func_id = FunctionId::new(path.clone(), "ResourceManager._get_resource".to_string(), 0);
 
     let framework_exclusions_std: std::collections::HashSet<FunctionId> =
         HashSet::new().into_iter().collect();
@@ -365,11 +353,7 @@ class ConversationPanel:
         .find(|f| f.name.contains("on_paint"))
         .expect("Should find on_paint function");
 
-    let func_id = FunctionId {
-        file: path.clone(),
-        name: "ConversationPanel.on_paint".to_string(),
-        line: 0,
-    };
+    let func_id = FunctionId::new(path.clone(), "ConversationPanel.on_paint".to_string(), 0);
 
     let framework_exclusions_std: std::collections::HashSet<FunctionId> =
         HashSet::new().into_iter().collect();

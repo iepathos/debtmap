@@ -372,11 +372,7 @@ impl EnhancedDeadCodeAnalyzer {
         func: &FunctionMetrics,
         call_graph: &CallGraph,
     ) -> DeadCodeResult {
-        let func_id = FunctionId {
-            name: func.name.clone(),
-            file: func.file.clone(),
-            line: func.line,
-        };
+        let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
         // Check for suppression comment
         if self.config.respect_suppression_comments && self.should_suppress(func) {
@@ -963,17 +959,9 @@ mod tests {
         let analyzer = EnhancedDeadCodeAnalyzer::new();
         let mut call_graph = CallGraph::new();
 
-        let func_id = FunctionId {
-            name: "my_function".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.py"), "my_function".to_string(), 10);
 
-        let caller_id = FunctionId {
-            name: "caller".to_string(),
-            file: PathBuf::from("test.py"),
-            line: 5,
-        };
+        let caller_id = FunctionId::new(PathBuf::from("test.py"), "caller".to_string(), 5);
 
         // Add a call to make the function live
         call_graph.add_call(crate::priority::call_graph::FunctionCall {

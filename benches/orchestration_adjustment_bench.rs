@@ -38,21 +38,17 @@ fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) 
 fn create_call_graph_with_callees(callee_count: usize) -> (CallGraph, FunctionId, FunctionMetrics) {
     let mut graph = CallGraph::new();
 
-    let orchestrator = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "orchestrator".to_string(),
-        line: 1,
-    };
+    let orchestrator = FunctionId::new(PathBuf::from("test.rs"), "orchestrator".to_string(), 1);
 
     graph.add_function(orchestrator.clone(), false, false, 2, 20);
 
     // Add callees
     for i in 0..callee_count {
-        let callee = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: format!("callee_{}", i),
-            line: 100 + i * 10,
-        };
+        let callee = FunctionId::new(
+            PathBuf::from("test.rs"),
+            format!("callee_{}", i),
+            100 + i * 10,
+        );
         graph.add_function(callee.clone(), false, false, 5, 20);
         graph.add_call(FunctionCall {
             caller: orchestrator.clone(),

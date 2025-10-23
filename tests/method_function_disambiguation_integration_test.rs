@@ -48,25 +48,17 @@ pub fn test_import_analysis() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Find the standalone function
-    let standalone_id = FunctionId {
-        file: path.clone(),
-        name: "analyze_imports".to_string(), // Simple name
-        line: 3,                             // Line where the standalone function is defined
-    };
+    let standalone_id = FunctionId::new(path.clone(), "analyze_imports".to_string(), 3);
 
     // Find the method
-    let method_id = FunctionId {
-        file: path.clone(),
-        name: "ImportResolver::analyze_imports".to_string(), // Qualified name
-        line: 14,                                            // Line where the method is defined
-    };
+    let method_id = FunctionId::new(
+        path.clone(),
+        "ImportResolver::analyze_imports".to_string(),
+        14,
+    );
 
     // Find the test
-    let test_id = FunctionId {
-        file: path.clone(),
-        name: "test_import_analysis".to_string(),
-        line: 20,
-    };
+    let test_id = FunctionId::new(path.clone(), "test_import_analysis".to_string(), 20);
 
     // Verify functions exist in graph
     let all_functions = call_graph.find_all_functions();
@@ -148,17 +140,9 @@ fn caller() {
     let path = PathBuf::from("simple.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
-    let standalone = FunctionId {
-        file: path.clone(),
-        name: "process".to_string(),
-        line: 2,
-    };
+    let standalone = FunctionId::new(path.clone(), "process".to_string(), 2);
 
-    let method = FunctionId {
-        file: path.clone(),
-        name: "Handler::process".to_string(),
-        line: 9,
-    };
+    let method = FunctionId::new(path.clone(), "Handler::process".to_string(), 9);
 
     println!("\nSimple test - All functions:");
     for func in call_graph.find_all_functions() {

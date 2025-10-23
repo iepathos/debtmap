@@ -232,11 +232,11 @@ impl TraitResolver {
     /// Create a ResolvedMethod for a default trait method
     fn create_default_method_resolution(trait_name: &str, method_name: &str) -> ResolvedMethod {
         ResolvedMethod {
-            function_id: FunctionId {
-                file: std::path::PathBuf::from("trait_default"),
-                name: format!("{}::{}", trait_name, method_name),
-                line: 0,
-            },
+            function_id: FunctionId::new(
+                std::path::PathBuf::from("trait_default"),
+                format!("{}::{}", trait_name, method_name),
+                0,
+            ),
             trait_name: Some(trait_name.to_string()),
             priority: ResolutionPriority::DefaultTraitMethod,
             confidence: 0.6,
@@ -396,11 +396,11 @@ mod tests {
     #[test]
     fn test_register_inherent_method() {
         let mut resolver = create_test_resolver();
-        let function_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "MyType::my_method".to_string(),
-            line: 10,
-        };
+        let function_id = FunctionId::new(
+            PathBuf::from("test.rs"),
+            "MyType::my_method".to_string(),
+            10,
+        );
 
         resolver.register_inherent_method(
             "MyType".to_string(),
@@ -737,11 +737,11 @@ mod tests {
             "test_method".to_string(),
             crate::analyzers::trait_implementation_tracker::MethodImpl {
                 name: "test_method".to_string(),
-                function_id: FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: "MyType::test_method".to_string(),
-                    line: 10,
-                },
+                function_id: FunctionId::new(
+                    PathBuf::from("test.rs"),
+                    "MyType::test_method".to_string(),
+                    10,
+                ),
                 overrides_default: true,
             },
         );
@@ -799,11 +799,11 @@ mod tests {
             "default_method".to_string(),
             crate::analyzers::trait_implementation_tracker::MethodImpl {
                 name: "default_method".to_string(),
-                function_id: FunctionId {
-                    file: PathBuf::from("test.rs"),
-                    name: "MyType::default_method".to_string(),
-                    line: 20,
-                },
+                function_id: FunctionId::new(
+                    PathBuf::from("test.rs"),
+                    "MyType::default_method".to_string(),
+                    20,
+                ),
                 overrides_default: true,
             },
         );

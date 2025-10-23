@@ -430,11 +430,7 @@ impl<'ast> Visit<'ast> for ModuleVisitor {
             let func_name = item.sig.ident.to_string();
             let line = self.get_line_number(item.sig.ident.span());
 
-            let func_id = FunctionId {
-                file: self.file_path.clone(),
-                name: func_name.clone(),
-                line,
-            };
+            let func_id = FunctionId::new(self.file_path.clone(), func_name.clone(), line);
 
             let export = PublicExport {
                 name: func_name,
@@ -555,11 +551,11 @@ impl<'ast> Visit<'ast> for CrossModuleCallVisitor {
         let func_name = item.sig.ident.to_string();
         let line = self.get_line_number(item.sig.ident.span());
 
-        self.current_function = Some(FunctionId {
-            file: PathBuf::new(), // Will be filled in by parent
-            name: func_name,
+        self.current_function = Some(FunctionId::new(
+            PathBuf::new(), // Will be filled in by parent
+            func_name,
             line,
-        });
+        ));
 
         // Continue visiting the function body
         syn::visit::visit_item_fn(self, item);
@@ -633,11 +629,7 @@ mod tests {
     }
 
     fn create_test_function_id(name: &str) -> FunctionId {
-        FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: name.to_string(),
-            line: 10,
-        }
+        FunctionId::new(PathBuf::from("test.rs"), name.to_string(), 10)
     }
 
     #[test]

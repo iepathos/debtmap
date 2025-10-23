@@ -93,23 +93,15 @@ fn test_optimized_test_detector() {
     let mut call_graph = CallGraph::new();
 
     // Add test functions
-    let test_func = FunctionId {
-        file: PathBuf::from("tests/test.rs"),
-        name: "test_something".to_string(),
-        line: 10,
-    };
+    let test_func = FunctionId::new(
+        PathBuf::from("tests/test.rs"),
+        "test_something".to_string(),
+        10,
+    );
 
-    let helper_func = FunctionId {
-        file: PathBuf::from("src/lib.rs"),
-        name: "helper".to_string(),
-        line: 20,
-    };
+    let helper_func = FunctionId::new(PathBuf::from("src/lib.rs"), "helper".to_string(), 20);
 
-    let main_func = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "main".to_string(),
-        line: 5,
-    };
+    let main_func = FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 5);
 
     // Add functions to graph
     call_graph.add_function(test_func.clone(), false, true, 5, 20);
@@ -194,11 +186,11 @@ fn test_large_codebase_parallel_analysis() {
 
     // Add functions to call graph
     for metric in &metrics {
-        let func_id = debtmap::priority::call_graph::FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
+        let func_id = debtmap::priority::call_graph::FunctionId::new(
+            metric.file.clone(),
+            metric.name.clone(),
+            metric.line,
+        );
         call_graph.add_function(
             func_id,
             false,
@@ -211,16 +203,16 @@ fn test_large_codebase_parallel_analysis() {
     // Add some call relationships
     for i in 0..metrics.len() - 1 {
         if i % 5 == 0 {
-            let caller = debtmap::priority::call_graph::FunctionId {
-                file: metrics[i].file.clone(),
-                name: metrics[i].name.clone(),
-                line: metrics[i].line,
-            };
-            let callee = debtmap::priority::call_graph::FunctionId {
-                file: metrics[i + 1].file.clone(),
-                name: metrics[i + 1].name.clone(),
-                line: metrics[i + 1].line,
-            };
+            let caller = debtmap::priority::call_graph::FunctionId::new(
+                metrics[i].file.clone(),
+                metrics[i].name.clone(),
+                metrics[i].line,
+            );
+            let callee = debtmap::priority::call_graph::FunctionId::new(
+                metrics[i + 1].file.clone(),
+                metrics[i + 1].name.clone(),
+                metrics[i + 1].line,
+            );
             call_graph.add_call_parts(
                 caller,
                 callee,

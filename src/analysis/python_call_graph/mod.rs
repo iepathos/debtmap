@@ -339,11 +339,11 @@ class MyClass:
             .unwrap();
 
         // Check that the call was tracked
-        let private_method_id = FunctionId {
-            name: "MyClass._private_method".to_string(),
-            file: Path::new("test.py").to_path_buf(),
-            line: 0,
-        };
+        let private_method_id = FunctionId::new(
+            Path::new("test.py").to_path_buf(),
+            "MyClass._private_method".to_string(),
+            0,
+        );
 
         assert!(
             !call_graph.get_callers(&private_method_id).is_empty(),
@@ -371,11 +371,11 @@ class Manager:
             .analyze_module(&module, Path::new("test.py"), &mut call_graph)
             .unwrap();
 
-        let connection_method_id = FunctionId {
-            name: "Manager._get_connection".to_string(),
-            file: Path::new("test.py").to_path_buf(),
-            line: 0,
-        };
+        let connection_method_id = FunctionId::new(
+            Path::new("test.py").to_path_buf(),
+            "Manager._get_connection".to_string(),
+            0,
+        );
 
         assert!(
             !call_graph.get_callers(&connection_method_id).is_empty(),
@@ -407,11 +407,11 @@ class ConversationPanel:
             .analyze_module(&module, Path::new("conversation_panel.py"), &mut call_graph)
             .unwrap();
 
-        let on_paint_id = FunctionId {
-            name: "ConversationPanel.on_paint".to_string(),
-            file: Path::new("conversation_panel.py").to_path_buf(),
-            line: 0,
-        };
+        let on_paint_id = FunctionId::new(
+            Path::new("conversation_panel.py").to_path_buf(),
+            "ConversationPanel.on_paint".to_string(),
+            0,
+        );
 
         // on_paint should have callers because it's bound as an event handler
         assert!(
@@ -464,11 +464,11 @@ class EventPanel:
         ];
 
         for handler_name in &handlers {
-            let handler_id = FunctionId {
-                name: handler_name.to_string(),
-                file: Path::new("event_panel.py").to_path_buf(),
-                line: 0,
-            };
+            let handler_id = FunctionId::new(
+                Path::new("event_panel.py").to_path_buf(),
+                handler_name.to_string(),
+                0,
+            );
 
             assert!(
                 !call_graph.get_callers(&handler_id).is_empty(),
@@ -510,11 +510,11 @@ class DeliveryBoy:
             .get("DeliveryBoy.deliver_message_added.deliver")
             .copied()
             .unwrap_or(0);
-        let deliver_id = FunctionId {
-            name: "DeliveryBoy.deliver_message_added.deliver".to_string(),
-            file: Path::new("delivery_boy.py").to_path_buf(),
-            line: deliver_line,
-        };
+        let deliver_id = FunctionId::new(
+            Path::new("delivery_boy.py").to_path_buf(),
+            "DeliveryBoy.deliver_message_added.deliver".to_string(),
+            deliver_line,
+        );
 
         // The nested deliver function should have callers because it's passed to wx.CallAfter
         assert!(
@@ -665,11 +665,11 @@ class TaskScheduler:
             .get("TaskScheduler.process_task")
             .copied()
             .unwrap_or(0);
-        let process_id = FunctionId {
-            name: "TaskScheduler.process_task".to_string(),
-            file: Path::new("scheduler.py").to_path_buf(),
-            line: process_line,
-        };
+        let process_id = FunctionId::new(
+            Path::new("scheduler.py").to_path_buf(),
+            "TaskScheduler.process_task".to_string(),
+            process_line,
+        );
 
         assert!(
             !call_graph.get_callers(&process_id).is_empty(),

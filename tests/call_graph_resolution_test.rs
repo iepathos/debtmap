@@ -6,29 +6,29 @@ fn test_resolve_cross_file_method_calls() {
     let mut call_graph = CallGraph::new();
 
     // Add a function in cache.rs
-    let store_func = FunctionId {
-        file: PathBuf::from("src/expansion/cache.rs"),
-        name: "store".to_string(),
-        line: 126,
-    };
+    let store_func = FunctionId::new(
+        PathBuf::from("src/expansion/cache.rs"),
+        "store".to_string(),
+        126,
+    );
     call_graph.add_function(store_func.clone(), false, false, 3, 36);
 
     // Add a function in expander.rs that calls store
-    let expand_func = FunctionId {
-        file: PathBuf::from("src/expansion/expander.rs"),
-        name: "expand_file".to_string(),
-        line: 200,
-    };
+    let expand_func = FunctionId::new(
+        PathBuf::from("src/expansion/expander.rs"),
+        "expand_file".to_string(),
+        200,
+    );
     call_graph.add_function(expand_func.clone(), false, false, 5, 50);
 
     // Add an unresolved call from expand_file to store
     // This simulates what happens when parsing sees self.cache.store()
     // The parser doesn't know the actual file, so it uses the current file with line 0
-    let unresolved_store = FunctionId {
-        file: PathBuf::from("src/expansion/expander.rs"), // Wrong file!
-        name: "store".to_string(),
-        line: 0, // Line 0 indicates unresolved
-    };
+    let unresolved_store = FunctionId::new(
+        PathBuf::from("src/expansion/expander.rs"),
+        "store".to_string(),
+        0,
+    );
 
     call_graph.add_call(FunctionCall {
         caller: expand_func.clone(),
@@ -63,34 +63,19 @@ fn test_resolve_handles_multiple_candidates() {
     let mut call_graph = CallGraph::new();
 
     // Add two functions with the same name in different files
-    let process1 = FunctionId {
-        file: PathBuf::from("src/module1.rs"),
-        name: "process".to_string(),
-        line: 10,
-    };
+    let process1 = FunctionId::new(PathBuf::from("src/module1.rs"), "process".to_string(), 10);
     call_graph.add_function(process1.clone(), false, false, 2, 20);
 
-    let process2 = FunctionId {
-        file: PathBuf::from("src/module2.rs"),
-        name: "process".to_string(),
-        line: 15,
-    };
+    let process2 = FunctionId::new(PathBuf::from("src/module2.rs"), "process".to_string(), 15);
     call_graph.add_function(process2.clone(), false, false, 3, 25);
 
     // Add a caller
-    let main_func = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "main".to_string(),
-        line: 5,
-    };
+    let main_func = FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 5);
     call_graph.add_function(main_func.clone(), true, false, 1, 10);
 
     // Add an unresolved call to "process"
-    let unresolved_process = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "process".to_string(),
-        line: 0,
-    };
+    let unresolved_process =
+        FunctionId::new(PathBuf::from("src/main.rs"), "process".to_string(), 0);
 
     call_graph.add_call(FunctionCall {
         caller: main_func.clone(),
@@ -120,18 +105,10 @@ fn test_resolve_preserves_resolved_calls() {
     let mut call_graph = CallGraph::new();
 
     // Add functions
-    let func_a = FunctionId {
-        file: PathBuf::from("src/a.rs"),
-        name: "func_a".to_string(),
-        line: 10,
-    };
+    let func_a = FunctionId::new(PathBuf::from("src/a.rs"), "func_a".to_string(), 10);
     call_graph.add_function(func_a.clone(), false, false, 2, 20);
 
-    let func_b = FunctionId {
-        file: PathBuf::from("src/b.rs"),
-        name: "func_b".to_string(),
-        line: 15,
-    };
+    let func_b = FunctionId::new(PathBuf::from("src/b.rs"), "func_b".to_string(), 15);
     call_graph.add_function(func_b.clone(), false, false, 3, 25);
 
     // Add a properly resolved call (line != 0)

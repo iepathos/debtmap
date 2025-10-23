@@ -58,11 +58,7 @@ impl GraphBuilder {
         is_test: bool,
         _is_async: bool,
     ) -> FunctionId {
-        let function_id = FunctionId {
-            name: name.clone(),
-            file: self.current_file.clone(),
-            line,
-        };
+        let function_id = FunctionId::new(self.current_file.clone(), name.clone(), line);
 
         // Add function with appropriate parameters
         // Using defaults for entry_point and complexity for now

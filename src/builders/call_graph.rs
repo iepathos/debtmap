@@ -17,11 +17,11 @@ pub fn build_initial_call_graph(metrics: &[FunctionMetrics]) -> priority::CallGr
     let mut call_graph = priority::CallGraph::new();
 
     for metric in metrics {
-        let func_id = priority::call_graph::FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
+        let func_id = priority::call_graph::FunctionId::new(
+            metric.file.clone(),
+            metric.name.clone(),
+            metric.line,
+        );
 
         call_graph.add_function(
             func_id,

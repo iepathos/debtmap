@@ -352,11 +352,11 @@ impl FunctionPointerVisitor {
 
         if let Expr::Path(path) = expr {
             if let Some(func_name) = self.extract_function_name_from_path(path) {
-                let target_func = FunctionId {
-                    file: self.file_path.clone(),
-                    name: func_name,
-                    line: 0, // Unknown line for external function
-                };
+                let target_func = FunctionId::new(
+                    self.file_path.clone(),
+                    func_name,
+                    0, // Unknown line for external function
+                );
                 possible_targets.insert(target_func);
             }
         }
@@ -423,11 +423,7 @@ impl FunctionPointerVisitor {
         for arg in &call.args {
             if let Expr::Path(arg_path) = arg {
                 if let Some(arg_func_name) = self.extract_function_name_from_path(arg_path) {
-                    let func_arg = FunctionId {
-                        file: self.file_path.clone(),
-                        name: arg_func_name,
-                        line: 0,
-                    };
+                    let func_arg = FunctionId::new(self.file_path.clone(), arg_func_name, 0);
                     function_arguments.push_back(func_arg);
                 }
             }
@@ -458,11 +454,7 @@ impl<'ast> Visit<'ast> for FunctionPointerVisitor {
         let func_name = item.sig.ident.to_string();
         let line = self.get_line_number(item.sig.ident.span());
 
-        self.current_function = Some(FunctionId {
-            file: self.file_path.clone(),
-            name: func_name,
-            line,
-        });
+        self.current_function = Some(FunctionId::new(self.file_path.clone(), func_name, line));
 
         // Analyze function parameters for function pointers
         for param in &item.sig.inputs {
@@ -548,11 +540,11 @@ impl<'ast> Visit<'ast> for ClosureCallVisitor {
     fn visit_expr_call(&mut self, call: &'ast ExprCall) {
         if let Expr::Path(path) = &*call.func {
             if let Some(func_name) = self.extract_function_name_from_path(path) {
-                let func_id = FunctionId {
-                    file: std::path::PathBuf::new(), // Will be filled in by parent
-                    name: func_name,
-                    line: 0,
-                };
+                let func_id = FunctionId::new(
+                    std::path::PathBuf::new(), // Will be filled in by parent
+                    func_name,
+                    0,
+                );
                 self.function_calls.push(func_id);
             }
         }
@@ -563,11 +555,7 @@ impl<'ast> Visit<'ast> for ClosureCallVisitor {
 
     fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
         let method_name = call.method.to_string();
-        let func_id = FunctionId {
-            file: std::path::PathBuf::new(),
-            name: method_name,
-            line: 0,
-        };
+        let func_id = FunctionId::new(std::path::PathBuf::new(), method_name, 0);
         self.function_calls.push(func_id);
 
         // Continue visiting
@@ -589,11 +577,11 @@ mod tests {
     #[test]
     fn test_extract_direct_pointer_call() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test direct function pointer call
         let call: ExprCall = parse_quote! { func_ptr(42) };
@@ -609,11 +597,11 @@ mod tests {
     #[test]
     fn test_extract_direct_pointer_call_with_method_call() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test method call (not a direct pointer call)
         // Using a different expression type that's not a Path
@@ -629,11 +617,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_map() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test higher-order function call with map
         let call: ExprCall = parse_quote! { map(process_item) };
@@ -650,11 +638,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_filter() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test higher-order function call with filter
         let call: ExprCall = parse_quote! { filter(is_valid) };
@@ -670,11 +658,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_non_hof() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test non-higher-order function call
         let call: ExprCall = parse_quote! { regular_func(arg) };
@@ -686,11 +674,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_empty_arguments() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test higher-order function call with no function arguments
         let call: ExprCall = parse_quote! { map() };
@@ -703,11 +691,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_closure_argument() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test call with closure argument (should not extract closure)
         let call: ExprCall = parse_quote! { map(|x| x + 1) };
@@ -720,11 +708,11 @@ mod tests {
     #[test]
     fn test_extract_hof_call_nested_path() {
         let visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        let caller = FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let caller = FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test higher-order function with nested path argument
         let call: ExprCall = parse_quote! { filter(module::is_valid) };
@@ -797,11 +785,11 @@ mod tests {
     #[test]
     fn test_analyze_call_expression_integration() {
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        ));
 
         // Test direct pointer call
         let call: ExprCall = parse_quote! { callback() };
@@ -881,11 +869,11 @@ mod tests {
     #[test]
     fn test_analyze_function_pointer_assignment_complete() {
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "outer_func".to_string(),
+            1,
+        ));
 
         // Test complete function pointer assignment
         // Creating a synthetic Local with function assignment
@@ -922,11 +910,11 @@ mod tests {
     #[test]
     fn test_analyze_function_pointer_assignment_no_init() {
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "outer_func".to_string(),
+            1,
+        ));
 
         // Test local without initialization (should not add pointer)
         let pat = Pat::Ident(PatIdent {
@@ -953,11 +941,11 @@ mod tests {
     #[test]
     fn test_analyze_function_pointer_assignment_non_ident_pattern() {
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "outer_func".to_string(),
-            line: 1,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "outer_func".to_string(),
+            1,
+        ));
 
         // Test with tuple pattern (should not add pointer)
         let pat: Pat = parse_quote! { (a, b) };
@@ -1099,11 +1087,11 @@ mod tests {
     fn test_analyze_function_pointer_assignment_complete_flow() {
         // Test the complete flow with all components working together
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "parent_func".to_string(),
-            line: 10,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "parent_func".to_string(),
+            10,
+        ));
 
         let pat: Pat = parse_quote! { callback };
         let init_expr: Expr = parse_quote! { process_item };
@@ -1133,11 +1121,11 @@ mod tests {
     fn test_analyze_function_pointer_assignment_with_complex_init() {
         // Test with a more complex initialization expression
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "setup_handlers".to_string(),
-            line: 5,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "setup_handlers".to_string(),
+            5,
+        ));
 
         let pat: Pat = parse_quote! { handler };
         // Using a closure expression
@@ -1168,11 +1156,11 @@ mod tests {
     fn test_analyze_function_pointer_assignment_edge_cases() {
         // Test various edge cases
         let mut visitor = FunctionPointerVisitor::new(std::path::PathBuf::from("test.rs"));
-        visitor.current_function = Some(FunctionId {
-            file: std::path::PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        });
+        visitor.current_function = Some(FunctionId::new(
+            std::path::PathBuf::from("test.rs"),
+            "test_func".to_string(),
+            1,
+        ));
 
         // Edge case 1: Pattern with type annotation
         let pat: Pat = parse_quote! { func_ptr };

@@ -874,11 +874,11 @@ fn extract_dependencies_count(
 ) -> usize {
     data_flow
         .and_then(|df| {
-            let func_id = crate::priority::call_graph::FunctionId {
-                file: func.file.clone(),
-                name: func.name.clone(),
-                line: func.line,
-            };
+            let func_id = crate::priority::call_graph::FunctionId::new(
+                func.file.clone(),
+                func.name.clone(),
+                func.line,
+            );
             df.get_variable_dependencies(&func_id).map(|d| d.len())
         })
         .unwrap_or(0)
@@ -1490,11 +1490,7 @@ mod tests {
     fn test_generate_usage_hints_basic() {
         let func = create_test_function("unused_func", None);
         let call_graph = CallGraph::new();
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "unused_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "unused_func".to_string(), 10);
 
         let hints = generate_usage_hints(&func, &call_graph, &func_id);
 

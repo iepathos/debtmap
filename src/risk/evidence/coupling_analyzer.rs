@@ -33,11 +33,11 @@ impl CouplingRiskAnalyzer {
         context: &RiskContext,
         call_graph: &CallGraph,
     ) -> RiskFactor {
-        let func_id = crate::priority::call_graph::FunctionId {
-            file: function.file.clone(),
-            name: function.function.clone(),
-            line: function.line,
-        };
+        let func_id = crate::priority::call_graph::FunctionId::new(
+            function.file.clone(),
+            function.function.clone(),
+            function.line,
+        );
 
         let afferent_coupling = call_graph.get_callers(&func_id).len() as u32;
         let efferent_coupling = call_graph.get_callees(&func_id).len() as u32;

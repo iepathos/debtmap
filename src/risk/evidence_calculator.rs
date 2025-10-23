@@ -74,11 +74,11 @@ impl EvidenceBasedRiskCalculator {
         function: &FunctionAnalysis,
         call_graph: &CallGraph,
     ) -> FunctionRole {
-        let func_id = crate::priority::call_graph::FunctionId {
-            file: function.file.clone(),
-            name: function.function.clone(),
-            line: function.line,
-        };
+        let func_id = crate::priority::call_graph::FunctionId::new(
+            function.file.clone(),
+            function.function.clone(),
+            function.line,
+        );
 
         let func_metrics = crate::core::FunctionMetrics {
             file: function.file.clone(),

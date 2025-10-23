@@ -189,11 +189,7 @@ fn test_method_resolution_order() {
     let mut resolver = TraitResolver::new(Arc::new(tracker.clone()));
 
     // Register an inherent method
-    let func_id = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "MyType::method".to_string(),
-        line: 10,
-    };
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "MyType::method".to_string(), 10);
     resolver.register_inherent_method("MyType".to_string(), "method".to_string(), func_id);
 
     // Test that inherent methods have highest priority
@@ -273,11 +269,7 @@ fn test_trait_method_confidence_scoring() {
     let tracker = Arc::new(TraitImplementationTracker::new());
     let mut resolver = TraitResolver::new(tracker);
 
-    let func_id = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "Type::method".to_string(),
-        line: 5,
-    };
+    let func_id = FunctionId::new(PathBuf::from("test.rs"), "Type::method".to_string(), 5);
     resolver.register_inherent_method("Type".to_string(), "method".to_string(), func_id);
 
     let traits_in_scope = HashSet::new();

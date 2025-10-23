@@ -218,11 +218,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_test_function_id() -> FunctionId {
-        FunctionId {
-            file: PathBuf::from("test.py"),
-            name: "Subject.notify".to_string(),
-            line: 10,
-        }
+        FunctionId::new(PathBuf::from("test.py"), "Subject.notify".to_string(), 10)
     }
 
     #[test]

@@ -22,27 +22,27 @@ fn test_method_vs_standalone_function_disambiguation() {
     let mut call_graph = CallGraph::new();
 
     // Scenario 1: Standalone function `analyze_imports` in module A
-    let standalone_analyze_imports = FunctionId {
-        file: PathBuf::from("src/analysis/python_call_graph/analyze.rs"),
-        name: "analyze_imports".to_string(),
-        line: 62,
-    };
+    let standalone_analyze_imports = FunctionId::new(
+        PathBuf::from("src/analysis/python_call_graph/analyze.rs"),
+        "analyze_imports".to_string(),
+        62,
+    );
     call_graph.add_function(standalone_analyze_imports.clone(), false, false, 2, 30);
 
     // Scenario 2: Method `analyze_imports` on `EnhancedImportResolver` in module B
-    let method_analyze_imports = FunctionId {
-        file: PathBuf::from("src/analysis/python_imports.rs"),
-        name: "EnhancedImportResolver::analyze_imports".to_string(), // Should be qualified!
-        line: 371,
-    };
+    let method_analyze_imports = FunctionId::new(
+        PathBuf::from("src/analysis/python_imports.rs"),
+        "EnhancedImportResolver::analyze_imports".to_string(),
+        371,
+    );
     call_graph.add_function(method_analyze_imports.clone(), false, false, 5, 50);
 
     // Scenario 3: Test function that calls the METHOD
-    let test_function = FunctionId {
-        file: PathBuf::from("src/analysis/python_imports.rs"),
-        name: "test_dynamic_import_in_conditionals".to_string(),
-        line: 985,
-    };
+    let test_function = FunctionId::new(
+        PathBuf::from("src/analysis/python_imports.rs"),
+        "test_dynamic_import_in_conditionals".to_string(),
+        985,
+    );
     call_graph.add_function(test_function.clone(), false, true, 1, 20);
 
     // Test calls resolver.analyze_imports() - this is a METHOD CALL
@@ -84,35 +84,28 @@ fn test_multiple_methods_same_name_different_types() {
 
     // Three different `process` functions:
     // 1. Standalone function
-    let standalone_process = FunctionId {
-        file: PathBuf::from("src/utils.rs"),
-        name: "process".to_string(),
-        line: 10,
-    };
+    let standalone_process =
+        FunctionId::new(PathBuf::from("src/utils.rs"), "process".to_string(), 10);
     call_graph.add_function(standalone_process.clone(), false, false, 2, 20);
 
     // 2. Method on TypeA
-    let type_a_process = FunctionId {
-        file: PathBuf::from("src/type_a.rs"),
-        name: "TypeA::process".to_string(),
-        line: 50,
-    };
+    let type_a_process = FunctionId::new(
+        PathBuf::from("src/type_a.rs"),
+        "TypeA::process".to_string(),
+        50,
+    );
     call_graph.add_function(type_a_process.clone(), false, false, 3, 30);
 
     // 3. Method on TypeB
-    let type_b_process = FunctionId {
-        file: PathBuf::from("src/type_b.rs"),
-        name: "TypeB::process".to_string(),
-        line: 75,
-    };
+    let type_b_process = FunctionId::new(
+        PathBuf::from("src/type_b.rs"),
+        "TypeB::process".to_string(),
+        75,
+    );
     call_graph.add_function(type_b_process.clone(), false, false, 4, 40);
 
     // Caller that uses TypeA::process
-    let caller = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "main".to_string(),
-        line: 5,
-    };
+    let caller = FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 5);
     call_graph.add_function(caller.clone(), true, false, 1, 10);
 
     // Main calls type_a.process()
@@ -147,26 +140,22 @@ fn test_unqualified_method_name_causes_ambiguity() {
     let mut call_graph = CallGraph::new();
 
     // Two methods with the SAME UNQUALIFIED NAME (this is the bug!)
-    let method1 = FunctionId {
-        file: PathBuf::from("src/type_a.rs"),
-        name: "analyze_imports".to_string(), // BUG: Not qualified!
-        line: 50,
-    };
+    let method1 = FunctionId::new(
+        PathBuf::from("src/type_a.rs"),
+        "analyze_imports".to_string(),
+        50,
+    );
     call_graph.add_function(method1.clone(), false, false, 3, 30);
 
-    let method2 = FunctionId {
-        file: PathBuf::from("src/type_b.rs"),
-        name: "analyze_imports".to_string(), // BUG: Not qualified!
-        line: 75,
-    };
+    let method2 = FunctionId::new(
+        PathBuf::from("src/type_b.rs"),
+        "analyze_imports".to_string(),
+        75,
+    );
     call_graph.add_function(method2.clone(), false, false, 4, 40);
 
     // Caller
-    let caller = FunctionId {
-        file: PathBuf::from("src/main.rs"),
-        name: "main".to_string(),
-        line: 5,
-    };
+    let caller = FunctionId::new(PathBuf::from("src/main.rs"), "main".to_string(), 5);
     call_graph.add_function(caller.clone(), true, false, 1, 10);
 
     // Main calls method1 specifically
@@ -206,35 +195,31 @@ fn test_trait_method_vs_free_function_disambiguation() {
     let mut call_graph = CallGraph::new();
 
     // Free function `parse`
-    let free_parse = FunctionId {
-        file: PathBuf::from("src/parser.rs"),
-        name: "parse".to_string(),
-        line: 10,
-    };
+    let free_parse = FunctionId::new(PathBuf::from("src/parser.rs"), "parse".to_string(), 10);
     call_graph.add_function(free_parse.clone(), false, false, 5, 50);
 
     // Trait method `Parser::parse`
-    let trait_parse = FunctionId {
-        file: PathBuf::from("src/parser_trait.rs"),
-        name: "Parser::parse".to_string(),
-        line: 25,
-    };
+    let trait_parse = FunctionId::new(
+        PathBuf::from("src/parser_trait.rs"),
+        "Parser::parse".to_string(),
+        25,
+    );
     call_graph.add_function(trait_parse.clone(), false, false, 3, 30);
 
     // Impl method `JsonParser::parse`
-    let impl_parse = FunctionId {
-        file: PathBuf::from("src/json_parser.rs"),
-        name: "JsonParser::parse".to_string(),
-        line: 40,
-    };
+    let impl_parse = FunctionId::new(
+        PathBuf::from("src/json_parser.rs"),
+        "JsonParser::parse".to_string(),
+        40,
+    );
     call_graph.add_function(impl_parse.clone(), false, false, 8, 80);
 
     // Test that calls impl method
-    let test = FunctionId {
-        file: PathBuf::from("tests/parser_test.rs"),
-        name: "test_json_parsing".to_string(),
-        line: 5,
-    };
+    let test = FunctionId::new(
+        PathBuf::from("tests/parser_test.rs"),
+        "test_json_parsing".to_string(),
+        5,
+    );
     call_graph.add_function(test.clone(), false, true, 1, 10);
 
     call_graph.add_call(FunctionCall {
@@ -264,27 +249,27 @@ fn test_coverage_matching_requires_qualified_names() {
     let mut call_graph = CallGraph::new();
 
     // File A: standalone function (UNCOVERED in tests)
-    let uncovered_function = FunctionId {
-        file: PathBuf::from("src/module_a.rs"),
-        name: "analyze_imports".to_string(),
-        line: 62,
-    };
+    let uncovered_function = FunctionId::new(
+        PathBuf::from("src/module_a.rs"),
+        "analyze_imports".to_string(),
+        62,
+    );
     call_graph.add_function(uncovered_function.clone(), false, false, 2, 30);
 
     // File B: method (COVERED in tests)
-    let covered_method = FunctionId {
-        file: PathBuf::from("src/module_b.rs"),
-        name: "Resolver::analyze_imports".to_string(), // Qualified name helps!
-        line: 371,
-    };
+    let covered_method = FunctionId::new(
+        PathBuf::from("src/module_b.rs"),
+        "Resolver::analyze_imports".to_string(),
+        371,
+    );
     call_graph.add_function(covered_method.clone(), false, false, 5, 50);
 
     // Test function
-    let test = FunctionId {
-        file: PathBuf::from("tests/test.rs"),
-        name: "test_imports".to_string(),
-        line: 10,
-    };
+    let test = FunctionId::new(
+        PathBuf::from("tests/test.rs"),
+        "test_imports".to_string(),
+        10,
+    );
     call_graph.add_function(test.clone(), false, true, 1, 20);
 
     // Test calls the METHOD (covered)
@@ -331,19 +316,19 @@ fn test_lcov_function_name_matching() {
     let mut call_graph = CallGraph::new();
 
     // Standalone function (LCOV: "FN:62,analyze_imports")
-    let standalone = FunctionId {
-        file: PathBuf::from("src/module_a.rs"),
-        name: "analyze_imports".to_string(), // Matches LCOV name
-        line: 62,
-    };
+    let standalone = FunctionId::new(
+        PathBuf::from("src/module_a.rs"),
+        "analyze_imports".to_string(),
+        62,
+    );
     call_graph.add_function(standalone.clone(), false, false, 2, 30);
 
     // Method on struct (LCOV: "FN:371,EnhancedImportResolver::analyze_imports")
-    let method = FunctionId {
-        file: PathBuf::from("src/module_b.rs"),
-        name: "EnhancedImportResolver::analyze_imports".to_string(), // Matches LCOV name
-        line: 371,
-    };
+    let method = FunctionId::new(
+        PathBuf::from("src/module_b.rs"),
+        "EnhancedImportResolver::analyze_imports".to_string(),
+        371,
+    );
     call_graph.add_function(method.clone(), false, false, 5, 50);
 
     // Mock coverage data (simulating parsed LCOV):
@@ -380,30 +365,24 @@ fn test_call_graph_uses_qualified_names_for_methods() {
     // ```
     // It should create a FunctionId with name="MyStruct::process", NOT name="process"
 
-    let correct_method_name = FunctionId {
-        file: PathBuf::from("src/types.rs"),
-        name: "MyStruct::process".to_string(), // Correct: qualified
-        line: 50,
-    };
+    let correct_method_name = FunctionId::new(
+        PathBuf::from("src/types.rs"),
+        "MyStruct::process".to_string(),
+        50,
+    );
     call_graph.add_function(correct_method_name.clone(), false, false, 3, 30);
 
     // BAD: Unqualified method name
-    let _incorrect_method_name = FunctionId {
-        file: PathBuf::from("src/types.rs"),
-        name: "process".to_string(), // Wrong: not qualified
-        line: 50,
-    };
+    let _incorrect_method_name =
+        FunctionId::new(PathBuf::from("src/types.rs"), "process".to_string(), 50);
 
     // These should be different FunctionIds (even though same file/line)
     // Actually, they are the same because FunctionId uses (file, name, line) as key
     // and the line is the same... This is interesting!
 
     // The real test: a method and standalone function with same simple name
-    let standalone_process = FunctionId {
-        file: PathBuf::from("src/utils.rs"),
-        name: "process".to_string(),
-        line: 10,
-    };
+    let standalone_process =
+        FunctionId::new(PathBuf::from("src/utils.rs"), "process".to_string(), 10);
     call_graph.add_function(standalone_process.clone(), false, false, 2, 20);
 
     // Verify: the method name includes the type
@@ -429,27 +408,27 @@ fn test_bug_reproduction_unqualified_method_causes_false_match() {
     // - Call graph incorrectly reports standalone function as called
 
     // Standalone function (correctly has no callers)
-    let standalone = FunctionId {
-        file: PathBuf::from("src/analysis/python_call_graph/analyze.rs"),
-        name: "analyze_imports".to_string(),
-        line: 62,
-    };
+    let standalone = FunctionId::new(
+        PathBuf::from("src/analysis/python_call_graph/analyze.rs"),
+        "analyze_imports".to_string(),
+        62,
+    );
     call_graph.add_function(standalone.clone(), false, false, 2, 30);
 
     // Method (correctly qualified)
-    let method = FunctionId {
-        file: PathBuf::from("src/analysis/python_imports.rs"),
-        name: "EnhancedImportResolver::analyze_imports".to_string(),
-        line: 371,
-    };
+    let method = FunctionId::new(
+        PathBuf::from("src/analysis/python_imports.rs"),
+        "EnhancedImportResolver::analyze_imports".to_string(),
+        371,
+    );
     call_graph.add_function(method.clone(), false, false, 5, 50);
 
     // Test function
-    let test = FunctionId {
-        file: PathBuf::from("src/analysis/python_imports.rs"),
-        name: "test_dynamic_import_in_conditionals".to_string(),
-        line: 985,
-    };
+    let test = FunctionId::new(
+        PathBuf::from("src/analysis/python_imports.rs"),
+        "test_dynamic_import_in_conditionals".to_string(),
+        985,
+    );
     call_graph.add_function(test.clone(), false, true, 1, 20);
 
     // Test calls the METHOD (not the standalone function)

@@ -383,11 +383,11 @@ impl TraitVisitor {
                 let method_name = method.sig.ident.to_string();
                 let line = self.get_line_number(method.sig.ident.span());
 
-                let method_id = FunctionId {
-                    file: self.file_path.clone(),
-                    name: format!("{implementing_type}::{method_name}"),
+                let method_id = FunctionId::new(
+                    self.file_path.clone(),
+                    format!("{implementing_type}::{method_name}"),
                     line,
-                };
+                );
 
                 let implementation = TraitMethodImplementation {
                     method_name,
@@ -443,11 +443,11 @@ impl<'ast> Visit<'ast> for TraitVisitor {
                 let method_name = method.sig.ident.to_string();
                 let line = self.get_line_number(method.sig.ident.span());
 
-                let method_id = FunctionId {
-                    file: self.file_path.clone(),
-                    name: format!("{trait_name}::{method_name}"),
+                let method_id = FunctionId::new(
+                    self.file_path.clone(),
+                    format!("{trait_name}::{method_name}"),
                     line,
-                };
+                );
 
                 let trait_method = TraitMethod {
                     trait_name: trait_name.clone(),
@@ -508,11 +508,7 @@ impl<'ast> Visit<'ast> for TraitVisitor {
         let func_name = item.sig.ident.to_string();
         let line = self.get_line_number(item.sig.ident.span());
 
-        self.current_function = Some(FunctionId {
-            file: self.file_path.clone(),
-            name: func_name,
-            line,
-        });
+        self.current_function = Some(FunctionId::new(self.file_path.clone(), func_name, line));
 
         // Continue visiting the function body
         syn::visit::visit_item_fn(self, item);

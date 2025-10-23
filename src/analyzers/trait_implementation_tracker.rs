@@ -407,11 +407,11 @@ impl TraitExtractor {
 
                 let method_impl = MethodImpl {
                     name: method_name.clone(),
-                    function_id: FunctionId {
-                        file: self.file_path.clone(),
-                        name: format!("{}::{}", implementing_type, method_name),
+                    function_id: FunctionId::new(
+                        self.file_path.clone(),
+                        format!("{}::{}", implementing_type, method_name),
                         line,
-                    },
+                    ),
                     overrides_default: false, // Would need trait definition to determine
                 };
 

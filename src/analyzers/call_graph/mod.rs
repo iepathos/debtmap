@@ -1,5 +1,6 @@
 pub mod call_resolution;
 pub mod graph_builder;
+pub mod import_map;
 /// Call graph extraction module providing two-pass resolution for accurate call tracking
 ///
 /// This module is organized into focused submodules:
@@ -7,13 +8,21 @@ pub mod graph_builder;
 /// - `call_resolution`: Resolves function calls to their definitions
 /// - `graph_builder`: Builds and manages the call graph structure
 /// - `trait_handling`: Handles trait resolution and method dispatch
+/// - `import_map`: Tracks imports and re-exports for resolution
+/// - `module_tree`: Maintains module hierarchy for path resolution
+/// - `path_resolver`: Combines imports and hierarchy for full resolution
 pub mod macro_expansion;
+pub mod module_tree;
+pub mod path_resolver;
 pub mod trait_handling;
 
 // Re-export main types for backward compatibility
 pub use call_resolution::{CallResolver, UnresolvedCall};
 pub use graph_builder::{ExprCategory, GraphBuilder};
+pub use import_map::ImportMap;
 pub use macro_expansion::{MacroExpander, MacroExpansionStats, MacroHandlingConfig};
+pub use module_tree::ModuleTree;
+pub use path_resolver::{PathResolver, PathResolverBuilder};
 pub use trait_handling::TraitHandler;
 
 use crate::analyzers::function_registry::FunctionSignatureRegistry;

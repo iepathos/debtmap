@@ -10,6 +10,18 @@ pub struct FunctionId {
     pub end_line: usize,
 }
 
+impl FunctionId {
+    /// Create a new FunctionId for debt aggregation
+    pub fn new(file: PathBuf, name: String, start_line: usize) -> Self {
+        Self {
+            file,
+            name,
+            start_line,
+            end_line: start_line, // Initialize end_line to start_line
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FunctionDebtProfile {
     pub function_id: FunctionId,

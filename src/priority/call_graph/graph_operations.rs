@@ -135,16 +135,12 @@ impl CallGraph {
     /// Add an edge between two functions by name (used by critical path analyzer)
     pub fn add_edge_by_name(&mut self, from: String, to: String, file: PathBuf) {
         // Create simplified FunctionIds for string-based access
-        let from_id = FunctionId {
-            file: file.clone(),
-            name: from,
-            line: 0, // Use 0 for string-based lookups
-        };
-        let to_id = FunctionId {
-            file: file.clone(),
-            name: to,
-            line: 0,
-        };
+        let from_id = FunctionId::new(
+            file.clone(),
+            from,
+            0, // Use 0 for string-based lookups
+        );
+        let to_id = FunctionId::new(file.clone(), to, 0);
 
         // Ensure both nodes exist
         if !self.nodes.contains_key(&from_id) {

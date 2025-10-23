@@ -17,11 +17,7 @@ fn test_orchestrator_receives_reduction() {
     // Build call graph for an orchestrator
     let mut call_graph = CallGraph::new();
 
-    let orchestrator = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: "coordinate_tasks".to_string(),
-        line: 1,
-    };
+    let orchestrator = FunctionId::new(PathBuf::from("test.rs"), "coordinate_tasks".to_string(), 1);
 
     call_graph.add_function(orchestrator.clone(), false, false, 2, 15);
 
@@ -81,11 +77,7 @@ fn test_non_orchestrator_no_adjustment() {
     let call_graph = CallGraph::new();
 
     let func = create_test_func("calculate_risk", 8, 12, 30);
-    let func_id = FunctionId {
-        file: func.file.clone(),
-        name: func.name.clone(),
-        line: func.line,
-    };
+    let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Classify role
     let role = classify_function_role(&func, &func_id, &call_graph);
@@ -116,11 +108,7 @@ fn test_quality_affects_reduction() {
 
     // High quality orchestrator (many callees, high delegation, low complexity)
     let high_quality = extract_composition_metrics(
-        &FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "high_quality".to_string(),
-            line: 1,
-        },
+        &FunctionId::new(PathBuf::from("test.rs"), "high_quality".to_string(), 1),
         &create_test_func("high_quality", 2, 3, 20),
         &create_test_call_graph(8, "high_quality", 1), // 8 callees in 20 lines = 40% delegation
     );
@@ -129,11 +117,7 @@ fn test_quality_affects_reduction() {
 
     // Low quality orchestrator (few callees, low delegation, high complexity)
     let low_quality = extract_composition_metrics(
-        &FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "low_quality".to_string(),
-            line: 50,
-        },
+        &FunctionId::new(PathBuf::from("test.rs"), "low_quality".to_string(), 50),
         &create_test_func("low_quality", 8, 10, 40),
         &create_test_call_graph(2, "low_quality", 50), // 2 callees in 40 lines = 5% delegation
     );
@@ -156,11 +140,7 @@ fn test_minimum_complexity_floor() {
 
     // Many callees (10) should have minimum floor of 20 (10 × 2.0)
     let metrics = extract_composition_metrics(
-        &FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "many_callees".to_string(),
-            line: 1,
-        },
+        &FunctionId::new(PathBuf::from("test.rs"), "many_callees".to_string(), 1),
         &create_test_func("many_callees", 2, 3, 20),
         &create_test_call_graph(10, "many_callees", 1),
     );
@@ -185,11 +165,7 @@ fn test_disabled_adjustment() {
     };
 
     let metrics = extract_composition_metrics(
-        &FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "orchestrator".to_string(),
-            line: 1,
-        },
+        &FunctionId::new(PathBuf::from("test.rs"), "orchestrator".to_string(), 1),
         &create_test_func("orchestrator", 2, 3, 15),
         &create_test_call_graph(5, "orchestrator", 1),
     );
@@ -235,11 +211,7 @@ fn create_test_func(
 fn create_test_call_graph(callee_count: usize, func_name: &str, func_line: usize) -> CallGraph {
     let mut graph = CallGraph::new();
 
-    let orchestrator = FunctionId {
-        file: PathBuf::from("test.rs"),
-        name: func_name.to_string(),
-        line: func_line,
-    };
+    let orchestrator = FunctionId::new(PathBuf::from("test.rs"), func_name.to_string(), func_line);
 
     graph.add_function(orchestrator.clone(), false, false, 2, 20);
 

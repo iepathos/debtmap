@@ -693,12 +693,7 @@ pub fn create_unified_analysis_with_exclusions(
         let function_mappings: Vec<(AggregatorFunctionId, usize, usize)> = metrics
             .iter()
             .map(|m| {
-                let func_id = AggregatorFunctionId {
-                    file: m.file.clone(),
-                    name: m.name.clone(),
-                    start_line: m.line,
-                    end_line: m.line + m.length,
-                };
+                let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line);
                 (func_id, m.line, m.line + m.length)
             })
             .collect();
@@ -868,11 +863,11 @@ fn should_skip_metric_for_debt_analysis(
         return true;
     }
 
-    let func_id = priority::call_graph::FunctionId {
-        file: metric.file.clone(),
-        name: metric.name.clone(),
-        line: metric.line,
-    };
+    let func_id = priority::call_graph::FunctionId::new(
+        metric.file.clone(),
+        metric.name.clone(),
+        metric.line,
+    );
 
     if test_only_functions.contains(&func_id) {
         return true;

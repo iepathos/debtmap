@@ -27,12 +27,7 @@ mod transformations {
         metrics
             .iter()
             .map(|m| {
-                let func_id = AggregatorFunctionId {
-                    file: m.file.clone(),
-                    name: m.name.clone(),
-                    start_line: m.line,
-                    end_line: m.line + m.length,
-                };
+                let func_id = AggregatorFunctionId::new(m.file.clone(), m.name.clone(), m.line);
                 (func_id, m.line, m.line + m.length)
             })
             .collect()
@@ -82,11 +77,7 @@ mod predicates {
             return false;
         }
 
-        let func_id = FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
+        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
 
         // Skip if in test-only functions set
         if test_only_functions.contains(&func_id) {
@@ -669,11 +660,7 @@ impl ParallelUnifiedAnalysisBuilder {
         context: &FunctionAnalysisContext,
     ) -> Option<UnifiedDebtItem> {
         // Get callee count for triviality check
-        let func_id = FunctionId {
-            file: metric.file.clone(),
-            name: metric.name.clone(),
-            line: metric.line,
-        };
+        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
         let callee_count = self.call_graph.get_callees(&func_id).len();
 
         // Apply filtering predicates

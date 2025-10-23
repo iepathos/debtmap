@@ -62,11 +62,11 @@
 //! let call_graph = CallGraph::new();
 //! let coverage = LcovData::default();
 //!
-//! let func_id = FunctionId {
-//!     file: PathBuf::from("src/lib.rs"),
-//!     name: "my_function".to_string(),
-//!     line: 42,
-//! };
+//! let func_id = FunctionId::new(
+//!     PathBuf::from("src/lib.rs"),
+//!     "my_function".to_string(),
+//!     42,
+//! );
 //!
 //! let complete = calculate_indirect_coverage(&func_id, &call_graph, &coverage);
 //! println!("Direct: {:.1}%, Indirect: {:.1}%, Effective: {:.1}%",
@@ -437,11 +437,7 @@ mod tests {
         let coverage = create_test_coverage();
         let graph = CallGraph::new();
 
-        let func_id = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "test_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "test_func".to_string(), 10);
 
         let transitive = calculate_transitive_coverage(&func_id, &graph, &coverage);
         assert!(transitive.direct > 0.0);
@@ -454,17 +450,9 @@ mod tests {
         let coverage = create_test_coverage();
         let mut graph = CallGraph::new();
 
-        let orchestrator = FunctionId {
-            file: PathBuf::from("orch.rs"),
-            name: "orchestrate".to_string(),
-            line: 1,
-        };
+        let orchestrator = FunctionId::new(PathBuf::from("orch.rs"), "orchestrate".to_string(), 1);
 
-        let worker = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "worker".to_string(),
-            line: 10,
-        };
+        let worker = FunctionId::new(PathBuf::from("test.rs"), "worker".to_string(), 10);
 
         graph.add_function(orchestrator.clone(), false, false, 2, 10);
         graph.add_function(worker.clone(), false, false, 5, 30);
@@ -485,11 +473,7 @@ mod tests {
         let coverage = create_test_coverage();
         let graph = CallGraph::new();
 
-        let func_id = FunctionId {
-            file: PathBuf::from("uncovered.rs"),
-            name: "complex_func".to_string(),
-            line: 1,
-        };
+        let func_id = FunctionId::new(PathBuf::from("uncovered.rs"), "complex_func".to_string(), 1);
 
         // High complexity, no coverage = high urgency
         let urgency = calculate_coverage_urgency(&func_id, &graph, &coverage, 10);
@@ -506,11 +490,11 @@ mod tests {
         let graph = CallGraph::new();
 
         // Create a function with varying coverage levels
-        let func_id = FunctionId {
-            file: PathBuf::from("gradient_test.rs"),
-            name: "test_func".to_string(),
-            line: 10,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("gradient_test.rs"),
+            "test_func".to_string(),
+            10,
+        );
 
         // Test with average complexity (10)
         let complexity = 10;
@@ -657,16 +641,8 @@ mod tests {
         let mut coverage = LcovData::default();
 
         // Setup: F called by C (C has 90% coverage)
-        let func_f = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "f".to_string(),
-            line: 10,
-        };
-        let caller_c = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "c".to_string(),
-            line: 50,
-        };
+        let func_f = FunctionId::new(PathBuf::from("test.rs"), "f".to_string(), 10);
+        let caller_c = FunctionId::new(PathBuf::from("test.rs"), "c".to_string(), 50);
 
         call_graph.add_function(func_f.clone(), false, false, 5, 20);
         call_graph.add_function(caller_c.clone(), false, false, 8, 40);
@@ -707,21 +683,9 @@ mod tests {
         let mut coverage = LcovData::default();
 
         // Setup: F ← C1 ← C2 (C2 has 95% coverage)
-        let func_f = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "f".to_string(),
-            line: 10,
-        };
-        let caller_c1 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "c1".to_string(),
-            line: 50,
-        };
-        let caller_c2 = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "c2".to_string(),
-            line: 80,
-        };
+        let func_f = FunctionId::new(PathBuf::from("test.rs"), "f".to_string(), 10);
+        let caller_c1 = FunctionId::new(PathBuf::from("test.rs"), "c1".to_string(), 50);
+        let caller_c2 = FunctionId::new(PathBuf::from("test.rs"), "c2".to_string(), 80);
 
         call_graph.add_function(func_f.clone(), false, false, 5, 20);
         call_graph.add_function(caller_c1.clone(), false, false, 8, 40);
@@ -775,11 +739,7 @@ mod tests {
 
         let func_ids: Vec<FunctionId> = functions
             .iter()
-            .map(|(name, line)| FunctionId {
-                file: PathBuf::from("test.rs"),
-                name: name.to_string(),
-                line: *line,
-            })
+            .map(|(name, line)| FunctionId::new(PathBuf::from("test.rs"), name.to_string(), *line))
             .collect();
 
         // Add all functions
@@ -823,11 +783,7 @@ mod tests {
         let call_graph = CallGraph::new();
         let mut coverage = LcovData::default();
 
-        let func_f = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "f".to_string(),
-            line: 10,
-        };
+        let func_f = FunctionId::new(PathBuf::from("test.rs"), "f".to_string(), 10);
 
         // F already has 85% direct coverage
         let funcs = vec![FunctionCoverage {
@@ -855,11 +811,7 @@ mod tests {
         let call_graph = CallGraph::new();
         let coverage = LcovData::default();
 
-        let func_f = FunctionId {
-            file: PathBuf::from("test.rs"),
-            name: "orphan".to_string(),
-            line: 10,
-        };
+        let func_f = FunctionId::new(PathBuf::from("test.rs"), "orphan".to_string(), 10);
 
         let complete_coverage = calculate_indirect_coverage(&func_f, &call_graph, &coverage);
 
@@ -873,11 +825,11 @@ mod tests {
         let coverage = LcovData::default(); // No coverage
         let graph = CallGraph::new();
 
-        let func_id = FunctionId {
-            file: PathBuf::from("complexity_test.rs"),
-            name: "test_func".to_string(),
-            line: 1,
-        };
+        let func_id = FunctionId::new(
+            PathBuf::from("complexity_test.rs"),
+            "test_func".to_string(),
+            1,
+        );
 
         // Test complexity scaling with 0% coverage
 

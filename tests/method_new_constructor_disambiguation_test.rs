@@ -56,25 +56,17 @@ mod tests {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Find the standalone function
-    let standalone_id = FunctionId {
-        file: path.clone(),
-        name: "analyze_imports".to_string(),
-        line: 3, // Line where standalone function is defined
-    };
+    let standalone_id = FunctionId::new(path.clone(), "analyze_imports".to_string(), 3);
 
     // Find the method
-    let method_id = FunctionId {
-        file: path.clone(),
-        name: "EnhancedImportResolver::analyze_imports".to_string(),
-        line: 17, // Line where method is defined
-    };
+    let method_id = FunctionId::new(
+        path.clone(),
+        "EnhancedImportResolver::analyze_imports".to_string(),
+        17,
+    );
 
     // Find the test
-    let test_id = FunctionId {
-        file: path.clone(),
-        name: "tests::test_direct_import".to_string(),
-        line: 27,
-    };
+    let test_id = FunctionId::new(path.clone(), "tests::test_direct_import".to_string(), 27);
 
     println!("\n=== All functions found ===");
     for func in call_graph.find_all_functions() {
@@ -175,17 +167,9 @@ fn use_builder() {
     let path = PathBuf::from("builder.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
-    let standalone = FunctionId {
-        file: path.clone(),
-        name: "build".to_string(),
-        line: 2,
-    };
+    let standalone = FunctionId::new(path.clone(), "build".to_string(), 2);
 
-    let method = FunctionId {
-        file: path.clone(),
-        name: "Builder::build".to_string(),
-        line: 15,
-    };
+    let method = FunctionId::new(path.clone(), "Builder::build".to_string(), 15);
 
     println!("\n=== Builder pattern test ===");
     for func in call_graph.find_all_functions() {

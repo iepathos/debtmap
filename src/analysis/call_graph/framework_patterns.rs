@@ -283,11 +283,7 @@ impl PatternVisitor {
         let func_name = func.sig.ident.to_string();
         let line = self.get_line_number(func.sig.ident.span());
 
-        let func_id = FunctionId {
-            file: self.file_path.clone(),
-            name: func_name.clone(),
-            line,
-        };
+        let func_id = FunctionId::new(self.file_path.clone(), func_name.clone(), line);
 
         // Check for visitor pattern methods by name
         if FrameworkPatternDetector::is_visitor_pattern_method(&func_name) {
@@ -624,11 +620,7 @@ impl<'ast> Visit<'ast> for PatternVisitor {
                 let method_name = method.sig.ident.to_string();
                 let line = self.get_line_number(method.sig.ident.span());
 
-                let func_id = FunctionId {
-                    file: self.file_path.clone(),
-                    name: method_name.clone(),
-                    line,
-                };
+                let func_id = FunctionId::new(self.file_path.clone(), method_name.clone(), line);
 
                 // Check if this is a visitor pattern method
                 if FrameworkPatternDetector::is_visitor_pattern_method(&method_name) {
@@ -668,11 +660,7 @@ mod tests {
     }
 
     fn create_function_id() -> FunctionId {
-        FunctionId {
-            name: "test_func".to_string(),
-            file: PathBuf::from("test.rs"),
-            line: 1,
-        }
+        FunctionId::new(PathBuf::from("test.rs"), "test_func".to_string(), 1)
     }
 
     #[test]
