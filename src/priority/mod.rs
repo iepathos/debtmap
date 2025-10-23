@@ -473,19 +473,21 @@ impl UnifiedAnalysis {
             }
         }
 
-        // For non-test items, also check complexity thresholds
-        // This helps filter out trivial functions that aren't really debt
+        // Filter out trivial functions based on configured complexity thresholds.
+        // Test-related items are exempt as they have different complexity characteristics.
         if !matches!(
             item.debt_type,
             DebtType::TestComplexityHotspot { .. }
                 | DebtType::TestTodo { .. }
                 | DebtType::TestDuplication { .. }
-        ) && item.cyclomatic_complexity <= min_cyclomatic
-            && item.cognitive_complexity <= min_cognitive
-        {
-            // Skip trivial functions unless they have other significant issues
-            // (like being completely untested critical paths)
-            if item.unified_score.coverage_factor < 8.0 {
+        ) {
+            // Enforce cyclomatic complexity threshold
+            if item.cyclomatic_complexity < min_cyclomatic {
+                return;
+            }
+
+            // Enforce cognitive complexity threshold
+            if item.cognitive_complexity < min_cognitive {
                 return;
             }
         }
@@ -1288,6 +1290,279 @@ mod tests {
         // Check fields are initialized
         assert_eq!(analysis.debt_density, 0.0);
         assert_eq!(analysis.total_lines_of_code, 0);
+    }
+
+    // Helper function to create test items
+    fn create_test_item(
+        debt_type: DebtType,
+        cyclomatic: u32,
+        cognitive: u32,
+        score: f64,
+    ) -> UnifiedDebtItem {
+        use semantic_classifier::FunctionRole;
+
+        UnifiedDebtItem {
+            location: unified_scorer::Location {
+                file: "test.rs".into(),
+                function: "test_fn".into(),
+                line: 1,
+            },
+            debt_type,
+            unified_score: unified_scorer::UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 10.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: score,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".into(),
+                rationale: "Test".into(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                risk_reduction: 0.0,
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: cyclomatic,
+            cognitive_complexity: cognitive,
+            entropy_details: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.0),
+            god_object_indicators: None,
+            tier: None,
+        }
+    }
+
+    #[test]
+    fn test_filter_below_cyclomatic_threshold() {
+        // Set minimum cyclomatic complexity threshold to 3
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create item with cyclomatic=2 (below threshold of 3)
+        let item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 2,
+                cognitive: 10,
+            },
+            2,    // cyclomatic
+            10,   // cognitive
+            15.0, // score
+        );
+
+        analysis.add_item(item);
+
+        // Should be filtered (2 < 3)
+        assert_eq!(analysis.items.len(), 0);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_filter_below_cognitive_threshold() {
+        // Set minimum cognitive complexity threshold to 5
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "0");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create item with cognitive=4 (below threshold of 5)
+        let item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 10,
+                cognitive: 4,
+            },
+            10,   // cyclomatic
+            4,    // cognitive - below threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item);
+
+        // Should be filtered (4 < 5)
+        assert_eq!(analysis.items.len(), 0);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_keep_at_threshold() {
+        // Set thresholds
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create item with complexities exactly at thresholds
+        let item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 3,
+                cognitive: 5,
+            },
+            3,    // cyclomatic - at threshold
+            5,    // cognitive - at threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item);
+
+        // Should be kept (3 >= 3 and 5 >= 5)
+        assert_eq!(analysis.items.len(), 1);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_untested_trivial_function_filtered() {
+        // Set minimum cyclomatic complexity threshold to 3
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "0");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create trivial function with 0% coverage (high coverage_factor)
+        let item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 1,
+                cognitive: 0,
+            },
+            1,    // cyclomatic - trivial
+            0,    // cognitive - trivial
+            17.5, // high score due to coverage gap
+        );
+
+        analysis.add_item(item);
+
+        // Should be filtered despite 0% coverage and high score
+        // The bug was that this was NOT filtered
+        assert_eq!(analysis.items.len(), 0);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_test_items_exempt_from_filtering() {
+        // Set high thresholds
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "10");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "20");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create test-related item with low complexity
+        let item = create_test_item(
+            DebtType::TestComplexityHotspot {
+                cyclomatic: 1,
+                cognitive: 0,
+                threshold: 5,
+            },
+            1,    // cyclomatic - below threshold
+            0,    // cognitive - below threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item);
+
+        // Should NOT be filtered (test items exempt)
+        assert_eq!(analysis.items.len(), 1);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_both_thresholds_must_be_satisfied() {
+        // Set both thresholds
+        std::env::set_var("DEBTMAP_MIN_CYCLOMATIC", "3");
+        std::env::set_var("DEBTMAP_MIN_COGNITIVE", "5");
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create item that meets cyclomatic but not cognitive
+        let item1 = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 5,
+                cognitive: 3,
+            },
+            5,    // cyclomatic - above threshold
+            3,    // cognitive - below threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item1);
+        // Should be filtered (cognitive 3 < 5)
+        assert_eq!(analysis.items.len(), 0);
+
+        // Create item that meets cognitive but not cyclomatic
+        let item2 = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 2,
+                cognitive: 10,
+            },
+            2,    // cyclomatic - below threshold
+            10,   // cognitive - above threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item2);
+        // Should be filtered (cyclomatic 2 < 3)
+        assert_eq!(analysis.items.len(), 0);
+
+        // Create item that meets both thresholds
+        let item3 = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 3,
+                cognitive: 5,
+            },
+            3,    // cyclomatic - at threshold
+            5,    // cognitive - at threshold
+            15.0, // score
+        );
+
+        analysis.add_item(item3);
+        // Should be kept (both thresholds satisfied)
+        assert_eq!(analysis.items.len(), 1);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
+        std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
     }
 }
 
