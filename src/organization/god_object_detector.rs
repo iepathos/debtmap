@@ -87,7 +87,10 @@ impl GodObjectDetector {
                     responsibilities: responsibilities.keys().cloned().collect(),
                     line_span: (
                         type_analysis.location.line,
-                        type_analysis.location.end_line.unwrap_or(type_analysis.location.line),
+                        type_analysis
+                            .location
+                            .end_line
+                            .unwrap_or(type_analysis.location.line),
                     ),
                 }
             })
