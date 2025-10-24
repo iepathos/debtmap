@@ -64,6 +64,11 @@ pub struct AnalyzeConfig {
     pub patterns: Option<Vec<String>>,
     pub pattern_threshold: f32,
     pub show_pattern_warnings: bool,
+    pub debug_call_graph: bool,
+    pub trace_functions: Option<Vec<String>>,
+    pub call_graph_stats_only: bool,
+    pub debug_format: crate::cli::DebugFormatArg,
+    pub validate_call_graph: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
