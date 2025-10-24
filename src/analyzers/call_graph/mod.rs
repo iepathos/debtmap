@@ -42,6 +42,8 @@ pub struct CallGraphExtractor {
     current_impl_type: Option<String>,
     current_file: PathBuf,
     module_path: Vec<String>,
+    /// Module path string for this file (e.g., "builders::call_graph")
+    file_module_path: String,
     /// Type tracker for accurate method resolution
     type_tracker: TypeTracker,
     /// Global type registry (optional)
@@ -58,6 +60,7 @@ pub struct CallGraphExtractor {
 impl CallGraphExtractor {
     pub fn new(file: PathBuf) -> Self {
         let graph_builder = GraphBuilder::new(file.clone());
+        let file_module_path = ModuleTree::infer_module_from_file(&file);
 
         Self {
             call_graph: graph_builder.call_graph.clone(),
@@ -66,6 +69,7 @@ impl CallGraphExtractor {
             current_impl_type: None,
             current_file: file.clone(),
             module_path: Vec::new(),
+            file_module_path,
             type_tracker: TypeTracker::new(),
             type_registry: None,
             function_registry: None,
@@ -79,6 +83,7 @@ impl CallGraphExtractor {
         let mut tracker = TypeTracker::with_registry(registry.clone());
         tracker.set_current_file(file.clone());
         let graph_builder = GraphBuilder::new(file.clone());
+        let file_module_path = ModuleTree::infer_module_from_file(&file);
 
         Self {
             call_graph: graph_builder.call_graph.clone(),
@@ -87,6 +92,7 @@ impl CallGraphExtractor {
             current_impl_type: None,
             current_file: file,
             module_path: Vec::new(),
+            file_module_path,
             type_tracker: tracker,
             type_registry: Some(registry),
             function_registry: None,
@@ -271,15 +277,20 @@ impl CallGraphExtractor {
 
     /// Add a function to the graph
     fn add_function_to_graph(&mut self, name: String, line: usize, item_fn: &ItemFn) {
-        let function_id = self
-            .graph_builder
-            .add_function_from_item(name, line, item_fn);
+        let function_id = self.graph_builder.add_function_from_item(
+            name,
+            line,
+            item_fn,
+            self.file_module_path.clone(),
+        );
         self.current_function = Some(function_id);
     }
 
     /// Add an impl method to the graph
     fn add_impl_method_to_graph(&mut self, name: String, line: usize, impl_fn: &ImplItemFn) {
-        let function_id = self.graph_builder.add_impl_method(name, line, impl_fn);
+        let function_id =
+            self.graph_builder
+                .add_impl_method(name, line, impl_fn, self.file_module_path.clone());
         self.current_function = Some(function_id);
     }
 
