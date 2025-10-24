@@ -6,7 +6,6 @@
 ///
 /// This test should FAIL with current code, PASS when bug is fixed.
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
-use debtmap::priority::call_graph::FunctionId;
 use std::path::PathBuf;
 
 #[test]
@@ -47,19 +46,6 @@ pub fn test_import_analysis() {
     let path = PathBuf::from("test.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
-    // Find the standalone function
-    let standalone_id = FunctionId::new(path.clone(), "analyze_imports".to_string(), 3);
-
-    // Find the method
-    let method_id = FunctionId::new(
-        path.clone(),
-        "ImportResolver::analyze_imports".to_string(),
-        14,
-    );
-
-    // Find the test
-    let test_id = FunctionId::new(path.clone(), "test_import_analysis".to_string(), 20);
-
     // Verify functions exist in graph
     let all_functions = call_graph.find_all_functions();
     println!("All functions found:");
@@ -67,8 +53,26 @@ pub fn test_import_analysis() {
         println!("  - {} at line {}", func.name, func.line);
     }
 
+    // Find the standalone function (not the method)
+    let standalone_id = all_functions
+        .iter()
+        .find(|f| f.name == "analyze_imports" && !f.name.contains("::"))
+        .expect("Should find standalone analyze_imports function");
+
+    // Find the method
+    let method_id = all_functions
+        .iter()
+        .find(|f| f.name == "ImportResolver::analyze_imports")
+        .expect("Should find ImportResolver::analyze_imports method");
+
+    // Find the test
+    let test_id = all_functions
+        .iter()
+        .find(|f| f.name == "test_import_analysis")
+        .expect("Should find test_import_analysis function");
+
     // THE BUG: Standalone function incorrectly shows callers
-    let standalone_callers = call_graph.get_callers(&standalone_id);
+    let standalone_callers = call_graph.get_callers(standalone_id);
     assert_eq!(
         standalone_callers.len(),
         0,
@@ -80,7 +84,7 @@ pub fn test_import_analysis() {
     );
 
     // THE FIX: Method correctly shows callers
-    let method_callers = call_graph.get_callers(&method_id);
+    let method_callers = call_graph.get_callers(method_id);
     assert_eq!(
         method_callers.len(),
         1,
@@ -92,7 +96,7 @@ pub fn test_import_analysis() {
     );
 
     // Verify test calls the method, not the standalone function
-    let test_callees = call_graph.get_callees(&test_id);
+    let test_callees = call_graph.get_callees(test_id);
 
     println!("\nTest callees:");
     for callee in &test_callees {
@@ -109,7 +113,7 @@ pub fn test_import_analysis() {
     assert!(
         !test_callees
             .iter()
-            .any(|c| c.name == "analyze_imports" && c.line == 3),
+            .any(|c| c.name == "analyze_imports" && !c.name.contains("::")),
         "Test should NOT call standalone analyze_imports() function"
     );
 }
@@ -140,13 +144,11 @@ fn caller() {
     let path = PathBuf::from("simple.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
-    let standalone = FunctionId::new(path.clone(), "process".to_string(), 2);
-
-    let method = FunctionId::new(path.clone(), "Handler::process".to_string(), 9);
+    let all_functions = call_graph.find_all_functions();
 
     println!("\nSimple test - All functions:");
-    for func in call_graph.find_all_functions() {
-        let callers = call_graph.get_callers(&func);
+    for func in &all_functions {
+        let callers = call_graph.get_callers(func);
         println!(
             "  {} (line {}) - {} callers",
             func.name,
@@ -155,8 +157,18 @@ fn caller() {
         );
     }
 
-    let standalone_callers = call_graph.get_callers(&standalone);
-    let method_callers = call_graph.get_callers(&method);
+    let standalone = all_functions
+        .iter()
+        .find(|f| f.name == "process" && !f.name.contains("::"))
+        .expect("Should find standalone process function");
+
+    let method = all_functions
+        .iter()
+        .find(|f| f.name == "Handler::process")
+        .expect("Should find Handler::process method");
+
+    let standalone_callers = call_graph.get_callers(standalone);
+    let method_callers = call_graph.get_callers(method);
 
     assert_eq!(
         standalone_callers.len(),

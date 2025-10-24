@@ -1,5 +1,4 @@
 use debtmap::analyzers::rust_call_graph::extract_call_graph;
-use debtmap::priority::call_graph::FunctionId;
 use std::path::PathBuf;
 
 #[test]
@@ -32,13 +31,19 @@ fn validate() {
     assert_eq!(functions.len(), 4, "Should find 4 functions");
 
     // Check main's callees
-    let main_id = FunctionId::new(path.clone(), "main".to_string(), 2);
-    let main_callees = call_graph.get_callees(&main_id);
+    let main_func = functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("Should find main function");
+    let main_callees = call_graph.get_callees(main_func);
     assert_eq!(main_callees.len(), 2, "main should call 2 functions");
 
     // Check helper's callers
-    let helper_id = FunctionId::new(path.clone(), "helper".to_string(), 7);
-    let helper_callers = call_graph.get_callers(&helper_id);
+    let helper_func = functions
+        .iter()
+        .find(|f| f.name == "helper")
+        .expect("Should find helper function");
+    let helper_callers = call_graph.get_callers(helper_func);
     assert_eq!(helper_callers.len(), 1, "helper should have 1 caller");
     assert_eq!(
         helper_callers[0].name, "main",
@@ -215,8 +220,12 @@ fn validate(value: &i32) -> bool {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check that closure calls are detected
-    let process_id = FunctionId::new(path.clone(), "process_items".to_string(), 2);
-    let process_callees = call_graph.get_callees(&process_id);
+    let functions = call_graph.find_all_functions();
+    let process_func = functions
+        .iter()
+        .find(|f| f.name == "process_items")
+        .expect("Should find process_items function");
+    let process_callees = call_graph.get_callees(process_func);
     assert!(
         process_callees.iter().any(|f| f.name == "transform"),
         "Should detect transform call in closure"
@@ -254,8 +263,12 @@ async fn validate_async() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check async function calls
-    let main_id = FunctionId::new(path.clone(), "main".to_string(), 2);
-    let main_callees = call_graph.get_callees(&main_id);
+    let functions = call_graph.find_all_functions();
+    let main_func = functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("Should find main function");
+    let main_callees = call_graph.get_callees(main_func);
     assert_eq!(main_callees.len(), 2, "main should call 2 async functions");
 }
 
@@ -287,8 +300,12 @@ fn direct_call() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Macro calls might not be detected - this is a known limitation
-    let main_id = FunctionId::new(path.clone(), "main".to_string(), 8);
-    let main_callees = call_graph.get_callees(&main_id);
+    let functions = call_graph.find_all_functions();
+    let main_func = functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("Should find main function");
+    let main_callees = call_graph.get_callees(main_func);
     // Should at least detect direct_call
     assert!(
         main_callees.iter().any(|f| f.name == "direct_call"),
@@ -325,8 +342,12 @@ fn validate() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check qualified path calls
-    let main_id = FunctionId::new(path.clone(), "main".to_string(), 8);
-    let main_callees = call_graph.get_callees(&main_id);
+    let functions = call_graph.find_all_functions();
+    let main_func = functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("Should find main function");
+    let main_callees = call_graph.get_callees(main_func);
     assert!(
         !main_callees.is_empty(),
         "Should detect at least some qualified calls"
@@ -360,8 +381,12 @@ fn main() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Check generic function calls
-    let process_id = FunctionId::new(path.clone(), "process".to_string(), 2);
-    let process_callees = call_graph.get_callees(&process_id);
+    let functions = call_graph.find_all_functions();
+    let process_func = functions
+        .iter()
+        .find(|f| f.name == "process")
+        .expect("Should find process function");
+    let process_callees = call_graph.get_callees(process_func);
     assert_eq!(
         process_callees.len(),
         2,
@@ -391,8 +416,12 @@ fn main() {
     let call_graph = extract_call_graph(&parsed, &path);
 
     // Function pointers are hard to track statically
-    let main_id = FunctionId::new(path.clone(), "main".to_string(), 10);
-    let main_callees = call_graph.get_callees(&main_id);
+    let functions = call_graph.find_all_functions();
+    let main_func = functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("Should find main function");
+    let main_callees = call_graph.get_callees(main_func);
     assert!(
         main_callees.iter().any(|f| f.name == "apply_operation"),
         "Should detect apply_operation call"

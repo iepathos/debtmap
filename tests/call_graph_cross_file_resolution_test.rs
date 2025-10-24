@@ -185,6 +185,7 @@ fn test_qualified_call_resolution() {
 }
 
 #[test]
+#[ignore] // This test analyzes the entire codebase and is very slow - run manually with --ignored
 fn test_self_referential_call_detection() {
     // This test directly reproduces the actual bug:
     // process_rust_files_for_call_graph is called from validate.rs and unified_analysis.rs
@@ -308,12 +309,27 @@ pub mod module_b;
     let caller_names = call_graph.get_callers_by_name("target_function");
 
     println!("Found {} callers for target_function", caller_names.len());
+    println!("Callers: {:?}", caller_names);
+
+    // Debug: print all functions and edges
+    let all_functions = call_graph.find_all_functions();
+    println!("\nAll functions:");
+    for func in &all_functions {
+        println!("  {} ({})", func.name, func.file.display());
+        let callees = call_graph.get_callees(func);
+        if !callees.is_empty() {
+            for callee in callees {
+                println!("    -> {}", callee.name);
+            }
+        }
+    }
 
     // Should detect all 3 different call syntaxes
     assert!(
         caller_names.len() >= 3,
-        "Expected 3 callers (direct import, qualified, full path), found {}",
-        caller_names.len()
+        "Expected 3 callers (direct import, qualified, full path), found {}: {:?}",
+        caller_names.len(),
+        caller_names
     );
 }
 

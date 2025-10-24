@@ -170,11 +170,20 @@ impl ModuleTree {
     pub fn infer_module_from_file(file_path: &Path) -> String {
         let path_str = file_path.to_string_lossy();
 
-        // Remove src/ prefix if present
-        let without_src = path_str
-            .strip_prefix("src/")
-            .or_else(|| path_str.strip_prefix("src\\"))
-            .unwrap_or(&path_str);
+        // Find the src/ directory in the path and extract everything after it
+        // This handles both relative paths (src/foo.rs) and absolute paths (/path/to/project/src/foo.rs)
+        let without_src =
+            if let Some(src_idx) = path_str.find("/src/").or_else(|| path_str.find("\\src\\")) {
+                // Found src/ in the path, extract everything after it
+                let start_idx = src_idx + 5; // Skip "/src/" or "\src\"
+                &path_str[start_idx..]
+            } else {
+                // No src/ found, try stripping it from the beginning as a fallback
+                path_str
+                    .strip_prefix("src/")
+                    .or_else(|| path_str.strip_prefix("src\\"))
+                    .unwrap_or(&path_str)
+            };
 
         // Remove .rs extension
         let without_ext = without_src.strip_suffix(".rs").unwrap_or(without_src);
@@ -315,6 +324,7 @@ mod tests {
 
     #[test]
     fn test_infer_module_from_file() {
+        // Test relative paths
         assert_eq!(
             ModuleTree::infer_module_from_file(&PathBuf::from("src/commands/analyze.rs")),
             "commands::analyze"
@@ -329,6 +339,30 @@ mod tests {
             ModuleTree::infer_module_from_file(&PathBuf::from("src/main.rs")),
             "main"
         );
+
+        // Test absolute paths (like those from temp directories)
+        assert_eq!(
+            ModuleTree::infer_module_from_file(&PathBuf::from("/var/tmp/project/src/module_a.rs")),
+            "module_a"
+        );
+
+        assert_eq!(
+            ModuleTree::infer_module_from_file(&PathBuf::from(
+                "/home/user/code/project/src/builders/call_graph.rs"
+            )),
+            "builders::call_graph"
+        );
+
+        // Test Windows-style paths
+        #[cfg(target_os = "windows")]
+        {
+            assert_eq!(
+                ModuleTree::infer_module_from_file(&PathBuf::from(
+                    "C:\\Users\\dev\\project\\src\\module_b.rs"
+                )),
+                "module_b"
+            );
+        }
     }
 
     #[test]

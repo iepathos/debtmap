@@ -185,12 +185,8 @@ fn use_builder() {
     // The module path is inferred from the file path (builder.rs -> "builder")
     let module_path = "builder".to_string();
 
-    let standalone = FunctionId::with_module_path(
-        path.clone(),
-        "build".to_string(),
-        2,
-        module_path.clone(),
-    );
+    let standalone =
+        FunctionId::with_module_path(path.clone(), "build".to_string(), 2, module_path.clone());
 
     let method = FunctionId::with_module_path(
         path.clone(),

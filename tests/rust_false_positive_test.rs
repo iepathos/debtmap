@@ -203,8 +203,11 @@ pub fn use_calculator() -> i32 {
         .expect("Should find Calculator::calculate method");
 
     // Test standalone function (should be dead code)
-    let standalone_func_id =
-        FunctionId::new(path.clone(), "calculate".to_string(), standalone_func.line);
+    let all_functions = call_graph.find_all_functions();
+    let standalone_func_id = all_functions
+        .iter()
+        .find(|f| f.name == "calculate" && !f.name.contains("::"))
+        .expect("Should find standalone calculate function");
 
     // For this test, we need to bypass the language-level dead code detection setting
     // and test the core logic directly.
@@ -221,7 +224,7 @@ pub fn use_calculator() -> i32 {
         || standalone_func.name.starts_with("__")
         || standalone_func.is_trait_method;
 
-    let standalone_has_callers = !call_graph.get_callers(&standalone_func_id).is_empty();
+    let standalone_has_callers = !call_graph.get_callers(standalone_func_id).is_empty();
 
     // Since Rust dead code detection is disabled by default, we'll manually check the logic
     let standalone_is_dead = if !standalone_excluded && !standalone_has_callers {
@@ -231,11 +234,10 @@ pub fn use_calculator() -> i32 {
     };
 
     // Test method (should NOT be dead code)
-    let method_func_id = FunctionId::new(
-        path.clone(),
-        "Calculator::calculate".to_string(),
-        method_func.line,
-    );
+    let method_func_id = all_functions
+        .iter()
+        .find(|f| f.name == "Calculator::calculate")
+        .expect("Should find Calculator::calculate method");
 
     // Check if method would be dead code using the same logic
     let method_excluded = method_func.name == "main"
@@ -249,7 +251,7 @@ pub fn use_calculator() -> i32 {
         || method_func.name.starts_with("__")
         || method_func.is_trait_method;
 
-    let method_has_callers = !call_graph.get_callers(&method_func_id).is_empty();
+    let method_has_callers = !call_graph.get_callers(method_func_id).is_empty();
 
     let method_is_dead = if !method_excluded && !method_has_callers {
         true // Would be dead code if detection was enabled
