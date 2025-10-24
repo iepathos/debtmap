@@ -314,6 +314,125 @@ impl TraitRegistry {
     ) -> Option<&Vector<TraitMethodImplementation>> {
         self.visit_implementations.get(type_name)
     }
+
+    /// Resolve trait method calls and add edges to call graph
+    /// Returns the number of trait method calls resolved
+    pub fn resolve_trait_method_calls(
+        &self,
+        call_graph: &mut crate::priority::call_graph::CallGraph,
+    ) -> usize {
+        let mut resolved_count = 0;
+
+        for call in self.unresolved_calls.iter() {
+            let implementations = self.resolve_trait_call(call);
+
+            for impl_method_id in implementations.iter() {
+                // Add edge from caller to trait implementation
+                call_graph.add_call_parts(
+                    call.caller.clone(),
+                    impl_method_id.clone(),
+                    crate::priority::call_graph::CallType::Direct,
+                );
+
+                // Mark as reachable through trait dispatch
+                call_graph.mark_as_trait_dispatch(impl_method_id.clone());
+
+                resolved_count += 1;
+            }
+        }
+
+        resolved_count
+    }
+
+    /// Detect common trait patterns and mark them as entry points
+    pub fn detect_common_trait_patterns(
+        &self,
+        call_graph: &mut crate::priority::call_graph::CallGraph,
+    ) {
+        self.detect_default_trait_impls(call_graph);
+        self.detect_clone_trait_impls(call_graph);
+        self.detect_constructor_patterns(call_graph);
+        self.detect_from_into_impls(call_graph);
+        self.detect_display_debug_impls(call_graph);
+    }
+
+    /// Detect Default trait implementations
+    fn detect_default_trait_impls(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
+        if let Some(impls) = self.trait_implementations.get("Default") {
+            for trait_impl in impls.iter() {
+                for method_impl in trait_impl.method_implementations.iter() {
+                    if method_impl.method_name == "default" {
+                        call_graph.mark_as_trait_dispatch(method_impl.method_id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Detect Clone trait implementations
+    fn detect_clone_trait_impls(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
+        if let Some(impls) = self.trait_implementations.get("Clone") {
+            for trait_impl in impls.iter() {
+                for method_impl in trait_impl.method_implementations.iter() {
+                    if method_impl.method_name == "clone"
+                        || method_impl.method_name == "clone_box"
+                        || method_impl.method_name == "clone_from"
+                    {
+                        call_graph.mark_as_trait_dispatch(method_impl.method_id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Detect constructor patterns (Type::new, Type::builder, etc.)
+    fn detect_constructor_patterns(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
+        // Collect functions first to avoid borrow conflicts
+        let functions: Vec<_> = call_graph.get_all_functions().cloned().collect();
+
+        for function in functions {
+            // Detect ::new() pattern
+            if function.name.ends_with("::new") || function.name == "new" {
+                call_graph.mark_as_trait_dispatch(function.clone());
+            }
+
+            // Detect builder pattern (Type::builder, Type::with_*)
+            if function.name.ends_with("::builder")
+                || function.name.contains("::with_")
+                || function.name.ends_with("::create")
+            {
+                call_graph.mark_as_trait_dispatch(function);
+            }
+        }
+    }
+
+    /// Detect From/Into trait implementations
+    fn detect_from_into_impls(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
+        for trait_name in &["From", "Into"] {
+            if let Some(impls) = self.trait_implementations.get(*trait_name) {
+                for trait_impl in impls.iter() {
+                    for method_impl in trait_impl.method_implementations.iter() {
+                        call_graph.mark_as_trait_dispatch(method_impl.method_id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Detect Display/Debug trait implementations
+    fn detect_display_debug_impls(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
+        for trait_name in &["Display", "Debug"] {
+            if let Some(impls) = self.trait_implementations.get(*trait_name) {
+                for trait_impl in impls.iter() {
+                    for method_impl in trait_impl.method_implementations.iter() {
+                        if method_impl.method_name == "fmt" {
+                            call_graph.mark_as_trait_dispatch(method_impl.method_id.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Statistics about trait usage in the codebase
@@ -613,5 +732,184 @@ mod tests {
         assert!(!TraitVisitor::is_visitor_pattern_trait("VisitData"));
         assert!(!TraitVisitor::is_visitor_pattern_trait("MyVisitor"));
         assert!(!TraitVisitor::is_visitor_pattern_trait(""));
+    }
+
+    #[test]
+    fn test_detect_default_trait_impls() {
+        use crate::priority::call_graph::{CallGraph, FunctionId};
+        use std::path::PathBuf;
+
+        let mut registry = TraitRegistry::new();
+        let mut call_graph = CallGraph::new();
+
+        // Add a Default trait implementation
+        let file_path = PathBuf::from("test.rs");
+        let default_method =
+            FunctionId::new(file_path.clone(), "MyConfig::default".to_string(), 10);
+
+        let trait_impl = TraitImplementation {
+            trait_name: "Default".to_string(),
+            implementing_type: "MyConfig".to_string(),
+            method_implementations: vec![TraitMethodImplementation {
+                method_name: "default".to_string(),
+                method_id: default_method.clone(),
+                overrides_default: false,
+            }]
+            .into(),
+            impl_id: None,
+        };
+
+        registry
+            .trait_implementations
+            .insert("Default".to_string(), vec![trait_impl].into());
+
+        // Detect Default trait implementations
+        registry.detect_default_trait_impls(&mut call_graph);
+
+        // Verify the function was marked as entry point (trait dispatch)
+        assert!(call_graph.is_entry_point(&default_method));
+    }
+
+    #[test]
+    fn test_detect_clone_trait_impls() {
+        use crate::priority::call_graph::{CallGraph, FunctionId};
+        use std::path::PathBuf;
+
+        let mut registry = TraitRegistry::new();
+        let mut call_graph = CallGraph::new();
+
+        let file_path = PathBuf::from("test.rs");
+        let clone_method = FunctionId::new(file_path.clone(), "MyType::clone".to_string(), 20);
+        let clone_box_method =
+            FunctionId::new(file_path.clone(), "MyType::clone_box".to_string(), 25);
+
+        let trait_impl = TraitImplementation {
+            trait_name: "Clone".to_string(),
+            implementing_type: "MyType".to_string(),
+            method_implementations: vec![
+                TraitMethodImplementation {
+                    method_name: "clone".to_string(),
+                    method_id: clone_method.clone(),
+                    overrides_default: false,
+                },
+                TraitMethodImplementation {
+                    method_name: "clone_box".to_string(),
+                    method_id: clone_box_method.clone(),
+                    overrides_default: false,
+                },
+            ]
+            .into(),
+            impl_id: None,
+        };
+
+        registry
+            .trait_implementations
+            .insert("Clone".to_string(), vec![trait_impl].into());
+
+        registry.detect_clone_trait_impls(&mut call_graph);
+
+        // Both methods should be marked as entry points
+        assert!(call_graph.is_entry_point(&clone_method));
+        assert!(call_graph.is_entry_point(&clone_box_method));
+    }
+
+    #[test]
+    fn test_detect_constructor_patterns() {
+        use crate::priority::call_graph::{CallGraph, FunctionId};
+        use std::path::PathBuf;
+
+        let registry = TraitRegistry::new();
+        let mut call_graph = CallGraph::new();
+
+        let file_path = PathBuf::from("test.rs");
+
+        // Add various constructor patterns
+        let new_method = FunctionId::new(file_path.clone(), "MyType::new".to_string(), 10);
+        let builder_method = FunctionId::new(file_path.clone(), "Config::builder".to_string(), 20);
+        let with_method =
+            FunctionId::new(file_path.clone(), "Settings::with_defaults".to_string(), 30);
+        let create_method = FunctionId::new(file_path.clone(), "Database::create".to_string(), 40);
+        let normal_method = FunctionId::new(file_path.clone(), "util::process".to_string(), 50);
+
+        call_graph.add_function(new_method.clone(), false, false, 1, 10);
+        call_graph.add_function(builder_method.clone(), false, false, 1, 10);
+        call_graph.add_function(with_method.clone(), false, false, 1, 10);
+        call_graph.add_function(create_method.clone(), false, false, 1, 10);
+        call_graph.add_function(normal_method.clone(), false, false, 1, 10);
+
+        registry.detect_constructor_patterns(&mut call_graph);
+
+        // Constructor patterns should be marked as entry points
+        assert!(call_graph.is_entry_point(&new_method));
+        assert!(call_graph.is_entry_point(&builder_method));
+        assert!(call_graph.is_entry_point(&with_method));
+        assert!(call_graph.is_entry_point(&create_method));
+
+        // Normal methods should not be marked
+        assert!(!call_graph.is_entry_point(&normal_method));
+    }
+
+    #[test]
+    fn test_resolve_trait_method_calls() {
+        use crate::priority::call_graph::{CallGraph, FunctionId};
+        use std::path::PathBuf;
+
+        let mut registry = TraitRegistry::new();
+        let mut call_graph = CallGraph::new();
+
+        let file_path = PathBuf::from("test.rs");
+
+        // Create a caller function
+        let caller = FunctionId::new(file_path.clone(), "create_config".to_string(), 5);
+        call_graph.add_function(caller.clone(), false, false, 1, 10);
+
+        // Create a Default trait implementation
+        let default_impl = FunctionId::new(file_path.clone(), "MyConfig::default".to_string(), 10);
+        // Add implementation to call graph so it can be found
+        call_graph.add_function(default_impl.clone(), false, false, 1, 10);
+
+        let trait_impl = TraitImplementation {
+            trait_name: "Default".to_string(),
+            implementing_type: "MyConfig".to_string(),
+            method_implementations: vec![TraitMethodImplementation {
+                method_name: "default".to_string(),
+                method_id: default_impl.clone(),
+                overrides_default: false,
+            }]
+            .into(),
+            impl_id: None,
+        };
+
+        registry
+            .trait_implementations
+            .insert("Default".to_string(), vec![trait_impl].into());
+
+        // Also need to add the type-to-trait mapping for resolution
+        registry.type_to_traits.insert(
+            "MyConfig".to_string(),
+            vec!["Default".to_string()].into_iter().collect(),
+        );
+
+        // Add an unresolved trait call
+        registry.unresolved_calls.push_back(TraitMethodCall {
+            caller: caller.clone(),
+            trait_name: "Default".to_string(),
+            method_name: "default".to_string(),
+            receiver_type: Some("MyConfig".to_string()),
+            line: 6,
+        });
+
+        // Resolve trait method calls
+        let resolved_count = registry.resolve_trait_method_calls(&mut call_graph);
+
+        // Should have resolved one call
+        assert_eq!(resolved_count, 1);
+
+        // Should have added an edge from caller to implementation
+        let callees = call_graph.get_callees(&caller);
+        assert!(callees.contains(&default_impl));
+
+        // Implementation should be marked as entry point
+        assert!(call_graph.is_entry_point(&default_impl));
     }
 }
