@@ -55,7 +55,7 @@ fn diagnose_missing_calls() {
         println!("  {} at line {}", func.name, func.line);
 
         // Check what this function calls
-        let callees = call_graph.get_callees(&func);
+        let callees = call_graph.get_callees(func);
         if !callees.is_empty() {
             println!("    Calls: {}", callees.len());
             for callee in callees.iter().take(5) {
@@ -91,7 +91,7 @@ fn diagnose_missing_calls() {
         } else {
             for func in found {
                 println!("\n  Function: {} at line {}", func.name, func.line);
-                let callees = call_graph.get_callees(&func);
+                let callees = call_graph.get_callees(func);
                 println!("    Calls {} functions:", callees.len());
 
                 let calls_target = callees
@@ -109,7 +109,7 @@ fn diagnose_missing_calls() {
                         if callee.name == "build_and_cache_graph"
                             || callee.name == "DataFlowGraph::call_graph"
                         {
-                            let indirect_callees = call_graph.get_callees(&callee);
+                            let indirect_callees = call_graph.get_callees(callee);
                             println!(
                                 "         (which calls {} functions)",
                                 indirect_callees.len()
@@ -137,7 +137,7 @@ fn diagnose_missing_calls() {
 
     for func in build_and_cache {
         println!("Function: {} at line {}", func.name, func.line);
-        let callees = call_graph.get_callees(&func);
+        let callees = call_graph.get_callees(func);
         println!("  Calls {} functions:", callees.len());
         for callee in &callees {
             println!("    -> {}", callee.name);

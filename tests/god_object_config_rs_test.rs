@@ -135,10 +135,7 @@ fn test_god_object_detection_on_config_rs() {
     // Check that priorities are assigned (may not always be High)
     eprintln!("Module priorities:");
     for split in &analysis.recommended_splits {
-        eprintln!(
-            "  - {}: {:?}",
-            split.suggested_name, split.priority
-        );
+        eprintln!("  - {}: {:?}", split.suggested_name, split.priority);
     }
 
     // Validate that the priority field exists and is being used
