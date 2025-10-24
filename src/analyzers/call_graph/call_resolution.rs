@@ -271,7 +271,57 @@ impl<'a> CallResolver<'a> {
 
     /// Normalize path prefixes in function names
     pub fn normalize_path_prefix(name: &str) -> String {
-        name.to_string()
+        // Strip generic type parameters for better matching
+        Self::strip_generic_params(name)
+    }
+
+    /// Strip generic type parameters from function names
+    /// Examples: "foo<T>" -> "foo", "bar::<Type>" -> "bar"
+    pub fn strip_generic_params(name: &str) -> String {
+        // Handle turbofish syntax (::< >) and regular generics (< >)
+        let without_turbofish = if let Some(pos) = name.find("::<") {
+            // Find matching closing bracket
+            if let Some(end) = Self::find_matching_bracket(&name[pos + 3..]) {
+                format!("{}{}", &name[..pos], &name[pos + 3 + end + 1..])
+            } else {
+                name.to_string()
+            }
+        } else {
+            name.to_string()
+        };
+
+        // Handle regular generics
+        if let Some(pos) = without_turbofish.find('<') {
+            if let Some(end) = Self::find_matching_bracket(&without_turbofish[pos + 1..]) {
+                format!(
+                    "{}{}",
+                    &without_turbofish[..pos],
+                    &without_turbofish[pos + 1 + end + 1..]
+                )
+            } else {
+                without_turbofish
+            }
+        } else {
+            without_turbofish
+        }
+    }
+
+    /// Find matching closing bracket, accounting for nested brackets
+    fn find_matching_bracket(s: &str) -> Option<usize> {
+        let mut depth = 1;
+        for (i, ch) in s.chars().enumerate() {
+            match ch {
+                '<' => depth += 1,
+                '>' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 
     /// Pure function to select the best candidate from multiple matches
@@ -746,6 +796,72 @@ mod tests {
         let result = CallResolver::apply_generic_preference(generic_functions.clone());
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].name, "regular_func"); // Non-generic should win
+    }
+
+    #[test]
+    fn test_strip_generic_params() {
+        // Test simple generic
+        assert_eq!(CallResolver::strip_generic_params("foo<T>"), "foo");
+
+        // Test turbofish syntax
+        assert_eq!(CallResolver::strip_generic_params("bar::<Type>"), "bar");
+
+        // Test nested generics
+        assert_eq!(
+            CallResolver::strip_generic_params("func<Vec<String>>"),
+            "func"
+        );
+
+        // Test multiple type parameters
+        assert_eq!(CallResolver::strip_generic_params("map<K, V>"), "map");
+
+        // Test qualified name with generics
+        assert_eq!(
+            CallResolver::strip_generic_params("module::function<T>"),
+            "module::function"
+        );
+
+        // Test method with generics
+        assert_eq!(
+            CallResolver::strip_generic_params("Type::method<T, U>"),
+            "Type::method"
+        );
+
+        // Test non-generic function (should return unchanged)
+        assert_eq!(
+            CallResolver::strip_generic_params("simple_function"),
+            "simple_function"
+        );
+
+        // Test complex nested generics
+        assert_eq!(
+            CallResolver::strip_generic_params("complex<HashMap<String, Vec<i32>>>"),
+            "complex"
+        );
+    }
+
+    #[test]
+    fn test_find_matching_bracket() {
+        // Simple case
+        assert_eq!(CallResolver::find_matching_bracket("T>"), Some(1));
+
+        // Nested brackets
+        assert_eq!(
+            CallResolver::find_matching_bracket("Vec<String>>"),
+            Some(11)
+        );
+
+        // Multiple levels of nesting
+        assert_eq!(
+            CallResolver::find_matching_bracket("HashMap<String, Vec<i32>>>"),
+            Some(25)
+        );
+
+        // No closing bracket
+        assert_eq!(CallResolver::find_matching_bracket("T"), None);
+
+        // Mismatched brackets
+        assert_eq!(CallResolver::find_matching_bracket("T<U"), None);
     }
 }
 

@@ -28,42 +28,145 @@ impl PathResolver {
         }
     }
 
-    /// Resolve a function call to a FunctionId
+    /// Resolve a function call to a FunctionId using multiple strategies
     pub fn resolve_call(
         &self,
         caller_file: &Path,
         callee_name: &str,
         call_graph: &CallGraph,
     ) -> Option<FunctionId> {
-        // Try multiple resolution strategies in order of likelihood
+        // Strategy 1: Exact match (highest priority)
+        if let Some(resolved) = self.resolve_exact_match(caller_file, callee_name, call_graph) {
+            return Some(resolved);
+        }
 
-        // 1. Simple name - check imports first
+        // Strategy 2: Import-based resolution
+        if let Some(resolved) =
+            self.resolve_through_imports_enhanced(caller_file, callee_name, call_graph)
+        {
+            return Some(resolved);
+        }
+
+        // Strategy 3: Module hierarchy search
+        if let Some(resolved) = self.resolve_through_hierarchy(caller_file, callee_name, call_graph)
+        {
+            return Some(resolved);
+        }
+
+        // Strategy 4: Fuzzy matching with generic stripping
+        if let Some(resolved) = self.resolve_fuzzy(caller_file, callee_name, call_graph) {
+            return Some(resolved);
+        }
+
+        None
+    }
+
+    /// Strategy 1: Exact match resolution
+    fn resolve_exact_match(
+        &self,
+        caller_file: &Path,
+        callee_name: &str,
+        call_graph: &CallGraph,
+    ) -> Option<FunctionId> {
+        // Try exact name match in same file first
         if !callee_name.contains("::") {
-            if let Some(resolved) =
-                self.resolve_through_imports(caller_file, callee_name, call_graph)
-            {
-                return Some(resolved);
-            }
-
-            // Fallback to same-file search
             if let Some(resolved) = self.find_in_same_file(caller_file, callee_name, call_graph) {
                 return Some(resolved);
             }
         }
 
-        // 2. Qualified path - use module tree
+        // Try exact qualified path match
         if callee_name.contains("::") {
-            if let Some(resolved) =
-                self.resolve_qualified_path(caller_file, callee_name, call_graph)
-            {
+            if let Some(resolved) = self.find_function_by_path(callee_name, call_graph) {
                 return Some(resolved);
             }
         }
 
-        // 3. Check re-exports
-        if let Some(resolved) = self.resolve_through_reexports(caller_file, callee_name, call_graph)
-        {
-            return Some(resolved);
+        None
+    }
+
+    /// Strategy 2: Enhanced import-based resolution with glob support
+    fn resolve_through_imports_enhanced(
+        &self,
+        caller_file: &Path,
+        callee_name: &str,
+        call_graph: &CallGraph,
+    ) -> Option<FunctionId> {
+        // Simple name - check imports
+        if !callee_name.contains("::") {
+            return self.resolve_through_imports(caller_file, callee_name, call_graph);
+        }
+
+        // Qualified path - check if first segment is imported
+        if callee_name.contains("::") {
+            return self.resolve_qualified_path(caller_file, callee_name, call_graph);
+        }
+
+        None
+    }
+
+    /// Strategy 3: Module hierarchy-based resolution
+    fn resolve_through_hierarchy(
+        &self,
+        caller_file: &Path,
+        callee_name: &str,
+        call_graph: &CallGraph,
+    ) -> Option<FunctionId> {
+        // Get current module
+        let current_module = self.module_tree.get_module(caller_file)?;
+
+        // For simple names, try searching in current module and parents
+        if !callee_name.contains("::") {
+            // Search in current module
+            let current_module_prefix = format!("{}::{}", current_module, callee_name);
+            if let Some(resolved) = self.find_function_by_path(&current_module_prefix, call_graph) {
+                return Some(resolved);
+            }
+
+            // Search in parent modules
+            let mut parent_module = self.module_tree.get_parent(current_module);
+            while let Some(parent) = parent_module {
+                let parent_prefix = format!("{}::{}", parent, callee_name);
+                if let Some(resolved) = self.find_function_by_path(&parent_prefix, call_graph) {
+                    return Some(resolved);
+                }
+                parent_module = self.module_tree.get_parent(parent);
+            }
+        }
+
+        // Check re-exports as part of hierarchy search
+        self.resolve_through_reexports(caller_file, callee_name, call_graph)
+    }
+
+    /// Strategy 4: Fuzzy matching with generic parameter stripping
+    fn resolve_fuzzy(
+        &self,
+        _caller_file: &Path,
+        callee_name: &str,
+        call_graph: &CallGraph,
+    ) -> Option<FunctionId> {
+        use crate::analyzers::call_graph::CallResolver;
+
+        // Normalize by stripping generic parameters
+        let normalized_name = CallResolver::strip_generic_params(callee_name);
+
+        // Search for functions with matching normalized names
+        for func in call_graph.get_all_functions() {
+            let normalized_func_name = CallResolver::strip_generic_params(&func.name);
+
+            // Check if normalized names match
+            if normalized_func_name == normalized_name {
+                return Some(func.clone());
+            }
+
+            // Also check base name match
+            if let Some(base) = normalized_func_name.split("::").last() {
+                if let Some(search_base) = normalized_name.split("::").last() {
+                    if base == search_base && normalized_func_name.ends_with(&normalized_name) {
+                        return Some(func.clone());
+                    }
+                }
+            }
         }
 
         None
