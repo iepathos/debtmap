@@ -6,6 +6,44 @@ use crate::priority::call_graph::{CallGraph, FunctionId};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
+/// Configuration for call graph validation
+#[derive(Debug, Clone, Default)]
+pub struct CallGraphValidationConfig {
+    /// Functions expected to be orphaned (won't be flagged as issues)
+    pub orphan_whitelist: HashSet<String>,
+    /// Additional entry points beyond standard detection
+    pub additional_entry_points: HashSet<String>,
+}
+
+impl CallGraphValidationConfig {
+    /// Create a new empty configuration
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a function to the orphan whitelist
+    pub fn add_orphan_whitelist(&mut self, function_name: String) -> &mut Self {
+        self.orphan_whitelist.insert(function_name);
+        self
+    }
+
+    /// Add an additional entry point
+    pub fn add_entry_point(&mut self, function_name: String) -> &mut Self {
+        self.additional_entry_points.insert(function_name);
+        self
+    }
+
+    /// Check if a function is whitelisted as an expected orphan
+    pub fn is_whitelisted_orphan(&self, function: &FunctionId) -> bool {
+        self.orphan_whitelist.contains(&function.name)
+    }
+
+    /// Check if a function is configured as an additional entry point
+    pub fn is_additional_entry_point(&self, function: &FunctionId) -> bool {
+        self.additional_entry_points.contains(&function.name)
+    }
+}
+
 /// Structural issue in the call graph
 #[derive(Debug, Clone)]
 pub enum StructuralIssue {
@@ -149,11 +187,19 @@ pub struct CallGraphValidator;
 impl CallGraphValidator {
     /// Validate call graph structure
     pub fn validate(call_graph: &CallGraph) -> ValidationReport {
+        Self::validate_with_config(call_graph, &CallGraphValidationConfig::default())
+    }
+
+    /// Validate call graph structure with custom configuration
+    pub fn validate_with_config(
+        call_graph: &CallGraph,
+        config: &CallGraphValidationConfig,
+    ) -> ValidationReport {
         let mut report = ValidationReport::new();
 
         // Check for structural issues
         Self::check_dangling_edges(call_graph, &mut report);
-        Self::check_orphaned_nodes(call_graph, &mut report);
+        Self::check_orphaned_nodes(call_graph, &mut report, config);
         Self::check_duplicate_nodes(call_graph, &mut report);
 
         // Check for suspicious patterns
@@ -186,7 +232,12 @@ impl CallGraphValidator {
     }
 
     /// Check if a function is an entry point (expected to have no callers)
-    fn is_entry_point(function: &FunctionId) -> bool {
+    fn is_entry_point(function: &FunctionId, config: &CallGraphValidationConfig) -> bool {
+        // Check configured additional entry points
+        if config.is_additional_entry_point(function) {
+            return true;
+        }
+
         // Existing checks
         if function.name == "main" {
             return true;
@@ -241,12 +292,17 @@ impl CallGraphValidator {
     }
 
     /// Check for orphaned nodes (functions with no connections)
-    fn check_orphaned_nodes(call_graph: &CallGraph, report: &mut ValidationReport) {
+    fn check_orphaned_nodes(
+        call_graph: &CallGraph,
+        report: &mut ValidationReport,
+        config: &CallGraphValidationConfig,
+    ) {
         for function in call_graph.get_all_functions() {
             let has_callers = !call_graph.get_callers(function).is_empty();
             let has_callees = !call_graph.get_callees(function).is_empty();
-            let is_entry_point = Self::is_entry_point(function);
+            let is_entry_point = Self::is_entry_point(function, config);
             let is_self_referential = Self::is_self_referential(function, call_graph);
+            let is_whitelisted = config.is_whitelisted_orphan(function);
 
             // Update statistics
             report.statistics.total_functions += 1;
@@ -279,23 +335,29 @@ impl CallGraphValidator {
             // ISOLATED: No callers, no callees (true orphan)
             if !has_callers && !has_callees && !is_entry_point {
                 report.statistics.isolated_functions += 1;
-                report
-                    .structural_issues
-                    .push(StructuralIssue::IsolatedFunction {
-                        function: function.clone(),
-                    });
+                // Skip if whitelisted
+                if !is_whitelisted {
+                    report
+                        .structural_issues
+                        .push(StructuralIssue::IsolatedFunction {
+                            function: function.clone(),
+                        });
+                }
                 continue;
             }
 
             // UNREACHABLE: No callers but has callees (dead code with dependencies)
             if !has_callers && has_callees && !is_entry_point {
                 report.statistics.unreachable_functions += 1;
-                report
-                    .structural_issues
-                    .push(StructuralIssue::UnreachableFunction {
-                        function: function.clone(),
-                        reason: UnreachableReason::NoCallers,
-                    });
+                // Skip if whitelisted
+                if !is_whitelisted {
+                    report
+                        .structural_issues
+                        .push(StructuralIssue::UnreachableFunction {
+                            function: function.clone(),
+                            reason: UnreachableReason::NoCallers,
+                        });
+                }
             }
         }
     }
@@ -433,7 +495,20 @@ impl CallGraphValidator {
         call_graph: &CallGraph,
         expectations: &[Expectation],
     ) -> ValidationReport {
-        let report = Self::validate(call_graph);
+        Self::validate_expectations_with_config(
+            call_graph,
+            expectations,
+            &CallGraphValidationConfig::default(),
+        )
+    }
+
+    /// Validate against expected patterns with custom configuration
+    pub fn validate_expectations_with_config(
+        call_graph: &CallGraph,
+        expectations: &[Expectation],
+        config: &CallGraphValidationConfig,
+    ) -> ValidationReport {
+        let report = Self::validate_with_config(call_graph, config);
 
         for expectation in expectations {
             if !expectation.check(call_graph) {
@@ -589,6 +664,7 @@ mod tests {
 
     #[test]
     fn test_entry_point_detection() {
+        let config = CallGraphValidationConfig::default();
         let test_cases = vec![
             ("src/main.rs", "main"),
             ("src/lib.rs", "test_my_function"),
@@ -601,7 +677,7 @@ mod tests {
         for (file, name) in test_cases {
             let func = FunctionId::new(PathBuf::from(file), name.to_string(), 1);
             assert!(
-                CallGraphValidator::is_entry_point(&func),
+                CallGraphValidator::is_entry_point(&func, &config),
                 "Expected {} in {} to be entry point",
                 name,
                 file
@@ -717,5 +793,86 @@ mod tests {
         assert_eq!(report.statistics.recursive_functions, 1);
         assert_eq!(report.statistics.isolated_functions, 0);
         assert_eq!(report.statistics.unreachable_functions, 0);
+    }
+
+    #[test]
+    fn test_orphan_whitelist() {
+        let mut call_graph = CallGraph::new();
+        let isolated = FunctionId::new(PathBuf::from("test.rs"), "utility_fn".to_string(), 10);
+
+        call_graph.add_function(isolated.clone(), false, false, 1, 10);
+        // No calls added - function is isolated
+
+        // Validate without config - should be flagged as isolated
+        let report = CallGraphValidator::validate(&call_graph);
+        assert!(
+            report.structural_issues.iter().any(
+                |issue| matches!(issue, StructuralIssue::IsolatedFunction { function } if function == &isolated)
+            ),
+            "Isolated function should be detected without whitelist"
+        );
+
+        // Validate with whitelist config - should NOT be flagged
+        let mut config = CallGraphValidationConfig::new();
+        config.add_orphan_whitelist("utility_fn".to_string());
+        let report_with_config = CallGraphValidator::validate_with_config(&call_graph, &config);
+
+        assert!(
+            !report_with_config.structural_issues.iter().any(
+                |issue| matches!(issue, StructuralIssue::IsolatedFunction { function } if function == &isolated)
+            ),
+            "Whitelisted function should not be flagged as isolated"
+        );
+    }
+
+    #[test]
+    fn test_additional_entry_points() {
+        let mut call_graph = CallGraph::new();
+        let custom_entry = FunctionId::new(PathBuf::from("test.rs"), "custom_main".to_string(), 10);
+        let helper = FunctionId::new(PathBuf::from("test.rs"), "helper".to_string(), 20);
+
+        call_graph.add_function(custom_entry.clone(), false, false, 1, 10);
+        call_graph.add_function(helper.clone(), false, false, 1, 5);
+        call_graph.add_call_parts(
+            custom_entry.clone(),
+            helper,
+            crate::priority::call_graph::CallType::Direct,
+        );
+
+        // Without config - custom_main has no callers, should be unreachable
+        let report = CallGraphValidator::validate(&call_graph);
+        assert!(
+            report.structural_issues.iter().any(
+                |issue| matches!(issue, StructuralIssue::UnreachableFunction { function, .. } if function == &custom_entry)
+            ),
+            "Custom entry point should be unreachable without config"
+        );
+
+        // With additional entry point config - should NOT be flagged
+        let mut config = CallGraphValidationConfig::new();
+        config.add_entry_point("custom_main".to_string());
+        let report_with_config = CallGraphValidator::validate_with_config(&call_graph, &config);
+
+        assert!(
+            !report_with_config.structural_issues.iter().any(
+                |issue| matches!(issue, StructuralIssue::UnreachableFunction { function, .. } if function == &custom_entry)
+            ),
+            "Configured entry point should not be flagged as unreachable"
+        );
+        assert_eq!(report_with_config.statistics.entry_points, 1);
+    }
+
+    #[test]
+    fn test_config_builder_pattern() {
+        let mut config = CallGraphValidationConfig::new();
+        config
+            .add_orphan_whitelist("temp_fn".to_string())
+            .add_orphan_whitelist("debug_fn".to_string())
+            .add_entry_point("custom_entry".to_string());
+
+        assert_eq!(config.orphan_whitelist.len(), 2);
+        assert_eq!(config.additional_entry_points.len(), 1);
+        assert!(config.orphan_whitelist.contains("temp_fn"));
+        assert!(config.additional_entry_points.contains("custom_entry"));
     }
 }
