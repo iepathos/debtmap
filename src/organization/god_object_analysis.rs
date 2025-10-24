@@ -40,8 +40,22 @@ pub enum GodObjectConfidence {
 pub struct ModuleSplit {
     pub suggested_name: String,
     pub methods_to_move: Vec<String>,
+    pub structs_to_move: Vec<String>,
     pub responsibility: String,
     pub estimated_lines: usize,
+    pub method_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+    #[serde(default)]
+    pub priority: Priority,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum Priority {
+    High,
+    #[default]
+    Medium,
+    Low,
 }
 
 #[derive(Debug, Clone)]
@@ -341,8 +355,12 @@ pub fn recommend_module_splits(
                     responsibility.to_lowercase().replace(' ', "_")
                 ),
                 methods_to_move: methods.clone(),
+                structs_to_move: vec![],
                 responsibility: responsibility.clone(),
                 estimated_lines: methods.len() * 20, // Rough estimate
+                method_count: methods.len(),
+                warning: None,
+                priority: Priority::Medium,
             });
         }
     }
@@ -354,6 +372,7 @@ pub fn recommend_module_splits(
 pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleSplit> {
     let mut grouped: HashMap<String, Vec<String>> = HashMap::new();
     let mut line_estimates: HashMap<String, usize> = HashMap::new();
+    let mut method_counts: HashMap<String, usize> = HashMap::new();
 
     for struct_metrics in structs {
         let domain = classify_struct_domain(&struct_metrics.name);
@@ -361,8 +380,9 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
             .entry(domain.clone())
             .or_default()
             .push(struct_metrics.name.clone());
-        *line_estimates.entry(domain).or_insert(0) +=
+        *line_estimates.entry(domain.clone()).or_insert(0) +=
             struct_metrics.line_span.1 - struct_metrics.line_span.0;
+        *method_counts.entry(domain).or_insert(0) += struct_metrics.method_count;
     }
 
     grouped
@@ -370,11 +390,16 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
         .filter(|(_, structs)| structs.len() > 1)
         .map(|(domain, structs)| {
             let estimated_lines = line_estimates.get(&domain).copied().unwrap_or(0);
+            let method_count = method_counts.get(&domain).copied().unwrap_or(0);
             ModuleSplit {
                 suggested_name: format!("config/{}.rs", domain),
-                methods_to_move: structs,
+                methods_to_move: vec![],
+                structs_to_move: structs,
                 responsibility: domain.clone(),
                 estimated_lines,
+                method_count,
+                warning: None,
+                priority: Priority::Medium,
             }
         })
         .collect()
@@ -402,4 +427,88 @@ pub fn classify_struct_domain(struct_name: &str) -> String {
     } else {
         "misc".to_string()
     }
+}
+
+/// Data structure for grouping structs with their methods
+#[derive(Debug, Clone)]
+pub struct StructWithMethods {
+    pub name: String,
+    pub methods: Vec<String>,
+    pub line_span: (usize, usize),
+}
+
+/// Suggest module splits using enhanced struct ownership analysis.
+///
+/// This function uses the struct ownership analyzer to create more accurate
+/// recommendations based on which methods belong to which structs.
+///
+/// # Arguments
+///
+/// * `structs` - Per-struct metrics
+/// * `ownership` - Struct ownership analyzer (optional for backward compatibility)
+///
+/// # Returns
+///
+/// Vector of validated module splits
+pub fn suggest_splits_by_struct_grouping(
+    structs: &[StructMetrics],
+    ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
+) -> Vec<ModuleSplit> {
+    use crate::organization::domain_classifier::classify_struct_domain_enhanced;
+    use crate::organization::split_validator::validate_and_refine_splits;
+
+    // If no ownership info, fall back to basic domain-based grouping
+    let ownership = match ownership {
+        Some(o) => o,
+        None => return suggest_module_splits_by_domain(structs),
+    };
+
+    // Group structs by domain using enhanced classification
+    let mut domain_groups: HashMap<String, Vec<StructWithMethods>> = HashMap::new();
+
+    for struct_metrics in structs {
+        let methods = ownership.get_struct_methods(&struct_metrics.name);
+        let domain = classify_struct_domain_enhanced(&struct_metrics.name, methods);
+
+        domain_groups
+            .entry(domain)
+            .or_default()
+            .push(StructWithMethods {
+                name: struct_metrics.name.clone(),
+                methods: methods.to_vec(),
+                line_span: struct_metrics.line_span,
+            });
+    }
+
+    // Convert domain groups to module splits
+    let splits: Vec<ModuleSplit> = domain_groups
+        .into_iter()
+        .map(|(domain, structs_with_methods)| {
+            let struct_names: Vec<String> = structs_with_methods
+                .iter()
+                .map(|s| s.name.clone())
+                .collect();
+
+            let total_methods: usize = structs_with_methods.iter().map(|s| s.methods.len()).sum();
+
+            let estimated_lines: usize = structs_with_methods
+                .iter()
+                .map(|s| s.line_span.1.saturating_sub(s.line_span.0))
+                .sum();
+
+            ModuleSplit {
+                suggested_name: format!("{}_{}", "module", domain),
+                methods_to_move: vec![],
+                structs_to_move: struct_names,
+                responsibility: domain,
+                estimated_lines: estimated_lines.max(total_methods * 15), // Estimate if line_span not available
+                method_count: total_methods,
+                warning: None,
+                priority: Priority::Medium,
+            }
+        })
+        .collect();
+
+    // Validate and refine splits (filters too small, splits too large)
+    validate_and_refine_splits(splits)
 }

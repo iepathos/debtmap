@@ -35,8 +35,34 @@ pub struct GodObjectIndicators {
 pub struct ModuleSplit {
     pub suggested_name: String,
     pub methods_to_move: Vec<String>,
+    #[serde(default)]
+    pub structs_to_move: Vec<String>,
     pub responsibility: String,
     pub estimated_lines: usize,
+    #[serde(default)]
+    pub method_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<String>,
+    #[serde(default)]
+    pub priority: Priority,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum Priority {
+    High,
+    #[default]
+    Medium,
+    Low,
+}
+
+impl From<crate::organization::Priority> for Priority {
+    fn from(p: crate::organization::Priority) -> Self {
+        match p {
+            crate::organization::Priority::High => Priority::High,
+            crate::organization::Priority::Medium => Priority::Medium,
+            crate::organization::Priority::Low => Priority::Low,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

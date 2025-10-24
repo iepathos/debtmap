@@ -51,8 +51,12 @@ impl UnifiedFileAnalyzer {
                     .map(|split| ModuleSplit {
                         suggested_name: split.suggested_name.clone(),
                         methods_to_move: split.methods_to_move.clone(),
+                        structs_to_move: split.structs_to_move.clone(),
                         responsibility: split.responsibility.clone(),
                         estimated_lines: split.estimated_lines,
+                        method_count: split.method_count,
+                        warning: split.warning.clone(),
+                        priority: split.priority.into(),
                     })
                     .collect();
 

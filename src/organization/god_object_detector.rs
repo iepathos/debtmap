@@ -57,9 +57,20 @@ impl GodObjectDetector {
         // Get basic file-level analysis
         let file_metrics = self.analyze_comprehensive(path, ast);
 
+        // For Rust files, use struct ownership analysis
+        let ownership = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            Some(crate::organization::struct_ownership::StructOwnershipAnalyzer::analyze_file(ast))
+        } else {
+            None
+        };
+
         // Classify as god class, god module, or not god object
-        let classification =
-            self.classify_god_object(&per_struct_metrics, file_metrics.method_count, &thresholds);
+        let classification = self.classify_god_object(
+            &per_struct_metrics,
+            file_metrics.method_count,
+            &thresholds,
+            ownership.as_ref(),
+        );
 
         // Generate context-aware recommendation
         let recommendation =
@@ -103,6 +114,7 @@ impl GodObjectDetector {
         per_struct_metrics: &[StructMetrics],
         total_methods: usize,
         thresholds: &GodObjectThresholds,
+        ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
     ) -> GodObjectType {
         // Check if any individual struct exceeds thresholds (god class)
         for struct_metrics in per_struct_metrics {
@@ -133,7 +145,15 @@ impl GodObjectDetector {
                     line_span: (0, 0),
                 });
 
-            let suggested_splits = suggest_module_splits_by_domain(per_struct_metrics);
+            // Use enhanced struct ownership analysis if available
+            let suggested_splits = if ownership.is_some() {
+                crate::organization::suggest_splits_by_struct_grouping(
+                    per_struct_metrics,
+                    ownership,
+                )
+            } else {
+                suggest_module_splits_by_domain(per_struct_metrics)
+            };
 
             return GodObjectType::GodModule {
                 total_structs: per_struct_metrics.len(),
@@ -186,10 +206,23 @@ impl GodObjectDetector {
                     let split_suggestions = suggested_splits
                         .iter()
                         .map(|s| {
-                            format!(
-                                "  - {}: {} structs",
-                                s.suggested_name,
+                            let structs_count = if !s.structs_to_move.is_empty() {
+                                s.structs_to_move.len()
+                            } else {
                                 s.methods_to_move.len()
+                            };
+                            let priority_icon = match s.priority {
+                                crate::organization::Priority::High => "⭐⭐⭐",
+                                crate::organization::Priority::Medium => "⭐⭐",
+                                crate::organization::Priority::Low => "⭐",
+                            };
+                            format!(
+                                "  - {} {}: {} structs, {} methods (~{} lines)",
+                                priority_icon,
+                                s.suggested_name,
+                                structs_count,
+                                s.method_count,
+                                s.estimated_lines
                             )
                         })
                         .collect::<Vec<_>>()

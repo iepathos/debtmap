@@ -383,7 +383,7 @@ pub mod commands;
     );
 
     assert!(
-        caller_names.len() >= 1,
+        !caller_names.is_empty(),
         "Should find call from commands::validate, found {}",
         caller_names.len()
     );

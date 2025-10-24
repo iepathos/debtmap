@@ -764,10 +764,17 @@ fn format_god_object_steps(
                 formatter.emoji("├─", "-")
             };
 
+            // Show priority indicator
+            let priority_indicator = match split.priority {
+                crate::priority::file_metrics::Priority::High => "⭐⭐⭐ High",
+                crate::priority::file_metrics::Priority::Medium => "⭐⭐ Medium",
+                crate::priority::file_metrics::Priority::Low => "⭐ Low",
+            };
+
             // Show module name and responsibility
             writeln!(
                 output,
-                "{}  {}  {} {}.{} - {} ({} methods, ~{} lines)",
+                "{}  {}  {} {}.{} - {} ({} methods, ~{} lines) [{}]",
                 formatter.emoji("│", ""),
                 branch,
                 formatter.emoji("📦", "[M]"),
@@ -775,7 +782,8 @@ fn format_god_object_steps(
                 extension,
                 split.responsibility,
                 split.methods_to_move.len(),
-                split.estimated_lines
+                split.estimated_lines,
+                priority_indicator
             )
             .unwrap();
 
@@ -812,6 +820,35 @@ fn format_god_object_steps(
                     )
                 };
                 continuation.unwrap();
+            }
+
+            // Show structs being moved
+            if !split.structs_to_move.is_empty() {
+                let branch_prefix = if is_last { " " } else { "│" };
+                writeln!(
+                    output,
+                    "{}  {}     {} Structs: {} ({} structs)",
+                    formatter.emoji("│", ""),
+                    formatter.emoji(branch_prefix, ""),
+                    formatter.emoji("→", "->"),
+                    split.structs_to_move.join(", "),
+                    split.structs_to_move.len()
+                )
+                .unwrap();
+            }
+
+            // Show warning if present
+            if let Some(warning) = &split.warning {
+                let branch_prefix = if is_last { " " } else { "│" };
+                writeln!(
+                    output,
+                    "{}  {}     {} {}",
+                    formatter.emoji("│", ""),
+                    formatter.emoji(branch_prefix, ""),
+                    formatter.emoji("⚠️", "[!]"),
+                    warning
+                )
+                .unwrap();
             }
         }
 
