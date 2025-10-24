@@ -75,8 +75,15 @@ impl CallGraph {
     }
 
     pub fn get_callees(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        // Use fuzzy matching to find the canonical FunctionId in the graph
+        // This handles cases where the query FunctionId might have a different
+        // module_path or slight variations (e.g., from FunctionMetrics vs call graph extraction)
+        let canonical_func_id = self
+            .find_function(func_id)
+            .unwrap_or_else(|| func_id.clone());
+
         self.callee_index
-            .get(func_id)
+            .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default()
     }
@@ -86,8 +93,15 @@ impl CallGraph {
     }
 
     pub fn get_callers(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        // Use fuzzy matching to find the canonical FunctionId in the graph
+        // This handles cases where the query FunctionId might have a different
+        // module_path or slight variations (e.g., from FunctionMetrics vs call graph extraction)
+        let canonical_func_id = self
+            .find_function(func_id)
+            .unwrap_or_else(|| func_id.clone());
+
         self.caller_index
-            .get(func_id)
+            .get(&canonical_func_id)
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default()
     }
