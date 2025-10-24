@@ -145,7 +145,7 @@ fn test_validator_on_healthy_graph() {
 
     // Should have detected the orphaned function
     assert!(
-        report.structural_issues.len() > 0 || report.warnings.len() > 0,
+        !report.structural_issues.is_empty() || !report.warnings.is_empty(),
         "Should detect structural issues or warnings"
     );
 }

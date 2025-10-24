@@ -101,11 +101,11 @@ impl CallGraphValidator {
     /// Check for dangling edges (references to non-existent functions)
     fn check_dangling_edges(call_graph: &CallGraph, report: &mut ValidationReport) {
         let all_function_ids: HashSet<_> =
-            call_graph.get_all_functions().map(|f| f.clone()).collect();
+            call_graph.get_all_functions().cloned().collect();
 
         for function in call_graph.get_all_functions() {
             // Check callees
-            let callees = call_graph.get_callees(&function);
+            let callees = call_graph.get_callees(function);
             for callee in callees {
                 if !all_function_ids.contains(&callee) {
                     report
@@ -122,8 +122,8 @@ impl CallGraphValidator {
     /// Check for orphaned nodes (functions with no connections)
     fn check_orphaned_nodes(call_graph: &CallGraph, report: &mut ValidationReport) {
         for function in call_graph.get_all_functions() {
-            let has_callers = !call_graph.get_callers(&function).is_empty();
-            let has_callees = !call_graph.get_callees(&function).is_empty();
+            let has_callers = !call_graph.get_callers(function).is_empty();
+            let has_callees = !call_graph.get_callees(function).is_empty();
 
             // Skip main and test functions (expected to have no callers)
             let is_entry_point = function.name == "main"
@@ -177,7 +177,7 @@ impl CallGraphValidator {
         const HIGH_CALLER_THRESHOLD: usize = 50;
 
         for function in call_graph.get_all_functions() {
-            let callers = call_graph.get_callers(&function);
+            let callers = call_graph.get_callers(function);
             if callers.len() > HIGH_CALLER_THRESHOLD {
                 report.warnings.push(ValidationWarning::TooManyCallers {
                     function: function.clone(),
@@ -192,7 +192,7 @@ impl CallGraphValidator {
         const HIGH_CALLEE_THRESHOLD: usize = 50;
 
         for function in call_graph.get_all_functions() {
-            let callees = call_graph.get_callees(&function);
+            let callees = call_graph.get_callees(function);
             if callees.len() > HIGH_CALLEE_THRESHOLD {
                 report.warnings.push(ValidationWarning::TooManyCallees {
                     function: function.clone(),
@@ -250,7 +250,7 @@ impl CallGraphValidator {
                 .unwrap_or(false);
 
             if is_standalone && starts_lowercase {
-                let has_no_callers = call_graph.get_callers(&function).is_empty();
+                let has_no_callers = call_graph.get_callers(function).is_empty();
 
                 // Skip test and main functions
                 let is_entry_point = function.name == "main"

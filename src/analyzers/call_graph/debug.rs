@@ -278,7 +278,7 @@ impl CallGraphDebugger {
             self.stats.failed,
             100.0 - self.stats.success_rate()
         ));
-        output.push_str("\n");
+        output.push('\n');
 
         // Strategy breakdown
         if !self.stats.by_strategy.is_empty() {
@@ -294,7 +294,7 @@ impl CallGraphDebugger {
                     strategy, stats.attempts, success_rate
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Timing information
@@ -312,7 +312,7 @@ impl CallGraphDebugger {
                 "    p99: {:.2}ms\n",
                 self.stats.time_percentiles.p99.as_secs_f64() * 1000.0
             ));
-            output.push_str("\n");
+            output.push('\n');
         }
 
         // Failed resolutions
@@ -378,7 +378,7 @@ impl CallGraphDebugger {
                     }
                 }
 
-                output.push_str("\n");
+                output.push('\n');
             }
 
             if failures.len() > 20 {

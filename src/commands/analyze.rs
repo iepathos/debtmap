@@ -409,7 +409,10 @@ fn handle_call_graph_diagnostics(
 
         eprintln!("\n=== Call Graph Validation Report ===");
         eprintln!("Health Score: {}/100", validation_report.health_score);
-        eprintln!("Structural Issues: {}", validation_report.structural_issues.len());
+        eprintln!(
+            "Structural Issues: {}",
+            validation_report.structural_issues.len()
+        );
         eprintln!("Warnings: {}", validation_report.warnings.len());
 
         if !validation_report.structural_issues.is_empty() {
@@ -425,7 +428,10 @@ fn handle_call_graph_diagnostics(
                 eprintln!("  - {:?}", warning);
             }
             if validation_report.warnings.len() > 10 {
-                eprintln!("  ... and {} more warnings", validation_report.warnings.len() - 10);
+                eprintln!(
+                    "  ... and {} more warnings",
+                    validation_report.warnings.len() - 10
+                );
             }
         }
     }
@@ -442,9 +448,10 @@ fn handle_call_graph_diagnostics(
             show_timing: true,
             max_candidates_shown: 5,
             format,
-            filter_functions: config.trace_functions.as_ref().map(|funcs| {
-                funcs.iter().cloned().collect()
-            }),
+            filter_functions: config
+                .trace_functions
+                .as_ref()
+                .map(|funcs| funcs.iter().cloned().collect()),
         };
 
         let mut debugger = CallGraphDebugger::new(debug_config);
@@ -471,17 +478,20 @@ fn handle_call_graph_diagnostics(
         eprintln!("Total Functions: {}", call_graph.node_count());
 
         // Calculate total calls by summing callees for all functions
-        let total_calls: usize = call_graph.get_all_functions()
+        let total_calls: usize = call_graph
+            .get_all_functions()
             .map(|func| call_graph.get_callees(func).len())
             .sum();
         eprintln!("Total Calls: {}", total_calls);
 
-        eprintln!("Average Calls per Function: {:.2}",
+        eprintln!(
+            "Average Calls per Function: {:.2}",
             if call_graph.node_count() > 0 {
                 total_calls as f64 / call_graph.node_count() as f64
             } else {
                 0.0
-            });
+            }
+        );
     }
 
     Ok(())
