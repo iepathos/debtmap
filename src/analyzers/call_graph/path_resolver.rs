@@ -247,7 +247,9 @@ impl PathResolver {
                     // Verify the file path contains the expected module name
                     let file_path_str = func.file.to_string_lossy();
                     let expected_module = &path_parts[..path_parts.len() - 1].join("/");
-                    if file_path_str.contains(expected_module) || expected_module.starts_with("crate") {
+                    if file_path_str.contains(expected_module)
+                        || expected_module.starts_with("crate")
+                    {
                         return Some(func.clone());
                     }
                 }

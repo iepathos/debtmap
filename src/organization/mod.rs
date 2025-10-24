@@ -2,16 +2,24 @@ use crate::common::SourceLocation;
 use syn;
 
 pub mod complexity_weighting;
+pub mod domain_classifier;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod purity_analyzer;
+pub mod split_validator;
+pub mod struct_ownership;
 
 pub use god_object_analysis::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, recommend_module_splits, suggest_module_splits_by_domain,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    GodObjectType, ModuleSplit, PurityDistribution, StructMetrics,
+    suggest_splits_by_struct_grouping, EnhancedGodObjectAnalysis, GodObjectAnalysis,
+    GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
+    PurityDistribution, StructMetrics, StructWithMethods,
 };
+
+pub use domain_classifier::classify_struct_domain_enhanced;
+pub use split_validator::validate_and_refine_splits;
+pub use struct_ownership::StructOwnershipAnalyzer;
 
 pub use god_object_metrics::{
     FileMetricHistory, FileTrend, GodObjectMetrics, GodObjectSnapshot, MetricsSummary,
