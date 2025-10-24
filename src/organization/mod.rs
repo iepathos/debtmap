@@ -1,7 +1,12 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod call_graph_cohesion;
+pub mod cohesion_calculator;
+pub mod cohesion_priority;
 pub mod complexity_weighting;
+pub mod cycle_detector;
+pub mod dependency_analyzer;
 pub mod domain_classifier;
 pub mod god_object_analysis;
 pub mod god_object_metrics;

@@ -48,6 +48,15 @@ pub struct ModuleSplit {
     pub warning: Option<String>,
     #[serde(default)]
     pub priority: Priority,
+    /// Cohesion score (0.0-1.0) measuring how tightly related the methods are
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cohesion_score: Option<f64>,
+    /// External modules/structs this module depends on
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_in: Vec<String>,
+    /// External modules/structs that depend on this module
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_out: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -361,6 +370,9 @@ pub fn recommend_module_splits(
                 method_count: methods.len(),
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             });
         }
     }
@@ -400,6 +412,9 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 method_count,
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             }
         })
         .collect()
@@ -505,6 +520,9 @@ pub fn suggest_splits_by_struct_grouping(
                 method_count: total_methods,
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             }
         })
         .collect();
