@@ -194,7 +194,15 @@ impl ParallelCallGraphBuilder {
         enhanced_builder.analyze_cross_module(&workspace_files)?;
 
         // Finalize trait analysis - detect patterns ONCE after all files processed
+        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+        if !quiet_mode {
+            eprint!("🔍 Resolving trait patterns and method calls...");
+            std::io::Write::flush(&mut std::io::stderr()).ok();
+        }
         enhanced_builder.finalize_trait_analysis()?;
+        if !quiet_mode {
+            eprintln!(" ✓");
+        }
 
         // Extract results
         let enhanced_graph = enhanced_builder.build();
