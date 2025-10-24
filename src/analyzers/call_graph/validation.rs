@@ -924,7 +924,6 @@ mod tests {
         use crate::core::Language;
         use crate::io::walker;
         use std::env;
-        use std::path::Path;
 
         // Get the project root (debtmap's own codebase)
         let project_root = env::current_dir().expect("Failed to get current directory");
@@ -943,7 +942,7 @@ mod tests {
         // Extract all functions from file metrics
         let all_functions: Vec<_> = file_metrics
             .iter()
-            .flat_map(|fm| fm.functions.clone())
+            .flat_map(|fm| fm.complexity.functions.clone())
             .collect();
 
         // Build call graph
