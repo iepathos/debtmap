@@ -1,3 +1,4 @@
+use crate::config::CallerCalleeConfig;
 use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, FunctionVisibility, Tier,
@@ -8,6 +9,78 @@ use std::fmt::Write;
 
 #[path = "formatter_verbosity.rs"]
 mod verbosity;
+
+// ============================================================================
+// Caller/Callee Filtering and Formatting Functions
+// ============================================================================
+
+/// Pure function to determine if a function reference should be included in output
+fn should_include_in_output(function_name: &str, config: &CallerCalleeConfig) -> bool {
+    // Check for standard library patterns
+    if !config.show_std_lib && is_standard_library_call(function_name) {
+        return false;
+    }
+
+    // Check for external crate patterns (functions with :: that aren't std)
+    if !config.show_external && is_external_crate_call(function_name) {
+        return false;
+    }
+
+    true
+}
+
+/// Pure function to check if a call is to the standard library
+fn is_standard_library_call(function_name: &str) -> bool {
+    function_name.starts_with("std::")
+        || function_name.starts_with("core::")
+        || function_name.starts_with("alloc::")
+        || function_name == "println"
+        || function_name == "print"
+        || function_name == "eprintln"
+        || function_name == "eprint"
+        || function_name == "write"
+        || function_name == "writeln"
+        || function_name == "format"
+        || function_name == "panic"
+        || function_name == "assert"
+        || function_name == "debug_assert"
+}
+
+/// Pure function to check if a call is to an external crate
+fn is_external_crate_call(function_name: &str) -> bool {
+    // Has :: but not std/core/alloc
+    function_name.contains("::")
+        && !function_name.starts_with("std::")
+        && !function_name.starts_with("core::")
+        && !function_name.starts_with("alloc::")
+        && !function_name.starts_with("crate::")
+}
+
+/// Pure function to filter a list of dependencies based on configuration
+fn filter_dependencies(names: &[String], config: &CallerCalleeConfig) -> Vec<String> {
+    names
+        .iter()
+        .filter(|name| should_include_in_output(name, config))
+        .cloned()
+        .collect()
+}
+
+/// Pure function to format a function reference for display
+fn format_function_reference(function_name: &str) -> String {
+    // Simplify long paths - show just the last component with file hint
+    if function_name.contains("::") {
+        let parts: Vec<&str> = function_name.split("::").collect();
+        if parts.len() > 2 {
+            format!("{}::{}", parts[parts.len() - 2], parts[parts.len() - 1])
+        } else {
+            function_name.to_string()
+        }
+    } else {
+        function_name.to_string()
+    }
+}
+
+// ============================================================================
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
@@ -1286,6 +1359,8 @@ fn format_file_priority_item(
 }
 
 // Helper function to format a list with truncation
+// Note: Currently used only in tests, but kept for potential future use
+#[allow(dead_code)]
 fn format_truncated_list(items: &[String], max_display: usize) -> String {
     if items.len() <= max_display {
         items.join(", ")
@@ -1391,10 +1466,13 @@ impl ComplexityInfo {
 }
 
 struct DependencyInfo {
+    #[allow(dead_code)]
     upstream: usize,
+    #[allow(dead_code)]
     downstream: usize,
     upstream_callers: Vec<String>,
     downstream_callees: Vec<String>,
+    #[allow(dead_code)]
     has_dependencies: bool,
 }
 
@@ -1519,31 +1597,105 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
     ))
 }
 
-// Pure function to format dependencies section
+// Pure function to format dependencies section with enhanced caller/callee display
 fn format_dependencies_section(context: &FormatContext) -> Option<String> {
-    if !context.dependency_info.has_dependencies {
+    let config = CallerCalleeConfig::default();
+    let formatter = ColoredFormatter::new(FormattingConfig::default());
+
+    // Filter callers and callees based on configuration
+    let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, &config);
+    let filtered_callees =
+        filter_dependencies(&context.dependency_info.downstream_callees, &config);
+
+    // Only show section if we have callers or callees to display
+    if filtered_callers.is_empty() && filtered_callees.is_empty() {
         return None;
     }
 
-    let mut section = format!(
-        "{} {} upstream, {} downstream",
-        "├─ DEPENDENCIES:".bright_blue(),
-        context.dependency_info.upstream,
-        context.dependency_info.downstream
-    );
+    let mut section = format!("{}", "├─ DEPENDENCIES:".bright_blue());
 
-    // Add callers information
-    if !context.dependency_info.upstream_callers.is_empty() {
-        let callers_display = format_truncated_list(&context.dependency_info.upstream_callers, 3);
-        section.push_str(&format!("\n│  ├─ CALLERS: {}", callers_display));
+    // Display callers
+    if !filtered_callers.is_empty() {
+        let caller_count = filtered_callers.len();
+        let display_count = caller_count.min(config.max_callers);
+
+        section.push_str(&format!(
+            "\n{}  {} {} ({}):",
+            formatter.emoji("│", "|"),
+            formatter.emoji("├─", "|-"),
+            formatter.emoji("📞", "Called by"),
+            caller_count
+        ));
+
+        for caller in filtered_callers.iter().take(display_count) {
+            let formatted_caller = format_function_reference(caller);
+            section.push_str(&format!(
+                "\n{}  {}     {} {}",
+                formatter.emoji("│", "|"),
+                formatter.emoji("│", "|"),
+                formatter.emoji("•", "*"),
+                formatted_caller.bright_cyan()
+            ));
+        }
+
+        if caller_count > display_count {
+            section.push_str(&format!(
+                "\n{}  {}     {} (showing {} of {})",
+                formatter.emoji("│", "|"),
+                formatter.emoji("│", "|"),
+                formatter.emoji("…", "..."),
+                display_count,
+                caller_count
+            ));
+        }
+    } else {
+        section.push_str(&format!(
+            "\n{}  {} {} No direct callers detected",
+            formatter.emoji("│", "|"),
+            formatter.emoji("├─", "|-"),
+            formatter.emoji("📞", "Called by")
+        ));
     }
 
-    // Add callees information
-    if !context.dependency_info.downstream_callees.is_empty() {
-        let callees_display = format_truncated_list(&context.dependency_info.downstream_callees, 3);
+    // Display callees
+    if !filtered_callees.is_empty() {
+        let callee_count = filtered_callees.len();
+        let display_count = callee_count.min(config.max_callees);
+
         section.push_str(&format!(
-            "\n│  └─ CALLS: {}",
-            callees_display.bright_magenta()
+            "\n{}  {} {} ({}):",
+            formatter.emoji("│", "|"),
+            formatter.emoji("└─", "+-"),
+            formatter.emoji("📤", "Calls"),
+            callee_count
+        ));
+
+        for callee in filtered_callees.iter().take(display_count) {
+            let formatted_callee = format_function_reference(callee);
+            section.push_str(&format!(
+                "\n{}       {} {}",
+                formatter.emoji("│", "|"),
+                formatter.emoji("•", "*"),
+                formatted_callee.bright_magenta()
+            ));
+        }
+
+        if callee_count > display_count {
+            section.push_str(&format!(
+                "\n{}       {} (showing {} of {})",
+                formatter.emoji("│", "|"),
+                formatter.emoji("…", "..."),
+                display_count,
+                callee_count
+            ));
+        }
+    } else if !filtered_callers.is_empty() {
+        // Only show "calls nothing" if we showed callers
+        section.push_str(&format!(
+            "\n{}  {} {} Calls no other functions",
+            formatter.emoji("│", "|"),
+            formatter.emoji("└─", "+-"),
+            formatter.emoji("📤", "Calls")
         ));
     }
 
@@ -2069,10 +2221,12 @@ mod tests {
         let mut item = create_test_item(7.0);
         item.upstream_dependencies = 3;
         item.downstream_dependencies = 2;
+        item.upstream_callers = vec!["caller1".to_string()];
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("DEPENDENCIES:"));
-        assert!(plain.contains("3 upstream"));
+        // New format shows count in parentheses
+        assert!(plain.contains("(1)") || plain.contains("caller1"));
     }
 
     #[test]
@@ -2083,8 +2237,10 @@ mod tests {
         item.upstream_dependencies = 2;
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
-        assert!(plain.contains("CALLERS:"));
-        assert!(plain.contains("caller1, caller2"));
+        // New format shows "Called by" with count
+        assert!(plain.contains("Called by") || plain.contains("caller1"));
+        assert!(plain.contains("caller1"));
+        assert!(plain.contains("caller2"));
     }
 
     #[test]
@@ -2097,11 +2253,14 @@ mod tests {
             "c3".to_string(),
             "c4".to_string(),
             "c5".to_string(),
+            "c6".to_string(),
+            "c7".to_string(),
         ];
-        item.upstream_dependencies = 5;
+        item.upstream_dependencies = 7;
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
-        assert!(plain.contains("... (2 more)"));
+        // New format shows "showing 5 of 7"
+        assert!(plain.contains("showing 5 of 7"));
     }
 
     #[test]
@@ -2112,8 +2271,10 @@ mod tests {
         item.downstream_dependencies = 2;
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
-        assert!(plain.contains("CALLS:"));
-        assert!(plain.contains("func1, func2"));
+        // New format shows "Calls" with count
+        assert!(plain.contains("Calls") || plain.contains("func1"));
+        assert!(plain.contains("func1"));
+        assert!(plain.contains("func2"));
     }
 
     #[test]
@@ -2167,8 +2328,12 @@ mod tests {
         let mut item = create_test_item(3.5);
         item.upstream_dependencies = 0;
         item.downstream_dependencies = 0;
+        // Clear the caller/callee lists too
+        item.upstream_callers = vec![];
+        item.downstream_callees = vec![];
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
+        // With no callers or callees, DEPENDENCIES section should not appear
         assert!(!plain.contains("DEPENDENCIES:"));
     }
 
@@ -2266,6 +2431,201 @@ mod tests {
     #[test]
     fn test_format_role_unknown() {
         assert_eq!(format_role(FunctionRole::Unknown), "Unknown");
+    }
+
+    // ============================================================================
+    // Caller/Callee Tests
+    // ============================================================================
+
+    #[test]
+    fn test_is_standard_library_call() {
+        assert!(is_standard_library_call("std::vec::Vec"));
+        assert!(is_standard_library_call("core::fmt::Display"));
+        assert!(is_standard_library_call("alloc::string::String"));
+        assert!(is_standard_library_call("println"));
+        assert!(is_standard_library_call("write"));
+        assert!(is_standard_library_call("writeln"));
+
+        assert!(!is_standard_library_call("my_function"));
+        assert!(!is_standard_library_call("crate::utils::helper"));
+    }
+
+    #[test]
+    fn test_is_external_crate_call() {
+        assert!(is_external_crate_call("serde::Serialize"));
+        assert!(is_external_crate_call("tokio::runtime::Runtime"));
+
+        assert!(!is_external_crate_call("std::vec::Vec"));
+        assert!(!is_external_crate_call("core::fmt::Display"));
+        assert!(!is_external_crate_call("crate::utils::helper"));
+        assert!(!is_external_crate_call("my_function"));
+    }
+
+    #[test]
+    fn test_should_include_in_output_default_config() {
+        let config = CallerCalleeConfig::default();
+
+        // Should exclude std lib by default
+        assert!(!should_include_in_output("std::vec::Vec", &config));
+        assert!(!should_include_in_output("println", &config));
+
+        // Should exclude external crates by default
+        assert!(!should_include_in_output("serde::Serialize", &config));
+
+        // Should include local functions
+        assert!(should_include_in_output("my_function", &config));
+        assert!(should_include_in_output("crate::utils::helper", &config));
+    }
+
+    #[test]
+    fn test_should_include_in_output_show_all() {
+        let config = CallerCalleeConfig {
+            max_callers: 5,
+            max_callees: 5,
+            show_external: true,
+            show_std_lib: true,
+        };
+
+        // Should include everything when configured
+        assert!(should_include_in_output("std::vec::Vec", &config));
+        assert!(should_include_in_output("serde::Serialize", &config));
+        assert!(should_include_in_output("my_function", &config));
+    }
+
+    #[test]
+    fn test_filter_dependencies() {
+        let config = CallerCalleeConfig::default();
+
+        let names = vec![
+            "std::vec::Vec".to_string(),
+            "my_function".to_string(),
+            "serde::Serialize".to_string(),
+            "crate::helper".to_string(),
+            "writeln".to_string(),
+        ];
+
+        let filtered = filter_dependencies(&names, &config);
+
+        // Should only include local functions
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.contains(&"my_function".to_string()));
+        assert!(filtered.contains(&"crate::helper".to_string()));
+    }
+
+    #[test]
+    fn test_format_function_reference() {
+        // Simple function name
+        assert_eq!(format_function_reference("my_function"), "my_function");
+
+        // Short path
+        assert_eq!(format_function_reference("crate::helper"), "crate::helper");
+
+        // Long path - should simplify
+        assert_eq!(
+            format_function_reference("crate::utils::io::helper::read_file"),
+            "helper::read_file"
+        );
+
+        // Module path
+        assert_eq!(
+            format_function_reference("std::collections::HashMap"),
+            "collections::HashMap"
+        );
+    }
+
+    #[test]
+    fn test_format_dependencies_section_with_callers() {
+        let mut item = create_test_item(6.0);
+        item.upstream_callers = vec![
+            "caller1".to_string(),
+            "caller2".to_string(),
+            "crate::module::caller3".to_string(),
+        ];
+        item.downstream_callees = vec!["callee1".to_string()];
+
+        let context = create_format_context(1, &item);
+        let section = format_dependencies_section(&context);
+
+        assert!(section.is_some());
+        let section_text = strip_ansi_codes(&section.unwrap());
+        assert!(section_text.contains("DEPENDENCIES:"));
+        assert!(section_text.contains("Called by"));
+        assert!(section_text.contains("caller1"));
+        assert!(section_text.contains("caller2"));
+    }
+
+    #[test]
+    fn test_format_dependencies_section_no_callers() {
+        let mut item = create_test_item(6.0);
+        item.upstream_callers = vec![];
+        item.downstream_callees = vec!["callee1".to_string(), "callee2".to_string()];
+
+        let context = create_format_context(1, &item);
+        let section = format_dependencies_section(&context);
+
+        assert!(section.is_some());
+        let section_text = strip_ansi_codes(&section.unwrap());
+        assert!(section_text.contains("No direct callers detected"));
+        assert!(section_text.contains("Calls"));
+    }
+
+    #[test]
+    fn test_format_dependencies_section_filters_std_lib() {
+        let mut item = create_test_item(6.0);
+        item.upstream_callers = vec!["caller1".to_string()];
+        item.downstream_callees = vec![
+            "std::println".to_string(),
+            "writeln".to_string(),
+            "my_function".to_string(),
+        ];
+
+        let context = create_format_context(1, &item);
+        let section = format_dependencies_section(&context);
+
+        assert!(section.is_some());
+        let section_text = strip_ansi_codes(&section.unwrap());
+
+        // Should include my_function but not std lib calls
+        assert!(section_text.contains("my_function"));
+        assert!(!section_text.contains("println"));
+        assert!(!section_text.contains("writeln"));
+
+        // Should show count of 1 (only my_function)
+        assert!(section_text.contains("(1)"));
+    }
+
+    #[test]
+    fn test_format_dependencies_section_truncation() {
+        let mut item = create_test_item(6.0);
+        // Create more than 5 callers
+        item.upstream_callers = vec![
+            "caller1".to_string(),
+            "caller2".to_string(),
+            "caller3".to_string(),
+            "caller4".to_string(),
+            "caller5".to_string(),
+            "caller6".to_string(),
+            "caller7".to_string(),
+        ];
+
+        let context = create_format_context(1, &item);
+        let section = format_dependencies_section(&context);
+
+        assert!(section.is_some());
+        let section_text = strip_ansi_codes(&section.unwrap());
+
+        // Should show truncation message
+        assert!(section_text.contains("showing 5 of 7"));
+    }
+
+    #[test]
+    fn test_caller_callee_config_defaults() {
+        let config = CallerCalleeConfig::default();
+
+        assert_eq!(config.max_callers, 5);
+        assert_eq!(config.max_callees, 5);
+        assert!(!config.show_external);
+        assert!(!config.show_std_lib);
     }
 
     // Helper function to create test FileDebtItem
