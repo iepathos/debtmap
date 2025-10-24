@@ -49,10 +49,7 @@ impl CallGraph {
 
         // Populate name index (name only)
         let normalized_name = FunctionId::normalize_name(&id.name);
-        self.name_index
-            .entry(normalized_name)
-            .or_default()
-            .push(id);
+        self.name_index.entry(normalized_name).or_default().push(id);
     }
 
     pub fn add_call(&mut self, call: FunctionCall) {
