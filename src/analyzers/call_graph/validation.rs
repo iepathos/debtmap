@@ -930,8 +930,9 @@ mod tests {
 
         // Find Rust files in the project
         let config = crate::config::get_config();
-        let files = walker::find_project_files_with_config(&project_root, vec![Language::Rust], config)
-            .expect("Failed to find project files");
+        let files =
+            walker::find_project_files_with_config(&project_root, vec![Language::Rust], config)
+                .expect("Failed to find project files");
 
         // Analyze files to get function metrics
         let file_metrics: Vec<_> = files
@@ -974,10 +975,22 @@ mod tests {
         // Print summary for manual inspection
         eprintln!("\n=== Debtmap Self-Analysis Health Report ===");
         eprintln!("Health Score: {}/100", validation_report.health_score);
-        eprintln!("Total Functions: {}", validation_report.statistics.total_functions);
-        eprintln!("Entry Points: {}", validation_report.statistics.entry_points);
-        eprintln!("Isolated Functions: {}", validation_report.statistics.isolated_functions);
-        eprintln!("Structural Issues: {}", validation_report.structural_issues.len());
+        eprintln!(
+            "Total Functions: {}",
+            validation_report.statistics.total_functions
+        );
+        eprintln!(
+            "Entry Points: {}",
+            validation_report.statistics.entry_points
+        );
+        eprintln!(
+            "Isolated Functions: {}",
+            validation_report.statistics.isolated_functions
+        );
+        eprintln!(
+            "Structural Issues: {}",
+            validation_report.structural_issues.len()
+        );
         eprintln!("Warnings: {}", validation_report.warnings.len());
     }
 }

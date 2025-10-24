@@ -384,7 +384,8 @@ fn perform_unified_analysis_computation(
     }
 
     // Integrate trait resolution to reduce false positives
-    let trait_resolution_stats = integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
+    let trait_resolution_stats =
+        integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
 
     if !quiet_mode {
         if use_emoji {
@@ -396,11 +397,23 @@ fn perform_unified_analysis_computation(
         // Display trait resolution statistics in verbose mode
         if verbose_macro_warnings {
             if use_emoji {
-                eprintln!("🔗 Resolved {} trait method calls", trait_resolution_stats.resolved_calls);
-                eprintln!("🎯 Marked {} trait implementations as callable", trait_resolution_stats.marked_implementations);
+                eprintln!(
+                    "🔗 Resolved {} trait method calls",
+                    trait_resolution_stats.resolved_calls
+                );
+                eprintln!(
+                    "🎯 Marked {} trait implementations as callable",
+                    trait_resolution_stats.marked_implementations
+                );
             } else {
-                eprintln!("Resolved {} trait method calls", trait_resolution_stats.resolved_calls);
-                eprintln!("Marked {} trait implementations as callable", trait_resolution_stats.marked_implementations);
+                eprintln!(
+                    "Resolved {} trait method calls",
+                    trait_resolution_stats.resolved_calls
+                );
+                eprintln!(
+                    "Marked {} trait implementations as callable",
+                    trait_resolution_stats.marked_implementations
+                );
             }
         }
 
