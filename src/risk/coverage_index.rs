@@ -20,18 +20,10 @@ fn normalize_path(path: &Path) -> PathBuf {
 ///
 /// # Usage
 ///
-/// Build index once and share across threads:
-///
-/// ```ignore
-/// use std::sync::Arc;
-/// let coverage = parse_lcov("coverage.info")?;
-/// let index = Arc::new(CoverageIndex::from_coverage(&coverage));
-///
-/// files.par_iter().for_each(|file| {
-///     let cov = index.get_function_coverage(file, "my_function");
-///     // Process coverage...
-/// });
-/// ```
+/// Build the index once from parsed LCOV data, then share it across threads
+/// using `Arc` for concurrent access. The index provides O(1) lookups by
+/// file path and function name, making it efficient for parallel analysis
+/// of large codebases.
 #[derive(Debug, Clone)]
 pub struct CoverageIndex {
     /// Coverage records indexed by (file, function_name) for O(1) lookup

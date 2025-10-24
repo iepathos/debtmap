@@ -500,12 +500,9 @@ fn normalize_function_name(name: &str) -> String {
 /// * `lcov_path` - The path from LCOV data (often relative)
 ///
 /// # Example
-/// ```ignore
-/// use std::path::PathBuf;
-/// let query = PathBuf::from("/home/user/project/src/main.rs");
-/// let lcov = PathBuf::from("src/main.rs");
-/// // query.ends_with(&lcov) == true
-/// ```
+///
+/// Given query path `/home/user/project/src/main.rs` and LCOV path `src/main.rs`,
+/// this strategy returns `true` because the query ends with the LCOV path.
 #[allow(dead_code)]
 fn matches_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
     query_path.ends_with(lcov_path)
@@ -521,12 +518,10 @@ fn matches_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
 /// * `lcov_path` - The path from LCOV data (often absolute)
 ///
 /// # Example
-/// ```ignore
-/// use std::path::PathBuf;
-/// let query = PathBuf::from("./src/lib.rs");
-/// let lcov = PathBuf::from("/home/user/project/src/lib.rs");
-/// // lcov.ends_with("src/lib.rs") == true
-/// ```
+///
+/// Given query path `./src/lib.rs` and LCOV path `/home/user/project/src/lib.rs`,
+/// after normalizing the query to `src/lib.rs`, this strategy returns `true`
+/// because the LCOV path ends with the normalized query.
 #[allow(dead_code)]
 fn matches_reverse_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool {
     let normalized_query = normalize_path(query_path);
@@ -543,12 +538,9 @@ fn matches_reverse_suffix_strategy(query_path: &Path, lcov_path: &Path) -> bool 
 /// * `lcov_path` - The path from LCOV data
 ///
 /// # Example
-/// ```ignore
-/// use std::path::PathBuf;
-/// let query = PathBuf::from("src/main.rs");
-/// let lcov = PathBuf::from("./src/main.rs");
-/// // After normalization, both are "src/main.rs"
-/// ```
+///
+/// Given query path `src/main.rs` and LCOV path `./src/main.rs`,
+/// both normalize to `src/main.rs` and this strategy returns `true`.
 #[allow(dead_code)]
 fn matches_normalized_equality_strategy(query_path: &Path, lcov_path: &Path) -> bool {
     normalize_path(lcov_path) == normalize_path(query_path)
@@ -648,17 +640,10 @@ fn apply_strategies_parallel<'a>(
 /// Reference to the function coverage data if found, None otherwise
 ///
 /// # Example
-/// ```ignore
-/// use std::collections::HashMap;
-/// use std::path::PathBuf;
 ///
-/// let mut functions = HashMap::new();
-/// let coverage = vec![/* FunctionCoverage data */];
-/// functions.insert(PathBuf::from("src/main.rs"), coverage);
-///
-/// let query = PathBuf::from("./src/main.rs");
-/// // Finds the functions using normalized path matching
-/// ```
+/// This function can find coverage data even when paths differ in normalization.
+/// For instance, querying `./src/main.rs` will match stored data under `src/main.rs`.
+/// Uses parallel search for large datasets (>20 files) and sequential for smaller ones.
 #[allow(dead_code)]
 fn find_functions_by_path<'a>(
     functions: &'a HashMap<PathBuf, Vec<FunctionCoverage>>,
@@ -683,15 +668,9 @@ fn find_functions_by_path<'a>(
 /// A new PathBuf with leading "./" removed
 ///
 /// # Example
-/// ```ignore
-/// use std::path::PathBuf;
 ///
-/// let path = PathBuf::from("./src/main.rs");
-/// // normalize_path removes the leading "./"
-/// // Result: "src/main.rs"
-///
-/// // Idempotent - normalizing again gives same result
-/// ```
+/// Normalizing `./src/main.rs` produces `src/main.rs`.
+/// The function is idempotent: normalizing `src/main.rs` again returns `src/main.rs`.
 #[allow(dead_code)]
 fn normalize_path(path: &Path) -> PathBuf {
     // Convert to string, remove leading ./

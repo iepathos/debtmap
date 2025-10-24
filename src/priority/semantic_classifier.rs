@@ -107,19 +107,19 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
 /// - Minimal nesting (≤ 1 level)
 /// - Low cognitive complexity (≤ 3)
 ///
-/// # Examples
+/// # Detected Patterns
 ///
-/// ```rust,ignore
-/// // Simple constructor - matches
-/// fn new() -> Self { Self { field: 0 } }
+/// **Simple constructors** (matches):
+/// - Standard names: `new()`, `default()`, `from_*()`, `with_*()`
+/// - Short length: < 15 lines
+/// - Low complexity: cyclomatic ≤ 2, cognitive ≤ 3
+/// - Minimal nesting: ≤ 1 level
+/// - Contains basic struct initialization
 ///
-/// // Complex factory - does NOT match
-/// fn create_with_validation(data: Data) -> Result<Self> {
-///     validate(data)?;
-///     // ... 30 lines of logic
-///     Ok(Self { ... })
-/// }
-/// ```
+/// **Complex factories** (does NOT match):
+/// - Long functions with extensive validation logic
+/// - High cyclomatic complexity from error handling
+/// - Multiple levels of nesting or control flow
 ///
 /// # False Positive Prevention
 ///
@@ -159,19 +159,18 @@ fn is_simple_constructor(func: &FunctionMetrics) -> bool {
 /// 4. Body must show constructor patterns (struct init, Self refs)
 /// 5. Complexity must be reasonable (≤5 cyclomatic, no loops)
 ///
-/// # Examples
+/// # Detected Patterns
 ///
-/// ```rust,ignore
-/// // Detected by AST (non-standard name)
-/// pub fn create_default_client() -> Self {
-///     Self { timeout: Duration::from_secs(30) }
-/// }
+/// **AST-based detection** (when enabled and available):
+/// - Functions with non-standard names like `create_default_client()`, `from_config()`
+/// - Returns `Self`, `Result<Self>`, or `Option<Self>`
+/// - Body contains struct initialization patterns with `Self { ... }`
+/// - Simple logic without loops or complex control flow
 ///
-/// // Detected by name-based (standard pattern)
-/// pub fn new() -> Self {
-///     Self { field: 0 }
-/// }
-/// ```
+/// **Name-based detection** (fallback):
+/// - Standard constructor names: `new`, `default`, `from_*`, `with_*`
+/// - Short functions (< 15 lines) with low complexity
+/// - Minimal nesting and simple initialization patterns
 fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) -> bool {
     // Check configuration
     let config = crate::config::get_constructor_detection_config();
@@ -225,28 +224,19 @@ fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn
 /// 2. Verify low cognitive complexity (≤3)
 /// 3. Analyze function body for exhaustive match returning only literals
 ///
-/// # Examples
+/// # Detected Patterns
 ///
-/// ```rust,ignore
-/// // Detected as enum converter
-/// impl FrameworkType {
-///     pub fn name(&self) -> &'static str {
-///         match self {
-///             FrameworkType::Django => "Django",
-///             FrameworkType::Flask => "Flask",
-///         }
-///     }
-/// }
+/// **Simple enum converters** (classified as IOWrapper):
+/// - Methods like `name()`, `as_str()`, `to_string()` on enums
+/// - Body contains exhaustive `match` statement on `self`
+/// - All match arms return string/numeric literals only
+/// - No function calls, computations, or complex logic
+/// - Very low cognitive complexity (≤ 3)
 ///
-/// // NOT detected (has function calls)
-/// impl BuiltinException {
-///     pub fn message(&self) -> String {
-///         match self {
-///             Self::ValueError => format!("Invalid value"),
-///         }
-///     }
-/// }
-/// ```
+/// **Complex enum methods** (NOT detected, remain PureLogic):
+/// - Match arms that call functions like `format!()` or constructors
+/// - Methods with additional logic beyond simple mapping
+/// - Methods that aggregate or compute values
 fn is_enum_converter_enhanced(func: &FunctionMetrics, syn_func: &syn::ItemFn) -> bool {
     is_enum_converter(func, syn_func)
 }
@@ -263,19 +253,20 @@ fn is_enum_converter_enhanced(func: &FunctionMetrics, syn_func: &syn::ItemFn) ->
 /// 3. Check function is short (< 10 lines, nesting ≤ 1)
 /// 4. If AST available, verify body is simple accessor pattern
 ///
-/// # Examples
+/// # Detected Patterns
 ///
-/// ```rust,ignore
-/// // Detected as accessor
-/// pub fn id(&self) -> UserId { self.id }
-/// pub fn name(&self) -> &str { &self.name }
-/// pub fn is_active(&self) -> bool { matches!(self.status, Status::Active) }
+/// **Simple accessors** (classified as IOWrapper):
+/// - Direct field access: `id()`, `name()` returning field values
+/// - Boolean checks: `is_active()`, `has_permission()` with simple conditions
+/// - Type conversions: `as_str()`, `to_string()` with minimal logic
+/// - Uses immutable `&self` reference only
+/// - Very low complexity (cyclomatic ≤ 2, cognitive ≤ 1)
+/// - Short length (< 10 lines, nesting ≤ 1)
 ///
-/// // NOT detected (complex logic)
-/// pub fn calculate_total(&self) -> f64 {
-///     self.items.iter().map(|i| i.price).sum()
-/// }
-/// ```
+/// **Complex methods** (NOT detected, remain PureLogic):
+/// - Methods with calculations, iterations, or aggregations
+/// - Methods calling other business logic functions
+/// - Methods with complex control flow or multiple branches
 fn is_accessor_method(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) -> bool {
     let config = crate::config::get_accessor_detection_config();
 
