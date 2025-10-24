@@ -231,6 +231,53 @@ pub struct RoleCoverageWeights {
     pub unknown: f64,
 }
 
+/// Configuration for caller/callee display in output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallerCalleeConfig {
+    /// Maximum number of callers to display (default: 5)
+    #[serde(default = "default_max_callers")]
+    pub max_callers: usize,
+
+    /// Maximum number of callees to display (default: 5)
+    #[serde(default = "default_max_callees")]
+    pub max_callees: usize,
+
+    /// Whether to show external crate calls (default: false)
+    #[serde(default = "default_show_external")]
+    pub show_external: bool,
+
+    /// Whether to show standard library calls (default: false)
+    #[serde(default = "default_show_std_lib")]
+    pub show_std_lib: bool,
+}
+
+impl Default for CallerCalleeConfig {
+    fn default() -> Self {
+        Self {
+            max_callers: default_max_callers(),
+            max_callees: default_max_callees(),
+            show_external: default_show_external(),
+            show_std_lib: default_show_std_lib(),
+        }
+    }
+}
+
+fn default_max_callers() -> usize {
+    5
+}
+
+fn default_max_callees() -> usize {
+    5
+}
+
+fn default_show_external() -> bool {
+    false
+}
+
+fn default_show_std_lib() -> bool {
+    false
+}
+
 /// Orchestrator detection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorDetectionConfig {
