@@ -97,14 +97,64 @@ impl PathResolver {
     ) -> Option<FunctionId> {
         let segments: Vec<String> = qualified_name.split("::").map(|s| s.to_string()).collect();
 
-        // Get current module
-        let current_module = self.module_tree.get_module(caller_file)?;
+        if segments.is_empty() {
+            return None;
+        }
 
-        // Resolve the path
-        let resolved_path = self.module_tree.resolve_path(current_module, &segments)?;
+        // Strategy 1: Check if the first segment is an imported module
+        if segments.len() >= 2 {
+            let first_segment = &segments[0];
 
-        // Find function with this path
-        self.find_function_by_path(&resolved_path, call_graph)
+            // Check if this module is imported
+            if let Some(imported_paths) = self.import_map.resolve_import(caller_file, first_segment) {
+                // The first segment resolves to an imported module
+                // Build the full path by replacing the first segment
+                for imported_path in &imported_paths {
+                    let mut full_path_segments = imported_path.split("::").map(|s| s.to_string()).collect::<Vec<_>>();
+
+                    // Resolve super/self/crate if present in the imported path
+                    if let Some(current_module) = self.module_tree.get_module(caller_file) {
+                        if let Some(resolved) = self.module_tree.resolve_path(current_module, &full_path_segments) {
+                            // Use the resolved path instead of the raw import path
+                            full_path_segments = resolved.split("::").map(|s| s.to_string()).collect();
+                        }
+                    }
+
+                    full_path_segments.extend_from_slice(&segments[1..]);
+                    let full_path = full_path_segments.join("::");
+
+                    // Debug logging
+                    log::trace!(
+                        "Resolving qualified path: {} in {:?} -> trying {}",
+                        qualified_name,
+                        caller_file,
+                        full_path
+                    );
+
+                    if let Some(func) = self.find_function_by_path(&full_path, call_graph) {
+                        return Some(func);
+                    }
+                }
+            }
+        }
+
+        // Strategy 2: Try using module tree resolution
+        if let Some(current_module) = self.module_tree.get_module(caller_file) {
+            if let Some(resolved_path) = self.module_tree.resolve_path(current_module, &segments) {
+                if let Some(func) = self.find_function_by_path(&resolved_path, call_graph) {
+                    return Some(func);
+                }
+            }
+        }
+
+        // Strategy 3: Try direct lookup (for crate::... paths)
+        if let Some(resolved) = self.import_map.resolve_qualified_path(&segments) {
+            if let Some(func) = self.find_function_by_path(&resolved, call_graph) {
+                return Some(func);
+            }
+        }
+
+        None
     }
 
     /// Resolve through re-exports
@@ -152,11 +202,33 @@ impl PathResolver {
             }
         }
 
-        // Try base name match
+        // Try matching by module_path + function name
+        // Split path into potential module path and function name
         if let Some(base_name) = path.split("::").last() {
-            for func in call_graph.get_all_functions() {
-                if Self::matches_name(&func.name, base_name) && func.module_path == path {
-                    return Some(func.clone());
+            // Try different ways to split the path
+            let path_parts: Vec<&str> = path.split("::").collect();
+
+            for i in 0..path_parts.len() {
+                let potential_module = path_parts[0..i].join("::");
+                let potential_func_path = path_parts[i..].join("::");
+
+                for func in call_graph.get_all_functions() {
+                    // Match if:
+                    // 1. Function name matches the remaining path
+                    // 2. Module path matches (if we have module_path)
+                    if func.name == potential_func_path
+                        && (potential_module.is_empty() || func.module_path == potential_module)
+                    {
+                        return Some(func.clone());
+                    }
+
+                    // Also try matching just the function name with module_path check
+                    if Self::matches_name(&func.name, base_name)
+                        && !potential_module.is_empty()
+                        && func.module_path == path_parts[0..path_parts.len() - 1].join("::")
+                    {
+                        return Some(func.clone());
+                    }
                 }
             }
         }

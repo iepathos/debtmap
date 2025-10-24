@@ -34,7 +34,11 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     let mut combined_graph = CallGraph::new();
     let mut all_unresolved_calls = Vec::new();
 
-    // Phase 1: Extract all functions and collect unresolved calls from all files
+    // Build PathResolver for import-aware resolution
+    use crate::analyzers::call_graph::PathResolverBuilder;
+    let mut path_resolver_builder = PathResolverBuilder::new();
+
+    // Phase 1: Extract all functions, collect unresolved calls, and analyze imports
     for (file, path) in files {
         let mut extractor = CallGraphExtractor::new(path.clone());
         // Extract functions and collect unresolved calls
@@ -45,9 +49,14 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
 
         // Collect unresolved calls for later resolution
         all_unresolved_calls.extend(extractor.unresolved_calls.clone());
+
+        // Analyze imports for this file
+        path_resolver_builder = path_resolver_builder.analyze_file(path.clone(), file);
     }
 
-    // Phase 2: Resolve all calls now that we have all functions
+    let path_resolver = path_resolver_builder.build();
+
+    // Phase 2: Resolve all calls now that we have all functions and imports
     let multi_file_path = PathBuf::from("multi-file");
     let mut resolved_calls = Vec::new();
 
@@ -56,12 +65,26 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
             crate::analyzers::call_graph::CallResolver::new(&combined_graph, &multi_file_path);
 
         for unresolved in &all_unresolved_calls {
+            // Try standard resolution first
             if let Some(callee) = resolver.resolve_call(unresolved) {
                 resolved_calls.push(crate::priority::call_graph::FunctionCall {
                     caller: unresolved.caller.clone(),
                     callee,
                     call_type: unresolved.call_type.clone(),
                 });
+            } else if unresolved.callee_name.contains("::") {
+                // For qualified paths that didn't resolve, try using PathResolver
+                if let Some(callee) = path_resolver.resolve_call(
+                    &unresolved.caller.file,
+                    &unresolved.callee_name,
+                    &combined_graph,
+                ) {
+                    resolved_calls.push(crate::priority::call_graph::FunctionCall {
+                        caller: unresolved.caller.clone(),
+                        callee,
+                        call_type: unresolved.call_type.clone(),
+                    });
+                }
             }
         }
     }

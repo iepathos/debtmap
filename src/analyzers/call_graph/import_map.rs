@@ -272,4 +272,21 @@ mod tests {
         let module_path = map.get_module_path(&file);
         assert_eq!(module_path, Some(&"commands::analyze".to_string()));
     }
+
+    #[test]
+    fn test_super_import() {
+        let mut map = ImportMap::new();
+        let file = PathBuf::from("src/builders/unified_analysis.rs");
+
+        let code = r#"
+            use super::{call_graph, parallel_call_graph};
+        "#;
+        let ast = parse_code(code);
+        map.analyze_imports(&file, &ast);
+
+        let resolved = map.resolve_import(&file, "call_graph");
+        println!("Resolved call_graph import: {:?}", resolved);
+        assert!(resolved.is_some());
+        assert_eq!(resolved.unwrap()[0], "super::call_graph");
+    }
 }
