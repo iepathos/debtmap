@@ -31,8 +31,7 @@ commands:
 
 # Custom merge workflow - ensures clean integration back to master
 merge:
-  # Step 1: Fetch latest changes and merge master into worktree
-  - shell: "git fetch origin"
+  # Step 1: Merge master into worktree
   - claude: "/prodigy-merge-master"  # Handles merge conflicts if any
 
   # Step 2: Run CI checks and fix any issues
