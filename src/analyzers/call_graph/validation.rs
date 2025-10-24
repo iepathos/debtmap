@@ -916,4 +916,69 @@ mod tests {
         assert!(config.orphan_whitelist.contains("temp_fn"));
         assert!(config.additional_entry_points.contains("custom_entry"));
     }
+
+    #[test]
+    #[ignore] // Integration test - run explicitly
+    fn test_real_project_health_score() {
+        use crate::builders::call_graph;
+        use crate::core::Language;
+        use crate::io::walker;
+        use std::env;
+        use std::path::Path;
+
+        // Get the project root (debtmap's own codebase)
+        let project_root = env::current_dir().expect("Failed to get current directory");
+
+        // Find Rust files in the project
+        let config = crate::config::get_config();
+        let files = walker::find_project_files_with_config(&project_root, vec![Language::Rust], config)
+            .expect("Failed to find project files");
+
+        // Analyze files to get function metrics
+        let file_metrics: Vec<_> = files
+            .iter()
+            .filter_map(|path| crate::analysis_utils::analyze_single_file(path))
+            .collect();
+
+        // Extract all functions from file metrics
+        let all_functions: Vec<_> = file_metrics
+            .iter()
+            .flat_map(|fm| fm.functions.clone())
+            .collect();
+
+        // Build call graph
+        let mut call_graph = call_graph::build_initial_call_graph(&all_functions);
+
+        // Build full call graph with Rust-specific features
+        call_graph::process_rust_files_for_call_graph(&project_root, &mut call_graph, false, false)
+            .expect("Failed to process Rust files");
+
+        // Validate the call graph
+        let validation_report = CallGraphValidator::validate(&call_graph);
+
+        // Assert health score is >= 70 (spec requirement)
+        assert!(
+            validation_report.health_score >= 70,
+            "Health score {} is below threshold 70. Structural issues: {}, Warnings: {}",
+            validation_report.health_score,
+            validation_report.structural_issues.len(),
+            validation_report.warnings.len()
+        );
+
+        // Assert isolated functions are < 500 (spec requirement)
+        assert!(
+            validation_report.statistics.isolated_functions < 500,
+            "Isolated functions {} exceeds threshold 500",
+            validation_report.statistics.isolated_functions
+        );
+
+        // Print summary for manual inspection
+        eprintln!("\n=== Debtmap Self-Analysis Health Report ===");
+        eprintln!("Health Score: {}/100", validation_report.health_score);
+        eprintln!("Total Functions: {}", validation_report.statistics.total_functions);
+        eprintln!("Entry Points: {}", validation_report.statistics.entry_points);
+        eprintln!("Isolated Functions: {}", validation_report.statistics.isolated_functions);
+        eprintln!("Structural Issues: {}", validation_report.structural_issues.len());
+        eprintln!("Warnings: {}", validation_report.warnings.len());
+    }
 }

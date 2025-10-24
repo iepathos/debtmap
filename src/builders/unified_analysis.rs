@@ -375,9 +375,38 @@ fn perform_unified_analysis_computation(
     if !quiet_mode {
         if use_emoji {
             eprintln!(" ✓");
-            eprint!("📊 Loading coverage data...");
+            eprint!("🔍 Resolving trait method calls...");
         } else {
             eprintln!(" [OK]");
+            eprint!("Resolving trait method calls...");
+        }
+        std::io::Write::flush(&mut std::io::stderr()).unwrap();
+    }
+
+    // Integrate trait resolution to reduce false positives
+    let trait_resolution_stats = integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
+
+    if !quiet_mode {
+        if use_emoji {
+            eprintln!(" ✓");
+        } else {
+            eprintln!(" [OK]");
+        }
+
+        // Display trait resolution statistics in verbose mode
+        if verbose_macro_warnings {
+            if use_emoji {
+                eprintln!("🔗 Resolved {} trait method calls", trait_resolution_stats.resolved_calls);
+                eprintln!("🎯 Marked {} trait implementations as callable", trait_resolution_stats.marked_implementations);
+            } else {
+                eprintln!("Resolved {} trait method calls", trait_resolution_stats.resolved_calls);
+                eprintln!("Marked {} trait implementations as callable", trait_resolution_stats.marked_implementations);
+            }
+        }
+
+        if use_emoji {
+            eprint!("📊 Loading coverage data...");
+        } else {
             eprint!("Loading coverage data...");
         }
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
@@ -1316,4 +1345,37 @@ fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
             test_effort: file_data.file_metrics.uncovered_lines as f64 * 0.1,
         },
     }
+}
+
+/// Statistics about trait resolution
+#[derive(Debug, Clone, Default)]
+struct TraitResolutionStats {
+    resolved_calls: usize,
+    marked_implementations: usize,
+}
+
+/// Integrate trait resolution into the call graph to reduce false positives
+fn integrate_trait_resolution(
+    _project_path: &Path,
+    call_graph: &mut crate::priority::call_graph::CallGraph,
+    _verbose: bool,
+) -> Result<TraitResolutionStats> {
+    use crate::analysis::call_graph::TraitRegistry;
+
+    // Build trait registry from the project
+    let trait_registry = TraitRegistry::new();
+
+    // Detect common trait patterns (Default, Clone, etc.) and mark them as entry points
+    trait_registry.detect_common_trait_patterns(call_graph);
+
+    // Resolve trait method calls to concrete implementations
+    let resolved_count = trait_registry.resolve_trait_method_calls(call_graph);
+
+    // Get statistics about trait usage
+    let trait_stats = trait_registry.get_statistics();
+
+    Ok(TraitResolutionStats {
+        resolved_calls: resolved_count,
+        marked_implementations: trait_stats.total_implementations,
+    })
 }
