@@ -409,8 +409,38 @@ fn handle_call_graph_diagnostics(
 
         eprintln!("\n=== Call Graph Validation Report ===");
         eprintln!("Health Score: {}/100", validation_report.health_score);
+
+        // Display statistics
+        eprintln!("\n📊 Statistics:");
         eprintln!(
-            "Structural Issues: {}",
+            "  Total Functions: {}",
+            validation_report.statistics.total_functions
+        );
+        eprintln!(
+            "  Entry Points: {}",
+            validation_report.statistics.entry_points
+        );
+        eprintln!(
+            "  Leaf Functions: {} (has callers, no callees)",
+            validation_report.statistics.leaf_functions
+        );
+        eprintln!(
+            "  Unreachable: {} (no callers, has callees)",
+            validation_report.statistics.unreachable_functions
+        );
+        eprintln!(
+            "  Isolated: {} (no callers, no callees)",
+            validation_report.statistics.isolated_functions
+        );
+        if validation_report.statistics.recursive_functions > 0 {
+            eprintln!(
+                "  Recursive: {}",
+                validation_report.statistics.recursive_functions
+            );
+        }
+
+        eprintln!(
+            "\nStructural Issues: {}",
             validation_report.structural_issues.len()
         );
         eprintln!("Warnings: {}", validation_report.warnings.len());

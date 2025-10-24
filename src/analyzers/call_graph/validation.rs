@@ -238,16 +238,24 @@ impl CallGraphValidator {
             return true;
         }
 
-        // Existing checks
+        // Main function
         if function.name == "main" {
             return true;
         }
-        if function.name.starts_with("test_") || function.name.contains("::test_") {
+
+        // Test functions
+        if function.name.starts_with("test_")
+            || function.name.contains("::test_")
+            || function.name.starts_with("#[test]")
+        {
             return true;
         }
 
         // Benchmark functions
-        if function.name.starts_with("bench_") || function.name.contains("::bench_") {
+        if function.name.starts_with("bench_")
+            || function.name.contains("::bench_")
+            || function.name.starts_with("#[bench]")
+        {
             return true;
         }
 
@@ -265,21 +273,54 @@ impl CallGraphValidator {
         // Check for lib.rs or main.rs (library APIs)
         if let Some(file_name) = function.file.file_name().and_then(|s| s.to_str()) {
             if file_name == "lib.rs" || file_name == "main.rs" {
-                // Functions in lib.rs with short names (< 20 chars) likely public
-                if function.name.len() < 20 && !function.name.contains("::") {
+                // Functions in lib.rs with short names (< 30 chars) likely public exports
+                if function.name.len() < 30 && !function.name.contains("::") {
                     return true;
                 }
             }
         }
 
-        // Trait implementations (contains ::)
+        // Trait implementations - common patterns (contains ::)
         if function.name.contains("::") {
-            // Check for common trait patterns
-            let trait_patterns = ["default", "new", "clone", "from", "into", "display"];
-            let lowercase_name = function.name.to_lowercase();
-            if trait_patterns.iter().any(|&p| lowercase_name.contains(p)) {
+            let trait_methods = [
+                "default",
+                "new",
+                "clone",
+                "clone_box",
+                "clone_from",
+                "from",
+                "into",
+                "fmt",
+                "display",
+                "debug",
+                "drop",
+                "deref",
+                "deref_mut",
+                "hash",
+                "eq",
+                "builder",
+                "create",
+                "with_",
+                "try_from",
+                "try_into",
+            ];
+
+            let name_lower = function.name.to_lowercase();
+            if trait_methods
+                .iter()
+                .any(|&method| name_lower.contains(method))
+            {
                 return true;
             }
+        }
+
+        // Constructor patterns (without ::)
+        if function.name == "new"
+            || function.name == "builder"
+            || function.name == "create"
+            || function.name.starts_with("with_")
+        {
+            return true;
         }
 
         false
@@ -874,5 +915,82 @@ mod tests {
         assert_eq!(config.additional_entry_points.len(), 1);
         assert!(config.orphan_whitelist.contains("temp_fn"));
         assert!(config.additional_entry_points.contains("custom_entry"));
+    }
+
+    #[test]
+    #[ignore] // Integration test - run explicitly
+    fn test_real_project_health_score() {
+        use crate::builders::call_graph;
+        use crate::core::Language;
+        use crate::io::walker;
+        use std::env;
+
+        // Get the project root (debtmap's own codebase)
+        let project_root = env::current_dir().expect("Failed to get current directory");
+
+        // Find Rust files in the project
+        let config = crate::config::get_config();
+        let files =
+            walker::find_project_files_with_config(&project_root, vec![Language::Rust], config)
+                .expect("Failed to find project files");
+
+        // Analyze files to get function metrics
+        let file_metrics: Vec<_> = files
+            .iter()
+            .filter_map(|path| crate::analysis_utils::analyze_single_file(path))
+            .collect();
+
+        // Extract all functions from file metrics
+        let all_functions: Vec<_> = file_metrics
+            .iter()
+            .flat_map(|fm| fm.complexity.functions.clone())
+            .collect();
+
+        // Build call graph
+        let mut call_graph = call_graph::build_initial_call_graph(&all_functions);
+
+        // Build full call graph with Rust-specific features
+        call_graph::process_rust_files_for_call_graph(&project_root, &mut call_graph, false, false)
+            .expect("Failed to process Rust files");
+
+        // Validate the call graph
+        let validation_report = CallGraphValidator::validate(&call_graph);
+
+        // Assert health score is >= 70 (spec requirement)
+        assert!(
+            validation_report.health_score >= 70,
+            "Health score {} is below threshold 70. Structural issues: {}, Warnings: {}",
+            validation_report.health_score,
+            validation_report.structural_issues.len(),
+            validation_report.warnings.len()
+        );
+
+        // Assert isolated functions are < 500 (spec requirement)
+        assert!(
+            validation_report.statistics.isolated_functions < 500,
+            "Isolated functions {} exceeds threshold 500",
+            validation_report.statistics.isolated_functions
+        );
+
+        // Print summary for manual inspection
+        eprintln!("\n=== Debtmap Self-Analysis Health Report ===");
+        eprintln!("Health Score: {}/100", validation_report.health_score);
+        eprintln!(
+            "Total Functions: {}",
+            validation_report.statistics.total_functions
+        );
+        eprintln!(
+            "Entry Points: {}",
+            validation_report.statistics.entry_points
+        );
+        eprintln!(
+            "Isolated Functions: {}",
+            validation_report.statistics.isolated_functions
+        );
+        eprintln!(
+            "Structural Issues: {}",
+            validation_report.structural_issues.len()
+        );
+        eprintln!("Warnings: {}", validation_report.warnings.len());
     }
 }
