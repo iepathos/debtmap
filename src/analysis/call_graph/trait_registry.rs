@@ -11,6 +11,7 @@ use crate::analyzers::trait_resolver::TraitResolver;
 use crate::priority::call_graph::FunctionId;
 use anyhow::Result;
 use im::{HashMap, HashSet, Vector};
+use rayon::prelude::*;
 use std::path::Path;
 use std::sync::Arc;
 use syn::visit::Visit;
@@ -387,9 +388,11 @@ impl TraitRegistry {
 
     /// Detect constructor patterns (Type::new, Type::builder, etc.)
     fn detect_constructor_patterns(&self, call_graph: &mut crate::priority::call_graph::CallGraph) {
-        // Collect only the matching function IDs (not full clones)
+        // Parallel filter: check all functions in parallel, collect only matches
         let matching_functions: Vec<_> = call_graph
             .get_all_functions()
+            .collect::<Vec<_>>() // Collect references first
+            .into_par_iter() // Parallelize the iteration
             .filter(|f| {
                 f.name.ends_with("::new")
                     || f.name == "new"
@@ -397,7 +400,7 @@ impl TraitRegistry {
                     || f.name.contains("::with_")
                     || f.name.ends_with("::create")
             })
-            .cloned()
+            .cloned() // Clone only the matches
             .collect();
 
         // Now mark them (much smaller set, ~200-500 instead of 4,991)
