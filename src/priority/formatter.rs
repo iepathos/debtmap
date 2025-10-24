@@ -1598,9 +1598,12 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
 }
 
 // Pure function to format dependencies section with enhanced caller/callee display
-fn format_dependencies_section(context: &FormatContext) -> Option<String> {
+fn format_dependencies_section_with_config(
+    context: &FormatContext,
+    formatting_config: FormattingConfig,
+) -> Option<String> {
     let config = CallerCalleeConfig::default();
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let formatter = ColoredFormatter::new(formatting_config);
 
     // Filter callers and callees based on configuration
     let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, &config);
@@ -1700,6 +1703,11 @@ fn format_dependencies_section(context: &FormatContext) -> Option<String> {
     }
 
     Some(section)
+}
+
+// Wrapper function that uses default formatting configuration
+fn format_dependencies_section(context: &FormatContext) -> Option<String> {
+    format_dependencies_section_with_config(context, FormattingConfig::default())
 }
 
 // Pure function to format debt-specific section
@@ -2021,6 +2029,7 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::formatting::{ColorMode, EmojiMode};
     use crate::priority::call_graph::CallGraph;
     use crate::priority::file_metrics::{
         FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
@@ -2544,7 +2553,9 @@ mod tests {
         item.downstream_callees = vec!["callee1".to_string()];
 
         let context = create_format_context(1, &item);
-        let section = format_dependencies_section(&context);
+        // Use explicit formatting config to ensure deterministic behavior in tests
+        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
         let section_text = strip_ansi_codes(&section.unwrap());
@@ -2561,7 +2572,9 @@ mod tests {
         item.downstream_callees = vec!["callee1".to_string(), "callee2".to_string()];
 
         let context = create_format_context(1, &item);
-        let section = format_dependencies_section(&context);
+        // Use explicit formatting config to ensure deterministic behavior in tests
+        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
         let section_text = strip_ansi_codes(&section.unwrap());
@@ -2580,7 +2593,9 @@ mod tests {
         ];
 
         let context = create_format_context(1, &item);
-        let section = format_dependencies_section(&context);
+        // Use explicit formatting config to ensure deterministic behavior in tests
+        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
         let section_text = strip_ansi_codes(&section.unwrap());
@@ -2609,7 +2624,9 @@ mod tests {
         ];
 
         let context = create_format_context(1, &item);
-        let section = format_dependencies_section(&context);
+        // Use explicit formatting config to ensure deterministic behavior in tests
+        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
         let section_text = strip_ansi_codes(&section.unwrap());
