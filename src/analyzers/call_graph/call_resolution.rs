@@ -276,7 +276,7 @@ impl<'a> CallResolver<'a> {
     }
 
     /// Strip generic type parameters from function names
-    /// Examples: "foo<T>" -> "foo", "bar::<Type>" -> "bar"
+    /// Examples: `foo<T>` -> "foo", `bar::<Type>` -> "bar"
     pub fn strip_generic_params(name: &str) -> String {
         // Handle turbofish syntax (::< >) and regular generics (< >)
         let without_turbofish = if let Some(pos) = name.find("::<") {

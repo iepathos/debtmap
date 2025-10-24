@@ -558,6 +558,11 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         pattern_threshold,
         show_pattern_warnings,
         explain_metrics,
+        debug_call_graph,
+        trace_functions,
+        call_graph_stats_only,
+        debug_format,
+        validate_call_graph,
     } = command
     {
         // Apply side effects first
@@ -625,6 +630,11 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             patterns,
             pattern_threshold,
             show_pattern_warnings,
+            debug_call_graph,
+            trace_functions,
+            call_graph_stats_only,
+            debug_format,
+            validate_call_graph,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -813,6 +823,11 @@ fn build_analyze_config(
     patterns: Option<Vec<String>>,
     pattern_threshold: f32,
     show_pattern_warnings: bool,
+    debug_call_graph: bool,
+    trace_functions: Option<Vec<String>>,
+    call_graph_stats_only: bool,
+    debug_format: debtmap::cli::DebugFormatArg,
+    validate_call_graph: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -864,6 +879,11 @@ fn build_analyze_config(
         patterns,
         pattern_threshold,
         show_pattern_warnings,
+        debug_call_graph,
+        trace_functions,
+        call_graph_stats_only,
+        debug_format,
+        validate_call_graph,
     }
 }
 

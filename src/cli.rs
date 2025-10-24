@@ -11,6 +11,14 @@ pub enum ThresholdPreset {
     Lenient,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum DebugFormatArg {
+    /// Human-readable text format
+    Text,
+    /// JSON format for programmatic analysis
+    Json,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
 #[command(about = "Code complexity and technical debt analyzer", long_about = None)]
@@ -234,6 +242,26 @@ pub enum Commands {
         /// Explain metric definitions and formulas (measured vs estimated)
         #[arg(long = "explain-metrics")]
         explain_metrics: bool,
+
+        /// Enable call graph debugging with detailed resolution information
+        #[arg(long = "debug-call-graph")]
+        debug_call_graph: bool,
+
+        /// Trace specific functions during call resolution (comma-separated)
+        #[arg(long = "trace-function", value_delimiter = ',')]
+        trace_functions: Option<Vec<String>>,
+
+        /// Show only call graph statistics (no detailed failure list)
+        #[arg(long = "call-graph-stats")]
+        call_graph_stats_only: bool,
+
+        /// Debug output format (text or json)
+        #[arg(long = "debug-format", value_enum, default_value = "text")]
+        debug_format: DebugFormatArg,
+
+        /// Validate call graph structure and report issues
+        #[arg(long = "validate-call-graph")]
+        validate_call_graph: bool,
     },
 
     /// Initialize configuration file
