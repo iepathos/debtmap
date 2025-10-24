@@ -5,6 +5,12 @@ use std::path::Path;
 mod simplified_implementation;
 pub use simplified_implementation::SimplifiedPythonOrganizationDetector;
 
+pub mod class_ownership;
+pub mod domain_classifier;
+
+pub use class_ownership::PythonClassAnalyzer;
+pub use domain_classifier::classify_python_class_domain;
+
 pub struct PythonOrganizationAnalyzer {
     detector: SimplifiedPythonOrganizationDetector,
 }
