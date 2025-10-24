@@ -57,8 +57,14 @@ impl GraphBuilder {
         line: usize,
         is_test: bool,
         _is_async: bool,
+        module_path: String,
     ) -> FunctionId {
-        let function_id = FunctionId::new(self.current_file.clone(), name.clone(), line);
+        let function_id = FunctionId::with_module_path(
+            self.current_file.clone(),
+            name.clone(),
+            line,
+            module_path,
+        );
 
         // Add function with appropriate parameters
         // Using defaults for entry_point and complexity for now
@@ -78,6 +84,7 @@ impl GraphBuilder {
         name: String,
         line: usize,
         item_fn: &ItemFn,
+        module_path: String,
     ) -> FunctionId {
         let is_test = item_fn.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
@@ -87,7 +94,7 @@ impl GraphBuilder {
 
         let is_async = item_fn.sig.asyncness.is_some();
 
-        self.add_function(name, line, is_test, is_async)
+        self.add_function(name, line, is_test, is_async, module_path)
     }
 
     /// Add an impl method to the graph
@@ -96,6 +103,7 @@ impl GraphBuilder {
         name: String,
         line: usize,
         impl_fn: &ImplItemFn,
+        module_path: String,
     ) -> FunctionId {
         let is_test = impl_fn.attrs.iter().any(|attr| {
             attr.path().is_ident("test")
@@ -105,7 +113,7 @@ impl GraphBuilder {
 
         let is_async = impl_fn.sig.asyncness.is_some();
 
-        self.add_function(name, line, is_test, is_async)
+        self.add_function(name, line, is_test, is_async, module_path)
     }
 
     /// Add a call edge to the graph

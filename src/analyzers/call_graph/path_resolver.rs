@@ -106,17 +106,25 @@ impl PathResolver {
             let first_segment = &segments[0];
 
             // Check if this module is imported
-            if let Some(imported_paths) = self.import_map.resolve_import(caller_file, first_segment) {
+            if let Some(imported_paths) = self.import_map.resolve_import(caller_file, first_segment)
+            {
                 // The first segment resolves to an imported module
                 // Build the full path by replacing the first segment
                 for imported_path in &imported_paths {
-                    let mut full_path_segments = imported_path.split("::").map(|s| s.to_string()).collect::<Vec<_>>();
+                    let mut full_path_segments = imported_path
+                        .split("::")
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>();
 
                     // Resolve super/self/crate if present in the imported path
                     if let Some(current_module) = self.module_tree.get_module(caller_file) {
-                        if let Some(resolved) = self.module_tree.resolve_path(current_module, &full_path_segments) {
+                        if let Some(resolved) = self
+                            .module_tree
+                            .resolve_path(current_module, &full_path_segments)
+                        {
                             // Use the resolved path instead of the raw import path
-                            full_path_segments = resolved.split("::").map(|s| s.to_string()).collect();
+                            full_path_segments =
+                                resolved.split("::").map(|s| s.to_string()).collect();
                         }
                     }
 

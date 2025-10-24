@@ -203,13 +203,19 @@ mod tests {
     fn test_resolve_super_qualified_path() {
         let mut tree = ModuleTree::new();
         tree.add_module("builders".to_string(), PathBuf::from("src/builders/mod.rs"));
-        tree.add_module("builders::unified_analysis".to_string(), PathBuf::from("src/builders/unified_analysis.rs"));
-        tree.add_module("builders::call_graph".to_string(), PathBuf::from("src/builders/call_graph.rs"));
+        tree.add_module(
+            "builders::unified_analysis".to_string(),
+            PathBuf::from("src/builders/unified_analysis.rs"),
+        );
+        tree.add_module(
+            "builders::call_graph".to_string(),
+            PathBuf::from("src/builders/call_graph.rs"),
+        );
 
         // From builders::unified_analysis, super::call_graph should resolve to builders::call_graph
         let resolved = tree.resolve_path(
             "builders::unified_analysis",
-            &["super".to_string(), "call_graph".to_string()]
+            &["super".to_string(), "call_graph".to_string()],
         );
         println!("Resolved super::call_graph: {:?}", resolved);
         assert_eq!(resolved, Some("builders::call_graph".to_string()));

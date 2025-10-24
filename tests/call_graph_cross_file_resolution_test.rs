@@ -9,11 +9,7 @@
 ///
 /// Expected: The call graph should detect 2 callers for the builder function
 /// Actual (bug): The call graph shows 0 callers
-
-use debtmap::{
-    builders::call_graph,
-    priority::call_graph::CallGraph,
-};
+use debtmap::{builders::call_graph, priority::call_graph::CallGraph};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -124,7 +120,11 @@ fn test_cross_file_call_resolution_detects_callers() {
         false, // show_macro_stats
     );
 
-    assert!(result.is_ok(), "Call graph construction failed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Call graph construction failed: {:?}",
+        result.err()
+    );
 
     // Get the callers for build_project_call_graph using the name-based API
     let caller_names = call_graph.get_callers_by_name("build_project_call_graph");
@@ -144,11 +144,15 @@ fn test_cross_file_call_resolution_detects_callers() {
 
     // At minimum, we should find calls from command and unified modules
     assert!(
-        caller_names.iter().any(|name| name.contains("execute_validate_command")),
+        caller_names
+            .iter()
+            .any(|name| name.contains("execute_validate_command")),
         "Should find caller from command module"
     );
     assert!(
-        caller_names.iter().any(|name| name.contains("perform_unified_analysis")),
+        caller_names
+            .iter()
+            .any(|name| name.contains("perform_unified_analysis")),
         "Should find caller from unified module"
     );
 }
@@ -161,12 +165,8 @@ fn test_qualified_call_resolution() {
     // Build the call graph
     let mut call_graph = CallGraph::new();
 
-    let result = call_graph::process_rust_files_for_call_graph(
-        project_path,
-        &mut call_graph,
-        false,
-        false,
-    );
+    let result =
+        call_graph::process_rust_files_for_call_graph(project_path, &mut call_graph, false, false);
 
     assert!(result.is_ok());
 
@@ -194,16 +194,15 @@ fn test_self_referential_call_detection() {
     let mut call_graph = CallGraph::new();
 
     // Build call graph on debtmap's own codebase
-    let result = call_graph::process_rust_files_for_call_graph(
-        &project_path,
-        &mut call_graph,
-        false,
-        false,
-    );
+    let result =
+        call_graph::process_rust_files_for_call_graph(&project_path, &mut call_graph, false, false);
 
     if result.is_err() {
         // Skip test if we can't build the call graph
-        println!("Skipping test - couldn't build call graph: {:?}", result.err());
+        println!(
+            "Skipping test - couldn't build call graph: {:?}",
+            result.err()
+        );
         return;
     }
 
@@ -212,20 +211,28 @@ fn test_self_referential_call_detection() {
     println!("\nTotal functions in call graph: {}", all_functions.len());
 
     // Check if the expected callers are in the graph
-    let validate_functions: Vec<_> = all_functions.iter()
+    let validate_functions: Vec<_> = all_functions
+        .iter()
         .filter(|f| f.file.to_string_lossy().contains("validate.rs"))
         .collect();
-    let unified_functions: Vec<_> = all_functions.iter()
+    let unified_functions: Vec<_> = all_functions
+        .iter()
         .filter(|f| f.file.to_string_lossy().contains("unified_analysis.rs"))
         .collect();
 
     println!("Functions in validate.rs: {}", validate_functions.len());
-    println!("Functions in unified_analysis.rs: {}", unified_functions.len());
+    println!(
+        "Functions in unified_analysis.rs: {}",
+        unified_functions.len()
+    );
 
     // Look for process_rust_files_for_call_graph itself
     let caller_names = call_graph.get_callers_by_name("process_rust_files_for_call_graph");
 
-    println!("\nCallers for process_rust_files_for_call_graph: {}", caller_names.len());
+    println!(
+        "\nCallers for process_rust_files_for_call_graph: {}",
+        caller_names.len()
+    );
     println!("Caller names: {:?}", caller_names);
 
     // Check if validate.rs and unified_analysis.rs are even in the call graph
@@ -370,7 +377,10 @@ pub mod commands;
 
     let caller_names = call_graph.get_callers_by_name("process_files");
 
-    println!("Found {} callers for builders::call_graph::process_files", caller_names.len());
+    println!(
+        "Found {} callers for builders::call_graph::process_files",
+        caller_names.len()
+    );
 
     assert!(
         caller_names.len() >= 1,
