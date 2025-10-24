@@ -90,6 +90,9 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             warning: Some("Auto-split due to size".to_string()),
             responsibility: split.responsibility.clone(),
             methods_to_move: vec![], // Methods grouped by struct
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -100,6 +103,9 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             warning: Some("Auto-split due to size".to_string()),
             responsibility: split.responsibility,
             methods_to_move: vec![],
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
         },
     ]
 }
@@ -122,6 +128,9 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             priority: Priority::Medium,
             warning: Some("Auto-split due to size".to_string()),
             responsibility: split.responsibility.clone(),
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -132,6 +141,9 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             priority: Priority::Medium,
             warning: Some("Auto-split due to size".to_string()),
             responsibility: split.responsibility,
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
         },
     ]
 }
@@ -139,6 +151,27 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_split(
+        name: &str,
+        method_count: usize,
+        structs: Vec<&str>,
+        priority: Priority,
+    ) -> ModuleSplit {
+        ModuleSplit {
+            suggested_name: name.to_string(),
+            methods_to_move: vec![],
+            structs_to_move: structs.into_iter().map(|s| s.to_string()).collect(),
+            responsibility: "test".to_string(),
+            estimated_lines: method_count * 20,
+            method_count,
+            warning: None,
+            priority,
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
+        }
+    }
 
     #[test]
     fn test_reject_undersized_splits() {
@@ -151,6 +184,9 @@ mod tests {
             method_count: 3,
             warning: None,
             priority: Priority::Low,
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
         };
 
         let validated = validate_and_refine_splits(vec![split]);
@@ -159,16 +195,7 @@ mod tests {
 
     #[test]
     fn test_accept_valid_splits() {
-        let split = ModuleSplit {
-            suggested_name: "valid".to_string(),
-            methods_to_move: vec![],
-            structs_to_move: vec!["S1".into(), "S2".into()],
-            responsibility: "test".to_string(),
-            estimated_lines: 200,
-            method_count: 15,
-            warning: None,
-            priority: Priority::Medium,
-        };
+        let split = make_split("valid", 15, vec!["S1", "S2"], Priority::Medium);
 
         let validated = validate_and_refine_splits(vec![split.clone()]);
         assert_eq!(validated.len(), 1);
@@ -179,16 +206,7 @@ mod tests {
 
     #[test]
     fn test_warn_borderline_splits() {
-        let split = ModuleSplit {
-            suggested_name: "borderline".to_string(),
-            methods_to_move: vec![],
-            structs_to_move: vec!["S1".into(), "S2".into(), "S3".into()],
-            responsibility: "test".to_string(),
-            estimated_lines: 500,
-            method_count: 35,
-            warning: None,
-            priority: Priority::High,
-        };
+        let split = make_split("borderline", 35, vec!["S1", "S2", "S3"], Priority::High);
 
         let validated = validate_and_refine_splits(vec![split]);
         assert_eq!(validated.len(), 1);
@@ -203,16 +221,12 @@ mod tests {
 
     #[test]
     fn test_split_oversized_modules() {
-        let split = ModuleSplit {
-            suggested_name: "oversized".to_string(),
-            methods_to_move: vec![],
-            structs_to_move: vec!["S1".into(), "S2".into(), "S3".into(), "S4".into()],
-            responsibility: "test".to_string(),
-            estimated_lines: 1000,
-            method_count: 60,
-            warning: None,
-            priority: Priority::Medium,
-        };
+        let split = make_split(
+            "oversized",
+            60,
+            vec!["S1", "S2", "S3", "S4"],
+            Priority::Medium,
+        );
 
         let validated = validate_and_refine_splits(vec![split]);
 
@@ -228,36 +242,9 @@ mod tests {
     #[test]
     fn test_multiple_splits_mixed_sizes() {
         let splits = vec![
-            ModuleSplit {
-                suggested_name: "too_small".to_string(),
-                methods_to_move: vec![],
-                structs_to_move: vec![],
-                responsibility: "test".to_string(),
-                estimated_lines: 30,
-                method_count: 2,
-                warning: None,
-                priority: Priority::Low,
-            },
-            ModuleSplit {
-                suggested_name: "perfect".to_string(),
-                methods_to_move: vec![],
-                structs_to_move: vec![],
-                responsibility: "test".to_string(),
-                estimated_lines: 200,
-                method_count: 10,
-                warning: None,
-                priority: Priority::Medium,
-            },
-            ModuleSplit {
-                suggested_name: "too_large".to_string(),
-                methods_to_move: vec![],
-                structs_to_move: vec!["S1".into(), "S2".into()],
-                responsibility: "test".to_string(),
-                estimated_lines: 800,
-                method_count: 50,
-                warning: None,
-                priority: Priority::High,
-            },
+            make_split("too_small", 2, vec![], Priority::Low),
+            make_split("perfect", 10, vec![], Priority::Medium),
+            make_split("too_large", 50, vec!["S1", "S2"], Priority::High),
         ];
 
         let validated = validate_and_refine_splits(splits);
@@ -283,16 +270,7 @@ mod tests {
 
     #[test]
     fn test_edge_case_exactly_5_methods() {
-        let split = ModuleSplit {
-            suggested_name: "minimum".to_string(),
-            methods_to_move: vec![],
-            structs_to_move: vec![],
-            responsibility: "test".to_string(),
-            estimated_lines: 100,
-            method_count: 5,
-            warning: None,
-            priority: Priority::Low,
-        };
+        let split = make_split("minimum", 5, vec![], Priority::Low);
 
         let validated = validate_and_refine_splits(vec![split]);
         assert_eq!(validated.len(), 1); // Should be kept
@@ -301,16 +279,7 @@ mod tests {
 
     #[test]
     fn test_edge_case_exactly_40_methods() {
-        let split = ModuleSplit {
-            suggested_name: "maximum".to_string(),
-            methods_to_move: vec![],
-            structs_to_move: vec![],
-            responsibility: "test".to_string(),
-            estimated_lines: 600,
-            method_count: 40,
-            warning: None,
-            priority: Priority::High,
-        };
+        let split = make_split("maximum", 40, vec![], Priority::High);
 
         let validated = validate_and_refine_splits(vec![split]);
         assert_eq!(validated.len(), 1); // Should be kept

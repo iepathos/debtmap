@@ -48,6 +48,15 @@ pub struct ModuleSplit {
     pub warning: Option<String>,
     #[serde(default)]
     pub priority: Priority,
+    /// Cohesion score (0.0-1.0) measuring how tightly related the methods are
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cohesion_score: Option<f64>,
+    /// External modules/structs this module depends on
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_in: Vec<String>,
+    /// External modules/structs that depend on this module
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies_out: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -361,6 +370,9 @@ pub fn recommend_module_splits(
                 method_count: methods.len(),
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             });
         }
     }
@@ -400,6 +412,9 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 method_count,
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             }
         })
         .collect()
@@ -446,13 +461,17 @@ pub struct StructWithMethods {
 ///
 /// * `structs` - Per-struct metrics
 /// * `ownership` - Struct ownership analyzer (optional for backward compatibility)
+/// * `file_path` - Path to the source file (optional, for call graph analysis)
+/// * `ast` - Parsed AST (optional, for call graph analysis)
 ///
 /// # Returns
 ///
-/// Vector of validated module splits
+/// Vector of validated module splits with cohesion scores and dependencies when available
 pub fn suggest_splits_by_struct_grouping(
     structs: &[StructMetrics],
     ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
+    file_path: Option<&std::path::Path>,
+    ast: Option<&syn::File>,
 ) -> Vec<ModuleSplit> {
     use crate::organization::domain_classifier::classify_struct_domain_enhanced;
     use crate::organization::split_validator::validate_and_refine_splits;
@@ -505,10 +524,21 @@ pub fn suggest_splits_by_struct_grouping(
                 method_count: total_methods,
                 warning: None,
                 priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
             }
         })
         .collect();
 
     // Validate and refine splits (filters too small, splits too large)
-    validate_and_refine_splits(splits)
+    let validated_splits = validate_and_refine_splits(splits);
+
+    // Enhance with cohesion scores and dependencies if ast and file_path are available
+    if let (Some(path), Some(ast_file)) = (file_path, ast) {
+        use crate::organization::call_graph_cohesion::enhance_splits_with_cohesion;
+        enhance_splits_with_cohesion(validated_splits, path, ast_file, ownership)
+    } else {
+        validated_splits
+    }
 }
