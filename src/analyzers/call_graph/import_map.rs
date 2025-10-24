@@ -106,9 +106,41 @@ impl ImportMap {
 
     /// Resolve an imported name in a file to its full module path
     pub fn resolve_import(&self, file_path: &Path, name: &str) -> Option<Vec<String>> {
-        self.imports
+        // First try direct import lookup
+        if let Some(paths) = self
+            .imports
             .get(&(file_path.to_path_buf(), name.to_string()))
-            .cloned()
+        {
+            return Some(paths.clone());
+        }
+
+        // If not found, check glob imports
+        self.resolve_through_glob_imports(file_path, name)
+    }
+
+    /// Resolve a name through glob imports
+    fn resolve_through_glob_imports(&self, file_path: &Path, name: &str) -> Option<Vec<String>> {
+        // Get all glob import prefixes for this file
+        let glob_prefixes = self
+            .imports
+            .get(&(file_path.to_path_buf(), "*".to_string()))?;
+
+        // For each glob prefix, construct potential qualified paths
+        let mut results = Vec::new();
+        for prefix in glob_prefixes {
+            let qualified = if prefix.is_empty() {
+                name.to_string()
+            } else {
+                format!("{}::{}", prefix, name)
+            };
+            results.push(qualified);
+        }
+
+        if results.is_empty() {
+            None
+        } else {
+            Some(results)
+        }
     }
 
     /// Resolve through re-exports
@@ -288,5 +320,62 @@ mod tests {
         println!("Resolved call_graph import: {:?}", resolved);
         assert!(resolved.is_some());
         assert_eq!(resolved.unwrap()[0], "super::call_graph");
+    }
+
+    #[test]
+    fn test_glob_import_resolution() {
+        let mut map = ImportMap::new();
+        let file = PathBuf::from("test.rs");
+
+        let code = r#"
+            use std::collections::*;
+        "#;
+        let ast = parse_code(code);
+        map.analyze_imports(&file, &ast);
+
+        // Should resolve HashMap through glob import
+        let resolved = map.resolve_import(&file, "HashMap");
+        assert!(resolved.is_some());
+        let paths = resolved.unwrap();
+        assert!(paths.contains(&"std::collections::HashMap".to_string()));
+    }
+
+    #[test]
+    fn test_multiple_glob_imports() {
+        let mut map = ImportMap::new();
+        let file = PathBuf::from("test.rs");
+
+        let code = r#"
+            use std::collections::*;
+            use std::io::*;
+        "#;
+        let ast = parse_code(code);
+        map.analyze_imports(&file, &ast);
+
+        // Should have multiple possible resolutions for same name
+        let resolved = map.resolve_import(&file, "Error");
+        assert!(resolved.is_some());
+        let paths = resolved.unwrap();
+        // Should include both std::collections::Error and std::io::Error
+        assert!(!paths.is_empty());
+    }
+
+    #[test]
+    fn test_specific_import_precedence_over_glob() {
+        let mut map = ImportMap::new();
+        let file = PathBuf::from("test.rs");
+
+        let code = r#"
+            use std::collections::HashMap;
+            use std::collections::*;
+        "#;
+        let ast = parse_code(code);
+        map.analyze_imports(&file, &ast);
+
+        // Specific import should be found first
+        let resolved = map.resolve_import(&file, "HashMap");
+        assert!(resolved.is_some());
+        let paths = resolved.unwrap();
+        assert!(paths.contains(&"std::collections::HashMap".to_string()));
     }
 }
