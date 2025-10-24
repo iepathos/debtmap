@@ -2,6 +2,7 @@ use crate::common::SourceLocation;
 use syn;
 
 pub mod call_graph_cohesion;
+pub mod class_ownership;
 pub mod cohesion_calculator;
 pub mod cohesion_priority;
 pub mod complexity_weighting;
@@ -10,6 +11,8 @@ pub mod dependency_analyzer;
 pub mod domain_classifier;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
+pub mod javascript;
+pub mod language;
 pub mod purity_analyzer;
 pub mod split_validator;
 pub mod struct_ownership;
@@ -201,3 +204,7 @@ pub use god_object_detector::GodObjectDetector;
 pub use magic_value_detector::MagicValueDetector;
 pub use parameter_analyzer::ParameterAnalyzer;
 pub use primitive_obsession_detector::PrimitiveObsessionDetector;
+
+// Multi-language support exports
+pub use class_ownership::{ClassOwnership, ClassOwnershipAnalyzer};
+pub use language::Language;
