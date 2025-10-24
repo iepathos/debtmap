@@ -100,8 +100,7 @@ impl CallGraphValidator {
 
     /// Check for dangling edges (references to non-existent functions)
     fn check_dangling_edges(call_graph: &CallGraph, report: &mut ValidationReport) {
-        let all_function_ids: HashSet<_> =
-            call_graph.get_all_functions().cloned().collect();
+        let all_function_ids: HashSet<_> = call_graph.get_all_functions().cloned().collect();
 
         for function in call_graph.get_all_functions() {
             // Check callees
