@@ -92,6 +92,9 @@ pub fn process_rust_files_for_call_graph(
 
     enhanced_builder.analyze_cross_module(&workspace_files)?;
 
+    // Finalize trait analysis - detect patterns ONCE after all files processed
+    enhanced_builder.finalize_trait_analysis()?;
+
     let enhanced_graph = enhanced_builder.build();
     let framework_exclusions = enhanced_graph.framework_patterns.get_exclusions();
     let framework_exclusions_std: HashSet<priority::call_graph::FunctionId> =

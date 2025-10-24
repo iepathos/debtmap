@@ -193,6 +193,9 @@ impl ParallelCallGraphBuilder {
         // Cross-module analysis
         enhanced_builder.analyze_cross_module(&workspace_files)?;
 
+        // Finalize trait analysis - detect patterns ONCE after all files processed
+        enhanced_builder.finalize_trait_analysis()?;
+
         // Extract results
         let enhanced_graph = enhanced_builder.build();
 
@@ -230,8 +233,21 @@ pub fn build_call_graph_parallel(
 
     if show_progress {
         config = config.with_progress(|processed, total| {
-            if processed % 10 == 0 || processed == total {
-                log::info!("Progress: {}/{} files processed", processed, total);
+            let percentage = (processed as f64 / total as f64 * 100.0) as u32;
+            let remaining = total - processed;
+
+            // Update every 5% or at completion
+            if processed % (total / 20).max(1) == 0 || processed == total {
+                eprint!(
+                    "\r🔗 Building call graph... {}/{} files ({:3}%) - {} remaining",
+                    processed, total, percentage, remaining
+                );
+                std::io::Write::flush(&mut std::io::stderr()).ok();
+            }
+
+            // Final newline when complete
+            if processed == total {
+                eprintln!();
             }
         });
     }

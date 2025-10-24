@@ -135,17 +135,8 @@ impl RustCallGraphBuilder {
             // Initialize the trait resolver for enhanced resolution
             self.enhanced_graph.trait_registry.init_resolver();
 
-            // Detect common trait patterns (Default, Clone, From, Into, constructors)
-            // This marks trait implementations as entry points to reduce false positives
-            self.enhanced_graph
-                .trait_registry
-                .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
-
-            // Resolve trait method calls and add edges to call graph
-            let _resolved_count = self
-                .enhanced_graph
-                .trait_registry
-                .resolve_trait_method_calls(&mut self.enhanced_graph.base_graph);
+            // NOTE: detect_common_trait_patterns should be called ONCE after all files
+            // are processed, not once per file. See finalize_trait_analysis() method.
 
             self.resolve_trait_method_calls()?;
             self.mark_visit_trait_methods()?;
@@ -193,6 +184,23 @@ impl RustCallGraphBuilder {
             self.resolve_cross_module_calls()?;
         }
         Ok(self)
+    }
+
+    /// Finalize trait analysis after all files have been processed
+    /// This should be called ONCE after all per-file analysis is complete
+    pub fn finalize_trait_analysis(&mut self) -> Result<()> {
+        // Detect common trait patterns (Default, Clone, From, Into, constructors)
+        self.enhanced_graph
+            .trait_registry
+            .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
+
+        // Resolve trait method calls after pattern detection
+        let _resolved_count = self
+            .enhanced_graph
+            .trait_registry
+            .resolve_trait_method_calls(&mut self.enhanced_graph.base_graph);
+
+        Ok(())
     }
 
     /// Complete the analysis and return the Rust-specific call graph

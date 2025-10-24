@@ -345,14 +345,7 @@ fn perform_unified_analysis_computation(
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
     let use_emoji =
         formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
-    if !quiet_mode {
-        if use_emoji {
-            eprint!("🔗 Building call graph...");
-        } else {
-            eprint!("Building call graph...");
-        }
-        std::io::Write::flush(&mut std::io::stderr()).unwrap();
-    }
+    // Progress will be shown by the parallel builder itself
 
     let (framework_exclusions, function_pointer_used_functions) = match execution_strategy {
         ExecutionStrategy::Parallel => {
