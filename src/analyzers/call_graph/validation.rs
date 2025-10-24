@@ -238,16 +238,24 @@ impl CallGraphValidator {
             return true;
         }
 
-        // Existing checks
+        // Main function
         if function.name == "main" {
             return true;
         }
-        if function.name.starts_with("test_") || function.name.contains("::test_") {
+
+        // Test functions
+        if function.name.starts_with("test_")
+            || function.name.contains("::test_")
+            || function.name.starts_with("#[test]")
+        {
             return true;
         }
 
         // Benchmark functions
-        if function.name.starts_with("bench_") || function.name.contains("::bench_") {
+        if function.name.starts_with("bench_")
+            || function.name.contains("::bench_")
+            || function.name.starts_with("#[bench]")
+        {
             return true;
         }
 
@@ -265,21 +273,54 @@ impl CallGraphValidator {
         // Check for lib.rs or main.rs (library APIs)
         if let Some(file_name) = function.file.file_name().and_then(|s| s.to_str()) {
             if file_name == "lib.rs" || file_name == "main.rs" {
-                // Functions in lib.rs with short names (< 20 chars) likely public
-                if function.name.len() < 20 && !function.name.contains("::") {
+                // Functions in lib.rs with short names (< 30 chars) likely public exports
+                if function.name.len() < 30 && !function.name.contains("::") {
                     return true;
                 }
             }
         }
 
-        // Trait implementations (contains ::)
+        // Trait implementations - common patterns (contains ::)
         if function.name.contains("::") {
-            // Check for common trait patterns
-            let trait_patterns = ["default", "new", "clone", "from", "into", "display"];
-            let lowercase_name = function.name.to_lowercase();
-            if trait_patterns.iter().any(|&p| lowercase_name.contains(p)) {
+            let trait_methods = [
+                "default",
+                "new",
+                "clone",
+                "clone_box",
+                "clone_from",
+                "from",
+                "into",
+                "fmt",
+                "display",
+                "debug",
+                "drop",
+                "deref",
+                "deref_mut",
+                "hash",
+                "eq",
+                "builder",
+                "create",
+                "with_",
+                "try_from",
+                "try_into",
+            ];
+
+            let name_lower = function.name.to_lowercase();
+            if trait_methods
+                .iter()
+                .any(|&method| name_lower.contains(method))
+            {
                 return true;
             }
+        }
+
+        // Constructor patterns (without ::)
+        if function.name == "new"
+            || function.name == "builder"
+            || function.name == "create"
+            || function.name.starts_with("with_")
+        {
+            return true;
         }
 
         false
