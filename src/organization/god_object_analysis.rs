@@ -461,13 +461,17 @@ pub struct StructWithMethods {
 ///
 /// * `structs` - Per-struct metrics
 /// * `ownership` - Struct ownership analyzer (optional for backward compatibility)
+/// * `file_path` - Path to the source file (optional, for call graph analysis)
+/// * `ast` - Parsed AST (optional, for call graph analysis)
 ///
 /// # Returns
 ///
-/// Vector of validated module splits
+/// Vector of validated module splits with cohesion scores and dependencies when available
 pub fn suggest_splits_by_struct_grouping(
     structs: &[StructMetrics],
     ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
+    file_path: Option<&std::path::Path>,
+    ast: Option<&syn::File>,
 ) -> Vec<ModuleSplit> {
     use crate::organization::domain_classifier::classify_struct_domain_enhanced;
     use crate::organization::split_validator::validate_and_refine_splits;
@@ -528,5 +532,13 @@ pub fn suggest_splits_by_struct_grouping(
         .collect();
 
     // Validate and refine splits (filters too small, splits too large)
-    validate_and_refine_splits(splits)
+    let validated_splits = validate_and_refine_splits(splits);
+
+    // Enhance with cohesion scores and dependencies if ast and file_path are available
+    if let (Some(path), Some(ast_file)) = (file_path, ast) {
+        use crate::organization::call_graph_cohesion::enhance_splits_with_cohesion;
+        enhance_splits_with_cohesion(validated_splits, path, ast_file, ownership)
+    } else {
+        validated_splits
+    }
 }
