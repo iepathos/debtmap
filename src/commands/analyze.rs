@@ -109,7 +109,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         std::env::set_var("DEBTMAP_NO_CACHE", "1");
     }
 
-    let languages = language_parser::parse_languages(config.languages);
+    let languages = language_parser::parse_languages(config.languages.clone());
     let results = analyze_project(
         config.path.clone(),
         languages,
@@ -140,6 +140,11 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             formatting_config: config.formatting_config,
         },
     )?;
+
+    // Handle call graph debug and validation flags
+    if config.debug_call_graph || config.validate_call_graph || config.call_graph_stats_only {
+        handle_call_graph_diagnostics(&unified_analysis, &config)?;
+    }
 
     // Apply category filtering if specified
     let filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
@@ -382,6 +387,101 @@ fn analyze_and_configure_project_size(
                 std::io::stderr().flush().unwrap();
             }
         }
+    }
+
+    Ok(())
+}
+
+/// Handle call graph debug and validation diagnostics
+fn handle_call_graph_diagnostics(
+    unified_analysis: &crate::priority::UnifiedAnalysis,
+    config: &AnalyzeConfig,
+) -> Result<()> {
+    use crate::analyzers::call_graph::debug::{CallGraphDebugger, DebugConfig, DebugFormat};
+    use crate::analyzers::call_graph::validation::CallGraphValidator;
+
+    // Get the call graph from unified analysis
+    let call_graph = &unified_analysis.call_graph;
+
+    // Run validation if requested
+    if config.validate_call_graph {
+        let validation_report = CallGraphValidator::validate(call_graph);
+
+        eprintln!("\n=== Call Graph Validation Report ===");
+        eprintln!("Health Score: {}/100", validation_report.health_score);
+        eprintln!("Structural Issues: {}", validation_report.structural_issues.len());
+        eprintln!("Warnings: {}", validation_report.warnings.len());
+
+        if !validation_report.structural_issues.is_empty() {
+            eprintln!("\nStructural Issues:");
+            for issue in &validation_report.structural_issues {
+                eprintln!("  - {:?}", issue);
+            }
+        }
+
+        if !validation_report.warnings.is_empty() && config.verbosity > 0 {
+            eprintln!("\nWarnings:");
+            for warning in validation_report.warnings.iter().take(10) {
+                eprintln!("  - {:?}", warning);
+            }
+            if validation_report.warnings.len() > 10 {
+                eprintln!("  ... and {} more warnings", validation_report.warnings.len() - 10);
+            }
+        }
+    }
+
+    // Run debug output if requested
+    if config.debug_call_graph {
+        let format = match config.debug_format {
+            crate::cli::DebugFormatArg::Text => DebugFormat::Text,
+            crate::cli::DebugFormatArg::Json => DebugFormat::Json,
+        };
+
+        let debug_config = DebugConfig {
+            show_successes: config.verbosity > 1,
+            show_timing: true,
+            max_candidates_shown: 5,
+            format,
+            filter_functions: config.trace_functions.as_ref().map(|funcs| {
+                funcs.iter().cloned().collect()
+            }),
+        };
+
+        let mut debugger = CallGraphDebugger::new(debug_config);
+
+        // Add trace functions if specified
+        if let Some(ref funcs) = config.trace_functions {
+            for func in funcs {
+                debugger.add_trace_function(func.clone());
+            }
+        }
+
+        // Finalize statistics
+        debugger.finalize_statistics();
+
+        // Output debug report
+        eprintln!("\n=== Call Graph Debug Report ===");
+        let mut stdout = std::io::stdout();
+        debugger.write_report(&mut stdout)?;
+    }
+
+    // Show call graph stats if requested
+    if config.call_graph_stats_only {
+        eprintln!("\n=== Call Graph Statistics ===");
+        eprintln!("Total Functions: {}", call_graph.node_count());
+
+        // Calculate total calls by summing callees for all functions
+        let total_calls: usize = call_graph.get_all_functions()
+            .map(|func| call_graph.get_callees(func).len())
+            .sum();
+        eprintln!("Total Calls: {}", total_calls);
+
+        eprintln!("Average Calls per Function: {:.2}",
+            if call_graph.node_count() > 0 {
+                total_calls as f64 / call_graph.node_count() as f64
+            } else {
+                0.0
+            });
     }
 
     Ok(())

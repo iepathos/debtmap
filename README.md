@@ -180,6 +180,115 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 Debtmap includes Python parsing functionality via `rustpython-parser`, which depends on `malachite` (LGPL-3.0 licensed) for arbitrary-precision arithmetic. This LGPL dependency is used only for Python AST parsing and does not affect the MIT licensing of debtmap itself. For use cases requiring strict MIT-only dependencies, Python support can be disabled or replaced with an alternative parser.
 
+## Debugging Call Graph Issues
+
+Debtmap includes powerful debugging and diagnostic tools for troubleshooting call graph analysis and understanding function relationship detection.
+
+### Debug Call Graph Resolution
+
+View detailed information about how functions are resolved and linked in the call graph:
+
+```bash
+# Enable debug mode for call graph analysis
+debtmap analyze . --debug-call-graph
+
+# Output debug information in JSON format
+debtmap analyze . --debug-call-graph --debug-format json
+
+# Trace specific functions to see their resolution details
+debtmap analyze . --debug-call-graph --trace-function my_function --trace-function other_function
+```
+
+**Debug output includes:**
+- Resolution statistics (success rate, failure reasons)
+- Strategy performance (exact match, fuzzy matching, etc.)
+- Timing percentiles (p50, p95, p99) for performance analysis
+- Failed resolutions with detailed candidate information
+- Recommendations for improving resolution accuracy
+
+### Validate Call Graph Structure
+
+Check the structural integrity and health of the generated call graph:
+
+```bash
+# Run validation checks on call graph
+debtmap analyze . --validate-call-graph
+
+# Combine validation with debug output
+debtmap analyze . --validate-call-graph --debug-call-graph
+```
+
+**Validation checks:**
+- **Structural Issues**: Detects dangling edges, orphaned nodes, and duplicate functions
+- **Heuristic Warnings**: Identifies suspicious patterns like unusually high fan-in/fan-out
+- **Health Score**: Overall graph quality score (0-100) based on detected issues
+- **Detailed Reports**: Shows specific issues with file locations and function names
+
+### View Call Graph Statistics
+
+Get quick statistics about call graph size and structure:
+
+```bash
+# Show call graph statistics only (fast, minimal output)
+debtmap analyze . --call-graph-stats-only
+```
+
+**Statistics include:**
+- Total number of functions analyzed
+- Total number of function calls detected
+- Average calls per function (graph density)
+
+### Common Use Cases
+
+**Debugging unresolved function calls:**
+```bash
+# See why specific functions aren't being linked
+debtmap analyze . --debug-call-graph --trace-function problematic_function
+```
+
+**Validating analysis quality:**
+```bash
+# Check for structural problems in call graph
+debtmap analyze . --validate-call-graph
+```
+
+**Performance profiling:**
+```bash
+# See timing breakdown of call resolution
+debtmap analyze . --debug-call-graph --debug-format json
+```
+
+**Combining with normal analysis:**
+```bash
+# Run full analysis with debugging enabled
+debtmap analyze . --lcov coverage.info --debug-call-graph --validate-call-graph
+```
+
+### Interpreting Debug Output
+
+**Health Score:**
+- **95-100**: Excellent - Very few unresolved calls
+- **85-94**: Good - Acceptable resolution rate
+- **<85**: Needs attention - High number of unresolved calls
+
+**Resolution Strategies:**
+- **Exact**: Exact function name match (highest confidence)
+- **Fuzzy**: Qualified name match (e.g., `Module::function`)
+- **NameOnly**: Base name match (lowest confidence, may have ambiguity)
+
+**Common Issues:**
+- **Dangling Edges**: References to non-existent functions (potential parser bugs)
+- **Orphaned Nodes**: Functions with no connections (may indicate missed calls)
+- **High Fan-Out**: Functions calling many others (potential god objects)
+- **High Fan-In**: Functions called by many others (potential bottlenecks)
+
+### Performance Considerations
+
+Debug and validation modes add minimal overhead (<20% typically) and can be used in CI/CD pipelines. For large codebases (>1000 files), consider:
+- Using `--call-graph-stats-only` for quick health checks
+- Limiting `--trace-function` to specific problem areas
+- Running full debug analysis periodically rather than on every build
+
 ## Roadmap
 
 ### Language Support

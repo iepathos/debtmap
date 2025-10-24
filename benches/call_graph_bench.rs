@@ -3,6 +3,8 @@
 //! This ensures that the refactoring hasn't introduced performance regressions
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use debtmap::analyzers::call_graph::debug::{CallGraphDebugger, DebugConfig, DebugFormat};
+use debtmap::analyzers::call_graph::validation::CallGraphValidator;
 use debtmap::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use std::hint::black_box;
 use std::path::PathBuf;
@@ -147,6 +149,89 @@ fn bench_cross_file_resolution(c: &mut Criterion) {
     });
 }
 
+/// Benchmark debug mode overhead - verifies <20% overhead requirement
+fn bench_debug_mode_overhead(c: &mut Criterion) {
+    let graph = create_test_graph(500);
+
+    // Baseline: validation without debug mode
+    c.bench_function("validation_baseline", |b| {
+        b.iter(|| {
+            CallGraphValidator::validate(black_box(&graph));
+        });
+    });
+
+    // With debug mode enabled
+    c.bench_function("validation_with_debug", |b| {
+        b.iter(|| {
+            let debug_config = DebugConfig {
+                show_successes: false,
+                show_timing: true,
+                max_candidates_shown: 5,
+                format: DebugFormat::Text,
+                filter_functions: None,
+            };
+            let mut debugger = CallGraphDebugger::new(debug_config);
+            debugger.finalize_statistics();
+
+            CallGraphValidator::validate(black_box(&graph));
+        });
+    });
+
+    // Debug report generation
+    c.bench_function("debug_report_generation_text", |b| {
+        b.iter(|| {
+            let debug_config = DebugConfig {
+                show_successes: false,
+                show_timing: true,
+                max_candidates_shown: 5,
+                format: DebugFormat::Text,
+                filter_functions: None,
+            };
+            let mut debugger = CallGraphDebugger::new(debug_config);
+            debugger.finalize_statistics();
+
+            let mut output = Vec::new();
+            let _ = debugger.write_report(&mut output);
+        });
+    });
+
+    c.bench_function("debug_report_generation_json", |b| {
+        b.iter(|| {
+            let debug_config = DebugConfig {
+                show_successes: false,
+                show_timing: true,
+                max_candidates_shown: 5,
+                format: DebugFormat::Json,
+                filter_functions: None,
+            };
+            let mut debugger = CallGraphDebugger::new(debug_config);
+            debugger.finalize_statistics();
+
+            let mut output = Vec::new();
+            let _ = debugger.write_report(&mut output);
+        });
+    });
+}
+
+/// Benchmark validation operations
+fn bench_validation_operations(c: &mut Criterion) {
+    let graph = create_test_graph(1000);
+
+    c.bench_function("validate_call_graph_1000_functions", |b| {
+        b.iter(|| {
+            CallGraphValidator::validate(black_box(&graph));
+        });
+    });
+
+    // Test with smaller graph
+    let small_graph = create_test_graph(100);
+    c.bench_function("validate_call_graph_100_functions", |b| {
+        b.iter(|| {
+            CallGraphValidator::validate(black_box(&small_graph));
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_add_function,
@@ -155,7 +240,9 @@ criterion_group!(
     bench_transitive_callees,
     bench_criticality_calculation,
     bench_delegation_detection,
-    bench_cross_file_resolution
+    bench_cross_file_resolution,
+    bench_debug_mode_overhead,
+    bench_validation_operations
 );
 
 criterion_main!(benches);
