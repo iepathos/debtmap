@@ -231,6 +231,19 @@ impl PathResolver {
                     }
                 }
             }
+
+            // Fallback: if module_path is not populated (empty string), just match by function name
+            // This is a temporary workaround until spec 142 is fully implemented
+            for func in call_graph.get_all_functions() {
+                if Self::matches_name(&func.name, base_name) && func.module_path.is_empty() {
+                    // Verify the file path contains the expected module name
+                    let file_path_str = func.file.to_string_lossy();
+                    let expected_module = &path_parts[..path_parts.len() - 1].join("/");
+                    if file_path_str.contains(expected_module) || expected_module.starts_with("crate") {
+                        return Some(func.clone());
+                    }
+                }
+            }
         }
 
         None

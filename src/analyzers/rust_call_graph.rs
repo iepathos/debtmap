@@ -72,8 +72,9 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
                     callee,
                     call_type: unresolved.call_type.clone(),
                 });
-            } else if unresolved.callee_name.contains("::") {
-                // For qualified paths that didn't resolve, try using PathResolver
+            } else {
+                // If standard resolution fails, try using PathResolver
+                // This handles both simple names (via imports) and qualified paths
                 if let Some(callee) = path_resolver.resolve_call(
                     &unresolved.caller.file,
                     &unresolved.callee_name,
