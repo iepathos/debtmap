@@ -885,9 +885,10 @@ mod tests {
             .insert("Default".to_string(), vec![trait_impl].into());
 
         // Also need to add the type-to-trait mapping for resolution
-        registry
-            .type_to_traits
-            .insert("MyConfig".to_string(), vec!["Default".to_string()].into_iter().collect());
+        registry.type_to_traits.insert(
+            "MyConfig".to_string(),
+            vec!["Default".to_string()].into_iter().collect(),
+        );
 
         // Add an unresolved trait call
         registry.unresolved_calls.push_back(TraitMethodCall {
