@@ -55,26 +55,41 @@ mod tests {
     let path = PathBuf::from("test.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
+    // The module path is inferred from the file path (test.rs -> "test")
+    let module_path = "test".to_string();
+
     // Find the standalone function
-    let standalone_id = FunctionId::new(path.clone(), "analyze_imports".to_string(), 3);
+    let standalone_id = FunctionId::with_module_path(
+        path.clone(),
+        "analyze_imports".to_string(),
+        3,
+        module_path.clone(),
+    );
 
     // Find the method
-    let method_id = FunctionId::new(
+    let method_id = FunctionId::with_module_path(
         path.clone(),
         "EnhancedImportResolver::analyze_imports".to_string(),
         17,
+        module_path.clone(),
     );
 
     // Find the test
-    let test_id = FunctionId::new(path.clone(), "tests::test_direct_import".to_string(), 27);
+    let test_id = FunctionId::with_module_path(
+        path.clone(),
+        "tests::test_direct_import".to_string(),
+        27,
+        module_path.clone(),
+    );
 
     println!("\n=== All functions found ===");
     for func in call_graph.find_all_functions() {
         let callers = call_graph.get_callers(&func);
         println!(
-            "  {} (line {}) - {} callers",
+            "  {} (line {}, module_path: '{}') - {} callers",
             func.name,
             func.line,
+            func.module_path,
             callers.len()
         );
         for caller in callers {
@@ -167,9 +182,22 @@ fn use_builder() {
     let path = PathBuf::from("builder.rs");
     let call_graph = extract_call_graph(&parsed, &path);
 
-    let standalone = FunctionId::new(path.clone(), "build".to_string(), 2);
+    // The module path is inferred from the file path (builder.rs -> "builder")
+    let module_path = "builder".to_string();
 
-    let method = FunctionId::new(path.clone(), "Builder::build".to_string(), 15);
+    let standalone = FunctionId::with_module_path(
+        path.clone(),
+        "build".to_string(),
+        2,
+        module_path.clone(),
+    );
+
+    let method = FunctionId::with_module_path(
+        path.clone(),
+        "Builder::build".to_string(),
+        15,
+        module_path.clone(),
+    );
 
     println!("\n=== Builder pattern test ===");
     for func in call_graph.find_all_functions() {
