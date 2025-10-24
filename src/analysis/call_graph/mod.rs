@@ -135,6 +135,18 @@ impl RustCallGraphBuilder {
             // Initialize the trait resolver for enhanced resolution
             self.enhanced_graph.trait_registry.init_resolver();
 
+            // Detect common trait patterns (Default, Clone, From, Into, constructors)
+            // This marks trait implementations as entry points to reduce false positives
+            self.enhanced_graph
+                .trait_registry
+                .detect_common_trait_patterns(&mut self.enhanced_graph.base_graph);
+
+            // Resolve trait method calls and add edges to call graph
+            let _resolved_count = self
+                .enhanced_graph
+                .trait_registry
+                .resolve_trait_method_calls(&mut self.enhanced_graph.base_graph);
+
             self.resolve_trait_method_calls()?;
             self.mark_visit_trait_methods()?;
             self.resolve_trait_object_calls()?;
