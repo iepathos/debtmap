@@ -2,6 +2,33 @@ use crate::organization::class_ownership::{ClassOwnership, ClassOwnershipAnalyze
 use crate::organization::language::Language;
 use tree_sitter::{Node, Parser};
 
+/// JavaScript and TypeScript class ownership analyzer.
+///
+/// This analyzer extracts class definitions, methods, and standalone functions from JavaScript
+/// and TypeScript code using tree-sitter for AST parsing.
+///
+/// # Call Graph Integration
+///
+/// **Note**: Call graph integration is not yet implemented for JavaScript/TypeScript. The current
+/// implementation provides robust domain-based classification through pattern matching on class
+/// names and method names (see `domain_classifier.rs`). This approach covers common React, Vue,
+/// Angular, and Node.js patterns without requiring call graph analysis.
+///
+/// **Future Enhancement**: When the JavaScript/TypeScript call graph analyzer becomes available,
+/// this analyzer can be extended to provide cohesion scoring similar to Rust's implementation.
+/// The call graph would enable:
+/// - Detection of method call patterns within classes and components
+/// - Identification of tightly coupled vs loosely coupled methods
+/// - More accurate god object detection through cohesion metrics
+/// - Analysis of React component prop drilling and state management patterns
+///
+/// **Integration Path**: To add call graph support in the future:
+/// 1. Create a JavaScript/TypeScript call graph analyzer in `src/analysis/javascript/call_graph.rs`
+/// 2. Add a `compute_cohesion_score` method to this analyzer
+/// 3. Use the call graph to analyze intra-class method calls and component relationships
+/// 4. Apply the same cohesion scoring algorithm used for Rust (see spec 144)
+///
+/// For now, the domain classifier provides sufficient classification accuracy for most projects.
 pub struct JavaScriptClassAnalyzer {
     language_variant: Language,
 }

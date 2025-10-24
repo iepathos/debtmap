@@ -2,6 +2,32 @@ use crate::organization::class_ownership::{ClassOwnership, ClassOwnershipAnalyze
 use crate::organization::language::Language;
 use rustpython_parser::ast;
 
+/// Python-specific class ownership analyzer.
+///
+/// This analyzer extracts class definitions, methods, and standalone functions from Python code.
+/// It uses AST parsing via rustpython_parser to identify class structures and their members.
+///
+/// # Call Graph Integration
+///
+/// **Note**: Call graph integration is not yet implemented for Python. The current implementation
+/// provides robust domain-based classification through pattern matching on class names and method
+/// names (see `domain_classifier.rs`). This approach covers the majority of common use cases without
+/// requiring call graph analysis.
+///
+/// **Future Enhancement**: When the Python call graph analyzer becomes available, this analyzer
+/// can be extended to provide cohesion scoring similar to Rust's implementation. The call graph
+/// would enable:
+/// - Detection of method call patterns within classes
+/// - Identification of tightly coupled vs loosely coupled methods
+/// - More accurate god object detection through cohesion metrics
+///
+/// **Integration Path**: To add call graph support in the future:
+/// 1. Create a Python call graph analyzer in `src/analysis/python/call_graph.rs`
+/// 2. Add a `compute_cohesion_score` method to this analyzer
+/// 3. Use the call graph to analyze intra-class method calls
+/// 4. Apply the same cohesion scoring algorithm used for Rust (see spec 144)
+///
+/// For now, the domain classifier provides sufficient classification accuracy for most projects.
 pub struct PythonClassAnalyzer;
 
 impl PythonClassAnalyzer {
