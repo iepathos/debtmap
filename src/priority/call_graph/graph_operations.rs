@@ -6,9 +6,15 @@ use std::path::PathBuf;
 
 impl CallGraph {
     pub fn merge(&mut self, other: CallGraph) {
-        // Merge nodes
+        // Merge nodes (use add_function to maintain indexes)
         for (id, node) in other.nodes {
-            self.nodes.insert(id, node);
+            self.add_function(
+                id,
+                node.is_entry_point,
+                node.is_test,
+                node.complexity,
+                node._lines,
+            );
         }
 
         // Merge edges
@@ -32,7 +38,18 @@ impl CallGraph {
             complexity,
             _lines: lines,
         };
-        self.nodes.insert(id, node);
+        self.nodes.insert(id.clone(), node);
+
+        // Populate fuzzy index (name + file)
+        let fuzzy_key = id.fuzzy_key();
+        self.fuzzy_index
+            .entry(fuzzy_key)
+            .or_default()
+            .push(id.clone());
+
+        // Populate name index (name only)
+        let normalized_name = FunctionId::normalize_name(&id.name);
+        self.name_index.entry(normalized_name).or_default().push(id);
     }
 
     pub fn add_call(&mut self, call: FunctionCall) {
@@ -99,18 +116,9 @@ impl CallGraph {
     /// Mark a function as being reachable through trait dispatch
     /// This helps reduce false positives in dead code detection
     pub fn mark_as_trait_dispatch(&mut self, func_id: FunctionId) {
-        // Ensure the function exists in the graph
+        // Ensure the function exists in the graph (use add_function to maintain indexes)
         if !self.nodes.contains_key(&func_id) {
-            self.nodes.insert(
-                func_id.clone(),
-                FunctionNode {
-                    id: func_id.clone(),
-                    is_entry_point: false,
-                    is_test: false,
-                    complexity: 0,
-                    _lines: 0,
-                },
-            );
+            self.add_function(func_id.clone(), false, false, 0, 0);
         }
 
         // Mark it as an entry point to prevent dead code false positives
@@ -269,6 +277,62 @@ impl CallGraph {
         self.nodes.is_empty()
     }
 
+    /// Find a function using fallback matching strategies
+    /// Tries exact match first, then fuzzy match, then name-only match
+    pub fn find_function(&self, query: &FunctionId) -> Option<FunctionId> {
+        // 1. Try exact match (most common case)
+        if self.nodes.contains_key(query) {
+            return Some(query.clone());
+        }
+
+        // 2. Try fuzzy match (name + file)
+        let fuzzy_key = query.fuzzy_key();
+        if let Some(candidates) = self.fuzzy_index.get(&fuzzy_key) {
+            if candidates.len() == 1 {
+                return Some(candidates[0].clone());
+            }
+            // Multiple candidates: try to disambiguate by line proximity
+            if let Some(best) = Self::disambiguate_by_line(candidates, query.line) {
+                return Some(best);
+            }
+        }
+
+        // 3. Try name-only match (cross-file)
+        let normalized_name = FunctionId::normalize_name(&query.name);
+        if let Some(candidates) = self.name_index.get(&normalized_name) {
+            // For name-only matches, prefer same module path if available
+            if let Some(best) = Self::disambiguate_by_module(candidates, &query.module_path) {
+                return Some(best);
+            }
+            // If no module path match, try line proximity
+            if let Some(best) = Self::disambiguate_by_line(candidates, query.line) {
+                return Some(best);
+            }
+        }
+
+        None
+    }
+
+    /// Disambiguate between multiple candidates by line proximity
+    fn disambiguate_by_line(candidates: &[FunctionId], target_line: usize) -> Option<FunctionId> {
+        candidates
+            .iter()
+            .min_by_key(|func_id| target_line.abs_diff(func_id.line))
+            .cloned()
+    }
+
+    /// Disambiguate between multiple candidates by module path match
+    fn disambiguate_by_module(
+        candidates: &[FunctionId],
+        target_module: &str,
+    ) -> Option<FunctionId> {
+        // First try exact module path match
+        candidates
+            .iter()
+            .find(|func_id| func_id.module_path == target_module)
+            .cloned()
+    }
+
     /// Find a function at a specific file and line location
     /// Returns the function that contains the given line
     pub fn find_function_at_location(&self, file: &PathBuf, line: usize) -> Option<FunctionId> {
@@ -294,5 +358,124 @@ impl CallGraph {
             .filter(|func_id| func_id.line <= target_line)
             .min_by_key(|func_id| target_line - func_id.line)
             .map(|&func_id| func_id.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exact_lookup() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+
+        // Exact match should succeed
+        let result = graph.find_function(&func_id);
+        assert_eq!(result, Some(func_id));
+    }
+
+    #[test]
+    fn test_fuzzy_lookup_different_line() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+
+        // Query with different line number should find via fuzzy match
+        let query = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 150);
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func_id));
+    }
+
+    #[test]
+    fn test_fuzzy_lookup_generic_function() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "map".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+
+        // Query with generic type parameter should find base function
+        let query = FunctionId::new(PathBuf::from("test.rs"), "map<String>".to_string(), 100);
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func_id));
+    }
+
+    #[test]
+    fn test_name_only_lookup() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+
+        // Query from different file should find via name-only match
+        let query = FunctionId::new(PathBuf::from("other.rs"), "foo".to_string(), 50);
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func_id));
+    }
+
+    #[test]
+    fn test_disambiguate_by_line_proximity() {
+        let mut graph = CallGraph::new();
+        let func1 = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 100);
+        let func2 = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 200);
+        graph.add_function(func1.clone(), false, false, 5, 10);
+        graph.add_function(func2.clone(), false, false, 5, 10);
+
+        // Query at line 120 should prefer func1 (closer)
+        let query = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 120);
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func1));
+
+        // Query at line 190 should prefer func2 (closer)
+        let query = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 190);
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func2));
+    }
+
+    #[test]
+    fn test_disambiguate_by_module_path() {
+        let mut graph = CallGraph::new();
+        let func1 = FunctionId::with_module_path(
+            PathBuf::from("test.rs"),
+            "foo".to_string(),
+            100,
+            "module1".to_string(),
+        );
+        let func2 = FunctionId::with_module_path(
+            PathBuf::from("other.rs"),
+            "foo".to_string(),
+            100,
+            "module2".to_string(),
+        );
+        graph.add_function(func1.clone(), false, false, 5, 10);
+        graph.add_function(func2.clone(), false, false, 5, 10);
+
+        // Query with module1 should prefer func1
+        let query = FunctionId::with_module_path(
+            PathBuf::from("another.rs"),
+            "foo".to_string(),
+            50,
+            "module1".to_string(),
+        );
+        let result = graph.find_function(&query);
+        assert_eq!(result, Some(func1));
+    }
+
+    #[test]
+    fn test_no_match_returns_none() {
+        let graph = CallGraph::new();
+        let query = FunctionId::new(PathBuf::from("test.rs"), "nonexistent".to_string(), 100);
+        let result = graph.find_function(&query);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_lookup_chain_short_circuits() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "foo".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+
+        // Exact match should be found immediately without fallback
+        let result = graph.find_function(&func_id);
+        assert_eq!(result, Some(func_id));
     }
 }
