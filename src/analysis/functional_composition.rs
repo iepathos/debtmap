@@ -332,8 +332,39 @@ fn extract_pipeline_from_method_call(
 
         // Detect parallel iterators - check without allocating string each time
         match method_str.as_str() {
-            "par_iter" | "par_iter_mut" | "par_bridge" => is_parallel = true,
+            "par_iter" | "par_iter_mut" | "into_par_iter" | "par_bridge" => {
+                is_parallel = true;
+                stages.push(PipelineStage::Iterator {
+                    method: method_str.clone(),
+                });
+            }
+            // Standard iterators
             "iter" | "into_iter" | "iter_mut" => {
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            // Iterator constructors (these ARE iterators, not receivers)
+            "lines" | "chars" | "bytes" | "split_whitespace" => {
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            // Slice/collection iterators
+            "windows" | "chunks" | "chunks_exact" | "rchunks" | "split" | "rsplit" | "split_terminator" => {
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            // Collection-specific iterators
+            "into_values" | "into_keys" | "values" | "keys" => {
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            // std::iter constructors (from expressions, not method calls)
+            // These won't appear as method calls usually, but include for completeness
+            "once" | "repeat" | "repeat_with" | "from_fn" | "successors" | "empty" => {
                 stages.push(PipelineStage::Iterator {
                     method: method_str,
                 });
@@ -346,7 +377,7 @@ fn extract_pipeline_from_method_call(
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "fold" | "reduce" => stages.push(PipelineStage::Fold {
+            "fold" | "reduce" | "scan" | "try_fold" | "try_for_each" => stages.push(PipelineStage::Fold {
                 init_complexity: 1,
                 fold_complexity: 1,
             }),
@@ -354,47 +385,119 @@ fn extract_pipeline_from_method_call(
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
+            "filter_map" => stages.push(PipelineStage::FlatMap {
+                // filter_map is like flat_map with Option
+                closure_complexity: 1,
+                has_nested_pipeline: false,
+            }),
+            "take" | "skip" | "step_by" | "chain" | "zip" | "enumerate" | "peekable" | "fuse" |
+            "take_while" | "skip_while" | "map_while" | "by_ref" | "inspect" | "flatten" => {
+                // Adapter methods that transform the iterator
+                stages.push(PipelineStage::Map {
+                    closure_complexity: 0, // No closure for these (or it's implicit)
+                    has_nested_pipeline: false,
+                });
+            }
+            "cloned" | "copied" => {
+                // Simple transformation adapters
+                stages.push(PipelineStage::Map {
+                    closure_complexity: 0,
+                    has_nested_pipeline: false,
+                });
+            }
+            "rev" | "cycle" => {
+                // Order/repetition adapters
+                stages.push(PipelineStage::Map {
+                    closure_complexity: 0,
+                    has_nested_pipeline: false,
+                });
+            }
             "collect" => {
                 terminal_op = Some(TerminalOp::Collect);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+                // Don't add terminal ops as stages - they terminate, not transform
             }
             "sum" => {
-                terminal_op = Some(TerminalOp::Sum);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+                // sum() is a reducing operation, counts as transformation
+                stages.push(PipelineStage::Fold {
+                    init_complexity: 0,
+                    fold_complexity: 0,
                 });
+                terminal_op = Some(TerminalOp::Sum);
             }
             "count" => {
-                terminal_op = Some(TerminalOp::Count);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+                // count() is a reducing operation
+                stages.push(PipelineStage::Fold {
+                    init_complexity: 0,
+                    fold_complexity: 0,
                 });
+                terminal_op = Some(TerminalOp::Count);
             }
             "any" => {
-                terminal_op = Some(TerminalOp::Any);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+                // any() has a closure, so it's also a transformation
+                stages.push(PipelineStage::Filter {
+                    closure_complexity: 1,
+                    has_nested_pipeline: false,
                 });
+                terminal_op = Some(TerminalOp::Any);
             }
             "all" => {
-                terminal_op = Some(TerminalOp::All);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+                // all() has a closure, so it's also a transformation
+                stages.push(PipelineStage::Filter {
+                    closure_complexity: 1,
+                    has_nested_pipeline: false,
                 });
+                terminal_op = Some(TerminalOp::All);
             }
             "find" => {
-                terminal_op = Some(TerminalOp::Find);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+                // find() has a closure, so it's also a transformation
+                stages.push(PipelineStage::Filter {
+                    closure_complexity: 1,
+                    has_nested_pipeline: false,
                 });
+                terminal_op = Some(TerminalOp::Find);
             }
             "for_each" => {
                 terminal_op = Some(TerminalOp::ForEach);
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
+            }
+            "partition" => {
+                // Partitioning has a closure
+                stages.push(PipelineStage::Filter {
+                    closure_complexity: 1,
+                    has_nested_pipeline: false,
                 });
+                terminal_op = Some(TerminalOp::Collect);
+            }
+            "unzip" => {
+                // Unzip is a transformation without a closure
+                stages.push(PipelineStage::Map {
+                    closure_complexity: 0,
+                    has_nested_pipeline: false,
+                });
+                terminal_op = Some(TerminalOp::Collect);
+            }
+            "max" | "min" | "max_by" | "min_by" | "max_by_key" | "min_by_key" => {
+                // Extrema operations are terminal
+                terminal_op = Some(TerminalOp::Reduce);
+            }
+            "position" | "rposition" => {
+                // Position finding operations have a closure
+                stages.push(PipelineStage::Filter {
+                    closure_complexity: 1,
+                    has_nested_pipeline: false,
+                });
+                terminal_op = Some(TerminalOp::Find);
+            }
+            "nth" | "last" => {
+                // Element access operations
+                terminal_op = Some(TerminalOp::Find);
+            }
+            "product" => {
+                // Product is like sum - a reducing operation
+                stages.push(PipelineStage::Fold {
+                    init_complexity: 0,
+                    fold_complexity: 0,
+                });
+                terminal_op = Some(TerminalOp::Sum);
             }
             _ => {} // Ignore other methods
         }
@@ -410,7 +513,20 @@ fn extract_pipeline_from_method_call(
     stages.reverse();
 
     // Early exit if no valid pipeline
-    if stages.is_empty() || !has_iterator_start(&stages) {
+    if stages.is_empty() {
+        return Vec::new();
+    }
+
+    // Must start with either an iterator OR a transformation stage
+    // (Range, Option, Result don't need explicit .iter() calls)
+    if !has_iterator_start(&stages) && !has_transformation_stage(&stages) {
+        return Vec::new();
+    }
+
+    // Require at least one transformation stage (map, filter, fold, etc.)
+    // UNLESS we have a meaningful terminal operation (sum, any, find, etc.)
+    // These terminals provide functional value even without intermediate transformations
+    if !has_transformation_stage(&stages) && !has_meaningful_terminal(&terminal_op) {
         return Vec::new();
     }
 
@@ -430,6 +546,40 @@ fn has_iterator_start(stages: &[PipelineStage]) -> bool {
         .first()
         .map(|s| matches!(s, PipelineStage::Iterator { .. }))
         .unwrap_or(false)
+}
+
+/// Check if pipeline has at least one transformation stage
+/// (not just iterator initialization)
+fn has_transformation_stage(stages: &[PipelineStage]) -> bool {
+    stages.iter().any(|stage| {
+        matches!(
+            stage,
+            PipelineStage::Map { .. }
+                | PipelineStage::Filter { .. }
+                | PipelineStage::Fold { .. }
+                | PipelineStage::FlatMap { .. }
+                | PipelineStage::AndThen { .. }
+                | PipelineStage::MapErr { .. }
+                | PipelineStage::Inspect { .. }
+        )
+    })
+}
+
+/// Check if terminal operation is meaningful enough to constitute a functional pattern
+/// even without intermediate transformations (e.g., `items.iter().sum()` is functional)
+fn has_meaningful_terminal(terminal: &Option<TerminalOp>) -> bool {
+    matches!(
+        terminal,
+        Some(TerminalOp::Sum)
+            | Some(TerminalOp::Count)
+            | Some(TerminalOp::Any)
+            | Some(TerminalOp::All)
+            | Some(TerminalOp::Find)
+            | Some(TerminalOp::Reduce)
+            | Some(TerminalOp::Collect) // partition, unzip, etc.
+    )
+    // Note: Collect alone (without transformations) is NOT meaningful
+    // But we include it because partition/unzip set terminal to Collect
 }
 
 /// Analyze function purity using functional accumulation
@@ -613,8 +763,10 @@ pub fn score_composition(
     purity: &PurityMetrics,
     config: &FunctionalAnalysisConfig,
 ) -> f64 {
+    // No functional pipelines = not functional code, regardless of purity
+    // Purity alone doesn't make code "functional" - it needs transformation pipelines
     if pipelines.is_empty() {
-        return purity.score * 0.5; // No pipelines, but may be pure
+        return 0.0;
     }
 
     let pipeline_score = score_pipelines(pipelines, config);
@@ -749,7 +901,8 @@ mod tests {
         let pipelines = detect_pipelines(&function, &config);
 
         assert_eq!(pipelines.len(), 1);
-        assert_eq!(pipelines[0].depth, 4);
+        // Depth is 3: iter, map, filter (collect is terminal, not a stage)
+        assert_eq!(pipelines[0].depth, 3);
         assert!(!pipelines[0].is_parallel);
         assert_eq!(pipelines[0].terminal_operation, Some(TerminalOp::Collect));
     }
