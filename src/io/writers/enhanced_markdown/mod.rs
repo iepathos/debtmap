@@ -118,9 +118,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         }
 
         match self.config.detail_level {
-            DetailLevel::Detailed | DetailLevel::Complete => {
-                self.write_statistics_section(results)
-            }
+            DetailLevel::Detailed | DetailLevel::Complete => self.write_statistics_section(results),
             _ => Ok(()),
         }
     }
