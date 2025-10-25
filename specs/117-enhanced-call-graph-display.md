@@ -31,14 +31,14 @@ Debtmap currently collects comprehensive call graph data (callers and callees fo
 **User's Example Request**:
 From the user's debtmap output example, they want to see caller/callee information like:
 ```
-#3 SCORE: 16.7 [🔴 UNTESTED] [CRITICAL]
+#3 SCORE: 16.7 [UNTESTED] [CRITICAL]
 ├─ LOCATION: ./src/commands/analyze.rs:396 handle_call_graph_diagnostics()
 ├─ ACTION: Add 8 tests for 100% coverage gap, then refactor complexity 14 into 7 functions
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by (2):
+│  ├─ Called by (2):
 │  │     • main::cli_handler
 │  │     • commands::run_analysis
-│  └─ 📤 Calls (5):
+│  └─ Calls (5):
 │        • io::print_diagnostics
 │        • analysis::validate_graph
 │        • config::get_settings
@@ -114,7 +114,7 @@ Ensure that call graph data (callers and callees) is consistently displayed in a
 
 3. **Usability**
    - Clear visual distinction between callers and callees
-   - Emoji/icons for better visual scanning
+   - Clear text labels for better visual scanning
    - Truncation with clear indication of hidden items
    - Consistent formatting across all output types
 
@@ -373,15 +373,15 @@ debtmap analyze src --include-std-lib-calls
 
 **Terminal Output Format**:
 ```
-#3 SCORE: 16.7 [🔴 UNTESTED] [CRITICAL]
-   ↳ Main factors: 🔴 UNTESTED (0% coverage, weight: 50%), Moderate complexity
+#3 SCORE: 16.7 [UNTESTED] [CRITICAL]
+   Main factors: UNTESTED (0% coverage, weight: 50%), Moderate complexity
 ├─ LOCATION: ./src/commands/analyze.rs:396 handle_call_graph_diagnostics()
 ├─ ACTION: Add 8 tests for 100% coverage gap, then refactor complexity 14 into 7 functions
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by (2):
+│  ├─ Called by (2):
 │  │     • main::cli_handler
 │  │     • commands::run_analysis
-│  └─ 📤 Calls (5):
+│  └─ Calls (5):
 │        • io::print_diagnostics
 │        • analysis::validate_graph
 │        • config::get_settings
@@ -391,10 +391,10 @@ debtmap analyze src --include-std-lib-calls
 Or with file locations enabled:
 ```
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by (2):
+│  ├─ Called by (2):
 │  │     • main::cli_handler (src/main.rs:45)
 │  │     • commands::run_analysis (src/commands/mod.rs:123)
-│  └─ 📤 Calls (5):
+│  └─ Calls (5):
 │        • io::print_diagnostics (src/io/mod.rs:89)
 │        • analysis::validate_graph (src/analysis/mod.rs:234)
 │        • config::get_settings (src/config.rs:56)
@@ -404,8 +404,8 @@ Or with file locations enabled:
 For empty callers:
 ```
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by: No direct callers detected
-│  └─ 📤 Calls (3):
+│  ├─ Called by: No direct callers detected
+│  └─ Calls (3):
 │        • helper::process_data
 │        • utils::validate_input
 │        • io::write_output
@@ -414,10 +414,10 @@ For empty callers:
 For functions that call nothing:
 ```
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by (2):
+│  ├─ Called by (2):
 │  │     • main::process
 │  │     • worker::run_task
-│  └─ 📤 Calls: Calls no other functions
+│  └─ Calls: Calls no other functions
 ```
 
 ### Code Organization
@@ -638,10 +638,10 @@ Debtmap shows caller and callee relationships for each function in the DEPENDENC
 
 ```
 ├─ DEPENDENCIES:
-│  ├─ 📞 Called by (2):     # Functions that call this function
+│  ├─ Called by (2):     # Functions that call this function
 │  │     • main::cli_handler
 │  │     • commands::run_analysis
-│  └─ 📤 Calls (5):         # Functions called by this function
+│  └─ Calls (5):         # Functions called by this function
 │        • io::print_diagnostics
 │        • analysis::validate_graph
 │        … (showing 3 of 5)  # Truncated display

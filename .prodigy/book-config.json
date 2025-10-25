@@ -39,6 +39,11 @@
       "area": "architecture",
       "source_files": ["src/analyzers/", "src/analysis/", "src/risk/", "src/priority/"],
       "feature_categories": ["architecture", "data_flow", "pipelines", "system_design"]
+    },
+    {
+      "area": "responsibility_analysis",
+      "source_files": ["src/organization/god_object_analysis.rs", "src/organization/god_object_detector.rs", "src/organization/mod.rs"],
+      "feature_categories": ["srp_detection", "responsibility_inference", "method_categorization", "refactoring_recommendations"]
     }
   ],
   "chapter_file": "workflows/data/debtmap-chapters.json",

@@ -23,6 +23,7 @@
 - [God Object Detection](god-object-detection.md)
 - [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
+- [Responsibility Analysis](responsibility-analysis.md)
 - [Scoring Strategies](scoring-strategies.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 
