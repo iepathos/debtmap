@@ -654,7 +654,9 @@ mod tests {
         assert!(lines[0].contains("3-5 pure functions"));
 
         // Verify contains appropriate patterns
-        assert!(lines.iter().any(|l| l.contains("Decompose into logical units")));
+        assert!(lines
+            .iter()
+            .any(|l| l.contains("Decompose into logical units")));
     }
 
     #[test]
