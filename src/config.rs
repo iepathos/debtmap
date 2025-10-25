@@ -203,6 +203,54 @@ fn default_unknown_multiplier() -> f64 {
     1.0 // No adjustment for unknown functions
 }
 
+/// Complexity weights configuration (spec 121)
+/// Controls how cyclomatic and cognitive complexity are combined in scoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComplexityWeightsConfig {
+    /// Weight for cyclomatic complexity (default: 0.3)
+    #[serde(default = "default_cyclomatic_weight")]
+    pub cyclomatic: f64,
+
+    /// Weight for cognitive complexity (default: 0.7)
+    #[serde(default = "default_cognitive_weight")]
+    pub cognitive: f64,
+
+    /// Maximum cyclomatic complexity for normalization (default: 50)
+    #[serde(default = "default_max_cyclomatic")]
+    pub max_cyclomatic: f64,
+
+    /// Maximum cognitive complexity for normalization (default: 100)
+    #[serde(default = "default_max_cognitive")]
+    pub max_cognitive: f64,
+}
+
+impl Default for ComplexityWeightsConfig {
+    fn default() -> Self {
+        Self {
+            cyclomatic: default_cyclomatic_weight(),
+            cognitive: default_cognitive_weight(),
+            max_cyclomatic: default_max_cyclomatic(),
+            max_cognitive: default_max_cognitive(),
+        }
+    }
+}
+
+fn default_cyclomatic_weight() -> f64 {
+    0.3 // 30% weight - cyclomatic as proxy for test cases
+}
+
+fn default_cognitive_weight() -> f64 {
+    0.7 // 70% weight - cognitive correlates better with bugs
+}
+
+fn default_max_cyclomatic() -> f64 {
+    50.0 // Reasonable maximum for cyclomatic complexity
+}
+
+fn default_max_cognitive() -> f64 {
+    100.0 // Cognitive complexity can go higher
+}
+
 /// Role-based coverage weight multipliers for scoring adjustment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleCoverageWeights {
@@ -1010,6 +1058,10 @@ pub struct DebtmapConfig {
     /// Pure mapping pattern detection configuration (spec 118)
     #[serde(default)]
     pub mapping_patterns: Option<MappingPatternConfig>,
+
+    /// Complexity weights configuration (spec 121)
+    #[serde(default)]
+    pub complexity_weights: Option<ComplexityWeightsConfig>,
 }
 
 /// Classification configuration
