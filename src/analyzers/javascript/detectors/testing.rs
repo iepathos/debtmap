@@ -1784,4 +1784,244 @@ mod tests {
             }
         }
     }
+
+    // Tests for detect_react_test_issues
+    #[test]
+    fn test_detect_react_test_issues_no_render_calls() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('no render calls', () => {
+                const value = calculateValue();
+                expect(value).toBe(42);
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "No render calls should not trigger issue");
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_render_with_cleanup() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('render with cleanup', () => {
+                const { container } = render(<Component />);
+                expect(container).toBeDefined();
+                cleanup();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Render with cleanup should not trigger issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_render_missing_cleanup() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('render without cleanup', () => {
+                const { container } = render(<Component />);
+                expect(container).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Render without cleanup should trigger issue"
+        );
+
+        if let TestingAntiPattern::MissingCleanup {
+            test_name,
+            resource_type,
+            ..
+        } = &issues[0]
+        {
+            assert_eq!(test_name, "React test");
+            assert_eq!(resource_type, "React components");
+        } else {
+            panic!("Expected MissingCleanup pattern");
+        }
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_multiple_renders_insufficient_cleanups() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('multiple renders', () => {
+                const first = render(<Component1 />);
+                const second = render(<Component2 />);
+                const third = render(<Component3 />);
+                cleanup();
+                expect(first).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Multiple renders with insufficient cleanups should trigger issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_mount_alias() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('mount instead of render', () => {
+                const wrapper = mount(<Component />);
+                expect(wrapper).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            1,
+            "Mount without cleanup should trigger issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_unmount_in_cleanup() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('mount with unmount', () => {
+                const wrapper = mount(<Component />);
+                expect(wrapper).toBeDefined();
+                unmount();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Mount with unmount should not trigger issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_member_expression_cleanup() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('member expression cleanup', () => {
+                const wrapper = render(<Component />);
+                expect(wrapper).toBeDefined();
+                wrapper.unmount();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Member expression unmount should count as cleanup"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_empty_source() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = "";
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(issues.len(), 0, "Empty source should not trigger issue");
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_equal_render_cleanup_count() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('balanced render and cleanup', () => {
+                const first = render(<Component1 />);
+                const second = render(<Component2 />);
+                cleanup();
+                cleanup();
+                expect(first).toBeDefined();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "Equal render and cleanup count should not trigger issue"
+        );
+    }
+
+    #[test]
+    fn test_detect_react_test_issues_component_will_unmount() {
+        let javascript = tree_sitter_javascript::LANGUAGE.into();
+        let mut parser = Parser::new();
+        parser.set_language(&javascript).unwrap();
+
+        let source = r#"
+            test('componentWillUnmount lifecycle', () => {
+                const wrapper = render(<Component />);
+                expect(wrapper).toBeDefined();
+                componentWillUnmount();
+            });
+        "#;
+
+        let tree = parser.parse(source, None).unwrap();
+        let mut issues = Vec::new();
+        detect_react_test_issues(tree.root_node(), source, &javascript, &mut issues);
+        assert_eq!(
+            issues.len(),
+            0,
+            "componentWillUnmount should count as cleanup"
+        );
+    }
 }
