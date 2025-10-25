@@ -117,11 +117,12 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
             return Ok(());
         }
 
-        if self.config.detail_level < DetailLevel::Detailed {
-            return Ok(());
+        match self.config.detail_level {
+            DetailLevel::Detailed | DetailLevel::Complete => {
+                self.write_statistics_section(results)
+            }
+            _ => Ok(()),
         }
-
-        self.write_statistics_section(results)
     }
 
     fn write_header(&mut self, results: &AnalysisResults) -> Result<()> {
