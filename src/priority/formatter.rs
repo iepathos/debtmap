@@ -1981,6 +1981,7 @@ fn format_role(role: FunctionRole) -> &'static str {
         FunctionRole::IOWrapper => "IOWrapper",
         FunctionRole::EntryPoint => "EntryPoint",
         FunctionRole::PatternMatch => "PatternMatch",
+        FunctionRole::Debug => "Debug",
         FunctionRole::Unknown => "Unknown",
     }
 }

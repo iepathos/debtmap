@@ -14,6 +14,7 @@ fn get_role_display_name(role: FunctionRole) -> &'static str {
         FunctionRole::IOWrapper => "I/O wrapper",
         FunctionRole::EntryPoint => "Entry point",
         FunctionRole::PatternMatch => "Pattern matching",
+        FunctionRole::Debug => "Debug/diagnostic",
         FunctionRole::Unknown => "Function",
     }
 }
@@ -378,6 +379,7 @@ fn format_role_description(role: FunctionRole) -> String {
         FunctionRole::IOWrapper => "I/O wrapper".to_string(),
         FunctionRole::EntryPoint => "entry point".to_string(),
         FunctionRole::PatternMatch => "pattern matching".to_string(),
+        FunctionRole::Debug => "debug/diagnostic".to_string(),
         FunctionRole::Unknown => "function".to_string(),
     }
 }

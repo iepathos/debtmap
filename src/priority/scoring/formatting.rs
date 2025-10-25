@@ -16,6 +16,7 @@ pub(super) fn format_role_description(role: FunctionRole) -> &'static str {
         FunctionRole::IOWrapper => "I/O wrapper",
         FunctionRole::EntryPoint => "entry point",
         FunctionRole::PatternMatch => "pattern matching",
+        FunctionRole::Debug => "debug/diagnostic",
         FunctionRole::Unknown => "function",
     }
 }
@@ -28,6 +29,7 @@ pub(super) fn get_role_display_name(role: FunctionRole) -> &'static str {
         FunctionRole::IOWrapper => "I/O wrapper",
         FunctionRole::EntryPoint => "Entry point",
         FunctionRole::PatternMatch => "Pattern matching",
+        FunctionRole::Debug => "Debug/diagnostic",
         FunctionRole::Unknown => "Function",
     }
 }

@@ -68,6 +68,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::Orchestrator => 0.6, // Moderate weight for orchestration
             FunctionRole::IOWrapper => 0.4,    // Lower weight for I/O
             FunctionRole::PatternMatch => 0.3, // Low weight for pattern matching
+            FunctionRole::Debug => 0.2,        // Very low weight for debug functions
             FunctionRole::Unknown => 0.8,      // Default weight
         }
     }
@@ -208,6 +209,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::Orchestrator => 1.0, // Normal criticality
             FunctionRole::IOWrapper => 0.5, // Less critical paths
             FunctionRole::PatternMatch => 0.3, // Pattern matching has low criticality
+            FunctionRole::Debug => 0.2,     // Debug functions have very low criticality
             FunctionRole::Unknown => 1.0,
         }
     }
@@ -245,6 +247,13 @@ impl CoverageRiskAnalyzer {
                 moderate: base_thresholds.moderate * 0.8,
                 poor: base_thresholds.poor * 0.8,
                 critical: base_thresholds.critical * 0.8,
+            },
+            FunctionRole::Debug => CoverageThresholds {
+                excellent: base_thresholds.excellent * 0.7,
+                good: base_thresholds.good * 0.7,
+                moderate: base_thresholds.moderate * 0.7,
+                poor: base_thresholds.poor * 0.7,
+                critical: base_thresholds.critical * 0.7,
             },
             FunctionRole::Unknown => base_thresholds,
         }
@@ -409,6 +418,7 @@ impl CoverageRiskAnalyzer {
             FunctionRole::Orchestrator => format!("Orchestration path {}", index),
             FunctionRole::IOWrapper => format!("I/O operation {}", index),
             FunctionRole::PatternMatch => format!("Pattern branch {}", index),
+            FunctionRole::Debug => format!("Debug diagnostic {}", index),
             FunctionRole::Unknown => format!("Execution path {}", index),
         }
     }

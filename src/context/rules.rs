@@ -255,6 +255,7 @@ impl ContextRuleEngine {
             "utility" | "util" => Some(FunctionRole::Utility),
             "build_script" | "build" => Some(FunctionRole::BuildScript),
             "example" => Some(FunctionRole::Example),
+            "debug" | "diagnostic" => Some(FunctionRole::Debug),
             _ => None,
         }
     }

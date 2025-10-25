@@ -193,6 +193,7 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::Orchestrator => 0.9, // Orchestration is less risky
             FunctionRole::IOWrapper => 0.7,    // I/O wrappers are expected to be simple
             FunctionRole::PatternMatch => 0.5, // Pattern matching is very low risk
+            FunctionRole::Debug => 0.4,        // Debug functions have very low test priority
             FunctionRole::Unknown => 1.0,      // Default multiplier
         }
     }
@@ -208,6 +209,7 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::IOWrapper => 1.0,    // More lenient for I/O
             FunctionRole::Orchestrator => 0.5, // Slightly more lenient
             FunctionRole::PatternMatch => 1.5, // Very lenient for pattern matching
+            FunctionRole::Debug => 2.0,        // Very lenient for debug functions
             _ => 0.0,                          // Standard thresholds
         }
     }
@@ -379,6 +381,7 @@ impl EvidenceBasedRiskCalculator {
             FunctionRole::IOWrapper => "I/O wrapper",
             FunctionRole::EntryPoint => "entry point",
             FunctionRole::PatternMatch => "pattern matching",
+            FunctionRole::Debug => "debug/diagnostic",
             FunctionRole::Unknown => "general",
         }
     }
