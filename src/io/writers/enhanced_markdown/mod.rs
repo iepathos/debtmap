@@ -58,30 +58,69 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
     ) -> Result<()> {
         self.write_header(results)?;
         self.write_executive_summary(results, unified_analysis)?;
-
-        if self.config.include_visualizations {
-            self.write_visualizations(results, unified_analysis)?;
-        }
-
-        if let Some(insights) = risk_insights {
-            self.write_risk_analysis(results, insights)?;
-        }
-
-        if self.config.detail_level >= DetailLevel::Standard {
-            self.write_technical_debt(results, unified_analysis)?;
-
-            if let Some(analysis) = unified_analysis {
-                self.write_dependency_analysis_section(analysis)?;
-            }
-        }
-
-        if self.config.include_statistics && self.config.detail_level >= DetailLevel::Detailed {
-            self.write_statistics_section(results)?;
-        }
-
+        self.write_optional_visualizations(results, unified_analysis)?;
+        self.write_optional_risk_analysis(results, risk_insights)?;
+        self.write_optional_technical_debt(results, unified_analysis)?;
+        self.write_optional_statistics(results)?;
         self.write_recommendations(results, unified_analysis)?;
-
         Ok(())
+    }
+
+    /// Write visualizations section if enabled in configuration
+    fn write_optional_visualizations(
+        &mut self,
+        results: &AnalysisResults,
+        unified_analysis: Option<&UnifiedAnalysis>,
+    ) -> Result<()> {
+        if !self.config.include_visualizations {
+            return Ok(());
+        }
+
+        self.write_visualizations(results, unified_analysis)
+    }
+
+    /// Write risk analysis section if insights are available
+    fn write_optional_risk_analysis(
+        &mut self,
+        results: &AnalysisResults,
+        risk_insights: Option<&RiskInsight>,
+    ) -> Result<()> {
+        let Some(insights) = risk_insights else {
+            return Ok(());
+        };
+
+        self.write_risk_analysis(results, insights)
+    }
+
+    /// Write technical debt section if detail level is sufficient
+    fn write_optional_technical_debt(
+        &mut self,
+        results: &AnalysisResults,
+        unified_analysis: Option<&UnifiedAnalysis>,
+    ) -> Result<()> {
+        if self.config.detail_level < DetailLevel::Standard {
+            return Ok(());
+        }
+
+        self.write_technical_debt(results, unified_analysis)?;
+
+        let Some(analysis) = unified_analysis else {
+            return Ok(());
+        };
+
+        self.write_dependency_analysis_section(analysis)
+    }
+
+    /// Write statistics section if enabled and detail level is sufficient
+    fn write_optional_statistics(&mut self, results: &AnalysisResults) -> Result<()> {
+        if !self.config.include_statistics {
+            return Ok(());
+        }
+
+        match self.config.detail_level {
+            DetailLevel::Detailed | DetailLevel::Complete => self.write_statistics_section(results),
+            _ => Ok(()),
+        }
     }
 
     fn write_header(&mut self, results: &AnalysisResults) -> Result<()> {
