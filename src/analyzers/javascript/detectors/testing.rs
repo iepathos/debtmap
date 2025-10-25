@@ -336,11 +336,18 @@ fn detect_react_test_issues(
         let mut matches = cursor.matches(&query, root, source.as_bytes());
 
         while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.first() {
-                let text = get_node_text(func.node, source);
-                if text == "cleanup" || text == "unmount" || text.contains("unmount") {
-                    cleanup_count += 1;
-                }
+            let is_cleanup = match_
+                .captures
+                .iter()
+                .filter(|c| c.index == 0 || c.index == 1) // Only check @func and @prop
+                .map(|c| get_node_text(c.node, source))
+                .any(|text| {
+                    let lower = text.to_lowercase();
+                    text == "cleanup" || text == "unmount" || lower.contains("unmount")
+                });
+
+            if is_cleanup {
+                cleanup_count += 1;
             }
         }
     }
