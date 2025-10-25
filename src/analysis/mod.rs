@@ -13,6 +13,7 @@
 
 pub mod attribution;
 pub mod call_graph;
+pub mod context_detection;
 pub mod diagnostics;
 pub mod framework_patterns;
 pub mod function_visitor;
@@ -30,6 +31,7 @@ pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
+pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
 };

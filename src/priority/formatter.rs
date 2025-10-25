@@ -2022,6 +2022,9 @@ mod tests {
             entropy_details: None,
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         }
     }
 

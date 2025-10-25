@@ -385,6 +385,9 @@ mod tests {
             purity_confidence: None,
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         }
     }
 

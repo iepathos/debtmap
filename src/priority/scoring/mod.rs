@@ -4,6 +4,7 @@ pub mod calculation;
 pub mod classification;
 pub mod computation;
 pub mod construction;
+pub mod context_aware;
 pub mod coverage_expectations;
 pub mod coverage_scoring;
 pub mod debt_item;
@@ -47,5 +48,9 @@ pub use orchestration_adjustment::{
 pub use coverage_expectations::{CoverageExpectations, CoverageGap, CoverageRange, GapSeverity};
 
 pub use coverage_scoring::calculate_coverage_score;
+
+pub use context_aware::{
+    ContextRecommendationEngine, ContextualRecommendation, Severity as ContextSeverity,
+};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility
