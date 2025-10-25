@@ -60,6 +60,23 @@ pub fn create_unified_debt_item_enhanced(
         .map(|id| id.name.clone())
         .collect();
 
+    // Detect function context (spec 122)
+    let context_detector = crate::analysis::ContextDetector::new();
+    let context_analysis = context_detector.detect_context(func, &func.file);
+
+    // Generate contextual recommendation if confidence is high enough (spec 122)
+    let contextual_recommendation = if context_analysis.confidence > 0.6 {
+        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        Some(engine.generate_recommendation(
+            func,
+            context_analysis.context,
+            context_analysis.confidence,
+            unified_score.final_score,
+        ))
+    } else {
+        None
+    };
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -85,6 +102,9 @@ pub fn create_unified_debt_item_enhanced(
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
         tier: None,
+        function_context: Some(context_analysis.context),
+        context_confidence: Some(context_analysis.confidence),
+        contextual_recommendation,
     }
 }
 
@@ -227,6 +247,23 @@ fn build_unified_debt_item(
     context: DebtAnalysisContext,
     deps: DependencyMetrics,
 ) -> UnifiedDebtItem {
+    // Detect function context (spec 122)
+    let context_detector = crate::analysis::ContextDetector::new();
+    let context_analysis = context_detector.detect_context(func, &func.file);
+
+    // Generate contextual recommendation if confidence is high enough (spec 122)
+    let contextual_recommendation = if context_analysis.confidence > 0.6 {
+        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        Some(engine.generate_recommendation(
+            func,
+            context_analysis.context,
+            context_analysis.confidence,
+            context.unified_score.final_score,
+        ))
+    } else {
+        None
+    };
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -252,6 +289,9 @@ fn build_unified_debt_item(
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
         tier: None,
+        function_context: Some(context_analysis.context),
+        context_confidence: Some(context_analysis.confidence),
+        contextual_recommendation,
     }
 }
 
@@ -360,6 +400,23 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let upstream = call_graph.get_callers(&func_id);
     let downstream = call_graph.get_callees(&func_id);
 
+    // Detect function context (spec 122)
+    let context_detector = crate::analysis::ContextDetector::new();
+    let context_analysis = context_detector.detect_context(func, &func.file);
+
+    // Generate contextual recommendation if confidence is high enough (spec 122)
+    let contextual_recommendation = if context_analysis.confidence > 0.6 {
+        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        Some(engine.generate_recommendation(
+            func,
+            context_analysis.context,
+            context_analysis.confidence,
+            unified_score.final_score,
+        ))
+    } else {
+        None
+    };
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -385,6 +442,9 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
         tier: None,
+        function_context: Some(context_analysis.context),
+        context_confidence: Some(context_analysis.confidence),
+        contextual_recommendation,
     }
 }
 
@@ -441,6 +501,23 @@ pub fn create_unified_debt_item_with_data_flow(
     // Calculate entropy details
     let entropy_details = calculate_entropy_details(func);
 
+    // Detect function context (spec 122)
+    let context_detector = crate::analysis::ContextDetector::new();
+    let context_analysis = context_detector.detect_context(func, &func.file);
+
+    // Generate contextual recommendation if confidence is high enough (spec 122)
+    let contextual_recommendation = if context_analysis.confidence > 0.6 {
+        let engine = crate::priority::scoring::ContextRecommendationEngine::new();
+        Some(engine.generate_recommendation(
+            func,
+            context_analysis.context,
+            context_analysis.confidence,
+            unified_score.final_score,
+        ))
+    } else {
+        None
+    };
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -466,5 +543,8 @@ pub fn create_unified_debt_item_with_data_flow(
         purity_confidence: func.purity_confidence,
         god_object_indicators: None,
         tier: None,
+        function_context: Some(context_analysis.context),
+        context_confidence: Some(context_analysis.confidence),
+        contextual_recommendation,
     }
 }

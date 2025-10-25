@@ -55,6 +55,9 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         entropy_details: None,
         god_object_indicators: None,
         tier: None,
+        function_context: None,
+        context_confidence: None,
+        contextual_recommendation: None,
     }
 }
 

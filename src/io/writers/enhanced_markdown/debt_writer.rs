@@ -180,6 +180,9 @@ mod tests {
             purity_confidence: Some(0.8),
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         }]);
 
         UnifiedAnalysis {

@@ -56,6 +56,9 @@ pub struct UnifiedDebtItem {
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
     #[serde(skip)]
     pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
+    pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
+    pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
+    pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1390,6 +1390,9 @@ mod tests {
             purity_confidence: None,
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         }
     }
 
@@ -1919,6 +1922,9 @@ mod tests {
             purity_confidence: Some(1.0),
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         };
 
         let high_item = UnifiedDebtItem {
@@ -1967,6 +1973,9 @@ mod tests {
             purity_confidence: Some(0.8),
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         };
 
         let moderate_item = UnifiedDebtItem {
@@ -2016,6 +2025,9 @@ mod tests {
             purity_confidence: Some(0.9),
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         };
 
         let low_item = UnifiedDebtItem {
@@ -2066,6 +2078,9 @@ mod tests {
             purity_confidence: Some(0.5),
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         };
 
         analysis.add_item(critical_item);

@@ -485,6 +485,9 @@ mod tests {
             purity_confidence: None,
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -692,6 +695,9 @@ mod tests {
             purity_confidence: None,
             god_object_indicators: None,
             tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
         }];
 
         let deps = extract_module_dependencies(&items);
