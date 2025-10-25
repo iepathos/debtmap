@@ -9,7 +9,6 @@
 //!
 //! Implements Specification 111: AST-Based Functional Pattern Detection
 
-use quote::ToTokens;
 use serde::{Deserialize, Serialize};
 use syn::{Block, Expr, ExprMethodCall, ItemFn, Local, Stmt};
 
@@ -213,6 +212,17 @@ pub fn analyze_composition(
     function: &ItemFn,
     config: &FunctionalAnalysisConfig,
 ) -> CompositionMetrics {
+    // Early exit for empty functions
+    if function.block.stmts.is_empty() {
+        return CompositionMetrics {
+            pipelines: Vec::new(),
+            purity_score: 1.0,
+            immutability_ratio: 1.0,
+            composition_quality: 0.5,
+            side_effect_kind: SideEffectKind::Pure,
+        };
+    }
+
     let pipelines = detect_pipelines(function, config);
     let purity = analyze_purity(function, config);
     let quality = score_composition(&pipelines, &purity, config);
@@ -240,6 +250,11 @@ fn collect_pipelines(
     config: &FunctionalAnalysisConfig,
     nesting: usize,
 ) -> Vec<Pipeline> {
+    // Early exit for empty blocks
+    if block.stmts.is_empty() {
+        return Vec::new();
+    }
+
     block
         .stmts
         .iter()
@@ -311,45 +326,77 @@ fn extract_pipeline_from_method_call(
 
     // Walk backwards through the chain
     loop {
-        let method_name = current.method.to_string();
+        // Use ident directly instead of converting to string
+        let method_ident = &current.method;
+        let method_str = method_ident.to_string();
 
-        // Detect parallel iterators
-        if method_name == "par_iter" || method_name == "par_iter_mut" || method_name == "par_bridge"
-        {
-            is_parallel = true;
-        }
-
-        // Classify the stage
-        if is_iterator_method(&method_name) {
-            stages.push(PipelineStage::Iterator {
-                method: method_name,
-            });
-        } else if method_name == "map" {
-            stages.push(PipelineStage::Map {
-                closure_complexity: 1, // Simplified for now
-                has_nested_pipeline: false,
-            });
-        } else if method_name == "filter" {
-            stages.push(PipelineStage::Filter {
+        // Detect parallel iterators - check without allocating string each time
+        match method_str.as_str() {
+            "par_iter" | "par_iter_mut" | "par_bridge" => is_parallel = true,
+            "iter" | "into_iter" | "iter_mut" => {
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "map" => stages.push(PipelineStage::Map {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
-            });
-        } else if method_name == "fold" || method_name == "reduce" {
-            stages.push(PipelineStage::Fold {
+            }),
+            "filter" => stages.push(PipelineStage::Filter {
+                closure_complexity: 1,
+                has_nested_pipeline: false,
+            }),
+            "fold" | "reduce" => stages.push(PipelineStage::Fold {
                 init_complexity: 1,
                 fold_complexity: 1,
-            });
-        } else if method_name == "flat_map" {
-            stages.push(PipelineStage::FlatMap {
+            }),
+            "flat_map" => stages.push(PipelineStage::FlatMap {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
-            });
-        } else if is_terminal_method(&method_name) {
-            terminal_op = classify_terminal(&method_name);
-            // Terminal operations are also stages in the pipeline
-            stages.push(PipelineStage::Iterator {
-                method: method_name,
-            });
+            }),
+            "collect" => {
+                terminal_op = Some(TerminalOp::Collect);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "sum" => {
+                terminal_op = Some(TerminalOp::Sum);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "count" => {
+                terminal_op = Some(TerminalOp::Count);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "any" => {
+                terminal_op = Some(TerminalOp::Any);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "all" => {
+                terminal_op = Some(TerminalOp::All);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "find" => {
+                terminal_op = Some(TerminalOp::Find);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            "for_each" => {
+                terminal_op = Some(TerminalOp::ForEach);
+                stages.push(PipelineStage::Iterator {
+                    method: method_str,
+                });
+            }
+            _ => {} // Ignore other methods
         }
 
         // Move to the receiver
@@ -362,8 +409,9 @@ fn extract_pipeline_from_method_call(
     // Reverse stages to get correct order
     stages.reverse();
 
+    // Early exit if no valid pipeline
     if stages.is_empty() || !has_iterator_start(&stages) {
-        return vec![];
+        return Vec::new();
     }
 
     vec![Pipeline {
@@ -372,38 +420,8 @@ fn extract_pipeline_from_method_call(
         is_parallel,
         terminal_operation: terminal_op,
         nesting_level: nesting,
-        builder_pattern: false, // Simplified for now
+        builder_pattern: false,
     }]
-}
-
-/// Check if a method is an iterator method
-fn is_iterator_method(method: &str) -> bool {
-    matches!(
-        method,
-        "iter" | "into_iter" | "iter_mut" | "par_iter" | "par_iter_mut" | "par_bridge"
-    )
-}
-
-/// Check if a method is a terminal operation
-fn is_terminal_method(method: &str) -> bool {
-    matches!(
-        method,
-        "collect" | "sum" | "count" | "any" | "all" | "find" | "for_each"
-    )
-}
-
-/// Classify a terminal method
-fn classify_terminal(method: &str) -> Option<TerminalOp> {
-    match method {
-        "collect" => Some(TerminalOp::Collect),
-        "sum" => Some(TerminalOp::Sum),
-        "count" => Some(TerminalOp::Count),
-        "any" => Some(TerminalOp::Any),
-        "all" => Some(TerminalOp::All),
-        "find" => Some(TerminalOp::Find),
-        "for_each" => Some(TerminalOp::ForEach),
-        _ => None,
-    }
 }
 
 /// Check if stages start with an iterator
@@ -461,7 +479,10 @@ fn analyze_stmt_purity(stmt: &Stmt) -> PurityAccumulator {
 
 /// Analyze local binding purity
 fn analyze_local_purity(local: &Local) -> PurityAccumulator {
-    let mut acc = if local.pat.to_token_stream().to_string().contains("mut") {
+    // Check mutability without string conversion
+    let is_mutable = matches!(&local.pat, syn::Pat::Ident(pat_ident) if pat_ident.mutability.is_some());
+
+    let mut acc = if is_mutable {
         PurityAccumulator {
             mutable_bindings: 1,
             ..Default::default()
@@ -508,23 +529,23 @@ fn analyze_expr_purity(expr: &Expr) -> PurityAccumulator {
 
 /// Classify macro side effects
 fn classify_macro_side_effect(mac: &syn::Macro) -> PurityAccumulator {
-    let path = mac.path.segments.last().map(|s| s.ident.to_string());
+    let Some(last_segment) = mac.path.segments.last() else {
+        return PurityAccumulator::default();
+    };
 
-    match path.as_deref() {
-        Some("println") | Some("eprintln") | Some("print") | Some("eprint") => PurityAccumulator {
+    let ident_str = last_segment.ident.to_string();
+
+    match ident_str.as_str() {
+        "println" | "eprintln" | "print" | "eprint" => PurityAccumulator {
             io_operations: vec!["console_output".to_string()],
             ..Default::default()
         },
-        Some("debug") | Some("info") | Some("warn") | Some("error") | Some("trace") => {
+        "debug" | "info" | "warn" | "error" | "trace" | "log" => {
             PurityAccumulator {
-                benign_side_effects: vec![format!("logging::{}", path.unwrap())],
+                benign_side_effects: vec![format!("logging::{}", ident_str)],
                 ..Default::default()
             }
         }
-        Some("log") => PurityAccumulator {
-            benign_side_effects: vec!["logging::log".to_string()],
-            ..Default::default()
-        },
         _ => PurityAccumulator::default(),
     }
 }

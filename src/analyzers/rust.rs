@@ -583,7 +583,18 @@ impl FunctionVisitor {
             use crate::analysis::functional_composition::{
                 analyze_composition, FunctionalAnalysisConfig,
             };
-            let config = FunctionalAnalysisConfig::balanced();
+
+            // Load config profile from environment variable or default to balanced
+            let config = std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE")
+                .ok()
+                .and_then(|p| match p.as_str() {
+                    "strict" => Some(FunctionalAnalysisConfig::strict()),
+                    "balanced" => Some(FunctionalAnalysisConfig::balanced()),
+                    "lenient" => Some(FunctionalAnalysisConfig::lenient()),
+                    _ => None,
+                })
+                .unwrap_or_else(FunctionalAnalysisConfig::balanced);
+
             Some(analyze_composition(item_fn, &config))
         } else {
             None
