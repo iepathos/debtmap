@@ -61,10 +61,11 @@ impl ComplexityWeights {
                 cyclomatic: 0.25,
                 cognitive: 0.75,
             },
-            // I/O wrappers and pattern matching: default weights
-            FunctionRole::IOWrapper | FunctionRole::PatternMatch | FunctionRole::Unknown => {
-                Self::default()
-            }
+            // I/O wrappers, pattern matching, debug, and unknown: default weights
+            FunctionRole::IOWrapper
+            | FunctionRole::PatternMatch
+            | FunctionRole::Debug
+            | FunctionRole::Unknown => Self::default(),
         }
     }
 }
@@ -369,6 +370,15 @@ mod tests {
     fn for_role_io_wrapper_uses_defaults() {
         use crate::priority::FunctionRole;
         let weights = ComplexityWeights::for_role(FunctionRole::IOWrapper);
+        let defaults = ComplexityWeights::default();
+        assert_eq!(weights.cyclomatic, defaults.cyclomatic);
+        assert_eq!(weights.cognitive, defaults.cognitive);
+    }
+
+    #[test]
+    fn for_role_debug_uses_defaults() {
+        use crate::priority::FunctionRole;
+        let weights = ComplexityWeights::for_role(FunctionRole::Debug);
         let defaults = ComplexityWeights::default();
         assert_eq!(weights.cyclomatic, defaults.cyclomatic);
         assert_eq!(weights.cognitive, defaults.cognitive);
