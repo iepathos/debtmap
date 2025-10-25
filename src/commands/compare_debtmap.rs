@@ -547,3 +547,240 @@ fn print_summary(result: &ValidationResult) {
         result.after_summary.total_items, result.after_summary.average_score
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::json::UnifiedJsonOutput;
+    use crate::priority::{DebtItem, FunctionDebtItem, FunctionLocation, TransitiveCoverage, UnifiedScore};
+    use std::path::PathBuf;
+
+    fn create_function_item(
+        file: &str,
+        function: &str,
+        line: usize,
+        score: f64,
+        complexity: u32,
+        coverage: Option<f64>,
+    ) -> DebtItem {
+        DebtItem::Function(Box::new(FunctionDebtItem {
+            location: FunctionLocation {
+                file: PathBuf::from(file),
+                function: function.to_string(),
+                line,
+            },
+            unified_score: UnifiedScore {
+                final_score: score,
+                complexity_score: 0.0,
+                size_score: 0.0,
+                testing_score: 0.0,
+                god_object_score: 0.0,
+            },
+            cyclomatic_complexity: complexity,
+            cognitive_complexity: 0,
+            halstead_difficulty: 0.0,
+            lines_of_code: 50,
+            transitive_coverage: coverage.map(|c| TransitiveCoverage {
+                direct: c,
+                transitive: c,
+                tested_locs: vec![],
+            }),
+            god_object_score: 0.0,
+        }))
+    }
+
+    fn create_test_output(items: Vec<DebtItem>) -> UnifiedJsonOutput {
+        UnifiedJsonOutput { items }
+    }
+
+    #[test]
+    fn test_perform_validation_no_improvements_or_issues() {
+        let before = create_test_output(vec![]);
+        let after = create_test_output(vec![]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert_eq!(result.status, "complete");
+        assert_eq!(result.improvements.len(), 0);
+        assert_eq!(result.remaining_issues.len(), 0);
+        assert_eq!(result.gaps.len(), 0);
+        assert!(result.completion_percentage >= 75.0);
+    }
+
+    #[test]
+    fn test_perform_validation_resolved_high_priority() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert_eq!(result.status, "complete");
+        assert!(result.improvements.iter().any(|i| i.contains("Resolved 1 high-priority")));
+        assert_eq!(result.remaining_issues.len(), 0);
+        assert!(result.completion_percentage >= 75.0);
+    }
+
+    #[test]
+    fn test_perform_validation_complexity_reduction() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 20, Some(0.5)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 8.0, 10, Some(0.5)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.improvements.iter().any(|i| i.contains("Reduced average cyclomatic complexity")));
+    }
+
+    #[test]
+    fn test_perform_validation_coverage_improvement() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 10, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 8.0, 10, Some(0.8)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.improvements.iter().any(|i| i.contains("Added test coverage")));
+    }
+
+    #[test]
+    fn test_perform_validation_unchanged_critical() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.remaining_issues.iter().any(|i| i.contains("critical debt item")));
+        assert!(result.gaps.contains_key("critical_debt_remaining_0"));
+    }
+
+    #[test]
+    fn test_perform_validation_new_critical_regression() {
+        let before = create_test_output(vec![]);
+        let after = create_test_output(vec![
+            create_function_item("src/new.rs", "bad_fn", 20, 12.0, 20, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.remaining_issues.iter().any(|i| i.contains("new critical debt items")));
+        assert!(result.gaps.contains_key("regression_detected"));
+        assert_eq!(result.status, "failed");
+    }
+
+    #[test]
+    fn test_perform_validation_combined_improvements() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 20, Some(0.0)),
+            create_function_item("src/test.rs", "fn2", 30, 9.0, 15, Some(0.2)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn2", 30, 7.0, 10, Some(0.8)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.improvements.len() >= 2);
+        assert!(result.improvements.iter().any(|i| i.contains("Resolved")));
+        assert!(result.improvements.iter().any(|i| i.contains("complexity") || i.contains("coverage")));
+        assert_eq!(result.status, "complete");
+    }
+
+    #[test]
+    fn test_perform_validation_status_complete() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert_eq!(result.status, "complete");
+        assert!(result.completion_percentage >= 75.0);
+    }
+
+    #[test]
+    fn test_perform_validation_status_incomplete() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+            create_function_item("src/test.rs", "fn2", 20, 11.0, 20, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 8.0, 10, Some(0.5)),
+            create_function_item("src/test.rs", "fn2", 20, 11.0, 20, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.completion_percentage >= 40.0 && result.completion_percentage < 75.0);
+        assert_eq!(result.status, "incomplete");
+    }
+
+    #[test]
+    fn test_perform_validation_status_failed() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+            create_function_item("src/test.rs", "fn2", 20, 12.0, 20, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.completion_percentage < 40.0);
+        assert_eq!(result.status, "failed");
+    }
+
+    #[test]
+    fn test_perform_validation_gap_detail_generation() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "critical_fn", 10, 10.0, 15, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "critical_fn", 10, 10.0, 15, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.gaps.contains_key("critical_debt_remaining_0"));
+        let gap = result.gaps.get("critical_debt_remaining_0").unwrap();
+        assert_eq!(gap.severity, "high");
+        assert!(gap.location.contains("src/test.rs"));
+        assert!(gap.location.contains("critical_fn"));
+        assert_eq!(gap.original_score, Some(10.0));
+        assert_eq!(gap.current_score, Some(10.0));
+    }
+
+    #[test]
+    fn test_perform_validation_multiple_unchanged_critical() {
+        let before = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+            create_function_item("src/test.rs", "fn2", 20, 11.0, 20, Some(0.0)),
+            create_function_item("src/test.rs", "fn3", 30, 12.0, 25, Some(0.0)),
+        ]);
+        let after = create_test_output(vec![
+            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
+            create_function_item("src/test.rs", "fn2", 20, 11.0, 20, Some(0.0)),
+            create_function_item("src/test.rs", "fn3", 30, 12.0, 25, Some(0.0)),
+        ]);
+
+        let result = perform_validation(&before, &after).unwrap();
+
+        assert!(result.remaining_issues.iter().any(|i| i.contains("3 critical debt items")));
+        assert_eq!(result.gaps.len(), 2); // Only first 2 are added
+        assert!(result.gaps.contains_key("critical_debt_remaining_0"));
+        assert!(result.gaps.contains_key("critical_debt_remaining_1"));
+    }
+}
