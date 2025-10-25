@@ -1,12 +1,12 @@
 use crate::core::Priority;
 
-/// Get health status emoji based on score
+/// Get health status indicator based on score
 pub fn get_health_emoji(score: u32) -> &'static str {
     match score {
-        90..=100 => "💚",
-        70..=89 => "💛",
-        50..=69 => "🟠",
-        _ => "🔴",
+        90..=100 => "[GOOD]",
+        70..=89 => "[OK]",
+        50..=69 => "[WARN]",
+        _ => "[CRITICAL]",
     }
 }
 
@@ -42,46 +42,46 @@ pub fn get_debt_status(count: usize) -> &'static str {
 
 /// Get trend indicator for changes
 pub fn get_trend_indicator(_change: f64) -> &'static str {
-    "➡️" // Placeholder for future trend analysis
+    "->" // Placeholder for future trend analysis
 }
 
-/// Get complexity indicator with emoji
+/// Get complexity indicator
 pub fn get_complexity_indicator(complexity: f64) -> &'static str {
     match complexity {
-        x if x <= 5.0 => "🟢 Low",
-        x if x <= 10.0 => "🟡 Med",
-        x if x <= 20.0 => "🟠 High",
-        _ => "🔴 Critical",
+        x if x <= 5.0 => "[LOW] Low",
+        x if x <= 10.0 => "[MED] Med",
+        x if x <= 20.0 => "[HIGH] High",
+        _ => "[CRIT] Critical",
     }
 }
 
-/// Get coverage indicator with emoji
+/// Get coverage indicator
 pub fn get_coverage_indicator(coverage: f64) -> &'static str {
     match coverage {
-        x if x >= 0.8 => "🟢 High",
-        x if x >= 0.5 => "🟡 Med",
-        x if x >= 0.2 => "🟠 Low",
-        _ => "🔴 None",
+        x if x >= 0.8 => "[HIGH] High",
+        x if x >= 0.5 => "[MED] Med",
+        x if x >= 0.2 => "[LOW] Low",
+        _ => "[NONE] None",
     }
 }
 
-/// Get risk indicator with emoji
+/// Get risk indicator
 pub fn get_risk_indicator(risk: f64) -> &'static str {
     match risk {
-        x if x <= 3.0 => "🟢 Low",
-        x if x <= 6.0 => "🟡 Medium",
-        x if x <= 8.0 => "🟠 High",
-        _ => "🔴 Critical",
+        x if x <= 3.0 => "[LOW] Low",
+        x if x <= 6.0 => "[MED] Medium",
+        x if x <= 8.0 => "[HIGH] High",
+        _ => "[CRIT] Critical",
     }
 }
 
 /// Get priority label for items
 pub fn get_priority_label(index: usize) -> &'static str {
     match index {
-        0 => "🔴 Critical",
-        1 => "🟠 High",
-        2 => "🟡 Medium",
-        _ => "🟢 Low",
+        0 => "[CRIT] Critical",
+        1 => "[HIGH] High",
+        2 => "[MED] Medium",
+        _ => "[LOW] Low",
     }
 }
 
@@ -90,10 +90,10 @@ pub fn calculate_category_severity(priorities: &[Priority]) -> &'static str {
     let max_priority = priorities.iter().max().unwrap_or(&Priority::Low);
 
     match max_priority {
-        Priority::Critical => "🔴 Critical",
-        Priority::High => "🟠 High",
-        Priority::Medium => "🟡 Medium",
-        Priority::Low => "🟢 Low",
+        Priority::Critical => "[CRIT] Critical",
+        Priority::High => "[HIGH] High",
+        Priority::Medium => "[MED] Medium",
+        Priority::Low => "[LOW] Low",
     }
 }
 
@@ -132,9 +132,9 @@ mod tests {
 
     #[test]
     fn test_health_score_indicators() {
-        assert_eq!(get_health_emoji(95), "💚");
-        assert_eq!(get_health_emoji(75), "💛");
-        assert_eq!(get_health_emoji(55), "🟠");
-        assert_eq!(get_health_emoji(30), "🔴");
+        assert_eq!(get_health_emoji(95), "[GOOD]");
+        assert_eq!(get_health_emoji(75), "[OK]");
+        assert_eq!(get_health_emoji(55), "[WARN]");
+        assert_eq!(get_health_emoji(30), "[CRITICAL]");
     }
 }
