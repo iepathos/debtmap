@@ -754,7 +754,7 @@ fn determine_file_type_label(
     }
 }
 
-// Pure function to generate WHY explanation message
+// Pure function to generate WHY explanation message with accurate terminology
 fn generate_why_message(
     is_god_object: bool,
     fields_count: usize,
@@ -764,17 +764,28 @@ fn generate_why_message(
     total_lines: usize,
 ) -> String {
     if is_god_object {
-        if fields_count > 5 {
+        // Distinguish between god class (single struct with many methods) vs god module (many functions/types)
+        if fields_count > 5 && methods_count > 20 {
+            // God class: single struct/class with many methods and fields
             format!(
-                "This class violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
+                "This struct violates single responsibility principle with {} methods and {} fields across {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
                 methods_count,
                 fields_count,
                 responsibilities
             )
-        } else {
+        } else if function_count > 50 {
+            // God module: many module-level functions or multiple types
             format!(
-                "This module contains {} functions in a single file, violating module cohesion principles. Large procedural modules are difficult to navigate, understand, and maintain.",
-                function_count
+                "This module contains {} module functions across {} responsibilities. Large modules with many diverse functions are difficult to navigate, understand, and maintain.",
+                function_count,
+                responsibilities
+            )
+        } else {
+            // Default case for god object
+            format!(
+                "This file contains {} functions with {} distinct responsibilities. Consider splitting by responsibility for better organization.",
+                function_count,
+                responsibilities
             )
         }
     } else if total_lines > 500 {

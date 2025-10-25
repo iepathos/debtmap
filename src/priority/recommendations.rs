@@ -61,22 +61,44 @@ pub fn generate_god_object_recommendation(
 
     DetailedRecommendation {
         severity: Severity::Critical,
-        
-        title: format!(
-            "🚨 GOD OBJECT: {} ({} methods, {} fields, {} responsibilities)",
-            file_name,
-            analysis.method_count,
-            analysis.field_count,
-            analysis.responsibility_count
-        ),
-        
-        description: format!(
-            "This file/class has grown too large and handles too many responsibilities. \
-             With {} lines and {} total complexity, it's become difficult to maintain, \
-             test, and understand. This is the #1 priority for refactoring.",
-            analysis.lines_of_code,
-            analysis.complexity_sum
-        ),
+
+        title: if analysis.field_count > 5 && analysis.method_count > 20 {
+            format!(
+                "🚨 GOD OBJECT: {} ({} methods, {} fields, {} responsibilities)",
+                file_name,
+                analysis.method_count,
+                analysis.field_count,
+                analysis.responsibility_count
+            )
+        } else {
+            format!(
+                "🚨 GOD MODULE: {} ({} module functions, {} responsibilities)",
+                file_name,
+                analysis.method_count,
+                analysis.responsibility_count
+            )
+        },
+
+        description: if analysis.field_count > 5 && analysis.method_count > 20 {
+            format!(
+                "This struct has grown too large and handles too many responsibilities. \
+                 With {} methods, {} fields, and {} lines of code, it's become difficult to maintain, \
+                 test, and understand. This is a high priority for refactoring.",
+                analysis.method_count,
+                analysis.field_count,
+                analysis.lines_of_code
+            )
+        } else {
+            format!(
+                "This module contains {} module functions across {} responsibilities. \
+                 With {} lines of code and {} total complexity, it's become difficult to navigate \
+                 and maintain. Consider splitting into focused sub-modules.",
+                analysis.method_count,
+                analysis.responsibility_count,
+                analysis.lines_of_code,
+                analysis.complexity_sum
+            )
+        },
         
         action_items,
         
@@ -98,21 +120,28 @@ pub fn format_god_object_display(
     rank: usize,
 ) -> String {
     let mut output = String::new();
-    
+
+    // Determine if this is a god class or god module
+    let is_god_class = analysis.field_count > 5 && analysis.method_count > 20;
+    let label = if is_god_class { "GOD OBJECT" } else { "GOD MODULE" };
+    let metric_label = if is_god_class { "Methods" } else { "Module Functions" };
+
     output.push_str(&format!(
-        "#{} SCORE: {:.1} [🚨 GOD OBJECT]\n",
-        rank, score
+        "#{} SCORE: {:.1} [🚨 {}]\n",
+        rank, score, label
     ));
-    
+
     output.push_str(&format!(
         "   └─ {}\n",
         path.display()
     ));
-    
-    output.push_str("\n   📊 GOD OBJECT METRICS:\n");
-    output.push_str(&format!("   ├─ Methods: {} (max: 20)\n", analysis.method_count));
-    output.push_str(&format!("   ├─ Fields: {} (max: 15)\n", analysis.field_count));
-    output.push_str(&format!("   ├─ Responsibilities: {} (max: 3)\n", analysis.responsibility_count));
+
+    output.push_str(&format!("\n   📊 {} METRICS:\n", label));
+    output.push_str(&format!("   ├─ {}: {} (max: {})\n", metric_label, analysis.method_count, if is_god_class { 20 } else { 50 }));
+    if is_god_class {
+        output.push_str(&format!("   ├─ Fields: {} (max: 15)\n", analysis.field_count));
+    }
+    output.push_str(&format!("   ├─ Responsibilities: {} (max: {})\n", analysis.responsibility_count, if is_god_class { 3 } else { 4 }));
     output.push_str(&format!("   ├─ Lines: {} (max: 1,000)\n", analysis.lines_of_code));
     output.push_str(&format!("   └─ Total Complexity: {}\n", analysis.complexity_sum));
     

@@ -1432,6 +1432,227 @@ This prevents false positives from large but simple pattern-matching code.
 
 ## God Object Detection
 
+### Understanding God Object vs God Module Detection
+
+Debtmap distinguishes between two fundamentally different organizational problems that both manifest as large files:
+
+#### GOD OBJECT: A Struct/Class with Too Many Methods
+
+**Definition**: A single struct or class that has accumulated too many methods and too many fields, violating the Single Responsibility Principle.
+
+**Classification Criteria**:
+- More than 20 methods on a single struct/class
+- More than 5 fields in the struct/class
+- Methods operate on shared mutable state (the fields)
+
+**Example (Rust)**:
+```rust
+// GOD OBJECT detected
+pub struct MassiveController {
+    // 8 fields
+    db_connection: DbPool,
+    cache: Cache,
+    logger: Logger,
+    config: Config,
+    session: Session,
+    auth: AuthService,
+    metrics: Metrics,
+    queue: MessageQueue,
+}
+
+impl MassiveController {
+    // 50 methods operating on the fields above
+    pub fn handle_user_login(&mut self, ...) { ... }
+    pub fn validate_session(&self, ...) { ... }
+    pub fn update_cache(&mut self, ...) { ... }
+    pub fn send_notification(&self, ...) { ... }
+    // ... 46 more methods
+}
+```
+
+**Why It's Problematic**:
+- Violates Single Responsibility Principle (one class doing too much)
+- Methods share mutable state (fields), creating tight coupling
+- Hard to test in isolation (need to mock all dependencies)
+- Changes to one responsibility affect the entire class
+- Difficult to refactor without breaking many dependents
+
+**Recommended Fix**:
+- Extract logical groups of methods into separate structs
+- Move related fields to the new structs
+- Use composition instead of putting everything in one class
+- Apply the Single Responsibility Principle
+
+**Example Refactoring**:
+```rust
+// Split into focused components
+pub struct AuthController {
+    auth: AuthService,
+    session: Session,
+}
+
+pub struct CacheController {
+    cache: Cache,
+    db_connection: DbPool,
+}
+
+pub struct NotificationController {
+    queue: MessageQueue,
+    logger: Logger,
+}
+```
+
+#### GOD MODULE: A File with Too Many Diverse Functions
+
+**Definition**: A module (file) containing many top-level functions that don't share state but represent diverse, unrelated responsibilities.
+
+**Classification Criteria**:
+- More than 20 module-level functions
+- Does NOT meet GOD OBJECT criteria (no single struct with >20 methods AND >5 fields)
+- Functions serve diverse purposes (not cohesive)
+
+**Example (Rust)**:
+```rust
+// GOD MODULE detected: utils.rs
+// 50 diverse module-level functions, no dominant struct
+
+pub fn parse_json(input: &str) -> Result<Value> { ... }
+pub fn validate_email(email: &str) -> bool { ... }
+pub fn format_currency(amount: f64) -> String { ... }
+pub fn hash_password(password: &str) -> String { ... }
+pub fn send_http_request(url: &str) -> Result<Response> { ... }
+pub fn compress_data(data: &[u8]) -> Vec<u8> { ... }
+// ... 44 more unrelated utility functions
+```
+
+**Why It's Problematic**:
+- Lacks cohesion (functions serve unrelated purposes)
+- Hard to navigate and understand module purpose
+- Violates module-level Single Responsibility Principle
+- Encourages "dumping ground" for miscellaneous functions
+- Changes to one function may require rebuilding entire module
+
+**Recommended Fix**:
+- Group related functions into focused modules
+- Create domain-specific utility modules
+- Use submodules to organize by feature/domain
+
+**Example Refactoring**:
+```rust
+// Split into cohesive modules
+// src/parsing.rs
+pub fn parse_json(input: &str) -> Result<Value> { ... }
+pub fn parse_xml(input: &str) -> Result<Document> { ... }
+
+// src/validation.rs
+pub fn validate_email(email: &str) -> bool { ... }
+pub fn validate_url(url: &str) -> bool { ... }
+
+// src/formatting.rs
+pub fn format_currency(amount: f64) -> String { ... }
+pub fn format_date(date: DateTime) -> String { ... }
+
+// src/crypto.rs
+pub fn hash_password(password: &str) -> String { ... }
+pub fn verify_hash(password: &str, hash: &str) -> bool { ... }
+```
+
+#### Key Distinction Summary
+
+| Aspect | GOD OBJECT | GOD MODULE |
+|--------|-----------|-----------|
+| **Structure** | One struct/class with many methods | Many module-level functions |
+| **State** | Methods share mutable state (fields) | Functions are independent, no shared state |
+| **Threshold** | >20 methods AND >5 fields on one struct | >20 module-level functions, NOT a god object |
+| **Detection** | Count methods per struct + field count | Count total functions in file |
+| **Problem Type** | Object-oriented design issue | Module organization issue |
+| **Fix Strategy** | Extract classes, apply SRP | Split into cohesive modules |
+
+#### How Debtmap Classifies Files
+
+Debtmap uses a priority-based classification algorithm:
+
+1. **Check for GOD OBJECT first**:
+   - Find the largest struct/class in the file
+   - If it has >20 methods AND >5 fields → classify as **GOD OBJECT**
+   - Output shows: "GOD OBJECT: MyStruct (50 methods, 8 fields)"
+
+2. **If not a GOD OBJECT, check for GOD MODULE**:
+   - Count total module-level functions (excluding test functions)
+   - If >20 functions → classify as **GOD MODULE**
+   - Output shows: "GOD MODULE (50 module functions)"
+
+3. **Otherwise**:
+   - File is not classified as either pattern
+
+#### Output Examples
+
+**GOD OBJECT Detection**:
+```
+#3 SCORE: 7.5 [HIGH]
+├─ GOD OBJECT: src/controller.rs
+├─ TYPE: UserController (52 methods, 8 fields)
+├─ ACTION: Extract responsibilities into focused classes
+├─ WHY: Single class with too many methods and fields
+└─ Methods: handle_user_login, validate_session, update_cache, ... (52 total)
+```
+
+**GOD MODULE Detection**:
+```
+#5 SCORE: 6.8 [HIGH]
+├─ GOD MODULE: src/utils.rs
+├─ TYPE: Module with 47 diverse functions
+├─ ACTION: Split into cohesive submodules by domain
+├─ WHY: Module lacks focus, contains unrelated utilities
+└─ Module Functions: parse_json, validate_email, format_currency, ... (47 total)
+```
+
+#### Implementation Details
+
+**Location**: `src/organization/god_object_detector.rs`
+
+**Classification Logic**:
+```rust
+// Simplified algorithm
+fn classify_file(file: &FileMetrics) -> Classification {
+    // Priority 1: Check for god objects
+    for struct_info in &file.structs {
+        if struct_info.methods.len() > 20 && struct_info.fields.len() > 5 {
+            return Classification::GodObject {
+                struct_name: struct_info.name,
+                method_count: struct_info.methods.len(),
+                field_count: struct_info.fields.len(),
+            };
+        }
+    }
+
+    // Priority 2: Check for god module
+    let module_functions = file.functions.iter()
+        .filter(|f| !f.is_test && !f.is_method)
+        .count();
+
+    if module_functions > 20 {
+        return Classification::GodModule {
+            function_count: module_functions,
+        };
+    }
+
+    Classification::Normal
+}
+```
+
+**Verbose Output**:
+When running with `--verbose`, debtmap shows the classification decision process:
+
+```
+Analyzing: src/processor.rs
+  Checking for GOD OBJECT...
+    Largest struct: DataProcessor (12 methods, 4 fields) - below threshold
+  Checking for GOD MODULE...
+    Module functions: 35 (threshold: 20) - GOD MODULE detected
+  Classification: GOD MODULE
+```
+
 ### Complexity-Weighted Scoring
 
 **Design Problem**: Traditional god object detection relies on raw method counts, which creates false positives for well-refactored code. A file with 100 simple helper functions (complexity 1-3) should not rank higher than a file with 10 highly complex functions (complexity 17+).
