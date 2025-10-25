@@ -713,12 +713,12 @@ mod tests {
                 pub fn func() {
                     inner_func();
                 }
-                
+
                 fn inner_func() {
                     println!("Inner");
                 }
             }
-            
+
             fn main() {
                 submodule::func();
             }
@@ -735,5 +735,128 @@ mod tests {
         assert!(graph
             .get_all_functions()
             .any(|f| f.name == "submodule::inner_func"));
+    }
+
+    #[test]
+    fn test_intra_struct_method_call_tracking() {
+        let code = r#"
+            struct Formatter {
+                plain: bool,
+            }
+
+            impl Formatter {
+                pub fn format_output(&self, data: &str) -> String {
+                    // Calls helper method on self
+                    let formatted = self.format_helper(data);
+                    formatted
+                }
+
+                fn format_helper(&self, data: &str) -> String {
+                    data.to_uppercase()
+                }
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        let graph = extractor.extract(&file);
+
+        // Find the functions
+        let format_output = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("format_output"))
+            .expect("format_output should exist in call graph");
+
+        let format_helper = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("format_helper"))
+            .expect("format_helper should exist in call graph");
+
+        // Verify call is tracked - format_helper should have callers
+        let callers = graph.get_callers(format_helper);
+        assert!(
+            !callers.is_empty(),
+            "format_helper should have callers (format_output calls it via self.format_helper())"
+        );
+
+        let has_format_output = callers.iter().any(|c| c.name.contains("format_output"));
+        assert!(
+            has_format_output,
+            "format_output should be in the list of callers for format_helper. Found callers: {:?}",
+            callers.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Verify the reverse - format_output should have callees
+        let callees = graph.get_callees(format_output);
+        let has_format_helper = callees.iter().any(|c| c.name.contains("format_helper"));
+        assert!(
+            has_format_helper,
+            "format_helper should be in the list of callees for format_output. Found callees: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_multiple_intra_struct_calls() {
+        let code = r#"
+            struct PatternOutputFormatter;
+
+            impl PatternOutputFormatter {
+                pub fn format_pattern_usage(&self, pattern: &Pattern) -> String {
+                    self.format_pattern_type(&pattern.pattern_type)
+                }
+
+                pub fn format_detailed(&self, pattern: &Pattern) -> String {
+                    self.format_pattern_type(&pattern.pattern_type)
+                }
+
+                pub fn format_compact(&self, pattern: &Pattern) -> String {
+                    self.format_pattern_type(&pattern.pattern_type)
+                }
+
+                fn format_pattern_type(&self, pattern_type: &str) -> String {
+                    pattern_type.to_string()
+                }
+            }
+
+            struct Pattern {
+                pattern_type: String,
+            }
+        "#;
+
+        let file = parse_rust_code(code);
+        let extractor = CallGraphExtractor::new(PathBuf::from("test.rs"));
+        let graph = extractor.extract(&file);
+
+        // Find format_pattern_type method
+        let format_pattern_type = graph
+            .get_all_functions()
+            .find(|f| f.name.contains("format_pattern_type"))
+            .expect("format_pattern_type should exist");
+
+        // Verify it has callers
+        let callers = graph.get_callers(format_pattern_type);
+        assert!(
+            callers.len() >= 3,
+            "format_pattern_type should have at least 3 callers (format_pattern_usage, format_detailed, format_compact), found: {}. Callers: {:?}",
+            callers.len(),
+            callers.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // Verify specific callers
+        assert!(
+            callers
+                .iter()
+                .any(|c| c.name.contains("format_pattern_usage")),
+            "format_pattern_usage should be a caller"
+        );
+        assert!(
+            callers.iter().any(|c| c.name.contains("format_detailed")),
+            "format_detailed should be a caller"
+        );
+        assert!(
+            callers.iter().any(|c| c.name.contains("format_compact")),
+            "format_compact should be a caller"
+        );
     }
 }
