@@ -256,6 +256,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -298,7 +300,9 @@ mod tests {
                         detected_patterns: None,
                         upstream_callers: None,
                         downstream_callees: None,
-                    }],
+                    mapping_pattern_result: None,
+            adjusted_complexity: None,
+        }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
                 },
@@ -331,7 +335,9 @@ mod tests {
                             detected_patterns: None,
                             upstream_callers: None,
                             downstream_callees: None,
-                        },
+                        mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
                         FunctionMetrics {
                             name: "func_c".to_string(),
                             file: PathBuf::from("file2.rs"),
@@ -350,7 +356,9 @@ mod tests {
                             detected_patterns: None,
                             upstream_callers: None,
                             downstream_callees: None,
-                        },
+                        mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
                     ],
                     cyclomatic_complexity: 10,
                     cognitive_complexity: 13,

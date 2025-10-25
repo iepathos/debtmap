@@ -501,6 +501,8 @@ fn extract_functions_from_stmts(
                     detected_patterns,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: None,
+                    adjusted_complexity: None,
                 });
 
                 // Recursively look for nested functions
@@ -570,6 +572,8 @@ fn extract_functions_from_stmts(
                     detected_patterns,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: None,
+                    adjusted_complexity: None,
                 });
 
                 // Recursively look for nested functions

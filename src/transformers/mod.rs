@@ -165,6 +165,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         }
     }
 

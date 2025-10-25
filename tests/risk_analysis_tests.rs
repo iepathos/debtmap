@@ -54,6 +54,8 @@ end_of_record
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -117,7 +119,9 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            }],
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        }],
             summary: ComplexitySummary {
                 total_functions: 1,
                 average_complexity: 3.0,
@@ -181,7 +185,9 @@ fn test_analyze_risk_without_coverage() {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            }],
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        }],
             summary: ComplexitySummary {
                 total_functions: 1,
                 average_complexity: 2.0,

@@ -165,6 +165,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         }];
 
         AnalysisResults {
@@ -340,6 +342,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+        mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -364,6 +368,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+        mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -388,6 +394,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+        mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -412,6 +420,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+        mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -440,7 +450,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            });
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        });
         }
 
         let top_3 = get_top_complex_functions(&metrics, 3);
@@ -480,7 +492,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            },
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
             FunctionMetrics {
                 name: "func_2".to_string(),
                 file: PathBuf::from("test.rs"),
@@ -499,7 +513,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            },
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
         ];
 
         let top_5 = get_top_complex_functions(&metrics, 5);

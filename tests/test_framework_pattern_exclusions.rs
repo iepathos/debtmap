@@ -27,6 +27,8 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
     };
 
     let func_id = FunctionId::new(
@@ -90,7 +92,9 @@ fn test_visit_trait_pattern_exclusion() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    };
+    mapping_pattern_result: None,
+            adjusted_complexity: None,
+        };
 
     let func_id = FunctionId::new(
         visit_func.file.clone(),

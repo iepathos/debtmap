@@ -203,6 +203,8 @@ fn test_pattern_matching_for_different_languages() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
     };
 
     let python_func = FunctionMetrics {
@@ -223,7 +225,9 @@ fn test_pattern_matching_for_different_languages() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    };
+    mapping_pattern_result: None,
+            adjusted_complexity: None,
+        };
 
     let js_func = FunctionMetrics {
         name: "testJavaScript".to_string(),
@@ -243,7 +247,9 @@ fn test_pattern_matching_for_different_languages() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    };
+    mapping_pattern_result: None,
+            adjusted_complexity: None,
+        };
 
     // Create dummy file metrics for testing
     let file_metrics = debtmap::core::FileMetrics {

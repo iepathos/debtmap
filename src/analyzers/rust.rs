@@ -5,6 +5,9 @@ use crate::complexity::{
     cyclomatic::{calculate_cyclomatic, calculate_cyclomatic_adjusted},
     if_else_analyzer::{IfElseChain, IfElseChainAnalyzer},
     message_generator::{generate_enhanced_message, EnhancedComplexityMessage},
+    pure_mapping_patterns::{
+        calculate_adjusted_complexity, MappingPatternConfig, MappingPatternDetector,
+    },
     recursive_detector::{MatchLocation, RecursiveMatchDetector},
     threshold_manager::{ComplexityThresholds, ThresholdPreset},
 };
@@ -537,6 +540,22 @@ impl FunctionVisitor {
         block: &syn::Block,
         item_fn: &syn::ItemFn,
     ) -> FunctionMetrics {
+        // Detect pure mapping patterns (spec 118)
+        let function_body = quote::quote!(#block).to_string();
+        let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
+        let mapping_result =
+            mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
+
+        let adjusted_complexity = if mapping_result.is_pure_mapping {
+            Some(calculate_adjusted_complexity(
+                complexity.cyclomatic,
+                complexity.cognitive,
+                &mapping_result,
+            ))
+        } else {
+            None
+        };
+
         FunctionMetrics {
             name: context.name,
             file: context.file,
@@ -552,9 +571,15 @@ impl FunctionVisitor {
             entropy_score: metadata.entropy_score,
             is_pure: metadata.purity_info.0,
             purity_confidence: metadata.purity_info.1,
-            detected_patterns: None, // TODO: Add pattern detection for Rust
+            detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: if mapping_result.is_pure_mapping {
+                Some(mapping_result)
+            } else {
+                None
+            },
+            adjusted_complexity,
         }
     }
 
@@ -872,6 +897,22 @@ impl FunctionVisitor {
         let line = self.get_line_number(closure.body.span());
         let entropy_score = self.calculate_closure_entropy(block);
 
+        // Detect pure mapping patterns for closures (spec 118)
+        let function_body = quote::quote!(#block).to_string();
+        let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
+        let mapping_result =
+            mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
+
+        let adjusted_complexity = if mapping_result.is_pure_mapping {
+            Some(calculate_adjusted_complexity(
+                complexity.cyclomatic,
+                complexity.cognitive,
+                &mapping_result,
+            ))
+        } else {
+            None
+        };
+
         FunctionMetrics {
             name,
             file: self.current_file.clone(),
@@ -890,6 +931,12 @@ impl FunctionVisitor {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: if mapping_result.is_pure_mapping {
+                Some(mapping_result)
+            } else {
+                None
+            },
+            adjusted_complexity,
         }
     }
 
@@ -1443,6 +1490,8 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1462,7 +1511,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            },
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
         ];
 
         let (total_cyc, total_cog) = calculate_total_complexity(&functions);
@@ -1499,6 +1550,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+        mapping_pattern_result: None,
+            adjusted_complexity: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {

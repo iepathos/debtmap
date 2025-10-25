@@ -28,6 +28,8 @@ fn create_test_metrics(path: &str, cyclo: u32, cognitive: u32) -> FileMetrics {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
             }],
             cyclomatic_complexity: cyclo,
             cognitive_complexity: cognitive,

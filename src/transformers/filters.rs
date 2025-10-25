@@ -225,6 +225,8 @@ mod tests {
                         detected_patterns: None,
                         upstream_callers: None,
                         downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -244,7 +246,9 @@ mod tests {
                         detected_patterns: None,
                         upstream_callers: None,
                         downstream_callees: None,
-                    },
+                    mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
                 ],
                 cyclomatic_complexity: 17,
                 cognitive_complexity: 23,
@@ -419,7 +423,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            },
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
             FunctionMetrics {
                 name: "func2".to_string(),
                 file: PathBuf::from("test.rs"),
@@ -438,7 +444,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            },
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+        },
         ];
 
         let (total_cyc, total_cog) = calculate_total_complexity(&functions);
