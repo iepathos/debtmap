@@ -390,8 +390,8 @@ mod tests {
                     detected_patterns: None,
                     upstream_callers: None,
                     downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
+                    mapping_pattern_result: None,
+                    adjusted_complexity: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -786,7 +786,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         });
 
@@ -876,7 +876,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         });
 

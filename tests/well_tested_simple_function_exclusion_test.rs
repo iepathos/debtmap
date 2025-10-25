@@ -82,7 +82,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 
@@ -178,9 +178,9 @@ fn test_well_tested_simple_function_has_low_score() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
 
     let mut coverage_data = LcovData::default();
     coverage_data.functions.insert(

@@ -160,8 +160,8 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -181,9 +181,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 file: PathBuf::from("test3.rs"),
                 name: "critical_complexity".to_string(),
@@ -202,9 +202,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
         ];
 
         let critical = get_critical_risk_functions(&metrics, 2);

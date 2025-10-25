@@ -182,8 +182,8 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -203,9 +203,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
         ];
 
         AnalysisResults {

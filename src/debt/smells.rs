@@ -329,9 +329,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 name: "function_b".to_string(),
                 file: PathBuf::from("src/module_b.rs"),
@@ -350,9 +350,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
         ];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -383,9 +383,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
                 file: PathBuf::from("src/user_handler.rs"),
@@ -404,9 +404,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
         ];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -445,9 +445,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 name: "func_b".to_string(),
                 file: PathBuf::from("src/module.rs"),
@@ -466,9 +466,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 name: "func_c".to_string(),
                 file: PathBuf::from("src/module.rs"),
@@ -487,9 +487,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
             FunctionMetrics {
                 name: "small_func".to_string(),
                 file: PathBuf::from("src/module.rs"),
@@ -508,9 +508,9 @@ mod tests {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
-        },
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
+            },
         ];
         let smells = detect_data_clumps(&functions);
 
@@ -549,7 +549,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 
@@ -623,7 +623,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 
@@ -669,7 +669,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 
@@ -723,7 +723,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 
@@ -756,7 +756,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
 

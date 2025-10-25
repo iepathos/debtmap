@@ -69,7 +69,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
         assert!(is_trivial_delegation(&simple));
@@ -92,7 +92,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
         assert!(!is_trivial_delegation(&complex));
@@ -118,7 +118,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
         assert_eq!(calculate_complexity_weight(&trivial), 0.1);
@@ -141,7 +141,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
         assert_eq!(calculate_complexity_weight(&simple), 0.5);
@@ -164,7 +164,7 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         };
         assert_eq!(calculate_complexity_weight(&complex), 1.0);

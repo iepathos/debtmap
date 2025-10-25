@@ -43,7 +43,7 @@ fn test_complexity_metrics() {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         },
         FunctionMetrics {
@@ -64,7 +64,7 @@ fn test_complexity_metrics() {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
-        mapping_pattern_result: None,
+            mapping_pattern_result: None,
             adjusted_complexity: None,
         },
     ];
@@ -105,9 +105,9 @@ fn test_function_is_complex() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
 
     assert!(
         func.is_complex(10),

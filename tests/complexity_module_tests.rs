@@ -26,8 +26,8 @@ fn test_complexity_calculator_new() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-            mapping_pattern_result: None,
-            adjusted_complexity: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -53,9 +53,9 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(
         calc.is_complex(&metrics),
         "Should be complex when cyclomatic > threshold"
@@ -83,9 +83,9 @@ fn test_complexity_calculator_is_complex_cognitive() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(
         calc.is_complex(&metrics),
         "Should be complex when cognitive > threshold"
@@ -113,9 +113,9 @@ fn test_complexity_calculator_is_complex_both() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(
         calc.is_complex(&metrics),
         "Should be complex when both metrics > threshold"
@@ -143,9 +143,9 @@ fn test_complexity_calculator_is_not_complex() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(
         !calc.is_complex(&metrics),
         "Should not be complex when both metrics <= threshold"
@@ -173,9 +173,9 @@ fn test_complexity_calculator_calculate_score_low() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
         score, 50,
@@ -204,9 +204,9 @@ fn test_complexity_calculator_calculate_score_medium() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
         score, 100,
@@ -235,9 +235,9 @@ fn test_complexity_calculator_calculate_score_high() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
         score, 200,
@@ -266,9 +266,9 @@ fn test_complexity_calculator_calculate_score_zero() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
 }
@@ -376,9 +376,9 @@ fn test_complexity_calculator_boundary_values() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(!calc.is_complex(&metrics_zero));
 
     let metrics_one = FunctionMetrics {
@@ -399,9 +399,9 @@ fn test_complexity_calculator_boundary_values() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(!calc.is_complex(&metrics_one));
 
     let metrics_two = FunctionMetrics {
@@ -422,9 +422,9 @@ fn test_complexity_calculator_boundary_values() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     assert!(calc.is_complex(&metrics_two));
 }
 
@@ -450,9 +450,9 @@ fn test_complexity_score_proportions() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
         score_cyclo, 50,
@@ -477,9 +477,9 @@ fn test_complexity_score_proportions() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
-    mapping_pattern_result: None,
-            adjusted_complexity: None,
-        };
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
+    };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(
         score_cognitive, 50,

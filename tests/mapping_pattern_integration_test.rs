@@ -1,6 +1,5 @@
 /// Integration test for spec 118 - Pure Mapping Pattern Detection
 /// Verifies that mapping patterns are detected and result in reduced complexity scores
-
 use debtmap::analyzers::{rust::RustAnalyzer, Analyzer};
 use std::path::PathBuf;
 
