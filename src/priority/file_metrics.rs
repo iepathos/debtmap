@@ -29,6 +29,9 @@ pub struct GodObjectIndicators {
     /// Recommended module splits with methods to move
     #[serde(default)]
     pub recommended_splits: Vec<ModuleSplit>,
+    /// Detailed module structure analysis (for enhanced reporting)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub module_structure: Option<crate::analysis::ModuleStructure>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -220,6 +223,7 @@ impl Default for GodObjectIndicators {
             god_object_score: 0.0,
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
+            module_structure: None,
         }
     }
 }
@@ -291,6 +295,7 @@ mod tests {
                 god_object_score: 0.8,
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
+                module_structure: None,
             },
             function_scores: vec![5.0; 60],
         };

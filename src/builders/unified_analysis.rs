@@ -1286,6 +1286,7 @@ fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObj
         god_object_score: 0.0,
         responsibility_names: Vec::new(),
         recommended_splits: Vec::new(),
+        module_structure: None,
     }
 }
 
@@ -1322,6 +1323,7 @@ fn create_god_object_analysis(
         confidence: crate::organization::GodObjectConfidence::Definite,
         responsibilities: Vec::new(),
         purity_distribution: None,
+        module_structure: file_metrics.god_object_indicators.module_structure.clone(),
     })
 }
 

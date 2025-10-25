@@ -17,6 +17,7 @@ pub struct GodObjectDetector {
     max_fields: usize,
     max_responsibilities: usize,
     location_extractor: Option<UnifiedLocationExtractor>,
+    source_content: Option<String>,
 }
 
 impl Default for GodObjectDetector {
@@ -26,6 +27,7 @@ impl Default for GodObjectDetector {
             max_fields: 10,
             max_responsibilities: 3,
             location_extractor: None,
+            source_content: None,
         }
     }
 }
@@ -41,6 +43,7 @@ impl GodObjectDetector {
             max_fields: 10,
             max_responsibilities: 3,
             location_extractor: Some(UnifiedLocationExtractor::new(source_content)),
+            source_content: Some(source_content.to_string()),
         }
     }
 
@@ -421,6 +424,20 @@ impl GodObjectDetector {
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
+        // Optionally generate detailed module structure analysis for Rust files
+        let module_structure =
+            if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                if let Some(source_content) = &self.source_content {
+                    use crate::analysis::ModuleStructureAnalyzer;
+                    let analyzer = ModuleStructureAnalyzer::new_rust();
+                    Some(analyzer.analyze_rust_file(source_content, path))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
         GodObjectAnalysis {
             is_god_object,
             method_count: total_methods,
@@ -433,6 +450,7 @@ impl GodObjectDetector {
             confidence,
             responsibilities,
             purity_distribution,
+            module_structure,
         }
     }
 

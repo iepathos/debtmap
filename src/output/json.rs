@@ -408,6 +408,7 @@ mod tests {
                     god_object_score: 85.0,
                     responsibility_names: vec!["Too many responsibilities".to_string()],
                     recommended_splits: vec![],
+                    module_structure: None,
                 },
                 function_scores: vec![],
             },

@@ -1306,6 +1306,7 @@ mod tests {
                         god_object_score: 0.0,
                         responsibility_names: vec![],
                         recommended_splits: vec![],
+                        module_structure: None,
                     },
                     function_scores: vec![],
                 },
@@ -1793,6 +1794,7 @@ mod tests {
                 god_object_score: 0.5,
                 responsibility_names: vec![],
                 recommended_splits: vec![],
+                module_structure: None,
             },
             function_scores: vec![],
         };
@@ -1957,6 +1959,7 @@ mod tests {
                 god_object_score: 0.5,
                 responsibility_names: vec![],
                 recommended_splits: vec![],
+                module_structure: None,
             },
             function_scores: vec![],
         };
