@@ -108,6 +108,56 @@ Debtmap identifies classes and modules with too many responsibilities using puri
 
 📖 **Read more:** [God Object Detection](https://iepathos.github.io/debtmap/god-object-detection.html)
 
+#### Understanding GOD OBJECT vs GOD MODULE
+
+Debtmap distinguishes between two different organizational anti-patterns:
+
+**GOD OBJECT** - A single struct/class with too many methods and fields:
+- Classification: >20 methods AND >5 fields on one struct/class
+- Problem: One class doing too much, methods share mutable state
+- Example output: `GOD OBJECT: UserController (52 methods, 8 fields)`
+- Fix: Extract responsibilities into focused classes
+
+**GOD MODULE** - A file with too many diverse functions:
+- Classification: >20 module-level functions, but NOT a god object
+- Problem: Module lacks cohesion, contains unrelated utilities
+- Example output: `GOD MODULE (47 module functions)`
+- Fix: Split into cohesive submodules by domain
+
+**How to interpret the output:**
+
+When debtmap detects a god object, you'll see:
+```
+#3 SCORE: 7.5 [HIGH]
+├─ GOD OBJECT: src/controller.rs
+├─ TYPE: UserController (52 methods, 8 fields)
+├─ ACTION: Extract responsibilities into focused classes
+└─ WHY: Single class with too many methods and fields
+```
+
+The key indicators:
+- **Methods**: Number of methods on the dominant struct
+- **Fields**: Number of fields in that struct
+- This means refactor the specific struct, not the whole file
+
+When debtmap detects a god module, you'll see:
+```
+#5 SCORE: 6.8 [HIGH]
+├─ GOD MODULE: src/utils.rs
+├─ TYPE: Module with 47 diverse functions
+├─ ACTION: Split into cohesive submodules by domain
+└─ WHY: Module lacks focus, contains unrelated utilities
+```
+
+The key indicators:
+- **Module Functions**: Total count of module-level functions
+- This means reorganize the file's functions into multiple focused modules
+
+**Quick Decision Guide:**
+- See "GOD OBJECT"? Extract that specific class into smaller classes
+- See "GOD MODULE"? Split the file's functions into multiple focused modules
+- Both can appear in the same codebase for different files
+
 ### Pattern Detection
 Automatically detects common design patterns (Observer, Factory, Singleton, Strategy, etc.) with configurable confidence thresholds.
 
