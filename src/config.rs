@@ -1006,6 +1006,10 @@ pub struct DebtmapConfig {
     /// Constructor detection configuration (spec 117)
     #[serde(default, rename = "classification")]
     pub classification: Option<ClassificationConfig>,
+
+    /// Pure mapping pattern detection configuration (spec 118)
+    #[serde(default)]
+    pub mapping_patterns: Option<MappingPatternConfig>,
 }
 
 /// Classification configuration

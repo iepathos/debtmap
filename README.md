@@ -163,6 +163,41 @@ Automatically detects common design patterns (Observer, Factory, Singleton, Stra
 
 📖 **Read more:** [Analysis Guide](https://iepathos.github.io/debtmap/analysis-guide.html)
 
+### Pure Mapping Pattern Detection
+Reduces false positives from exhaustive match expressions that are actually simple and maintainable. Debtmap recognizes pure mapping patterns - match statements that transform input to output without side effects - and adjusts complexity scores accordingly.
+
+**What's a pure mapping pattern?**
+
+```rust
+fn status_to_string(status: Status) -> &'static str {
+    match status {
+        Status::Success => "success",
+        Status::Pending => "pending",
+        Status::Failed => "failed",
+        Status::Cancelled => "cancelled",
+        // ... many more cases
+    }
+}
+```
+
+This function has high cyclomatic complexity (one branch per case), but it's simple to maintain because:
+- Each branch is independent and straightforward
+- No mutation or side effects occur
+- The pattern is predictable and easy to understand
+- Adding new cases requires minimal changes
+
+**Impact**: By recognizing these patterns, debtmap reduces complexity scores by up to 30% for pure mapping functions, preventing them from incorrectly appearing as high-priority refactoring targets.
+
+**Configuration**: Customize detection thresholds in `.debtmap.toml`:
+```toml
+[mapping_patterns]
+enabled = true                      # Enable mapping pattern detection
+complexity_reduction = 0.30         # Reduce complexity by 30%
+min_branches = 3                    # Minimum match arms to consider
+```
+
+📖 **Read more:** [Configuration Guide](https://iepathos.github.io/debtmap/configuration.html#pure-mapping-pattern-detection)
+
 ### Cache Management
 Intelligent cache system with automatic pruning and configurable strategies (LRU, LFU, FIFO, age-based).
 

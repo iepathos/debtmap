@@ -571,6 +571,72 @@ context = "test"
 severity = "low"        # Unwrap is acceptable in test code
 ```
 
+### Pure Mapping Pattern Detection
+
+Configure detection of pure mapping patterns to reduce false positives from exhaustive match expressions:
+
+```toml
+[mapping_patterns]
+enabled = true                      # Enable mapping pattern detection (default: true)
+complexity_reduction = 0.30         # Reduce complexity by 30% (default: 0.30)
+min_branches = 3                    # Minimum match arms to consider (default: 3)
+```
+
+**What are pure mapping patterns?**
+
+Pure mapping patterns are exhaustive match expressions that transform input to output without side effects. These patterns have high cyclomatic complexity due to many branches, but are actually simple and maintainable because:
+
+- Each branch is independent and straightforward
+- No mutation or side effects occur
+- The pattern is predictable and easy to understand
+- Adding new cases requires minimal changes
+
+**Example:**
+```rust
+fn status_to_string(status: Status) -> &'static str {
+    match status {
+        Status::Success => "success",
+        Status::Pending => "pending",
+        Status::Failed => "failed",
+        Status::Cancelled => "cancelled",
+        // ... many more cases
+    }
+}
+```
+
+This function has high cyclomatic complexity (one branch per case), but is simple to maintain. Mapping pattern detection recognizes this and reduces the complexity score appropriately.
+
+**Configuration options:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `enabled` | true | Enable mapping pattern detection |
+| `complexity_reduction` | 0.30 | Percentage to reduce complexity (0.0-1.0) |
+| `min_branches` | 3 | Minimum match arms to be considered a mapping pattern |
+
+**Example configuration:**
+
+```toml
+# Conservative reduction
+[mapping_patterns]
+complexity_reduction = 0.20         # Only 20% reduction
+
+# Aggressive reduction for codebases with many mapping patterns
+[mapping_patterns]
+complexity_reduction = 0.50         # 50% reduction
+
+# Disable if you want to see all match complexity
+[mapping_patterns]
+enabled = false
+```
+
+**When to adjust:**
+
+- **Increase `complexity_reduction`** if you have many simple mapping functions being flagged as complex
+- **Decrease `complexity_reduction`** if you want more conservative adjustments
+- **Increase `min_branches`** to only apply reduction to very large match statements
+- **Disable entirely** if you want raw complexity scores without adjustment
+
 ### External API Configuration
 
 Mark functions as public API for enhanced testing recommendations:
