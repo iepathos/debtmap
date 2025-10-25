@@ -293,7 +293,7 @@ pub struct RoleCoverageWeights {
 }
 
 /// Configuration for caller/callee display in output
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CallerCalleeConfig {
     /// Maximum number of callers to display (default: 5)
     #[serde(default = "default_max_callers")]

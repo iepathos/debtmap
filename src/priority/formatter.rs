@@ -1518,13 +1518,13 @@ fn format_dependencies_section_with_config(
     context: &FormatContext,
     formatting_config: FormattingConfig,
 ) -> Option<String> {
-    let config = CallerCalleeConfig::default();
+    let config = &formatting_config.caller_callee;
     let _formatter = ColoredFormatter::new(formatting_config);
 
     // Filter callers and callees based on configuration
-    let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, &config);
+    let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, config);
     let filtered_callees =
-        filter_dependencies(&context.dependency_info.downstream_callees, &config);
+        filter_dependencies(&context.dependency_info.downstream_callees, config);
 
     // Always show dependencies section (per spec 117)
     let mut section = format!("{}", "├─ DEPENDENCIES:".bright_blue());

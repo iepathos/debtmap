@@ -563,6 +563,12 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         call_graph_stats_only,
         debug_format,
         validate_call_graph,
+        show_dependencies,
+        no_dependencies,
+        max_callers,
+        max_callees,
+        show_external,
+        show_std_lib,
     } = command
     {
         // Apply side effects first
@@ -581,7 +587,15 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         }
 
         // Build configuration from pure data transformation
-        let formatting_config = create_formatting_config(plain);
+        let formatting_config = create_formatting_config(
+            plain,
+            show_dependencies,
+            no_dependencies,
+            max_callers,
+            max_callees,
+            show_external,
+            show_std_lib,
+        );
         let config = build_analyze_config(
             path,
             format,
@@ -635,6 +649,12 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             call_graph_stats_only,
             debug_format,
             validate_call_graph,
+            show_dependencies,
+            no_dependencies,
+            max_callers,
+            max_callees,
+            show_external,
+            show_std_lib,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -765,12 +785,33 @@ fn convert_output_format(format: debtmap::cli::OutputFormat) -> debtmap::cli::Ou
 }
 
 // Pure function to create formatting configuration
-fn create_formatting_config(plain: bool) -> FormattingConfig {
-    if plain {
-        FormattingConfig::new(ColorMode::Never)
+fn create_formatting_config(
+    plain: bool,
+    _show_dependencies: bool,
+    _no_dependencies: bool,
+    max_callers: usize,
+    max_callees: usize,
+    show_external: bool,
+    show_std_lib: bool,
+) -> FormattingConfig {
+    use debtmap::config::CallerCalleeConfig;
+
+    let color_mode = if plain {
+        ColorMode::Never
     } else {
-        FormattingConfig::from_env()
-    }
+        // Get color mode from environment
+        let base_config = FormattingConfig::from_env();
+        base_config.color
+    };
+
+    let caller_callee = CallerCalleeConfig {
+        max_callers,
+        max_callees,
+        show_external,
+        show_std_lib,
+    };
+
+    FormattingConfig::with_caller_callee(color_mode, caller_callee)
 }
 
 // Pure function to build analyze configuration
@@ -828,6 +869,12 @@ fn build_analyze_config(
     call_graph_stats_only: bool,
     debug_format: debtmap::cli::DebugFormatArg,
     validate_call_graph: bool,
+    show_dependencies: bool,
+    no_dependencies: bool,
+    max_callers: usize,
+    max_callees: usize,
+    show_external: bool,
+    show_std_lib: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -884,6 +931,12 @@ fn build_analyze_config(
         call_graph_stats_only,
         debug_format,
         validate_call_graph,
+        show_dependencies,
+        no_dependencies,
+        max_callers,
+        max_callees,
+        show_external,
+        show_std_lib,
     }
 }
 

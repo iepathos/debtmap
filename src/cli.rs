@@ -262,6 +262,30 @@ pub enum Commands {
         /// Validate call graph structure and report issues
         #[arg(long = "validate-call-graph")]
         validate_call_graph: bool,
+
+        /// Show dependency information (callers/callees) in output
+        #[arg(long = "show-dependencies")]
+        show_dependencies: bool,
+
+        /// Hide dependency information (callers/callees) in output
+        #[arg(long = "no-dependencies", conflicts_with = "show_dependencies")]
+        no_dependencies: bool,
+
+        /// Maximum number of callers to display (default: 5)
+        #[arg(long = "max-callers", default_value = "5")]
+        max_callers: usize,
+
+        /// Maximum number of callees to display (default: 5)
+        #[arg(long = "max-callees", default_value = "5")]
+        max_callees: usize,
+
+        /// Show external crate calls in dependencies
+        #[arg(long = "show-external-calls")]
+        show_external: bool,
+
+        /// Show standard library calls in dependencies
+        #[arg(long = "show-std-lib-calls")]
+        show_std_lib: bool,
     },
 
     /// Initialize configuration file
