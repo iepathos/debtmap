@@ -252,8 +252,9 @@ fn test_performance_overhead_under_10_percent() {
     }
     let with_duration = start.elapsed();
 
-    let overhead_pct =
-        (with_duration.as_secs_f64() - without_duration.as_secs_f64()) / without_duration.as_secs_f64() * 100.0;
+    let overhead_pct = (with_duration.as_secs_f64() - without_duration.as_secs_f64())
+        / without_duration.as_secs_f64()
+        * 100.0;
 
     println!(
         "Performance overhead: {:.2}% (without: {:?}, with: {:?})",
@@ -469,15 +470,36 @@ fn test_full_corpus_accuracy() {
     println!("  Recall: {:.2}%", recall * 100.0);
     println!("  F1 Score: {:.4}", f1);
     println!("  Details: {:?}", metrics);
-    println!("  Total samples: {}",
-        metrics.true_positives + metrics.false_positives +
-        metrics.true_negatives + metrics.false_negatives);
+    println!(
+        "  Total samples: {}",
+        metrics.true_positives
+            + metrics.false_positives
+            + metrics.true_negatives
+            + metrics.false_negatives
+    );
 
     // Spec requirements validation
     println!("\nSpec 111 Requirements:");
-    println!("  Precision ≥ 90%: {}", if precision >= 0.90 { "✓ PASS" } else { "✗ FAIL" });
-    println!("  Recall ≥ 85%: {}", if recall >= 0.85 { "✓ PASS" } else { "✗ FAIL" });
-    println!("  F1 Score ≥ 0.87: {}", if f1 >= 0.87 { "✓ PASS" } else { "✗ FAIL" });
+    println!(
+        "  Precision ≥ 90%: {}",
+        if precision >= 0.90 {
+            "✓ PASS"
+        } else {
+            "✗ FAIL"
+        }
+    );
+    println!(
+        "  Recall ≥ 85%: {}",
+        if recall >= 0.85 {
+            "✓ PASS"
+        } else {
+            "✗ FAIL"
+        }
+    );
+    println!(
+        "  F1 Score ≥ 0.87: {}",
+        if f1 >= 0.87 { "✓ PASS" } else { "✗ FAIL" }
+    );
 
     // Assert spec requirements
     assert!(
@@ -490,11 +512,7 @@ fn test_full_corpus_accuracy() {
         "Recall requirement not met: {:.2}% < 85%",
         recall * 100.0
     );
-    assert!(
-        f1 >= 0.87,
-        "F1 score requirement not met: {:.4} < 0.87",
-        f1
-    );
+    assert!(f1 >= 0.87, "F1 score requirement not met: {:.4} < 0.87", f1);
 }
 
 /// Test different analysis profiles (strict, balanced, lenient)

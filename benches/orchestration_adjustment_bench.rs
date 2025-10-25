@@ -34,6 +34,7 @@ fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) 
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     }
 }
 
@@ -169,6 +170,7 @@ fn bench_composition_quality_calculation(c: &mut Criterion) {
         callee_count: 8,
         delegation_ratio: 0.6,
         local_complexity: 2,
+        ast_composition_quality: None,
     };
 
     group.bench_function("excellent", |b| {
@@ -185,6 +187,7 @@ fn bench_composition_quality_calculation(c: &mut Criterion) {
         callee_count: 2,
         delegation_ratio: 0.1,
         local_complexity: 8,
+        ast_composition_quality: None,
     };
 
     group.bench_function("poor", |b| {

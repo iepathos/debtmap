@@ -340,34 +340,25 @@ fn extract_pipeline_from_method_call(
             }
             // Standard iterators
             "iter" | "into_iter" | "iter_mut" => {
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+                stages.push(PipelineStage::Iterator { method: method_str });
             }
             // Iterator constructors (these ARE iterators, not receivers)
             "lines" | "chars" | "bytes" | "split_whitespace" => {
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+                stages.push(PipelineStage::Iterator { method: method_str });
             }
             // Slice/collection iterators
-            "windows" | "chunks" | "chunks_exact" | "rchunks" | "split" | "rsplit" | "split_terminator" => {
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+            "windows" | "chunks" | "chunks_exact" | "rchunks" | "split" | "rsplit"
+            | "split_terminator" => {
+                stages.push(PipelineStage::Iterator { method: method_str });
             }
             // Collection-specific iterators
             "into_values" | "into_keys" | "values" | "keys" => {
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+                stages.push(PipelineStage::Iterator { method: method_str });
             }
             // std::iter constructors (from expressions, not method calls)
             // These won't appear as method calls usually, but include for completeness
             "once" | "repeat" | "repeat_with" | "from_fn" | "successors" | "empty" => {
-                stages.push(PipelineStage::Iterator {
-                    method: method_str,
-                });
+                stages.push(PipelineStage::Iterator { method: method_str });
             }
             "map" => stages.push(PipelineStage::Map {
                 closure_complexity: 1,
@@ -377,10 +368,12 @@ fn extract_pipeline_from_method_call(
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "fold" | "reduce" | "scan" | "try_fold" | "try_for_each" => stages.push(PipelineStage::Fold {
-                init_complexity: 1,
-                fold_complexity: 1,
-            }),
+            "fold" | "reduce" | "scan" | "try_fold" | "try_for_each" => {
+                stages.push(PipelineStage::Fold {
+                    init_complexity: 1,
+                    fold_complexity: 1,
+                })
+            }
             "flat_map" => stages.push(PipelineStage::FlatMap {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
@@ -390,8 +383,8 @@ fn extract_pipeline_from_method_call(
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "take" | "skip" | "step_by" | "chain" | "zip" | "enumerate" | "peekable" | "fuse" |
-            "take_while" | "skip_while" | "map_while" | "by_ref" | "inspect" | "flatten" => {
+            "take" | "skip" | "step_by" | "chain" | "zip" | "enumerate" | "peekable" | "fuse"
+            | "take_while" | "skip_while" | "map_while" | "by_ref" | "inspect" | "flatten" => {
                 // Adapter methods that transform the iterator
                 stages.push(PipelineStage::Map {
                     closure_complexity: 0, // No closure for these (or it's implicit)
@@ -630,7 +623,8 @@ fn analyze_stmt_purity(stmt: &Stmt) -> PurityAccumulator {
 /// Analyze local binding purity
 fn analyze_local_purity(local: &Local) -> PurityAccumulator {
     // Check mutability without string conversion
-    let is_mutable = matches!(&local.pat, syn::Pat::Ident(pat_ident) if pat_ident.mutability.is_some());
+    let is_mutable =
+        matches!(&local.pat, syn::Pat::Ident(pat_ident) if pat_ident.mutability.is_some());
 
     let mut acc = if is_mutable {
         PurityAccumulator {
@@ -690,12 +684,10 @@ fn classify_macro_side_effect(mac: &syn::Macro) -> PurityAccumulator {
             io_operations: vec!["console_output".to_string()],
             ..Default::default()
         },
-        "debug" | "info" | "warn" | "error" | "trace" | "log" => {
-            PurityAccumulator {
-                benign_side_effects: vec![format!("logging::{}", ident_str)],
-                ..Default::default()
-            }
-        }
+        "debug" | "info" | "warn" | "error" | "trace" | "log" => PurityAccumulator {
+            benign_side_effects: vec![format!("logging::{}", ident_str)],
+            ..Default::default()
+        },
         _ => PurityAccumulator::default(),
     }
 }

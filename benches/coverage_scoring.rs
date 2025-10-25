@@ -2,8 +2,9 @@
 ///
 /// Verifies that the role-based coverage expectations and scoring have
 /// minimal performance impact (<3% of analysis time) as required by spec.
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::priority::scoring::{calculate_coverage_score, CoverageExpectations};
+use std::hint::black_box;
 
 fn bench_coverage_score_calculation(c: &mut Criterion) {
     let expectations = CoverageExpectations::default();
@@ -39,7 +40,7 @@ fn bench_coverage_score_calculation(c: &mut Criterion) {
             |b, &size| {
                 b.iter(|| {
                     for i in 0..size {
-                        let coverage = (i as f64 % 100.0); // Vary coverage
+                        let coverage = i as f64 % 100.0; // Vary coverage
                         let role = roles[i % roles.len()];
                         black_box(calculate_coverage_score(coverage, role, &expectations));
                     }
@@ -107,7 +108,7 @@ fn bench_role_expectations_lookup(c: &mut Criterion) {
 
 fn bench_coverage_expectations_default(c: &mut Criterion) {
     c.bench_function("coverage_expectations_default", |b| {
-        b.iter(|| CoverageExpectations::default())
+        b.iter(CoverageExpectations::default)
     });
 }
 

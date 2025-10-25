@@ -1765,10 +1765,7 @@ pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
 
 /// Get functional analysis configuration (spec 111)
 pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisConfig {
-    get_config()
-        .functional_analysis
-        .clone()
-        .unwrap_or_default()
+    get_config().functional_analysis.clone().unwrap_or_default()
 }
 
 /// Get smart performance configuration
