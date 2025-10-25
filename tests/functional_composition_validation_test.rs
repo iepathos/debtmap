@@ -275,7 +275,6 @@ fn test_performance_overhead_under_10_percent() {
 #[test]
 fn test_accuracy_metrics() {
     let analyzer = RustAnalyzer::new().with_functional_analysis(true);
-    let config = FunctionalAnalysisConfig::balanced();
 
     let mut metrics = AccuracyMetrics::default();
 
@@ -387,6 +386,117 @@ fn test_accuracy_metrics() {
     }
 }
 
+/// Test accuracy metrics on full test corpus
+///
+/// Validates spec requirements using the complete 95-file test corpus:
+/// - 65 positive examples (functional patterns)
+/// - 45 negative examples (imperative patterns)
+/// - Precision ≥90%, Recall ≥85%, F1 ≥0.87
+#[test]
+fn test_full_corpus_accuracy() {
+    use std::fs;
+    use std::path::Path;
+
+    let analyzer = RustAnalyzer::new().with_functional_analysis(true);
+    let mut metrics = AccuracyMetrics::default();
+
+    // Process positive examples (should detect functional patterns)
+    let positive_dir = Path::new("tests/fixtures/functional_patterns/positive");
+    if positive_dir.exists() {
+        for entry in fs::read_dir(positive_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if path.extension().map(|e| e == "rs").unwrap_or(false) {
+                if let Ok(code) = fs::read_to_string(&path) {
+                    if let Ok(ast) = analyzer.parse(&code, path.clone()) {
+                        let result = analyzer.analyze(&ast);
+
+                        if let Some(func) = result.complexity.functions.first() {
+                            if let Some(comp) = &func.composition_metrics {
+                                // Functional pattern detected if has pipelines or good quality
+                                if !comp.pipelines.is_empty() || comp.composition_quality > 0.5 {
+                                    metrics.true_positives += 1;
+                                } else {
+                                    metrics.false_negatives += 1;
+                                }
+                            } else {
+                                metrics.false_negatives += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Process negative examples (should NOT detect functional patterns)
+    let negative_dir = Path::new("tests/fixtures/functional_patterns/negative");
+    if negative_dir.exists() {
+        for entry in fs::read_dir(negative_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if path.extension().map(|e| e == "rs").unwrap_or(false) {
+                if let Ok(code) = fs::read_to_string(&path) {
+                    if let Ok(ast) = analyzer.parse(&code, path.clone()) {
+                        let result = analyzer.analyze(&ast);
+
+                        if let Some(func) = result.complexity.functions.first() {
+                            if let Some(comp) = &func.composition_metrics {
+                                // Correctly classified if no pipelines and low quality
+                                if comp.pipelines.is_empty() && comp.composition_quality < 0.3 {
+                                    metrics.true_negatives += 1;
+                                } else {
+                                    metrics.false_positives += 1;
+                                }
+                            } else {
+                                metrics.true_negatives += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let precision = metrics.precision();
+    let recall = metrics.recall();
+    let f1 = metrics.f1_score();
+
+    println!("\nFull Corpus Accuracy Metrics:");
+    println!("  Precision: {:.2}%", precision * 100.0);
+    println!("  Recall: {:.2}%", recall * 100.0);
+    println!("  F1 Score: {:.4}", f1);
+    println!("  Details: {:?}", metrics);
+    println!("  Total samples: {}",
+        metrics.true_positives + metrics.false_positives +
+        metrics.true_negatives + metrics.false_negatives);
+
+    // Spec requirements validation
+    println!("\nSpec 111 Requirements:");
+    println!("  Precision ≥ 90%: {}", if precision >= 0.90 { "✓ PASS" } else { "✗ FAIL" });
+    println!("  Recall ≥ 85%: {}", if recall >= 0.85 { "✓ PASS" } else { "✗ FAIL" });
+    println!("  F1 Score ≥ 0.87: {}", if f1 >= 0.87 { "✓ PASS" } else { "✗ FAIL" });
+
+    // Assert spec requirements
+    assert!(
+        precision >= 0.90,
+        "Precision requirement not met: {:.2}% < 90%",
+        precision * 100.0
+    );
+    assert!(
+        recall >= 0.85,
+        "Recall requirement not met: {:.2}% < 85%",
+        recall * 100.0
+    );
+    assert!(
+        f1 >= 0.87,
+        "F1 score requirement not met: {:.4} < 0.87",
+        f1
+    );
+}
+
 /// Test different analysis profiles (strict, balanced, lenient)
 #[test]
 fn test_analysis_profiles() {
@@ -400,7 +510,7 @@ fn test_analysis_profiles() {
     let path = PathBuf::from("test.rs");
 
     // Parse once
-    if let Ok(ast) = analyzer.parse(code, path) {
+    if let Ok(_ast) = analyzer.parse(code, path) {
         if let Ok(item_fn) = syn::parse_str::<syn::ItemFn>(code) {
             // Test strict profile
             let strict = FunctionalAnalysisConfig::strict();
