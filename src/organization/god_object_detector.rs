@@ -275,6 +275,17 @@ impl GodObjectDetector {
         }
     }
 
+    /// Analyzes a file for god object patterns.
+    ///
+    /// # God Class vs God Module
+    ///
+    /// This function distinguishes between:
+    /// - **God Class**: Single struct with excessive methods (>20), fields (>15)
+    /// - **God Module**: File with excessive standalone functions (>50)
+    ///
+    /// Previously, this incorrectly combined standalone functions with struct
+    /// methods, causing false positives for functional/procedural modules.
+    /// Now it analyzes struct methods separately from standalone functions.
     pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
         let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
         visitor.visit_file(ast);
@@ -291,15 +302,20 @@ impl GodObjectDetector {
         // Count standalone functions in addition to methods from types
         let standalone_count = visitor.standalone_functions.len();
 
-        // Combine methods from the primary type (if any) with standalone functions
+        // Only count methods belonging to the analyzed struct, NOT standalone functions
         let (total_methods, total_fields, all_methods, total_complexity) =
             if let Some(type_info) = primary_type {
-                // Combine struct methods with standalone functions
-                let mut all_methods = type_info.methods.clone();
-                all_methods.extend(visitor.standalone_functions.clone());
+                // Only use the struct's actual methods (don't combine with standalone functions)
+                let total_methods = type_info.method_count;
+                let all_methods = type_info.methods.clone();
 
-                let total_methods = type_info.method_count + standalone_count;
-                let total_complexity = (total_methods * 5) as u32;
+                // Calculate complexity only for struct methods
+                let total_complexity = visitor
+                    .function_complexity
+                    .iter()
+                    .filter(|fc| all_methods.contains(&fc.name))
+                    .map(|fc| fc.cyclomatic_complexity)
+                    .sum();
 
                 (
                     total_methods,
@@ -318,8 +334,8 @@ impl GodObjectDetector {
         // Count actual lines more accurately by looking at span information
         // For now, use a better heuristic based on item count and complexity
         let lines_of_code = if let Some(type_info) = primary_type {
-            // Estimate based on methods, fields, and standalone functions
-            type_info.method_count * 15 + type_info.field_count * 2 + standalone_count * 10 + 50
+            // Estimate based on only the struct's methods and fields (not standalone functions)
+            type_info.method_count * 15 + type_info.field_count * 2 + 50
         } else {
             // If no types, estimate based on standalone functions
             standalone_count * 10 + 20
