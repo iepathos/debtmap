@@ -221,7 +221,7 @@ fn create_summary(analysis: &UnifiedJsonOutput) -> AnalysisSummary {
 
     let high_priority_items = function_items
         .iter()
-        .filter(|item| item.unified_score.final_score >= 8.0)
+        .filter(|item| is_critical(item.unified_score.final_score))
         .count();
 
     let average_score = if function_items.is_empty() {
@@ -277,7 +277,7 @@ fn identify_resolved_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput
 
     let high_priority_count = resolved
         .iter()
-        .filter(|item| item.unified_score.final_score >= 8.0)
+        .filter(|item| is_critical(item.unified_score.final_score))
         .count();
 
     ResolvedItems {
@@ -390,7 +390,7 @@ fn identify_new_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> 
         .filter_map(|item| match item {
             DebtItem::Function(f) => {
                 if !before_keys.contains(&(f.location.file.clone(), f.location.function.clone()))
-                    && f.unified_score.final_score >= 8.0
+                    && is_critical(f.unified_score.final_score)
                 {
                     Some(ItemInfo {
                         file: f.location.file.clone(),
@@ -415,6 +415,14 @@ fn identify_new_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> 
 struct UnchangedCritical {
     count: usize,
     items: Vec<ItemInfo>,
+}
+
+/// Threshold for identifying critical debt items
+const CRITICAL_SCORE_THRESHOLD: f64 = 8.0;
+
+/// Check if a score is considered critical (≥ threshold)
+fn is_critical(score: f64) -> bool {
+    score >= CRITICAL_SCORE_THRESHOLD
 }
 
 /// Build a map of (file, function) -> FunctionMetrics for quick lookup
@@ -447,7 +455,7 @@ fn identify_unchanged_critical(
 
     for item in &before.items {
         if let DebtItem::Function(before_item) = item {
-            if before_item.unified_score.final_score >= 8.0 {
+            if is_critical(before_item.unified_score.final_score) {
                 let key = (
                     before_item.location.file.clone(),
                     before_item.location.function.clone(),
@@ -456,7 +464,7 @@ fn identify_unchanged_critical(
                     let score_change = (before_item.unified_score.final_score
                         - after_item.unified_score.final_score)
                         .abs();
-                    if score_change < 0.5 && after_item.unified_score.final_score >= 8.0 {
+                    if score_change < 0.5 && is_critical(after_item.unified_score.final_score) {
                         unchanged_critical.push(ItemInfo {
                             file: before_item.location.file.clone(),
                             function: before_item.location.function.clone(),
@@ -912,6 +920,26 @@ mod tests {
         // After score is < 8.0, so should not be included
         assert_eq!(result.count, 0);
         assert_eq!(result.items.len(), 0);
+    }
+
+    // Tests for is_critical
+    #[test]
+    fn test_is_critical_below_threshold() {
+        assert!(!is_critical(7.9));
+        assert!(!is_critical(0.0));
+        assert!(!is_critical(5.5));
+    }
+
+    #[test]
+    fn test_is_critical_at_threshold() {
+        assert!(is_critical(8.0));
+    }
+
+    #[test]
+    fn test_is_critical_above_threshold() {
+        assert!(is_critical(8.1));
+        assert!(is_critical(10.0));
+        assert!(is_critical(15.5));
     }
 
     // Tests for build_function_map
