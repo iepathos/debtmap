@@ -11,7 +11,7 @@ pub fn write_priority_actions<W: Write>(
     writer: &mut W,
     unified_analysis: Option<&UnifiedAnalysis>,
 ) -> Result<()> {
-    writeln!(writer, "### 🚨 Priority Actions\n")?;
+    writeln!(writer, "### [CRITICAL] Priority Actions\n")?;
 
     if let Some(analysis) = unified_analysis {
         let priority_items: Vec<_> = analysis

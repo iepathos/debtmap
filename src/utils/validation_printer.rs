@@ -2,7 +2,7 @@ use super::super::commands::validate::ValidationDetails;
 use crate::risk;
 
 pub fn print_validation_success(details: &ValidationDetails, verbosity: u8) {
-    println!("✅ Validation PASSED - All metrics within thresholds");
+    println!("[OK] Validation PASSED - All metrics within thresholds");
 
     if verbosity > 0 {
         println!();
@@ -15,7 +15,7 @@ pub fn print_validation_failure_with_details(
     risk_insights: &Option<risk::RiskInsight>,
     verbosity: u8,
 ) {
-    println!("❌ Validation FAILED - Some metrics exceed thresholds");
+    println!("[ERROR] Validation FAILED - Some metrics exceed thresholds");
     println!();
 
     print_validation_details(details);
@@ -197,7 +197,7 @@ fn format_threshold_failure(
     comparison: &str,
 ) -> String {
     format!(
-        "    ❌ {}: {} {} {}",
+        "    [ERROR] {}: {} {} {}",
         metric_name, actual, comparison, threshold
     )
 }
@@ -296,7 +296,7 @@ mod tests {
         assert!(formatted.contains("10"));
         assert!(formatted.contains("5"));
         assert!(formatted.contains(">"));
-        assert!(formatted.contains("❌"));
+        assert!(formatted.contains("[ERROR]"));
     }
 
     #[test]
@@ -410,9 +410,9 @@ mod tests {
     #[test]
     fn test_format_threshold_failure() {
         let result = format_threshold_failure("Test metric", "100", "50", ">");
-        assert_eq!(result, "    ❌ Test metric: 100 > 50");
+        assert_eq!(result, "    [ERROR] Test metric: 100 > 50");
 
         let result = format_threshold_failure("Coverage", "40%", "60%", "<");
-        assert_eq!(result, "    ❌ Coverage: 40% < 60%");
+        assert_eq!(result, "    [ERROR] Coverage: 40% < 60%");
     }
 }

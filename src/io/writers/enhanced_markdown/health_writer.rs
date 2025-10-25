@@ -203,7 +203,7 @@ pub fn write_strategic_priorities_section<W: Write>(
     writer: &mut W,
     priorities: &[StrategicPriority],
 ) -> Result<()> {
-    writeln!(writer, "### 🚨 Strategic Priorities\n")?;
+    writeln!(writer, "### [CRITICAL] Strategic Priorities\n")?;
 
     for (i, priority) in priorities.iter().enumerate() {
         writeln!(writer, "#### {}. {}\n", i + 1, priority.title)?;
