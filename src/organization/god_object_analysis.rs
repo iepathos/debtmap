@@ -279,32 +279,109 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
     groups
 }
 
+/// Infer responsibility category from function/method name.
+///
+/// This function uses common naming patterns to categorize functions into
+/// responsibility groups. It recognizes standard Rust function prefixes like
+/// `format_*`, `parse_*`, `filter_*`, etc.
+///
+/// # Pattern Recognition
+///
+/// - `format_*`, `render_*`, `write_*`, `print_*` → "Formatting & Output"
+/// - `parse_*`, `read_*`, `extract_*` → "Parsing & Input"
+/// - `filter_*`, `select_*`, `find_*` → "Filtering & Selection"
+/// - `transform_*`, `convert_*`, `map_*`, `apply_*` → "Transformation"
+/// - `get_*`, `set_*` → "Data Access"
+/// - `validate_*`, `check_*`, `verify_*`, `is_*` → "Validation"
+/// - `calculate_*`, `compute_*` → "Computation"
+/// - `create_*`, `build_*`, `new_*` → "Construction"
+/// - `save_*`, `load_*`, `store_*` → "Persistence"
+/// - `process_*`, `handle_*` → "Processing"
+/// - `send_*`, `receive_*` → "Communication"
+/// - Everything else → "Utilities"
+///
+/// # Extending Patterns
+///
+/// To add new patterns:
+/// 1. Add a new `else if` clause with the prefix check
+/// 2. Choose a descriptive category name
+/// 3. Add a unit test for the new pattern
+/// 4. Update this documentation
+///
+/// # Note on Catch-all
+///
+/// The catch-all category is "Utilities" rather than "Core Operations" because
+/// it more accurately describes miscellaneous helper functions that don't fit
+/// standard naming conventions.
 fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
-    if lower.starts_with("get") || lower.starts_with("set") {
+    // Formatting & Output
+    if lower.starts_with("format")
+        || lower.starts_with("render")
+        || lower.starts_with("write")
+        || lower.starts_with("print")
+    {
+        "Formatting & Output".to_string()
+    }
+    // Parsing & Input
+    else if lower.starts_with("parse")
+        || lower.starts_with("read")
+        || lower.starts_with("extract")
+    {
+        "Parsing & Input".to_string()
+    }
+    // Filtering & Selection
+    else if lower.starts_with("filter")
+        || lower.starts_with("select")
+        || lower.starts_with("find")
+    {
+        "Filtering & Selection".to_string()
+    }
+    // Transformation
+    else if lower.starts_with("transform")
+        || lower.starts_with("convert")
+        || lower.starts_with("map")
+        || lower.starts_with("apply")
+    {
+        "Transformation".to_string()
+    }
+    // Data Access (existing)
+    else if lower.starts_with("get") || lower.starts_with("set") {
         "Data Access".to_string()
-    } else if lower.starts_with("calculate") || lower.starts_with("compute") {
-        "Computation".to_string()
-    } else if lower.starts_with("validate")
+    }
+    // Validation (existing, enhanced with 'is_' prefix)
+    else if lower.starts_with("validate")
         || lower.starts_with("check")
         || lower.starts_with("verify")
+        || lower.starts_with("is")
     {
         "Validation".to_string()
-    } else if lower.starts_with("save") || lower.starts_with("load") || lower.starts_with("store") {
-        "Persistence".to_string()
-    } else if lower.starts_with("create") || lower.starts_with("build") || lower.starts_with("new")
+    }
+    // Computation (existing)
+    else if lower.starts_with("calculate") || lower.starts_with("compute") {
+        "Computation".to_string()
+    }
+    // Construction (existing)
+    else if lower.starts_with("create") || lower.starts_with("build") || lower.starts_with("new")
     {
         "Construction".to_string()
-    } else if lower.starts_with("send")
-        || lower.starts_with("receive")
-        || lower.starts_with("handle")
-    {
-        "Communication".to_string()
-    } else if lower.starts_with("process") || lower.starts_with("transform") {
+    }
+    // Persistence (existing)
+    else if lower.starts_with("save") || lower.starts_with("load") || lower.starts_with("store") {
+        "Persistence".to_string()
+    }
+    // Processing (existing)
+    else if lower.starts_with("process") || lower.starts_with("handle") {
         "Processing".to_string()
-    } else {
-        "Core Operations".to_string()
+    }
+    // Communication (existing)
+    else if lower.starts_with("send") || lower.starts_with("receive") {
+        "Communication".to_string()
+    }
+    // Utilities (renamed from "Core Operations")
+    else {
+        "Utilities".to_string()
     }
 }
 
@@ -540,5 +617,222 @@ pub fn suggest_splits_by_struct_grouping(
         enhance_splits_with_cohesion(validated_splits, path, ast_file, ownership)
     } else {
         validated_splits
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("format_output"),
+            "Formatting & Output"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("format_json"),
+            "Formatting & Output"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("FORMAT_DATA"),
+            "Formatting & Output"
+        );
+    }
+
+    #[test]
+    fn test_render_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("render_table"),
+            "Formatting & Output"
+        );
+    }
+
+    #[test]
+    fn test_write_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("write_to_file"),
+            "Formatting & Output"
+        );
+    }
+
+    #[test]
+    fn test_print_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("print_results"),
+            "Formatting & Output"
+        );
+    }
+
+    #[test]
+    fn test_parse_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("parse_input"),
+            "Parsing & Input"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("parse_json"),
+            "Parsing & Input"
+        );
+    }
+
+    #[test]
+    fn test_read_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("read_config"),
+            "Parsing & Input"
+        );
+    }
+
+    #[test]
+    fn test_extract_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("extract_data"),
+            "Parsing & Input"
+        );
+    }
+
+    #[test]
+    fn test_filter_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("filter_results"),
+            "Filtering & Selection"
+        );
+    }
+
+    #[test]
+    fn test_select_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("select_items"),
+            "Filtering & Selection"
+        );
+    }
+
+    #[test]
+    fn test_find_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("find_element"),
+            "Filtering & Selection"
+        );
+    }
+
+    #[test]
+    fn test_transform_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("transform_data"),
+            "Transformation"
+        );
+    }
+
+    #[test]
+    fn test_convert_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("convert_to_json"),
+            "Transformation"
+        );
+    }
+
+    #[test]
+    fn test_map_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("map_values"),
+            "Transformation"
+        );
+    }
+
+    #[test]
+    fn test_apply_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("apply_mapping"),
+            "Transformation"
+        );
+    }
+
+    #[test]
+    fn test_get_prefix_recognized() {
+        assert_eq!(infer_responsibility_from_method("get_value"), "Data Access");
+    }
+
+    #[test]
+    fn test_set_prefix_recognized() {
+        assert_eq!(infer_responsibility_from_method("set_value"), "Data Access");
+    }
+
+    #[test]
+    fn test_is_prefix_recognized() {
+        assert_eq!(infer_responsibility_from_method("is_valid"), "Validation");
+        assert_eq!(infer_responsibility_from_method("is_empty"), "Validation");
+    }
+
+    #[test]
+    fn test_validate_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("validate_input"),
+            "Validation"
+        );
+    }
+
+    #[test]
+    fn test_check_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("check_constraints"),
+            "Validation"
+        );
+    }
+
+    #[test]
+    fn test_verify_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("verify_signature"),
+            "Validation"
+        );
+    }
+
+    #[test]
+    fn test_catch_all_renamed_to_utilities() {
+        assert_eq!(
+            infer_responsibility_from_method("unknown_function"),
+            "Utilities"
+        );
+        assert_eq!(infer_responsibility_from_method("some_helper"), "Utilities");
+    }
+
+    #[test]
+    fn test_responsibility_grouping_not_empty() {
+        let methods = vec!["format_a".to_string(), "format_b".to_string()];
+        let groups = group_methods_by_responsibility(&methods);
+        assert!(!groups.is_empty());
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups.get("Formatting & Output").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_multiple_responsibility_groups() {
+        let methods = vec![
+            "format_output".to_string(),
+            "format_json".to_string(),
+            "parse_input".to_string(),
+            "get_value".to_string(),
+            "is_valid".to_string(),
+        ];
+        let groups = group_methods_by_responsibility(&methods);
+        assert_eq!(groups.len(), 4); // Formatting & Output, Parsing & Input, Data Access, Validation
+        assert!(groups.contains_key("Formatting & Output"));
+        assert!(groups.contains_key("Parsing & Input"));
+        assert!(groups.contains_key("Data Access"));
+        assert!(groups.contains_key("Validation"));
+    }
+
+    #[test]
+    fn test_case_insensitive_matching() {
+        assert_eq!(
+            infer_responsibility_from_method("FORMAT_OUTPUT"),
+            "Formatting & Output"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("Parse_Input"),
+            "Parsing & Input"
+        );
+        assert_eq!(infer_responsibility_from_method("IS_VALID"), "Validation");
     }
 }
