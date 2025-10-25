@@ -10,7 +10,7 @@
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
-A fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
+A code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.
 
 📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
 
@@ -22,11 +22,11 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
 **Unique Capabilities:**
-- **Entropy-Based Complexity Analysis** - Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%
-- **Coverage-Risk Correlation** - The only tool that combines complexity metrics with test coverage to identify genuinely risky code
+- **Coverage-Risk Correlation** - Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
+- **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
 - **Actionable Recommendations** - Provides specific guidance with quantified impact metrics instead of generic warnings
-- **Blazing Fast** - Written in Rust for 10-100x faster analysis than Java/Python-based competitors
-- **Free & Open Source** - MIT licensed, no enterprise pricing required
+- **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
+- **Fast & Open Source** - Written in Rust for 10-100x faster analysis, MIT licensed with no enterprise pricing
 
 📖 **Read more:** [Why Debtmap?](https://iepathos.github.io/debtmap/why-debtmap.html)
 
@@ -34,14 +34,15 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 
 | Capability | Debtmap Approach |
 |-----------|------------------|
-| **Complexity Analysis** | Entropy-based analysis distinguishes genuine complexity from repetitive patterns |
 | **Risk Prioritization** | Correlates complexity with test coverage to identify truly risky code |
+| **False Positive Reduction** | Uses entropy analysis to distinguish genuine complexity from repetitive patterns |
 | **Recommendations** | Quantified impact metrics ("Add 6 tests, -3.7 risk reduction") |
+| **Multi-Factor Scoring** | Combines complexity, coverage, dependencies, and call graphs |
 | **Speed** | Rust-based parallel processing for 10-100x faster analysis |
 | **Coverage Integration** | Works with any LCOV-compatible coverage tool |
 | **Cost** | Free, open source, MIT licensed |
 
-**Key Differentiator**: Debtmap is the only tool that combines entropy-based complexity analysis with coverage-risk correlation to reduce false positives and prioritize testing efforts.
+**Key Differentiator**: Debtmap combines coverage-risk correlation with multi-factor analysis (complexity, dependencies, call graphs) and entropy-adjusted scoring to reduce false positives and prioritize testing efforts effectively.
 
 ## Documentation
 
@@ -90,13 +91,14 @@ Debtmap shows you exactly what to fix first with actionable recommendations:
 
 ## Key Features
 
-- **Entropy-Based Complexity Analysis** - Reduces false positives by 70% using information theory
-- **Coverage-Risk Correlation** - The only tool combining complexity with test coverage
+- **Coverage-Risk Correlation** - Combines complexity with test coverage to prioritize genuinely risky code
+- **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive scoring
+- **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuine complexity from repetitive patterns (reduces false positives by up to 70%)
 - **Actionable Recommendations** - Specific guidance with quantified impact metrics
 - **Multi-language Support** - Full Rust support, partial Python/JavaScript/TypeScript
-- **Blazing Fast** - 10-100x faster than Java/Python-based competitors (written in Rust)
+- **Fast Performance** - 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
 - **Language-Agnostic Coverage** - Works with any tool generating LCOV format
-- **Context-Aware Analysis** - Intelligently reduces false positives by 70%
+- **Context-Aware Analysis** - Understands entry points, call graphs, and testing patterns
 - **Free & Open Source** - MIT licensed, no enterprise pricing required
 
 📖 See the [Getting Started Guide](https://iepathos.github.io/debtmap/getting-started.html) for complete feature documentation and examples.

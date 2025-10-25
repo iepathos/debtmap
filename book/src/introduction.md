@@ -2,7 +2,7 @@
 
 > 🚧 **Early Prototype** - This project is under active development and APIs may change
 
-Debtmap is a fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.
+Debtmap is a code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.
 
 ## What is Debtmap?
 
@@ -13,10 +13,10 @@ Unlike traditional static analysis tools that simply flag complex code, Debtmap 
 Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.
 
 **What Makes Debtmap Different:**
-- **Entropy-Based Complexity Analysis**: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%
-- **Coverage-Risk Correlation**: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
-- **Risk-Driven Prioritization**: Prioritizes refactoring and testing efforts based on complexity, coverage, and dependency factors
-- **Actionable Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" rather than just flagging issues
+- **Coverage-Risk Correlation**: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
+- **Multi-Factor Analysis**: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
+- **Reduced False Positives**: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
+- **Actionable Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" with quantified impact metrics
 - **Performance**: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
 
 ## Why Use Debtmap?
@@ -34,7 +34,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 
 ### Analysis Capabilities
 - **Multi-language support** - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection
-- **Entropy-based complexity analysis** - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory
+- **Reduced false positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)
 - **Token classification system** - Advanced token categorization with weighted entropy for accurate complexity assessment
 - **Threshold presets** - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards
 - **Comprehensive debt detection** - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)
