@@ -282,7 +282,7 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
 
         // Display entropy information if available
         if let Some(entropy_details) = func.get_entropy_details() {
-            if let Some(entropy_lines) = format_entropy_info(entropy_details) {
+            if let Some(entropy_lines) = format_entropy_info(&entropy_details) {
                 for line in entropy_lines {
                     println!("{line}");
                 }

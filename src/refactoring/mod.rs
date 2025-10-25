@@ -660,7 +660,7 @@ pub enum RefactoringOpportunity {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ComplexityLevel {
     Low,      // ≤5 - No action needed
     Moderate, // 6-10 - Direct functional transformation
