@@ -1523,8 +1523,7 @@ fn format_dependencies_section_with_config(
 
     // Filter callers and callees based on configuration
     let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, config);
-    let filtered_callees =
-        filter_dependencies(&context.dependency_info.downstream_callees, config);
+    let filtered_callees = filter_dependencies(&context.dependency_info.downstream_callees, config);
 
     // Always show dependencies section (per spec 117)
     let mut section = format!("{}", "├─ DEPENDENCIES:".bright_blue());
@@ -2300,9 +2299,18 @@ mod tests {
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
         // Per spec 117: DEPENDENCIES section should ALWAYS appear
-        assert!(plain.contains("DEPENDENCIES:"), "DEPENDENCIES section must always appear");
-        assert!(plain.contains("No direct callers detected"), "Must show empty caller message");
-        assert!(plain.contains("Calls no other functions"), "Must show empty callee message");
+        assert!(
+            plain.contains("DEPENDENCIES:"),
+            "DEPENDENCIES section must always appear"
+        );
+        assert!(
+            plain.contains("No direct callers detected"),
+            "Must show empty caller message"
+        );
+        assert!(
+            plain.contains("Calls no other functions"),
+            "Must show empty callee message"
+        );
     }
 
     #[test]

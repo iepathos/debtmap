@@ -1,7 +1,7 @@
+use crate::config::CallerCalleeConfig;
 use colored::*;
 use std::env;
 use std::io::IsTerminal;
-use crate::config::CallerCalleeConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColorMode {
