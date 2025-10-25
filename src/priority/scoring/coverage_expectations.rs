@@ -2,7 +2,6 @@
 ///
 /// This module defines expected test coverage ranges for different function roles
 /// and provides functionality to calculate coverage gaps and their severity.
-
 use serde::{Deserialize, Serialize};
 
 /// Represents a range of acceptable coverage percentages.

@@ -2,7 +2,6 @@
 ///
 /// This module implements the coverage scoring algorithm from spec 119,
 /// replacing uniform 80% targets with role-specific expectations.
-
 use super::coverage_expectations::{CoverageExpectations, CoverageGap, GapSeverity};
 
 /// Calculates a prioritization score based on coverage gap.
