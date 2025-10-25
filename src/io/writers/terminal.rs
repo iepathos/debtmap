@@ -215,6 +215,49 @@ fn get_refactoring_patterns(level: &ComplexityLevel) -> &'static str {
     }
 }
 
+/// Format entropy information for display if dampening is applied
+fn format_entropy_info(entropy_details: &crate::core::EntropyDetails) -> Option<Vec<String>> {
+    if !entropy_details.dampening_applied {
+        return None;
+    }
+
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
+        "↓".green(),
+        entropy_details.token_entropy,
+        entropy_details.pattern_repetition * 100.0,
+        entropy_details.effective_complexity
+    ));
+
+    for reason in entropy_details.reasoning.iter().take(1) {
+        lines.push(format!("       {}", reason.dimmed()));
+    }
+
+    Some(lines)
+}
+
+/// Format refactoring guidance for functions above complexity threshold
+fn format_refactoring_guidance(cyclomatic: u32) -> Option<Vec<String>> {
+    if cyclomatic <= 5 {
+        return None;
+    }
+
+    let complexity_level = classify_complexity_level(cyclomatic);
+    let action_msg = get_refactoring_action_message(&complexity_level)?;
+
+    let mut lines = Vec::new();
+    lines.push(action_msg.yellow().to_string());
+
+    let patterns = get_refactoring_patterns(&complexity_level);
+    if !patterns.is_empty() {
+        lines.push(format!("     PATTERNS: {}", patterns.cyan()));
+    }
+
+    lines.push("     BENEFIT: Pure functions are easily testable and composable".to_string());
+    Some(lines)
+}
+
 fn print_complexity_hotspots(results: &AnalysisResults) {
     if results.complexity.metrics.is_empty() {
         return;
@@ -239,34 +282,17 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
 
         // Display entropy information if available
         if let Some(entropy_details) = func.get_entropy_details() {
-            if entropy_details.dampening_applied {
-                println!(
-                    "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
-                    "↓".green(),
-                    entropy_details.token_entropy,
-                    entropy_details.pattern_repetition * 100.0,
-                    entropy_details.effective_complexity
-                );
-                for reason in entropy_details.reasoning.iter().take(1) {
-                    println!("       {}", reason.dimmed());
+            if let Some(entropy_lines) = format_entropy_info(&entropy_details) {
+                for line in entropy_lines {
+                    println!("{line}");
                 }
             }
         }
 
         // Generate refactoring guidance for high complexity functions
-        if func.cyclomatic > 5 {
-            let complexity_level = classify_complexity_level(func.cyclomatic);
-
-            if let Some(action_msg) = get_refactoring_action_message(&complexity_level) {
-                println!("{}", action_msg.yellow());
-
-                // Add patterns to apply
-                let patterns = get_refactoring_patterns(&complexity_level);
-                if !patterns.is_empty() {
-                    println!("     PATTERNS: {}", patterns.cyan());
-                }
-
-                println!("     BENEFIT: Pure functions are easily testable and composable");
+        if let Some(guidance_lines) = format_refactoring_guidance(func.cyclomatic) {
+            for line in guidance_lines {
+                println!("{line}");
             }
         }
     }
@@ -438,5 +464,226 @@ mod tests {
 
         let result = writer.write_risk_insights(&insights);
         assert!(result.is_ok());
+    }
+
+    // Helper functions for creating test data
+
+    fn create_entropy_details_with_dampening() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 3.5,
+            pattern_repetition: 0.65,
+            branch_similarity: 0.8,
+            effective_complexity: 8.2,
+            dampening_applied: true,
+            dampening_factor: 0.75,
+            reasoning: vec![
+                "High pattern repetition detected".to_string(),
+                "Similar branch structures found".to_string(),
+            ],
+        }
+    }
+
+    fn create_entropy_details_without_dampening() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 1.2,
+            pattern_repetition: 0.1,
+            branch_similarity: 0.2,
+            effective_complexity: 5.0,
+            dampening_applied: false,
+            dampening_factor: 1.0,
+            reasoning: vec![],
+        }
+    }
+
+    fn create_entropy_details_empty_reasoning() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 2.8,
+            pattern_repetition: 0.45,
+            branch_similarity: 0.6,
+            effective_complexity: 6.5,
+            dampening_applied: true,
+            dampening_factor: 0.85,
+            reasoning: vec![],
+        }
+    }
+
+    // Phase 1: Tests for existing pure functions
+
+    #[test]
+    fn test_classify_complexity_level_boundaries() {
+        assert_eq!(classify_complexity_level(0), ComplexityLevel::Low);
+        assert_eq!(classify_complexity_level(5), ComplexityLevel::Low);
+        assert_eq!(classify_complexity_level(6), ComplexityLevel::Moderate);
+        assert_eq!(classify_complexity_level(10), ComplexityLevel::Moderate);
+        assert_eq!(classify_complexity_level(11), ComplexityLevel::High);
+        assert_eq!(classify_complexity_level(15), ComplexityLevel::High);
+        assert_eq!(classify_complexity_level(16), ComplexityLevel::Severe);
+        assert_eq!(classify_complexity_level(100), ComplexityLevel::Severe);
+    }
+
+    #[test]
+    fn test_get_refactoring_action_message() {
+        assert!(get_refactoring_action_message(&ComplexityLevel::Low).is_none());
+        assert!(get_refactoring_action_message(&ComplexityLevel::Moderate).is_some());
+        assert!(get_refactoring_action_message(&ComplexityLevel::High).is_some());
+        assert!(get_refactoring_action_message(&ComplexityLevel::Severe).is_some());
+
+        // Verify messages contain expected guidance
+        let moderate_msg = get_refactoring_action_message(&ComplexityLevel::Moderate).unwrap();
+        assert!(moderate_msg.contains("2-3 pure functions"));
+
+        let high_msg = get_refactoring_action_message(&ComplexityLevel::High).unwrap();
+        assert!(high_msg.contains("3-5 pure functions"));
+
+        let severe_msg = get_refactoring_action_message(&ComplexityLevel::Severe).unwrap();
+        assert!(severe_msg.contains("5+ pure functions"));
+    }
+
+    #[test]
+    fn test_get_refactoring_patterns() {
+        assert_eq!(get_refactoring_patterns(&ComplexityLevel::Low), "");
+        assert!(!get_refactoring_patterns(&ComplexityLevel::Moderate).is_empty());
+        assert!(!get_refactoring_patterns(&ComplexityLevel::High).is_empty());
+        assert!(!get_refactoring_patterns(&ComplexityLevel::Severe).is_empty());
+
+        // Verify patterns contain expected keywords
+        let moderate_patterns = get_refactoring_patterns(&ComplexityLevel::Moderate);
+        assert!(moderate_patterns.contains("map/filter/fold"));
+
+        let severe_patterns = get_refactoring_patterns(&ComplexityLevel::Severe);
+        assert!(severe_patterns.contains("monadic"));
+    }
+
+    // Phase 2: Tests for format_entropy_info function
+
+    #[test]
+    fn test_format_entropy_info_dampening_applied() {
+        let details = create_entropy_details_with_dampening();
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 2); // Header + one reason
+
+        // Verify header line contains expected values
+        assert!(lines[0].contains("Entropy: 3.50"));
+        assert!(lines[0].contains("Repetition: 65%"));
+        assert!(lines[0].contains("Effective: 8.2x"));
+
+        // Verify reasoning line
+        assert!(lines[1].contains("High pattern repetition detected"));
+    }
+
+    #[test]
+    fn test_format_entropy_info_no_dampening() {
+        let details = create_entropy_details_without_dampening();
+        let result = format_entropy_info(&details);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_format_entropy_info_no_reasoning() {
+        let details = create_entropy_details_empty_reasoning();
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 1); // Only header, no reasoning
+
+        // Verify header contains expected values
+        assert!(lines[0].contains("Entropy: 2.80"));
+        assert!(lines[0].contains("Repetition: 45%"));
+        assert!(lines[0].contains("Effective: 6.5x"));
+    }
+
+    #[test]
+    fn test_format_entropy_info_limits_reasoning_to_one() {
+        let mut details = create_entropy_details_with_dampening();
+        details.reasoning = vec![
+            "Reason 1".to_string(),
+            "Reason 2".to_string(),
+            "Reason 3".to_string(),
+        ];
+
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 2); // Header + only first reason
+        assert!(lines[1].contains("Reason 1"));
+        assert!(!lines.iter().any(|l| l.contains("Reason 2")));
+    }
+
+    // Phase 3: Tests for format_refactoring_guidance function
+
+    #[test]
+    fn test_format_refactoring_guidance_low_complexity() {
+        assert!(format_refactoring_guidance(3).is_none());
+        assert!(format_refactoring_guidance(5).is_none());
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_moderate_complexity() {
+        let result = format_refactoring_guidance(7);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 2); // Action + patterns + benefit
+
+        // Verify contains action message
+        assert!(lines[0].contains("2-3 pure functions"));
+
+        // Verify contains patterns
+        assert!(lines.iter().any(|l| l.contains("map/filter/fold")));
+
+        // Verify contains benefit
+        assert!(lines
+            .iter()
+            .any(|l| l.contains("Pure functions are easily testable")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_high_complexity() {
+        let result = format_refactoring_guidance(12);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 3);
+
+        // Verify contains action for high complexity
+        assert!(lines[0].contains("3-5 pure functions"));
+
+        // Verify contains appropriate patterns
+        assert!(lines
+            .iter()
+            .any(|l| l.contains("Decompose into logical units")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_severe_complexity() {
+        let result = format_refactoring_guidance(20);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 3);
+
+        // Verify contains action for severe complexity
+        assert!(lines[0].contains("5+ pure functions"));
+
+        // Verify contains architectural patterns
+        assert!(lines.iter().any(|l| l.contains("monadic patterns")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_boundary_at_six() {
+        // At threshold (5): should return None
+        assert!(format_refactoring_guidance(5).is_none());
+
+        // Just above threshold (6): should return Some
+        let result = format_refactoring_guidance(6);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(!lines.is_empty());
     }
 }
