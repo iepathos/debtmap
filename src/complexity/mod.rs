@@ -10,6 +10,7 @@ pub mod match_patterns;
 pub mod message_generator;
 pub mod pattern_adjustments;
 pub mod patterns;
+pub mod pure_mapping_patterns;
 pub mod python_pattern_adjustments;
 pub mod python_patterns;
 pub mod python_specific_patterns;

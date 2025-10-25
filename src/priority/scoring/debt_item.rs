@@ -450,6 +450,8 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -656,6 +658,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -754,6 +758,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -792,6 +798,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -834,6 +842,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -874,6 +884,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -915,6 +927,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -956,6 +970,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -1001,6 +1017,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -1056,6 +1074,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let func_id = create_function_id(&func);
@@ -1301,6 +1321,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -1362,6 +1384,8 @@ mod tests {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

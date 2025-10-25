@@ -21,6 +21,8 @@ fn test_code_smell_long_parameter_list() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     };
 
     // Test with 7 parameters (over threshold of 5)
@@ -59,6 +61,8 @@ fn test_code_smell_long_method() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     };
 
     let smell = detect_long_method(&func);
@@ -97,6 +101,8 @@ fn test_code_smell_deep_nesting() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     };
 
     let smell = detect_deep_nesting(&func);
@@ -135,6 +141,8 @@ fn test_code_smell_detection_multiple() {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     };
 
     let smells = analyze_function_smells(&func, 7);

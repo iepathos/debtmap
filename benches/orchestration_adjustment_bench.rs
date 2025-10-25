@@ -32,6 +32,8 @@ fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) 
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 

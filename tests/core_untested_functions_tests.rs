@@ -33,6 +33,8 @@ fn create_test_metrics_simple() -> FileMetrics {
                 detected_patterns: None,
                 upstream_callers: None,
                 downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: None,
             }],
             cyclomatic_complexity: 2,
             cognitive_complexity: 3,
@@ -69,6 +71,8 @@ fn create_test_metrics_complex() -> FileMetrics {
                     detected_patterns: None,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: None,
+                    adjusted_complexity: None,
                 },
                 FunctionMetrics {
                     name: "complex_func2".to_string(),
@@ -88,6 +92,8 @@ fn create_test_metrics_complex() -> FileMetrics {
                     detected_patterns: None,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: None,
+                    adjusted_complexity: None,
                 },
             ],
             cyclomatic_complexity: 8,
@@ -276,6 +282,8 @@ mod test_combine_metrics {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let func2 = FunctionMetrics {
@@ -296,6 +304,8 @@ mod test_combine_metrics {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let metrics1 = ComplexityMetrics {
@@ -349,6 +359,8 @@ mod test_combine_metrics {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         let metrics1 = ComplexityMetrics {

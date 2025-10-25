@@ -98,6 +98,8 @@ impl EvidenceBasedRiskCalculator {
             detected_patterns: None, // TODO: Add pattern detection for risk analysis
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

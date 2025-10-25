@@ -57,6 +57,9 @@ pub struct FunctionMetrics {
     pub detected_patterns: Option<Vec<String>>, // Patterns detected for complexity adjustment
     pub upstream_callers: Option<Vec<String>>, // Functions that call this function
     pub downstream_callees: Option<Vec<String>>, // Functions that this function calls
+    pub mapping_pattern_result:
+        Option<crate::complexity::pure_mapping_patterns::MappingPatternResult>, // Pure mapping pattern detection result (spec 118)
+    pub adjusted_complexity: Option<f64>, // Adjusted complexity score after mapping pattern detection (spec 118)
 }
 
 /// Entropy details for explainable output
@@ -91,6 +94,8 @@ impl FunctionMetrics {
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
         }
     }
 

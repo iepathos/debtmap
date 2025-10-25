@@ -6,6 +6,9 @@ use crate::analyzers::python_purity::PythonPurityDetector;
 use crate::analyzers::Analyzer;
 use crate::complexity::entropy_core::{EntropyConfig, UniversalEntropyCalculator};
 use crate::complexity::languages::python::PythonEntropyAnalyzer;
+use crate::complexity::pure_mapping_patterns::{
+    calculate_adjusted_complexity, MappingPatternConfig, MappingPatternDetector,
+};
 use crate::complexity::python_pattern_adjustments::{
     apply_adjustments, detect_patterns, detect_patterns_async,
 };
@@ -483,6 +486,22 @@ fn extract_functions_from_stmts(
                 // Detect if this is a test function using comprehensive patterns
                 let test_result = test_detector.detect_test(func_def, &test_context);
 
+                // Detect pure mapping patterns (spec 118)
+                let function_body = format_python_function_body(&func_def.body);
+                let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
+                let mapping_result =
+                    mapping_detector.analyze_function(&function_body, adjusted_cyclomatic);
+
+                let adjusted_complexity_value = if mapping_result.is_pure_mapping {
+                    Some(calculate_adjusted_complexity(
+                        adjusted_cyclomatic,
+                        adjusted_cognitive,
+                        &mapping_result,
+                    ))
+                } else {
+                    None
+                };
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -501,6 +520,12 @@ fn extract_functions_from_stmts(
                     detected_patterns,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: if mapping_result.is_pure_mapping {
+                        Some(mapping_result)
+                    } else {
+                        None
+                    },
+                    adjusted_complexity: adjusted_complexity_value,
                 });
 
                 // Recursively look for nested functions
@@ -552,6 +577,22 @@ fn extract_functions_from_stmts(
                 // Detect if this is an async test function using comprehensive patterns
                 let test_result = test_detector.detect_async_test(func_def, &test_context);
 
+                // Detect pure mapping patterns (spec 118)
+                let function_body = format_python_function_body(&func_def.body);
+                let mapping_detector = MappingPatternDetector::new(MappingPatternConfig::default());
+                let mapping_result =
+                    mapping_detector.analyze_function(&function_body, adjusted_cyclomatic);
+
+                let adjusted_complexity_value = if mapping_result.is_pure_mapping {
+                    Some(calculate_adjusted_complexity(
+                        adjusted_cyclomatic,
+                        adjusted_cognitive,
+                        &mapping_result,
+                    ))
+                } else {
+                    None
+                };
+
                 functions.push(FunctionMetrics {
                     name: function_name,
                     file: path.to_path_buf(),
@@ -570,6 +611,12 @@ fn extract_functions_from_stmts(
                     detected_patterns,
                     upstream_callers: None,
                     downstream_callees: None,
+                    mapping_pattern_result: if mapping_result.is_pure_mapping {
+                        Some(mapping_result)
+                    } else {
+                        None
+                    },
+                    adjusted_complexity: adjusted_complexity_value,
                 });
 
                 // Recursively look for nested functions
@@ -832,5 +879,45 @@ fn create_module_dependency(module: &ast::Identifier) -> Dependency {
     Dependency {
         name: module.to_string(),
         kind: DependencyKind::Module,
+    }
+}
+
+/// Format Python function body for pattern detection
+/// This creates a simplified string representation of the AST
+/// that captures enough structure for mapping pattern detection
+fn format_python_function_body(body: &[ast::Stmt]) -> String {
+    let mut output = String::new();
+    for stmt in body {
+        format_python_stmt(stmt, &mut output, 0);
+    }
+    output
+}
+
+fn format_python_stmt(stmt: &ast::Stmt, output: &mut String, indent: usize) {
+    use std::fmt::Write;
+    let indent_str = "    ".repeat(indent);
+
+    match stmt {
+        ast::Stmt::If(if_stmt) => {
+            let _ = writeln!(output, "{}if :", indent_str);
+            for s in &if_stmt.body {
+                format_python_stmt(s, output, indent + 1);
+            }
+            for elif in &if_stmt.orelse {
+                format_python_stmt(elif, output, indent);
+            }
+        }
+        ast::Stmt::Return(_) => {
+            let _ = writeln!(output, "{}return ", indent_str);
+        }
+        ast::Stmt::Expr(_) => {
+            let _ = writeln!(output, "{}expr", indent_str);
+        }
+        ast::Stmt::Assign(_) => {
+            let _ = writeln!(output, "{}assign", indent_str);
+        }
+        _ => {
+            let _ = writeln!(output, "{}stmt", indent_str);
+        }
     }
 }

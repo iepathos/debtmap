@@ -550,6 +550,9 @@ fn default_data_flow_max_business_logic_ratio() -> f64 {
     0.3
 }
 
+// Pure mapping pattern detection config (spec 118)
+pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
+
 impl Default for RoleCoverageWeights {
     fn default() -> Self {
         Self {
@@ -1003,6 +1006,10 @@ pub struct DebtmapConfig {
     /// Constructor detection configuration (spec 117)
     #[serde(default, rename = "classification")]
     pub classification: Option<ClassificationConfig>,
+
+    /// Pure mapping pattern detection configuration (spec 118)
+    #[serde(default)]
+    pub mapping_patterns: Option<MappingPatternConfig>,
 }
 
 /// Classification configuration
