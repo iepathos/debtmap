@@ -547,3 +547,351 @@ fn print_summary(result: &ValidationResult) {
         result.after_summary.total_items, result.after_summary.average_score
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::coverage_propagation::TransitiveCoverage;
+    use crate::priority::unified_scorer::{Location, UnifiedDebtItem, UnifiedScore};
+    use crate::priority::{
+        ActionableRecommendation, DebtItem, DebtType, FileDebtItem, FunctionRole, ImpactMetrics,
+    };
+
+    fn create_empty_output() -> UnifiedJsonOutput {
+        UnifiedJsonOutput {
+            items: vec![],
+            total_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                risk_reduction: 0.0,
+                lines_reduction: 0,
+            },
+            total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_lines_of_code: 0,
+            overall_coverage: None,
+        }
+    }
+
+    fn create_output_with_items(items: Vec<DebtItem>) -> UnifiedJsonOutput {
+        UnifiedJsonOutput {
+            items,
+            total_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                risk_reduction: 0.0,
+                lines_reduction: 0,
+            },
+            total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_lines_of_code: 1000,
+            overall_coverage: None,
+        }
+    }
+
+    fn create_test_function_item(
+        file: &str,
+        function: &str,
+        score: f64,
+        complexity: u32,
+        coverage: Option<TransitiveCoverage>,
+    ) -> DebtItem {
+        DebtItem::Function(Box::new(UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from(file),
+                function: function.to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: complexity,
+                cognitive: 5,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 0.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: score,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "refactor".to_string(),
+                rationale: "test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                risk_reduction: 0.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: coverage,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: complexity,
+            cognitive_complexity: 5,
+            entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
+            god_object_indicators: None,
+            tier: None,
+        }))
+    }
+
+    #[test]
+    fn test_empty_before_and_after() {
+        let before = create_empty_output();
+        let after = create_empty_output();
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.complexity_reduction, 0.0);
+        assert_eq!(result.coverage_improvement, 0.0);
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_no_improvements_below_threshold() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 5.0, 10, None)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 4.6, 10, None)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.complexity_reduction, 0.0);
+        assert_eq!(result.coverage_improvement, 0.0);
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_score_improvement_above_threshold_with_complexity_reduction() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 20, None)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, None)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert!(result.complexity_reduction > 0.0);
+        assert_eq!((result.complexity_reduction * 100.0).round() / 100.0, 0.5);
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_score_improvement_with_coverage_increase() {
+        let before_coverage = Some(TransitiveCoverage {
+            direct: 0.3,
+            transitive: 0.2,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let after_coverage = Some(TransitiveCoverage {
+            direct: 0.8,
+            transitive: 0.7,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 10, before_coverage)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.coverage_improvement_count, 1);
+        assert_eq!(result.coverage_improvement, 1.0);
+    }
+
+    #[test]
+    fn test_score_improvement_with_both_metrics_improved() {
+        let before_coverage = Some(TransitiveCoverage {
+            direct: 0.3,
+            transitive: 0.2,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let after_coverage = Some(TransitiveCoverage {
+            direct: 0.8,
+            transitive: 0.7,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 20, before_coverage)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert!(result.complexity_reduction > 0.0);
+        assert_eq!((result.complexity_reduction * 100.0).round() / 100.0, 0.5);
+        assert_eq!(result.coverage_improvement_count, 1);
+        assert_eq!(result.coverage_improvement, 1.0);
+    }
+
+    #[test]
+    fn test_item_only_in_after_not_in_before() {
+        let before = create_empty_output();
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "new_func", 5.0, 10, None)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.complexity_reduction, 0.0);
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_item_only_in_before_not_in_after() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "old_func", 5.0, 10, None)
+        ]);
+        let after = create_empty_output();
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.complexity_reduction, 0.0);
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_file_level_items_are_filtered() {
+        use crate::priority::file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators};
+
+        let before = create_output_with_items(vec![
+            DebtItem::File(Box::new(FileDebtItem {
+                metrics: FileDebtMetrics {
+                    path: PathBuf::from("test.rs"),
+                    total_lines: 100,
+                    function_count: 5,
+                    class_count: 0,
+                    avg_complexity: 15.0,
+                    max_complexity: 20,
+                    total_complexity: 75,
+                    coverage_percent: 0.0,
+                    uncovered_lines: 100,
+                    god_object_indicators: GodObjectIndicators {
+                        methods_count: 5,
+                        fields_count: 2,
+                        responsibilities: 3,
+                        is_god_object: false,
+                        god_object_score: 0.0,
+                        responsibility_names: vec![],
+                        recommended_splits: vec![],
+                    },
+                    function_scores: vec![],
+                },
+                score: 10.0,
+                priority_rank: 1,
+                recommendation: "refactor".to_string(),
+                impact: FileImpact {
+                    complexity_reduction: 0.0,
+                    maintainability_improvement: 0.0,
+                    test_effort: 0.0,
+                },
+            })),
+            create_test_function_item("test.rs", "func1", 10.0, 20, None),
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, None)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert!(result.complexity_reduction > 0.0);
+    }
+
+    #[test]
+    fn test_multiple_improvements() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 20, None),
+            create_test_function_item("test.rs", "func2", 8.0, 15, None),
+            create_test_function_item("test.rs", "func3", 6.0, 10, None),
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, None),
+            create_test_function_item("test.rs", "func2", 7.0, 8, None),
+            create_test_function_item("test.rs", "func3", 5.0, 5, None),
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert!(result.complexity_reduction > 0.0);
+    }
+
+    #[test]
+    fn test_missing_transitive_coverage_uses_default() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 20, None)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, None)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.coverage_improvement_count, 0);
+    }
+
+    #[test]
+    fn test_coverage_uses_max_of_direct_and_transitive() {
+        let before_coverage = Some(TransitiveCoverage {
+            direct: 0.3,
+            transitive: 0.5,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let after_coverage = Some(TransitiveCoverage {
+            direct: 0.8,
+            transitive: 0.6,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 10, before_coverage)
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!(result.coverage_improvement_count, 1);
+    }
+
+    #[test]
+    fn test_average_complexity_reduction_calculation() {
+        let before = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 10.0, 20, None),
+            create_test_function_item("test.rs", "func2", 8.0, 10, None),
+        ]);
+        let after = create_output_with_items(vec![
+            create_test_function_item("test.rs", "func1", 9.0, 10, None),
+            create_test_function_item("test.rs", "func2", 7.0, 5, None),
+        ]);
+
+        let result = identify_improved_items(&before, &after);
+
+        assert_eq!((result.complexity_reduction * 100.0).round() / 100.0, 0.5);
+    }
+}
