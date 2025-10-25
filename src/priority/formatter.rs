@@ -876,6 +876,13 @@ fn format_god_object_steps(
         format_generic_god_object_steps(output, formatter, item, extension);
     }
 
+    // Add enhanced module structure analysis if available
+    // Use detailed verbosity by default (can be controlled via config in future)
+    if let Some(module_structure) = &indicators.module_structure {
+        use crate::config::VerbosityLevel;
+        format_module_structure_analysis(output, module_structure, VerbosityLevel::Detailed);
+    }
+
     // Add implementation guidance
     output.push('\n');
     writeln!(output, "  - IMPLEMENTATION ORDER:").unwrap();
@@ -899,6 +906,105 @@ fn format_god_object_steps(
         "  -  [4] Refactor incrementally: 10-20 methods at a time"
     )
     .unwrap();
+}
+
+// Format enhanced module structure analysis
+fn format_module_structure_analysis(
+    output: &mut String,
+    module_structure: &crate::analysis::ModuleStructure,
+    verbosity: crate::config::VerbosityLevel,
+) {
+    use std::fmt::Write;
+    use crate::config::VerbosityLevel;
+
+    output.push('\n');
+
+    // Summary: Show basic structure info
+    writeln!(
+        output,
+        "  - STRUCTURE: {} responsibilities across {} components",
+        module_structure.responsibility_count,
+        module_structure.components.len()
+    )
+    .unwrap();
+
+    // Detailed and Comprehensive: Show function breakdown
+    if verbosity != VerbosityLevel::Summary {
+        let func_counts = &module_structure.function_counts;
+        writeln!(
+            output,
+            "  - FUNCTIONS: {} total ({} public, {} private)",
+            func_counts.total(),
+            func_counts.public_functions,
+            func_counts.private_functions
+        )
+        .unwrap();
+
+        // Show largest components
+        if !module_structure.components.is_empty() {
+            writeln!(output, "  - LARGEST COMPONENTS:").unwrap();
+            let mut sorted_components = module_structure.components.clone();
+            sorted_components.sort_by_key(|c| std::cmp::Reverse(c.line_count()));
+
+            let component_count = if verbosity == VerbosityLevel::Comprehensive { 5 } else { 3 };
+            for component in sorted_components.iter().take(component_count) {
+                writeln!(
+                    output,
+                    "    - {}: {} functions, {} lines",
+                    component.name(),
+                    component.method_count(),
+                    component.line_count()
+                )
+                .unwrap();
+            }
+        }
+    }
+
+    // Comprehensive: Show detailed coupling analysis
+    if verbosity == VerbosityLevel::Comprehensive {
+        let deps = &module_structure.dependencies;
+        if !deps.coupling_scores.is_empty() {
+            writeln!(output, "  - COUPLING ANALYSIS:").unwrap();
+
+            let mut low_coupling: Vec<_> = deps
+                .coupling_scores
+                .iter()
+                .filter(|(_, score)| **score < 0.3)
+                .collect();
+            low_coupling.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+
+            if !low_coupling.is_empty() {
+                writeln!(output, "    - Low coupling (easy to extract):").unwrap();
+                for (component, score) in low_coupling.iter().take(3) {
+                    writeln!(
+                        output,
+                        "      - {} (coupling: {:.2})",
+                        component, score
+                    )
+                    .unwrap();
+                }
+            }
+
+            let mut high_coupling: Vec<_> = deps
+                .coupling_scores
+                .iter()
+                .filter(|(_, score)| **score >= 0.7)
+                .collect();
+            high_coupling.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
+            if !high_coupling.is_empty() {
+                writeln!(output, "    - High coupling (refactor carefully):").unwrap();
+                for (component, score) in high_coupling.iter().take(3) {
+                    writeln!(
+                        output,
+                        "      - {} (coupling: {:.2})",
+                        component, score
+                    )
+                    .unwrap();
+                }
+            }
+        }
+    }
 }
 
 // Format language-specific refactoring advice

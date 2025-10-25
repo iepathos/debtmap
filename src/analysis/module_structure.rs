@@ -253,6 +253,24 @@ impl ModuleStructureAnalyzer {
         }
     }
 
+    pub fn new_python() -> Self {
+        Self {
+            _language: "python".to_string(),
+        }
+    }
+
+    pub fn new_javascript() -> Self {
+        Self {
+            _language: "javascript".to_string(),
+        }
+    }
+
+    pub fn new_typescript() -> Self {
+        Self {
+            _language: "typescript".to_string(),
+        }
+    }
+
     /// Analyze a Rust source file to extract detailed module structure
     pub fn analyze_rust_file(
         &self,
@@ -472,6 +490,176 @@ impl ModuleStructureAnalyzer {
                 _ => false,
             })
             .count()
+    }
+
+    /// Analyze a Python source file to extract module structure
+    pub fn analyze_python_file(
+        &self,
+        content: &str,
+        _file_path: &std::path::Path,
+    ) -> ModuleStructure {
+        // Basic text-based analysis for Python
+        let lines: Vec<&str> = content.lines().collect();
+        let total_lines = lines.len();
+
+        let mut components = Vec::new();
+        let mut public_count = 0;
+        let mut private_count = 0;
+
+        // Simple pattern matching for Python classes and functions
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // Detect class definitions
+            if trimmed.starts_with("class ") {
+                let name = trimmed
+                    .strip_prefix("class ")
+                    .and_then(|s| s.split(['(', ':']).next())
+                    .unwrap_or("Unknown")
+                    .trim()
+                    .to_string();
+                let public = !name.starts_with('_');
+                components.push(ModuleComponent::Struct {
+                    name,
+                    fields: 0,
+                    methods: 0,
+                    public,
+                    line_range: (idx, idx),
+                });
+            }
+
+            // Detect function definitions
+            if trimmed.starts_with("def ") {
+                let name = trimmed
+                    .strip_prefix("def ")
+                    .and_then(|s| s.split('(').next())
+                    .unwrap_or("unknown")
+                    .trim()
+                    .to_string();
+                let public = !name.starts_with('_');
+
+                if public {
+                    public_count += 1;
+                } else {
+                    private_count += 1;
+                }
+
+                components.push(ModuleComponent::ModuleLevelFunction {
+                    name,
+                    public,
+                    lines: 5, // Estimate
+                    complexity: 1,
+                });
+            }
+        }
+
+        let responsibility_count = (components.len() / 5).max(1);
+
+        ModuleStructure {
+            total_lines,
+            components,
+            function_counts: FunctionCounts {
+                module_level_functions: public_count + private_count,
+                impl_methods: 0,
+                trait_methods: 0,
+                nested_module_functions: 0,
+                public_functions: public_count,
+                private_functions: private_count,
+            },
+            responsibility_count,
+            public_api_surface: public_count,
+            dependencies: ComponentDependencyGraph::new(),
+        }
+    }
+
+    /// Analyze a JavaScript source file to extract module structure
+    pub fn analyze_javascript_file(
+        &self,
+        content: &str,
+        _file_path: &std::path::Path,
+    ) -> ModuleStructure {
+        // Basic text-based analysis for JavaScript
+        let lines: Vec<&str> = content.lines().collect();
+        let total_lines = lines.len();
+
+        let mut components = Vec::new();
+        let mut public_count = 0;
+        let mut private_count = 0;
+
+        // Simple pattern matching for JS classes and functions
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+
+            // Detect class definitions
+            if trimmed.starts_with("class ") || trimmed.contains(" class ") {
+                let name = trimmed
+                    .split_whitespace()
+                    .skip_while(|&s| s != "class")
+                    .nth(1)
+                    .unwrap_or("Unknown")
+                    .split(['{', ' '])
+                    .next()
+                    .unwrap_or("Unknown")
+                    .to_string();
+                components.push(ModuleComponent::Struct {
+                    name,
+                    fields: 0,
+                    methods: 0,
+                    public: true,
+                    line_range: (idx, idx),
+                });
+            }
+
+            // Detect function definitions (function keyword, arrow functions, methods)
+            if trimmed.starts_with("function ")
+                || trimmed.starts_with("export function ")
+                || trimmed.contains("= function")
+                || trimmed.contains("=> ") && (trimmed.starts_with("const ") || trimmed.starts_with("let "))
+            {
+                let is_export = trimmed.starts_with("export ");
+                if is_export {
+                    public_count += 1;
+                } else {
+                    private_count += 1;
+                }
+
+                components.push(ModuleComponent::ModuleLevelFunction {
+                    name: "function".to_string(),
+                    public: is_export,
+                    lines: 5,
+                    complexity: 1,
+                });
+            }
+        }
+
+        let responsibility_count = (components.len() / 5).max(1);
+
+        ModuleStructure {
+            total_lines,
+            components,
+            function_counts: FunctionCounts {
+                module_level_functions: public_count + private_count,
+                impl_methods: 0,
+                trait_methods: 0,
+                nested_module_functions: 0,
+                public_functions: public_count,
+                private_functions: private_count,
+            },
+            responsibility_count,
+            public_api_surface: public_count,
+            dependencies: ComponentDependencyGraph::new(),
+        }
+    }
+
+    /// Analyze a TypeScript source file to extract module structure
+    pub fn analyze_typescript_file(
+        &self,
+        content: &str,
+        _file_path: &std::path::Path,
+    ) -> ModuleStructure {
+        // TypeScript analysis is similar to JavaScript with type annotations
+        // For now, delegate to JavaScript analyzer
+        self.analyze_javascript_file(content, _file_path)
     }
 }
 

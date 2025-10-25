@@ -890,6 +890,24 @@ fn default_max_complexity() -> u32 {
     200
 }
 
+/// Verbosity level for output formatting
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum VerbosityLevel {
+    /// Summary output - only essential information
+    Summary,
+    /// Detailed output - includes module structure details
+    Detailed,
+    /// Comprehensive output - all available analysis data
+    Comprehensive,
+}
+
+impl Default for VerbosityLevel {
+    fn default() -> Self {
+        VerbosityLevel::Detailed
+    }
+}
+
 /// Display configuration for output formatting
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DisplayConfig {
@@ -900,6 +918,10 @@ pub struct DisplayConfig {
     /// Maximum items to show per tier (default: 5)
     #[serde(default = "default_items_per_tier")]
     pub items_per_tier: usize,
+
+    /// Verbosity level for output (summary/detailed/comprehensive)
+    #[serde(default)]
+    pub verbosity: VerbosityLevel,
 }
 
 impl Default for DisplayConfig {
@@ -907,6 +929,7 @@ impl Default for DisplayConfig {
         Self {
             tiered: default_tiered_display(),
             items_per_tier: default_items_per_tier(),
+            verbosity: VerbosityLevel::default(),
         }
     }
 }
