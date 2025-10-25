@@ -1032,6 +1032,10 @@ pub struct DebtmapConfig {
     /// Role-based coverage expectations (spec 119)
     #[serde(default)]
     pub coverage_expectations: Option<crate::priority::scoring::CoverageExpectations>,
+
+    /// AST-based functional pattern analysis configuration (spec 111)
+    #[serde(default)]
+    pub functional_analysis: Option<crate::analysis::FunctionalAnalysisConfig>,
 }
 
 /// Classification configuration

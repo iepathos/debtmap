@@ -297,6 +297,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let pattern = detector.detect(&func);
@@ -331,6 +332,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let pattern = detector.detect(&func);
@@ -364,6 +366,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let pattern = detector.detect(&func);
@@ -403,6 +406,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         }];
 
         let result = tracker.analyze_patterns(&functions);

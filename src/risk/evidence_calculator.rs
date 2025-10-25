@@ -100,6 +100,7 @@ impl EvidenceBasedRiskCalculator {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

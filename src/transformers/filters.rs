@@ -227,6 +227,7 @@ mod tests {
                         downstream_callees: None,
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
+                        composition_metrics: None,
                     },
                     FunctionMetrics {
                         name: "high_complexity".to_string(),
@@ -248,6 +249,7 @@ mod tests {
                         downstream_callees: None,
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
+                        composition_metrics: None,
                     },
                 ],
                 cyclomatic_complexity: 17,
@@ -425,6 +427,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -446,6 +449,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
         ];
 

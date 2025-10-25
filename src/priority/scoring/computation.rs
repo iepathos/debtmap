@@ -249,6 +249,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         let risk = calculate_risk_score(&func);
         assert!(risk < 3.0, "Low complexity should have low risk score");
@@ -276,6 +277,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         let risk = calculate_risk_score(&func);
         assert!(risk >= 8.0, "High complexity should have high risk score");

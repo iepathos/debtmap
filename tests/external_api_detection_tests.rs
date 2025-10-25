@@ -27,6 +27,7 @@ fn create_function(name: &str, path: &str, visibility: Option<String>) -> Functi
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     }
 }
 

@@ -580,6 +580,7 @@ impl FunctionVisitor {
                 None
             },
             adjusted_complexity,
+            composition_metrics: None, // Will be populated when functional analysis is enabled (spec 111)
         }
     }
 
@@ -937,6 +938,7 @@ impl FunctionVisitor {
                 None
             },
             adjusted_complexity,
+            composition_metrics: None,
         }
     }
 
@@ -1492,6 +1494,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1513,6 +1516,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
         ];
 
@@ -1552,6 +1556,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {
