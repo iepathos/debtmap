@@ -133,7 +133,7 @@ fn format_default_with_config(
     // For now, always use detailed format to preserve existing functionality
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
@@ -150,8 +150,7 @@ fn format_default_with_config(
     let count = top_items.len().min(limit);
     writeln!(
         output,
-        "{} {}",
-        "[TARGET]",
+        "[TARGET] {}",
         format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()
             .bold()
@@ -174,16 +173,14 @@ fn format_default_with_config(
     // Add summary
     writeln!(
         output,
-        "{} {}",
-        "[STATS]",
+        "[STATS] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{} {}",
-        "[DENSITY]",
+        "[DENSITY] {}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -197,8 +194,7 @@ fn format_default_with_config(
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "{} {}",
-                "[CHART]",
+                "[CHART] {}",
                 format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
             )
             .unwrap();
@@ -226,7 +222,7 @@ fn format_tail_with_config(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
@@ -271,7 +267,7 @@ fn format_tiered_terminal(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     // Header
     let divider = "=".repeat(44);
@@ -290,8 +286,7 @@ fn format_tiered_terminal(
 
     writeln!(
         output,
-        "{} {}",
-        "[TARGET]",
+        "[TARGET] {}",
         "TECHNICAL DEBT ANALYSIS - PRIORITY TIERS"
             .bright_yellow()
             .bold()
@@ -336,13 +331,12 @@ fn format_tiered_terminal(
     let low_count: usize = tiered_display.low.iter().map(|g| g.items.len()).sum();
 
     writeln!(output, "{}", divider.bright_blue()).unwrap();
-    writeln!(output, "{} DEBT DISTRIBUTION", "[SUMMARY]").unwrap();
+    writeln!(output, "[SUMMARY] DEBT DISTRIBUTION").unwrap();
 
     if critical_count > 0 {
         writeln!(
             output,
-            "  {} Critical: {} items",
-            "[!]",
+            "  [!] Critical: {} items",
             critical_count.to_string().bright_red()
         )
         .unwrap();
@@ -350,8 +344,7 @@ fn format_tiered_terminal(
     if high_count > 0 {
         writeln!(
             output,
-            "  {} High: {} items",
-            "[*]",
+            "  [*] High: {} items",
             high_count.to_string().bright_yellow()
         )
         .unwrap();
@@ -359,8 +352,7 @@ fn format_tiered_terminal(
     if moderate_count > 0 {
         writeln!(
             output,
-            "  {} Moderate: {} items",
-            "[+]",
+            "  [+] Moderate: {} items",
             moderate_count.to_string().bright_blue()
         )
         .unwrap();
@@ -368,8 +360,7 @@ fn format_tiered_terminal(
     if low_count > 0 {
         writeln!(
             output,
-            "  {} Low: {} items",
-            "[-]",
+            "  [-] Low: {} items",
             low_count.to_string().white()
         )
         .unwrap();
@@ -378,16 +369,14 @@ fn format_tiered_terminal(
     writeln!(output).unwrap();
     writeln!(
         output,
-        "{} {}",
-        "[TOTAL]",
+        "[TOTAL] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{} {}",
-        "[DENSITY]",
+        "[DENSITY] {}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -401,8 +390,7 @@ fn format_tiered_terminal(
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "{} {}",
-                "[COVERAGE]",
+                "[COVERAGE] {}",
                 format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
             )
             .unwrap();
@@ -424,7 +412,7 @@ fn format_tier_terminal(
         return;
     }
 
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     // Tier header with color based on tier level
     let tier_header = match tier {
@@ -467,8 +455,7 @@ fn format_tier_terminal(
             if remaining > 0 {
                 writeln!(
                     output,
-                    "  {} ... and {} more items in this tier",
-                    "[+]", remaining
+                    "  [+] ... and {} more items in this tier", remaining
                 )
                 .unwrap();
             }
@@ -489,29 +476,27 @@ fn format_display_group_terminal(
     verbosity: u8,
     config: FormattingConfig,
 ) {
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     if group.items.len() > 1 && group.batch_action.is_some() {
         // Grouped similar items
         writeln!(
             output,
-            "  {} {} ({} similar items)",
-            "[GROUP]",
+            "  [GROUP] {} ({} similar items)",
             group.debt_type.bright_cyan(),
             group.items.len().to_string().yellow()
         )
         .unwrap();
 
         if let Some(action) = &group.batch_action {
-            writeln!(output, "    {} {}", "->", action.green()).unwrap();
+            writeln!(output, "    -> {}", action.green()).unwrap();
         }
 
         // Show first item as example if verbose
         if verbosity >= 1 && !group.items.is_empty() {
             writeln!(
                 output,
-                "    {} Example: {}",
-                "[eg]",
+                "    [eg] Example: {}",
                 format_item_location(&group.items[0])
             )
             .unwrap();
@@ -540,14 +525,13 @@ fn format_compact_item(
     verbosity: u8,
     config: FormattingConfig,
 ) {
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     match item {
         priority::DebtItem::Function(func) => {
             writeln!(
                 output,
-                "  {} #{} [{}] {}:{} {}",
-                ">",
+                "  > #{} [{}] {}:{} {}",
                 index,
                 format!("{:.1}", func.unified_score.final_score).yellow(),
                 func.location.file.display(),
@@ -559,8 +543,7 @@ fn format_compact_item(
             // Show brief action
             writeln!(
                 output,
-                "      {} {}",
-                "->",
+                "      -> {}",
                 func.recommendation.primary_action.green()
             )
             .unwrap();
@@ -568,8 +551,7 @@ fn format_compact_item(
         priority::DebtItem::File(file) => {
             writeln!(
                 output,
-                "  {} #{} [{}] {} ({} lines)",
-                "[F]",
+                "  [F] #{} [{}] {} ({} lines)",
                 index,
                 format!("{:.1}", file.score).yellow(),
                 file.metrics.path.display(),
@@ -578,7 +560,7 @@ fn format_compact_item(
             .unwrap();
 
             // Show brief action
-            writeln!(output, "      {} {}", "->", file.recommendation.green()).unwrap();
+            writeln!(output, "      -> {}", file.recommendation.green()).unwrap();
         }
     }
 
@@ -603,7 +585,7 @@ fn format_item_location(item: &priority::DebtItem) -> String {
 fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
 
     let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
@@ -670,7 +652,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
 
     let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
@@ -815,16 +797,14 @@ fn format_god_object_steps(
     if !indicators.recommended_splits.is_empty() {
         writeln!(
             output,
-            "{}  {} RECOMMENDED SPLITS ({} modules):",
-            "",
-            "-",
+            "  - RECOMMENDED SPLITS ({} modules):",
             indicators.recommended_splits.len()
         )
         .unwrap();
 
         for (idx, split) in indicators.recommended_splits.iter().enumerate() {
             let is_last = idx == indicators.recommended_splits.len() - 1;
-            let branch = if is_last { "-" } else { "-" };
+            let branch = "-";
 
             // Show priority indicator
             let priority_indicator = match split.priority {
@@ -836,10 +816,8 @@ fn format_god_object_steps(
             // Show module name and responsibility
             writeln!(
                 output,
-                "{}  {}  {} {}.{} - {} ({} methods, ~{} lines) [{}]",
-                "",
+                "  {}  [M] {}.{} - {} ({} methods, ~{} lines) [{}]",
                 branch,
-                "[M]",
                 split.suggested_name,
                 extension,
                 split.responsibility,
@@ -863,10 +841,7 @@ fn format_god_object_steps(
                     let _branch_prefix = if is_last { " " } else { "│" };
                     writeln!(
                         output,
-                        "{}  {}     {} Methods: {}, ... +{} more",
-                        "",
-                        "",
-                        "->",
+                        "       -> Methods: {}, ... +{} more",
                         methods_display.join(", "),
                         split.methods_to_move.len() - sample_size
                     )
@@ -874,10 +849,7 @@ fn format_god_object_steps(
                     let _branch_prefix = if is_last { " " } else { "│" };
                     writeln!(
                         output,
-                        "{}  {}     {} Methods: {}",
-                        "",
-                        "",
-                        "->",
+                        "       -> Methods: {}",
                         methods_display.join(", ")
                     )
                 };
@@ -889,10 +861,7 @@ fn format_god_object_steps(
                 let _branch_prefix = if is_last { " " } else { "│" };
                 writeln!(
                     output,
-                    "{}  {}     {} Structs: {} ({} structs)",
-                    "",
-                    "",
-                    "->",
+                    "       -> Structs: {} ({} structs)",
                     split.structs_to_move.join(", "),
                     split.structs_to_move.len()
                 )
@@ -902,12 +871,12 @@ fn format_god_object_steps(
             // Show warning if present
             if let Some(warning) = &split.warning {
                 let _branch_prefix = if is_last { " " } else { "│" };
-                writeln!(output, "{}  {}     {} {}", "", "", "[!]", warning).unwrap();
+                writeln!(output, "       [!] {}", warning).unwrap();
             }
         }
 
         // Add language-specific advice
-        writeln!(output, "{}", "").unwrap();
+        output.push('\n');
 
         format_language_specific_advice(output, formatter, language, extension);
     } else {
@@ -916,30 +885,26 @@ fn format_god_object_steps(
     }
 
     // Add implementation guidance
-    writeln!(output, "{}", "").unwrap();
-    writeln!(output, "{}  {} IMPLEMENTATION ORDER:", "", "-").unwrap();
+    output.push('\n');
+    writeln!(output, "  - IMPLEMENTATION ORDER:").unwrap();
     writeln!(
         output,
-        "{}  {}  {} Start with lowest coupling modules (Data Access, Utilities)",
-        "", "-", "[1]"
+        "  -  [1] Start with lowest coupling modules (Data Access, Utilities)"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Move 10-20 methods at a time, test after each move",
-        "", "-", "[2]"
+        "  -  [2] Move 10-20 methods at a time, test after each move"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Keep original file as facade during migration",
-        "", "-", "[3]"
+        "  -  [3] Keep original file as facade during migration"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Refactor incrementally: 10-20 methods at a time",
-        "", "-", "[4]"
+        "  -  [4] Refactor incrementally: 10-20 methods at a time"
     )
     .unwrap();
 }
@@ -951,100 +916,86 @@ fn format_language_specific_advice(
     language: &str,
     extension: &str,
 ) {
-    writeln!(output, "{}  {} {} PATTERNS:", "", "-", language).unwrap();
+    writeln!(output, "  - {} PATTERNS:", language).unwrap();
 
     match extension {
         "py" => {
             writeln!(
                 output,
-                "{}  {}  {} Use dataclasses/attrs for data-heavy classes",
-                "", "-", "-"
+                "  -  - Use dataclasses/attrs for data-heavy classes"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Extract interfaces with Protocol/ABC",
-                "", "-", "-"
+                "  -  - Extract interfaces with Protocol/ABC"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Prefer composition over inheritance",
-                "", "-", "-"
+                "  -  - Prefer composition over inheritance"
             )
             .unwrap();
         }
         "rs" => {
             writeln!(
                 output,
-                "{}  {}  {} Extract traits for shared behavior",
-                "", "-", "-"
+                "  -  - Extract traits for shared behavior"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Use newtype pattern for domain types",
-                "", "-", "-"
+                "  -  - Use newtype pattern for domain types"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Consider builder pattern for complex construction",
-                "", "-", "-"
+                "  -  - Consider builder pattern for complex construction"
             )
             .unwrap();
         }
         "js" | "jsx" => {
             writeln!(
                 output,
-                "{}  {}  {} Decompose into smaller classes/modules",
-                "", "-", "-"
+                "  -  - Decompose into smaller classes/modules"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Use functional composition where possible",
-                "", "-", "-"
+                "  -  - Use functional composition where possible"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Extract hooks for React components",
-                "", "-", "-"
+                "  -  - Extract hooks for React components"
             )
             .unwrap();
         }
         "ts" | "tsx" => {
             writeln!(
                 output,
-                "{}  {}  {} Extract interfaces for contracts",
-                "", "-", "-"
+                "  -  - Extract interfaces for contracts"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Use type guards for domain logic",
-                "", "-", "-"
+                "  -  - Use type guards for domain logic"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Leverage discriminated unions",
-                "", "-", "-"
+                "  -  - Leverage discriminated unions"
             )
             .unwrap();
         }
         _ => {
             writeln!(
                 output,
-                "{}  {}  {} Extract interfaces/protocols for shared behavior",
-                "", "-", "-"
+                "  -  - Extract interfaces/protocols for shared behavior"
             )
             .unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Prefer composition over inheritance",
-                "", "-", "-"
+                "  -  - Prefer composition over inheritance"
             )
             .unwrap();
         }
@@ -1067,28 +1018,24 @@ fn format_generic_god_object_steps(
 
     writeln!(
         output,
-        "{}  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
-        "",
+        "  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
         "-".yellow()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{}  {}  {} {}_core.{} - Core business logic",
-        "", "-", "[1]", file_name, extension
+        "  -  [1] {}_core.{} - Core business logic", file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} {}_io.{} - Input/output operations",
-        "", "-", "[2]", file_name, extension
+        "  -  [2] {}_io.{} - Input/output operations", file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} {}_utils.{} - Helper functions",
-        "", "-", "[3]", file_name, extension
+        "  -  [3] {}_utils.{} - Helper functions", file_name, extension
     )
     .unwrap();
 }
@@ -1521,7 +1468,7 @@ fn format_dependencies_section_with_config(
     formatting_config: FormattingConfig,
 ) -> Option<String> {
     let config = CallerCalleeConfig::default();
-    let formatter = ColoredFormatter::new(formatting_config);
+    let _formatter = ColoredFormatter::new(formatting_config);
 
     // Filter callers and callees based on configuration
     let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, &config);
@@ -1635,7 +1582,7 @@ fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
 
 // Pure function to format rationale section
 fn format_rationale_section(context: &FormatContext) -> String {
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
     format!("{} {}", "- WHY:".bright_blue(), context.rationale)
 }
 

@@ -81,7 +81,7 @@ fn benchmark_analysis_without_aggregation(c: &mut Criterion) {
                     aggregation_method: None,
                     min_problematic: None,
                     no_god_object: false,
-                    formatting_config: Default::default(),
+                    _formatting_config: Default::default(),
                 },
             );
         });
@@ -120,7 +120,7 @@ fn benchmark_analysis_with_aggregation(c: &mut Criterion) {
                     aggregation_method: Some("weighted_sum".to_string()),
                     min_problematic: None,
                     no_god_object: false,
-                    formatting_config: Default::default(),
+                    _formatting_config: Default::default(),
                 },
             );
         });
@@ -162,7 +162,7 @@ fn benchmark_aggregation_methods(c: &mut Criterion) {
                         aggregation_method: Some(method.to_string()),
                         min_problematic: None,
                         no_god_object: false,
-                        formatting_config: Default::default(),
+                        _formatting_config: Default::default(),
                     },
                 );
             });

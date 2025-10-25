@@ -701,7 +701,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let step_start = Instant::now();
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
     if !quiet_mode {
-        eprintln!("  [TIME]Data flow graph creation: {:?}", step_start.elapsed());
+        eprintln!(
+            "  [TIME]Data flow graph creation: {:?}",
+            step_start.elapsed()
+        );
     }
 
     // Step 2: Populate purity analysis

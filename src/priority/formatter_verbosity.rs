@@ -594,8 +594,7 @@ fn format_basic_call_graph(
     if caller_count > 0 || callee_count > 0 {
         writeln!(
             output,
-            "{} {} {} caller{}, {} callee{}",
-            "-",
+            "- {} {} caller{}, {} callee{}",
             "CALLS:".bright_blue(),
             caller_count,
             if caller_count == 1 { "" } else { "s" },
@@ -608,9 +607,7 @@ fn format_basic_call_graph(
         if caller_count == 0 && callee_count > 0 {
             writeln!(
                 output,
-                "{}   {} {}",
-                " ",
-                "!",
+                "    ! {}",
                 "No callers detected - may be dead code".yellow()
             )
             .unwrap();
@@ -629,8 +626,7 @@ fn format_item_body(
     // Location section
     writeln!(
         output,
-        "{} {} {}:{} {}()",
-        "-",
+        "- {} {}:{} {}()",
         "LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
@@ -645,21 +641,23 @@ fn format_item_body(
     // ACTION section
     writeln!(
         output,
-        "{} {} {}",
-        "-",
+        "- {} {}",
         "ACTION:".bright_blue(),
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
 
     // Implementation steps
-    format_implementation_steps(output, &item.recommendation.implementation_steps, _formatter);
+    format_implementation_steps(
+        output,
+        &item.recommendation.implementation_steps,
+        _formatter,
+    );
 
     // IMPACT section
     writeln!(
         output,
-        "{} {} {}",
-        "-",
+        "- {} {}",
         "IMPACT:".bright_blue(),
         crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
     )
@@ -694,7 +692,7 @@ fn format_implementation_steps(
 ) {
     if !steps.is_empty() {
         for (i, step) in steps.iter().enumerate() {
-            let prefix = if i == steps.len() - 1 { "   -" } else { "   -" };
+            let prefix = "   -";
             writeln!(
                 output,
                 "{} {}. {}",
@@ -720,8 +718,7 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "{} {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
-                "-",
+                "- {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
@@ -734,8 +731,7 @@ fn format_complexity_summary(
         } else {
             writeln!(
                 output,
-                "{} {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
-                "-",
+                "- {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 branch_count.to_string().yellow(),
@@ -759,8 +755,7 @@ fn format_dependencies_summary(
     if upstream > 0 || downstream > 0 {
         writeln!(
             output,
-            "{} {} {} upstream, {} downstream",
-            "-",
+            "- {} {} upstream, {} downstream",
             "DEPENDENCIES:".bright_blue(),
             upstream.to_string().cyan(),
             downstream.to_string().cyan()
@@ -771,9 +766,8 @@ fn format_dependencies_summary(
             let callers_display = format_callers_display(&item.upstream_callers, 3);
             writeln!(
                 output,
-                "{}  {} CALLERS: {}",
+                "{}  - CALLERS: {}",
                 tree_pipe,
-                "-",
                 callers_display.cyan()
             )
             .unwrap();
@@ -783,9 +777,8 @@ fn format_dependencies_summary(
             let callees_display = format_callees_display(&item.downstream_callees, 3);
             writeln!(
                 output,
-                "{}  {} CALLS: {}",
+                "{}  - CALLS: {}",
                 tree_pipe,
-                "-",
                 callees_display.bright_magenta()
             )
             .unwrap();
@@ -807,8 +800,7 @@ fn format_scoring_breakdown(
 
     writeln!(
         output,
-        "{} {} Coverage: {} | Complexity: {} | Dependencies: {}",
-        "-",
+        "- {} Coverage: {} | Complexity: {} | Dependencies: {}",
         "SCORING:".bright_blue(),
         coverage_contribution.bright_yellow(),
         complexity_contribution.bright_yellow(),
@@ -840,8 +832,7 @@ fn format_coverage_section(
 
         writeln!(
             output,
-            "{} {} {}{}{}",
-            "-",
+            "- {} {}{}{}",
             "COVERAGE:".bright_blue(),
             coverage_status.bright_yellow(),
             uncovered_summary.bright_red(),
@@ -864,7 +855,7 @@ fn format_detailed_coverage_analysis(
     _formatter: &ColoredFormatter,
     tree_pipe: &str,
 ) {
-    writeln!(output, "{} {}", "-", "COVERAGE DETAILS:".bright_blue()).unwrap();
+    writeln!(output, "- {}", "COVERAGE DETAILS:".bright_blue()).unwrap();
 
     let mut sorted_lines = trans_cov.uncovered_lines.clone();
     sorted_lines.sort_unstable();
@@ -884,18 +875,17 @@ fn format_detailed_coverage_analysis(
 
     writeln!(
         output,
-        "{}  {} Uncovered lines: {}",
+        "{}  - Uncovered lines: {}",
         tree_pipe,
-        "-",
         lines_str.bright_red()
     )
     .unwrap();
 
     let branch_recommendations = analyze_coverage_gaps(&sorted_lines, item);
     if !branch_recommendations.is_empty() {
-        writeln!(output, "{}  {} Test focus areas:", tree_pipe, "-").unwrap();
+        writeln!(output, "{}  - Test focus areas:", tree_pipe).unwrap();
         for rec in branch_recommendations.iter().take(3) {
-            writeln!(output, "{}      {} {}", tree_pipe, "*", rec.yellow()).unwrap();
+            writeln!(output, "{}      * {}", tree_pipe, rec.yellow()).unwrap();
         }
     }
 }
@@ -909,19 +899,14 @@ fn format_related_items(
     if !related_items.is_empty() {
         writeln!(
             output,
-            "{} {} {} related items to address:",
-            "-",
+            "- {} {} related items to address:",
             "RELATED:".bright_blue(),
             related_items.len().to_string().cyan()
         )
         .unwrap();
 
-        for (i, related) in related_items.iter().enumerate() {
-            let prefix = if i == related_items.len() - 1 {
-                "   -"
-            } else {
-                "   -"
-            };
+        for related in related_items.iter() {
+            let prefix = "   -";
             writeln!(output, "{} {}", prefix, related.bright_magenta()).unwrap();
         }
     }
@@ -992,7 +977,7 @@ pub fn format_priority_item_with_config(
     }
 
     // Format the rest of the item
-    format_item_body(output, item, &formatter, verbosity, &tree_pipe);
+    format_item_body(output, item, &formatter, verbosity, tree_pipe);
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations
