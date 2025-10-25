@@ -388,3 +388,117 @@ fn test_complex_entry_point_still_flagged() {
         score.final_score
     );
 }
+
+#[test]
+fn test_io_wrapper_role_multiplier_not_clamped() {
+    // Spec 119: IOWrapper role multiplier (0.5) should not be clamped to 0.8
+    // with new default clamp range [0.3, 1.8]
+    let mut io_wrapper = create_test_metrics();
+    io_wrapper.name = "write_output".to_string();
+    io_wrapper.cyclomatic = 16;
+    io_wrapper.cognitive = 18;
+    io_wrapper.length = 50;
+    io_wrapper.nesting = 3;
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&io_wrapper);
+
+    let score = calculate_unified_priority(&io_wrapper, &call_graph, Some(&lcov), None);
+
+    // With the new clamp range [0.3, 1.8], the 0.5 multiplier should be applied
+    // for IOWrapper functions (detected by name pattern or classifier)
+    // Expected base score for cyclo=16, 0% coverage is around 22.0
+    // With 0.5 multiplier: 22.0 * 0.5 = 11.0
+    // With role-specific coverage weight (0.5x), the score should be even lower (~8-11)
+    assert!(
+        score.final_score < 20.0,
+        "IOWrapper should score relatively low. Score: {}",
+        score.final_score
+    );
+
+    // Verify role multiplier was applied (should be 0.5 or close for IOWrapper)
+    assert!(
+        score.role_multiplier <= 0.8,
+        "Role multiplier for IOWrapper should be <=0.8, got: {}",
+        score.role_multiplier
+    );
+}
+
+#[test]
+fn test_entry_point_role_multiplier_not_clamped() {
+    // Spec 119: EntryPoint role multiplier (1.5) should not be clamped to 1.2
+    // with new default clamp range [0.3, 1.8]
+    let entry_point = create_entry_point_function(15, 18);
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&entry_point);
+
+    let score = calculate_unified_priority(&entry_point, &call_graph, Some(&lcov), None);
+
+    // Verify role multiplier was applied
+    assert!(
+        (score.role_multiplier - 1.5).abs() < 0.01,
+        "Role multiplier should be 1.5 for EntryPoint, got: {}",
+        score.role_multiplier
+    );
+
+    // Score should reflect the 1.5x boost (not clamped to 1.2x)
+    // With coverage weight adjustment, score will be lower than raw calculation
+    assert!(
+        score.final_score > 8.0,
+        "EntryPoint with 1.5x multiplier should have elevated score. Score: {}",
+        score.final_score
+    );
+}
+
+#[test]
+fn test_io_wrapper_coverage_weight_reduced() {
+    // Spec 119: IOWrapper functions should have reduced coverage weight (0.5x)
+    let mut io_wrapper = create_test_metrics();
+    io_wrapper.name = "format_output".to_string();
+    io_wrapper.file = PathBuf::from("src/io/formatter.rs");
+    io_wrapper.cyclomatic = 12;
+    io_wrapper.cognitive = 14;
+    io_wrapper.length = 40;
+    io_wrapper.nesting = 2;
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&io_wrapper);
+
+    let score = calculate_unified_priority(&io_wrapper, &call_graph, Some(&lcov), None);
+
+    // With 0% coverage, 0.5x coverage weight, and 0.5x role multiplier,
+    // the score should be significantly lower than a PureLogic function
+    // with same complexity
+    assert!(
+        score.final_score < 15.0,
+        "IOWrapper with reduced coverage weight should score low. Score: {}",
+        score.final_score
+    );
+}
+
+#[test]
+fn test_pure_logic_coverage_weight_unchanged() {
+    // Spec 119: PureLogic functions should maintain 1.0x coverage weight
+    let pure_logic = create_pure_logic_function(12, 14);
+
+    let call_graph = CallGraph::new();
+    let lcov = create_zero_coverage_data(&pure_logic);
+
+    let score = calculate_unified_priority(&pure_logic, &call_graph, Some(&lcov), None);
+
+    // PureLogic with 0% coverage should score higher than IOWrapper
+    // due to full coverage weight (1.0x) and no role multiplier reduction
+    assert!(
+        score.final_score > 8.0,
+        "PureLogic with 0% coverage should score reasonably high. Score: {}",
+        score.final_score
+    );
+
+    // Role multiplier for PureLogic with complexity > 5 should be 1.3
+    assert!(
+        score.role_multiplier >= 1.0,
+        "Role multiplier for PureLogic should be >= 1.0, got: {}",
+        score.role_multiplier
+    );
+}

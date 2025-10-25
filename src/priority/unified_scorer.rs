@@ -269,12 +269,17 @@ pub fn calculate_unified_priority_with_debt(
         0.0
     };
 
-    // Apply minimal role adjustment (capped to avoid distortion)
+    // Apply role adjustment with configurable clamping (spec 119)
     // NOTE: This is separate from role-based coverage weight adjustment (applied earlier at line 236).
     // Coverage weight adjusts coverage expectations by role (entry points need less unit coverage).
-    // This multiplier provides a small final adjustment for role importance (0.8-1.2x range).
+    // This multiplier provides a final adjustment for role importance (default 0.3-1.8x range).
     // The two-stage approach ensures they don't interfere with each other.
-    let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
+    let role_config = crate::config::get_role_multiplier_config();
+    let clamped_role_multiplier = if role_config.enable_clamping {
+        role_multiplier.clamp(role_config.clamp_min, role_config.clamp_max)
+    } else {
+        role_multiplier
+    };
     let role_adjusted_score = base_score * clamped_role_multiplier;
 
     // Add debt-based adjustments additively (not multiplicatively)

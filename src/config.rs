@@ -576,7 +576,7 @@ fn default_pure_logic_coverage_weight() -> f64 {
 }
 
 fn default_io_wrapper_coverage_weight() -> f64 {
-    1.0 // I/O wrappers should have unit tests, no reduction
+    0.5 // I/O wrappers are integration tested, reduce unit coverage penalty (spec 119)
 }
 
 fn default_pattern_match_coverage_weight() -> f64 {
@@ -585,6 +585,44 @@ fn default_pattern_match_coverage_weight() -> f64 {
 
 fn default_unknown_coverage_weight() -> f64 {
     1.0 // Unknown functions get normal coverage expectations
+}
+
+/// Role multiplier clamping configuration (spec 119)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleMultiplierConfig {
+    /// Minimum clamp value for role multipliers (default: 0.3)
+    #[serde(default = "default_role_clamp_min")]
+    pub clamp_min: f64,
+
+    /// Maximum clamp value for role multipliers (default: 1.8)
+    #[serde(default = "default_role_clamp_max")]
+    pub clamp_max: f64,
+
+    /// Whether to enable clamping (default: true)
+    #[serde(default = "default_enable_role_clamping")]
+    pub enable_clamping: bool,
+}
+
+impl Default for RoleMultiplierConfig {
+    fn default() -> Self {
+        Self {
+            clamp_min: default_role_clamp_min(),
+            clamp_max: default_role_clamp_max(),
+            enable_clamping: default_enable_role_clamping(),
+        }
+    }
+}
+
+fn default_role_clamp_min() -> f64 {
+    0.3 // Allow IOWrapper to get 50% reduction (0.5 multiplier)
+}
+
+fn default_role_clamp_max() -> f64 {
+    1.8 // Allow EntryPoint to get 50% increase (1.5 multiplier)
+}
+
+fn default_enable_role_clamping() -> bool {
+    true // Enable by default
 }
 
 /// Score normalization configuration
@@ -948,6 +986,10 @@ pub struct DebtmapConfig {
     /// Role-based coverage weight multipliers
     #[serde(default)]
     pub role_coverage_weights: Option<RoleCoverageWeights>,
+
+    /// Role multiplier clamping configuration (spec 119)
+    #[serde(default)]
+    pub role_multiplier_config: Option<RoleMultiplierConfig>,
 
     /// Orchestrator detection configuration
     #[serde(default)]
@@ -1624,6 +1666,14 @@ pub fn get_error_handling_config() -> ErrorHandlingConfig {
 pub fn get_role_coverage_weights() -> RoleCoverageWeights {
     get_config()
         .role_coverage_weights
+        .clone()
+        .unwrap_or_default()
+}
+
+/// Get role multiplier clamping configuration (spec 119)
+pub fn get_role_multiplier_config() -> RoleMultiplierConfig {
+    get_config()
+        .role_multiplier_config
         .clone()
         .unwrap_or_default()
 }
