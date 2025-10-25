@@ -103,7 +103,7 @@ fn classify_risk_level(score: f64) -> ColoredString {
 }
 
 fn print_risk_summary(insights: &RiskInsight) {
-    println!("📈 {} Summary", "RISK".bold());
+    println!("[STATS] {} Summary", "RISK".bold());
     println!("───────────────────────────────────────────");
     println!(
         "Codebase Risk Score: {:.1} ({})",
@@ -157,7 +157,7 @@ fn print_summary(results: &AnalysisResults) {
         results.complexity.metrics.iter().map(|m| &m.file).collect();
     let file_count = unique_files.len();
 
-    println!("📊 {} Summary", "CODEBASE".bold());
+    println!("[STATS] {} Summary", "CODEBASE".bold());
     println!("───────────────────────────────────────────");
     println!("  Files analyzed:      {file_count}");
     println!(
@@ -263,7 +263,7 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
         return;
     }
 
-    println!("⚠️  {} (Top 5)", "COMPLEXITY HOTSPOTS".bold());
+    println!("[WARN] {} (Top 5)", "COMPLEXITY HOTSPOTS".bold());
     println!("───────────────────────────────────────────");
     let top_complex = get_top_complex_functions(&results.complexity.metrics, 5);
 
@@ -311,7 +311,7 @@ fn print_technical_debt(results: &AnalysisResults) {
     }
 
     println!(
-        "🔧 {} ({} items)",
+        "[INFO] {} ({} items)",
         "TECHNICAL DEBT".bold(),
         results.technical_debt.items.len()
     );
@@ -341,9 +341,9 @@ fn print_technical_debt(results: &AnalysisResults) {
 fn print_pass_fail_status(results: &AnalysisResults) {
     let passing = is_passing(results);
     let status = if passing {
-        "✓ Pass/Fail: PASS".green()
+        "[OK] Pass/Fail: PASS".green()
     } else {
-        "✗ Pass/Fail: FAIL (some metrics exceed thresholds)".red()
+        "[ERROR] Pass/Fail: FAIL (some metrics exceed thresholds)".red()
     };
     println!("{status}");
 }

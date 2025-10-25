@@ -1,5 +1,5 @@
 use crate::config::CallerCalleeConfig;
-use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
+use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, FunctionVisibility, Tier,
     UnifiedAnalysis, UnifiedDebtItem,
@@ -133,9 +133,9 @@ fn format_default_with_config(
     // For now, always use detailed format to preserve existing functionality
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
-    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
@@ -150,8 +150,7 @@ fn format_default_with_config(
     let count = top_items.len().min(limit);
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("🎯", "[TARGET]"),
+        "[TARGET] {}",
         format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()
             .bold()
@@ -174,16 +173,14 @@ fn format_default_with_config(
     // Add summary
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("📊", "[STATS]"),
+        "[STATS] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("📏", "[DENSITY]"),
+        "[DENSITY] {}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -197,8 +194,7 @@ fn format_default_with_config(
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "{} {}",
-                formatter.emoji("📈", "[CHART]"),
+                "[CHART] {}",
                 format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
             )
             .unwrap();
@@ -226,9 +222,9 @@ fn format_tail_with_config(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
-    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
@@ -271,10 +267,10 @@ fn format_tiered_terminal(
 ) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     // Header
-    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
@@ -290,8 +286,7 @@ fn format_tiered_terminal(
 
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("🎯", "[TARGET]"),
+        "[TARGET] {}",
         "TECHNICAL DEBT ANALYSIS - PRIORITY TIERS"
             .bright_yellow()
             .bold()
@@ -336,18 +331,12 @@ fn format_tiered_terminal(
     let low_count: usize = tiered_display.low.iter().map(|g| g.items.len()).sum();
 
     writeln!(output, "{}", divider.bright_blue()).unwrap();
-    writeln!(
-        output,
-        "{} DEBT DISTRIBUTION",
-        formatter.emoji("📊", "[SUMMARY]")
-    )
-    .unwrap();
+    writeln!(output, "[SUMMARY] DEBT DISTRIBUTION").unwrap();
 
     if critical_count > 0 {
         writeln!(
             output,
-            "  {} Critical: {} items",
-            formatter.emoji("🚨", "[!]"),
+            "  [!] Critical: {} items",
             critical_count.to_string().bright_red()
         )
         .unwrap();
@@ -355,8 +344,7 @@ fn format_tiered_terminal(
     if high_count > 0 {
         writeln!(
             output,
-            "  {} High: {} items",
-            formatter.emoji("⚠️", "[*]"),
+            "  [*] High: {} items",
             high_count.to_string().bright_yellow()
         )
         .unwrap();
@@ -364,35 +352,26 @@ fn format_tiered_terminal(
     if moderate_count > 0 {
         writeln!(
             output,
-            "  {} Moderate: {} items",
-            formatter.emoji("📊", "[+]"),
+            "  [+] Moderate: {} items",
             moderate_count.to_string().bright_blue()
         )
         .unwrap();
     }
     if low_count > 0 {
-        writeln!(
-            output,
-            "  {} Low: {} items",
-            formatter.emoji("📝", "[-]"),
-            low_count.to_string().white()
-        )
-        .unwrap();
+        writeln!(output, "  [-] Low: {} items", low_count.to_string().white()).unwrap();
     }
 
     writeln!(output).unwrap();
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("📈", "[TOTAL]"),
+        "[TOTAL] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{} {}",
-        formatter.emoji("📏", "[DENSITY]"),
+        "[DENSITY] {}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -406,8 +385,7 @@ fn format_tiered_terminal(
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "{} {}",
-                formatter.emoji("📊", "[COVERAGE]"),
+                "[COVERAGE] {}",
                 format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
             )
             .unwrap();
@@ -429,31 +407,31 @@ fn format_tier_terminal(
         return;
     }
 
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     // Tier header with color based on tier level
     let tier_header = match tier {
         Tier::Critical => format!(
             "{} {} - {}",
-            formatter.emoji("🚨", "[CRITICAL]"),
+            "[CRITICAL]",
             "CRITICAL".bright_red().bold(),
             "Immediate Action Required".red()
         ),
         Tier::High => format!(
             "{} {} - {}",
-            formatter.emoji("⚠️", "[HIGH]"),
+            "[HIGH]",
             "HIGH PRIORITY",
             "Current Sprint".yellow()
         ),
         Tier::Moderate => format!(
             "{} {} - {}",
-            formatter.emoji("📊", "[MODERATE]"),
+            "[MODERATE]",
             "MODERATE".bright_blue().bold(),
             "Next Sprint".blue()
         ),
         Tier::Low => format!(
             "{} {} - {}",
-            formatter.emoji("📝", "[LOW]"),
+            "[LOW]",
             "LOW".white().bold(),
             "Backlog".white()
         ),
@@ -472,8 +450,7 @@ fn format_tier_terminal(
             if remaining > 0 {
                 writeln!(
                     output,
-                    "  {} ... and {} more items in this tier",
-                    formatter.emoji("📋", "[+]"),
+                    "  [+] ... and {} more items in this tier",
                     remaining
                 )
                 .unwrap();
@@ -495,35 +472,27 @@ fn format_display_group_terminal(
     verbosity: u8,
     config: FormattingConfig,
 ) {
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     if group.items.len() > 1 && group.batch_action.is_some() {
         // Grouped similar items
         writeln!(
             output,
-            "  {} {} ({} similar items)",
-            formatter.emoji("📦", "[GROUP]"),
+            "  [GROUP] {} ({} similar items)",
             group.debt_type.bright_cyan(),
             group.items.len().to_string().yellow()
         )
         .unwrap();
 
         if let Some(action) = &group.batch_action {
-            writeln!(
-                output,
-                "    {} {}",
-                formatter.emoji("➜", "->"),
-                action.green()
-            )
-            .unwrap();
+            writeln!(output, "    -> {}", action.green()).unwrap();
         }
 
         // Show first item as example if verbose
         if verbosity >= 1 && !group.items.is_empty() {
             writeln!(
                 output,
-                "    {} Example: {}",
-                formatter.emoji("📍", "[eg]"),
+                "    [eg] Example: {}",
                 format_item_location(&group.items[0])
             )
             .unwrap();
@@ -552,14 +521,13 @@ fn format_compact_item(
     verbosity: u8,
     config: FormattingConfig,
 ) {
-    let formatter = ColoredFormatter::new(config);
+    let _formatter = ColoredFormatter::new(config);
 
     match item {
         priority::DebtItem::Function(func) => {
             writeln!(
                 output,
-                "  {} #{} [{}] {}:{} {}",
-                formatter.emoji("▶", ">"),
+                "  > #{} [{}] {}:{} {}",
                 index,
                 format!("{:.1}", func.unified_score.final_score).yellow(),
                 func.location.file.display(),
@@ -571,8 +539,7 @@ fn format_compact_item(
             // Show brief action
             writeln!(
                 output,
-                "      {} {}",
-                formatter.emoji("➜", "->"),
+                "      -> {}",
                 func.recommendation.primary_action.green()
             )
             .unwrap();
@@ -580,8 +547,7 @@ fn format_compact_item(
         priority::DebtItem::File(file) => {
             writeln!(
                 output,
-                "  {} #{} [{}] {} ({} lines)",
-                formatter.emoji("📁", "[F]"),
+                "  [F] #{} [{}] {} ({} lines)",
                 index,
                 format!("{:.1}", file.score).yellow(),
                 file.metrics.path.display(),
@@ -590,13 +556,7 @@ fn format_compact_item(
             .unwrap();
 
             // Show brief action
-            writeln!(
-                output,
-                "      {} {}",
-                formatter.emoji("➜", "->"),
-                file.recommendation.green()
-            )
-            .unwrap();
+            writeln!(output, "      -> {}", file.recommendation.green()).unwrap();
         }
     }
 
@@ -621,9 +581,9 @@ fn format_item_location(item: &priority::DebtItem) -> String {
 fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
 
-    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
@@ -660,7 +620,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(output).unwrap();
     writeln!(
         output,
-        "📊 {}",
+        "[STATS] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
             .bright_cyan()
             .bold()
@@ -688,9 +648,9 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
 fn format_detailed(analysis: &UnifiedAnalysis) -> String {
     let mut output = String::new();
     let version = env!("CARGO_PKG_VERSION");
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
 
-    let divider = formatter.emoji("═".repeat(44).as_str(), "=".repeat(44).as_str());
+    let divider = "=".repeat(44);
     writeln!(output, "{}", divider.bright_blue()).unwrap();
     writeln!(
         output,
@@ -833,35 +793,27 @@ fn format_god_object_steps(
     if !indicators.recommended_splits.is_empty() {
         writeln!(
             output,
-            "{}  {} RECOMMENDED SPLITS ({} modules):",
-            formatter.emoji("│", ""),
-            formatter.emoji("├─", "-"),
+            "  - RECOMMENDED SPLITS ({} modules):",
             indicators.recommended_splits.len()
         )
         .unwrap();
 
         for (idx, split) in indicators.recommended_splits.iter().enumerate() {
             let is_last = idx == indicators.recommended_splits.len() - 1;
-            let branch = if is_last {
-                formatter.emoji("└─", "-")
-            } else {
-                formatter.emoji("├─", "-")
-            };
+            let branch = "-";
 
             // Show priority indicator
             let priority_indicator = match split.priority {
-                crate::priority::file_metrics::Priority::High => "⭐⭐⭐ High",
-                crate::priority::file_metrics::Priority::Medium => "⭐⭐ Medium",
-                crate::priority::file_metrics::Priority::Low => "⭐ Low",
+                crate::priority::file_metrics::Priority::High => "[*][*][*] High",
+                crate::priority::file_metrics::Priority::Medium => "[*][*] Medium",
+                crate::priority::file_metrics::Priority::Low => "[*] Low",
             };
 
             // Show module name and responsibility
             writeln!(
                 output,
-                "{}  {}  {} {}.{} - {} ({} methods, ~{} lines) [{}]",
-                formatter.emoji("│", ""),
+                "  {}  [M] {}.{} - {} ({} methods, ~{} lines) [{}]",
                 branch,
-                formatter.emoji("📦", "[M]"),
                 split.suggested_name,
                 extension,
                 split.responsibility,
@@ -882,39 +834,26 @@ fn format_god_object_steps(
                     .collect();
 
                 let continuation = if split.methods_to_move.len() > sample_size {
-                    let branch_prefix = if is_last { " " } else { "│" };
+                    let _branch_prefix = if is_last { " " } else { "│" };
                     writeln!(
                         output,
-                        "{}  {}     {} Methods: {}, ... +{} more",
-                        formatter.emoji("│", ""),
-                        formatter.emoji(branch_prefix, ""),
-                        formatter.emoji("→", "->"),
+                        "       -> Methods: {}, ... +{} more",
                         methods_display.join(", "),
                         split.methods_to_move.len() - sample_size
                     )
                 } else {
-                    let branch_prefix = if is_last { " " } else { "│" };
-                    writeln!(
-                        output,
-                        "{}  {}     {} Methods: {}",
-                        formatter.emoji("│", ""),
-                        formatter.emoji(branch_prefix, ""),
-                        formatter.emoji("→", "->"),
-                        methods_display.join(", ")
-                    )
+                    let _branch_prefix = if is_last { " " } else { "│" };
+                    writeln!(output, "       -> Methods: {}", methods_display.join(", "))
                 };
                 continuation.unwrap();
             }
 
             // Show structs being moved
             if !split.structs_to_move.is_empty() {
-                let branch_prefix = if is_last { " " } else { "│" };
+                let _branch_prefix = if is_last { " " } else { "│" };
                 writeln!(
                     output,
-                    "{}  {}     {} Structs: {} ({} structs)",
-                    formatter.emoji("│", ""),
-                    formatter.emoji(branch_prefix, ""),
-                    formatter.emoji("→", "->"),
+                    "       -> Structs: {} ({} structs)",
                     split.structs_to_move.join(", "),
                     split.structs_to_move.len()
                 )
@@ -923,21 +862,13 @@ fn format_god_object_steps(
 
             // Show warning if present
             if let Some(warning) = &split.warning {
-                let branch_prefix = if is_last { " " } else { "│" };
-                writeln!(
-                    output,
-                    "{}  {}     {} {}",
-                    formatter.emoji("│", ""),
-                    formatter.emoji(branch_prefix, ""),
-                    formatter.emoji("⚠️", "[!]"),
-                    warning
-                )
-                .unwrap();
+                let _branch_prefix = if is_last { " " } else { "│" };
+                writeln!(output, "       [!] {}", warning).unwrap();
             }
         }
 
         // Add language-specific advice
-        writeln!(output, "{}", formatter.emoji("│", "")).unwrap();
+        output.push('\n');
 
         format_language_specific_advice(output, formatter, language, extension);
     } else {
@@ -946,44 +877,26 @@ fn format_god_object_steps(
     }
 
     // Add implementation guidance
-    writeln!(output, "{}", formatter.emoji("│", "")).unwrap();
+    output.push('\n');
+    writeln!(output, "  - IMPLEMENTATION ORDER:").unwrap();
     writeln!(
         output,
-        "{}  {} IMPLEMENTATION ORDER:",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-")
+        "  -  [1] Start with lowest coupling modules (Data Access, Utilities)"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Start with lowest coupling modules (Data Access, Utilities)",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        formatter.emoji("⭐", "[1]")
+        "  -  [2] Move 10-20 methods at a time, test after each move"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Move 10-20 methods at a time, test after each move",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        formatter.emoji("⚙️", "[2]")
+        "  -  [3] Keep original file as facade during migration"
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} Keep original file as facade during migration",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        formatter.emoji("🔄", "[3]")
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "{}  {}  {} Refactor incrementally: 10-20 methods at a time",
-        formatter.emoji("│", ""),
-        formatter.emoji("└─", "-"),
-        formatter.emoji("✅", "[4]")
+        "  -  [4] Refactor incrementally: 10-20 methods at a time"
     )
     .unwrap();
 }
@@ -991,141 +904,48 @@ fn format_god_object_steps(
 // Format language-specific refactoring advice
 fn format_language_specific_advice(
     output: &mut String,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     language: &str,
     extension: &str,
 ) {
-    writeln!(
-        output,
-        "{}  {} {} PATTERNS:",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        language
-    )
-    .unwrap();
+    writeln!(output, "  - {} PATTERNS:", language).unwrap();
 
     match extension {
         "py" => {
             writeln!(
                 output,
-                "{}  {}  {} Use dataclasses/attrs for data-heavy classes",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
+                "  -  - Use dataclasses/attrs for data-heavy classes"
             )
             .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Extract interfaces with Protocol/ABC",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Prefer composition over inheritance",
-                formatter.emoji("│", ""),
-                formatter.emoji("└─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
+            writeln!(output, "  -  - Extract interfaces with Protocol/ABC").unwrap();
+            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
         }
         "rs" => {
+            writeln!(output, "  -  - Extract traits for shared behavior").unwrap();
+            writeln!(output, "  -  - Use newtype pattern for domain types").unwrap();
             writeln!(
                 output,
-                "{}  {}  {} Extract traits for shared behavior",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Use newtype pattern for domain types",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Consider builder pattern for complex construction",
-                formatter.emoji("│", ""),
-                formatter.emoji("└─", "-"),
-                formatter.emoji("•", "-")
+                "  -  - Consider builder pattern for complex construction"
             )
             .unwrap();
         }
         "js" | "jsx" => {
-            writeln!(
-                output,
-                "{}  {}  {} Decompose into smaller classes/modules",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Use functional composition where possible",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Extract hooks for React components",
-                formatter.emoji("│", ""),
-                formatter.emoji("└─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
+            writeln!(output, "  -  - Decompose into smaller classes/modules").unwrap();
+            writeln!(output, "  -  - Use functional composition where possible").unwrap();
+            writeln!(output, "  -  - Extract hooks for React components").unwrap();
         }
         "ts" | "tsx" => {
-            writeln!(
-                output,
-                "{}  {}  {} Extract interfaces for contracts",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Use type guards for domain logic",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Leverage discriminated unions",
-                formatter.emoji("│", ""),
-                formatter.emoji("└─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
+            writeln!(output, "  -  - Extract interfaces for contracts").unwrap();
+            writeln!(output, "  -  - Use type guards for domain logic").unwrap();
+            writeln!(output, "  -  - Leverage discriminated unions").unwrap();
         }
         _ => {
             writeln!(
                 output,
-                "{}  {}  {} Extract interfaces/protocols for shared behavior",
-                formatter.emoji("│", ""),
-                formatter.emoji("├─", "-"),
-                formatter.emoji("•", "-")
+                "  -  - Extract interfaces/protocols for shared behavior"
             )
             .unwrap();
-            writeln!(
-                output,
-                "{}  {}  {} Prefer composition over inheritance",
-                formatter.emoji("│", ""),
-                formatter.emoji("└─", "-"),
-                formatter.emoji("•", "-")
-            )
-            .unwrap();
+            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
         }
     }
 }
@@ -1133,7 +953,7 @@ fn format_language_specific_advice(
 // Fallback generic advice when detailed splits aren't available
 fn format_generic_god_object_steps(
     output: &mut String,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     item: &priority::FileDebtItem,
     extension: &str,
 ) {
@@ -1146,40 +966,27 @@ fn format_generic_god_object_steps(
 
     writeln!(
         output,
-        "{}  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-").yellow()
+        "  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
+        "-".yellow()
     )
     .unwrap();
 
     writeln!(
         output,
-        "{}  {}  {} {}_core.{} - Core business logic",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        formatter.emoji("📦", "[1]"),
-        file_name,
-        extension
+        "  -  [1] {}_core.{} - Core business logic",
+        file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} {}_io.{} - Input/output operations",
-        formatter.emoji("│", ""),
-        formatter.emoji("├─", "-"),
-        formatter.emoji("📦", "[2]"),
-        file_name,
-        extension
+        "  -  [2] {}_io.{} - Input/output operations",
+        file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "{}  {}  {} {}_utils.{} - Helper functions",
-        formatter.emoji("│", ""),
-        formatter.emoji("└─", "-"),
-        formatter.emoji("📦", "[3]"),
-        file_name,
-        extension
+        "  -  [3] {}_utils.{} - Helper functions",
+        file_name, extension
     )
     .unwrap();
 }
@@ -1202,7 +1009,7 @@ fn calculate_impact_message(is_god_object: bool, total_lines: usize) -> String {
 // Function to format detailed metrics section
 fn format_detailed_metrics(
     output: &mut String,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     is_god_object: bool,
     methods_count: usize,
     fields_count: usize,
@@ -1212,7 +1019,7 @@ fn format_detailed_metrics(
         writeln!(
             output,
             "{} Methods: {}, Fields: {}, Responsibilities: {}",
-            formatter.emoji("├─ METRICS:", "└─ METRICS:").bright_blue(),
+            "└─ METRICS:".bright_blue(),
             methods_count.to_string().yellow(),
             fields_count.to_string().yellow(),
             responsibilities.to_string().yellow()
@@ -1245,7 +1052,7 @@ fn classify_function_count(function_count: usize) -> &'static str {
 // Function to format scoring breakdown and dependencies
 fn format_scoring_and_dependencies(
     output: &mut String,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     total_lines: usize,
     function_count: usize,
 ) {
@@ -1253,7 +1060,7 @@ fn format_scoring_and_dependencies(
     writeln!(
         output,
         "{} File size: {} | Functions: {} | Complexity: HIGH",
-        formatter.emoji("├─ SCORING:", "└─ SCORING:").bright_blue(),
+        "└─ SCORING:".bright_blue(),
         classify_file_size(total_lines),
         classify_function_count(function_count)
     )
@@ -1264,9 +1071,7 @@ fn format_scoring_and_dependencies(
         writeln!(
             output,
             "{} {} functions may have complex interdependencies",
-            formatter
-                .emoji("└─ DEPENDENCIES:", "└─ DEPENDENCIES:")
-                .bright_blue(),
+            "└─ DEPENDENCIES:".bright_blue(),
             function_count
         )
         .unwrap();
@@ -1303,7 +1108,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {} ({} lines, {} functions)",
-        formatter.emoji("├─", "└─").bright_blue(),
+        "└─".bright_blue(),
         item.metrics.path.display().to_string().bright_green(),
         item.metrics.total_lines,
         item.metrics.function_count
@@ -1322,7 +1127,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {}",
-        formatter.emoji("├─ WHY:", "└─ WHY:").bright_blue(),
+        "└─ WHY:".bright_blue(),
         why_message.bright_white()
     )
     .unwrap();
@@ -1330,7 +1135,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {}",
-        formatter.emoji("├─ ACTION:", "└─ ACTION:").bright_yellow(),
+        "└─ ACTION:".bright_yellow(),
         item.recommendation.bright_green().bold()
     )
     .unwrap();
@@ -1347,7 +1152,7 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {}",
-        formatter.emoji("├─ IMPACT:", "└─ IMPACT:").bright_blue(),
+        "└─ IMPACT:".bright_blue(),
         impact.bright_cyan()
     )
     .unwrap();
@@ -1614,7 +1419,7 @@ fn format_dependencies_section_with_config(
     formatting_config: FormattingConfig,
 ) -> Option<String> {
     let config = CallerCalleeConfig::default();
-    let formatter = ColoredFormatter::new(formatting_config);
+    let _formatter = ColoredFormatter::new(formatting_config);
 
     // Filter callers and callees based on configuration
     let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, &config);
@@ -1635,19 +1440,16 @@ fn format_dependencies_section_with_config(
 
         section.push_str(&format!(
             "\n{}  {} {} ({}):",
-            formatter.emoji("│", "|"),
-            formatter.emoji("├─", "|-"),
-            formatter.emoji("📞", "Called by"),
-            caller_count
+            "|", "|-", "Called by", caller_count
         ));
 
         for caller in filtered_callers.iter().take(display_count) {
             let formatted_caller = format_function_reference(caller);
             section.push_str(&format!(
                 "\n{}  {}     {} {}",
-                formatter.emoji("│", "|"),
-                formatter.emoji("│", "|"),
-                formatter.emoji("•", "*"),
+                "|",
+                "|",
+                "*",
                 formatted_caller.bright_cyan()
             ));
         }
@@ -1655,19 +1457,13 @@ fn format_dependencies_section_with_config(
         if caller_count > display_count {
             section.push_str(&format!(
                 "\n{}  {}     {} (showing {} of {})",
-                formatter.emoji("│", "|"),
-                formatter.emoji("│", "|"),
-                formatter.emoji("…", "..."),
-                display_count,
-                caller_count
+                "|", "|", "...", display_count, caller_count
             ));
         }
     } else {
         section.push_str(&format!(
             "\n{}  {} {} No direct callers detected",
-            formatter.emoji("│", "|"),
-            formatter.emoji("├─", "|-"),
-            formatter.emoji("📞", "Called by")
+            "|", "|-", "Called by"
         ));
     }
 
@@ -1678,18 +1474,15 @@ fn format_dependencies_section_with_config(
 
         section.push_str(&format!(
             "\n{}  {} {} ({}):",
-            formatter.emoji("│", "|"),
-            formatter.emoji("└─", "+-"),
-            formatter.emoji("📤", "Calls"),
-            callee_count
+            "|", "+-", "Calls", callee_count
         ));
 
         for callee in filtered_callees.iter().take(display_count) {
             let formatted_callee = format_function_reference(callee);
             section.push_str(&format!(
                 "\n{}       {} {}",
-                formatter.emoji("│", "|"),
-                formatter.emoji("•", "*"),
+                "|",
+                "*",
                 formatted_callee.bright_magenta()
             ));
         }
@@ -1697,19 +1490,14 @@ fn format_dependencies_section_with_config(
         if callee_count > display_count {
             section.push_str(&format!(
                 "\n{}       {} (showing {} of {})",
-                formatter.emoji("│", "|"),
-                formatter.emoji("…", "..."),
-                display_count,
-                callee_count
+                "|", "...", display_count, callee_count
             ));
         }
     } else if !filtered_callers.is_empty() {
         // Only show "calls nothing" if we showed callers
         section.push_str(&format!(
             "\n{}  {} {} Calls no other functions",
-            formatter.emoji("│", "|"),
-            formatter.emoji("└─", "+-"),
-            formatter.emoji("📤", "Calls")
+            "|", "+-", "Calls"
         ));
     }
 
@@ -1745,12 +1533,8 @@ fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
 
 // Pure function to format rationale section
 fn format_rationale_section(context: &FormatContext) -> String {
-    let formatter = ColoredFormatter::new(FormattingConfig::default());
-    format!(
-        "{} {}",
-        formatter.emoji("└─ WHY:", "- WHY:").bright_blue(),
-        context.rationale
-    )
+    let _formatter = ColoredFormatter::new(FormattingConfig::default());
+    format!("{} {}", "- WHY:".bright_blue(), context.rationale)
 }
 
 // I/O function to apply formatted sections to output
@@ -1831,7 +1615,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
             writeln!(
                 output,
                 "│  └─ {} God Object: {} methods, {} fields, {} responsibilities",
-                "⚠️".bright_yellow(),
+                "[WARNING]".bright_yellow(),
                 god_obj.method_count,
                 god_obj.field_count,
                 god_obj.responsibility_count
@@ -1863,7 +1647,7 @@ pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalys
     writeln!(output).unwrap();
     writeln!(
         output,
-        "📊 {}",
+        "[STATS] {}",
         "TOTAL IMPACT IF ALL FIXED".bright_green().bold()
     )
     .unwrap();
@@ -2040,7 +1824,7 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::formatting::{ColorMode, EmojiMode};
+    use crate::formatting::ColorMode;
     use crate::priority::call_graph::CallGraph;
     use crate::priority::file_metrics::{
         FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
@@ -2565,7 +2349,7 @@ mod tests {
 
         let context = create_format_context(1, &item);
         // Use explicit formatting config to ensure deterministic behavior in tests
-        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
@@ -2584,7 +2368,7 @@ mod tests {
 
         let context = create_format_context(1, &item);
         // Use explicit formatting config to ensure deterministic behavior in tests
-        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
@@ -2605,7 +2389,7 @@ mod tests {
 
         let context = create_format_context(1, &item);
         // Use explicit formatting config to ensure deterministic behavior in tests
-        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());
@@ -2636,7 +2420,7 @@ mod tests {
 
         let context = create_format_context(1, &item);
         // Use explicit formatting config to ensure deterministic behavior in tests
-        let formatting_config = FormattingConfig::new(ColorMode::Never, EmojiMode::Never);
+        let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
 
         assert!(section.is_some());

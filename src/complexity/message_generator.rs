@@ -498,13 +498,13 @@ pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
 
     // Details section
     if !message.details.is_empty() {
-        writeln!(output, "\n📊 COMPLEXITY ISSUES:").unwrap();
+        writeln!(output, "\n[STATS] COMPLEXITY ISSUES:").unwrap();
         for (i, detail) in message.details.iter().enumerate() {
             let severity_icon = match detail.severity {
-                Severity::Low => "ℹ️",
-                Severity::Medium => "⚠️",
-                Severity::High => "🔴",
-                Severity::Critical => "🚨",
+                Severity::Low => "[INFO]",
+                Severity::Medium => "[WARNING]",
+                Severity::High => "[ERROR]",
+                Severity::Critical => "[!]",
             };
             writeln!(
                 output,
@@ -526,7 +526,7 @@ pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
 
     // Recommendations section
     if !message.recommendations.is_empty() {
-        writeln!(output, "\n💡 RECOMMENDATIONS:").unwrap();
+        writeln!(output, "\n[TIP] RECOMMENDATIONS:").unwrap();
         for rec in &message.recommendations {
             writeln!(output, "  • {}", rec.title).unwrap();
             writeln!(output, "    {}", rec.description).unwrap();
@@ -536,7 +536,7 @@ pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
 
     // Code example
     if let Some(example) = &message.code_examples {
-        writeln!(output, "\n📝 REFACTORING EXAMPLE:").unwrap();
+        writeln!(output, "\n[REFACTORING EXAMPLE]").unwrap();
         writeln!(output, "  {}", example.explanation).unwrap();
         writeln!(output, "\n  Before:").unwrap();
         for line in example.before.lines() {

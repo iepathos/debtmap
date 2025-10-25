@@ -64,7 +64,7 @@ pub fn generate_god_object_recommendation(
 
         title: if analysis.field_count > 5 && analysis.method_count > 20 {
             format!(
-                "🚨 GOD OBJECT: {} ({} methods, {} fields, {} responsibilities)",
+                "[CRITICAL] GOD OBJECT: {} ({} methods, {} fields, {} responsibilities)",
                 file_name,
                 analysis.method_count,
                 analysis.field_count,
@@ -72,7 +72,7 @@ pub fn generate_god_object_recommendation(
             )
         } else {
             format!(
-                "🚨 GOD MODULE: {} ({} module functions, {} responsibilities)",
+                "[CRITICAL] GOD MODULE: {} ({} module functions, {} responsibilities)",
                 file_name,
                 analysis.method_count,
                 analysis.responsibility_count
@@ -127,7 +127,7 @@ pub fn format_god_object_display(
     let metric_label = if is_god_class { "Methods" } else { "Module Functions" };
 
     output.push_str(&format!(
-        "#{} SCORE: {:.1} [🚨 {}]\n",
+        "#{} SCORE: {:.1} [[CRITICAL] {}]\n",
         rank, score, label
     ));
 
@@ -136,7 +136,7 @@ pub fn format_god_object_display(
         path.display()
     ));
 
-    output.push_str(&format!("\n   📊 {} METRICS:\n", label));
+    output.push_str(&format!("\n   [STATS] {} METRICS:\n", label));
     output.push_str(&format!("   ├─ {}: {} (max: {})\n", metric_label, analysis.method_count, if is_god_class { 20 } else { 50 }));
     if is_god_class {
         output.push_str(&format!("   ├─ Fields: {} (max: 15)\n", analysis.field_count));
@@ -146,7 +146,7 @@ pub fn format_god_object_display(
     output.push_str(&format!("   └─ Total Complexity: {}\n", analysis.complexity_sum));
     
     if !analysis.recommended_splits.is_empty() {
-        output.push_str("\n   🔧 RECOMMENDED REFACTORING:\n");
+        output.push_str("\n   [INFO] RECOMMENDED REFACTORING:\n");
         output.push_str("   Split into focused modules:\n");
         
         for split in &analysis.recommended_splits {
@@ -164,7 +164,7 @@ pub fn format_god_object_display(
     }
     
     output.push_str(&format!(
-        "\n   ⚡ IMPACT: -{} complexity, +80% maintainability, +70% testability\n",
+        "\n   [PERF] IMPACT: -{} complexity, +80% maintainability, +70% testability\n",
         analysis.complexity_sum / 2
     ));
     

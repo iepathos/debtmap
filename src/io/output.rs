@@ -26,35 +26,35 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
 // Helper functions shared by multiple writers
 pub fn complexity_status(avg: f64) -> &'static str {
     match avg {
-        a if a > 15.0 => "❌ High",
-        a if a > 10.0 => "⚠️ Medium",
-        a if a > 5.0 => "🔶 Moderate",
-        _ => "✅ Low",
+        a if a > 15.0 => "[ERROR] High",
+        a if a > 10.0 => "[WARN] Medium",
+        a if a > 5.0 => "[INFO] Moderate",
+        _ => "[OK] Low",
     }
 }
 
 pub fn debt_status(count: usize) -> &'static str {
     match count {
-        c if c > 50 => "❌ High",
-        c if c > 20 => "⚠️ Medium",
-        c if c > 10 => "🔶 Moderate",
-        _ => "✅ Low",
+        c if c > 50 => "[ERROR] High",
+        c if c > 20 => "[WARN] Medium",
+        c if c > 10 => "[INFO] Moderate",
+        _ => "[OK] Low",
     }
 }
 
 pub fn high_complexity_status(count: usize) -> &'static str {
     match count {
-        0 => "✅ Good",
-        1..=5 => "🔶 Fair",
-        _ => "❌ Poor",
+        0 => "[OK] Good",
+        1..=5 => "[INFO] Fair",
+        _ => "[ERROR] Poor",
     }
 }
 
 pub fn debt_score_status(score: u32, threshold: u32) -> &'static str {
     match score {
-        s if s > threshold => "❌ High",
-        s if s > threshold / 2 => "⚠️ Medium",
-        _ => "✅ Good",
+        s if s > threshold => "[ERROR] High",
+        s if s > threshold / 2 => "[WARN] Medium",
+        _ => "[OK] Good",
     }
 }
 
@@ -219,107 +219,107 @@ mod tests {
 
     #[test]
     fn test_complexity_status_low() {
-        assert_eq!(complexity_status(0.0), "✅ Low");
-        assert_eq!(complexity_status(2.5), "✅ Low");
-        assert_eq!(complexity_status(5.0), "✅ Low");
+        assert_eq!(complexity_status(0.0), "[OK] Low");
+        assert_eq!(complexity_status(2.5), "[OK] Low");
+        assert_eq!(complexity_status(5.0), "[OK] Low");
     }
 
     #[test]
     fn test_complexity_status_moderate() {
-        assert_eq!(complexity_status(5.1), "🔶 Moderate");
-        assert_eq!(complexity_status(7.5), "🔶 Moderate");
-        assert_eq!(complexity_status(10.0), "🔶 Moderate");
+        assert_eq!(complexity_status(5.1), "[INFO] Moderate");
+        assert_eq!(complexity_status(7.5), "[INFO] Moderate");
+        assert_eq!(complexity_status(10.0), "[INFO] Moderate");
     }
 
     #[test]
     fn test_complexity_status_medium() {
-        assert_eq!(complexity_status(10.1), "⚠️ Medium");
-        assert_eq!(complexity_status(12.5), "⚠️ Medium");
-        assert_eq!(complexity_status(15.0), "⚠️ Medium");
+        assert_eq!(complexity_status(10.1), "[WARN] Medium");
+        assert_eq!(complexity_status(12.5), "[WARN] Medium");
+        assert_eq!(complexity_status(15.0), "[WARN] Medium");
     }
 
     #[test]
     fn test_complexity_status_high() {
-        assert_eq!(complexity_status(15.1), "❌ High");
-        assert_eq!(complexity_status(20.0), "❌ High");
-        assert_eq!(complexity_status(100.0), "❌ High");
+        assert_eq!(complexity_status(15.1), "[ERROR] High");
+        assert_eq!(complexity_status(20.0), "[ERROR] High");
+        assert_eq!(complexity_status(100.0), "[ERROR] High");
     }
 
     #[test]
     fn test_debt_status_low() {
-        assert_eq!(debt_status(0), "✅ Low");
-        assert_eq!(debt_status(5), "✅ Low");
-        assert_eq!(debt_status(10), "✅ Low");
+        assert_eq!(debt_status(0), "[OK] Low");
+        assert_eq!(debt_status(5), "[OK] Low");
+        assert_eq!(debt_status(10), "[OK] Low");
     }
 
     #[test]
     fn test_debt_status_moderate() {
-        assert_eq!(debt_status(11), "🔶 Moderate");
-        assert_eq!(debt_status(15), "🔶 Moderate");
-        assert_eq!(debt_status(20), "🔶 Moderate");
+        assert_eq!(debt_status(11), "[INFO] Moderate");
+        assert_eq!(debt_status(15), "[INFO] Moderate");
+        assert_eq!(debt_status(20), "[INFO] Moderate");
     }
 
     #[test]
     fn test_debt_status_medium() {
-        assert_eq!(debt_status(21), "⚠️ Medium");
-        assert_eq!(debt_status(35), "⚠️ Medium");
-        assert_eq!(debt_status(50), "⚠️ Medium");
+        assert_eq!(debt_status(21), "[WARN] Medium");
+        assert_eq!(debt_status(35), "[WARN] Medium");
+        assert_eq!(debt_status(50), "[WARN] Medium");
     }
 
     #[test]
     fn test_debt_status_high() {
-        assert_eq!(debt_status(51), "❌ High");
-        assert_eq!(debt_status(100), "❌ High");
-        assert_eq!(debt_status(1000), "❌ High");
+        assert_eq!(debt_status(51), "[ERROR] High");
+        assert_eq!(debt_status(100), "[ERROR] High");
+        assert_eq!(debt_status(1000), "[ERROR] High");
     }
 
     #[test]
     fn test_high_complexity_status_good() {
-        assert_eq!(high_complexity_status(0), "✅ Good");
+        assert_eq!(high_complexity_status(0), "[OK] Good");
     }
 
     #[test]
     fn test_high_complexity_status_fair() {
-        assert_eq!(high_complexity_status(1), "🔶 Fair");
-        assert_eq!(high_complexity_status(3), "🔶 Fair");
-        assert_eq!(high_complexity_status(5), "🔶 Fair");
+        assert_eq!(high_complexity_status(1), "[INFO] Fair");
+        assert_eq!(high_complexity_status(3), "[INFO] Fair");
+        assert_eq!(high_complexity_status(5), "[INFO] Fair");
     }
 
     #[test]
     fn test_high_complexity_status_poor() {
-        assert_eq!(high_complexity_status(6), "❌ Poor");
-        assert_eq!(high_complexity_status(10), "❌ Poor");
-        assert_eq!(high_complexity_status(100), "❌ Poor");
+        assert_eq!(high_complexity_status(6), "[ERROR] Poor");
+        assert_eq!(high_complexity_status(10), "[ERROR] Poor");
+        assert_eq!(high_complexity_status(100), "[ERROR] Poor");
     }
 
     #[test]
     fn test_debt_score_status_good() {
-        assert_eq!(debt_score_status(25, 100), "✅ Good");
-        assert_eq!(debt_score_status(49, 100), "✅ Good");
-        assert_eq!(debt_score_status(0, 100), "✅ Good");
+        assert_eq!(debt_score_status(25, 100), "[OK] Good");
+        assert_eq!(debt_score_status(49, 100), "[OK] Good");
+        assert_eq!(debt_score_status(0, 100), "[OK] Good");
     }
 
     #[test]
     fn test_debt_score_status_medium() {
-        assert_eq!(debt_score_status(50, 100), "✅ Good");
-        assert_eq!(debt_score_status(51, 100), "⚠️ Medium");
-        assert_eq!(debt_score_status(75, 100), "⚠️ Medium");
-        assert_eq!(debt_score_status(100, 100), "⚠️ Medium");
+        assert_eq!(debt_score_status(50, 100), "[OK] Good");
+        assert_eq!(debt_score_status(51, 100), "[WARN] Medium");
+        assert_eq!(debt_score_status(75, 100), "[WARN] Medium");
+        assert_eq!(debt_score_status(100, 100), "[WARN] Medium");
     }
 
     #[test]
     fn test_debt_score_status_high() {
-        assert_eq!(debt_score_status(101, 100), "❌ High");
-        assert_eq!(debt_score_status(150, 100), "❌ High");
-        assert_eq!(debt_score_status(1000, 100), "❌ High");
+        assert_eq!(debt_score_status(101, 100), "[ERROR] High");
+        assert_eq!(debt_score_status(150, 100), "[ERROR] High");
+        assert_eq!(debt_score_status(1000, 100), "[ERROR] High");
     }
 
     #[test]
     fn test_debt_score_status_boundary_conditions() {
         // Test exact boundary values
-        assert_eq!(debt_score_status(50, 100), "✅ Good"); // Exactly half
-        assert_eq!(debt_score_status(100, 100), "⚠️ Medium"); // Exactly at threshold
-        assert_eq!(debt_score_status(101, 100), "❌ High"); // Just over threshold
+        assert_eq!(debt_score_status(50, 100), "[OK] Good"); // Exactly half
+        assert_eq!(debt_score_status(100, 100), "[WARN] Medium"); // Exactly at threshold
+        assert_eq!(debt_score_status(101, 100), "[ERROR] High"); // Just over threshold
     }
 
     #[test]

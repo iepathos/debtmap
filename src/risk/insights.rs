@@ -31,7 +31,7 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
         return output;
     }
 
-    output.push_str("🔥 CRITICAL RISK FUNCTIONS (Complexity > 15, Coverage < 30%)\n");
+    output.push_str("[CRITICAL] CRITICAL RISK FUNCTIONS (Complexity > 15, Coverage < 30%)\n");
     output.push_str("─────────────────────────────────────────────────────────────\n");
 
     for (i, risk) in critical_risks.iter().enumerate() {
@@ -164,7 +164,7 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         return output;
     }
 
-    output.push_str("🎯 TOP 5 TESTING RECOMMENDATIONS\n");
+    output.push_str("[TARGET] TOP 5 TESTING RECOMMENDATIONS\n");
     output.push_str("Ordered by Risk Priority (Complexity × Coverage Gap × Dependencies)\n");
     output.push('\n');
 
@@ -253,10 +253,10 @@ fn format_critical_functions_insight(critical_count: usize) -> Option<String> {
 fn format_correlation_insight(correlation: f64) -> Option<String> {
     match correlation {
         c if c < -0.3 => Some(format!(
-            "• ✅ Good news: Complex code tends to be better tested (correlation: {c:.2})\n"
+            "• [OK] Good news: Complex code tends to be better tested (correlation: {c:.2})\n"
         )),
         c if c > 0.3 => Some(format!(
-            "• ⚠️  Warning: Complex code lacks coverage (correlation: {c:.2})\n"
+            "• [WARN] Warning: Complex code lacks coverage (correlation: {c:.2})\n"
         )),
         _ => None,
     }
@@ -320,7 +320,7 @@ pub fn format_actionable_insights(insight: &RiskInsight) -> String {
     ];
 
     format!(
-        "💡 ACTIONABLE INSIGHTS\n──────────────────────\n{}",
+        "[TIP] ACTIONABLE INSIGHTS\n──────────────────────\n{}",
         insights.into_iter().flatten().collect::<String>()
     )
 }

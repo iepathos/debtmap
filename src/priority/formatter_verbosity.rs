@@ -1,4 +1,4 @@
-use crate::formatting::{ColoredFormatter, FormattingConfig, OutputFormatter};
+use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{score_formatter, TransitiveCoverage, UnifiedDebtItem};
 use colored::*;
@@ -7,9 +7,9 @@ use std::fmt::Write;
 // Pure function to classify coverage percentage
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
     match coverage_pct {
-        0.0 => (" [🔴 UNTESTED]", "🔴 UNTESTED"),
-        c if c < 20.0 => (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE"),
-        c if c < 50.0 => (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE"),
+        0.0 => (" [ERROR UNTESTED]", "[ERROR] UNTESTED"),
+        c if c < 20.0 => (" [WARN LOW COVERAGE]", "[WARN] LOW COVERAGE"),
+        c if c < 50.0 => (" [WARN PARTIAL COVERAGE]", "[WARN] PARTIAL COVERAGE"),
         _ => ("", ""),
     }
 }
@@ -24,7 +24,7 @@ fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'
         let coverage_pct = trans_cov.direct * 100.0;
         classify_coverage_percentage(coverage_pct).0
     } else if item.unified_score.coverage_factor >= 10.0 {
-        " [🔴 UNTESTED]"
+        " [ERROR UNTESTED]"
     } else {
         ""
     }
@@ -33,12 +33,12 @@ fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'
 // Pure function to format coverage status
 fn format_coverage_status(coverage_pct: f64) -> String {
     match coverage_pct {
-        0.0 => "🔴 UNTESTED".to_string(),
-        c if c < 20.0 => format!("🟠 LOW ({:.1}%)", c),
-        c if c < 50.0 => format!("🟡 PARTIAL ({:.1}%)", c),
-        c if c < 80.0 => format!("🟨 MODERATE ({:.1}%)", c),
-        c if c < 95.0 => format!("🟢 GOOD ({:.1}%)", c),
-        _ => format!("✅ EXCELLENT ({:.1}%)", coverage_pct),
+        0.0 => "[ERROR] UNTESTED".to_string(),
+        c if c < 20.0 => format!("[WARN] LOW ({:.1}%)", c),
+        c if c < 50.0 => format!("[WARN] PARTIAL ({:.1}%)", c),
+        c if c < 80.0 => format!("[INFO] MODERATE ({:.1}%)", c),
+        c if c < 95.0 => format!("[OK] GOOD ({:.1}%)", c),
+        _ => format!("[OK] EXCELLENT ({:.1}%)", coverage_pct),
     }
 }
 
@@ -55,9 +55,9 @@ fn format_coverage_factor_description(
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
-            0.0 => Some("🔴 UNTESTED (0% coverage, weight: 50%)".to_string()),
-            c if c < 20.0 => Some(format!("🟠 LOW COVERAGE ({:.1}%, weight: 50%)", c)),
-            c if c < 50.0 => Some(format!("🟡 PARTIAL COVERAGE ({:.1}%, weight: 50%)", c)),
+            0.0 => Some("[ERROR] UNTESTED (0% coverage, weight: 50%)".to_string()),
+            c if c < 20.0 => Some(format!("[WARN] LOW COVERAGE ({:.1}%, weight: 50%)", c)),
+            c if c < 50.0 => Some(format!("[WARN] PARTIAL COVERAGE ({:.1}%, weight: 50%)", c)),
             c if c >= 95.0 => Some(format!("Excellent coverage {:.1}%", c)),
             c if c >= 80.0 => Some(format!("Good coverage {:.1}%", c)),
             _ if item.unified_score.coverage_factor > 3.0 => {
@@ -66,7 +66,7 @@ fn format_coverage_factor_description(
             _ => None,
         }
     } else if item.unified_score.coverage_factor >= 10.0 {
-        Some("🔴 UNTESTED (no coverage data, weight: 50%)".to_string())
+        Some("[ERROR] UNTESTED (no coverage data, weight: 50%)".to_string())
     } else if item.unified_score.coverage_factor > 3.0 {
         Some("No coverage data (weight: 50%)".to_string())
     } else {
@@ -77,10 +77,10 @@ fn format_coverage_factor_description(
 // Pure function to get gap severity indicator based on gap percentage
 fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
     match gap_percentage {
-        p if p <= 25.0 => "🟡 LOW",
-        p if p <= 50.0 => "🟠 MODERATE",
-        p if p <= 75.0 => "🔴 HIGH",
-        _ => "🔴🔴 CRITICAL",
+        p if p <= 25.0 => "[WARN] LOW",
+        p if p <= 50.0 => "[WARN] MODERATE",
+        p if p <= 75.0 => "[ERROR] HIGH",
+        _ => "[CRITICAL] CRITICAL",
     }
 }
 
@@ -373,13 +373,13 @@ fn format_score_header(
 }
 
 /// Format the main factors line
-fn format_main_factors(factors: &[String], formatter: &ColoredFormatter) -> String {
+fn format_main_factors(factors: &[String], _formatter: &ColoredFormatter) -> String {
     if factors.is_empty() {
         String::new()
     } else {
         format!(
             "   {} Main factors: {}",
-            formatter.emoji("↳", "  "),
+            "  ",
             factors.join(", ").bright_white()
         )
     }
@@ -388,12 +388,12 @@ fn format_main_factors(factors: &[String], formatter: &ColoredFormatter) -> Stri
 /// Format score calculation section for verbosity >= 2
 fn format_score_calculation_section(
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) -> Vec<String> {
     let mut lines = Vec::new();
-    let tree_branch = formatter.emoji("├─", "-");
-    let tree_sub_branch = formatter.emoji("│  ├─", "  -");
-    let tree_pipe = formatter.emoji("│", " ");
+    let tree_branch = "-";
+    let tree_sub_branch = "  -";
+    let tree_pipe = " ";
 
     lines.push(format!(
         "{} {}",
@@ -423,7 +423,7 @@ fn format_score_calculation_section(
     lines.push(format!(
         "{}  {} Coverage Score: {:.1} × 40% = {:.2}{}{}",
         tree_pipe,
-        formatter.emoji("├─", "-"),
+        "-",
         factors.coverage_factor * 10.0, // Convert to 0-100 scale
         factors.coverage_factor * 10.0 * 0.4,
         coverage_detail,
@@ -435,7 +435,7 @@ fn format_score_calculation_section(
     lines.push(format!(
         "{}  {} Complexity Score: {:.1} × 40% = {:.2}{}",
         tree_pipe,
-        formatter.emoji("├─", "-"),
+        "-",
         factors.complexity_factor * 10.0, // Convert to 0-100 scale
         factors.complexity_factor * 10.0 * 0.40,
         complexity_detail
@@ -445,7 +445,7 @@ fn format_score_calculation_section(
     lines.push(format!(
         "{}  {} Dependency Score: {:.1} × 20% = {:.2} ({} callers)",
         tree_pipe,
-        formatter.emoji("├─", "-"),
+        "-",
         factors.dependency_factor * 10.0, // Convert to 0-100 scale
         factors.dependency_factor * 10.0 * 0.20,
         item.upstream_callers.len() // Display actual caller count, not normalized score
@@ -460,7 +460,7 @@ fn format_score_calculation_section(
     lines.push(format!(
         "{}  {} Base Score: {:.2} + {:.2} + {:.2} = {:.2}",
         tree_pipe,
-        formatter.emoji("├─", "-"),
+        "-",
         coverage_contribution,
         complexity_contribution,
         dependency_contribution,
@@ -472,7 +472,7 @@ fn format_score_calculation_section(
         lines.push(format!(
             "{}  {} Entropy Impact: {:.0}% dampening (entropy: {:.2}, repetition: {:.0}%)",
             tree_pipe,
-            formatter.emoji("├─", "-"),
+            "-",
             (1.0 - entropy.dampening_factor) * 100.0,
             entropy.entropy_score,
             entropy.pattern_repetition * 100.0
@@ -481,16 +481,12 @@ fn format_score_calculation_section(
 
     lines.push(format!(
         "{}  {} Role Adjustment: ×{:.2}",
-        tree_pipe,
-        formatter.emoji("├─", "-"),
-        item.unified_score.role_multiplier
+        tree_pipe, "-", item.unified_score.role_multiplier
     ));
 
     lines.push(format!(
         "{}  {} Final Score: {:.2}",
-        tree_pipe,
-        formatter.emoji("└─", "-"),
-        item.unified_score.final_score
+        tree_pipe, "-", item.unified_score.final_score
     ));
 
     lines
@@ -499,43 +495,31 @@ fn format_score_calculation_section(
 /// Format complexity details section
 fn format_complexity_details_section(
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) -> Vec<String> {
     let mut lines = Vec::new();
-    let tree_pipe = formatter.emoji("│", " ");
+    let tree_pipe = " ";
 
-    lines.push(format!(
-        "{} {}",
-        formatter.emoji("├─", "-"),
-        "COMPLEXITY DETAILS:".bright_blue()
-    ));
+    lines.push(format!("{} {}", "-", "COMPLEXITY DETAILS:".bright_blue()));
 
     lines.push(format!(
         "{}  {} Cyclomatic Complexity: {}",
-        tree_pipe,
-        formatter.emoji("├─", "-"),
-        item.cyclomatic_complexity
+        tree_pipe, "-", item.cyclomatic_complexity
     ));
 
     lines.push(format!(
         "{}  {} Cognitive Complexity: {}",
-        tree_pipe,
-        formatter.emoji("├─", "-"),
-        item.cognitive_complexity
+        tree_pipe, "-", item.cognitive_complexity
     ));
 
     lines.push(format!(
         "{}  {} Function Length: {} lines",
-        tree_pipe,
-        formatter.emoji("├─", "-"),
-        item.function_length
+        tree_pipe, "-", item.function_length
     ));
 
     lines.push(format!(
         "{}  {} Nesting Depth: {}",
-        tree_pipe,
-        formatter.emoji("└─", "-"),
-        item.nesting_depth
+        tree_pipe, "-", item.nesting_depth
     ));
 
     lines
@@ -544,31 +528,25 @@ fn format_complexity_details_section(
 /// Format coverage details section for verbosity >= 2
 fn format_coverage_details_section(
     trans_cov: &TransitiveCoverage,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) -> Vec<String> {
     let mut lines = Vec::new();
-    let tree_pipe = formatter.emoji("│", " ");
+    let tree_pipe = " ";
 
     if !trans_cov.uncovered_lines.is_empty() {
-        lines.push(format!(
-            "{} {}",
-            formatter.emoji("├─", "-"),
-            "COVERAGE DETAILS:".bright_blue()
-        ));
+        lines.push(format!("{} {}", "-", "COVERAGE DETAILS:".bright_blue()));
 
         lines.push(format!(
             "{}  {} Coverage: {:.1}%",
             tree_pipe,
-            formatter.emoji("├─", "-"),
+            "-",
             trans_cov.direct * 100.0
         ));
 
         let line_ranges = format_line_ranges(&trans_cov.uncovered_lines);
         lines.push(format!(
             "{}  {} Uncovered Lines: {}",
-            tree_pipe,
-            formatter.emoji("└─", "-"),
-            line_ranges
+            tree_pipe, "-", line_ranges
         ));
     }
 
@@ -576,43 +554,26 @@ fn format_coverage_details_section(
 }
 
 /// Format call graph section for verbosity >= 2
-fn format_call_graph_section(item: &UnifiedDebtItem, formatter: &ColoredFormatter) -> Vec<String> {
+fn format_call_graph_section(item: &UnifiedDebtItem, _formatter: &ColoredFormatter) -> Vec<String> {
     let mut lines = Vec::new();
-    let tree_pipe = formatter.emoji("│", " ");
+    let tree_pipe = " ";
 
     if !item.upstream_callers.is_empty() || !item.downstream_callees.is_empty() {
-        lines.push(format!(
-            "{} {}",
-            formatter.emoji("├─", "-"),
-            "CALL GRAPH:".bright_blue()
-        ));
+        lines.push(format!("{} {}", "-", "CALL GRAPH:".bright_blue()));
 
         if !item.upstream_callers.is_empty() {
             let callers = format_callers_display(&item.upstream_callers, 5);
-            lines.push(format!(
-                "{}  {} Called by: {}",
-                tree_pipe,
-                formatter.emoji("├─", "-"),
-                callers
-            ));
+            lines.push(format!("{}  {} Called by: {}", tree_pipe, "-", callers));
         }
 
         if !item.downstream_callees.is_empty() {
             let callees = format_callees_display(&item.downstream_callees, 5);
-            lines.push(format!(
-                "{}  {} Calls: {}",
-                tree_pipe,
-                formatter.emoji("└─", "-"),
-                callees
-            ));
+            lines.push(format!("{}  {} Calls: {}", tree_pipe, "-", callees));
         } else if !item.upstream_callers.is_empty() {
             // Change the last caller line to use └─ if there are no callees
             lines.push(format!(
                 "{}  {} Dependencies: {} upstream, {} downstream",
-                tree_pipe,
-                formatter.emoji("└─", "-"),
-                item.upstream_dependencies,
-                item.downstream_dependencies
+                tree_pipe, "-", item.upstream_dependencies, item.downstream_dependencies
             ));
         }
     }
@@ -624,7 +585,7 @@ fn format_call_graph_section(item: &UnifiedDebtItem, formatter: &ColoredFormatte
 fn format_basic_call_graph(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) {
     let caller_count = item.upstream_callers.len();
     let callee_count = item.downstream_callees.len();
@@ -633,8 +594,7 @@ fn format_basic_call_graph(
     if caller_count > 0 || callee_count > 0 {
         writeln!(
             output,
-            "{} {} {} caller{}, {} callee{}",
-            formatter.emoji("├─", "-"),
+            "- {} {} caller{}, {} callee{}",
             "CALLS:".bright_blue(),
             caller_count,
             if caller_count == 1 { "" } else { "s" },
@@ -647,9 +607,7 @@ fn format_basic_call_graph(
         if caller_count == 0 && callee_count > 0 {
             writeln!(
                 output,
-                "{}   {} {}",
-                formatter.emoji("│", " "),
-                formatter.emoji("⚠", "!"),
+                "    ! {}",
                 "No callers detected - may be dead code".yellow()
             )
             .unwrap();
@@ -661,15 +619,14 @@ fn format_basic_call_graph(
 fn format_item_body(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
 ) {
     // Location section
     writeln!(
         output,
-        "{} {} {}:{} {}()",
-        formatter.emoji("├─", "-"),
+        "- {} {}:{} {}()",
         "LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
@@ -678,66 +635,64 @@ fn format_item_body(
     .unwrap();
 
     // WHY section (the rationale)
-    let why_label = formatter.emoji("└─ WHY:", "- WHY:").bright_blue();
+    let why_label = "- WHY:".bright_blue();
     writeln!(output, "{} {}", why_label, item.recommendation.rationale).unwrap();
 
     // ACTION section
     writeln!(
         output,
-        "{} {} {}",
-        formatter.emoji("├─", "-"),
+        "- {} {}",
         "ACTION:".bright_blue(),
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
 
     // Implementation steps
-    format_implementation_steps(output, &item.recommendation.implementation_steps, formatter);
+    format_implementation_steps(
+        output,
+        &item.recommendation.implementation_steps,
+        _formatter,
+    );
 
     // IMPACT section
     writeln!(
         output,
-        "{} {} {}",
-        formatter.emoji("├─", "-"),
+        "- {} {}",
         "IMPACT:".bright_blue(),
         crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
     )
     .unwrap();
 
     // COMPLEXITY section
-    format_complexity_summary(output, item, formatter);
+    format_complexity_summary(output, item, _formatter);
 
     // DEPENDENCIES section
-    format_dependencies_summary(output, item, formatter, tree_pipe);
+    format_dependencies_summary(output, item, _formatter, tree_pipe);
 
     // CALL GRAPH section - show basic info even at verbosity 0
-    format_basic_call_graph(output, item, formatter);
+    format_basic_call_graph(output, item, _formatter);
 
     // SCORING breakdown for verbosity >= 1
     if (1..2).contains(&verbosity) {
-        format_scoring_breakdown(output, item, formatter);
+        format_scoring_breakdown(output, item, _formatter);
     }
 
     // COVERAGE section
-    format_coverage_section(output, item, formatter, verbosity, tree_pipe);
+    format_coverage_section(output, item, _formatter, verbosity, tree_pipe);
 
     // RELATED items
-    format_related_items(output, &item.recommendation.related_items, formatter);
+    format_related_items(output, &item.recommendation.related_items, _formatter);
 }
 
 /// Format implementation steps
 fn format_implementation_steps(
     output: &mut String,
     steps: &[String],
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) {
     if !steps.is_empty() {
         for (i, step) in steps.iter().enumerate() {
-            let prefix = if i == steps.len() - 1 {
-                formatter.emoji("│  └─", "   -")
-            } else {
-                formatter.emoji("│  ├─", "   -")
-            };
+            let prefix = "   -";
             writeln!(
                 output,
                 "{} {}. {}",
@@ -754,7 +709,7 @@ fn format_implementation_steps(
 fn format_complexity_summary(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) {
     let (cyclomatic, cognitive, branch_count, nesting, _length) =
         crate::priority::formatter::extract_complexity_info(item);
@@ -763,8 +718,7 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "{} {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
-                formatter.emoji("├─", "-"),
+                "- {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
@@ -777,8 +731,7 @@ fn format_complexity_summary(
         } else {
             writeln!(
                 output,
-                "{} {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
-                formatter.emoji("├─", "-"),
+                "- {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 branch_count.to_string().yellow(),
@@ -794,7 +747,7 @@ fn format_complexity_summary(
 fn format_dependencies_summary(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     tree_pipe: &str,
 ) {
     let (upstream, downstream) = crate::priority::formatter::extract_dependency_info(item);
@@ -802,8 +755,7 @@ fn format_dependencies_summary(
     if upstream > 0 || downstream > 0 {
         writeln!(
             output,
-            "{} {} {} upstream, {} downstream",
-            formatter.emoji("├─", "-"),
+            "- {} {} upstream, {} downstream",
             "DEPENDENCIES:".bright_blue(),
             upstream.to_string().cyan(),
             downstream.to_string().cyan()
@@ -814,9 +766,8 @@ fn format_dependencies_summary(
             let callers_display = format_callers_display(&item.upstream_callers, 3);
             writeln!(
                 output,
-                "{}  {} CALLERS: {}",
+                "{}  - CALLERS: {}",
                 tree_pipe,
-                formatter.emoji("├─", "-"),
                 callers_display.cyan()
             )
             .unwrap();
@@ -826,9 +777,8 @@ fn format_dependencies_summary(
             let callees_display = format_callees_display(&item.downstream_callees, 3);
             writeln!(
                 output,
-                "{}  {} CALLS: {}",
+                "{}  - CALLS: {}",
                 tree_pipe,
-                formatter.emoji("└─", "-"),
                 callees_display.bright_magenta()
             )
             .unwrap();
@@ -840,7 +790,7 @@ fn format_dependencies_summary(
 fn format_scoring_breakdown(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) {
     let coverage_contribution = classify_coverage_contribution(item);
     let complexity_contribution =
@@ -850,8 +800,7 @@ fn format_scoring_breakdown(
 
     writeln!(
         output,
-        "{} {} Coverage: {} | Complexity: {} | Dependencies: {}",
-        formatter.emoji("├─", "-"),
+        "- {} Coverage: {} | Complexity: {} | Dependencies: {}",
         "SCORING:".bright_blue(),
         coverage_contribution.bright_yellow(),
         complexity_contribution.bright_yellow(),
@@ -864,7 +813,7 @@ fn format_scoring_breakdown(
 fn format_coverage_section(
     output: &mut String,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
 ) {
@@ -883,8 +832,7 @@ fn format_coverage_section(
 
         writeln!(
             output,
-            "{} {} {}{}{}",
-            formatter.emoji("├─", "-"),
+            "- {} {}{}{}",
             "COVERAGE:".bright_blue(),
             coverage_status.bright_yellow(),
             uncovered_summary.bright_red(),
@@ -894,7 +842,7 @@ fn format_coverage_section(
 
         // Detailed coverage analysis for verbosity >= 2
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
-            format_detailed_coverage_analysis(output, trans_cov, item, formatter, tree_pipe);
+            format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
         }
     }
 }
@@ -904,16 +852,10 @@ fn format_detailed_coverage_analysis(
     output: &mut String,
     trans_cov: &TransitiveCoverage,
     item: &UnifiedDebtItem,
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
     tree_pipe: &str,
 ) {
-    writeln!(
-        output,
-        "{} {}",
-        formatter.emoji("├─", "-"),
-        "COVERAGE DETAILS:".bright_blue()
-    )
-    .unwrap();
+    writeln!(output, "- {}", "COVERAGE DETAILS:".bright_blue()).unwrap();
 
     let mut sorted_lines = trans_cov.uncovered_lines.clone();
     sorted_lines.sort_unstable();
@@ -933,31 +875,17 @@ fn format_detailed_coverage_analysis(
 
     writeln!(
         output,
-        "{}  {} Uncovered lines: {}",
+        "{}  - Uncovered lines: {}",
         tree_pipe,
-        formatter.emoji("├─", "-"),
         lines_str.bright_red()
     )
     .unwrap();
 
     let branch_recommendations = analyze_coverage_gaps(&sorted_lines, item);
     if !branch_recommendations.is_empty() {
-        writeln!(
-            output,
-            "{}  {} Test focus areas:",
-            tree_pipe,
-            formatter.emoji("└─", "-")
-        )
-        .unwrap();
+        writeln!(output, "{}  - Test focus areas:", tree_pipe).unwrap();
         for rec in branch_recommendations.iter().take(3) {
-            writeln!(
-                output,
-                "{}      {} {}",
-                tree_pipe,
-                formatter.emoji("•", "*"),
-                rec.yellow()
-            )
-            .unwrap();
+            writeln!(output, "{}      * {}", tree_pipe, rec.yellow()).unwrap();
         }
     }
 }
@@ -966,24 +894,19 @@ fn format_detailed_coverage_analysis(
 fn format_related_items(
     output: &mut String,
     related_items: &[String],
-    formatter: &ColoredFormatter,
+    _formatter: &ColoredFormatter,
 ) {
     if !related_items.is_empty() {
         writeln!(
             output,
-            "{} {} {} related items to address:",
-            formatter.emoji("├─", "-"),
+            "- {} {} related items to address:",
             "RELATED:".bright_blue(),
             related_items.len().to_string().cyan()
         )
         .unwrap();
 
-        for (i, related) in related_items.iter().enumerate() {
-            let prefix = if i == related_items.len() - 1 {
-                formatter.emoji("│  └─", "   -")
-            } else {
-                formatter.emoji("│  ├─", "   -")
-            };
+        for related in related_items.iter() {
+            let prefix = "   -";
             writeln!(output, "{} {}", prefix, related.bright_magenta()).unwrap();
         }
     }
@@ -1001,7 +924,7 @@ pub fn format_priority_item_with_config(
     let severity = crate::priority::formatter::get_severity_label(item.unified_score.final_score);
     let severity_color =
         crate::priority::formatter::get_severity_color(item.unified_score.final_score);
-    let tree_pipe = formatter.emoji("│", " ");
+    let tree_pipe = " ";
 
     // Format and write the score header
     let coverage_indicator = get_coverage_indicator(item, has_coverage_data);
@@ -1054,7 +977,7 @@ pub fn format_priority_item_with_config(
     }
 
     // Format the rest of the item
-    format_item_body(output, item, &formatter, verbosity, &tree_pipe);
+    format_item_body(output, item, &formatter, verbosity, tree_pipe);
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations
@@ -1141,47 +1064,47 @@ mod tests {
     #[test]
     fn test_get_gap_severity_indicator() {
         // LOW: 1-25%
-        assert_eq!(get_gap_severity_indicator(0.0), "🟡 LOW");
-        assert_eq!(get_gap_severity_indicator(10.0), "🟡 LOW");
-        assert_eq!(get_gap_severity_indicator(25.0), "🟡 LOW");
+        assert_eq!(get_gap_severity_indicator(0.0), "[WARN] LOW");
+        assert_eq!(get_gap_severity_indicator(10.0), "[WARN] LOW");
+        assert_eq!(get_gap_severity_indicator(25.0), "[WARN] LOW");
 
         // MODERATE: 26-50%
-        assert_eq!(get_gap_severity_indicator(26.0), "🟠 MODERATE");
-        assert_eq!(get_gap_severity_indicator(40.0), "🟠 MODERATE");
-        assert_eq!(get_gap_severity_indicator(50.0), "🟠 MODERATE");
+        assert_eq!(get_gap_severity_indicator(26.0), "[WARN] MODERATE");
+        assert_eq!(get_gap_severity_indicator(40.0), "[WARN] MODERATE");
+        assert_eq!(get_gap_severity_indicator(50.0), "[WARN] MODERATE");
 
         // HIGH: 51-75%
-        assert_eq!(get_gap_severity_indicator(51.0), "🔴 HIGH");
-        assert_eq!(get_gap_severity_indicator(65.0), "🔴 HIGH");
-        assert_eq!(get_gap_severity_indicator(75.0), "🔴 HIGH");
+        assert_eq!(get_gap_severity_indicator(51.0), "[ERROR] HIGH");
+        assert_eq!(get_gap_severity_indicator(65.0), "[ERROR] HIGH");
+        assert_eq!(get_gap_severity_indicator(75.0), "[ERROR] HIGH");
 
         // CRITICAL: 76-100%
-        assert_eq!(get_gap_severity_indicator(76.0), "🔴🔴 CRITICAL");
-        assert_eq!(get_gap_severity_indicator(90.0), "🔴🔴 CRITICAL");
-        assert_eq!(get_gap_severity_indicator(100.0), "🔴🔴 CRITICAL");
+        assert_eq!(get_gap_severity_indicator(76.0), "[CRITICAL] CRITICAL");
+        assert_eq!(get_gap_severity_indicator(90.0), "[CRITICAL] CRITICAL");
+        assert_eq!(get_gap_severity_indicator(100.0), "[CRITICAL] CRITICAL");
     }
 
     #[test]
     fn test_classify_coverage_percentage() {
         assert_eq!(
             classify_coverage_percentage(0.0),
-            (" [🔴 UNTESTED]", "🔴 UNTESTED")
+            (" [ERROR UNTESTED]", "[ERROR] UNTESTED")
         );
         assert_eq!(
             classify_coverage_percentage(10.0),
-            (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE")
+            (" [WARN LOW COVERAGE]", "[WARN] LOW COVERAGE")
         );
         assert_eq!(
             classify_coverage_percentage(19.9),
-            (" [🟠 LOW COVERAGE]", "🟠 LOW COVERAGE")
+            (" [WARN LOW COVERAGE]", "[WARN] LOW COVERAGE")
         );
         assert_eq!(
             classify_coverage_percentage(20.0),
-            (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE")
+            (" [WARN PARTIAL COVERAGE]", "[WARN] PARTIAL COVERAGE")
         );
         assert_eq!(
             classify_coverage_percentage(49.9),
-            (" [🟡 PARTIAL COVERAGE]", "🟡 PARTIAL COVERAGE")
+            (" [WARN PARTIAL COVERAGE]", "[WARN] PARTIAL COVERAGE")
         );
         assert_eq!(classify_coverage_percentage(50.0), ("", ""));
         assert_eq!(classify_coverage_percentage(100.0), ("", ""));
@@ -1189,12 +1112,12 @@ mod tests {
 
     #[test]
     fn test_format_coverage_status() {
-        assert_eq!(format_coverage_status(0.0), "🔴 UNTESTED");
-        assert_eq!(format_coverage_status(10.0), "🟠 LOW (10.0%)");
-        assert_eq!(format_coverage_status(30.0), "🟡 PARTIAL (30.0%)");
-        assert_eq!(format_coverage_status(60.0), "🟨 MODERATE (60.0%)");
-        assert_eq!(format_coverage_status(85.0), "🟢 GOOD (85.0%)");
-        assert_eq!(format_coverage_status(96.0), "✅ EXCELLENT (96.0%)");
+        assert_eq!(format_coverage_status(0.0), "[ERROR] UNTESTED");
+        assert_eq!(format_coverage_status(10.0), "[WARN] LOW (10.0%)");
+        assert_eq!(format_coverage_status(30.0), "[WARN] PARTIAL (30.0%)");
+        assert_eq!(format_coverage_status(60.0), "[INFO] MODERATE (60.0%)");
+        assert_eq!(format_coverage_status(85.0), "[OK] GOOD (85.0%)");
+        assert_eq!(format_coverage_status(96.0), "[OK] EXCELLENT (96.0%)");
     }
 
     #[test]
@@ -1266,7 +1189,7 @@ mod tests {
     fn test_format_score_header() {
         use colored::Color;
 
-        let header = format_score_header(1, 85.5, " ⚠", "HIGH", Color::Red);
+        let header = format_score_header(1, 85.5, " [WARN]", "HIGH", Color::Red);
         assert!(header.contains("#1"));
         assert!(header.contains("SCORE:"));
         assert!(header.contains("[HIGH]"));

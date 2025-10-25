@@ -33,10 +33,10 @@ impl HealthStatus {
 
     pub fn as_string(&self) -> String {
         match self {
-            HealthStatus::Good(score) => format!("{}% 💚 Good", score),
-            HealthStatus::ModerateRisk(score) => format!("{}% 🟡 Moderate Risk", score),
-            HealthStatus::HighRisk(score) => format!("{}% 🟠 High Risk", score),
-            HealthStatus::Critical(score) => format!("{}% 🔴 Critical", score),
+            HealthStatus::Good(score) => format!("{}% [GOOD] Good", score),
+            HealthStatus::ModerateRisk(score) => format!("{}% [WARN] Moderate Risk", score),
+            HealthStatus::HighRisk(score) => format!("{}% [HIGH] High Risk", score),
+            HealthStatus::Critical(score) => format!("{}% [CRIT] Critical", score),
         }
     }
 
@@ -60,9 +60,9 @@ pub enum TrendIndicator {
 impl TrendIndicator {
     pub fn as_emoji(&self) -> &'static str {
         match self {
-            TrendIndicator::Improving => "↗️",
-            TrendIndicator::Stable => "↔️",
-            TrendIndicator::Declining => "↘️",
+            TrendIndicator::Improving => "/\\",
+            TrendIndicator::Stable => "--",
+            TrendIndicator::Declining => "\\/",
         }
     }
 

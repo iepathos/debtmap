@@ -259,11 +259,11 @@ impl CallGraphDebugger {
         let mut output = String::new();
 
         // Header
-        output.push_str("🔍 Call Graph Debug Report\n");
+        output.push_str("Call Graph Debug Report\n");
         output.push_str("════════════════════════════════════════\n\n");
 
         // Statistics
-        output.push_str("📊 RESOLUTION STATISTICS\n");
+        output.push_str("[STATS] RESOLUTION STATISTICS\n");
         output.push_str(&format!(
             "  Total Attempts:    {}\n",
             self.stats.total_attempts
@@ -319,7 +319,7 @@ impl CallGraphDebugger {
         let failures = self.failed_resolutions();
         if !failures.is_empty() {
             output.push_str(&format!(
-                "❌ FAILED RESOLUTIONS ({} total)\n\n",
+                "[ERROR] FAILED RESOLUTIONS ({} total)\n\n",
                 failures.len()
             ));
 

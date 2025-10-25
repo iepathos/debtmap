@@ -28,7 +28,7 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
             let limited = files.len().min(max_files);
             if files.len() > max_files {
                 eprintln!(
-                    "⚠️  Processing limited to {} files (found {}) by DEBTMAP_MAX_FILES",
+                    "[WARN] Processing limited to {} files (found {}) by DEBTMAP_MAX_FILES",
                     max_files,
                     files.len()
                 );
@@ -66,7 +66,7 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
         .collect();
 
     if show_progress {
-        eprintln!("\r✓ Analyzed {} files successfully", results.len());
+        eprintln!("\r[OK] Analyzed {} files successfully", results.len());
     }
 
     results
@@ -189,7 +189,7 @@ pub fn analyze_single_file_with_timeout(
             let quiet = std::env::var("DEBTMAP_QUIET").is_ok();
             if !quiet {
                 eprintln!(
-                    "⏱️  Timeout analyzing {} ({}s limit)",
+                    "[TIME] Timeout analyzing {} ({}s limit)",
                     file_path.display(),
                     effective_timeout
                 );

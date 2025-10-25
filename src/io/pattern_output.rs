@@ -109,7 +109,7 @@ impl PatternOutputFormatter {
                 )
             } else {
                 format!(
-                    "❌ {} ({}:{})\n   ✅ USED VIA PATTERN: {}\n",
+                    "[X] {} ({}:{})\n   [OK] USED VIA PATTERN: {}\n",
                     function_name,
                     file_path,
                     line,
@@ -125,7 +125,7 @@ impl PatternOutputFormatter {
             )
         } else {
             format!(
-                "❌ {} ({}:{})\n   ⚠️  No pattern usage detected - likely dead code\n",
+                "[X] {} ({}:{})\n   [WARNING] No pattern usage detected - likely dead code\n",
                 function_name, file_path, line
             )
         }
@@ -142,7 +142,7 @@ impl PatternOutputFormatter {
                 )
             } else {
                 format!(
-                    "  ⚠️  WARNING: Low confidence pattern detection ({}% < {}%)\n",
+                    "  [WARNING] Low confidence pattern detection ({}% < {}%)\n",
                     (pattern.confidence * 100.0) as u32,
                     (threshold * 100.0) as u32
                 )

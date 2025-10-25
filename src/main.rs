@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
 use debtmap::core::injection::{AppContainer, AppContainerBuilder};
-use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
+use debtmap::formatting::{ColorMode, FormattingConfig};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -767,7 +767,7 @@ fn convert_output_format(format: debtmap::cli::OutputFormat) -> debtmap::cli::Ou
 // Pure function to create formatting configuration
 fn create_formatting_config(plain: bool) -> FormattingConfig {
     if plain {
-        FormattingConfig::new(ColorMode::Never, EmojiMode::Never)
+        FormattingConfig::new(ColorMode::Never)
     } else {
         FormattingConfig::from_env()
     }
@@ -853,7 +853,7 @@ fn build_analyze_config(
         filter_categories: convert_filter_categories(filter_categories),
         no_context_aware,
         threshold_preset: convert_threshold_preset(threshold_preset),
-        formatting_config,
+        _formatting_config: formatting_config,
         parallel: should_use_parallel(no_parallel),
         jobs: get_worker_count(jobs),
         use_cache: should_use_cache(use_cache, no_cache),
@@ -993,11 +993,11 @@ fn format_comparison_markdown(comparison: &debtmap::comparison::ComparisonResult
         md.push_str("## Target Item Analysis\n\n");
 
         let status_icon = match target.status {
-            TargetStatus::Resolved => "✅",
-            TargetStatus::Improved => "✅",
-            TargetStatus::Unchanged => "⚠️",
-            TargetStatus::Regressed => "❌",
-            TargetStatus::NotFoundBefore | TargetStatus::NotFound => "❓",
+            TargetStatus::Resolved => "[OK]",
+            TargetStatus::Improved => "[OK]",
+            TargetStatus::Unchanged => "[WARNING]",
+            TargetStatus::Regressed => "[ERROR]",
+            TargetStatus::NotFoundBefore | TargetStatus::NotFound => "[UNKNOWN]",
         };
 
         md.push_str(&format!(
@@ -1050,9 +1050,9 @@ fn format_comparison_markdown(comparison: &debtmap::comparison::ComparisonResult
     md.push_str("## Project Health\n\n");
 
     let trend_icon = match comparison.summary.overall_debt_trend {
-        DebtTrend::Improving => "📉",
-        DebtTrend::Stable => "➡️",
-        DebtTrend::Regressing => "📈",
+        DebtTrend::Improving => "[IMPROVING]",
+        DebtTrend::Stable => "[STABLE]",
+        DebtTrend::Regressing => "[REGRESSING]",
     };
 
     md.push_str(&format!(
@@ -1074,7 +1074,7 @@ fn format_comparison_markdown(comparison: &debtmap::comparison::ComparisonResult
 
     if !comparison.regressions.is_empty() {
         md.push_str(&format!(
-            "\n⚠️ {} new critical item(s) detected\n\n",
+            "\n[WARNING] {} new critical item(s) detected\n\n",
             comparison.regressions.len()
         ));
 
@@ -1083,20 +1083,20 @@ fn format_comparison_markdown(comparison: &debtmap::comparison::ComparisonResult
             md.push_str(&format!("- `{}` (score: {:.1})\n", reg.location, reg.score));
         }
     } else {
-        md.push_str("\n✅ No new critical items introduced\n");
+        md.push_str("\n[OK] No new critical items introduced\n");
     }
 
     md.push_str("\n## Summary\n\n");
     if comparison.summary.target_improved {
-        md.push_str("✅ Target item significantly improved\n");
+        md.push_str("[OK] Target item significantly improved\n");
     }
     if comparison.summary.new_critical_count == 0 {
-        md.push_str("✅ No regressions detected\n");
+        md.push_str("[OK] No regressions detected\n");
     }
     match comparison.summary.overall_debt_trend {
-        DebtTrend::Improving => md.push_str("✅ Overall project health improved\n"),
-        DebtTrend::Stable => md.push_str("➡️ Overall project health stable\n"),
-        DebtTrend::Regressing => md.push_str("⚠️ Overall project health declined\n"),
+        DebtTrend::Improving => md.push_str("[OK] Overall project health improved\n"),
+        DebtTrend::Stable => md.push_str("[STABLE] Overall project health stable\n"),
+        DebtTrend::Regressing => md.push_str("[WARNING] Overall project health declined\n"),
     }
 
     md

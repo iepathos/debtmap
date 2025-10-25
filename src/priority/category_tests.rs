@@ -192,16 +192,16 @@ mod tests {
     #[test]
     fn test_category_names_and_icons() {
         assert_eq!(DebtCategory::Architecture.name(), "Architecture Issues");
-        assert_eq!(DebtCategory::Architecture.icon(), "🏗️");
+        assert_eq!(DebtCategory::Architecture.icon(), "[ARCH]");
 
         assert_eq!(DebtCategory::Testing.name(), "Testing Gaps");
-        assert_eq!(DebtCategory::Testing.icon(), "🧪");
+        assert_eq!(DebtCategory::Testing.icon(), "[TEST]");
 
         assert_eq!(DebtCategory::Performance.name(), "Performance Issues");
-        assert_eq!(DebtCategory::Performance.icon(), "⚡");
+        assert_eq!(DebtCategory::Performance.icon(), "[PERF]");
 
         assert_eq!(DebtCategory::CodeQuality.name(), "Code Quality");
-        assert_eq!(DebtCategory::CodeQuality.icon(), "📊");
+        assert_eq!(DebtCategory::CodeQuality.icon(), "[STATS]");
     }
 
     #[test]

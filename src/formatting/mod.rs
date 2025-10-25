@@ -28,50 +28,22 @@ impl ColorMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EmojiMode {
-    Auto,   // Use emoji if terminal supports Unicode
-    Always, // Always use emoji
-    Never,  // Never use emoji
-}
-
-impl EmojiMode {
-    pub fn parse(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "auto" => Some(Self::Auto),
-            "always" => Some(Self::Always),
-            "never" => Some(Self::Never),
-            _ => None,
-        }
-    }
-
-    pub fn should_use_emoji(&self) -> bool {
-        match self {
-            Self::Always => true,
-            Self::Never => false,
-            Self::Auto => detect_emoji_support(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct FormattingConfig {
     pub color: ColorMode,
-    pub emoji: EmojiMode,
 }
 
 impl Default for FormattingConfig {
     fn default() -> Self {
         Self {
             color: ColorMode::Auto,
-            emoji: EmojiMode::Auto,
         }
     }
 }
 
 impl FormattingConfig {
-    pub fn new(color: ColorMode, emoji: EmojiMode) -> Self {
-        Self { color, emoji }
+    pub fn new(color: ColorMode) -> Self {
+        Self { color }
     }
 
     pub fn from_env() -> Self {
@@ -99,11 +71,10 @@ impl FormattingConfig {
         config
     }
 
-    /// Create a plain output configuration (ASCII-only, no colors, no emoji)
+    /// Create a plain output configuration (no colors)
     pub fn plain() -> Self {
         Self {
             color: ColorMode::Never,
-            emoji: EmojiMode::Never,
         }
     }
 }
@@ -114,7 +85,6 @@ pub trait OutputFormatter {
     fn warning(&self, text: &str) -> String;
     fn info(&self, text: &str) -> String;
     fn header(&self, text: &str) -> String;
-    fn emoji(&self, emoji: &str, fallback: &str) -> String;
     fn bold(&self, text: &str) -> String;
     fn dim(&self, text: &str) -> String;
 }
@@ -177,14 +147,6 @@ impl OutputFormatter for ColoredFormatter {
         }
     }
 
-    fn emoji(&self, emoji: &str, fallback: &str) -> String {
-        if self.config.emoji.should_use_emoji() {
-            emoji.to_string()
-        } else {
-            fallback.to_string()
-        }
-    }
-
     fn bold(&self, text: &str) -> String {
         if self.config.color.should_use_color() {
             text.bold().to_string()
@@ -225,10 +187,6 @@ impl OutputFormatter for PlainFormatter {
         text.to_string()
     }
 
-    fn emoji(&self, _emoji: &str, fallback: &str) -> String {
-        fallback.to_string()
-    }
-
     fn bold(&self, text: &str) -> String {
         text.to_string()
     }
@@ -248,33 +206,4 @@ fn detect_color_support() -> bool {
 
     // Check if stdout is a TTY
     std::io::stdout().is_terminal()
-}
-
-fn detect_emoji_support() -> bool {
-    // For now, we'll use the same detection as color support
-    // In a more sophisticated implementation, we could check locale and terminal capabilities
-    detect_color_support()
-}
-
-// Common emoji mappings
-pub fn emoji_or_fallback(emoji: &str) -> (&str, &str) {
-    match emoji {
-        "✓" => ("✓", "[OK]"),
-        "✗" => ("✗", "[FAIL]"),
-        "⚠" => ("⚠", "[WARN]"),
-        "ℹ" => ("ℹ", "[INFO]"),
-        "📈" => ("📈", "[CHART]"),
-        "🔍" => ("🔍", "[SEARCH]"),
-        "📊" => ("📊", "[STATS]"),
-        "🎯" => ("🎯", "[TARGET]"),
-        "🔧" => ("🔧", "[FIX]"),
-        "📝" => ("📝", "[DOC]"),
-        "🚨" => ("🚨", "[ALERT]"),
-        "💡" => ("💡", "[IDEA]"),
-        "🏆" => ("🏆", "[TROPHY]"),
-        "🔴" => ("🔴", "[RED]"),
-        "🟡" => ("🟡", "[YELLOW]"),
-        "🟢" => ("🟢", "[GREEN]"),
-        _ => (emoji, ""),
-    }
 }
