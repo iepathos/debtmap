@@ -417,6 +417,24 @@ struct UnchangedCritical {
     items: Vec<ItemInfo>,
 }
 
+/// Build a map of (file, function) -> FunctionMetrics for quick lookup
+fn build_function_map(
+    items: &[crate::priority::DebtItem],
+) -> HashMap<(PathBuf, String), &crate::priority::UnifiedDebtItem> {
+    use crate::priority::DebtItem;
+
+    items
+        .iter()
+        .filter_map(|item| match item {
+            DebtItem::Function(f) => Some((
+                (f.location.file.clone(), f.location.function.clone()),
+                f.as_ref(),
+            )),
+            DebtItem::File(_) => None,
+        })
+        .collect()
+}
+
 fn identify_unchanged_critical(
     before: &UnifiedJsonOutput,
     after: &UnifiedJsonOutput,
@@ -425,16 +443,7 @@ fn identify_unchanged_critical(
 
     let mut unchanged_critical = Vec::new();
 
-    let after_map: HashMap<_, _> = after
-        .items
-        .iter()
-        .filter_map(|item| match item {
-            DebtItem::Function(f) => {
-                Some(((f.location.file.clone(), f.location.function.clone()), f))
-            }
-            DebtItem::File(_) => None,
-        })
-        .collect();
+    let after_map = build_function_map(&after.items);
 
     for item in &before.items {
         if let DebtItem::Function(before_item) = item {
@@ -903,6 +912,94 @@ mod tests {
         // After score is < 8.0, so should not be included
         assert_eq!(result.count, 0);
         assert_eq!(result.items.len(), 0);
+    }
+
+    // Tests for build_function_map
+    #[test]
+    fn test_build_function_map_empty() {
+        let items: Vec<DebtItem> = vec![];
+        let result = build_function_map(&items);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_build_function_map_only_functions() {
+        let items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "func1",
+                10,
+                9.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/bar.rs",
+                "func2",
+                20,
+                8.5,
+            ))),
+        ];
+
+        let result = build_function_map(&items);
+
+        assert_eq!(result.len(), 2);
+        assert!(result.contains_key(&(PathBuf::from("src/foo.rs"), "func1".to_string())));
+        assert!(result.contains_key(&(PathBuf::from("src/bar.rs"), "func2".to_string())));
+    }
+
+    #[test]
+    fn test_build_function_map_filters_file_items() {
+        use crate::priority::{
+            file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators},
+            FileDebtItem,
+        };
+
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("src/foo.rs"),
+            total_lines: 100,
+            function_count: 5,
+            class_count: 1,
+            avg_complexity: 5.0,
+            max_complexity: 10,
+            total_complexity: 25,
+            coverage_percent: 50.0,
+            uncovered_lines: 50,
+            god_object_indicators: GodObjectIndicators {
+                methods_count: 5,
+                fields_count: 3,
+                responsibilities: 2,
+                is_god_object: false,
+                god_object_score: 0.5,
+                responsibility_names: vec![],
+                recommended_splits: vec![],
+            },
+            function_scores: vec![],
+        };
+
+        let items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "func1",
+                10,
+                9.0,
+            ))),
+            DebtItem::File(Box::new(FileDebtItem {
+                metrics,
+                score: 10.0,
+                priority_rank: 0,
+                recommendation: "Test".into(),
+                impact: FileImpact {
+                    complexity_reduction: 0.0,
+                    maintainability_improvement: 0.0,
+                    test_effort: 0.0,
+                },
+            })),
+        ];
+
+        let result = build_function_map(&items);
+
+        // Only the function item should be in the map
+        assert_eq!(result.len(), 1);
+        assert!(result.contains_key(&(PathBuf::from("src/foo.rs"), "func1".to_string())));
     }
 
     #[test]
