@@ -218,9 +218,9 @@ impl GodObjectDetector {
                                 s.methods_to_move.len()
                             };
                             let priority_icon = match s.priority {
-                                crate::organization::Priority::High => "⭐⭐⭐",
-                                crate::organization::Priority::Medium => "⭐⭐",
-                                crate::organization::Priority::Low => "⭐",
+                                crate::organization::Priority::High => "[*][*][*]",
+                                crate::organization::Priority::Medium => "[*][*]",
+                                crate::organization::Priority::Low => "[*]",
                             };
                             format!(
                                 "  - {} {}: {} structs, {} methods (~{} lines)",

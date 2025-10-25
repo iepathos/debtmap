@@ -22,25 +22,25 @@ pub fn write_risk_distribution<W: Write>(
         writeln!(writer, "|------------|-------|------------|")?;
         writeln!(
             writer,
-            "| 🟢 Low | {} | {:.1}% |",
+            "| [OK] Low | {} | {:.1}% |",
             distribution.low_count,
             (distribution.low_count as f64 / total as f64) * 100.0
         )?;
         writeln!(
             writer,
-            "| 🟡 Medium | {} | {:.1}% |",
+            "| [WARN] Medium | {} | {:.1}% |",
             distribution.medium_count,
             (distribution.medium_count as f64 / total as f64) * 100.0
         )?;
         writeln!(
             writer,
-            "| 🟠 High | {} | {:.1}% |",
+            "| [WARN] High | {} | {:.1}% |",
             distribution.high_count,
             (distribution.high_count as f64 / total as f64) * 100.0
         )?;
         writeln!(
             writer,
-            "| 🔴 Critical | {} | {:.1}% |",
+            "| [ERROR] Critical | {} | {:.1}% |",
             distribution.critical_count,
             (distribution.critical_count as f64 / total as f64) * 100.0
         )?;
@@ -109,10 +109,10 @@ mod tests {
 
         let output = String::from_utf8(buffer.into_inner()).unwrap();
         assert!(output.contains("Risk Distribution"));
-        assert!(output.contains("🟢 Low"));
-        assert!(output.contains("🟡 Medium"));
-        assert!(output.contains("🟠 High"));
-        assert!(output.contains("🔴 Critical"));
+        assert!(output.contains("[OK] Low"));
+        assert!(output.contains("[WARN] Medium"));
+        assert!(output.contains("[WARN] High"));
+        assert!(output.contains("[ERROR] Critical"));
     }
 
     #[test]

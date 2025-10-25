@@ -217,7 +217,7 @@ fn format_cross_category_dependencies(
     output: &mut String,
     dependencies: &[CrossCategoryDependency],
 ) {
-    writeln!(output, "### ⚡ Cross-Category Dependencies\n").unwrap();
+    writeln!(output, "### [PERF] Cross-Category Dependencies\n").unwrap();
     writeln!(
         output,
         "These relationships affect how you should prioritize improvements:\n"
@@ -226,10 +226,10 @@ fn format_cross_category_dependencies(
 
     for dep in dependencies {
         let impact_symbol = match dep.impact_level {
-            ImpactLevel::Critical => "🔴",
-            ImpactLevel::High => "🟠",
-            ImpactLevel::Medium => "🟡",
-            ImpactLevel::Low => "🟢",
+            ImpactLevel::Critical => "[ERROR]",
+            ImpactLevel::High => "[WARN]",
+            ImpactLevel::Medium => "[WARN]",
+            ImpactLevel::Low => "[OK]",
         };
 
         writeln!(
@@ -327,10 +327,10 @@ pub fn format_priorities_tiered_markdown(
         critical_count + high_count + moderate_count + low_count
     )
     .unwrap();
-    writeln!(output, "- 🚨 Critical: {} items", critical_count).unwrap();
-    writeln!(output, "- ⚠️ High: {} items", high_count).unwrap();
-    writeln!(output, "- 📊 Moderate: {} items", moderate_count).unwrap();
-    writeln!(output, "- 📝 Low: {} items", low_count).unwrap();
+    writeln!(output, "- [CRITICAL] Critical: {} items", critical_count).unwrap();
+    writeln!(output, "- [WARN] High: {} items", high_count).unwrap();
+    writeln!(output, "- [STATS] Moderate: {} items", moderate_count).unwrap();
+    writeln!(output, "- [INFO] Low: {} items", low_count).unwrap();
 
     writeln!(output).unwrap();
     writeln!(
@@ -2071,10 +2071,10 @@ mod tests {
         let output = format_priorities_tiered_markdown(&analysis, 10, 0);
 
         // Check that all tier headers are present (if not empty)
-        assert!(output.contains("🚨 CRITICAL"));
-        assert!(output.contains("⚠️ HIGH"));
-        assert!(output.contains("📊 MODERATE"));
-        assert!(output.contains("📝 LOW"));
+        assert!(output.contains("[CRITICAL] CRITICAL"));
+        assert!(output.contains("[WARN] HIGH"));
+        assert!(output.contains("[STATS] MODERATE"));
+        assert!(output.contains("[INFO] LOW"));
 
         // Check that items are in the right sections
         assert!(output.contains("critical_func"));
@@ -2110,14 +2110,14 @@ mod tests {
     fn test_tier_headers() {
         assert_eq!(
             Tier::Critical.header(),
-            "🚨 CRITICAL - Immediate Action Required"
+            "[CRITICAL] CRITICAL - Immediate Action Required"
         );
-        assert_eq!(Tier::High.header(), "⚠️ HIGH - Current Sprint Priority");
+        assert_eq!(Tier::High.header(), "[WARN] HIGH - Current Sprint Priority");
         assert_eq!(
             Tier::Moderate.header(),
-            "📊 MODERATE - Next Sprint Planning"
+            "[STATS] MODERATE - Next Sprint Planning"
         );
-        assert_eq!(Tier::Low.header(), "📝 LOW - Backlog Consideration");
+        assert_eq!(Tier::Low.header(), "[INFO] LOW - Backlog Consideration");
     }
 
     #[test]

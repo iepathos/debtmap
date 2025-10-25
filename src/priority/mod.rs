@@ -248,10 +248,10 @@ impl DebtCategory {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            DebtCategory::Architecture => "🏗️",
-            DebtCategory::Testing => "🧪",
-            DebtCategory::Performance => "⚡",
-            DebtCategory::CodeQuality => "📊",
+            DebtCategory::Architecture => "[ARCH]",
+            DebtCategory::Testing => "[TEST]",
+            DebtCategory::Performance => "[PERF]",
+            DebtCategory::CodeQuality => "[STATS]",
         }
     }
 
@@ -377,10 +377,10 @@ impl Tier {
 
     pub fn header(&self) -> &'static str {
         match self {
-            Tier::Critical => "🚨 CRITICAL - Immediate Action Required",
-            Tier::High => "⚠️ HIGH - Current Sprint Priority",
-            Tier::Moderate => "📊 MODERATE - Next Sprint Planning",
-            Tier::Low => "📝 LOW - Backlog Consideration",
+            Tier::Critical => "[CRITICAL] CRITICAL - Immediate Action Required",
+            Tier::High => "[WARN] HIGH - Current Sprint Priority",
+            Tier::Moderate => "[STATS] MODERATE - Next Sprint Planning",
+            Tier::Low => "[INFO] LOW - Backlog Consideration",
         }
     }
 

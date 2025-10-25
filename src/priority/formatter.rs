@@ -828,9 +828,9 @@ fn format_god_object_steps(
 
             // Show priority indicator
             let priority_indicator = match split.priority {
-                crate::priority::file_metrics::Priority::High => "⭐⭐⭐ High",
-                crate::priority::file_metrics::Priority::Medium => "⭐⭐ Medium",
-                crate::priority::file_metrics::Priority::Low => "⭐ Low",
+                crate::priority::file_metrics::Priority::High => "[*][*][*] High",
+                crate::priority::file_metrics::Priority::Medium => "[*][*] Medium",
+                crate::priority::file_metrics::Priority::Low => "[*] Low",
             };
 
             // Show module name and responsibility

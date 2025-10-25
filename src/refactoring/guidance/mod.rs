@@ -72,10 +72,10 @@ impl RefactoringGuidanceGenerator {
 
     fn get_priority_icon(priority: &Priority) -> &'static str {
         match priority {
-            Priority::Critical => "🔴",
-            Priority::High => "🟠",
-            Priority::Medium => "🟡",
-            Priority::Low => "🟢",
+            Priority::Critical => "[ERROR]",
+            Priority::High => "[WARN]",
+            Priority::Medium => "[WARN]",
+            Priority::Low => "[OK]",
         }
     }
 
@@ -94,11 +94,11 @@ impl RefactoringGuidanceGenerator {
 
         // Add header based on quality assessment
         if analysis.quality_assessment.overall_score > 0.8 {
-            output.push_str(&format!("✓ Good Example: {}\n", analysis.function_name));
+            output.push_str(&format!("[OK] Good Example: {}\n", analysis.function_name));
             output.push_str(&self.format_strengths(&analysis.quality_assessment));
         } else {
             output.push_str(&format!(
-                "⚡ Refactoring Opportunity: {}\n",
+                "[PERF] Refactoring Opportunity: {}\n",
                 analysis.function_name
             ));
             output.push_str(&self.format_opportunities(&analysis.refactoring_opportunities));
@@ -268,16 +268,16 @@ pub struct EducationalContentGenerator;
 impl EducationalContentGenerator {
     pub fn generate_functional_programming_tips() -> Vec<String> {
         vec![
-            "💡 Pure functions have no side effects and always return the same output for the same input".to_string(),
-            "💡 Use map() to transform collections instead of for loops with push()".to_string(),
-            "💡 Use filter() to select items instead of if statements in loops".to_string(),
-            "💡 Use fold() to aggregate values instead of mutable accumulators".to_string(),
-            "💡 Keep I/O operations at the boundaries of your application".to_string(),
-            "💡 Compose small, focused functions to build complex behavior".to_string(),
-            "💡 Prefer immutable data structures to prevent unexpected mutations".to_string(),
-            "💡 Use Result<T, E> for error handling instead of exceptions".to_string(),
-            "💡 Pattern matching is more expressive than if-else chains".to_string(),
-            "💡 Property-based testing works great with pure functions".to_string(),
+            "[TIP] Pure functions have no side effects and always return the same output for the same input".to_string(),
+            "[TIP] Use map() to transform collections instead of for loops with push()".to_string(),
+            "[TIP] Use filter() to select items instead of if statements in loops".to_string(),
+            "[TIP] Use fold() to aggregate values instead of mutable accumulators".to_string(),
+            "[TIP] Keep I/O operations at the boundaries of your application".to_string(),
+            "[TIP] Compose small, focused functions to build complex behavior".to_string(),
+            "[TIP] Prefer immutable data structures to prevent unexpected mutations".to_string(),
+            "[TIP] Use Result<T, E> for error handling instead of exceptions".to_string(),
+            "[TIP] Pattern matching is more expressive than if-else chains".to_string(),
+            "[TIP] Property-based testing works great with pure functions".to_string(),
         ]
     }
 

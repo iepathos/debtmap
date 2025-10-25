@@ -141,7 +141,7 @@ fn generate_zero_coverage_complex_recommendation(
 
     (
         format!(
-            "⚠️ URGENT: Add {} tests for untested complex function, then refactor",
+            "[WARN] URGENT: Add {} tests for untested complex function, then refactor",
             test_cases_needed
         ),
         format!(
@@ -222,7 +222,7 @@ fn generate_zero_coverage_recommendation(
     let est_branches = func.nesting.max(1) * 2;
 
     (
-        "⚠️ URGENT: Add tests for completely untested function (0% coverage)".to_string(),
+        "[WARN] URGENT: Add tests for completely untested function (0% coverage)".to_string(),
         format!(
             "UNTESTED CODE: This {} has never been tested. \
              With ~{} estimated branches and complexity {}/{}, this represents high risk. \
