@@ -140,6 +140,8 @@ fn create_getter() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -162,6 +164,8 @@ fn create_setter() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -184,6 +188,8 @@ fn create_simple_validator() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -206,6 +212,8 @@ fn create_small_util() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -228,6 +236,8 @@ fn create_test_helper() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -250,6 +260,8 @@ fn create_complex_handler() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -272,6 +284,8 @@ fn create_nested_logic() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -294,6 +308,8 @@ fn create_long_switch() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }
 
@@ -316,5 +332,7 @@ fn create_moderate_complexity() -> FunctionMetrics {
         detected_patterns: None,
         upstream_callers: None,
         downstream_callees: None,
+        mapping_pattern_result: None,
+        adjusted_complexity: None,
     }
 }

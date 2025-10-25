@@ -113,7 +113,9 @@ impl MappingPatternDetector {
         }
 
         let lines: Vec<&str> = body.lines().collect();
-        let total_lines = lines.len();
+        // Filter out empty lines for a more accurate ratio
+        let non_empty_lines: Vec<&str> = lines.iter().filter(|l| !l.trim().is_empty()).copied().collect();
+        let total_lines = non_empty_lines.len();
 
         // Count match arms
         let arm_count = lines.iter().filter(|line| line.contains("=>")).count();
@@ -123,8 +125,8 @@ impl MappingPatternDetector {
         }
 
         // Calculate mapping ratio - how much of the function is the match expression
-        let match_start = lines.iter().position(|line| line.contains("match "))?;
-        let match_end = lines
+        let match_start = non_empty_lines.iter().position(|line| line.contains("match "))?;
+        let match_end = non_empty_lines
             .iter()
             .rposition(|line| line.trim_end().ends_with('}'))?;
         let match_lines = match_end.saturating_sub(match_start) + 1;
@@ -176,7 +178,9 @@ impl MappingPatternDetector {
         }
 
         let lines: Vec<&str> = body.lines().collect();
-        let total_lines = lines.len();
+        // Filter out empty lines for a more accurate ratio
+        let non_empty_lines: Vec<&str> = lines.iter().filter(|l| !l.trim().is_empty()).copied().collect();
+        let total_lines = non_empty_lines.len();
 
         // Count case statements
         let case_count = lines
@@ -191,7 +195,7 @@ impl MappingPatternDetector {
         // Check for simple cases (just return statements)
         let return_count = lines
             .iter()
-            .filter(|line| line.trim().starts_with("return "))
+            .filter(|line| line.contains("return "))
             .count();
 
         if return_count < case_count {
@@ -199,8 +203,8 @@ impl MappingPatternDetector {
         }
 
         // Calculate mapping ratio
-        let switch_start = lines.iter().position(|line| line.contains("switch"))?;
-        let switch_end = lines.iter().rposition(|line| line.trim() == "}")?;
+        let switch_start = non_empty_lines.iter().position(|line| line.contains("switch"))?;
+        let switch_end = non_empty_lines.iter().rposition(|line| line.trim() == "}")?;
         let switch_lines = switch_end.saturating_sub(switch_start) + 1;
         let mapping_ratio = switch_lines as f64 / total_lines as f64;
 
