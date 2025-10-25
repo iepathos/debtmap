@@ -183,6 +183,9 @@ impl Default for ParallelUnifiedAnalysisOptions {
 /// Timing information for analysis phases
 #[derive(Debug, Clone)]
 pub struct AnalysisPhaseTimings {
+    pub call_graph_building: Duration,
+    pub trait_resolution: Duration,
+    pub coverage_loading: Duration,
     pub data_flow_creation: Duration,
     pub purity_analysis: Duration,
     pub test_detection: Duration,
@@ -197,6 +200,9 @@ pub struct AnalysisPhaseTimings {
 impl Default for AnalysisPhaseTimings {
     fn default() -> Self {
         Self {
+            call_graph_building: Duration::from_secs(0),
+            trait_resolution: Duration::from_secs(0),
+            coverage_loading: Duration::from_secs(0),
             data_flow_creation: Duration::from_secs(0),
             purity_analysis: Duration::from_secs(0),
             test_detection: Duration::from_secs(0),
@@ -356,6 +362,18 @@ impl ParallelUnifiedAnalysisBuilder {
             options,
             timings: AnalysisPhaseTimings::default(),
         }
+    }
+
+    /// Set preliminary timing values (call graph, trait resolution, coverage loading)
+    pub fn set_preliminary_timings(
+        &mut self,
+        call_graph_building: Duration,
+        trait_resolution: Duration,
+        coverage_loading: Duration,
+    ) {
+        self.timings.call_graph_building = call_graph_building;
+        self.timings.trait_resolution = trait_resolution;
+        self.timings.coverage_loading = coverage_loading;
     }
 
     /// Execute phase 1: Parallel initialization
@@ -873,7 +891,10 @@ impl ParallelUnifiedAnalysisBuilder {
         }
 
         self.timings.sorting = start.elapsed();
-        self.timings.total = self.timings.data_flow_creation
+        self.timings.total = self.timings.call_graph_building
+            + self.timings.trait_resolution
+            + self.timings.coverage_loading
+            + self.timings.data_flow_creation
             + self.timings.purity_analysis
             + self.timings.test_detection
             + self.timings.debt_aggregation
@@ -889,6 +910,12 @@ impl ParallelUnifiedAnalysisBuilder {
             } else {
                 eprintln!("Total parallel analysis time: {:?}", self.timings.total);
             }
+            eprintln!(
+                "  - Call graph building: {:?}",
+                self.timings.call_graph_building
+            );
+            eprintln!("  - Trait resolution: {:?}", self.timings.trait_resolution);
+            eprintln!("  - Coverage loading: {:?}", self.timings.coverage_loading);
             eprintln!("  - Data flow: {:?}", self.timings.data_flow_creation);
             eprintln!("  - Purity: {:?}", self.timings.purity_analysis);
             eprintln!("  - Test detection: {:?}", self.timings.test_detection);

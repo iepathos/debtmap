@@ -347,6 +347,8 @@ fn perform_unified_analysis_computation(
         formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
     // Progress will be shown by the parallel builder itself
 
+    // Time call graph building
+    let call_graph_start = std::time::Instant::now();
     let (framework_exclusions, function_pointer_used_functions) = match execution_strategy {
         ExecutionStrategy::Parallel => {
             build_parallel_call_graph(project_path, &mut call_graph, jobs)?
@@ -364,6 +366,7 @@ fn perform_unified_analysis_computation(
             show_macro_stats,
         )?,
     };
+    let call_graph_time = call_graph_start.elapsed();
 
     if !quiet_mode {
         if use_emoji {
@@ -377,8 +380,10 @@ fn perform_unified_analysis_computation(
     }
 
     // Integrate trait resolution to reduce false positives
+    let trait_resolution_start = std::time::Instant::now();
     let trait_resolution_stats =
         integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
+    let trait_resolution_time = trait_resolution_start.elapsed();
 
     if !quiet_mode {
         if use_emoji {
@@ -418,7 +423,9 @@ fn perform_unified_analysis_computation(
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
+    let coverage_loading_start = std::time::Instant::now();
     let coverage_data = load_coverage_data(coverage_file.cloned())?;
+    let coverage_loading_time = coverage_loading_start.elapsed();
 
     // Emit warning if no coverage data provided (spec 108)
     if coverage_data.is_none() && !quiet_mode {
@@ -452,7 +459,7 @@ fn perform_unified_analysis_computation(
         &call_graph,
     );
 
-    let result = create_unified_analysis_with_exclusions(
+    let result = create_unified_analysis_with_exclusions_and_timing(
         &enriched_metrics,
         &call_graph,
         coverage_data.as_ref(),
@@ -463,6 +470,9 @@ fn perform_unified_analysis_computation(
         aggregation_method,
         min_problematic,
         no_god_object,
+        call_graph_time,
+        trait_resolution_time,
+        coverage_loading_time,
     );
 
     // Only print the checkmark if not in parallel mode (parallel mode prints its own progress)
@@ -663,6 +673,40 @@ pub fn create_unified_analysis_with_exclusions(
     min_problematic: Option<usize>,
     no_god_object: bool,
 ) -> UnifiedAnalysis {
+    use std::time::Duration;
+    create_unified_analysis_with_exclusions_and_timing(
+        metrics,
+        call_graph,
+        coverage_data,
+        framework_exclusions,
+        function_pointer_used_functions,
+        debt_items,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
+        no_god_object,
+        Duration::from_secs(0),
+        Duration::from_secs(0),
+        Duration::from_secs(0),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn create_unified_analysis_with_exclusions_and_timing(
+    metrics: &[FunctionMetrics],
+    call_graph: &priority::CallGraph,
+    coverage_data: Option<&risk::lcov::LcovData>,
+    framework_exclusions: &HashSet<priority::call_graph::FunctionId>,
+    function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
+    debt_items: Option<&[DebtItem]>,
+    no_aggregation: bool,
+    aggregation_method: Option<String>,
+    min_problematic: Option<usize>,
+    no_god_object: bool,
+    call_graph_time: std::time::Duration,
+    trait_resolution_time: std::time::Duration,
+    coverage_loading_time: std::time::Duration,
+) -> UnifiedAnalysis {
     // Check if parallel mode is enabled
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
@@ -685,6 +729,9 @@ pub fn create_unified_analysis_with_exclusions(
             min_problematic,
             no_god_object,
             jobs,
+            call_graph_time,
+            trait_resolution_time,
+            coverage_loading_time,
         );
     }
     use std::time::Instant;
@@ -832,6 +879,9 @@ fn create_unified_analysis_parallel(
     _min_problematic: Option<usize>,
     no_god_object: bool,
     jobs: Option<usize>,
+    call_graph_time: std::time::Duration,
+    trait_resolution_time: std::time::Duration,
+    coverage_loading_time: std::time::Duration,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::{
         ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
@@ -845,6 +895,13 @@ fn create_unified_analysis_parallel(
     };
 
     let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
+
+    // Set preliminary timing values from call graph building, trait resolution, and coverage loading
+    builder.set_preliminary_timings(
+        call_graph_time,
+        trait_resolution_time,
+        coverage_loading_time,
+    );
 
     // Phase 1: Parallel initialization
     let (data_flow_graph, _purity, test_only_functions, debt_aggregator) =
