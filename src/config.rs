@@ -1763,6 +1763,14 @@ pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
         .unwrap_or_default()
 }
 
+/// Get functional analysis configuration (spec 111)
+pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisConfig {
+    get_config()
+        .functional_analysis
+        .clone()
+        .unwrap_or_default()
+}
+
 /// Get smart performance configuration
 #[cfg(test)]
 mod tests {

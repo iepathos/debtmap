@@ -563,6 +563,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         call_graph_stats_only,
         debug_format,
         validate_call_graph,
+        ast_functional_analysis,
+        functional_analysis_profile,
     } = command
     {
         // Apply side effects first
@@ -635,6 +637,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             call_graph_stats_only,
             debug_format,
             validate_call_graph,
+            ast_functional_analysis,
+            functional_analysis_profile,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -828,6 +832,8 @@ fn build_analyze_config(
     call_graph_stats_only: bool,
     debug_format: debtmap::cli::DebugFormatArg,
     validate_call_graph: bool,
+    ast_functional_analysis: bool,
+    functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -884,6 +890,8 @@ fn build_analyze_config(
         call_graph_stats_only,
         debug_format,
         validate_call_graph,
+        ast_functional_analysis,
+        functional_analysis_profile,
     }
 }
 
