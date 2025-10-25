@@ -187,8 +187,8 @@ impl GodObjectDetector {
                 responsibilities,
             } => {
                 format!(
-                    "This class '{}' violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. \
-                    Extract methods into smaller, focused classes.",
+                    "This struct '{}' violates single responsibility principle with {} methods, {} fields, and {} distinct responsibilities. \
+                    Extract methods into smaller, focused structs or separate traits.",
                     struct_name, method_count, field_count, responsibilities
                 )
             }
