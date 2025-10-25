@@ -358,12 +358,7 @@ fn format_tiered_terminal(
         .unwrap();
     }
     if low_count > 0 {
-        writeln!(
-            output,
-            "  [-] Low: {} items",
-            low_count.to_string().white()
-        )
-        .unwrap();
+        writeln!(output, "  [-] Low: {} items", low_count.to_string().white()).unwrap();
     }
 
     writeln!(output).unwrap();
@@ -455,7 +450,8 @@ fn format_tier_terminal(
             if remaining > 0 {
                 writeln!(
                     output,
-                    "  [+] ... and {} more items in this tier", remaining
+                    "  [+] ... and {} more items in this tier",
+                    remaining
                 )
                 .unwrap();
             }
@@ -847,11 +843,7 @@ fn format_god_object_steps(
                     )
                 } else {
                     let _branch_prefix = if is_last { " " } else { "│" };
-                    writeln!(
-                        output,
-                        "       -> Methods: {}",
-                        methods_display.join(", ")
-                    )
+                    writeln!(output, "       -> Methods: {}", methods_display.join(", "))
                 };
                 continuation.unwrap();
             }
@@ -925,28 +917,12 @@ fn format_language_specific_advice(
                 "  -  - Use dataclasses/attrs for data-heavy classes"
             )
             .unwrap();
-            writeln!(
-                output,
-                "  -  - Extract interfaces with Protocol/ABC"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Prefer composition over inheritance"
-            )
-            .unwrap();
+            writeln!(output, "  -  - Extract interfaces with Protocol/ABC").unwrap();
+            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
         }
         "rs" => {
-            writeln!(
-                output,
-                "  -  - Extract traits for shared behavior"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Use newtype pattern for domain types"
-            )
-            .unwrap();
+            writeln!(output, "  -  - Extract traits for shared behavior").unwrap();
+            writeln!(output, "  -  - Use newtype pattern for domain types").unwrap();
             writeln!(
                 output,
                 "  -  - Consider builder pattern for complex construction"
@@ -954,38 +930,14 @@ fn format_language_specific_advice(
             .unwrap();
         }
         "js" | "jsx" => {
-            writeln!(
-                output,
-                "  -  - Decompose into smaller classes/modules"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Use functional composition where possible"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Extract hooks for React components"
-            )
-            .unwrap();
+            writeln!(output, "  -  - Decompose into smaller classes/modules").unwrap();
+            writeln!(output, "  -  - Use functional composition where possible").unwrap();
+            writeln!(output, "  -  - Extract hooks for React components").unwrap();
         }
         "ts" | "tsx" => {
-            writeln!(
-                output,
-                "  -  - Extract interfaces for contracts"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Use type guards for domain logic"
-            )
-            .unwrap();
-            writeln!(
-                output,
-                "  -  - Leverage discriminated unions"
-            )
-            .unwrap();
+            writeln!(output, "  -  - Extract interfaces for contracts").unwrap();
+            writeln!(output, "  -  - Use type guards for domain logic").unwrap();
+            writeln!(output, "  -  - Leverage discriminated unions").unwrap();
         }
         _ => {
             writeln!(
@@ -993,11 +945,7 @@ fn format_language_specific_advice(
                 "  -  - Extract interfaces/protocols for shared behavior"
             )
             .unwrap();
-            writeln!(
-                output,
-                "  -  - Prefer composition over inheritance"
-            )
-            .unwrap();
+            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
         }
     }
 }
@@ -1025,17 +973,20 @@ fn format_generic_god_object_steps(
 
     writeln!(
         output,
-        "  -  [1] {}_core.{} - Core business logic", file_name, extension
+        "  -  [1] {}_core.{} - Core business logic",
+        file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "  -  [2] {}_io.{} - Input/output operations", file_name, extension
+        "  -  [2] {}_io.{} - Input/output operations",
+        file_name, extension
     )
     .unwrap();
     writeln!(
         output,
-        "  -  [3] {}_utils.{} - Helper functions", file_name, extension
+        "  -  [3] {}_utils.{} - Helper functions",
+        file_name, extension
     )
     .unwrap();
 }
