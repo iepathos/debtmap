@@ -451,7 +451,7 @@ pub fn analyze_uncovered_lines(_func: &FunctionMetrics, uncovered_lines: &[usize
     let mut current_group = Vec::new();
 
     for &line in uncovered_lines {
-        if current_group.is_empty() || line == current_group.last().unwrap() + 1 {
+        if current_group.is_empty() || line == *current_group.last().unwrap() + 1 {
             current_group.push(line);
         } else {
             if !current_group.is_empty() {
