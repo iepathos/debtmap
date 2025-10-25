@@ -648,6 +648,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         }
     }
 
@@ -744,6 +745,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -798,6 +800,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let call_graph = CallGraph::new(); // Empty call graph - no callers
@@ -835,6 +838,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -903,6 +907,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let on_key_down = FunctionMetrics {
@@ -925,6 +930,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let mut call_graph = CallGraph::new();
@@ -998,6 +1004,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
 
         let mut call_graph = CallGraph::new();

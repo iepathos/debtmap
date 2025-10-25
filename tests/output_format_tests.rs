@@ -29,6 +29,7 @@ fn test_output_json_format() {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

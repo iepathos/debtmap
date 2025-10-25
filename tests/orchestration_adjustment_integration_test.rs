@@ -208,6 +208,7 @@ fn create_test_func(
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     }
 }
 

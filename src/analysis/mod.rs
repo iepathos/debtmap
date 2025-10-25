@@ -17,6 +17,7 @@ pub mod context_detection;
 pub mod diagnostics;
 pub mod framework_patterns;
 pub mod function_visitor;
+pub mod functional_composition;
 pub mod module_structure;
 pub mod multi_pass;
 pub mod patterns;
@@ -34,6 +35,10 @@ pub use call_graph::{
 pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
+};
+pub use functional_composition::{
+    analyze_composition, analyze_purity, detect_pipelines, score_composition, CompositionMetrics,
+    FunctionalAnalysisConfig, Pipeline, PipelineStage, PurityMetrics, SideEffectKind, TerminalOp,
 };
 pub use module_structure::{
     ComponentCouplingAnalysis, ComponentDependencyGraph, Difficulty, FunctionCounts, FunctionGroup,

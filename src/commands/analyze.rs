@@ -75,6 +75,8 @@ pub struct AnalyzeConfig {
     pub max_callees: usize,
     pub show_external: bool,
     pub show_std_lib: bool,
+    pub ast_functional_analysis: bool,
+    pub functional_analysis_profile: Option<crate::cli::FunctionalAnalysisProfile>,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -89,6 +91,21 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     // Set jobs environment variable for parallel processing
     if config.jobs > 0 {
         std::env::set_var("DEBTMAP_JOBS", config.jobs.to_string());
+    }
+
+    // Set functional analysis environment variables (spec 111)
+    if config.ast_functional_analysis {
+        std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS", "true");
+
+        // Set the profile if specified
+        if let Some(profile) = config.functional_analysis_profile {
+            let profile_str = match profile {
+                crate::cli::FunctionalAnalysisProfile::Strict => "strict",
+                crate::cli::FunctionalAnalysisProfile::Balanced => "balanced",
+                crate::cli::FunctionalAnalysisProfile::Lenient => "lenient",
+            };
+            std::env::set_var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE", profile_str);
+        }
     }
 
     // Handle cache flags

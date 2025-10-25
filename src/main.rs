@@ -569,6 +569,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         max_callees,
         show_external,
         show_std_lib,
+        ast_functional_analysis,
+        functional_analysis_profile,
     } = command
     {
         // Apply side effects first
@@ -655,6 +657,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             max_callees,
             show_external,
             show_std_lib,
+            ast_functional_analysis,
+            functional_analysis_profile,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -875,6 +879,8 @@ fn build_analyze_config(
     max_callees: usize,
     show_external: bool,
     show_std_lib: bool,
+    ast_functional_analysis: bool,
+    functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     debtmap::commands::analyze::AnalyzeConfig {
         path,
@@ -937,6 +943,8 @@ fn build_analyze_config(
         max_callees,
         show_external,
         show_std_lib,
+        ast_functional_analysis,
+        functional_analysis_profile,
     }
 }
 

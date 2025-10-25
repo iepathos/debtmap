@@ -167,6 +167,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         }];
 
         AnalysisResults {
@@ -344,6 +345,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -370,6 +372,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -396,6 +399,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -422,6 +426,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -452,6 +457,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             });
         }
 
@@ -494,6 +500,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -515,6 +522,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
         ];
 

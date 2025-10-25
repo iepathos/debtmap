@@ -28,6 +28,7 @@ fn test_complexity_calculator_new() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -55,6 +56,7 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -85,6 +87,7 @@ fn test_complexity_calculator_is_complex_cognitive() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -115,6 +118,7 @@ fn test_complexity_calculator_is_complex_both() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -145,6 +149,7 @@ fn test_complexity_calculator_is_not_complex() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -175,6 +180,7 @@ fn test_complexity_calculator_calculate_score_low() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -206,6 +212,7 @@ fn test_complexity_calculator_calculate_score_medium() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -237,6 +244,7 @@ fn test_complexity_calculator_calculate_score_high() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -268,6 +276,7 @@ fn test_complexity_calculator_calculate_score_zero() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -378,6 +387,7 @@ fn test_complexity_calculator_boundary_values() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -401,6 +411,7 @@ fn test_complexity_calculator_boundary_values() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -424,6 +435,7 @@ fn test_complexity_calculator_boundary_values() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -452,6 +464,7 @@ fn test_complexity_score_proportions() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -479,6 +492,7 @@ fn test_complexity_score_proportions() {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

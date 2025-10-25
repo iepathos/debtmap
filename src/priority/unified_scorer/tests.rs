@@ -25,6 +25,7 @@ fn create_test_metrics() -> FunctionMetrics {
         downstream_callees: None,
         mapping_pattern_result: None,
         adjusted_complexity: None,
+        composition_metrics: None,
     }
 }
 

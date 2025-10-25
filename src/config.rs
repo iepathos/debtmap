@@ -1102,6 +1102,10 @@ pub struct DebtmapConfig {
     /// Complexity weights configuration (spec 121)
     #[serde(default)]
     pub complexity_weights: Option<ComplexityWeightsConfig>,
+
+    /// AST-based functional pattern analysis configuration (spec 111)
+    #[serde(default)]
+    pub functional_analysis: Option<crate::analysis::FunctionalAnalysisConfig>,
 }
 
 /// Classification configuration
@@ -1827,6 +1831,11 @@ pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
         .as_ref()
         .and_then(|c| c.data_flow.clone())
         .unwrap_or_default()
+}
+
+/// Get functional analysis configuration (spec 111)
+pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisConfig {
+    get_config().functional_analysis.clone().unwrap_or_default()
 }
 
 /// Get smart performance configuration

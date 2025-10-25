@@ -86,7 +86,14 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
     type AnalyzerFactory = fn() -> Box<dyn Analyzer>;
 
     static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[
-        (Language::Rust, || Box::new(rust::RustAnalyzer::new())),
+        (Language::Rust, || {
+            let mut analyzer = rust::RustAnalyzer::new();
+            // Check environment variable for functional analysis (spec 111)
+            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+                analyzer = analyzer.with_functional_analysis(true);
+            }
+            Box::new(analyzer)
+        }),
         (Language::Python, || Box::new(python::PythonAnalyzer::new())),
         (Language::JavaScript, || {
             create_js_analyzer(javascript::JavaScriptAnalyzer::new_javascript, "JavaScript")

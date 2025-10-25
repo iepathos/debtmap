@@ -42,6 +42,7 @@ pub struct RustAnalyzer {
     complexity_threshold: u32,
     enhanced_thresholds: ComplexityThresholds,
     use_enhanced_detection: bool,
+    enable_functional_analysis: bool,
 }
 
 impl RustAnalyzer {
@@ -50,6 +51,7 @@ impl RustAnalyzer {
             complexity_threshold: 10,
             enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
             use_enhanced_detection: true,
+            enable_functional_analysis: false,
         }
     }
 
@@ -58,7 +60,13 @@ impl RustAnalyzer {
             complexity_threshold: 10,
             enhanced_thresholds: ComplexityThresholds::from_preset(preset),
             use_enhanced_detection: true,
+            enable_functional_analysis: false,
         }
+    }
+
+    pub fn with_functional_analysis(mut self, enable: bool) -> Self {
+        self.enable_functional_analysis = enable;
+        self
     }
 }
 
@@ -81,6 +89,7 @@ impl Analyzer for RustAnalyzer {
                 self.complexity_threshold,
                 &self.enhanced_thresholds,
                 self.use_enhanced_detection,
+                self.enable_functional_analysis,
             ),
             _ => FileMetrics {
                 path: PathBuf::new(),
@@ -112,9 +121,15 @@ fn analyze_rust_file(
     threshold: u32,
     enhanced_thresholds: &ComplexityThresholds,
     _use_enhanced: bool,
+    enable_functional_analysis: bool,
 ) -> FileMetrics {
     let source_content = read_source_content(&ast.path);
-    let analysis_result = analyze_ast_with_content(ast, &source_content, enhanced_thresholds);
+    let analysis_result = analyze_ast_with_content(
+        ast,
+        &source_content,
+        enhanced_thresholds,
+        enable_functional_analysis,
+    );
 
     let debt_items = create_debt_items(
         &ast.file,
@@ -152,12 +167,14 @@ fn analyze_ast_with_content(
     ast: &RustAst,
     source_content: &str,
     enhanced_thresholds: &ComplexityThresholds,
+    enable_functional_analysis: bool,
 ) -> AnalysisResult {
     let mut visitor = create_configured_visitor(
         ast.path.clone(),
         source_content.to_string(),
         enhanced_thresholds.clone(),
         Some(ast.file.clone()),
+        enable_functional_analysis,
     );
     visitor.visit_file(&ast.file);
 
@@ -173,10 +190,12 @@ fn create_configured_visitor(
     source_content: String,
     enhanced_thresholds: ComplexityThresholds,
     file_ast: Option<syn::File>,
+    enable_functional_analysis: bool,
 ) -> FunctionVisitor {
     let mut visitor = FunctionVisitor::new(path, source_content);
     visitor.file_ast = file_ast;
     visitor.enhanced_thresholds = enhanced_thresholds;
+    visitor.enable_functional_analysis = enable_functional_analysis;
     visitor
 }
 
@@ -374,6 +393,7 @@ struct FunctionVisitor {
     file_ast: Option<syn::File>,
     enhanced_analysis: Vec<EnhancedFunctionAnalysis>,
     enhanced_thresholds: ComplexityThresholds,
+    enable_functional_analysis: bool,
 }
 
 impl FunctionVisitor {
@@ -428,6 +448,7 @@ impl FunctionVisitor {
             file_ast: None,
             enhanced_analysis: Vec::new(),
             enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
+            enable_functional_analysis: false,
         }
     }
 
@@ -466,7 +487,7 @@ impl FunctionVisitor {
         let context = self.create_function_context(name.to_string(), line, is_trait_method);
         let role = Self::classify_function_role(name, metadata.is_test);
 
-        let metrics = Self::build_function_metrics(
+        let metrics = self.build_function_metrics(
             context,
             metadata.clone(),
             complexity_metrics,
@@ -532,8 +553,9 @@ impl FunctionVisitor {
         (matches, if_else_chains)
     }
 
-    // Pure function to build metrics
+    // Method to build metrics (needs self for enable_functional_analysis flag)
     fn build_function_metrics(
+        &self,
         context: FunctionContext,
         metadata: FunctionMetadata,
         complexity: ComplexityMetricsData,
@@ -552,6 +574,28 @@ impl FunctionVisitor {
                 complexity.cognitive,
                 &mapping_result,
             ))
+        } else {
+            None
+        };
+
+        // Perform functional composition analysis if enabled (spec 111)
+        let composition_metrics = if self.enable_functional_analysis {
+            use crate::analysis::functional_composition::{
+                analyze_composition, FunctionalAnalysisConfig,
+            };
+
+            // Load config profile from environment variable or default to balanced
+            let config = std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS_PROFILE")
+                .ok()
+                .and_then(|p| match p.as_str() {
+                    "strict" => Some(FunctionalAnalysisConfig::strict()),
+                    "balanced" => Some(FunctionalAnalysisConfig::balanced()),
+                    "lenient" => Some(FunctionalAnalysisConfig::lenient()),
+                    _ => None,
+                })
+                .unwrap_or_else(FunctionalAnalysisConfig::balanced);
+
+            Some(analyze_composition(item_fn, &config))
         } else {
             None
         };
@@ -580,6 +624,7 @@ impl FunctionVisitor {
                 None
             },
             adjusted_complexity,
+            composition_metrics,
         }
     }
 
@@ -937,6 +982,7 @@ impl FunctionVisitor {
                 None
             },
             adjusted_complexity,
+            composition_metrics: None,
         }
     }
 
@@ -1492,6 +1538,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1513,6 +1560,7 @@ mod tests {
                 downstream_callees: None,
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
+                composition_metrics: None,
             },
         ];
 
@@ -1552,6 +1600,7 @@ mod tests {
             downstream_callees: None,
             mapping_pattern_result: None,
             adjusted_complexity: None,
+            composition_metrics: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {
