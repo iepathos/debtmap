@@ -38,7 +38,7 @@ fn format_coverage_status(coverage_pct: f64) -> String {
         c if c < 50.0 => format!("🟡 PARTIAL ({:.1}%)", c),
         c if c < 80.0 => format!("🟨 MODERATE ({:.1}%)", c),
         c if c < 95.0 => format!("🟢 GOOD ({:.1}%)", c),
-        _ => format!("✅ EXCELLENT ({:.1}%)", coverage_pct),
+        _ => format!("[OK] EXCELLENT ({:.1}%)", coverage_pct),
     }
 }
 
@@ -1132,7 +1132,7 @@ mod tests {
         assert_eq!(format_coverage_status(30.0), "🟡 PARTIAL (30.0%)");
         assert_eq!(format_coverage_status(60.0), "🟨 MODERATE (60.0%)");
         assert_eq!(format_coverage_status(85.0), "🟢 GOOD (85.0%)");
-        assert_eq!(format_coverage_status(96.0), "✅ EXCELLENT (96.0%)");
+        assert_eq!(format_coverage_status(96.0), "[OK] EXCELLENT (96.0%)");
     }
 
     #[test]

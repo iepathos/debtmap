@@ -642,7 +642,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(output).unwrap();
     writeln!(
         output,
-        "📊 {}",
+        "[STATS] {}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
             .bright_cyan()
             .bold()
@@ -1717,7 +1717,7 @@ fn format_detailed_item(output: &mut String, rank: usize, item: &UnifiedDebtItem
             writeln!(
                 output,
                 "│  └─ {} God Object: {} methods, {} fields, {} responsibilities",
-                "⚠️".bright_yellow(),
+                "[WARNING]".bright_yellow(),
                 god_obj.method_count,
                 god_obj.field_count,
                 god_obj.responsibility_count
@@ -1749,7 +1749,7 @@ pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalys
     writeln!(output).unwrap();
     writeln!(
         output,
-        "📊 {}",
+        "[STATS] {}",
         "TOTAL IMPACT IF ALL FIXED".bright_green().bold()
     )
     .unwrap();
