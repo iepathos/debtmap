@@ -1,7 +1,17 @@
 # Example Debtmap Configuration: Orchestration Detection Tuning
-# 
+#
 # This example shows how to configure orchestration detection to reduce
 # false positives for your specific codebase patterns.
+
+[complexity_weights]
+# Weights for combining cyclomatic and cognitive complexity
+# Must sum to 1.0. Default favors cognitive complexity (0.7) over cyclomatic (0.3)
+cyclomatic = 0.3
+cognitive = 0.7
+
+# Maximum values for normalization (0-100 scale)
+max_cyclomatic = 50.0
+max_cognitive = 100.0
 
 [orchestration]
 # Minimum number of meaningful function delegations to be considered orchestration

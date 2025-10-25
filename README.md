@@ -200,6 +200,46 @@ min_branches = 3                    # Minimum match arms to consider
 
 📖 **Read more:** [Configuration Guide](https://iepathos.github.io/debtmap/configuration.html#pure-mapping-pattern-detection)
 
+### Complexity Scoring
+
+Debtmap uses **weighted complexity scoring** that combines cyclomatic and cognitive complexity metrics with configurable weights. This approach provides more accurate prioritization by emphasizing cognitive complexity, which research shows correlates better with bug density and maintenance difficulty.
+
+**Why cognitive complexity matters:**
+- Cyclomatic complexity counts control flow branches (if, while, for, etc.)
+- Cognitive complexity measures how hard code is to understand (nested conditions, breaks in linear flow)
+- A function can have high cyclomatic but low cognitive complexity (e.g., a simple switch statement with many cases)
+- Conversely, deeply nested conditionals have high cognitive complexity even with few branches
+
+**Default weights:**
+- **70% cognitive complexity** - Emphasizes human understanding difficulty
+- **30% cyclomatic complexity** - Still considers control flow complexity
+- Weights must sum to 1.0 and can be customized per project
+
+**Weighted score calculation:**
+1. Normalize both metrics to 0-100 scale (default: cyclomatic max=50, cognitive max=100)
+2. Apply weights: `score = (0.3 × normalized_cyclomatic) + (0.7 × normalized_cognitive)`
+3. Display as: `cyclomatic=15, cognitive=3 → weighted=11.1 (cognitive-driven)`
+
+**Configuration** in `.debtmap.toml`:
+```toml
+[complexity_weights]
+# Customize weights (must sum to 1.0)
+cyclomatic = 0.3
+cognitive = 0.7
+
+# Adjust normalization based on your codebase
+max_cyclomatic = 50.0
+max_cognitive = 100.0
+```
+
+**Benefits:**
+- Reduces false positives from simple repetitive patterns (e.g., mapping functions)
+- Prioritizes deeply nested logic that's truly hard to understand
+- Transparent scoring shows all metrics and the dominant driver
+- Configurable for different project needs
+
+📖 **Read more:** [Analysis Guide](https://iepathos.github.io/debtmap/analysis-guide.html)
+
 ### Cache Management
 Intelligent cache system with automatic pruning and configurable strategies (LRU, LFU, FIFO, age-based).
 
