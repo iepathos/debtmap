@@ -451,44 +451,53 @@ fn build_function_map(
         .collect()
 }
 
+/// Filter items to find critical items that remain unchanged between before and after
+fn filter_unchanged_critical_items(
+    before_items: &[crate::priority::DebtItem],
+    after_map: &HashMap<(PathBuf, String), &crate::priority::UnifiedDebtItem>,
+) -> Vec<ItemInfo> {
+    use crate::priority::DebtItem;
+
+    before_items
+        .iter()
+        .filter_map(|item| {
+            if let DebtItem::Function(before_item) = item {
+                if is_critical(before_item.unified_score.final_score) {
+                    let key = (
+                        before_item.location.file.clone(),
+                        before_item.location.function.clone(),
+                    );
+                    if let Some(after_item) = after_map.get(&key) {
+                        if is_score_unchanged(
+                            before_item.unified_score.final_score,
+                            after_item.unified_score.final_score,
+                        ) && is_critical(after_item.unified_score.final_score)
+                        {
+                            return Some(ItemInfo {
+                                file: before_item.location.file.clone(),
+                                function: before_item.location.function.clone(),
+                                line: before_item.location.line,
+                                score: before_item.unified_score.final_score,
+                            });
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .collect()
+}
+
 fn identify_unchanged_critical(
     before: &UnifiedJsonOutput,
     after: &UnifiedJsonOutput,
 ) -> UnchangedCritical {
-    use crate::priority::DebtItem;
-
-    let mut unchanged_critical = Vec::new();
-
     let after_map = build_function_map(&after.items);
-
-    for item in &before.items {
-        if let DebtItem::Function(before_item) = item {
-            if is_critical(before_item.unified_score.final_score) {
-                let key = (
-                    before_item.location.file.clone(),
-                    before_item.location.function.clone(),
-                );
-                if let Some(after_item) = after_map.get(&key) {
-                    if is_score_unchanged(
-                        before_item.unified_score.final_score,
-                        after_item.unified_score.final_score,
-                    ) && is_critical(after_item.unified_score.final_score)
-                    {
-                        unchanged_critical.push(ItemInfo {
-                            file: before_item.location.file.clone(),
-                            function: before_item.location.function.clone(),
-                            line: before_item.location.line,
-                            score: before_item.unified_score.final_score,
-                        });
-                    }
-                }
-            }
-        }
-    }
+    let items = filter_unchanged_critical_items(&before.items, &after_map);
 
     UnchangedCritical {
-        count: unchanged_critical.len(),
-        items: unchanged_critical,
+        count: items.len(),
+        items,
     }
 }
 
@@ -1067,6 +1076,113 @@ mod tests {
         // Only the function item should be in the map
         assert_eq!(result.len(), 1);
         assert!(result.contains_key(&(PathBuf::from("src/foo.rs"), "func1".to_string())));
+    }
+
+    // Tests for filter_unchanged_critical_items
+    #[test]
+    fn test_filter_unchanged_critical_items_empty() {
+        let before_items: Vec<DebtItem> = vec![];
+        let after_map = HashMap::new();
+
+        let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_unchanged_critical_items_all_resolved() {
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "resolved_fn",
+            10,
+            9.0,
+        )))];
+        let after_map = HashMap::new(); // Empty map means all resolved
+
+        let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_unchanged_critical_items_all_improved() {
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "improved_fn",
+            10,
+            10.0,
+        )))];
+
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "improved_fn",
+            10,
+            8.0,
+        )))];
+        let after_map = build_function_map(&after_items);
+
+        let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+        // Score changed by 2.0 which is > 0.5, so not included
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_unchanged_critical_items_mixed() {
+        let before_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/a.rs",
+                "unchanged",
+                10,
+                9.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/b.rs", "improved", 20, 10.0,
+            ))),
+        ];
+
+        let after_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/a.rs",
+                "unchanged",
+                10,
+                9.1,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/b.rs", "improved", 20, 8.0,
+            ))),
+        ];
+        let after_map = build_function_map(&after_items);
+
+        let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].function, "unchanged");
+    }
+
+    #[test]
+    fn test_filter_unchanged_critical_items_stays_critical_within_tolerance() {
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "critical_fn",
+            10,
+            9.0,
+        )))];
+
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "critical_fn",
+            10,
+            9.3,
+        )))];
+        let after_map = build_function_map(&after_items);
+
+        let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+        // Change is 0.3 which is < 0.5, and both are critical
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].function, "critical_fn");
+        assert_eq!(result[0].score, 9.0);
     }
 
     #[test]
