@@ -302,29 +302,46 @@ impl GodObjectDetector {
         // Count standalone functions in addition to methods from types
         let standalone_count = visitor.standalone_functions.len();
 
-        // Only count methods belonging to the analyzed struct, NOT standalone functions
+        // Determine what to analyze based on what has more content
+        // - If there's a struct with many methods → analyze as God Class
+        // - If there are many standalone functions → analyze as God Module
+        // - Prioritize whichever has more functions
         let (total_methods, total_fields, all_methods, total_complexity) =
             if let Some(type_info) = primary_type {
-                // Only use the struct's actual methods (don't combine with standalone functions)
-                let total_methods = type_info.method_count;
-                let all_methods = type_info.methods.clone();
+                // Check if the struct has methods OR if standalone functions should take priority
+                if type_info.method_count > standalone_count {
+                    // God Class: Struct with many methods
+                    let total_methods = type_info.method_count;
+                    let all_methods = type_info.methods.clone();
 
-                // Calculate complexity only for struct methods
-                let total_complexity = visitor
-                    .function_complexity
-                    .iter()
-                    .filter(|fc| all_methods.contains(&fc.name))
-                    .map(|fc| fc.cyclomatic_complexity)
-                    .sum();
+                    // Calculate complexity only for struct methods
+                    let total_complexity = visitor
+                        .function_complexity
+                        .iter()
+                        .filter(|fc| all_methods.contains(&fc.name))
+                        .map(|fc| fc.cyclomatic_complexity)
+                        .sum();
 
-                (
-                    total_methods,
-                    type_info.field_count,
-                    all_methods,
-                    total_complexity,
-                )
+                    (
+                        total_methods,
+                        type_info.field_count,
+                        all_methods,
+                        total_complexity,
+                    )
+                } else {
+                    // God Module: Many standalone functions (struct exists but has few/no methods)
+                    let all_methods = visitor.standalone_functions.clone();
+                    let total_complexity = (standalone_count * 5) as u32;
+
+                    (
+                        standalone_count,
+                        type_info.field_count,
+                        all_methods,
+                        total_complexity,
+                    )
+                }
             } else {
-                // No struct/impl blocks found - count standalone functions
+                // No struct/impl blocks found - count standalone functions as God Module
                 let all_methods = visitor.standalone_functions.clone();
                 let total_complexity = (standalone_count * 5) as u32;
 
@@ -342,7 +359,14 @@ impl GodObjectDetector {
         };
 
         let responsibility_groups = group_methods_by_responsibility(&all_methods);
-        let responsibility_count = responsibility_groups.len();
+
+        // Defensive check: Ensure we never report 0 responsibilities when functions exist
+        // If grouping failed or returned empty, default to 1 (all functions share one responsibility)
+        let responsibility_count = if responsibility_groups.is_empty() && !all_methods.is_empty() {
+            1
+        } else {
+            responsibility_groups.len()
+        };
 
         // Calculate complexity-weighted metrics (without purity)
         let weighted_method_count = aggregate_weighted_complexity(&visitor.function_complexity);
