@@ -536,7 +536,7 @@ pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
 
     // Code example
     if let Some(example) = &message.code_examples {
-        writeln!(output, "\n📝 REFACTORING EXAMPLE:").unwrap();
+        writeln!(output, "\n[REFACTORING EXAMPLE]").unwrap();
         writeln!(output, "  {}", example.explanation).unwrap();
         writeln!(output, "\n  Before:").unwrap();
         for line in example.before.lines() {
