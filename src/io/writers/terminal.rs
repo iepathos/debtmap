@@ -215,6 +215,28 @@ fn get_refactoring_patterns(level: &ComplexityLevel) -> &'static str {
     }
 }
 
+/// Format entropy information for display if dampening is applied
+fn format_entropy_info(entropy_details: &crate::core::EntropyDetails) -> Option<Vec<String>> {
+    if !entropy_details.dampening_applied {
+        return None;
+    }
+
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
+        "↓".green(),
+        entropy_details.token_entropy,
+        entropy_details.pattern_repetition * 100.0,
+        entropy_details.effective_complexity
+    ));
+
+    for reason in entropy_details.reasoning.iter().take(1) {
+        lines.push(format!("       {}", reason.dimmed()));
+    }
+
+    Some(lines)
+}
+
 fn print_complexity_hotspots(results: &AnalysisResults) {
     if results.complexity.metrics.is_empty() {
         return;
@@ -239,16 +261,9 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
 
         // Display entropy information if available
         if let Some(entropy_details) = func.get_entropy_details() {
-            if entropy_details.dampening_applied {
-                println!(
-                    "     {} Entropy: {:.2}, Repetition: {:.0}%, Effective: {:.1}x",
-                    "↓".green(),
-                    entropy_details.token_entropy,
-                    entropy_details.pattern_repetition * 100.0,
-                    entropy_details.effective_complexity
-                );
-                for reason in entropy_details.reasoning.iter().take(1) {
-                    println!("       {}", reason.dimmed());
+            if let Some(entropy_lines) = format_entropy_info(entropy_details) {
+                for line in entropy_lines {
+                    println!("{line}");
                 }
             }
         }
@@ -440,6 +455,47 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    // Helper functions for creating test data
+
+    fn create_entropy_details_with_dampening() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 3.5,
+            pattern_repetition: 0.65,
+            branch_similarity: 0.8,
+            effective_complexity: 8.2,
+            dampening_applied: true,
+            dampening_factor: 0.75,
+            reasoning: vec![
+                "High pattern repetition detected".to_string(),
+                "Similar branch structures found".to_string(),
+            ],
+        }
+    }
+
+    fn create_entropy_details_without_dampening() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 1.2,
+            pattern_repetition: 0.1,
+            branch_similarity: 0.2,
+            effective_complexity: 5.0,
+            dampening_applied: false,
+            dampening_factor: 1.0,
+            reasoning: vec![],
+        }
+    }
+
+    fn create_entropy_details_empty_reasoning() -> crate::core::EntropyDetails {
+        crate::core::EntropyDetails {
+            token_entropy: 2.8,
+            pattern_repetition: 0.45,
+            branch_similarity: 0.6,
+            effective_complexity: 6.5,
+            dampening_applied: true,
+            dampening_factor: 0.85,
+            reasoning: vec![],
+        }
+    }
+
     // Phase 1: Tests for existing pure functions
 
     #[test]
@@ -485,5 +541,65 @@ mod tests {
 
         let severe_patterns = get_refactoring_patterns(&ComplexityLevel::Severe);
         assert!(severe_patterns.contains("monadic"));
+    }
+
+    // Phase 2: Tests for format_entropy_info function
+
+    #[test]
+    fn test_format_entropy_info_dampening_applied() {
+        let details = create_entropy_details_with_dampening();
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 2); // Header + one reason
+
+        // Verify header line contains expected values
+        assert!(lines[0].contains("Entropy: 3.50"));
+        assert!(lines[0].contains("Repetition: 65%"));
+        assert!(lines[0].contains("Effective: 8.2x"));
+
+        // Verify reasoning line
+        assert!(lines[1].contains("High pattern repetition detected"));
+    }
+
+    #[test]
+    fn test_format_entropy_info_no_dampening() {
+        let details = create_entropy_details_without_dampening();
+        let result = format_entropy_info(&details);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_format_entropy_info_no_reasoning() {
+        let details = create_entropy_details_empty_reasoning();
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 1); // Only header, no reasoning
+
+        // Verify header contains expected values
+        assert!(lines[0].contains("Entropy: 2.80"));
+        assert!(lines[0].contains("Repetition: 45%"));
+        assert!(lines[0].contains("Effective: 6.5x"));
+    }
+
+    #[test]
+    fn test_format_entropy_info_limits_reasoning_to_one() {
+        let mut details = create_entropy_details_with_dampening();
+        details.reasoning = vec![
+            "Reason 1".to_string(),
+            "Reason 2".to_string(),
+            "Reason 3".to_string(),
+        ];
+
+        let result = format_entropy_info(&details);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert_eq!(lines.len(), 2); // Header + only first reason
+        assert!(lines[1].contains("Reason 1"));
+        assert!(!lines.iter().any(|l| l.contains("Reason 2")));
     }
 }
