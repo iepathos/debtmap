@@ -547,3 +547,415 @@ fn print_summary(result: &ValidationResult) {
         result.after_summary.total_items, result.after_summary.average_score
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::json::UnifiedJsonOutput;
+    use crate::priority::semantic_classifier::FunctionRole;
+    use crate::priority::unified_scorer::{Location, UnifiedScore};
+    use crate::priority::{
+        ActionableRecommendation, DebtItem, DebtType, ImpactMetrics, UnifiedDebtItem,
+    };
+    use std::path::PathBuf;
+
+    // Helper function to create test UnifiedDebtItem
+    fn create_test_debt_item(
+        file: &str,
+        function: &str,
+        line: usize,
+        score: f64,
+    ) -> UnifiedDebtItem {
+        UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from(file),
+                function: function.to_string(),
+                line,
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 5,
+                cognitive: 8,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 0.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: score,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".into(),
+                rationale: "Test".into(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: ImpactMetrics {
+                risk_reduction: 0.0,
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 8,
+            entropy_details: None,
+            is_pure: Some(false),
+            purity_confidence: Some(0.0),
+            god_object_indicators: None,
+            tier: None,
+        }
+    }
+
+    // Helper function to create UnifiedJsonOutput
+    fn create_test_output(items: Vec<DebtItem>) -> UnifiedJsonOutput {
+        UnifiedJsonOutput {
+            items,
+            total_impact: ImpactMetrics {
+                risk_reduction: 0.0,
+                complexity_reduction: 0.0,
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+            },
+            total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_lines_of_code: 1000,
+            overall_coverage: Some(50.0),
+        }
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_empty_inputs() {
+        let before = create_test_output(vec![]);
+        let after = create_test_output(vec![]);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_no_critical_items() {
+        // All scores below 8.0
+        let before_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "low_score",
+                10,
+                5.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/bar.rs",
+                "another_low",
+                20,
+                7.5,
+            ))),
+        ];
+        let after_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "low_score",
+                10,
+                5.2,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/bar.rs",
+                "another_low",
+                20,
+                7.3,
+            ))),
+        ];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_items_resolved() {
+        // Critical items in before, not in after (function removed)
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "critical_fn",
+            10,
+            9.0,
+        )))];
+        let after_items = vec![];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_items_unchanged() {
+        // Critical items with same score (±0.5)
+        let before_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "critical_fn",
+                10,
+                9.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/bar.rs",
+                "another_critical",
+                20,
+                10.5,
+            ))),
+        ];
+        let after_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/foo.rs",
+                "critical_fn",
+                10,
+                9.2,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/bar.rs",
+                "another_critical",
+                20,
+                10.3,
+            ))),
+        ];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 2);
+        assert_eq!(result.items.len(), 2);
+        assert_eq!(result.items[0].function, "critical_fn");
+        assert_eq!(result.items[0].score, 9.0);
+        assert_eq!(result.items[1].function, "another_critical");
+        assert_eq!(result.items[1].score, 10.5);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_items_improved_significantly() {
+        // Critical items where score drops > 0.5 (improved)
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "improved_fn",
+            10,
+            10.0,
+        )))];
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "improved_fn",
+            10,
+            9.0,
+        )))];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_items_worsened_but_stays_critical() {
+        // Critical items where score increases but both stay >= 8.0
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "worsened_fn",
+            10,
+            8.0,
+        )))];
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "worsened_fn",
+            10,
+            9.0,
+        )))];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        // Score change is 1.0, which is > 0.5, so it should NOT be included
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_mixed_scenario() {
+        // Mix of unchanged, resolved, and improved
+        let before_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/a.rs",
+                "unchanged",
+                10,
+                9.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/b.rs", "resolved", 20, 8.5,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/c.rs", "improved", 30, 10.0,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/d.rs",
+                "not_critical",
+                40,
+                7.0,
+            ))),
+        ];
+        let after_items = vec![
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/a.rs",
+                "unchanged",
+                10,
+                9.1,
+            ))),
+            // resolved is missing
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/c.rs", "improved", 30, 8.5,
+            ))),
+            DebtItem::Function(Box::new(create_test_debt_item(
+                "src/d.rs",
+                "not_critical",
+                40,
+                7.2,
+            ))),
+        ];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 1);
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(result.items[0].function, "unchanged");
+        assert_eq!(result.items[0].score, 9.0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_at_boundary() {
+        // Test edge case where score change is exactly 0.5
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "boundary_fn",
+            10,
+            9.0,
+        )))];
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "boundary_fn",
+            10,
+            8.5,
+        )))];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        // Score change is exactly 0.5, which is NOT < 0.5, so should not be included
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_after_becomes_non_critical() {
+        // Item is critical in before, but drops below 8.0 in after
+        let before_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "fixed_fn",
+            10,
+            9.0,
+        )))];
+        let after_items = vec![DebtItem::Function(Box::new(create_test_debt_item(
+            "src/foo.rs",
+            "fixed_fn",
+            10,
+            7.5,
+        )))];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        // After score is < 8.0, so should not be included
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+
+    #[test]
+    fn test_identify_unchanged_critical_file_items_ignored() {
+        // File items should be ignored (only functions are processed)
+        use crate::priority::{
+            file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators},
+            FileDebtItem,
+        };
+
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("src/foo.rs"),
+            total_lines: 100,
+            function_count: 5,
+            class_count: 1,
+            avg_complexity: 5.0,
+            max_complexity: 10,
+            total_complexity: 25,
+            coverage_percent: 50.0,
+            uncovered_lines: 50,
+            god_object_indicators: GodObjectIndicators {
+                methods_count: 5,
+                fields_count: 3,
+                responsibilities: 2,
+                is_god_object: false,
+                god_object_score: 0.5,
+                responsibility_names: vec![],
+                recommended_splits: vec![],
+            },
+            function_scores: vec![],
+        };
+
+        let file_item = DebtItem::File(Box::new(FileDebtItem {
+            metrics,
+            score: 10.0,
+            priority_rank: 0,
+            recommendation: "Test".into(),
+            impact: FileImpact {
+                complexity_reduction: 0.0,
+                maintainability_improvement: 0.0,
+                test_effort: 0.0,
+            },
+        }));
+
+        let before_items = vec![file_item.clone()];
+        let after_items = vec![file_item];
+
+        let before = create_test_output(before_items);
+        let after = create_test_output(after_items);
+
+        let result = identify_unchanged_critical(&before, &after);
+
+        assert_eq!(result.count, 0);
+        assert_eq!(result.items.len(), 0);
+    }
+}
