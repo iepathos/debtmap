@@ -425,6 +425,14 @@ fn is_critical(score: f64) -> bool {
     score >= CRITICAL_SCORE_THRESHOLD
 }
 
+/// Tolerance for considering scores as "unchanged"
+const SCORE_CHANGE_TOLERANCE: f64 = 0.5;
+
+/// Check if two scores are considered unchanged (absolute difference < tolerance)
+fn is_score_unchanged(before: f64, after: f64) -> bool {
+    (before - after).abs() < SCORE_CHANGE_TOLERANCE
+}
+
 /// Build a map of (file, function) -> FunctionMetrics for quick lookup
 fn build_function_map(
     items: &[crate::priority::DebtItem],
@@ -461,10 +469,11 @@ fn identify_unchanged_critical(
                     before_item.location.function.clone(),
                 );
                 if let Some(after_item) = after_map.get(&key) {
-                    let score_change = (before_item.unified_score.final_score
-                        - after_item.unified_score.final_score)
-                        .abs();
-                    if score_change < 0.5 && is_critical(after_item.unified_score.final_score) {
+                    if is_score_unchanged(
+                        before_item.unified_score.final_score,
+                        after_item.unified_score.final_score,
+                    ) && is_critical(after_item.unified_score.final_score)
+                    {
                         unchanged_critical.push(ItemInfo {
                             file: before_item.location.file.clone(),
                             function: before_item.location.function.clone(),
@@ -940,6 +949,36 @@ mod tests {
         assert!(is_critical(8.1));
         assert!(is_critical(10.0));
         assert!(is_critical(15.5));
+    }
+
+    // Tests for is_score_unchanged
+    #[test]
+    fn test_is_score_unchanged_exactly_equal() {
+        assert!(is_score_unchanged(9.0, 9.0));
+        assert!(is_score_unchanged(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_is_score_unchanged_within_tolerance() {
+        assert!(is_score_unchanged(9.0, 9.3));
+        assert!(is_score_unchanged(9.3, 9.0));
+        assert!(is_score_unchanged(10.0, 10.49));
+        assert!(is_score_unchanged(10.49, 10.0));
+    }
+
+    #[test]
+    fn test_is_score_unchanged_at_boundary() {
+        // Exactly at tolerance boundary (0.5) should NOT be considered unchanged
+        assert!(!is_score_unchanged(9.0, 8.5));
+        assert!(!is_score_unchanged(8.5, 9.0));
+    }
+
+    #[test]
+    fn test_is_score_unchanged_outside_tolerance() {
+        assert!(!is_score_unchanged(9.0, 8.4));
+        assert!(!is_score_unchanged(8.4, 9.0));
+        assert!(!is_score_unchanged(10.0, 11.0));
+        assert!(!is_score_unchanged(5.0, 7.0));
     }
 
     // Tests for build_function_map
