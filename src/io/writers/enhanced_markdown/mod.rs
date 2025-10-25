@@ -182,7 +182,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         unified_analysis: Option<&UnifiedAnalysis>,
     ) -> Result<()> {
         self.toc_builder.add_entry(1, "Visualizations");
-        writeln!(self.writer, "## 📊 Visualizations\n")?;
+        writeln!(self.writer, "## [STATS] Visualizations\n")?;
 
         self.toc_builder.add_entry(2, "Complexity Distribution");
         write_complexity_distribution(&mut self.writer, results)?;
@@ -207,7 +207,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         insights: &RiskInsight,
     ) -> Result<()> {
         self.toc_builder.add_entry(1, "Risk Analysis");
-        writeln!(self.writer, "## ⚠️ Risk Analysis\n")?;
+        writeln!(self.writer, "## [WARNING] Risk Analysis\n")?;
 
         writeln!(self.writer, "### Risk Summary\n")?;
         writeln!(
@@ -313,7 +313,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         unified_analysis: Option<&UnifiedAnalysis>,
     ) -> Result<()> {
         self.toc_builder.add_entry(1, "Recommendations");
-        writeln!(self.writer, "## 💡 Recommendations\n")?;
+        writeln!(self.writer, "## [TIP] Recommendations\n")?;
 
         write_priority_actions(&mut self.writer, unified_analysis)?;
         write_strategic_recommendations(&mut self.writer, results)?;

@@ -131,8 +131,7 @@ pub fn write_enhanced_health_dashboard<W: Write>(
     )?;
     writeln!(
         writer,
-        "| **Trend** | {} {} | Health is {} over time |",
-        dashboard.trend.as_emoji(),
+        "| **Trend** | {} | Health is {} over time |",
         dashboard.trend.as_string(),
         dashboard.trend.as_string().to_lowercase()
     )?;

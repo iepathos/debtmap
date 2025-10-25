@@ -401,7 +401,7 @@ fn perform_unified_analysis_computation(
         eprintln!();
         eprintln!(
             "{} Coverage data not provided. Analysis will focus on complexity and code smells.",
-            "💡 TIP:".bright_yellow()
+            "[TIP]".bright_yellow()
         );
         eprintln!(
             "   For test gap detection, provide coverage with: {}",
@@ -701,7 +701,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let step_start = Instant::now();
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
     if !quiet_mode {
-        eprintln!("  ⏱️  Data flow graph creation: {:?}", step_start.elapsed());
+        eprintln!("  [TIME]Data flow graph creation: {:?}", step_start.elapsed());
     }
 
     // Step 2: Populate purity analysis
@@ -709,7 +709,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     unified.populate_purity_analysis(metrics);
     if !quiet_mode {
         eprintln!(
-            "  ⏱️  Purity analysis ({} functions): {:?}",
+            "  [TIME]Purity analysis ({} functions): {:?}",
             metrics.len(),
             step_start.elapsed()
         );
@@ -721,7 +721,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         call_graph.find_test_only_functions().into_iter().collect();
     if !quiet_mode {
         eprintln!(
-            "  ⏱️  Test function detection ({} found): {:?}",
+            "  [TIME]Test function detection ({} found): {:?}",
             test_only_functions.len(),
             step_start.elapsed()
         );
@@ -743,7 +743,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
         debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
     }
     if !quiet_mode {
-        eprintln!("  ⏱️  Debt aggregator setup: {:?}", step_start.elapsed());
+        eprintln!("  [TIME]Debt aggregator setup: {:?}", step_start.elapsed());
     }
 
     // Step 5: Per-function debt analysis (main loop)
@@ -769,7 +769,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
     if !quiet_mode {
         eprintln!(
-            "  ⏱️  Per-function analysis ({} processed, {} skipped): {:?}",
+            "  [TIME]Per-function analysis ({} processed, {} skipped): {:?}",
             processed_count,
             skipped_count,
             step_start.elapsed()
@@ -788,7 +788,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
     if !quiet_mode && error_swallow_count > 0 {
         eprintln!(
-            "  ⏱️  Error swallowing conversion ({} items): {:?}",
+            "  [TIME]Error swallowing conversion ({} items): {:?}",
             error_swallow_count,
             step_start.elapsed()
         );
@@ -798,7 +798,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     let step_start = Instant::now();
     analyze_files_for_debt(&mut unified, metrics, coverage_data, no_god_object);
     if !quiet_mode {
-        eprintln!("  ⏱️  File-level analysis: {:?}", step_start.elapsed());
+        eprintln!("  [TIME]File-level analysis: {:?}", step_start.elapsed());
     }
 
     // Step 8: File aggregation has been removed - skip to step 9
@@ -816,10 +816,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
     if !quiet_mode {
         eprintln!(
-            "  ⏱️  Final sorting & impact calc: {:?}",
+            "  [TIME]Final sorting & impact calc: {:?}",
             step_start.elapsed()
         );
-        eprintln!("  ⏱️  TOTAL unified analysis time: {:?}", start.elapsed());
+        eprintln!("  [TIME]TOTAL unified analysis time: {:?}", start.elapsed());
     }
 
     unified
