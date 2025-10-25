@@ -231,12 +231,19 @@ pub struct CompositionMetrics {
 
     /// Cyclomatic complexity of the function itself
     pub local_complexity: u32,
+
+    /// AST-based composition quality from spec 111 (if available)
+    /// This provides a more accurate assessment based on actual functional patterns
+    /// (pipelines, purity, immutability) detected through AST analysis.
+    pub ast_composition_quality: Option<f64>,
 }
 
 /// Extract composition metrics from call graph (pure function)
 ///
 /// This function analyzes the call graph to determine how much a function
 /// delegates to other functions versus implementing logic itself.
+///
+/// Enhanced in spec 111 to include AST-based composition quality when available.
 ///
 /// # Formula
 ///
@@ -263,10 +270,17 @@ pub fn extract_composition_metrics(
     // Local complexity is the cyclomatic complexity
     let local_complexity = func.cyclomatic;
 
+    // Extract AST-based composition quality if available (spec 111)
+    let ast_composition_quality = func
+        .composition_metrics
+        .as_ref()
+        .map(|cm| cm.composition_quality);
+
     CompositionMetrics {
         callee_count,
         delegation_ratio,
         local_complexity,
+        ast_composition_quality,
     }
 }
 
@@ -440,10 +454,23 @@ fn adjust_orchestrator_score(
 /// ```
 ///
 /// Made public for benchmarking and testing purposes.
+///
+/// Enhanced to use AST-based functional composition metrics when available (spec 111).
+/// When composition_quality from AST analysis is present, it provides a more accurate
+/// assessment based on actual functional patterns (pipelines, purity, immutability).
 pub fn calculate_composition_quality(
     config: &OrchestrationAdjustmentConfig,
     metrics: &CompositionMetrics,
 ) -> f64 {
+    // If AST-based composition metrics are available (spec 111), use them directly
+    // as they provide more accurate functional composition quality assessment
+    if let Some(ast_quality) = metrics.ast_composition_quality {
+        // AST quality score is already 0.0-1.0, just ensure it meets minimum
+        return ast_quality.min(1.0).max(config.min_composition_quality);
+    }
+
+    // Fallback to heuristic-based quality calculation using call graph metrics
+
     // More callees = better orchestration (max +0.4)
     // Scale from 0.0 at 2 callees to 0.4 at 6+ callees
     let callee_quality = match metrics.callee_count {
@@ -555,6 +582,7 @@ mod tests {
             callee_count: 8,
             delegation_ratio: 0.5,
             local_complexity: 2,
+            ast_composition_quality: None,
         };
 
         let adjustment = adjust_score(&config, 100.0, &role, &metrics);
@@ -576,6 +604,7 @@ mod tests {
             callee_count: 6,
             delegation_ratio: 0.5,
             local_complexity: 2,
+            ast_composition_quality: None,
         };
 
         let adjustment = adjust_score(&config, 100.0, &role, &metrics);
@@ -608,6 +637,7 @@ mod tests {
             callee_count: 10,
             delegation_ratio: 0.6,
             local_complexity: 2,
+            ast_composition_quality: None,
         };
 
         // Even with high reduction, should not go below callee_count × 2
@@ -628,6 +658,7 @@ mod tests {
             callee_count: 0,
             delegation_ratio: 0.0,
             local_complexity: 5,
+            ast_composition_quality: None,
         };
 
         let adjustment = adjust_score(&config, 100.0, &role, &metrics);
@@ -649,6 +680,7 @@ mod tests {
             callee_count: 8,
             delegation_ratio: 0.6,
             local_complexity: 2,
+            ast_composition_quality: None,
         };
         let quality = calculate_composition_quality(&config, &excellent);
         assert!(
@@ -667,6 +699,7 @@ mod tests {
             callee_count: 4,
             delegation_ratio: 0.3,
             local_complexity: 3,
+            ast_composition_quality: None,
         };
         let quality = calculate_composition_quality(&config, &good);
         assert!(
@@ -685,6 +718,7 @@ mod tests {
             callee_count: 2,
             delegation_ratio: 0.1,
             local_complexity: 8,
+            ast_composition_quality: None,
         };
         let quality = calculate_composition_quality(&config, &poor);
         assert!(
@@ -706,6 +740,7 @@ mod tests {
             callee_count: 0,
             delegation_ratio: 0.0,
             local_complexity: 20,
+            ast_composition_quality: None,
         };
 
         let quality = calculate_composition_quality(&config, &worst);
@@ -726,6 +761,7 @@ mod tests {
             callee_count: 5,
             delegation_ratio: 0.3,
             local_complexity: 3,
+            ast_composition_quality: None,
         };
 
         // PureLogic should not receive adjustment
@@ -777,6 +813,7 @@ mod tests {
                 callee_count,
                 delegation_ratio,
                 local_complexity: complexity,
+                ast_composition_quality: None,
             };
 
             let adjustment = adjust_score(&config, base_score, &role, &metrics);
@@ -810,6 +847,7 @@ mod tests {
                 callee_count,
                 delegation_ratio: 0.8,
                 local_complexity: 2,
+            ast_composition_quality: None,
             };
 
             let adjustment = adjust_score(&config, base_score, &role, &metrics);
@@ -834,6 +872,7 @@ mod tests {
                 callee_count,
                 delegation_ratio,
                 local_complexity: complexity,
+                ast_composition_quality: None,
             };
 
             let quality = calculate_composition_quality(&config, &metrics);

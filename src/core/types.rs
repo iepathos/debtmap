@@ -178,6 +178,7 @@ pub struct Config {
     pub enable_cache: bool,
     pub parallel: bool,
     pub verbose: bool,
+    pub enable_functional_analysis: bool,
 }
 
 impl Default for Config {
@@ -196,6 +197,7 @@ impl Default for Config {
             enable_cache: true,
             parallel: true,
             verbose: false,
+            enable_functional_analysis: false,
         }
     }
 }

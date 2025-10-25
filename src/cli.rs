@@ -19,6 +19,16 @@ pub enum DebugFormatArg {
     Json,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum FunctionalAnalysisProfile {
+    /// Strict profile for codebases emphasizing functional purity
+    Strict,
+    /// Balanced profile for typical Rust codebases (default)
+    Balanced,
+    /// Lenient profile for imperative-heavy codebases
+    Lenient,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
 #[command(about = "Code complexity and technical debt analyzer", long_about = None)]
@@ -262,6 +272,14 @@ pub enum Commands {
         /// Validate call graph structure and report issues
         #[arg(long = "validate-call-graph")]
         validate_call_graph: bool,
+
+        /// Enable AST-based functional composition analysis (spec 111)
+        #[arg(long = "ast-functional-analysis")]
+        ast_functional_analysis: bool,
+
+        /// Functional analysis profile (strict, balanced, lenient)
+        #[arg(long = "functional-analysis-profile", value_enum)]
+        functional_analysis_profile: Option<FunctionalAnalysisProfile>,
     },
 
     /// Initialize configuration file
