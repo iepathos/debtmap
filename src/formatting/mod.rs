@@ -1,3 +1,4 @@
+use crate::config::CallerCalleeConfig;
 use colored::*;
 use std::env;
 use std::io::IsTerminal;
@@ -31,19 +32,31 @@ impl ColorMode {
 #[derive(Debug, Clone, Copy)]
 pub struct FormattingConfig {
     pub color: ColorMode,
+    pub caller_callee: CallerCalleeConfig,
 }
 
 impl Default for FormattingConfig {
     fn default() -> Self {
         Self {
             color: ColorMode::Auto,
+            caller_callee: CallerCalleeConfig::default(),
         }
     }
 }
 
 impl FormattingConfig {
     pub fn new(color: ColorMode) -> Self {
-        Self { color }
+        Self {
+            color,
+            caller_callee: CallerCalleeConfig::default(),
+        }
+    }
+
+    pub fn with_caller_callee(color: ColorMode, caller_callee: CallerCalleeConfig) -> Self {
+        Self {
+            color,
+            caller_callee,
+        }
     }
 
     pub fn from_env() -> Self {
@@ -75,6 +88,7 @@ impl FormattingConfig {
     pub fn plain() -> Self {
         Self {
             color: ColorMode::Never,
+            caller_callee: CallerCalleeConfig::default(),
         }
     }
 }

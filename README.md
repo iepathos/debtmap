@@ -478,6 +478,73 @@ Debug and validation modes add minimal overhead (<20% typically) and can be used
 - Limiting `--trace-function` to specific problem areas
 - Running full debug analysis periodically rather than on every build
 
+## Viewing Dependency Information
+
+Debtmap displays caller/callee relationships for each technical debt item, helping you understand the impact and reach of functions that need attention.
+
+### Dependency Display in Output
+
+When running analysis with default verbosity (`-v`), each debt item includes a DEPENDENCIES section showing:
+
+```
+#1 SCORE: 8.9 [CRITICAL]
+├─ TEST GAP: ./src/parser.rs:38 parse_complex_input()
+├─ ACTION: Add 6 unit tests for full coverage
+├─ IMPACT: -3.7 risk reduction
+├─ DEPENDENCIES:
+|  |- Called by (3):
+|       ⬆ validate_input
+|       ⬆ process_request
+|       ⬆ handle_api_call
+|  |- Calls (2):
+|       ⬇ tokenize
+|       ⬇ validate_syntax
+└─ WHY: Complex logic (cyclomatic=6) with 0% test coverage
+```
+
+**What the dependency information shows:**
+- **Called by (callers)**: Functions that depend on this function (upward arrow ⬆)
+- **Calls (callees)**: Functions this function depends on (downward arrow ⬇)
+- Counts are shown in parentheses (e.g., "(3)" means 3 callers)
+
+### Configuring Dependency Display
+
+Control how many dependencies are shown using CLI flags:
+
+```bash
+# Limit callers and callees displayed (default: 5 each)
+debtmap analyze . --max-callers 10 --max-callees 10
+
+# Show external crate calls (hidden by default)
+debtmap analyze . --show-external-calls
+
+# Show standard library calls (hidden by default)
+debtmap analyze . --show-std-lib-calls
+
+# Hide all dependency information
+debtmap analyze . --no-dependencies
+```
+
+### Configuration File
+
+Add dependency display settings to `.debtmap.toml`:
+
+```toml
+[output.dependencies]
+max_callers = 10        # Maximum callers to display (default: 5)
+max_callees = 10        # Maximum callees to display (default: 5)
+show_external = false   # Show external crate calls (default: false)
+show_std_lib = false    # Show stdlib calls (default: false)
+```
+
+### Understanding Dependency Impact
+
+Dependency information helps prioritize refactoring:
+- **High caller count** → Changes affect many parts of codebase (higher refactoring risk)
+- **High callee count** → Function has many dependencies (higher complexity)
+- **Entry points** (few/no callers) → Good starting points for testing
+- **Leaf functions** (few/no callees) → Easier to test in isolation
+
 ## Roadmap
 
 ### Language Support

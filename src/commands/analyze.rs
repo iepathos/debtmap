@@ -69,6 +69,12 @@ pub struct AnalyzeConfig {
     pub call_graph_stats_only: bool,
     pub debug_format: crate::cli::DebugFormatArg,
     pub validate_call_graph: bool,
+    pub show_dependencies: bool,
+    pub no_dependencies: bool,
+    pub max_callers: usize,
+    pub max_callees: usize,
+    pub show_external: bool,
+    pub show_std_lib: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
