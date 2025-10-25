@@ -659,12 +659,12 @@ mod tests {
 
     #[test]
     fn test_no_improvements_below_threshold() {
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 5.0, 10, None)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 4.6, 10, None)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 5.0, 10, None,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 4.6, 10, None,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -675,12 +675,12 @@ mod tests {
 
     #[test]
     fn test_score_improvement_above_threshold_with_complexity_reduction() {
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 10.0, 20, None)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, None)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 10.0, 20, None,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 9.0, 10, None,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -704,12 +704,20 @@ mod tests {
             uncovered_lines: vec![],
         });
 
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 10.0, 10, before_coverage)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            10.0,
+            10,
+            before_coverage,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            9.0,
+            10,
+            after_coverage,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -732,12 +740,20 @@ mod tests {
             uncovered_lines: vec![],
         });
 
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 10.0, 20, before_coverage)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            10.0,
+            20,
+            before_coverage,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            9.0,
+            10,
+            after_coverage,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -750,9 +766,9 @@ mod tests {
     #[test]
     fn test_item_only_in_after_not_in_before() {
         let before = create_empty_output();
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "new_func", 5.0, 10, None)
-        ]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "new_func", 5.0, 10, None,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -762,9 +778,9 @@ mod tests {
 
     #[test]
     fn test_item_only_in_before_not_in_after() {
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "old_func", 5.0, 10, None)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "old_func", 5.0, 10, None,
+        )]);
         let after = create_empty_output();
 
         let result = identify_improved_items(&before, &after);
@@ -811,9 +827,9 @@ mod tests {
             })),
             create_test_function_item("test.rs", "func1", 10.0, 20, None),
         ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, None)
-        ]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 9.0, 10, None,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -840,12 +856,12 @@ mod tests {
 
     #[test]
     fn test_missing_transitive_coverage_uses_default() {
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 10.0, 20, None)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, None)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 10.0, 20, None,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs", "func1", 9.0, 10, None,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
@@ -867,12 +883,20 @@ mod tests {
             uncovered_lines: vec![],
         });
 
-        let before = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 10.0, 10, before_coverage)
-        ]);
-        let after = create_output_with_items(vec![
-            create_test_function_item("test.rs", "func1", 9.0, 10, after_coverage)
-        ]);
+        let before = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            10.0,
+            10,
+            before_coverage,
+        )]);
+        let after = create_output_with_items(vec![create_test_function_item(
+            "test.rs",
+            "func1",
+            9.0,
+            10,
+            after_coverage,
+        )]);
 
         let result = identify_improved_items(&before, &after);
 
