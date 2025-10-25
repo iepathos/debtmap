@@ -1526,11 +1526,7 @@ fn format_dependencies_section_with_config(
     let filtered_callees =
         filter_dependencies(&context.dependency_info.downstream_callees, &config);
 
-    // Only show section if we have callers or callees to display
-    if filtered_callers.is_empty() && filtered_callees.is_empty() {
-        return None;
-    }
-
+    // Always show dependencies section (per spec 117)
     let mut section = format!("{}", "├─ DEPENDENCIES:".bright_blue());
 
     // Display callers
@@ -1593,8 +1589,8 @@ fn format_dependencies_section_with_config(
                 "|", "...", display_count, callee_count
             ));
         }
-    } else if !filtered_callers.is_empty() {
-        // Only show "calls nothing" if we showed callers
+    } else {
+        // Always show callees section, even when empty (per spec 117)
         section.push_str(&format!(
             "\n{}  {} {} Calls no other functions",
             "|", "+-", "Calls"
@@ -2183,6 +2179,71 @@ mod tests {
     }
 
     #[test]
+    fn test_format_priority_item_empty_dependencies_shows_section() {
+        // Spec 117: DEPENDENCIES section should always appear, even when empty
+        let mut output = String::new();
+        let mut item = create_test_item(6.0);
+        item.upstream_callers = vec![];
+        item.downstream_callees = vec![];
+        item.upstream_dependencies = 0;
+        item.downstream_dependencies = 0;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+
+        // Must show DEPENDENCIES section
+        assert!(
+            plain.contains("DEPENDENCIES:"),
+            "Missing DEPENDENCIES section for empty callers/callees"
+        );
+
+        // Must show empty caller message
+        assert!(
+            plain.contains("No direct callers detected"),
+            "Missing empty caller message"
+        );
+
+        // Must show empty callee message
+        assert!(
+            plain.contains("Calls no other functions"),
+            "Missing empty callee message"
+        );
+    }
+
+    #[test]
+    fn test_format_priority_item_empty_callers_only() {
+        // Test when only callers are empty
+        let mut output = String::new();
+        let mut item = create_test_item(6.5);
+        item.upstream_callers = vec![];
+        item.downstream_callees = vec!["some_function".to_string()];
+        item.upstream_dependencies = 0;
+        item.downstream_dependencies = 1;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+
+        assert!(plain.contains("DEPENDENCIES:"));
+        assert!(plain.contains("No direct callers detected"));
+        assert!(plain.contains("some_function"));
+    }
+
+    #[test]
+    fn test_format_priority_item_empty_callees_only() {
+        // Test when only callees are empty
+        let mut output = String::new();
+        let mut item = create_test_item(7.5);
+        item.upstream_callers = vec!["caller_func".to_string()];
+        item.downstream_callees = vec![];
+        item.upstream_dependencies = 1;
+        item.downstream_dependencies = 0;
+        format_priority_item(&mut output, 1, &item);
+        let plain = strip_ansi_codes(&output);
+
+        assert!(plain.contains("DEPENDENCIES:"));
+        assert!(plain.contains("caller_func"));
+        assert!(plain.contains("Calls no other functions"));
+    }
+
+    #[test]
     fn test_format_priority_item_dead_code() {
         let mut output = String::new();
         let mut item = create_test_item(4.0);
@@ -2238,8 +2299,10 @@ mod tests {
         item.downstream_callees = vec![];
         format_priority_item(&mut output, 1, &item);
         let plain = strip_ansi_codes(&output);
-        // With no callers or callees, DEPENDENCIES section should not appear
-        assert!(!plain.contains("DEPENDENCIES:"));
+        // Per spec 117: DEPENDENCIES section should ALWAYS appear
+        assert!(plain.contains("DEPENDENCIES:"), "DEPENDENCIES section must always appear");
+        assert!(plain.contains("No direct callers detected"), "Must show empty caller message");
+        assert!(plain.contains("Calls no other functions"), "Must show empty callee message");
     }
 
     #[test]
