@@ -891,8 +891,7 @@ fn default_max_complexity() -> u32 {
 }
 
 /// Verbosity level for output formatting
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum VerbosityLevel {
     /// Summary output - only essential information
