@@ -439,4 +439,51 @@ mod tests {
         let result = writer.write_risk_insights(&insights);
         assert!(result.is_ok());
     }
+
+    // Phase 1: Tests for existing pure functions
+
+    #[test]
+    fn test_classify_complexity_level_boundaries() {
+        assert_eq!(classify_complexity_level(0), ComplexityLevel::Low);
+        assert_eq!(classify_complexity_level(5), ComplexityLevel::Low);
+        assert_eq!(classify_complexity_level(6), ComplexityLevel::Moderate);
+        assert_eq!(classify_complexity_level(10), ComplexityLevel::Moderate);
+        assert_eq!(classify_complexity_level(11), ComplexityLevel::High);
+        assert_eq!(classify_complexity_level(15), ComplexityLevel::High);
+        assert_eq!(classify_complexity_level(16), ComplexityLevel::Severe);
+        assert_eq!(classify_complexity_level(100), ComplexityLevel::Severe);
+    }
+
+    #[test]
+    fn test_get_refactoring_action_message() {
+        assert!(get_refactoring_action_message(&ComplexityLevel::Low).is_none());
+        assert!(get_refactoring_action_message(&ComplexityLevel::Moderate).is_some());
+        assert!(get_refactoring_action_message(&ComplexityLevel::High).is_some());
+        assert!(get_refactoring_action_message(&ComplexityLevel::Severe).is_some());
+
+        // Verify messages contain expected guidance
+        let moderate_msg = get_refactoring_action_message(&ComplexityLevel::Moderate).unwrap();
+        assert!(moderate_msg.contains("2-3 pure functions"));
+
+        let high_msg = get_refactoring_action_message(&ComplexityLevel::High).unwrap();
+        assert!(high_msg.contains("3-5 pure functions"));
+
+        let severe_msg = get_refactoring_action_message(&ComplexityLevel::Severe).unwrap();
+        assert!(severe_msg.contains("5+ pure functions"));
+    }
+
+    #[test]
+    fn test_get_refactoring_patterns() {
+        assert_eq!(get_refactoring_patterns(&ComplexityLevel::Low), "");
+        assert!(!get_refactoring_patterns(&ComplexityLevel::Moderate).is_empty());
+        assert!(!get_refactoring_patterns(&ComplexityLevel::High).is_empty());
+        assert!(!get_refactoring_patterns(&ComplexityLevel::Severe).is_empty());
+
+        // Verify patterns contain expected keywords
+        let moderate_patterns = get_refactoring_patterns(&ComplexityLevel::Moderate);
+        assert!(moderate_patterns.contains("map/filter/fold"));
+
+        let severe_patterns = get_refactoring_patterns(&ComplexityLevel::Severe);
+        assert!(severe_patterns.contains("monadic"));
+    }
 }
