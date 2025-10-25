@@ -161,6 +161,7 @@ pub fn calculate_unified_priority_with_debt(
         && (role == FunctionRole::IOWrapper
             || role == FunctionRole::EntryPoint
             || role == FunctionRole::PatternMatch
+            || role == FunctionRole::Debug
             || (role == FunctionRole::PureLogic && func.length <= 10));
 
     // Check actual test coverage if we have lcov data
@@ -224,6 +225,7 @@ pub fn calculate_unified_priority_with_debt(
         FunctionRole::Orchestrator => 0.8,
         FunctionRole::IOWrapper => 0.5,
         FunctionRole::PatternMatch => 0.6,
+        FunctionRole::Debug => 0.3,
         _ => 1.0,
     };
 
@@ -235,6 +237,7 @@ pub fn calculate_unified_priority_with_debt(
         FunctionRole::PureLogic => role_coverage_weights.pure_logic,
         FunctionRole::IOWrapper => role_coverage_weights.io_wrapper,
         FunctionRole::PatternMatch => role_coverage_weights.pattern_match,
+        FunctionRole::Debug => role_coverage_weights.pattern_match, // Same as pattern_match
         _ => role_coverage_weights.unknown,
     };
 

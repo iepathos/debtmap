@@ -200,6 +200,68 @@ min_branches = 3                    # Minimum match arms to consider
 
 📖 **Read more:** [Configuration Guide](https://iepathos.github.io/debtmap/configuration.html#pure-mapping-pattern-detection)
 
+### Role-Based Coverage Expectations
+Debtmap recognizes that different types of functions have different testing priorities. Instead of applying a uniform 80% coverage target to all code, it uses role-specific expectations that reflect real-world testing best practices.
+
+**Default Coverage Expectations by Role:**
+
+| Function Role | Target | Why |
+|--------------|--------|-----|
+| **Pure Logic** | 90-100% | Easy to test, high ROI |
+| **Business Logic** | 80-95% | Critical functionality |
+| **Validation** | 85-98% | Must be correct |
+| **State Management** | 75-90% | Complex behavior |
+| **Error Handling** | 70-90% | Important paths |
+| **I/O Operations** | 60-80% | Often integration tested |
+| **Configuration** | 60-80% | Lower risk |
+| **Orchestration** | 65-85% | Coordinating functions |
+| **Utilities** | 75-95% | Should be reliable |
+| **Initialization** | 50-75% | Lower priority |
+| **Performance** | 40-60% | Optimization code |
+| **Debug/Development** | 20-40% | Development-only code |
+
+**How it works:**
+
+When debtmap identifies a function with low coverage, it considers the function's role:
+- A pure function with 70% coverage gets flagged (below 90% target)
+- A debug function with 70% coverage is fine (above 30% target)
+
+**Example output:**
+```
+#2 SCORE: 7.2 [HIGH]
+├─ TEST GAP: ./src/calc.rs:42 compute_price()
+├─ COVERAGE: 65% (expected: 90% for Pure functions) 🟠
+├─ ACTION: Add 8 unit tests to reach target
+└─ WHY: Pure logic is easy to test and high-value
+```
+
+**Customize expectations in `.debtmap.toml`:**
+```toml
+[coverage_expectations]
+pure = { min = 90.0, target = 95.0, max = 100.0 }
+business_logic = { min = 80.0, target = 90.0, max = 95.0 }
+debug = { min = 20.0, target = 30.0, max = 40.0 }
+```
+
+**Manual role override:**
+
+You can override automatic role detection using doc comments:
+```rust
+/// Calculate user discount
+/// @debtmap-role: BusinessLogic
+fn calculate_discount(user: &User) -> f64 {
+    // debtmap will use BusinessLogic expectations (80-95%)
+}
+```
+
+**Coverage gap severity indicators:**
+- 🟢 Meets or exceeds target
+- 🟡 Between min and target (minor gap)
+- 🟠 Below min but above 50% of min (moderate gap)
+- 🔴 Critically low (below 50% of min)
+
+📖 **Read more:** [Coverage Integration Guide](https://iepathos.github.io/debtmap/coverage-integration.html#role-based-expectations)
+
 ### Cache Management
 Intelligent cache system with automatic pruning and configurable strategies (LRU, LFU, FIFO, age-based).
 

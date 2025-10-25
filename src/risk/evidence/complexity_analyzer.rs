@@ -94,6 +94,12 @@ impl ComplexityRiskAnalyzer {
                 high: base_thresholds.high * 2.0,
                 critical: base_thresholds.critical * 2.0,
             },
+            FunctionRole::Debug => ComplexityThresholds {
+                low: base_thresholds.low * 2.5, // Very lenient for debug functions
+                moderate: base_thresholds.moderate * 2.5,
+                high: base_thresholds.high * 2.5,
+                critical: base_thresholds.critical * 2.5,
+            },
             FunctionRole::EntryPoint => ComplexityThresholds {
                 low: base_thresholds.low * 1.2,
                 moderate: base_thresholds.moderate * 1.2,
@@ -296,6 +302,7 @@ impl ComplexityRiskAnalyzer {
             FunctionRole::IOWrapper => 0.5,    // Lower weight for I/O
             FunctionRole::EntryPoint => 0.8,   // Moderate weight for entry points
             FunctionRole::PatternMatch => 0.3, // Very low weight for pattern matching
+            FunctionRole::Debug => 0.2,        // Very low weight for debug functions
             FunctionRole::Unknown => 0.9,      // Default weight
         }
     }

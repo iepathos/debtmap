@@ -116,7 +116,7 @@ fn classify_simple_by_role(func: &FunctionMetrics, role: &FunctionRole) -> DebtT
     use FunctionRole::*;
 
     match role {
-        IOWrapper | EntryPoint | PatternMatch => DebtType::Risk {
+        IOWrapper | EntryPoint | PatternMatch | Debug => DebtType::Risk {
             risk_score: 0.0,
             factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
         },
@@ -320,6 +320,7 @@ pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Opt
         FunctionRole::EntryPoint => (7, 10),
         FunctionRole::IOWrapper => (5, 8),
         FunctionRole::PatternMatch => (15, 20),
+        FunctionRole::Debug => (20, 25), // Very lenient for debug functions
         FunctionRole::Unknown => (10, 15),
     };
 
@@ -359,12 +360,13 @@ pub fn classify_simple_function_risk(
     }
 
     match role {
-        FunctionRole::IOWrapper | FunctionRole::EntryPoint | FunctionRole::PatternMatch => {
-            Some(DebtType::Risk {
-                risk_score: 0.0,
-                factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
-            })
-        }
+        FunctionRole::IOWrapper
+        | FunctionRole::EntryPoint
+        | FunctionRole::PatternMatch
+        | FunctionRole::Debug => Some(DebtType::Risk {
+            risk_score: 0.0,
+            factors: vec!["Simple I/O wrapper or entry point - minimal risk".to_string()],
+        }),
         FunctionRole::PureLogic if func.length <= 10 => Some(DebtType::Risk {
             risk_score: 0.0,
             factors: vec!["Trivial pure function - not technical debt".to_string()],

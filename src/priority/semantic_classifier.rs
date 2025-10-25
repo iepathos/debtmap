@@ -14,6 +14,7 @@ pub enum FunctionRole {
     IOWrapper,    // Thin I/O layer
     EntryPoint,   // Main entry points
     PatternMatch, // Pattern matching function (low complexity)
+    Debug,        // Debug/diagnostic functions (low test priority)
     Unknown,      // Cannot classify
 }
 
@@ -38,6 +39,11 @@ fn classify_by_rules(
     // Entry point has highest precedence
     if is_entry_point(func_id, call_graph) {
         return Some(FunctionRole::EntryPoint);
+    }
+
+    // Check for debug/diagnostic functions early (Spec 119)
+    if is_debug_function(func) {
+        return Some(FunctionRole::Debug);
     }
 
     // Check for constructors BEFORE pattern matching (Spec 117 + 122)
@@ -96,6 +102,83 @@ fn classify_by_rules(
 // Pure function to check if a function is an entry point
 fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
+}
+
+/// Detect debug/diagnostic functions (Spec 119)
+///
+/// Debug functions are typically used for troubleshooting and have lower test priority.
+/// Detection uses name patterns and behavioral characteristics.
+///
+/// # Detection Strategy
+///
+/// 1. Check if function name matches debug patterns
+/// 2. Check if function has diagnostic behavioral characteristics:
+///    - Primarily I/O operations (printing, logging)
+///    - Simple return type (unit or simple status)
+///    - Few external function calls
+///    - Low complexity (avoid misclassifying complex business logic)
+///
+/// # Detected Patterns
+///
+/// **Debug functions** (classified as Debug):
+/// - Name patterns: `debug_*`, `print_*`, `dump_*`, `trace_*`
+/// - Name patterns: `*_diagnostics`, `*_debug`, `*_stats`
+/// - Functions with primarily I/O operations and simple logic
+/// - Low complexity with minimal external calls
+///
+/// **Complex functions** (NOT classified as Debug):
+/// - High complexity (>10) even with debug-like name
+/// - Many external function calls (>10)
+/// - Complex business logic
+fn is_debug_function(func: &FunctionMetrics) -> bool {
+    let name_matches = matches_debug_pattern(&func.name);
+    let has_debug_characteristics = has_diagnostic_characteristics(func);
+
+    // If name matches debug pattern, check complexity isn't too high
+    // (prevents misclassifying complex functions with debug-like names)
+    if name_matches {
+        // Allow functions with complexity up to 10
+        return func.cognitive <= 10;
+    }
+
+    // If behavioral characteristics match, it's likely a debug function
+    has_debug_characteristics
+}
+
+/// Check if function name matches debug patterns
+fn matches_debug_pattern(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+
+    // Specific debug prefixes
+    let prefixes = ["debug_", "print_", "dump_", "trace_"];
+    // Specific debug suffixes
+    let suffixes = ["_diagnostics", "_debug", "_stats"];
+    // Specific debug contains patterns
+    let contains = ["diagnostics"];
+
+    prefixes.iter().any(|p| name_lower.starts_with(p))
+        || suffixes.iter().any(|s| name_lower.ends_with(s))
+        || contains.iter().any(|c| name_lower.contains(c))
+}
+
+/// Check if function has diagnostic behavioral characteristics
+fn has_diagnostic_characteristics(func: &FunctionMetrics) -> bool {
+    // Diagnostic functions typically have:
+    // - Very low complexity (< 5)
+    // - Short length (< 20 lines)
+    // - Output-focused I/O patterns (print, display, log, not read/write/load/save)
+    let is_very_simple = func.cognitive < 5 && func.length < 20;
+    let has_output_io_name = matches_output_io_pattern(&func.name);
+
+    is_very_simple && has_output_io_name
+}
+
+/// Check if name matches output-focused I/O patterns (not read/write operations)
+fn matches_output_io_pattern(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+    let output_patterns = ["print", "display", "show", "log", "trace", "dump"];
+
+    output_patterns.iter().any(|p| name_lower.contains(p))
 }
 
 /// Detect simple constructor functions to prevent false positive classifications.
@@ -763,6 +846,7 @@ pub fn get_role_multiplier(role: FunctionRole) -> f64 {
         FunctionRole::IOWrapper => config.io_wrapper,
         FunctionRole::EntryPoint => config.entry_point,
         FunctionRole::PatternMatch => config.pattern_match,
+        FunctionRole::Debug => config.debug,
         FunctionRole::Unknown => config.unknown,
     }
 }
@@ -1761,6 +1845,176 @@ mod tests {
             role,
             Some(FunctionRole::IOWrapper),
             "Accessor should be classified as IOWrapper"
+        );
+    }
+
+    // Debug role detection tests (spec 119)
+
+    #[test]
+    fn test_debug_function_with_diagnostics_suffix() {
+        let func = create_test_metrics("handle_call_graph_diagnostics", 5, 3, 20);
+        assert!(
+            is_debug_function(&func),
+            "Function with _diagnostics suffix should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_debug_function_with_debug_prefix() {
+        let func = create_test_metrics("debug_print_info", 3, 2, 15);
+        assert!(
+            is_debug_function(&func),
+            "Function with debug_ prefix should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_print_function_detected_as_debug() {
+        let func = create_test_metrics("print_statistics", 4, 3, 18);
+        assert!(
+            is_debug_function(&func),
+            "Function with print_ prefix should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_dump_function_detected_as_debug() {
+        let func = create_test_metrics("dump_state", 2, 1, 10);
+        assert!(
+            is_debug_function(&func),
+            "Function with dump_ prefix should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_trace_function_detected_as_debug() {
+        let func = create_test_metrics("trace_execution", 3, 2, 12);
+        assert!(
+            is_debug_function(&func),
+            "Function with trace_ prefix should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_high_complexity_debug_name_not_debug() {
+        // High complexity should prevent misclassification
+        let func = create_test_metrics("debug_complex_algorithm", 15, 12, 50);
+        assert!(
+            !is_debug_function(&func),
+            "High complexity function should not be classified as debug even with debug name"
+        );
+    }
+
+    #[test]
+    fn test_debug_stats_function() {
+        let func = create_test_metrics("calculate_stats", 4, 3, 20);
+        assert!(
+            is_debug_function(&func),
+            "Function ending with _stats should be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_debug_classification_integration() {
+        let graph = CallGraph::new();
+        // Use a function that clearly matches debug pattern without entry point pattern
+        let func = create_test_metrics("print_call_graph_diagnostics", 5, 3, 20);
+        let func_id = FunctionId::new(
+            PathBuf::from("commands/analyze.rs"),
+            "print_call_graph_diagnostics".to_string(),
+            396,
+        );
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::Debug,
+            "Diagnostic function should be classified as Debug role"
+        );
+    }
+
+    #[test]
+    fn test_entry_point_takes_precedence_over_debug() {
+        let graph = CallGraph::new();
+        // Function with both entry point and debug patterns - entry point wins
+        let func = create_test_metrics("handle_diagnostics", 5, 3, 20);
+        let func_id = FunctionId::new(
+            PathBuf::from("commands/analyze.rs"),
+            "handle_diagnostics".to_string(),
+            396,
+        );
+
+        let role = classify_function_role(&func, &func_id, &graph);
+        assert_eq!(
+            role,
+            FunctionRole::EntryPoint,
+            "Entry point pattern should take precedence over debug pattern"
+        );
+    }
+
+    #[test]
+    fn test_business_logic_not_misclassified_as_debug() {
+        let func = create_test_metrics("calculate_complexity", 8, 5, 30);
+        assert!(
+            !is_debug_function(&func),
+            "Business logic function should not be detected as debug"
+        );
+    }
+
+    #[test]
+    fn test_debug_role_multiplier() {
+        let multiplier = get_role_multiplier(FunctionRole::Debug);
+        assert_eq!(
+            multiplier, 0.3,
+            "Debug role should have lowest multiplier (0.3)"
+        );
+    }
+
+    #[test]
+    fn test_matches_debug_pattern() {
+        assert!(matches_debug_pattern("debug_foo"));
+        assert!(matches_debug_pattern("print_bar"));
+        assert!(matches_debug_pattern("dump_state"));
+        assert!(matches_debug_pattern("trace_execution"));
+        assert!(matches_debug_pattern("foo_diagnostics"));
+        assert!(matches_debug_pattern("bar_debug"));
+        assert!(matches_debug_pattern("baz_stats"));
+        assert!(matches_debug_pattern("test_diagnostics_helper"));
+
+        // Should not match
+        assert!(!matches_debug_pattern("calculate"));
+        assert!(!matches_debug_pattern("process"));
+        assert!(!matches_debug_pattern("validate"));
+    }
+
+    #[test]
+    fn test_diagnostic_characteristics() {
+        // Should match: simple output function
+        let func = create_test_metrics("print_output", 3, 2, 15);
+        assert!(
+            has_diagnostic_characteristics(&func),
+            "Simple print function should have diagnostic characteristics"
+        );
+
+        // Should not match: complex function
+        let func = create_test_metrics("print_complex", 10, 8, 40);
+        assert!(
+            !has_diagnostic_characteristics(&func),
+            "Complex function should not have diagnostic characteristics"
+        );
+
+        // Should not match: no output I/O pattern
+        let func = create_test_metrics("calculate_total", 3, 2, 15);
+        assert!(
+            !has_diagnostic_characteristics(&func),
+            "Non-output function should not have diagnostic characteristics"
+        );
+
+        // Should not match: read/write operations (not diagnostic output)
+        let func = create_test_metrics("read_file", 3, 2, 15);
+        assert!(
+            !has_diagnostic_characteristics(&func),
+            "Read/write operations should not have diagnostic characteristics"
         );
     }
 }

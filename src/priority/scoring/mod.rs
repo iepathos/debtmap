@@ -4,6 +4,8 @@ pub mod calculation;
 pub mod classification;
 pub mod computation;
 pub mod construction;
+pub mod coverage_expectations;
+pub mod coverage_scoring;
 pub mod debt_item;
 pub mod formatting;
 pub mod orchestration_adjustment;
@@ -41,5 +43,9 @@ pub use orchestration_adjustment::{
     adjust_score, extract_composition_metrics, CompositionMetrics, OrchestrationAdjustmentConfig,
     ReductionPercent, ScoreAdjustment,
 };
+
+pub use coverage_expectations::{CoverageExpectations, CoverageGap, CoverageRange, GapSeverity};
+
+pub use coverage_scoring::calculate_coverage_score;
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

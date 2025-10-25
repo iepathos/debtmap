@@ -161,6 +161,10 @@ pub struct RoleMultipliers {
     #[serde(default = "default_pattern_match_multiplier")]
     pub pattern_match: f64,
 
+    /// Multiplier for Debug functions (default: 0.3)
+    #[serde(default = "default_debug_multiplier")]
+    pub debug: f64,
+
     /// Multiplier for Unknown functions (default: 1.0)
     #[serde(default = "default_unknown_multiplier")]
     pub unknown: f64,
@@ -174,6 +178,7 @@ impl Default for RoleMultipliers {
             io_wrapper: default_io_wrapper_multiplier(),
             entry_point: default_entry_point_multiplier(),
             pattern_match: default_pattern_match_multiplier(),
+            debug: default_debug_multiplier(),
             unknown: default_unknown_multiplier(),
         }
     }
@@ -197,6 +202,10 @@ fn default_entry_point_multiplier() -> f64 {
 
 fn default_pattern_match_multiplier() -> f64 {
     0.6 // Moderate reduction (was 0.4)
+}
+
+fn default_debug_multiplier() -> f64 {
+    0.3 // Debug/diagnostic functions have lowest test priority (spec 119)
 }
 
 fn default_unknown_multiplier() -> f64 {
@@ -225,6 +234,10 @@ pub struct RoleCoverageWeights {
     /// Coverage weight multiplier for PatternMatch functions (default: 1.0)
     #[serde(default = "default_pattern_match_coverage_weight")]
     pub pattern_match: f64,
+
+    /// Coverage weight multiplier for Debug functions (default: 0.3)
+    #[serde(default = "default_debug_coverage_weight")]
+    pub debug: f64,
 
     /// Coverage weight multiplier for Unknown functions (default: 1.0)
     #[serde(default = "default_unknown_coverage_weight")]
@@ -561,6 +574,7 @@ impl Default for RoleCoverageWeights {
             pure_logic: default_pure_logic_coverage_weight(),
             io_wrapper: default_io_wrapper_coverage_weight(),
             pattern_match: default_pattern_match_coverage_weight(),
+            debug: default_debug_coverage_weight(),
             unknown: default_unknown_coverage_weight(),
         }
     }
@@ -584,6 +598,10 @@ fn default_io_wrapper_coverage_weight() -> f64 {
 
 fn default_pattern_match_coverage_weight() -> f64 {
     1.0 // Pattern matching should have unit tests, no reduction
+}
+
+fn default_debug_coverage_weight() -> f64 {
+    0.3 // Debug/diagnostic functions have lowest coverage expectations (spec 119)
 }
 
 fn default_unknown_coverage_weight() -> f64 {
@@ -1010,6 +1028,10 @@ pub struct DebtmapConfig {
     /// Pure mapping pattern detection configuration (spec 118)
     #[serde(default)]
     pub mapping_patterns: Option<MappingPatternConfig>,
+
+    /// Role-based coverage expectations (spec 119)
+    #[serde(default)]
+    pub coverage_expectations: Option<crate::priority::scoring::CoverageExpectations>,
 }
 
 /// Classification configuration
@@ -1673,6 +1695,14 @@ pub fn get_error_handling_config() -> ErrorHandlingConfig {
 pub fn get_role_coverage_weights() -> RoleCoverageWeights {
     get_config()
         .role_coverage_weights
+        .clone()
+        .unwrap_or_default()
+}
+
+/// Get role-based coverage expectations (spec 119)
+pub fn get_coverage_expectations() -> crate::priority::scoring::CoverageExpectations {
+    get_config()
+        .coverage_expectations
         .clone()
         .unwrap_or_default()
 }

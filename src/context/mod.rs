@@ -62,6 +62,8 @@ pub enum FunctionRole {
     BuildScript,
     /// Example/documentation code
     Example,
+    /// Debug/diagnostic function
+    Debug,
     /// Unknown role
     Unknown,
 }
