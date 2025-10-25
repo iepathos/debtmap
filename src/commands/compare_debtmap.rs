@@ -186,7 +186,15 @@ fn perform_validation(
         &after_summary,
     );
 
-    let status = if improvement_score >= 75.0 {
+    // Determine status based on functional composition of conditions
+    let has_regressions = new_items.critical_count > 0;
+    let all_high_priority_addressed = before_summary.high_priority_items > 0
+        && after_summary.high_priority_items == 0;
+    let meets_score_threshold = improvement_score >= 75.0;
+
+    let status = if has_regressions {
+        "failed"
+    } else if all_high_priority_addressed || meets_score_threshold {
         "complete"
     } else if improvement_score >= 40.0 {
         "incomplete"
@@ -474,8 +482,18 @@ fn calculate_improvement_score(
     before_summary: &AnalysisSummary,
     after_summary: &AnalysisSummary,
 ) -> f64 {
-    let resolved_high_priority_score = if before_summary.high_priority_items > 0 {
-        (resolved.high_priority_count as f64 / before_summary.high_priority_items as f64) * 100.0
+    // If both before and after have no items, it's 100% complete (nothing to do)
+    if before_summary.total_items == 0 && after_summary.total_items == 0 {
+        return 100.0;
+    }
+
+    // Calculate high-priority resolution score
+    let high_priority_progress = if before_summary.high_priority_items > 0 {
+        let resolved_count = resolved.high_priority_count as f64;
+        // Use saturating subtraction to handle cases where after > before (regressions)
+        let addressed_count = before_summary.high_priority_items.saturating_sub(after_summary.high_priority_items) as f64;
+        // Use the better of resolved or addressed (items may improve below threshold without being removed)
+        (addressed_count.max(resolved_count) / before_summary.high_priority_items as f64) * 100.0
     } else {
         100.0
     };
@@ -496,14 +514,30 @@ fn calculate_improvement_score(
         0.0
     };
 
-    let weighted_score = resolved_high_priority_score * 0.4
+    let weighted_score = high_priority_progress * 0.4
         + overall_score_improvement.max(0.0) * 0.3
         + complexity_reduction_score * 0.2
         + no_new_critical_score * 0.1;
 
-    let penalty = unchanged_critical.count as f64 * 5.0;
+    // Apply penalty for unchanged critical items, but ensure progress is still reflected
+    // If there are improvements (complexity reduction or coverage), reduce the penalty impact
+    let has_improvements = complexity_reduction_score > 0.0 || overall_score_improvement > 0.0;
+    let penalty_factor = if unchanged_critical.count > 0 && !has_improvements {
+        1.0 - (unchanged_critical.count as f64 * 0.1).min(0.5)
+    } else if unchanged_critical.count > 0 {
+        // Lighter penalty when there are improvements
+        1.0 - (unchanged_critical.count as f64 * 0.05).min(0.25)
+    } else {
+        1.0
+    };
 
-    (weighted_score - penalty).clamp(0.0, 100.0)
+    // Ensure minimum score of 40% when there are significant improvements
+    let final_score = weighted_score * penalty_factor;
+    if has_improvements && final_score < 40.0 && overall_score_improvement > 5.0 {
+        40.0
+    } else {
+        final_score.clamp(0.0, 100.0)
+    }
 }
 
 fn write_validation_result(path: &Path, result: &ValidationResult) -> Result<()> {
@@ -552,7 +586,7 @@ fn print_summary(result: &ValidationResult) {
 mod tests {
     use super::*;
     use crate::output::json::UnifiedJsonOutput;
-    use crate::priority::{DebtItem, FunctionDebtItem, FunctionLocation, TransitiveCoverage, UnifiedScore};
+    use crate::priority::{DebtItem, unified_scorer::{UnifiedDebtItem, Location, UnifiedScore}, coverage_propagation::TransitiveCoverage};
     use std::path::PathBuf;
 
     fn create_function_item(
@@ -563,34 +597,74 @@ mod tests {
         complexity: u32,
         coverage: Option<f64>,
     ) -> DebtItem {
-        DebtItem::Function(Box::new(FunctionDebtItem {
-            location: FunctionLocation {
+        DebtItem::Function(Box::new(UnifiedDebtItem {
+            location: Location {
                 file: PathBuf::from(file),
                 function: function.to_string(),
                 line,
             },
-            unified_score: UnifiedScore {
-                final_score: score,
-                complexity_score: 0.0,
-                size_score: 0.0,
-                testing_score: 0.0,
-                god_object_score: 0.0,
+            debt_type: crate::priority::DebtType::ComplexityHotspot {
+                cyclomatic: complexity,
+                cognitive: 0,
             },
-            cyclomatic_complexity: complexity,
-            cognitive_complexity: 0,
-            halstead_difficulty: 0.0,
-            lines_of_code: 50,
+            unified_score: UnifiedScore {
+                complexity_factor: 0.0,
+                coverage_factor: 0.0,
+                dependency_factor: 0.0,
+                role_multiplier: 1.0,
+                final_score: score,
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: crate::priority::semantic_classifier::FunctionRole::Unknown,
+            recommendation: crate::priority::ActionableRecommendation {
+                primary_action: String::new(),
+                rationale: String::new(),
+                implementation_steps: vec![],
+                related_items: vec![],
+            },
+            expected_impact: crate::priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
             transitive_coverage: coverage.map(|c| TransitiveCoverage {
                 direct: c,
                 transitive: c,
-                tested_locs: vec![],
+                propagated_from: vec![],
+                uncovered_lines: vec![],
             }),
-            god_object_score: 0.0,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 0,
+            function_length: 50,
+            cyclomatic_complexity: complexity,
+            cognitive_complexity: 0,
+            entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
+            god_object_indicators: None,
+            tier: None,
         }))
     }
 
     fn create_test_output(items: Vec<DebtItem>) -> UnifiedJsonOutput {
-        UnifiedJsonOutput { items }
+        UnifiedJsonOutput {
+            items,
+            total_impact: crate::priority::ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            total_debt_score: 0.0,
+            debt_density: 0.0,
+            total_lines_of_code: 0,
+            overall_coverage: None,
+        }
     }
 
     #[test]
