@@ -171,13 +171,15 @@ fn test_mixed_struct_and_functions() {
     let detector = GodObjectDetector::with_source_content(code);
     let analysis = detector.analyze_comprehensive(Path::new("mixed.rs"), &file);
 
+    // After spec 118: Only count impl methods for struct analysis, not standalone functions
+    // This prevents false positives for functional/procedural modules
     assert_eq!(
-        analysis.method_count, 25,
-        "Should count 5 impl methods + 20 standalone functions"
+        analysis.method_count, 5,
+        "Should count only the 5 impl methods, not standalone functions"
     );
     assert_eq!(analysis.field_count, 2, "Should count 2 struct fields");
-    // With complexity weighting, 25 simple functions (complexity 1 each) should have
-    // a low weighted count (~4.8) which is well below the threshold of 20
+    // With complexity weighting, 5 simple methods (complexity 1 each) should have
+    // a low weighted count which is well below the threshold of 20
     assert!(
         !analysis.is_god_object,
         "File with 25 simple functions should NOT be flagged as god object with complexity weighting"
