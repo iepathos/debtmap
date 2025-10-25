@@ -237,6 +237,27 @@ fn format_entropy_info(entropy_details: &crate::core::EntropyDetails) -> Option<
     Some(lines)
 }
 
+/// Format refactoring guidance for functions above complexity threshold
+fn format_refactoring_guidance(cyclomatic: u32) -> Option<Vec<String>> {
+    if cyclomatic <= 5 {
+        return None;
+    }
+
+    let complexity_level = classify_complexity_level(cyclomatic);
+    let action_msg = get_refactoring_action_message(&complexity_level)?;
+
+    let mut lines = Vec::new();
+    lines.push(action_msg.yellow().to_string());
+
+    let patterns = get_refactoring_patterns(&complexity_level);
+    if !patterns.is_empty() {
+        lines.push(format!("     PATTERNS: {}", patterns.cyan()));
+    }
+
+    lines.push("     BENEFIT: Pure functions are easily testable and composable".to_string());
+    Some(lines)
+}
+
 fn print_complexity_hotspots(results: &AnalysisResults) {
     if results.complexity.metrics.is_empty() {
         return;
@@ -269,19 +290,9 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
         }
 
         // Generate refactoring guidance for high complexity functions
-        if func.cyclomatic > 5 {
-            let complexity_level = classify_complexity_level(func.cyclomatic);
-
-            if let Some(action_msg) = get_refactoring_action_message(&complexity_level) {
-                println!("{}", action_msg.yellow());
-
-                // Add patterns to apply
-                let patterns = get_refactoring_patterns(&complexity_level);
-                if !patterns.is_empty() {
-                    println!("     PATTERNS: {}", patterns.cyan());
-                }
-
-                println!("     BENEFIT: Pure functions are easily testable and composable");
+        if let Some(guidance_lines) = format_refactoring_guidance(func.cyclomatic) {
+            for line in guidance_lines {
+                println!("{line}");
             }
         }
     }
@@ -601,5 +612,76 @@ mod tests {
         assert_eq!(lines.len(), 2); // Header + only first reason
         assert!(lines[1].contains("Reason 1"));
         assert!(!lines.iter().any(|l| l.contains("Reason 2")));
+    }
+
+    // Phase 3: Tests for format_refactoring_guidance function
+
+    #[test]
+    fn test_format_refactoring_guidance_low_complexity() {
+        assert!(format_refactoring_guidance(3).is_none());
+        assert!(format_refactoring_guidance(5).is_none());
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_moderate_complexity() {
+        let result = format_refactoring_guidance(7);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 2); // Action + patterns + benefit
+
+        // Verify contains action message
+        assert!(lines[0].contains("2-3 pure functions"));
+
+        // Verify contains patterns
+        assert!(lines.iter().any(|l| l.contains("map/filter/fold")));
+
+        // Verify contains benefit
+        assert!(lines
+            .iter()
+            .any(|l| l.contains("Pure functions are easily testable")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_high_complexity() {
+        let result = format_refactoring_guidance(12);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 3);
+
+        // Verify contains action for high complexity
+        assert!(lines[0].contains("3-5 pure functions"));
+
+        // Verify contains appropriate patterns
+        assert!(lines.iter().any(|l| l.contains("Decompose into logical units")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_severe_complexity() {
+        let result = format_refactoring_guidance(20);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(lines.len() >= 3);
+
+        // Verify contains action for severe complexity
+        assert!(lines[0].contains("5+ pure functions"));
+
+        // Verify contains architectural patterns
+        assert!(lines.iter().any(|l| l.contains("monadic patterns")));
+    }
+
+    #[test]
+    fn test_format_refactoring_guidance_boundary_at_six() {
+        // At threshold (5): should return None
+        assert!(format_refactoring_guidance(5).is_none());
+
+        // Just above threshold (6): should return Some
+        let result = format_refactoring_guidance(6);
+        assert!(result.is_some());
+
+        let lines = result.unwrap();
+        assert!(!lines.is_empty());
     }
 }
