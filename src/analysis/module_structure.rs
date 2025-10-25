@@ -614,7 +614,8 @@ impl ModuleStructureAnalyzer {
             if trimmed.starts_with("function ")
                 || trimmed.starts_with("export function ")
                 || trimmed.contains("= function")
-                || trimmed.contains("=> ") && (trimmed.starts_with("const ") || trimmed.starts_with("let "))
+                || trimmed.contains("=> ")
+                    && (trimmed.starts_with("const ") || trimmed.starts_with("let "))
             {
                 let is_export = trimmed.starts_with("export ");
                 if is_export {

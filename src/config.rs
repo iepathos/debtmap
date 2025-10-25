@@ -892,20 +892,16 @@ fn default_max_complexity() -> u32 {
 
 /// Verbosity level for output formatting
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum VerbosityLevel {
     /// Summary output - only essential information
     Summary,
     /// Detailed output - includes module structure details
+    #[default]
     Detailed,
     /// Comprehensive output - all available analysis data
     Comprehensive,
-}
-
-impl Default for VerbosityLevel {
-    fn default() -> Self {
-        VerbosityLevel::Detailed
-    }
 }
 
 /// Display configuration for output formatting

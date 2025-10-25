@@ -914,8 +914,8 @@ fn format_module_structure_analysis(
     module_structure: &crate::analysis::ModuleStructure,
     verbosity: crate::config::VerbosityLevel,
 ) {
-    use std::fmt::Write;
     use crate::config::VerbosityLevel;
+    use std::fmt::Write;
 
     output.push('\n');
 
@@ -946,7 +946,11 @@ fn format_module_structure_analysis(
             let mut sorted_components = module_structure.components.clone();
             sorted_components.sort_by_key(|c| std::cmp::Reverse(c.line_count()));
 
-            let component_count = if verbosity == VerbosityLevel::Comprehensive { 5 } else { 3 };
+            let component_count = if verbosity == VerbosityLevel::Comprehensive {
+                5
+            } else {
+                3
+            };
             for component in sorted_components.iter().take(component_count) {
                 writeln!(
                     output,
@@ -976,12 +980,7 @@ fn format_module_structure_analysis(
             if !low_coupling.is_empty() {
                 writeln!(output, "    - Low coupling (easy to extract):").unwrap();
                 for (component, score) in low_coupling.iter().take(3) {
-                    writeln!(
-                        output,
-                        "      - {} (coupling: {:.2})",
-                        component, score
-                    )
-                    .unwrap();
+                    writeln!(output, "      - {} (coupling: {:.2})", component, score).unwrap();
                 }
             }
 
@@ -995,12 +994,7 @@ fn format_module_structure_analysis(
             if !high_coupling.is_empty() {
                 writeln!(output, "    - High coupling (refactor carefully):").unwrap();
                 for (component, score) in high_coupling.iter().take(3) {
-                    writeln!(
-                        output,
-                        "      - {} (coupling: {:.2})",
-                        component, score
-                    )
-                    .unwrap();
+                    writeln!(output, "      - {} (coupling: {:.2})", component, score).unwrap();
                 }
             }
         }
@@ -2567,7 +2561,7 @@ mod tests {
                     god_object_score: 0.85,
                     responsibility_names: Vec::new(),
                     recommended_splits: Vec::new(),
-                module_structure: None,
+                    module_structure: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
             },

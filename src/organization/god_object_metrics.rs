@@ -251,7 +251,7 @@ mod tests {
             },
             responsibilities: Vec::new(),
             purity_distribution: None,
-        module_structure: None,
+            module_structure: None,
         }
     }
 
