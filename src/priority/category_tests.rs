@@ -74,6 +74,7 @@ mod tests {
                     god_object_score: if is_god_object { 3.5 } else { 0.0 },
                     responsibility_names: Vec::new(),
                     recommended_splits: Vec::new(),
+                module_structure: None,
                 },
                 function_scores: vec![],
             },

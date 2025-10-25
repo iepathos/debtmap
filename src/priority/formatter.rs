@@ -2461,6 +2461,7 @@ mod tests {
                     god_object_score: 0.85,
                     responsibility_names: Vec::new(),
                     recommended_splits: Vec::new(),
+                module_structure: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
             },
