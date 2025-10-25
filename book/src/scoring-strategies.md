@@ -353,6 +353,250 @@ ast_detection = false     # Fall back to pattern-only matching
 
 This feature is part of spec 117 and helps reduce false positives in priority scoring.
 
+### Role-Based Adjustments
+
+DebtMap uses a sophisticated two-stage role adjustment mechanism to ensure that scores accurately reflect both the testing strategy appropriate for each function type and the architectural importance of different roles.
+
+#### Why Role-Based Adjustments?
+
+**Problem**: Traditional scoring treats all functions equally, leading to false positives:
+
+1. **Entry points** (CLI handlers, HTTP routes, `main` functions) typically use integration tests rather than unit tests
+   - Flagging them for "low unit test coverage" misses that they're tested differently
+   - They orchestrate other code but contain minimal business logic
+
+2. **Pure business logic** functions should have comprehensive unit tests
+   - Easy to test in isolation with deterministic inputs/outputs
+   - Core value of the application lives here
+
+3. **I/O wrappers** are often tested implicitly through integration tests
+   - Thin abstractions over file system, network, or database operations
+   - Unit testing them provides limited value compared to integration testing
+
+**Solution**: DebtMap applies role-based adjustments in two stages to address both coverage expectations and architectural importance.
+
+#### Stage 1: Role-Based Coverage Weighting
+
+The first stage adjusts coverage penalty expectations based on function role. This prevents functions that use different testing strategies from unfairly dominating the priority list.
+
+**How It Works**:
+
+For each function, DebtMap:
+1. Detects the function's role (entry point, pure logic, I/O wrapper, etc.)
+2. Applies a coverage weight multiplier based on that role
+3. Reduces or increases the coverage penalty accordingly
+
+**Default Coverage Weights** (configurable in `.debtmap.toml`):
+
+| Function Role    | Coverage Weight | Impact on Scoring |
+|------------------|-----------------|-------------------|
+| Pure Logic       | 1.2             | Higher coverage penalty (should have unit tests) |
+| Unknown          | 1.0             | Standard penalty |
+| Pattern Match    | 1.0             | Standard penalty |
+| Orchestrator     | 0.8             | Reduced penalty (partially integration tested) |
+| I/O Wrapper      | 0.7             | Reduced penalty (often integration tested) |
+| Entry Point      | 0.6             | Significantly reduced penalty (integration tested) |
+
+**Example Score Changes**:
+
+**Before role-based coverage adjustment**:
+```
+Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Raw Coverage Penalty: 1.0 (full penalty)
+  Score: 8.5 (flagged as high priority)
+```
+
+**After role-based coverage adjustment**:
+```
+Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 0.4 (60% reduction via 0.6 weight)
+  Score: 4.2 (medium priority - more realistic)
+
+  Rationale: Entry points are integration tested, not unit tested.
+  This function is likely tested via API/CLI integration tests.
+```
+
+**Comparison with Pure Logic**:
+```
+Function: calculate_discount (Pure Logic)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 1.2 (20% increase via 1.2 weight)
+  Score: 9.8 (critical priority)
+
+  Rationale: Pure logic should have unit tests.
+  This function needs immediate test coverage.
+```
+
+#### Stage 2: Role Multiplier
+
+The second stage applies a final role-based multiplier to reflect architectural importance. This multiplier is **clamped by default** to prevent extreme score swings.
+
+**Configuration** (`.debtmap.toml` under `[scoring.role_multiplier]`):
+
+```toml
+[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+```
+
+**Clamp Range Rationale**:
+- **Default [0.3, 1.8]**: Balances differentiation with stability
+- **Lower bound (0.3)**: I/O wrappers still contribute 30% of base score (not invisible)
+- **Upper bound (1.8)**: Critical entry points don't overwhelm other issues (max 180%)
+- **Configurable**: Adjust based on project priorities
+
+**Example with Clamping**:
+```
+Function: process_data (Complex Pure Logic)
+  Base Score: 45.0
+  Unclamped Role Multiplier: 2.5
+  Clamped Multiplier: 1.8 (clamp_max)
+  Final Score: 45.0 × 1.8 = 81.0
+
+  Effect: Prevents one complex function from dominating entire priority list
+```
+
+#### Why Two Stages?
+
+The separation of coverage weight adjustment and role multiplier ensures they work together without interfering:
+
+**Stage 1 (Coverage Weight)**: Adjusts testing expectations
+- **Question**: "How much should we penalize missing unit tests for this type of function?"
+- **Example**: Entry points get 60% of normal coverage penalty (they're integration tested)
+
+**Stage 2 (Role Multiplier)**: Adjusts architectural importance
+- **Question**: "How important is this function relative to others with similar complexity?"
+- **Example**: Critical entry points might get a 1.2x multiplier (clamped), while simple I/O wrappers get 0.5x (clamped)
+
+**Independent Contributions**:
+```
+1. Calculate base score from complexity + dependencies
+2. Apply coverage weight by role → adjusted coverage penalty
+3. Combine into preliminary score
+4. Apply clamped role multiplier → final score
+```
+
+This approach ensures:
+- Coverage adjustments don't interfere with role multiplier
+- Both mechanisms contribute independently
+- Clamping prevents instability from extreme multipliers
+
+#### How This Reduces False Positives
+
+**False Positive #1: Entry Points Flagged for Low Coverage**
+
+**Before**:
+```
+Top Priority Items:
+1. main() - Score: 9.2 (0% unit test coverage)
+2. handle_cli_command() - Score: 8.8 (5% unit test coverage)
+3. run_server() - Score: 8.5 (0% unit test coverage)
+```
+
+**After**:
+```
+Top Priority Items:
+1. calculate_tax() - Score: 9.8 (0% coverage, Pure Logic)
+2. validate_payment() - Score: 9.2 (10% coverage, Pure Logic)
+3. main() - Score: 4.2 (0% coverage, Entry Point - integration tested)
+```
+
+**Result**: Business logic functions that actually need unit tests rise to the top.
+
+**False Positive #2: I/O Wrappers Over-Prioritized**
+
+**Before**:
+```
+Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Score: 7.5 (high priority)
+
+  Issue: This is a thin wrapper over std::fs::read_to_string.
+  Unit testing it provides minimal value vs integration tests.
+```
+
+**After**:
+```
+Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Adjusted Coverage Weight: 0.7
+  Score: 3.2 (low priority)
+
+  Rationale: I/O wrappers are integration tested.
+  Focus on business logic instead.
+```
+
+#### Configuration Examples
+
+**Emphasize Pure Logic Testing**:
+```toml
+[scoring.role_coverage_weights]
+pure_logic = 1.5        # Strong penalty for untested pure logic
+entry_point = 0.5       # Minimal penalty for untested entry points
+io_wrapper = 0.5        # Minimal penalty for untested I/O wrappers
+```
+
+**Conservative Approach (Smaller Adjustments)**:
+```toml
+[scoring.role_coverage_weights]
+pure_logic = 1.1        # Slight increase
+entry_point = 0.9       # Slight decrease
+io_wrapper = 0.9        # Slight decrease
+```
+
+**Disable Multiplier Clamping** (not recommended for production):
+```toml
+[scoring.role_multiplier]
+enable_clamping = false   # Allow unclamped multipliers
+# Warning: May cause unstable prioritization
+```
+
+#### Verification
+
+To see how role-based adjustments affect your codebase:
+
+```bash
+# Show detailed scoring breakdown
+debtmap analyze . --verbose
+
+# Compare with role adjustments disabled
+debtmap analyze . --config minimal.toml
+```
+
+**Sample verbose output**:
+```
+Function: src/handlers/request.rs:handle_request
+  Role: Entry Point
+  Complexity: 5
+  Coverage: 0%
+  Coverage Weight: 0.6 (Entry Point adjustment)
+  Adjusted Coverage Penalty: 0.4 (reduced from 1.0)
+  Base Score: 15.0
+  Role Multiplier: 1.2 (clamped from 1.5)
+  Final Score: 18.0
+
+  Interpretation:
+    - Entry point gets 60% coverage penalty instead of 100%
+    - Likely tested via integration tests
+    - Still flagged due to complexity, but not over-penalized for coverage
+```
+
+#### Benefits Summary
+
+- **Fewer false positives**: Entry points and I/O wrappers no longer dominate priority lists
+- **Better resource allocation**: Testing efforts focus on pure logic where unit tests provide most value
+- **Recognition of testing strategies**: Integration tests are valued equally with unit tests
+- **Stable prioritization**: Clamping prevents extreme multipliers from causing volatile rankings
+- **Configurable**: Adjust weights and clamp ranges to match your project's testing philosophy
+
 ### Use Cases
 
 **1. Identifying Specific Hot Spots**

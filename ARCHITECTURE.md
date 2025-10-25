@@ -1350,7 +1350,11 @@ The base score uses a **weighted sum model** that combines three primary factors
 base_score = (coverage_score × 0.4) + (complexity_score × 0.4) + (dependency_score × 0.2)
 ```
 
-#### Role-Based Coverage Weighting
+#### Two-Stage Role Adjustment Mechanism
+
+DebtMap employs a two-stage role adjustment mechanism to accurately score functions based on their architectural role and testing expectations. This prevents false positives (e.g., entry points flagged for low unit test coverage) while still accounting for role-based importance.
+
+**Stage 1: Role-Based Coverage Weighting**
 
 **Design Decision**: Not all functions need the same level of unit test coverage. Entry points (CLI handlers, HTTP routes, main functions) are typically integration tested rather than unit tested, while pure business logic should have comprehensive unit tests.
 
@@ -1361,7 +1365,7 @@ base_score = (coverage_score × 0.4) + (complexity_score × 0.4) + (dependency_s
 let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight_multiplier);
 ```
 
-**Default Weights** (configurable in `.debtmap.toml`):
+**Default Weights** (configurable in `.debtmap.toml` under `[scoring.role_coverage_weights]`):
 
 | Function Role    | Coverage Weight | Rationale                                    |
 |------------------|-----------------|----------------------------------------------|
@@ -1379,21 +1383,62 @@ let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight_multip
 - Focuses testing efforts on pure business logic where unit tests provide most value
 - Recognizes different testing strategies (unit vs integration) as equally valid
 
-#### Role Multiplier
+**Stage 2: Role Multiplier**
 
-A minimal role adjustment (clamped to 0.8-1.2x) is applied to the final score to reflect function importance:
+A role-based multiplier is applied to the final score to reflect function importance and architectural significance:
 
 ```rust
 // From unified_scorer.rs:261-262
-let clamped_role_multiplier = role_multiplier.clamp(0.8, 1.2);
+let clamped_role_multiplier = role_multiplier.clamp(clamp_min, clamp_max);
 let role_adjusted_score = base_score * clamped_role_multiplier;
 ```
 
-**Key Distinction**: The role multiplier is separate from coverage weight adjustment:
-- **Coverage weight** (applied early): Adjusts coverage expectations by role
-- **Role multiplier** (applied late): Small final adjustment for role importance
+**Configuration** (`.debtmap.toml` under `[scoring.role_multiplier]`):
 
-This two-stage approach ensures role-based coverage adjustments don't interfere with the role multiplier's impact on final prioritization.
+```toml
+[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+```
+
+**Clamp Range Rationale**:
+- **Default [0.3, 1.8]**: Allows significant differentiation without extreme swings
+- **Lower bound (0.3)**: Prevents I/O wrappers from becoming invisible (minimum 30% of base score)
+- **Upper bound (1.8)**: Prevents critical entry points from overwhelming other issues (maximum 180% of base score)
+- **Configurable**: Projects can adjust range based on their priorities
+
+**When to Disable Clamping**:
+- **Prototyping**: Testing extreme multiplier values for custom scoring strategies
+- **Special cases**: Very specific project needs requiring wide multiplier ranges
+- **Not recommended** for production use as it can lead to unstable prioritization
+
+**Key Distinction: Two-Stage Approach**
+
+The separation of coverage weight adjustment and role multiplier ensures they work together without interfering:
+
+1. **Coverage weight** (Stage 1, applied early): Adjusts coverage expectations by role
+   - Modifies how much coverage gaps penalize different function types
+   - Pure logic gets full coverage penalty (1.2x), entry points get reduced penalty (0.6x)
+
+2. **Role multiplier** (Stage 2, applied late): Small final adjustment for role importance
+   - Applied after all other scoring factors are computed
+   - Clamped to prevent extreme values (default: [0.3, 1.8])
+   - Fine-tunes final priority based on architectural significance
+
+**Example Workflow**:
+```
+1. Calculate base score from complexity and dependencies
+2. Apply coverage weight based on role → adjusted coverage penalty
+3. Combine into preliminary score
+4. Apply clamped role multiplier → final score
+```
+
+This two-stage approach ensures:
+- Role-based coverage adjustments don't interfere with the role multiplier
+- Both mechanisms contribute independently to the final score
+- Clamping prevents extreme multiplier values from distorting priorities
+- Configuration flexibility for different project needs
 
 #### Function Role Detection
 
