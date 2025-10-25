@@ -38,7 +38,7 @@ pub struct AnalyzeConfig {
     pub filter_categories: Option<Vec<String>>,
     pub no_context_aware: bool,
     pub threshold_preset: Option<cli::ThresholdPreset>,
-    pub formatting_config: FormattingConfig,
+    pub _formatting_config: FormattingConfig,
     pub parallel: bool,
     pub jobs: usize,
     pub use_cache: bool,
@@ -116,7 +116,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.threshold_complexity,
         config.threshold_duplication,
         config.parallel,
-        config.formatting_config,
+        config._formatting_config,
     )?;
 
     let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
@@ -137,7 +137,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             aggregation_method: config.aggregation_method.clone(),
             min_problematic: config.min_problematic,
             no_god_object: config.no_god_object,
-            formatting_config: config.formatting_config,
+            _formatting_config: config._formatting_config,
         },
     )?;
 
@@ -170,7 +170,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         output_file: config.output,
         output_format: Some(config.format),
         json_format: config.json_format,
-        formatting_config: config.formatting_config,
+        formatting_config: config._formatting_config,
     };
 
     output::output_unified_priorities_with_config(
@@ -184,15 +184,10 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
 }
 
 fn configure_output(config: &AnalyzeConfig) {
-    if config.formatting_config.color.should_use_color() {
+    if config._formatting_config.color.should_use_color() {
         colored::control::set_override(true);
     } else {
         colored::control::set_override(false);
-    }
-
-    // Set emoji mode environment variable for components that can't access FormattingConfig
-    if !config.formatting_config.emoji.should_use_emoji() {
-        std::env::set_var("DEBTMAP_NO_EMOJI", "1");
     }
 }
 
@@ -216,7 +211,7 @@ fn analyze_project(
     complexity_threshold: u32,
     duplication_threshold: usize,
     parallel_enabled: bool,
-    formatting_config: FormattingConfig,
+    _formatting_config: FormattingConfig,
 ) -> Result<AnalysisResults> {
     // Set environment variables for parallel processing
     if parallel_enabled {
@@ -227,7 +222,7 @@ fn analyze_project(
         .context("Failed to find project files")?;
 
     // Analyze project size and apply graduated optimizations
-    analyze_and_configure_project_size(&files, parallel_enabled, formatting_config)?;
+    analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
 
     // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
     let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
@@ -301,63 +296,37 @@ fn collect_file_metrics_with_cache(
 fn analyze_and_configure_project_size(
     files: &[PathBuf],
     parallel_enabled: bool,
-    formatting_config: FormattingConfig,
+    _formatting_config: FormattingConfig,
 ) -> Result<()> {
     let file_count = files.len();
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-    let use_emoji = formatting_config.emoji.should_use_emoji();
 
     if !quiet_mode {
         match file_count {
             0..=100 => {
                 // Small project - no warnings needed
-                if use_emoji {
-                    eprintln!("📁 Analyzing {} files (small project)", file_count);
-                } else {
-                    eprintln!("Analyzing {} files (small project)", file_count);
-                }
+                eprintln!("Analyzing {} files (small project)", file_count);
             }
             101..=500 => {
                 // Medium project - inform user
-                if use_emoji {
-                    eprintln!("📁 Analyzing {} files (medium project)", file_count);
-                } else {
-                    eprintln!("Analyzing {} files (medium project)", file_count);
-                }
+                eprintln!("Analyzing {} files (medium project)", file_count);
                 if parallel_enabled {
-                    if use_emoji {
-                        eprintln!("💡 Parallel processing enabled for better performance");
-                    } else {
-                        eprintln!("Parallel processing enabled for better performance");
-                    }
-                } else if use_emoji {
-                    eprintln!(
-                        "💡 Using sequential processing (use default for better performance)"
-                    );
+                    eprintln!("Parallel processing enabled for better performance");
                 } else {
                     eprintln!("Using sequential processing (use default for better performance)");
                 }
             }
             501..=1000 => {
                 // Large project - inform user
-                if use_emoji {
-                    eprintln!("📁 Analyzing {} files (large project)", file_count);
-                } else {
-                    eprintln!("Analyzing {} files (large project)", file_count);
-                }
+                eprintln!("Analyzing {} files (large project)", file_count);
 
                 // Enable parallel processing by default
                 std::env::set_var("RUST_BACKTRACE", "0"); // Reduce noise
             }
             1001..=2000 => {
                 // Very large project - inform user
-                if use_emoji {
-                    eprintln!("📁 Analyzing {} files (very large project)", file_count);
-                    eprint!("⏱️  Starting analysis...");
-                } else {
-                    eprintln!("Analyzing {} files (very large project)", file_count);
-                    eprint!("Starting analysis...");
-                }
+                eprintln!("Analyzing {} files (very large project)", file_count);
+                eprint!("Starting analysis...");
 
                 // Enable all performance optimizations
                 std::env::set_var("RUST_BACKTRACE", "0");
@@ -365,23 +334,13 @@ fn analyze_and_configure_project_size(
             }
             _ => {
                 // Massive project - inform user
-                if use_emoji {
-                    eprintln!("📁 Analyzing {} files (massive project)", file_count);
-                    eprintln!();
-                    eprintln!("💡 Suggestions:");
-                    eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
-                    eprintln!("   • Focus analysis on specific modules with targeted paths");
-                    eprintln!();
-                    eprint!("⏱️  Starting analysis...");
-                } else {
-                    eprintln!("Analyzing {} files (massive project)", file_count);
-                    eprintln!();
-                    eprintln!("Suggestions:");
-                    eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
-                    eprintln!("   • Focus analysis on specific modules with targeted paths");
-                    eprintln!();
-                    eprint!("Starting analysis...");
-                }
+                eprintln!("Analyzing {} files (massive project)", file_count);
+                eprintln!();
+                eprintln!("Suggestions:");
+                eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
+                eprintln!("   • Focus analysis on specific modules with targeted paths");
+                eprintln!();
+                eprint!("Starting analysis...");
 
                 std::env::set_var("RUST_BACKTRACE", "0");
                 std::io::stderr().flush().unwrap();
@@ -411,7 +370,7 @@ fn handle_call_graph_diagnostics(
         eprintln!("Health Score: {}/100", validation_report.health_score);
 
         // Display statistics
-        eprintln!("\n📊 Statistics:");
+        eprintln!("\nStatistics:");
         eprintln!(
             "  Total Functions: {}",
             validation_report.statistics.total_functions

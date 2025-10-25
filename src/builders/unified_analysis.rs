@@ -42,7 +42,7 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
-    pub formatting_config: crate::formatting::FormattingConfig,
+    pub _formatting_config: crate::formatting::FormattingConfig,
 }
 
 pub fn perform_unified_analysis(
@@ -70,7 +70,7 @@ pub fn perform_unified_analysis(
         aggregation_method: None,
         min_problematic: None,
         no_god_object: false,
-        formatting_config: crate::formatting::FormattingConfig::from_env(),
+        _formatting_config: crate::formatting::FormattingConfig::from_env(),
     })
 }
 
@@ -94,7 +94,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
-        formatting_config,
+        _formatting_config,
     } = options;
 
     // Extract files and create computation parameters in pure functional style
@@ -114,7 +114,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
-        formatting_config,
+        _formatting_config,
     );
 
     // Apply caching strategy using function composition
@@ -140,7 +140,7 @@ fn create_analysis_parameters<'a>(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
-    formatting_config: crate::formatting::FormattingConfig,
+    _formatting_config: crate::formatting::FormattingConfig,
 ) -> AnalysisParameters<'a> {
     let files = extract_unique_files(&results.complexity.metrics);
     let cache_config = CacheConfiguration::new(use_cache, files.len(), coverage_file.is_some());
@@ -162,7 +162,7 @@ fn create_analysis_parameters<'a>(
         no_god_object,
         files,
         cache_config,
-        formatting_config,
+        _formatting_config,
     }
 }
 
@@ -194,7 +194,7 @@ struct AnalysisParameters<'a> {
     no_god_object: bool,
     files: Vec<PathBuf>,
     cache_config: CacheConfiguration,
-    formatting_config: crate::formatting::FormattingConfig,
+    _formatting_config: crate::formatting::FormattingConfig,
 }
 
 // Pure function for cache configuration
@@ -226,7 +226,7 @@ fn attempt_cached_analysis(params: &AnalysisParameters) -> Option<Result<Unified
     let cache_key = create_cache_key(params).ok()?;
 
     unified_cache.get(&cache_key).map(|cached_analysis| {
-        log_cache_hit(params.formatting_config);
+        log_cache_hit(params._formatting_config);
         Ok(cached_analysis)
     })
 }
@@ -257,16 +257,10 @@ fn create_cache_key(params: &AnalysisParameters) -> Result<UnifiedAnalysisCacheK
 }
 
 // I/O function for logging cache hit
-fn log_cache_hit(formatting_config: crate::formatting::FormattingConfig) {
+fn log_cache_hit(__formatting_config: crate::formatting::FormattingConfig) {
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-    let use_emoji =
-        formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
     if !quiet_mode {
-        if use_emoji {
-            eprintln!("🎯 Using cached unified analysis ✓");
-        } else {
-            eprintln!("Using cached unified analysis [OK]");
-        }
+        eprintln!("Using cached unified analysis [OK]");
     }
 }
 
@@ -307,7 +301,7 @@ fn perform_computation(params: &AnalysisParameters) -> Result<UnifiedAnalysis> {
         params.aggregation_method.clone(),
         params.min_problematic,
         params.no_god_object,
-        params.formatting_config,
+        params._formatting_config,
     )
 }
 
@@ -329,7 +323,7 @@ fn perform_unified_analysis_computation(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
-    formatting_config: crate::formatting::FormattingConfig,
+    _formatting_config: crate::formatting::FormattingConfig,
 ) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -343,8 +337,6 @@ fn perform_unified_analysis_computation(
 
     // Progress tracking
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-    let use_emoji =
-        formatting_config.emoji.should_use_emoji() && std::env::var("DEBTMAP_NO_EMOJI").is_err();
     // Progress will be shown by the parallel builder itself
 
     // Time call graph building
@@ -369,13 +361,8 @@ fn perform_unified_analysis_computation(
     let call_graph_time = call_graph_start.elapsed();
 
     if !quiet_mode {
-        if use_emoji {
-            eprintln!(" ✓");
-            eprint!("🔍 Resolving trait method calls...");
-        } else {
-            eprintln!(" [OK]");
-            eprint!("Resolving trait method calls...");
-        }
+        eprintln!(" [OK]");
+        eprint!("Resolving trait method calls...");
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -386,40 +373,21 @@ fn perform_unified_analysis_computation(
     let trait_resolution_time = trait_resolution_start.elapsed();
 
     if !quiet_mode {
-        if use_emoji {
-            eprintln!(" ✓");
-        } else {
-            eprintln!(" [OK]");
-        }
+        eprintln!(" [OK]");
 
         // Display trait resolution statistics in verbose mode
         if verbose_macro_warnings {
-            if use_emoji {
-                eprintln!(
-                    "🔗 Resolved {} trait method calls",
-                    trait_resolution_stats.resolved_calls
-                );
-                eprintln!(
-                    "🎯 Marked {} trait implementations as callable",
-                    trait_resolution_stats.marked_implementations
-                );
-            } else {
-                eprintln!(
-                    "Resolved {} trait method calls",
-                    trait_resolution_stats.resolved_calls
-                );
-                eprintln!(
-                    "Marked {} trait implementations as callable",
-                    trait_resolution_stats.marked_implementations
-                );
-            }
+            eprintln!(
+                "Resolved {} trait method calls",
+                trait_resolution_stats.resolved_calls
+            );
+            eprintln!(
+                "Marked {} trait implementations as callable",
+                trait_resolution_stats.marked_implementations
+            );
         }
 
-        if use_emoji {
-            eprint!("📊 Loading coverage data...");
-        } else {
-            eprint!("Loading coverage data...");
-        }
+        eprint!("Loading coverage data...");
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -443,13 +411,8 @@ fn perform_unified_analysis_computation(
     }
 
     if !quiet_mode {
-        if use_emoji {
-            eprintln!(" ✓");
-            eprint!("🎯 Creating unified analysis... ");
-        } else {
-            eprintln!(" [OK]");
-            eprint!("Creating unified analysis... ");
-        }
+        eprintln!(" [OK]");
+        eprint!("Creating unified analysis... ");
         std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
@@ -480,11 +443,7 @@ fn perform_unified_analysis_computation(
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
     if !quiet_mode && !parallel_enabled {
-        if use_emoji {
-            eprintln!(" ✓");
-        } else {
-            eprintln!(" [OK]");
-        }
+        eprintln!(" [OK]");
     }
 
     Ok(result)

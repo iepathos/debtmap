@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use debtmap::cli::{Cli, Commands};
 use debtmap::core::injection::{AppContainer, AppContainerBuilder};
-use debtmap::formatting::{ColorMode, EmojiMode, FormattingConfig};
+use debtmap::formatting::{ColorMode, FormattingConfig};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -606,7 +606,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             filter_categories,
             no_context_aware,
             threshold_preset,
-            formatting_config,
+            _formatting_config,
             no_parallel,
             jobs,
             use_cache,
@@ -767,7 +767,7 @@ fn convert_output_format(format: debtmap::cli::OutputFormat) -> debtmap::cli::Ou
 // Pure function to create formatting configuration
 fn create_formatting_config(plain: bool) -> FormattingConfig {
     if plain {
-        FormattingConfig::new(ColorMode::Never, EmojiMode::Never)
+        FormattingConfig::new(ColorMode::Never)
     } else {
         FormattingConfig::from_env()
     }
@@ -853,7 +853,7 @@ fn build_analyze_config(
         filter_categories: convert_filter_categories(filter_categories),
         no_context_aware,
         threshold_preset: convert_threshold_preset(threshold_preset),
-        formatting_config,
+        _formatting_config,
         parallel: should_use_parallel(no_parallel),
         jobs: get_worker_count(jobs),
         use_cache: should_use_cache(use_cache, no_cache),
