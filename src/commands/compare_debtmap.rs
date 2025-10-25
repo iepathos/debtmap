@@ -188,8 +188,8 @@ fn perform_validation(
 
     // Determine status based on functional composition of conditions
     let has_regressions = new_items.critical_count > 0;
-    let all_high_priority_addressed = before_summary.high_priority_items > 0
-        && after_summary.high_priority_items == 0;
+    let all_high_priority_addressed =
+        before_summary.high_priority_items > 0 && after_summary.high_priority_items == 0;
     let meets_score_threshold = improvement_score >= 75.0;
 
     let status = if has_regressions {
@@ -491,7 +491,9 @@ fn calculate_improvement_score(
     let high_priority_progress = if before_summary.high_priority_items > 0 {
         let resolved_count = resolved.high_priority_count as f64;
         // Use saturating subtraction to handle cases where after > before (regressions)
-        let addressed_count = before_summary.high_priority_items.saturating_sub(after_summary.high_priority_items) as f64;
+        let addressed_count = before_summary
+            .high_priority_items
+            .saturating_sub(after_summary.high_priority_items) as f64;
         // Use the better of resolved or addressed (items may improve below threshold without being removed)
         (addressed_count.max(resolved_count) / before_summary.high_priority_items as f64) * 100.0
     } else {
@@ -586,7 +588,11 @@ fn print_summary(result: &ValidationResult) {
 mod tests {
     use super::*;
     use crate::output::json::UnifiedJsonOutput;
-    use crate::priority::{DebtItem, unified_scorer::{UnifiedDebtItem, Location, UnifiedScore}, coverage_propagation::TransitiveCoverage};
+    use crate::priority::{
+        coverage_propagation::TransitiveCoverage,
+        unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
+        DebtItem,
+    };
     use std::path::PathBuf;
 
     fn create_function_item(
@@ -683,72 +689,127 @@ mod tests {
 
     #[test]
     fn test_perform_validation_resolved_high_priority() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "complex_fn",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
         let after = create_test_output(vec![]);
 
         let result = perform_validation(&before, &after).unwrap();
 
         assert_eq!(result.status, "complete");
-        assert!(result.improvements.iter().any(|i| i.contains("Resolved 1 high-priority")));
+        assert!(result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Resolved 1 high-priority")));
         assert_eq!(result.remaining_issues.len(), 0);
         assert!(result.completion_percentage >= 75.0);
     }
 
     #[test]
     fn test_perform_validation_complexity_reduction() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 10.0, 20, Some(0.5)),
-        ]);
-        let after = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 8.0, 10, Some(0.5)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            10.0,
+            20,
+            Some(0.5),
+        )]);
+        let after = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            8.0,
+            10,
+            Some(0.5),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
-        assert!(result.improvements.iter().any(|i| i.contains("Reduced average cyclomatic complexity")));
+        assert!(result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Reduced average cyclomatic complexity")));
     }
 
     #[test]
     fn test_perform_validation_coverage_improvement() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 10.0, 10, Some(0.0)),
-        ]);
-        let after = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 8.0, 10, Some(0.8)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            10.0,
+            10,
+            Some(0.0),
+        )]);
+        let after = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            8.0,
+            10,
+            Some(0.8),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
-        assert!(result.improvements.iter().any(|i| i.contains("Added test coverage")));
+        assert!(result
+            .improvements
+            .iter()
+            .any(|i| i.contains("Added test coverage")));
     }
 
     #[test]
     fn test_perform_validation_unchanged_critical() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
-        ]);
-        let after = create_test_output(vec![
-            create_function_item("src/test.rs", "complex_fn", 10, 10.0, 15, Some(0.0)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "complex_fn",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
+        let after = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "complex_fn",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
-        assert!(result.remaining_issues.iter().any(|i| i.contains("critical debt item")));
+        assert!(result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("critical debt item")));
         assert!(result.gaps.contains_key("critical_debt_remaining_0"));
     }
 
     #[test]
     fn test_perform_validation_new_critical_regression() {
         let before = create_test_output(vec![]);
-        let after = create_test_output(vec![
-            create_function_item("src/new.rs", "bad_fn", 20, 12.0, 20, Some(0.0)),
-        ]);
+        let after = create_test_output(vec![create_function_item(
+            "src/new.rs",
+            "bad_fn",
+            20,
+            12.0,
+            20,
+            Some(0.0),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
-        assert!(result.remaining_issues.iter().any(|i| i.contains("new critical debt items")));
+        assert!(result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("new critical debt items")));
         assert!(result.gaps.contains_key("regression_detected"));
         assert_eq!(result.status, "failed");
     }
@@ -759,23 +820,36 @@ mod tests {
             create_function_item("src/test.rs", "fn1", 10, 10.0, 20, Some(0.0)),
             create_function_item("src/test.rs", "fn2", 30, 9.0, 15, Some(0.2)),
         ]);
-        let after = create_test_output(vec![
-            create_function_item("src/test.rs", "fn2", 30, 7.0, 10, Some(0.8)),
-        ]);
+        let after = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn2",
+            30,
+            7.0,
+            10,
+            Some(0.8),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
         assert!(result.improvements.len() >= 2);
         assert!(result.improvements.iter().any(|i| i.contains("Resolved")));
-        assert!(result.improvements.iter().any(|i| i.contains("complexity") || i.contains("coverage")));
+        assert!(result
+            .improvements
+            .iter()
+            .any(|i| i.contains("complexity") || i.contains("coverage")));
         assert_eq!(result.status, "complete");
     }
 
     #[test]
     fn test_perform_validation_status_complete() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
         let after = create_test_output(vec![]);
 
         let result = perform_validation(&before, &after).unwrap();
@@ -803,9 +877,14 @@ mod tests {
 
     #[test]
     fn test_perform_validation_status_failed() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "fn1",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
         let after = create_test_output(vec![
             create_function_item("src/test.rs", "fn1", 10, 10.0, 15, Some(0.0)),
             create_function_item("src/test.rs", "fn2", 20, 12.0, 20, Some(0.0)),
@@ -819,12 +898,22 @@ mod tests {
 
     #[test]
     fn test_perform_validation_gap_detail_generation() {
-        let before = create_test_output(vec![
-            create_function_item("src/test.rs", "critical_fn", 10, 10.0, 15, Some(0.0)),
-        ]);
-        let after = create_test_output(vec![
-            create_function_item("src/test.rs", "critical_fn", 10, 10.0, 15, Some(0.0)),
-        ]);
+        let before = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "critical_fn",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
+        let after = create_test_output(vec![create_function_item(
+            "src/test.rs",
+            "critical_fn",
+            10,
+            10.0,
+            15,
+            Some(0.0),
+        )]);
 
         let result = perform_validation(&before, &after).unwrap();
 
@@ -852,7 +941,10 @@ mod tests {
 
         let result = perform_validation(&before, &after).unwrap();
 
-        assert!(result.remaining_issues.iter().any(|i| i.contains("3 critical debt items")));
+        assert!(result
+            .remaining_issues
+            .iter()
+            .any(|i| i.contains("3 critical debt items")));
         assert_eq!(result.gaps.len(), 2); // Only first 2 are added
         assert!(result.gaps.contains_key("critical_debt_remaining_0"));
         assert!(result.gaps.contains_key("critical_debt_remaining_1"));
