@@ -1028,6 +1028,10 @@ pub struct DebtmapConfig {
     /// Pure mapping pattern detection configuration (spec 118)
     #[serde(default)]
     pub mapping_patterns: Option<MappingPatternConfig>,
+
+    /// Role-based coverage expectations (spec 119)
+    #[serde(default)]
+    pub coverage_expectations: Option<crate::priority::scoring::CoverageExpectations>,
 }
 
 /// Classification configuration
@@ -1691,6 +1695,14 @@ pub fn get_error_handling_config() -> ErrorHandlingConfig {
 pub fn get_role_coverage_weights() -> RoleCoverageWeights {
     get_config()
         .role_coverage_weights
+        .clone()
+        .unwrap_or_default()
+}
+
+/// Get role-based coverage expectations (spec 119)
+pub fn get_coverage_expectations() -> crate::priority::scoring::CoverageExpectations {
+    get_config()
+        .coverage_expectations
         .clone()
         .unwrap_or_default()
 }
