@@ -68,6 +68,7 @@ impl UnifiedFileAnalyzer {
                     god_object_score: analysis.god_object_score.min(100.0) / 100.0, // Normalize to 0-1
                     responsibility_names: analysis.responsibilities.clone(),
                     recommended_splits,
+                    module_structure: analysis.module_structure.clone(),
                 };
             }
         }
@@ -95,6 +96,7 @@ impl UnifiedFileAnalyzer {
             god_object_score: god_object_score.min(1.0),
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
+            module_structure: None,
         }
     }
 
@@ -218,6 +220,7 @@ impl UnifiedFileAnalyzer {
             god_object_score,
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
+            module_structure: None,
         }
     }
 }

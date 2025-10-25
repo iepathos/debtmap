@@ -127,6 +127,7 @@ mod file_analysis {
             god_object_score: 0.0,
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
+            module_structure: None,
         }
     }
 

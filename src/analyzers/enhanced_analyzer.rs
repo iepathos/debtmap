@@ -58,6 +58,7 @@ fn create_god_object_analysis(
         confidence: crate::organization::GodObjectConfidence::Probable,
         responsibilities: Vec::new(),
         purity_distribution: None,
+        module_structure: None,
     }
 }
 

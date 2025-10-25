@@ -16,6 +16,7 @@ pub mod call_graph;
 pub mod diagnostics;
 pub mod framework_patterns;
 pub mod function_visitor;
+pub mod module_structure;
 pub mod multi_pass;
 pub mod patterns;
 pub mod python_call_graph;
@@ -31,6 +32,10 @@ pub use call_graph::{
 };
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
+};
+pub use module_structure::{
+    ComponentCouplingAnalysis, ComponentDependencyGraph, Difficulty, FunctionCounts, FunctionGroup,
+    ModuleComponent, ModuleStructure, ModuleStructureAnalyzer, SplitRecommendation,
 };
 pub use patterns::{
     callback::CallbackPatternRecognizer, factory::FactoryPatternRecognizer,

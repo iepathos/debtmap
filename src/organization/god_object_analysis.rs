@@ -15,6 +15,8 @@ pub struct GodObjectAnalysis {
     pub responsibilities: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purity_distribution: Option<PurityDistribution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub module_structure: Option<crate::analysis::ModuleStructure>,
 }
 
 /// Distribution of functions by purity level
