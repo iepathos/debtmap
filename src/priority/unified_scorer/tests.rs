@@ -226,22 +226,27 @@ fn test_complex_function_has_score() {
 
 #[test]
 fn test_complexity_factor_stores_calculated_factor_not_raw_complexity() {
-    // Test spec 109: UnifiedScore.complexity_factor should store the result of
-    // calculate_complexity_factor(raw_complexity), not raw_complexity itself
+    // Test spec 121: UnifiedScore.complexity_factor should store the result of
+    // calculate_complexity_factor with weighted complexity scoring
     let mut func = create_test_metrics();
     func.cyclomatic = 5;
     func.cognitive = 15;
-    // raw_complexity = max(cyclomatic, cognitive * 0.4) = max(5, 6) = 6.0
-    // calculate_complexity_factor(6.0) should return 3.0 (halved because >= 5.0)
+    // With spec 121 cognitive-weighted scoring (default 0.3 cyclo, 0.7 cognitive):
+    // normalized_cyclo = (5/50) * 100 = 10.0
+    // normalized_cog = (15/100) * 100 = 15.0
+    // weighted = 0.3 * 10.0 + 0.7 * 15.0 = 13.5
+    // raw_complexity (0-10 scale) = 13.5 / 10.0 = 1.35
+    // complexity_factor = calculate_complexity_factor(1.35) = 1.35 / 2.0 = 0.675
 
     let call_graph = CallGraph::new();
     let score = calculate_unified_priority(&func, &call_graph, None, None);
 
-    // The complexity_factor field should store the calculated factor (3.0), not raw_complexity (6.0)
-    assert_eq!(
-            score.complexity_factor, 3.0,
-            "complexity_factor should store calculate_complexity_factor(6.0) = 3.0, not raw_complexity = 6.0"
-        );
+    // The complexity_factor field should store the calculated factor with cognitive weighting
+    assert!(
+        (score.complexity_factor - 0.675).abs() < 0.01,
+        "complexity_factor should be ~0.675 with cognitive weighting, got {}",
+        score.complexity_factor
+    );
 }
 
 #[test]
@@ -376,6 +381,7 @@ fn test_entry_point_with_coverage_not_overly_penalized() {
 #[test]
 fn test_complex_entry_point_still_flagged() {
     // Spec 110: Complex entry points should still be flagged despite coverage adjustment
+    // Spec 121: With cognitive-weighted scoring, high cognitive complexity is emphasized
     let complex_entry = create_entry_point_function(25, 30);
 
     let call_graph = CallGraph::new();
@@ -383,9 +389,15 @@ fn test_complex_entry_point_still_flagged() {
 
     let score = calculate_unified_priority(&complex_entry, &call_graph, Some(&lcov), None);
 
-    // Should still be flagged due to high complexity, even with coverage adjustment
+    // With cognitive-weighted scoring:
+    // normalized_cyclo = (25/50) * 100 = 50.0
+    // normalized_cog = (30/100) * 100 = 30.0
+    // weighted = 0.3 * 50.0 + 0.7 * 30.0 = 15.0 + 21.0 = 36.0
+    // raw_complexity = 36.0 / 10.0 = 3.6
+    // complexity_factor = 3.6 / 2.0 = 1.8
+    // With EntryPoint role multiplier (1.5x) and 0% coverage, expect score around 8-10
     assert!(
-        score.final_score > 10.0,
+        score.final_score > 8.0,
         "Complex entry point should still be flagged (score: {})",
         score.final_score
     );
@@ -430,6 +442,7 @@ fn test_io_wrapper_role_multiplier_not_clamped() {
 fn test_entry_point_role_multiplier_not_clamped() {
     // Spec 119: EntryPoint role multiplier (1.5) should not be clamped to 1.2
     // with new default clamp range [0.3, 1.8]
+    // Spec 121: With cognitive-weighted scoring, actual scores will differ
     let entry_point = create_entry_point_function(15, 18);
 
     let call_graph = CallGraph::new();
@@ -444,10 +457,15 @@ fn test_entry_point_role_multiplier_not_clamped() {
         score.role_multiplier
     );
 
-    // Score should reflect the 1.5x boost (not clamped to 1.2x)
-    // With coverage weight adjustment, score will be lower than raw calculation
+    // With cognitive-weighted scoring:
+    // normalized_cyclo = (15/50) * 100 = 30.0
+    // normalized_cog = (18/100) * 100 = 18.0
+    // weighted = 0.3 * 30.0 + 0.7 * 18.0 = 9.0 + 12.6 = 21.6
+    // raw_complexity = 21.6 / 10.0 = 2.16
+    // complexity_factor = 2.16 / 2.0 = 1.08
+    // With 1.5x multiplier and 0% coverage, expect score around 4-6
     assert!(
-        score.final_score > 8.0,
+        score.final_score > 4.0,
         "EntryPoint with 1.5x multiplier should have elevated score. Score: {}",
         score.final_score
     );
@@ -482,6 +500,7 @@ fn test_io_wrapper_coverage_weight_reduced() {
 #[test]
 fn test_pure_logic_coverage_weight_unchanged() {
     // Spec 119: PureLogic functions should maintain 1.0x coverage weight
+    // Spec 121: With cognitive-weighted scoring, scores will be adjusted
     let pure_logic = create_pure_logic_function(12, 14);
 
     let call_graph = CallGraph::new();
@@ -489,11 +508,16 @@ fn test_pure_logic_coverage_weight_unchanged() {
 
     let score = calculate_unified_priority(&pure_logic, &call_graph, Some(&lcov), None);
 
-    // PureLogic with 0% coverage should score higher than IOWrapper
-    // due to full coverage weight (1.0x) and no role multiplier reduction
+    // With cognitive-weighted scoring:
+    // normalized_cyclo = (12/50) * 100 = 24.0
+    // normalized_cog = (14/100) * 100 = 14.0
+    // weighted = 0.3 * 24.0 + 0.7 * 14.0 = 7.2 + 9.8 = 17.0
+    // raw_complexity = 17.0 / 10.0 = 1.7
+    // complexity_factor = 1.7 / 2.0 = 0.85
+    // With 1.3x multiplier and 0% coverage, expect score around 4-5
     assert!(
-        score.final_score > 8.0,
-        "PureLogic with 0% coverage should score reasonably high. Score: {}",
+        score.final_score > 4.0,
+        "PureLogic with 0% coverage should score reasonably. Score: {}",
         score.final_score
     );
 

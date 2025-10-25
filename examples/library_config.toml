@@ -4,6 +4,18 @@
 complexity = 15
 duplication = 50
 
+[complexity_weights]
+# Weights for combining cyclomatic and cognitive complexity
+# Must sum to 1.0. Default favors cognitive complexity (0.7) over cyclomatic (0.3)
+# Research shows cognitive complexity correlates better with bug density
+cyclomatic = 0.3
+cognitive = 0.7
+
+# Maximum values for normalization (0-100 scale)
+# Adjust these based on your codebase characteristics
+max_cyclomatic = 50.0
+max_cognitive = 100.0
+
 [external_api]
 # Enable external API detection for library projects
 detect_external_api = true

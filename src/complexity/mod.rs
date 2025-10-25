@@ -20,8 +20,12 @@ pub mod semantic_normalizer;
 pub mod threshold_manager;
 pub mod token_classifier;
 pub mod visitor_detector;
+pub mod weighted;
 
 use crate::core::FunctionMetrics;
+
+// Re-export weighted complexity types (spec 121)
+pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
 
 #[derive(Clone, Debug)]
 pub struct ComplexityCalculator {

@@ -359,33 +359,48 @@ pub fn calculate_unified_priority_with_debt(
         adjustment_applied: adjustment,
     }
 }
-/// Normalize complexity metrics with cognitive complexity weighting for orchestrators
+/// Normalize complexity to 0-10 scale using weighted complexity (spec 121).
 ///
-/// For orchestrators (coordination functions), cognitive complexity receives higher weight (70%)
-/// because sequential delegation has lower mental overhead than nested algorithmic logic,
-/// even with similar cyclomatic complexity from error handling.
-///
-/// For non-orchestrators, both metrics are weighted equally (50%/50%).
+/// Uses configurable weights for cyclomatic and cognitive complexity.
+/// Default: 30% cyclomatic, 70% cognitive (research shows cognitive correlates better with bugs).
+/// For orchestrators, cognitive weight may be increased further.
 fn normalize_complexity(cyclomatic: u32, cognitive: u32, is_orchestrator: bool) -> f64 {
-    // Apply cognitive complexity weighting based on function role
-    let combined = if is_orchestrator {
-        // Weight cognitive more heavily for orchestrators (70%)
-        // Sequential calls = low cognitive, high cyclomatic from error handling
-        (cyclomatic as f64 * 0.3) + (cognitive as f64 * 0.7)
+    use crate::complexity::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
+
+    // Get weights from configuration (spec 121)
+    let config = crate::config::get_config();
+    let weights = if let Some(weights_config) = config.complexity_weights.as_ref() {
+        ComplexityWeights {
+            cyclomatic: weights_config.cyclomatic,
+            cognitive: weights_config.cognitive,
+        }
     } else {
-        // Equal weight for pure logic (50%/50%)
-        (cyclomatic + cognitive) as f64 / 2.0
+        // For orchestrators, increase cognitive weight further
+        if is_orchestrator {
+            ComplexityWeights {
+                cyclomatic: 0.25,
+                cognitive: 0.75,
+            }
+        } else {
+            ComplexityWeights::default()
+        }
     };
 
-    // Use logarithmic scale for better distribution
-    // Complexity of 1-5 = low (0-3), 6-10 = medium (3-6), 11+ = high (6-10)
-    if combined <= 5.0 {
-        combined * 0.6
-    } else if combined <= 10.0 {
-        3.0 + (combined - 5.0) * 0.6
+    // Get normalization parameters from configuration
+    let normalization = if let Some(weights_config) = config.complexity_weights.as_ref() {
+        ComplexityNormalization {
+            max_cyclomatic: weights_config.max_cyclomatic,
+            max_cognitive: weights_config.max_cognitive,
+        }
     } else {
-        6.0 + ((combined - 10.0) * 0.2).min(4.0)
-    }
+        ComplexityNormalization::default()
+    };
+
+    // Calculate weighted complexity score (0-100 scale)
+    let weighted = WeightedComplexity::calculate(cyclomatic, cognitive, weights, &normalization);
+
+    // Convert from 0-100 scale to 0-10 scale for backward compatibility
+    weighted.weighted_score / 10.0
 }
 
 // Pure functions for scoring calculation (spec 68)

@@ -3,6 +3,8 @@
 //! Contains utility functions for formatting debt types, visibility levels,
 //! and other markdown formatting helpers.
 
+use crate::complexity::weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
+
 // Helper functions for formatting
 pub fn format_debt_type(debt_type: &crate::priority::DebtType) -> &'static str {
     use crate::priority::DebtType;
@@ -39,7 +41,10 @@ pub fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
             cyclomatic,
             cognitive,
         } => {
-            format!("Cyclomatic: {}, Cognitive: {}", cyclomatic, cognitive)
+            let weights = ComplexityWeights::default();
+            let norm = ComplexityNormalization::default();
+            let weighted = WeightedComplexity::calculate(*cyclomatic, *cognitive, weights, &norm);
+            weighted.format_complexity_info()
         }
         DebtType::DeadCode { visibility, .. } => {
             format!("Unused {:?} function", visibility)
