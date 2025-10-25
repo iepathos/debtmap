@@ -1238,4 +1238,101 @@ mod tests {
         assert_eq!(result.count, 0);
         assert_eq!(result.items.len(), 0);
     }
+
+    // Property-based tests
+    #[cfg(test)]
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            #[test]
+            fn prop_is_critical_threshold_consistent(score in 0.0f64..20.0f64) {
+                let result = is_critical(score);
+                if score >= CRITICAL_SCORE_THRESHOLD {
+                    prop_assert!(result);
+                } else {
+                    prop_assert!(!result);
+                }
+            }
+
+            #[test]
+            fn prop_is_score_unchanged_symmetric(before in 0.0f64..20.0f64, after in 0.0f64..20.0f64) {
+                let result1 = is_score_unchanged(before, after);
+                let result2 = is_score_unchanged(after, before);
+                prop_assert_eq!(result1, result2, "is_score_unchanged should be symmetric");
+            }
+
+            #[test]
+            fn prop_is_score_unchanged_reflexive(score in 0.0f64..20.0f64) {
+                prop_assert!(is_score_unchanged(score, score), "score should be unchanged from itself");
+            }
+
+            #[test]
+            fn prop_filter_returns_subset(count in 0usize..20) {
+                // Generate test items
+                let before_items: Vec<DebtItem> = (0..count)
+                    .map(|i| {
+                        DebtItem::Function(Box::new(create_test_debt_item(
+                            "src/test.rs",
+                            &format!("fn_{}", i),
+                            i * 10,
+                            8.5 + (i as f64 % 5.0),
+                        )))
+                    })
+                    .collect();
+
+                let after_map = build_function_map(&before_items);
+                let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+                // Result should never be larger than input
+                prop_assert!(result.len() <= before_items.len());
+            }
+
+            #[test]
+            fn prop_all_returned_items_are_critical(count in 1usize..20) {
+                // Generate test items with varying scores
+                let before_items: Vec<DebtItem> = (0..count)
+                    .map(|i| {
+                        DebtItem::Function(Box::new(create_test_debt_item(
+                            "src/test.rs",
+                            &format!("fn_{}", i),
+                            i * 10,
+                            6.0 + (i as f64 % 8.0), // Scores from 6.0 to 14.0
+                        )))
+                    })
+                    .collect();
+
+                let after_map = build_function_map(&before_items);
+                let result = filter_unchanged_critical_items(&before_items, &after_map);
+
+                // All returned items should have critical scores
+                for item in &result {
+                    prop_assert!(is_critical(item.score), "Item score {} should be critical", item.score);
+                }
+            }
+
+            #[test]
+            fn prop_count_equals_length(count in 0usize..50) {
+                let before_items: Vec<DebtItem> = (0..count)
+                    .map(|i| {
+                        DebtItem::Function(Box::new(create_test_debt_item(
+                            "src/test.rs",
+                            &format!("fn_{}", i),
+                            i * 10,
+                            8.5 + (i as f64 % 5.0),
+                        )))
+                    })
+                    .collect();
+
+                let after_output = create_test_output(before_items.clone());
+                let before_output = create_test_output(before_items);
+
+                let result = identify_unchanged_critical(&before_output, &after_output);
+
+                // Invariant: count should always equal items length
+                prop_assert_eq!(result.count, result.items.len());
+            }
+        }
+    }
 }
