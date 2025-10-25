@@ -2069,8 +2069,9 @@ interface_weight = 0.15
         // The config might override these, so we test flexible values
         let thresholds = get_validation_thresholds();
         assert_eq!(thresholds.max_average_complexity, 10.0);
-        assert_eq!(thresholds.max_high_complexity_count, 100);
-        // max_debt_items can be 2000 (default) or 2500 (from config)
+        // max_high_complexity_count can be 100 (default) or 350 (from .debtmap.toml)
+        assert!(thresholds.max_high_complexity_count >= 100);
+        // max_debt_items can be 2000 (default) or 18500 (from config)
         assert!(thresholds.max_debt_items >= 2000);
         // max_total_debt_score can be 1000 (default) or 5000 (from config)
         assert!(thresholds.max_total_debt_score >= 1000);
