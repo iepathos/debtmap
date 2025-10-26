@@ -115,7 +115,10 @@ Create a file at `$ARG_output` with this structure:
 
 ## Problem Summary
 
-**Location**: <location from debtmap - must be in format: ./file:function:line (WITH ./ prefix, use : separators)>
+**Location**: <location from debtmap - format depends on debt level:
+  - For function-level debt: ./file.rs:function:line (e.g., ./src/main.rs:process_data:42)
+  - For file-level debt: ./file.rs:file:0 (e.g., ./src/lib.rs:file:0)
+  IMPORTANT: Use exactly :file:0 for file-level debt (not :file:1), with NO additional text after the line number>
 **Priority Score**: <unified_score from debtmap>
 **Debt Type**: <debt_type from debtmap>
 **Current Metrics**:
