@@ -15,6 +15,7 @@
 # Advanced Topics
 
 - [Architecture](architecture.md)
+- [Architectural Analysis](architectural-analysis.md)
 - [Cache Management](cache-management.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
