@@ -10,6 +10,14 @@ readme = "README.md"
 keywords = ["code-analysis", "technical-debt", "complexity", "static-analysis"]
 categories = ["development-tools", "command-line-utilities"]
 
+[package.metadata.docs.rs]
+# Build with all features for comprehensive documentation
+all-features = true
+# Use nightly for better doc features
+rustdoc-args = ["--cfg", "docsrs"]
+# Show multiple platform targets
+targets = ["x86_64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc"]
+
 [lib]
 name = "debtmap"
 path = "src/lib.rs"
