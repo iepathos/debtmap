@@ -28,7 +28,9 @@ Where:
 
 ### Token Classification
 
-Debtmap classifies tokens by importance:
+Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the `use_classification` configuration option.
+
+**When enabled (default)**, tokens are weighted by importance:
 
 **High importance (weight: 1.0):**
 - Control flow keywords (`if`, `match`, `for`, `while`)
@@ -44,6 +46,8 @@ Debtmap classifies tokens by importance:
 - Identifiers (variable names)
 - Literals (strings, numbers)
 - Punctuation
+
+**When disabled** (`use_classification = false`), all tokens are treated equally, which may be useful for debugging or when you want unweighted entropy scores.
 
 ### Pattern Repetition Detection
 
@@ -89,32 +93,56 @@ if needs_auth {
 
 ### Effective Complexity Adjustment
 
-Adjusts raw cyclomatic complexity based on entropy:
+Debtmap applies complexity dampening based on **Spec 68: Graduated Entropy Dampening** only when code exhibits very low entropy (< 0.2), indicating highly repetitive patterns.
+
+#### When Dampening Applies
+
+**Threshold**: Entropy < 0.2 (very low entropy only)
+
+- **Entropy >= 0.2**: No dampening applied (preserves 100% of complexity)
+- **Entropy < 0.2**: Graduated dampening applied (preserves 50-100% of complexity)
+
+#### Dampening Formula (Spec 68)
+
+For very low entropy cases (< 0.2):
 
 ```
-Effective Complexity = Raw Complexity × (1 - Entropy Adjustment)
-
-Entropy Adjustment = min(
-    max_reduction,
-    (1 - shannon_entropy) × weight +
-    pattern_repetition × weight +
-    branch_similarity × weight
-)
+dampening_factor = 0.5 + 0.5 × (entropy / 0.2)
+effective_complexity = raw_complexity × dampening_factor
 ```
 
-**Example:**
+This ensures:
+- **Maximum reduction**: 50% (when entropy = 0.0)
+- **Minimum reduction**: 0% (when entropy = 0.2)
+- **Graduated scaling**: Linear interpolation between these extremes
+
+#### Example: Very Low Entropy (Dampening Applies)
+
 ```
 Raw Complexity: 20
-Shannon Entropy: 0.3 (low variety)
-Pattern Repetition: 0.8 (highly repetitive)
-Branch Similarity: 0.9 (very similar branches)
+Token Entropy: 0.1 (very low - highly repetitive)
 
-Entropy Adjustment = min(0.7, (1 - 0.3) × 0.4 + 0.8 × 0.3 + 0.9 × 0.3)
-                    = min(0.7, 0.28 + 0.24 + 0.27)
-                    = min(0.7, 0.79)
-                    = 0.7
+dampening_factor = 0.5 + 0.5 × (0.1 / 0.2)
+                 = 0.5 + 0.5 × 0.5
+                 = 0.5 + 0.25
+                 = 0.75
 
-Effective Complexity = 20 × (1 - 0.7) = 6
+Effective Complexity = 20 × 0.75 = 15
+
+Result: 25% reduction (preserves 75% of original complexity)
+```
+
+#### Example: Normal Entropy (No Dampening)
+
+```
+Raw Complexity: 20
+Token Entropy: 0.5 (normal variety)
+
+dampening_factor = 1.0 (no dampening for entropy >= 0.2)
+
+Effective Complexity = 20 × 1.0 = 20
+
+Result: 0% reduction (preserves 100% of original complexity)
 ```
 
 ## Real-World Examples
@@ -196,11 +224,11 @@ Configure entropy analysis in `.debtmap.toml`:
 # Enable entropy analysis (default: true)
 enabled = true
 
-# Weight of entropy in complexity adjustment (0.0-1.0, default: 0.5)
-weight = 0.5
+# Weight of entropy in complexity adjustment (0.0-1.0, default: 1.0)
+weight = 1.0
 
-# Minimum tokens required for entropy calculation (default: 10)
-min_tokens = 10
+# Minimum tokens required for entropy calculation (default: 20)
+min_tokens = 20
 
 # Pattern similarity threshold for detection (0.0-1.0, default: 0.7)
 pattern_threshold = 0.7
@@ -208,14 +236,23 @@ pattern_threshold = 0.7
 # Enable advanced token classification (default: true)
 use_classification = true
 
-# Entropy level below which dampening is applied (default: 0.5)
-entropy_threshold = 0.5
+# Entropy level below which dampening is applied (default: 0.4)
+entropy_threshold = 0.4
 
-# Branch similarity above which dampening is applied (default: 0.7)
-branch_threshold = 0.7
+# Branch similarity above which dampening is applied (default: 0.8)
+branch_threshold = 0.8
 
-# Maximum combined complexity reduction percentage (default: 0.7 = 70%)
-max_combined_reduction = 0.7
+# Maximum reduction from repetition patterns (default: 0.20 = 20%)
+max_repetition_reduction = 0.20
+
+# Maximum reduction from entropy analysis (default: 0.15 = 15%)
+max_entropy_reduction = 0.15
+
+# Maximum reduction from branch similarity (default: 0.25 = 25%)
+max_branch_reduction = 0.25
+
+# Maximum combined complexity reduction percentage (default: 0.30 = 30%)
+max_combined_reduction = 0.30
 ```
 
 ### Tuning for Your Project
@@ -242,10 +279,13 @@ max_combined_reduction = 0.9
 enabled = false
 ```
 
-Or via CLI:
+Or via CLI (disables entropy-based complexity adjustments):
 ```bash
+# Disables semantic analysis features including entropy dampening
 debtmap analyze . --semantic-off
 ```
+
+**Note**: The `--semantic-off` flag disables all semantic analysis features, including entropy-based complexity adjustments. This is useful when you want raw cyclomatic complexity without any dampening.
 
 ## Understanding the Impact
 
