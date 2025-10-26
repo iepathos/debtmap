@@ -479,7 +479,6 @@ fn build_parallel_call_graph(
             project_path,
             call_graph.clone(),
             thread_count,
-            true, // show_progress
         )?;
 
     // Process Python files (still sequential for now)

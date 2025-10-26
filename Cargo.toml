@@ -72,6 +72,9 @@ ignore = "0.4"
 colored = "3.0"
 comfy-table = "7.1"
 
+# Progress feedback
+indicatif = { version = "0.17", features = ["rayon"] }
+
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
 

@@ -6,6 +6,7 @@ use crate::{
     core::{self, *},
     formatting::FormattingConfig,
     io,
+    progress::{ProgressConfig, ProgressManager},
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -82,6 +83,11 @@ pub struct AnalyzeConfig {
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     configure_output(&config);
     set_threshold_preset(config.threshold_preset);
+
+    // Initialize global progress manager
+    let quiet = std::env::var("DEBTMAP_QUIET").is_ok();
+    let progress_config = ProgressConfig::from_env(quiet, config.verbosity);
+    ProgressManager::init_global(progress_config);
 
     // Set max files environment variable if specified
     if let Some(max_files) = config.max_files {

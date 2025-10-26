@@ -8,8 +8,10 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         parallel_call_graph::{ParallelCallGraph, ParallelConfig},
     },
+    progress::ProgressManager,
 };
 use anyhow::{Context, Result};
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -100,29 +102,38 @@ impl ParallelCallGraphBuilder {
         rust_files: &[PathBuf],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<Vec<(PathBuf, String)>> {
-        // Parse files in parallel, but only store the content strings
+        // Create progress bar using global progress manager
+        let progress = ProgressManager::global().map(|pm| {
+            let pb = pm.create_bar(
+                rust_files.len() as u64,
+                crate::progress::TEMPLATE_CALL_GRAPH,
+            );
+            pb.set_message("Building call graph");
+            pb
+        });
+
+        // Parse files in parallel with progress tracking
         let parsed_files: Vec<_> = rust_files
             .par_iter()
+            .progress_with(
+                progress
+                    .clone()
+                    .unwrap_or_else(indicatif::ProgressBar::hidden),
+            )
             .filter_map(|file_path| {
                 let content = io::read_file(file_path).ok()?;
 
-                // Update progress
+                // Update stats
                 parallel_graph.stats().increment_files();
-                if let Some(ref callback) = self.config.progress_callback {
-                    let processed = parallel_graph
-                        .stats()
-                        .files_processed
-                        .load(std::sync::atomic::Ordering::Relaxed);
-                    let total = parallel_graph
-                        .stats()
-                        .total_files
-                        .load(std::sync::atomic::Ordering::Relaxed);
-                    callback(processed, total);
-                }
 
                 Some((file_path.clone(), content))
             })
             .collect();
+
+        // Finish progress bar with completion message
+        if let Some(pb) = progress {
+            pb.finish_with_message("Call graph complete");
+        }
 
         Ok(parsed_files)
     }
@@ -231,33 +242,11 @@ pub fn build_call_graph_parallel(
     project_path: &Path,
     base_graph: CallGraph,
     num_threads: Option<usize>,
-    show_progress: bool,
 ) -> Result<(CallGraph, HashSet<FunctionId>, HashSet<FunctionId>)> {
     let mut config = ParallelConfig::default();
 
     if let Some(threads) = num_threads {
         config = config.with_threads(threads);
-    }
-
-    if show_progress {
-        config = config.with_progress(|processed, total| {
-            let percentage = (processed as f64 / total as f64 * 100.0) as u32;
-            let remaining = total - processed;
-
-            // Update every 5% or at completion
-            if processed % (total / 20).max(1) == 0 || processed == total {
-                eprint!(
-                    "\r🔗 Building call graph... {}/{} files ({:3}%) - {} remaining",
-                    processed, total, percentage, remaining
-                );
-                std::io::Write::flush(&mut std::io::stderr()).ok();
-            }
-
-            // Final newline when complete
-            if processed == total {
-                eprintln!();
-            }
-        });
     }
 
     let builder = ParallelCallGraphBuilder::with_config(config);

@@ -8,8 +8,10 @@ use crate::{
         file_metrics::FileDebtItem,
         UnifiedAnalysis, UnifiedDebtItem,
     },
+    progress::ProgressManager,
     risk::lcov::LcovData,
 };
+use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -592,13 +594,16 @@ impl ParallelUnifiedAnalysisBuilder {
         function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
-        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-        let show_progress =
-            transformations::should_show_progress(quiet_mode, self.options.progress);
 
-        if show_progress {
-            eprintln!("Starting parallel phase 2 (function analysis)...");
-        }
+        // Create progress bar for function analysis using global progress manager
+        let progress = ProgressManager::global().map(|pm| {
+            let pb = pm.create_bar(
+                metrics.len() as u64,
+                crate::progress::TEMPLATE_FUNCTION_ANALYSIS,
+            );
+            pb.set_message("Analyzing functions");
+            pb
+        });
 
         // Create analysis context for the pipeline
         let context = FunctionAnalysisContext {
@@ -610,18 +615,23 @@ impl ParallelUnifiedAnalysisBuilder {
             function_pointer_used_functions,
         };
 
-        // Functional pipeline for processing metrics
-        let items: Vec<UnifiedDebtItem> =
-            self.process_metrics_pipeline(metrics, test_only_functions, &context);
+        // Functional pipeline for processing metrics with progress tracking
+        let items: Vec<UnifiedDebtItem> = self.process_metrics_pipeline(
+            metrics,
+            test_only_functions,
+            &context,
+            progress.as_ref(),
+        );
 
         self.timings.function_analysis = start.elapsed();
 
-        if show_progress {
-            eprintln!(
-                "Phase 2 complete in {:?} ({} items processed)",
-                self.timings.function_analysis,
-                items.len()
-            );
+        // Finish progress bar with completion message
+        if let Some(pb) = progress {
+            pb.finish_with_message(format!(
+                "Function analysis complete ({} items in {:?})",
+                items.len(),
+                self.timings.function_analysis
+            ));
         }
 
         items
@@ -633,9 +643,15 @@ impl ParallelUnifiedAnalysisBuilder {
         metrics: &[FunctionMetrics],
         test_only_functions: &HashSet<FunctionId>,
         context: &FunctionAnalysisContext,
+        progress: Option<&indicatif::ProgressBar>,
     ) -> Vec<UnifiedDebtItem> {
         metrics
             .par_iter()
+            .progress_with(
+                progress
+                    .cloned()
+                    .unwrap_or_else(indicatif::ProgressBar::hidden),
+            )
             .filter_map(|metric| self.process_single_metric(metric, test_only_functions, context))
             .collect()
     }
