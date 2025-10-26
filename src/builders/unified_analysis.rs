@@ -615,7 +615,7 @@ fn load_coverage_data(coverage_file: Option<PathBuf>) -> Result<Option<risk::lco
             // Create progress bar if global progress manager is available
             let progress = crate::progress::ProgressManager::global()
                 .map(|pm| pm.create_spinner("Loading coverage data"))
-                .unwrap_or_else(|| indicatif::ProgressBar::hidden());
+                .unwrap_or_else(indicatif::ProgressBar::hidden);
 
             let data = risk::lcov::parse_lcov_file_with_progress(&lcov_path, &progress)
                 .context("Failed to parse LCOV file")?;
@@ -1408,10 +1408,11 @@ fn integrate_trait_resolution(
     // Create progress bar if global progress manager is available
     let progress = crate::progress::ProgressManager::global()
         .map(|pm| pm.create_bar(0, crate::progress::TEMPLATE_TRAIT_RESOLUTION))
-        .unwrap_or_else(|| indicatif::ProgressBar::hidden());
+        .unwrap_or_else(indicatif::ProgressBar::hidden);
 
     // Resolve trait method calls to concrete implementations
-    let resolved_count = trait_registry.resolve_trait_method_calls_with_progress(call_graph, &progress);
+    let resolved_count =
+        trait_registry.resolve_trait_method_calls_with_progress(call_graph, &progress);
 
     // Get statistics about trait usage
     let trait_stats = trait_registry.get_statistics();

@@ -772,7 +772,7 @@ impl ParallelUnifiedAnalysisBuilder {
                     None
                 }
             })
-            .unwrap_or_else(|| indicatif::ProgressBar::hidden());
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
 
         // Analyze files in parallel with progress tracking
         let file_items: Vec<FileDebtItem> = files_map
