@@ -421,6 +421,13 @@ pub enum GodObjectType {
         original_score: f64,
         adjusted_score: f64,
     },
+    /// Builder pattern - intentional fluent API with many setter methods
+    Builder {
+        pattern: crate::organization::builder_pattern::BuilderPattern,
+        confidence: f64,
+        original_score: f64,
+        adjusted_score: f64,
+    },
     /// No god object detected
     NotGodObject,
 }
