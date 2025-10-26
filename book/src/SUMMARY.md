@@ -19,6 +19,7 @@
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
+- [Dead Code Analysis](dead-code-analysis.md)
 - [Entropy Analysis](entropy-analysis.md)
 - [God Object Detection](god-object-detection.md)
 - [Parallel Processing](parallel-processing.md)
