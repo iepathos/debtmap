@@ -21,15 +21,25 @@ minimum_cognitive_complexity = 5      # Increased from 1 to skip simple cognitiv
 minimum_risk_score = 2.0              # Increased from 1.0 for Risk debt types
 
 # Validation thresholds for 'debtmap validate' command
+# Using density-based validation (scale-independent quality metrics)
 [thresholds.validation]
-max_average_complexity = 10.0         # Maximum allowed average complexity
-max_high_complexity_count = 375       # Maximum allowed high complexity functions
-max_debt_items = 20500                # Maximum allowed technical debt items
-max_total_debt_score = 5000           # Maximum allowed total debt score (unified scoring)
+# === PRIMARY QUALITY METRICS (Scale-Independent) ===
+max_average_complexity = 10.0         # Maximum allowed average complexity per function
+max_debt_density = 50.0               # Maximum allowed debt density per 1000 LOC (PRIMARY METRIC)
 max_codebase_risk_score = 7.0         # Maximum allowed codebase risk score
-max_high_risk_functions = 50          # Maximum allowed high-risk functions
-min_coverage_percentage = 0.0         # Minimum required code coverage percentage (0 = no minimum)
-max_debt_density = 50.0               # Maximum allowed debt density per 1000 LOC
+
+# === OPTIONAL METRICS ===
+min_coverage_percentage = 0.0         # Minimum required code coverage percentage (0 = disabled)
+
+# === SAFETY NET ===
+max_total_debt_score = 10000          # High ceiling to catch extreme cases (rarely triggers)
+
+# === DEPRECATED (Will be removed in v1.0) ===
+# These scale-dependent metrics are deprecated. Use max_debt_density instead.
+# Uncomment only if you need backward compatibility during migration.
+# max_high_complexity_count = 375
+# max_debt_items = 20500
+# max_high_risk_functions = 50
 
 [languages]
 enabled = ["rust", "javascript", "python", "go"]

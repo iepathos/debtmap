@@ -1173,53 +1173,98 @@ pub struct ThresholdsConfig {
 }
 
 /// Validation thresholds for the validate command
+///
+/// # Density-Based Validation
+///
+/// This configuration uses density-based metrics as primary validation
+/// criteria. Debt density (debt per 1000 LOC) provides a stable quality
+/// measure that doesn't require adjustment as the codebase grows.
+///
+/// ## Recommended Configuration
+///
+/// ```toml
+/// [thresholds.validation]
+/// max_debt_density = 50.0             # Primary quality metric
+/// max_average_complexity = 10.0       # Per-function quality
+/// max_codebase_risk_score = 7.0       # Overall risk level
+/// ```
+///
+/// ## Migration from Scale-Dependent Metrics
+///
+/// Old scale-dependent metrics are deprecated:
+/// - `max_high_complexity_count` → Use `max_debt_density`
+/// - `max_debt_items` → Use `max_debt_density`
+/// - `max_high_risk_functions` → Use `max_debt_density` + `max_codebase_risk_score`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationThresholds {
-    /// Maximum allowed average complexity (default: 10.0)
+    // === PRIMARY QUALITY METRICS (Scale-Independent) ===
+    /// Maximum allowed average complexity per function (default: 10.0)
+    /// This measures typical function complexity across the codebase
     #[serde(default = "default_max_avg_complexity")]
     pub max_average_complexity: f64,
 
-    /// Maximum allowed high complexity function count (default: 100)
-    #[serde(default = "default_max_high_complexity_count")]
-    pub max_high_complexity_count: usize,
-
-    /// Maximum allowed technical debt items (default: 2000)
-    #[serde(default = "default_max_debt_items")]
-    pub max_debt_items: usize,
-
-    /// Maximum allowed total debt score (default: 1000)
-    /// Note: Uses unified scoring where each item is capped at 10.0
-    #[serde(default = "default_max_total_debt_score")]
-    pub max_total_debt_score: u32,
+    /// Maximum allowed debt density per 1000 LOC (default: 50.0)
+    /// This is the PRIMARY quality metric for validation
+    /// Provides scale-independent quality measure that remains stable as codebase grows
+    #[serde(default = "default_max_debt_density")]
+    pub max_debt_density: f64,
 
     /// Maximum allowed codebase risk score (default: 7.0)
+    /// Overall risk level combining complexity, coverage, and criticality
     #[serde(default = "default_max_codebase_risk")]
     pub max_codebase_risk_score: f64,
 
-    /// Maximum allowed high-risk function count (default: 50)
-    #[serde(default = "default_max_high_risk_count")]
-    pub max_high_risk_functions: usize,
-
-    /// Minimum required code coverage percentage (default: 0.0 - no minimum)
+    // === OPTIONAL METRICS ===
+    /// Minimum required code coverage percentage (default: 0.0 - disabled)
+    /// Set to enforce minimum test coverage requirements
     #[serde(default = "default_min_coverage")]
     pub min_coverage_percentage: f64,
 
-    /// Maximum allowed debt density per 1000 LOC (default: 50.0)
-    #[serde(default = "default_max_debt_density")]
-    pub max_debt_density: f64,
+    // === SAFETY NET ===
+    /// Maximum total debt score - safety net to catch extreme cases (default: 10000)
+    /// High ceiling that rarely triggers in normal operation
+    /// Prevents runaway growth even if density stays low
+    #[serde(default = "default_max_total_debt_score_high")]
+    pub max_total_debt_score: u32,
+
+    // === DEPRECATED (Will be removed in v1.0) ===
+    /// DEPRECATED: Use max_debt_density instead
+    /// This scale-dependent metric grows linearly with codebase size
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[deprecated(since = "0.3.0", note = "Use max_debt_density instead")]
+    pub max_high_complexity_count: Option<usize>,
+
+    /// DEPRECATED: Use max_debt_density instead
+    /// This scale-dependent metric grows linearly with codebase size
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[deprecated(since = "0.3.0", note = "Use max_debt_density instead")]
+    pub max_debt_items: Option<usize>,
+
+    /// DEPRECATED: Use max_debt_density and max_codebase_risk_score instead
+    /// This scale-dependent metric grows linearly with codebase size
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[deprecated(
+        since = "0.3.0",
+        note = "Use max_debt_density and max_codebase_risk_score instead"
+    )]
+    pub max_high_risk_functions: Option<usize>,
 }
 
 impl Default for ValidationThresholds {
     fn default() -> Self {
         Self {
+            // Primary quality metrics
             max_average_complexity: default_max_avg_complexity(),
-            max_high_complexity_count: default_max_high_complexity_count(),
-            max_debt_items: default_max_debt_items(),
-            max_total_debt_score: default_max_total_debt_score(),
-            max_codebase_risk_score: default_max_codebase_risk(),
-            max_high_risk_functions: default_max_high_risk_count(),
-            min_coverage_percentage: default_min_coverage(),
             max_debt_density: default_max_debt_density(),
+            max_codebase_risk_score: default_max_codebase_risk(),
+            // Optional metrics
+            min_coverage_percentage: default_min_coverage(),
+            // Safety net
+            max_total_debt_score: default_max_total_debt_score_high(),
+            // Deprecated metrics (None by default)
+            max_high_complexity_count: None,
+            max_debt_items: None,
+            max_high_risk_functions: None,
         }
     }
 }
@@ -1228,26 +1273,17 @@ impl Default for ValidationThresholds {
 fn default_max_avg_complexity() -> f64 {
     10.0
 }
-fn default_max_high_complexity_count() -> usize {
-    100
-}
-fn default_max_debt_items() -> usize {
-    2000
-}
-fn default_max_total_debt_score() -> u32 {
-    1000 // Unified scoring: each item capped at 10.0, so ~100 high-priority items
-}
 fn default_max_codebase_risk() -> f64 {
     7.0
-}
-fn default_max_high_risk_count() -> usize {
-    50
 }
 fn default_min_coverage() -> f64 {
     0.0
 }
 fn default_max_debt_density() -> f64 {
     50.0 // 50 debt points per 1000 LOC - reasonable default for most projects
+}
+fn default_max_total_debt_score_high() -> u32 {
+    10000 // High ceiling - 5x typical project, acts as safety net for extreme cases
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -2068,16 +2104,20 @@ interface_weight = 0.15
         // Test that get_validation_thresholds returns expected values
         // The config might override these, so we test flexible values
         let thresholds = get_validation_thresholds();
+
+        // Primary quality metrics
         assert_eq!(thresholds.max_average_complexity, 10.0);
-        // max_high_complexity_count can be 100 (default) or 350 (from .debtmap.toml)
-        assert!(thresholds.max_high_complexity_count >= 100);
-        // max_debt_items can be 2000 (default) or 18500 (from config)
-        assert!(thresholds.max_debt_items >= 2000);
-        // max_total_debt_score can be 1000 (default) or 5000 (from config)
-        assert!(thresholds.max_total_debt_score >= 1000);
+        assert_eq!(thresholds.max_debt_density, 50.0);
         assert_eq!(thresholds.max_codebase_risk_score, 7.0);
-        assert_eq!(thresholds.max_high_risk_functions, 50);
         assert_eq!(thresholds.min_coverage_percentage, 0.0);
+
+        // Safety net - high ceiling
+        assert_eq!(thresholds.max_total_debt_score, 10000);
+
+        // Deprecated metrics should be None by default
+        assert_eq!(thresholds.max_high_complexity_count, None);
+        assert_eq!(thresholds.max_debt_items, None);
+        assert_eq!(thresholds.max_high_risk_functions, None);
     }
 
     #[test]
@@ -2316,13 +2356,20 @@ interface_weight = 0.15
     #[test]
     fn test_validation_thresholds_default() {
         let thresholds = ValidationThresholds::default();
+
+        // Primary quality metrics
         assert_eq!(thresholds.max_average_complexity, 10.0);
-        assert_eq!(thresholds.max_high_complexity_count, 100);
-        assert_eq!(thresholds.max_debt_items, 2000);
-        assert_eq!(thresholds.max_total_debt_score, 1000);
+        assert_eq!(thresholds.max_debt_density, 50.0);
         assert_eq!(thresholds.max_codebase_risk_score, 7.0);
-        assert_eq!(thresholds.max_high_risk_functions, 50);
         assert_eq!(thresholds.min_coverage_percentage, 0.0);
+
+        // Safety net - high ceiling
+        assert_eq!(thresholds.max_total_debt_score, 10000);
+
+        // Deprecated metrics should be None by default
+        assert_eq!(thresholds.max_high_complexity_count, None);
+        assert_eq!(thresholds.max_debt_items, None);
+        assert_eq!(thresholds.max_high_risk_functions, None);
     }
 
     #[test]
@@ -2433,13 +2480,13 @@ interface_weight = 0.15
 
     #[test]
     fn test_default_validation_threshold_functions() {
+        // Test primary quality metrics
         assert_eq!(default_max_avg_complexity(), 10.0);
-        assert_eq!(default_max_high_complexity_count(), 100);
-        assert_eq!(default_max_debt_items(), 2000);
-        assert_eq!(default_max_total_debt_score(), 1000);
+        assert_eq!(default_max_debt_density(), 50.0);
         assert_eq!(default_max_codebase_risk(), 7.0);
-        assert_eq!(default_max_high_risk_count(), 50);
         assert_eq!(default_min_coverage(), 0.0);
+        // Test safety net
+        assert_eq!(default_max_total_debt_score_high(), 10000);
     }
 
     #[test]
