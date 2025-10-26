@@ -569,7 +569,7 @@ impl FunctionVisitor {
         let mapping_result =
             mapping_detector.analyze_function(&function_body, complexity.cyclomatic);
 
-        let adjusted_complexity = if mapping_result.is_pure_mapping {
+        let mut adjusted_complexity = if mapping_result.is_pure_mapping {
             Some(calculate_adjusted_complexity(
                 complexity.cyclomatic,
                 complexity.cognitive,
@@ -578,6 +578,40 @@ impl FunctionVisitor {
         } else {
             None
         };
+
+        // Detect parallel execution patterns (spec 127)
+        let mut detected_patterns = Vec::new();
+        if let Some(ref file_ast) = self.file_ast {
+            use crate::organization::parallel_execution_pattern::{
+                adjust_parallel_score, ParallelPatternDetector,
+            };
+
+            let parallel_detector = ParallelPatternDetector::default();
+            if let Some(mut pattern) = parallel_detector.detect(file_ast, &self.source_content) {
+                // Fill in cyclomatic complexity for pattern
+                pattern.cyclomatic_complexity = complexity.cyclomatic as usize;
+
+                let confidence = parallel_detector.confidence(&pattern);
+
+                // Apply score adjustment if parallel pattern detected
+                let base_complexity = complexity.cyclomatic as f64;
+                let parallel_adjusted = adjust_parallel_score(base_complexity, &pattern);
+
+                // Use parallel adjustment if it's more lenient than mapping adjustment
+                if adjusted_complexity.is_none() || parallel_adjusted < adjusted_complexity.unwrap()
+                {
+                    adjusted_complexity = Some(parallel_adjusted);
+                }
+
+                detected_patterns.push(format!(
+                    "ParallelExecution({}, {:.0}% confidence, {} closures, {} captures)",
+                    pattern.library,
+                    confidence * 100.0,
+                    pattern.closure_count,
+                    pattern.total_captures
+                ));
+            }
+        }
 
         // Perform functional composition analysis if enabled (spec 111)
         let composition_metrics = if self.enable_functional_analysis {
@@ -616,7 +650,11 @@ impl FunctionVisitor {
             entropy_score: metadata.entropy_score,
             is_pure: metadata.purity_info.0,
             purity_confidence: metadata.purity_info.1,
-            detected_patterns: None,
+            detected_patterns: if detected_patterns.is_empty() {
+                None
+            } else {
+                Some(detected_patterns)
+            },
             upstream_callers: None,
             downstream_callees: None,
             mapping_pattern_result: if mapping_result.is_pure_mapping {
