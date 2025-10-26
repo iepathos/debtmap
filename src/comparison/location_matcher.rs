@@ -408,6 +408,7 @@ mod tests {
             data_flow_graph: crate::data_flow::DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
+            timings: None,
         }
     }
 

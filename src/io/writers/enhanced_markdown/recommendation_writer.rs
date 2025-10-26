@@ -170,6 +170,7 @@ mod tests {
             data_flow_graph: DataFlowGraph::new(),
             overall_coverage: None,
             has_coverage_data: false,
+            timings: None,
         }
     }
 

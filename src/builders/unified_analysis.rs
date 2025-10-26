@@ -824,13 +824,34 @@ fn create_unified_analysis_with_exclusions_and_timing(
     if let Some(lcov) = coverage_data {
         unified.overall_coverage = Some(lcov.get_overall_coverage());
     }
+
+    let total_time = start.elapsed();
+
     if !quiet_mode {
         eprintln!(
             "  [TIME]Final sorting & impact calc: {:?}",
             step_start.elapsed()
         );
-        eprintln!("  [TIME]TOTAL unified analysis time: {:?}", start.elapsed());
+        eprintln!("  [TIME]TOTAL unified analysis time: {:?}", total_time);
     }
+
+    // Attach timing information for sequential analysis (spec 130)
+    // Note: Sequential analysis doesn't track individual phase timings,
+    // but we can attach the preliminary timings that were passed in
+    unified.timings = Some(parallel_unified_analysis::AnalysisPhaseTimings {
+        call_graph_building: call_graph_time,
+        trait_resolution: trait_resolution_time,
+        coverage_loading: coverage_loading_time,
+        data_flow_creation: std::time::Duration::from_secs(0),
+        purity_analysis: std::time::Duration::from_secs(0),
+        test_detection: std::time::Duration::from_secs(0),
+        debt_aggregation: std::time::Duration::from_secs(0),
+        function_analysis: std::time::Duration::from_secs(0),
+        file_analysis: std::time::Duration::from_secs(0),
+        aggregation: std::time::Duration::from_secs(0),
+        sorting: std::time::Duration::from_secs(0),
+        total: total_time,
+    });
 
     unified
 }
@@ -898,13 +919,16 @@ fn create_unified_analysis_parallel(
     let file_items = builder.execute_phase3_parallel(metrics, coverage_data, no_god_object);
 
     // Build final unified analysis
-    let (unified, _timings) = builder.build(
+    let (mut unified, timings) = builder.build(
         data_flow_graph,
         _purity,
         all_items,
         file_items,
         coverage_data,
     );
+
+    // Attach timing information (spec 130)
+    unified.timings = Some(timings);
 
     // Aggregation has been removed - no longer needed
 
