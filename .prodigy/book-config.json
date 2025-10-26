@@ -44,6 +44,11 @@
       "area": "responsibility_analysis",
       "source_files": ["src/organization/god_object_analysis.rs", "src/organization/god_object_detector.rs", "src/organization/mod.rs"],
       "feature_categories": ["srp_detection", "responsibility_inference", "method_categorization", "refactoring_recommendations"]
+    },
+    {
+      "area": "boilerplate_detection",
+      "source_files": ["src/organization/boilerplate_detector.rs", "src/organization/trait_pattern_analyzer.rs", "src/organization/macro_recommendations.rs"],
+      "feature_categories": ["pattern_detection", "trait_analysis", "macro_recommendations", "boilerplate_scoring"]
     }
   ],
   "chapter_file": "workflows/data/debtmap-chapters.json",
