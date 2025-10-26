@@ -45,6 +45,9 @@ pub struct UnifiedAnalysis {
     pub overall_coverage: Option<f64>,
     #[serde(default)]
     pub has_coverage_data: bool,
+    /// Timing information for analysis phases (spec 130)
+    #[serde(skip)]
+    pub timings: Option<crate::builders::parallel_unified_analysis::AnalysisPhaseTimings>,
 }
 
 // Single function analysis for evidence-based risk calculation
@@ -431,7 +434,15 @@ impl UnifiedAnalysis {
             data_flow_graph,
             overall_coverage: None,
             has_coverage_data: false,
+            timings: None,
         }
+    }
+
+    /// Get timing information for the analysis phases (spec 130)
+    pub fn timings(
+        &self,
+    ) -> Option<&crate::builders::parallel_unified_analysis::AnalysisPhaseTimings> {
+        self.timings.as_ref()
     }
 
     pub fn add_file_item(&mut self, item: FileDebtItem) {
@@ -727,6 +738,7 @@ impl UnifiedAnalysis {
             data_flow_graph: self.data_flow_graph.clone(),
             overall_coverage: self.overall_coverage,
             has_coverage_data: self.has_coverage_data,
+            timings: self.timings.clone(),
         }
     }
 

@@ -1,4 +1,4 @@
-use super::super::builders::{call_graph, parallel_call_graph, unified_analysis};
+use super::super::builders::unified_analysis;
 use super::super::output;
 use super::super::utils::{analysis_helpers, risk_analyzer, validation_printer};
 use crate::{cli, config, core::*, risk};
@@ -204,7 +204,7 @@ fn validate_with_risk(
         .filter(|f| f.risk_score > risk_threshold)
         .count();
 
-    let unified = calculate_unified_analysis(results, lcov_data);
+    let unified = calculate_unified_analysis(results, lcov_data, config.verbosity);
     let total_debt_score = unified.total_debt_score as u32;
     let debt_density = unified.debt_density;
 
@@ -287,7 +287,7 @@ fn validate_with_risk(
 
 fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, ValidationDetails) {
     let thresholds = config::get_validation_thresholds();
-    let unified = calculate_unified_analysis(results, None);
+    let unified = calculate_unified_analysis(results, None, config.verbosity);
     let total_debt_score = unified.total_debt_score as u32;
     let debt_density = unified.debt_density;
 
@@ -346,81 +346,101 @@ fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, 
     (pass, details)
 }
 
+/// Calculate unified analysis using the shared pipeline (spec 130)
 fn calculate_unified_analysis(
     results: &AnalysisResults,
-    lcov_data: Option<&risk::lcov::LcovData>,
+    _lcov_data: Option<&risk::lcov::LcovData>,
+    verbosity: u8,
 ) -> crate::priority::UnifiedAnalysis {
-    let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
-    let project_path = &results.project_path;
-
     // Check if parallel processing is enabled via environment variable
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
 
-    let (framework_exclusions, function_pointer_used_functions) = if parallel_enabled {
-        let jobs = std::env::var("DEBTMAP_JOBS")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(0);
+    let jobs = std::env::var("DEBTMAP_JOBS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(0);
 
-        let thread_count = if jobs == 0 { None } else { Some(jobs) };
+    // Coverage file path is needed for unified analysis
+    // If lcov_data is provided, we assume it was loaded from a file
+    // For validate, we typically don't have the original file path accessible here
+    // So we pass None, which means coverage data will be passed directly via results
+    let coverage_file = None;
 
-        eprintln!("🔍 Building call graph in parallel...");
-
-        let (mut parallel_graph, exclusions, used_funcs) =
-            parallel_call_graph::build_call_graph_parallel(
-                project_path,
-                call_graph.clone(),
-                thread_count,
-            )
-            .unwrap_or_else(|e| {
-                log::warn!(
-                    "Parallel call graph failed, falling back to sequential: {}",
-                    e
-                );
-                (call_graph.clone(), Default::default(), Default::default())
-            });
-
-        // Process Python files
-        if let Err(e) =
-            call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)
-        {
-            log::warn!("Failed to process Python files for call graph: {}", e);
-        }
-
-        call_graph = parallel_graph;
-        (exclusions, used_funcs)
-    } else {
-        let result = call_graph::process_rust_files_for_call_graph(
-            project_path,
-            &mut call_graph,
-            false,
-            false,
-        )
-        .unwrap_or_default();
-
-        if let Err(e) =
-            call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)
-        {
-            log::warn!("Failed to process Python files for call graph: {}", e);
-        }
-
-        result
-    };
-
-    unified_analysis::create_unified_analysis_with_exclusions(
-        &results.complexity.metrics,
-        &call_graph,
-        lcov_data,
-        &framework_exclusions,
-        Some(&function_pointer_used_functions),
-        Some(&results.technical_debt.items),
-        false, // no_aggregation - use default settings for validate
-        None,  // aggregation_method - use default
-        None,  // min_problematic - use default
-        false, // no_god_object - enable god object detection by default
+    // Use the shared unified analysis pipeline (spec 130)
+    let unified = unified_analysis::perform_unified_analysis_with_options(
+        unified_analysis::UnifiedAnalysisOptions {
+            results,
+            coverage_file,
+            semantic_off: false,
+            project_path: &results.project_path,
+            verbose_macro_warnings: false,
+            show_macro_stats: false,
+            parallel: parallel_enabled,
+            jobs,
+            use_cache: true,
+            multi_pass: false,
+            show_attribution: false,
+            aggregate_only: false,
+            no_aggregation: false,
+            aggregation_method: None,
+            min_problematic: None,
+            no_god_object: false,
+            _formatting_config: Default::default(),
+        },
     )
+    .expect("Unified analysis failed");
+
+    // Display timing information if verbosity is enabled (spec 130)
+    display_timing_information(&unified, verbosity);
+
+    unified
+}
+
+/// Display timing information for analysis phases (spec 130)
+fn display_timing_information(unified: &crate::priority::UnifiedAnalysis, verbosity: u8) {
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+    // Don't display timing if quiet mode is enabled or verbosity is 0
+    if quiet_mode || verbosity == 0 {
+        return;
+    }
+
+    if let Some(timings) = unified.timings() {
+        eprintln!("\nTiming information:");
+        eprintln!("  Total analysis time: {:?}", timings.total);
+
+        // Only show detailed breakdown at verbosity >= 1
+        if verbosity >= 1 {
+            eprintln!("  - Call graph building: {:?}", timings.call_graph_building);
+            eprintln!("  - Trait resolution: {:?}", timings.trait_resolution);
+            eprintln!("  - Coverage loading: {:?}", timings.coverage_loading);
+
+            if timings.data_flow_creation.as_millis() > 0 {
+                eprintln!("  - Data flow: {:?}", timings.data_flow_creation);
+            }
+            if timings.purity_analysis.as_millis() > 0 {
+                eprintln!("  - Purity: {:?}", timings.purity_analysis);
+            }
+            if timings.test_detection.as_millis() > 0 {
+                eprintln!("  - Test detection: {:?}", timings.test_detection);
+            }
+            if timings.debt_aggregation.as_millis() > 0 {
+                eprintln!("  - Debt aggregation: {:?}", timings.debt_aggregation);
+            }
+            if timings.function_analysis.as_millis() > 0 {
+                eprintln!("  - Function analysis: {:?}", timings.function_analysis);
+            }
+            if timings.file_analysis.as_millis() > 0 {
+                eprintln!("  - File analysis: {:?}", timings.file_analysis);
+            }
+            if timings.sorting.as_millis() > 0 {
+                eprintln!("  - Sorting: {:?}", timings.sorting);
+            }
+        }
+        eprintln!();
+    }
 }
 
 #[cfg(test)]
