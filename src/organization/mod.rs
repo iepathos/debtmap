@@ -14,6 +14,7 @@ pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod javascript;
 pub mod language;
+pub mod parallel_execution_pattern;
 pub mod purity_analyzer;
 pub mod registry_pattern;
 pub mod split_validator;
@@ -55,6 +56,10 @@ pub use registry_pattern::{
 
 pub use struct_initialization::{
     FieldDependency, ReturnAnalysis, StructInitPattern, StructInitPatternDetector,
+};
+
+pub use parallel_execution_pattern::{
+    adjust_parallel_score, ClosureInfo, ParallelLibrary, ParallelPattern, ParallelPatternDetector,
 };
 
 #[derive(Debug, Clone, PartialEq)]
