@@ -95,16 +95,27 @@ You can suppress specific types of debt using bracket notation instead of suppre
 
 ### Supported Debt Types
 
-- `todo` - TODO comments
+You can suppress the following debt types by name in bracket notation:
+
+**Currently Supported:**
+- `todo` - TODO comments (also detects test-specific TODOs)
 - `fixme` - FIXME comments
-- `hack` - HACK markers
 - `smell` or `codesmell` - Code smell patterns
-- `complexity` - High cognitive complexity
-- `duplication` - Code duplication
-- `god_object` - God object warnings
-- `testing` - Testing gap warnings
+- `complexity` - High cognitive complexity (also detects test complexity)
+- `duplication` or `duplicate` - Code duplication (also detects test duplication)
 - `dependency` - Dependency issues
 - `*` - All types (wildcard)
+
+**Auto-Detected Types** (can be suppressed but not from inline comments):
+
+These types are detected by code analysis rather than comment scanning. To suppress them, use inline suppression markers (`debtmap:ignore`) on the relevant lines:
+
+- `error_swallowing` - Error handling issues (empty catch blocks, ignored errors)
+- `resource_management` - Resource cleanup issues (file handles, connections)
+- `code_organization` - Structural issues (god objects, large classes)
+- `test_quality` - Test-specific quality issues
+
+> **Note:** Additional type names like `hack`, `god_object`, and `testing` may be supported in future versions. Use the types listed above for reliable suppression.
 
 ### Wildcard Suppression
 
@@ -176,11 +187,14 @@ patterns = [
 ]
 ```
 
-### Function Name Exclusions
+### Function Name Exclusions (Planned)
 
-Exclude entire function families by name pattern:
+> **Note:** Function-level exclusions by name pattern are not yet implemented. This is a planned feature for a future release.
+
+When implemented, you will be able to exclude entire function families by name pattern:
 
 ```toml
+# Planned feature - not yet available
 [ignore.functions]
 patterns = [
     # Test setup functions
@@ -206,7 +220,7 @@ patterns = [
 ]
 ```
 
-Function patterns use wildcard matching where `*` matches any characters.
+**Current workaround:** Use inline suppression comments (`debtmap:ignore`) for specific functions, or use file pattern exclusions to exclude entire test files.
 
 ## Glob Pattern Syntax
 
@@ -228,9 +242,12 @@ patterns = [
     "src/**/*_generated.rs",  # Generated files in any subdirectory
     "**/test_*.py",           # Python test files anywhere
     "legacy/**/[!i]*.js",     # Legacy JS files not starting with 'i'
-    "**/*.{min.js,min.css}",  # Minified assets
+    "**/*.min.js",            # Minified JavaScript
+    "**/*.min.css",           # Minified CSS
 ]
 ```
+
+> **Note:** Brace expansion (e.g., `*.{js,css}`) is not supported. Use separate patterns for each file extension.
 
 ## Language-Specific Comment Syntax
 
@@ -262,13 +279,13 @@ This ensures you can always analyze specific files when needed, even if they mat
 
 ## Suppression Statistics
 
-Debtmap tracks suppression usage and can detect issues:
+Debtmap internally tracks suppression usage during analysis:
 
-- **Total suppressions**: Count of active suppressions
+- **Total suppressions**: Count of active suppressions across all files
 - **Suppressions by type**: How many of each debt type are suppressed
 - **Unclosed blocks**: Detection of `ignore-start` without matching `ignore-end`
 
-Future versions may include a command to report suppression statistics for your codebase.
+These statistics are tracked in real-time as files are analyzed. Future CLI enhancements may expose these statistics through a dedicated command to help you audit suppression usage across your codebase.
 
 ## Best Practices
 
@@ -365,14 +382,17 @@ patterns = [
     "**/test_*.py",
     "**/fixtures/**",
 ]
+```
 
-[ignore.functions]
-patterns = [
-    "test_*",
-    "setup_*",
-    "teardown_*",
-    "mock_*",
-]
+For test functions within production files, use inline suppressions:
+
+```rust
+#[cfg(test)]
+mod tests {
+    // debtmap:ignore-start -- Test code
+    fn setup_test_environment() { }
+    // debtmap:ignore-end
+}
 ```
 
 ### Suppressing Generated Code
@@ -383,12 +403,6 @@ patterns = [
     "**/*_generated.*",
     "**/proto/**",
     "**/bindings/**",
-]
-
-[ignore.functions]
-patterns = [
-    "derive_*",
-    "__*",
 ]
 ```
 
@@ -510,11 +524,11 @@ patterns = [
 
 ### Function Suppression Not Working
 
-If function name patterns aren't working:
+Function-level exclusions by name pattern are not yet implemented. To suppress specific functions:
 
-1. Verify the pattern is under `[ignore.functions]`, not `[ignore]`
-2. Check the function name exactly matches (case-sensitive)
-3. Remember `*` is a wildcard: `test_*` matches `test_foo` but not `my_test`
+1. Use inline suppressions: `// debtmap:ignore` before the function
+2. Use block suppressions: `// debtmap:ignore-start` ... `// debtmap:ignore-end`
+3. Exclude entire files using `[ignore]` patterns if the functions are in dedicated files
 
 ## Related Topics
 
@@ -530,8 +544,7 @@ Suppressions help you focus on actionable technical debt:
 - **Inline comments**: `debtmap:ignore`, `ignore-next-line`, `ignore-start/end`
 - **Type-specific**: Use `[type1,type2]` to suppress selectively
 - **Reasons**: Always use `-- reason` to document why
-- **Config patterns**: Use `.debtmap.toml` for systematic exclusions
-- **Function patterns**: Use `[ignore.functions]` for function name matching
+- **Config patterns**: Use `.debtmap.toml` for systematic file exclusions
 - **Best practices**: Use sparingly, prefer specific over broad, review periodically
 
 With proper use of suppressions, your Debtmap reports show only the debt that matters to your team.
