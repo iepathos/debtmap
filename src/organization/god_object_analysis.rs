@@ -1,9 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Type of god object detection
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum DetectionType {
+    /// Single struct with excessive methods (tests excluded from counts)
+    GodClass,
+    /// File with excessive functions or lines (tests included in counts)
+    GodFile,
+    /// Alias for GodFile
+    GodModule,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GodObjectAnalysis {
     pub is_god_object: bool,
+    /// For GodClass: production methods only (tests excluded)
+    /// For GodFile: all functions including tests
     pub method_count: usize,
     pub field_count: usize,
     pub responsibility_count: usize,
@@ -17,6 +30,8 @@ pub struct GodObjectAnalysis {
     pub purity_distribution: Option<PurityDistribution>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module_structure: Option<crate::analysis::ModuleStructure>,
+    /// Type of god object detection (class vs file/module)
+    pub detection_type: DetectionType,
 }
 
 /// Distribution of functions by purity level

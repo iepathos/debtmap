@@ -1,10 +1,10 @@
 use super::{
     aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_weight,
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
-    group_methods_by_responsibility, suggest_module_splits_by_domain, EnhancedGodObjectAnalysis,
-    FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds, GodObjectType,
-    MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector, PurityAnalyzer,
-    PurityDistribution, PurityLevel, ResponsibilityGroup, StructMetrics,
+    group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
+    EnhancedGodObjectAnalysis, FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds,
+    GodObjectType, MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector,
+    PurityAnalyzer, PurityDistribution, PurityLevel, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
@@ -473,34 +473,55 @@ impl GodObjectDetector {
         // Count standalone functions in addition to methods from types
         let standalone_count = visitor.standalone_functions.len();
 
-        // Spec 118: Only count impl methods for struct analysis, not standalone functions
-        // This prevents false positives for functional/procedural modules
-        let (total_methods, total_fields, all_methods, total_complexity) =
+        // Spec 118 & 130: Distinguish between God Class and God File
+        // - God Class: Struct with excessive methods (tests excluded)
+        // - God File: File with excessive functions/lines (tests included)
+        let (total_methods, total_fields, all_methods, total_complexity, detection_type) =
             if let Some(type_info) = primary_type {
-                // Always use struct's impl methods for analysis, regardless of standalone function count
-                let total_methods = type_info.method_count;
-                let all_methods = type_info.methods.clone();
+                // God Class analysis: struct with impl methods
+                // Spec 130: Filter out test functions for god class detection
+                let struct_method_names: std::collections::HashSet<_> =
+                    type_info.methods.iter().collect();
 
-                // Calculate complexity only for struct methods
-                let total_complexity = visitor
+                // Production methods only (exclude tests)
+                let production_complexity: Vec<_> = visitor
                     .function_complexity
                     .iter()
-                    .filter(|fc| all_methods.contains(&fc.name))
+                    .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
+                    .cloned()
+                    .collect();
+
+                let production_methods: Vec<String> = production_complexity
+                    .iter()
+                    .map(|fc| fc.name.clone())
+                    .collect();
+
+                let total_methods = production_methods.len();
+                let total_complexity: u32 = production_complexity
+                    .iter()
                     .map(|fc| fc.cyclomatic_complexity)
                     .sum();
 
                 (
                     total_methods,
                     type_info.field_count,
-                    all_methods,
+                    production_methods,
                     total_complexity,
+                    DetectionType::GodClass,
                 )
             } else {
-                // No struct/impl blocks found - count standalone functions as God Module
+                // No struct/impl blocks found - God File analysis
+                // Spec 130: Include ALL functions (production + tests) for file size concerns
                 let all_methods = visitor.standalone_functions.clone();
                 let total_complexity = (standalone_count * 5) as u32;
 
-                (standalone_count, 0, all_methods, total_complexity)
+                (
+                    standalone_count,
+                    0,
+                    all_methods,
+                    total_complexity,
+                    DetectionType::GodFile,
+                )
             };
 
         // Count actual lines more accurately by looking at span information
@@ -523,13 +544,53 @@ impl GodObjectDetector {
             responsibility_groups.len()
         };
 
-        // Calculate complexity-weighted metrics (without purity)
-        let weighted_method_count = aggregate_weighted_complexity(&visitor.function_complexity);
-        let avg_complexity = calculate_avg_complexity(&visitor.function_complexity);
+        // Calculate complexity-weighted metrics
+        // Spec 130: For God Class, use production functions only; for God File, use all
+        let relevant_complexity: Vec<_> = match detection_type {
+            DetectionType::GodClass => {
+                // Filter to production functions only (exclude tests)
+                visitor
+                    .function_complexity
+                    .iter()
+                    .filter(|fc| !fc.is_test)
+                    .cloned()
+                    .collect()
+            }
+            DetectionType::GodFile | DetectionType::GodModule => {
+                // Include all functions (production + tests)
+                visitor.function_complexity.clone()
+            }
+        };
+
+        let weighted_method_count = aggregate_weighted_complexity(&relevant_complexity);
+        let avg_complexity = calculate_avg_complexity(&relevant_complexity);
 
         // Calculate purity-weighted metrics
         let (purity_weighted_count, purity_distribution) = if !visitor.function_items.is_empty() {
-            Self::calculate_purity_weights(&visitor.function_items, &visitor.function_complexity)
+            // Filter function items based on detection type
+            let relevant_items: Vec<_> = match detection_type {
+                DetectionType::GodClass => {
+                    // Production functions only
+                    visitor
+                        .function_items
+                        .iter()
+                        .filter(|item| {
+                            !visitor
+                                .function_complexity
+                                .iter()
+                                .find(|fc| item.sig.ident == fc.name)
+                                .map(|fc| fc.is_test)
+                                .unwrap_or(false)
+                        })
+                        .cloned()
+                        .collect()
+                }
+                DetectionType::GodFile | DetectionType::GodModule => {
+                    // All functions
+                    visitor.function_items.clone()
+                }
+            };
+            Self::calculate_purity_weights(&relevant_items, &relevant_complexity)
         } else {
             (weighted_method_count, None)
         };
@@ -619,6 +680,7 @@ impl GodObjectDetector {
             responsibilities,
             purity_distribution,
             module_structure,
+            detection_type,
         }
     }
 

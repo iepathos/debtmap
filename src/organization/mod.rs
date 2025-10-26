@@ -24,7 +24,7 @@ pub mod struct_ownership;
 pub use god_object_analysis::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, recommend_module_splits, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, EnhancedGodObjectAnalysis, GodObjectAnalysis,
+    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
     GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
     PurityDistribution, StructMetrics, StructWithMethods,
 };

@@ -252,6 +252,7 @@ mod tests {
             responsibilities: Vec::new(),
             purity_distribution: None,
             module_structure: None,
+            detection_type: crate::organization::DetectionType::GodClass,
         }
     }
 
