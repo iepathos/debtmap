@@ -442,19 +442,161 @@ All coverage metrics and workflows are preserved.
 
 ## Implementation Notes
 
+### Advantages Over Tarpaulin
+
+Key benefits of migrating to cargo-llvm-cov:
+
+1. **Better Platform Support**
+   - ✅ Full support: Linux, macOS, Windows
+   - ✅ Works on ARM architectures (M1/M2 Macs)
+   - ⚠️ Tarpaulin: Linux x86-64 only, limited macOS support
+
+2. **Faster Execution**
+   - ✅ More efficient LLVM instrumentation
+   - ✅ Better incremental compilation support
+   - ✅ Typically 20-40% faster than tarpaulin
+
+3. **Better Accuracy**
+   - ✅ Fewer false positives/negatives
+   - ✅ More precise source mapping
+   - ✅ Better async/await coverage
+
+4. **Cargo Nextest Integration**
+   - ✅ Native support via `cargo llvm-cov nextest`
+   - ✅ Faster test execution with coverage
+   - ⚠️ Tarpaulin: Limited nextest support
+
+5. **Active Maintenance**
+   - ✅ Regular updates and bug fixes
+   - ✅ Follows Rust compiler development
+   - ✅ Growing ecosystem adoption
+
+6. **Industry Standard**
+   - ✅ Recommended by Rust project
+   - ✅ Uses rustc's native coverage
+   - ✅ Better long-term support
+
+### Known Limitations of cargo-llvm-cov
+
+Before migrating, be aware of these current limitations (most don't affect debtmap):
+
+1. **Doc Tests** (Issue #2)
+   - Doc tests disabled by default
+   - Requires nightly compiler for doctest coverage
+   - **Impact on debtmap**: Minor - we primarily use unit and integration tests
+   - **Mitigation**: Skip doctest coverage or use `--doctests` flag with nightly if needed
+
+2. **Branch Coverage** (Issue #8)
+   - Branch coverage not yet supported
+   - Line and region coverage available
+   - **Impact on debtmap**: None - we use line coverage metrics
+   - **Mitigation**: Use line coverage (default behavior)
+
+3. **Workspace Recompilation** (Issue #198)
+   - May recompile workspace crates on each run
+   - Can slow down coverage in large workspaces
+   - **Impact on debtmap**: Minor - single package project
+   - **Mitigation**: Use `--no-clean` for incremental runs during development
+
+4. **Non-Workspace Path Dependencies** (Issue #303)
+   - Path dependencies may be included in coverage reports
+   - Can inflate or skew coverage percentages
+   - **Impact on debtmap**: None - no path dependencies
+   - **Mitigation**: Use `--ignore-filename-pattern` to exclude unwanted paths
+
+5. **Compiler Version Requirements**
+   - Requires rustc 1.60+ to run
+   - Building cargo-llvm-cov itself requires rustc 1.81+
+   - LLVM version must match rustc's LLVM version
+   - **Impact on debtmap**: None - already using modern Rust
+   - **Mitigation**: CI already pins compatible Rust versions
+
+6. **Platform Support**
+   - Broader platform support than tarpaulin (Linux, macOS, Windows)
+   - tarpaulin only works well on Linux x86-64
+   - **Impact on debtmap**: Positive - better macOS support
+   - **Benefit**: More reliable cross-platform CI coverage
+
 ### Potential Issues and Solutions
 
 1. **Issue**: Different output directory structure
    **Solution**: Update all file path references in justfile and CI
+   ```
+   Old: target/coverage/tarpaulin-report.html
+   New: target/coverage/html/index.html
+   ```
 
 2. **Issue**: JSON output format may differ
    **Solution**: Update `just coverage-check` to parse llvm-cov JSON schema
+   ```bash
+   # May need to adjust jq query for new JSON structure
+   jq '.data[0].totals.lines.percent' coverage.json
+   ```
 
-3. **Issue**: Some developers may have tarpaulin installed
-   **Solution**: Add clear migration notes in commit message and update docs
-
-4. **Issue**: Coverage percentages may differ slightly
+3. **Issue**: Coverage percentages may differ slightly
    **Solution**: Document that ±2% variance is expected due to more accurate instrumentation
+   - llvm-cov has better source mapping accuracy
+   - May expose previously uncounted code paths
+   - May correctly exclude unreachable code
+
+4. **Issue**: First-time setup requires component installation
+   **Solution**: Document installation steps clearly
+   ```bash
+   cargo install cargo-llvm-cov
+   # rustup component add llvm-tools-preview  # Usually automatic
+   ```
+
+5. **Issue**: Some developers may have tarpaulin installed
+   **Solution**: Add clear migration notes in commit message and update docs
+   - Both tools can coexist
+   - Update justfile recipes to use llvm-cov
+   - Document transition in PR description
+
+6. **Issue**: LLVM version mismatch warnings
+   **Solution**: Use rustc-bundled LLVM tools (default behavior)
+   - cargo-llvm-cov automatically finds correct versions
+   - Only matters for custom LLVM installations
+
+7. **Issue**: Incomplete coverage on first run after clean
+   **Solution**: Run coverage twice if needed
+   ```bash
+   cargo llvm-cov clean
+   cargo llvm-cov --no-report  # First pass
+   cargo llvm-cov --no-run --html  # Generate report
+   ```
+
+8. **Issue**: Integration test binaries may need special handling
+   **Solution**: Already handled - cargo-llvm-cov covers all test types by default
+   - Unit tests: Covered automatically
+   - Integration tests: Covered automatically
+   - Doc tests: Use `--doctests` flag if needed (requires nightly)
+
+### Debtmap-Specific Considerations
+
+1. **Single Package Project**
+   - ✅ No workspace complexity
+   - ✅ No path dependency issues
+   - ✅ Straightforward migration
+
+2. **Test Suite Compatibility**
+   - Current: Uses cargo nextest
+   - cargo-llvm-cov: Supports nextest via `cargo llvm-cov nextest`
+   - **Action**: Update justfile to use `cargo llvm-cov nextest` if desired
+
+3. **LCOV Output for Self-Analysis**
+   - Critical requirement: debtmap analyzes its own coverage
+   - cargo-llvm-cov: Full LCOV support with `--lcov` flag
+   - ✅ No compatibility issues
+
+4. **Parallel Execution**
+   - Current: 12 parallel jobs in .tarpaulin.toml
+   - cargo-llvm-cov: Uses cargo's parallel test execution
+   - **Action**: No special configuration needed
+
+5. **CI Artifact Upload**
+   - Current: Uploads target/coverage/
+   - New: Same directory, different internal structure
+   - **Action**: Artifact upload paths remain the same
 
 ### Best Practices
 
@@ -511,6 +653,64 @@ None - this is an internal tooling change that doesn't affect:
 
 Total estimated time: 2-3 days including thorough testing
 
+## Troubleshooting Guide
+
+### Common Issues After Migration
+
+1. **Error: `llvm-tools-preview` component not found**
+   ```bash
+   # Solution: Install the component
+   rustup component add llvm-tools-preview
+   ```
+
+2. **Warning: Coverage data appears incomplete**
+   ```bash
+   # Solution: Clean and regenerate
+   cargo llvm-cov clean
+   cargo llvm-cov --all-features
+   ```
+
+3. **Error: Different coverage percentage than expected**
+   - **Cause**: More accurate instrumentation
+   - **Solution**: Review newly covered/uncovered code
+   - **Note**: ±2% variance is normal and expected
+
+4. **Error: HTML report not found at old path**
+   ```bash
+   # Old path: target/coverage/tarpaulin-report.html
+   # New path: target/coverage/html/index.html
+   # Solution: Update bookmarks and scripts
+   ```
+
+5. **Error: JSON schema different, jq query fails**
+   ```bash
+   # Old tarpaulin query:
+   jq '.files | to_entries | map(.value.coverage) | add / length'
+
+   # New llvm-cov query (may need adjustment):
+   jq '.data[0].totals.lines.percent'
+   ```
+
+6. **Performance: Coverage generation seems slow**
+   ```bash
+   # Solution: Use incremental mode for development
+   cargo llvm-cov --no-clean  # Skip clean step
+
+   # Or integrate with nextest for faster tests
+   cargo llvm-cov nextest
+   ```
+
+7. **CI: Artifact upload fails**
+   - **Cause**: Different directory structure
+   - **Solution**: Update artifact paths in workflow
+   ```yaml
+   # Before
+   path: target/coverage/tarpaulin-report.html
+
+   # After
+   path: target/coverage/
+   ```
+
 ## Success Metrics
 
 - [ ] All coverage workflows continue to function
@@ -520,6 +720,7 @@ Total estimated time: 2-3 days including thorough testing
 - [ ] No developer workflow disruption
 - [ ] Faster or equal coverage generation time
 - [ ] Improved coverage accuracy (if measurable)
+- [ ] macOS CI coverage more reliable than with tarpaulin
 
 ## References
 
