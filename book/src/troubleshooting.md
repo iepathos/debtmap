@@ -808,19 +808,18 @@ debtmap
 
 ### Tiered Prioritization Issues
 
-**Overview**: Debtmap uses a 4-tier system to classify technical debt items by priority:
+**Overview**: Debtmap uses a 4-tier system to classify and **sort** technical debt items by architectural importance. Tiers affect result ordering but do not multiply scores.
 
 **Tier Classification**:
-- **Tier 1 (Critical Architecture)**: High complexity, low coverage, high dependencies, entry points
+- **Tier 1 (Critical Architecture)**: High complexity, low coverage, high dependencies, entry points, or file-level architectural debt
 - **Tier 2 (Complex Untested)**: Significant complexity or coverage gaps
 - **Tier 3 (Testing Gaps)**: Moderate issues that need attention
 - **Tier 4 (Maintenance)**: Low-priority items, routine maintenance
 
-**Tier Weights**:
-- Tier 1: 1.5× multiplier (highest priority)
-- Tier 2: 1.0× multiplier (standard priority)
-- Tier 3: 0.7× multiplier (reduced priority)
-- Tier 4: 0.3× multiplier (lowest priority)
+**Result Ordering**:
+Results are sorted first by tier (T1 > T2 > T3 > T4), then by score within each tier. This ensures architecturally critical items appear at the top regardless of their absolute score.
+
+**Note**: Tier weights (1.5×, 1.0×, 0.7×, 0.3×) exist in the configuration but are currently not applied as score multipliers. Tiers control sort order instead.
 
 **Configuration**:
 ```toml
@@ -868,20 +867,9 @@ Tier 4 items will still appear in detailed output but won't clutter the main sum
 
 ### File-Level Scoring Issues
 
-**Overview**: Debtmap aggregates function/class scores into file-level scores using a multi-factor formula.
+**Overview**: Debtmap aggregates function/class scores into file-level scores using configurable aggregation methods.
 
-**File Score Formula**:
-```
-File Score = size_factor × complexity_factor × coverage_factor ×
-             density_factor × god_object_multiplier × function_scores
-```
-
-**Factors**:
-- **size_factor**: Based on lines of code (larger files = higher factor)
-- **complexity_factor**: Average complexity across functions
-- **coverage_factor**: File-level test coverage (from LCOV file)
-- **density_factor**: Penalizes files with >50 functions (indicates code smell)
-- **god_object_multiplier**: 1.5× for files exceeding god object thresholds
+**Note**: The exact aggregation formula depends on the selected method (see `--aggregation-method` flag). File-level scores combine individual item scores with file-level characteristics.
 
 **Aggregation Methods**:
 ```bash
@@ -1530,15 +1518,25 @@ debtmap validate /path/to/project --max-debt-density 20.0
 
 **Troubleshooting validation failures**:
 ```bash
-# See which files exceed threshold
+# See which files exceed threshold with details
 debtmap validate /path/to/project --max-debt-density 10.0 -v
 
-# Get detailed breakdown
+# Get detailed breakdown of debt density calculations
 debtmap validate /path/to/project --max-debt-density 10.0 -vv
 
-# Analyze specific files that failed
+# Analyze specific files that failed validation
 debtmap /path/to/problematic/file.rs -v
+
+# Understand debt density metric
+# Debt density = (total_debt_score / total_lines_of_code) × 1000
+# Example: 150 debt points across 10,000 LOC = 15.0 debt density
 ```
+
+**Interpreting debt density values**:
+- **< 5.0**: Excellent code quality
+- **5.0 - 10.0**: Good, manageable technical debt
+- **10.0 - 20.0**: Moderate debt, consider cleanup
+- **> 20.0**: High debt, refactoring recommended
 
 ### CI/CD Integration
 
@@ -1647,48 +1645,60 @@ debtmap src/specific/module
 
 **Q: How is the 0-10 priority score calculated?**
 
-A: Debtmap uses a multi-factor unified scoring formula to compute priority scores:
+A: Debtmap uses a multiplicative risk-based scoring formula to compute priority scores:
 
-**Base Score Formula**:
+**Core Formula**:
 ```
-Base Score = (Complexity Factor × 0.40) +
-             (Coverage Factor × 0.40) +
-             (Dependency Factor × 0.20)
-```
-
-**Where**:
-- **Complexity Factor**: Normalized cognitive complexity (0.0-10.0 scale)
-- **Coverage Factor**: `(1 - coverage_percentage) × 2 + 1` (ranges from 1.0-3.0)
-- **Dependency Factor**: Based on incoming/outgoing dependencies and coupling
-
-**Role Multipliers** adjust the base score by function role:
-- **Entry points**: 1.5× (critical path, highest priority)
-- **Business logic**: 1.2× (core functionality)
-- **Data access**: 1.0× (important but stable)
-- **Infrastructure**: 0.8× (lower priority)
-- **Utilities**: 0.5× (minimal priority)
-- **Test code**: 0.1× (lowest priority)
-
-**Final Score**:
-```
-Final Score = Base Score × Role Multiplier
+Final Score = base_risk × debt_factor × complexity_factor ×
+              coverage_penalty × coverage_factor
 ```
 
-This ensures functions are prioritized by true impact, not just raw complexity. Entry points with high complexity and low coverage get the highest scores, while well-tested utility functions get lower scores.
+**Base Risk Calculation**:
+```
+complexity_component = (cyclomatic × 0.3 + cognitive × 0.45) / 50.0
+coverage_component = (100 - coverage_percentage) / 100.0 × 0.5
+base_risk = (complexity_component + coverage_component) × 5.0
+```
+
+**Coverage Penalty** (tiered based on test coverage):
+- **< 20% coverage**: 3.0× penalty (critical)
+- **20-40% coverage**: 2.0× penalty (high risk)
+- **40-60% coverage**: 1.5× penalty (moderate risk)
+- **60-80% coverage**: 1.2× penalty (low risk)
+- **≥ 80% coverage**: 0.8× penalty (well tested - reduction)
+
+**Coverage Factor** (additional reduction for well-tested code):
+- **≥ 90% coverage**: 0.8 (20% score reduction)
+- **70-90% coverage**: 0.9 (10% score reduction)
+- **< 70% coverage**: 1.0 (no reduction)
+
+**Role-Based Adjustments** (Evidence-Based Calculator):
+- **Pure logic**: 1.2× (testable, maintainable code)
+- **Entry points**: 1.1× (public API boundaries)
+- **I/O wrappers**: 0.7× (thin delegation layers)
+
+**Default Weights**:
+- Coverage weight: 0.5
+- Cyclomatic complexity weight: 0.3
+- Cognitive complexity weight: 0.45
+- Debt factor weight: 0.2
 
 **Example**:
-- Function with complexity=20, coverage=0%, dependencies=5, role=entry_point
-- Complexity factor: 8.0 (normalized)
-- Coverage factor: 3.0 (untested)
-- Dependency factor: 2.5 (moderate coupling)
-- Base score: (8.0 × 0.40) + (3.0 × 0.40) + (2.5 × 0.20) = 4.9
-- Final score: 4.9 × 1.5 (entry point) = **7.35**
+- Function: cyclomatic=15, cognitive=20, coverage=10%, role=entry_point
+- Complexity component: (15 × 0.3 + 20 × 0.45) / 50 = 0.27
+- Coverage component: (100 - 10) / 100 × 0.5 = 0.45
+- Base risk: (0.27 + 0.45) × 5.0 = 3.6
+- Coverage penalty: 3.0 (< 20% coverage)
+- Coverage factor: 1.0 (< 70% coverage)
+- Debt factor: ~1.2 (moderate debt patterns)
+- Complexity factor: ~1.3 (pattern-adjusted)
+- Final score: 3.6 × 1.2 × 1.3 × 3.0 × 1.0 × 1.1 (role) ≈ **18.5** (clamped to 10.0 scale)
 
 ```bash
 # See score breakdown with verbosity
 debtmap -v
 
-# See detailed factor calculations
+# See detailed factor calculations including all multipliers
 debtmap -vv
 ```
 
@@ -1696,20 +1706,36 @@ debtmap -vv
 
 **Q: How does coverage affect scores?**
 
-A: Coverage is integrated into the unified scoring system as a factor:
-- **Coverage Factor Formula**: `(1 - coverage_percentage) × 2 + 1`
-- This factor is weighted at 40% in the unified scoring formula
-- **Base Score** = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)
-- **Final Score** = Base Score × Role Multiplier
+A: Coverage affects scores through two multiplicative factors in the risk calculation:
 
-This means untested code (0% coverage) gets the highest coverage factor (3.0), while fully tested code (100% coverage) gets the lowest (1.0), ensuring untested complex code rises to the top.
+**1. Coverage Penalty** (tiered multiplier based on test coverage):
+- **< 20% coverage**: 3.0× penalty (untested code gets highest priority)
+- **20-40% coverage**: 2.0× penalty
+- **40-60% coverage**: 1.5× penalty
+- **60-80% coverage**: 1.2× penalty
+- **≥ 80% coverage**: 0.8× reduction (well-tested code deprioritized)
+
+**2. Coverage Factor** (additional reduction for well-tested code):
+- **≥ 90% coverage**: 0.8 (20% score reduction)
+- **70-90% coverage**: 0.9 (10% score reduction)
+- **< 70% coverage**: 1.0 (no additional reduction)
+
+**3. Base Risk Component** (coverage weight: 0.5):
+- `coverage_component = (100 - coverage_percentage) / 100.0 × 0.5`
+- Integrated into base risk calculation
+
+**Combined Effect**:
+Untested complex code (0% coverage) receives maximum penalties (3.0× coverage penalty), while well-tested code (≥90% coverage) receives both the 0.8× coverage penalty and 0.8× coverage factor, resulting in a 0.64× total reduction. This ensures untested code rises to the top of the priority list.
 
 ```bash
 # Use coverage file
 debtmap --coverage-file coverage.info
 
-# See coverage impact
+# See coverage impact on scoring
 debtmap --coverage-file coverage.info -v
+
+# See detailed coverage penalty and factor breakdown
+debtmap --coverage-file coverage.info -vv
 ```
 
 See the FAQ entry "How is the 0-10 priority score calculated?" for complete scoring formula details.
