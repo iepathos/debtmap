@@ -2,7 +2,20 @@
 
 Debtmap integrates with [Prodigy](https://github.com/iepathos/prodigy) to provide fully automated technical debt reduction through AI-driven workflows. This chapter explains how to set up and use Prodigy workflows to automatically refactor code, add tests, and improve codebase quality.
 
+## Prerequisites Checklist
+
+Before using Prodigy with Debtmap, ensure you have:
+
+- [ ] Rust 1.70 or later installed
+- [ ] Debtmap installed (`cargo install debtmap`)
+- [ ] Prodigy installed (`cargo install --git https://github.com/iepathos/prodigy prodigy`)
+- [ ] Anthropic API key for Claude access
+- [ ] Git (for worktree management)
+- [ ] Optional: `just` command runner, or use direct `cargo` commands as alternatives
+
 ## What is Prodigy?
+
+> **Note**: Prodigy is a separate open-source tool (https://github.com/iepathos/prodigy). You need to install both Debtmap and Prodigy to use this integration.
 
 Prodigy is an AI-powered workflow automation system that uses Claude to execute complex multi-step tasks. When integrated with Debtmap, it can:
 
@@ -49,12 +62,11 @@ All changes happen in **isolated git worktrees**:
 # Install Prodigy from GitHub repository
 cargo install --git https://github.com/iepathos/prodigy prodigy
 
-# Or if available on crates.io:
-cargo install prodigy
-
 # Verify installation
 prodigy --version
 ```
+
+> **Note**: Currently, Prodigy must be installed from GitHub. Check the [Prodigy repository](https://github.com/iepathos/prodigy) for the latest installation instructions.
 
 **Requirements:**
 - Rust 1.70 or later
@@ -92,7 +104,7 @@ Create a workflow file `workflows/debtmap.yml`:
 # Sequential workflow. Fix top technical debt item
 
 # Phase 1: Generate coverage data
-- shell: "just coverage-lcov"
+- shell: "just coverage-lcov"  # or: cargo tarpaulin --out lcov --output-dir target/coverage
 
 # Phase 2: Analyze tech debt and capture baseline
 - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json"
@@ -145,6 +157,8 @@ Create a workflow file `workflows/debtmap.yml`:
     max_attempts: 5
     fail_workflow: true
 ```
+
+> **Note about `just`**: This example uses `just` (a command runner like `make`). If you don't have a `justfile`, replace `just coverage-lcov` with `cargo tarpaulin --out lcov --output-dir target/coverage`, `just test` with `cargo test`, and `just fmt-check && just lint` with `cargo fmt --check && cargo clippy -- -D warnings`.
 
 ### 2. Run Workflow
 
@@ -387,7 +401,7 @@ Use `on_failure` to handle command failures:
 
 ### Coverage Integration
 
-Generate and use coverage data in workflows:
+Generate and use coverage data in workflows. See [Coverage Integration](./coverage-integration.md) for details on generating LCOV files and understanding coverage metrics.
 
 ```yaml
 # Generate coverage
@@ -398,6 +412,8 @@ Generate and use coverage data in workflows:
 ```
 
 ## Claude Slash Commands
+
+> **Important**: The slash commands documented below are custom commands that should be created in your `.claude/commands/` directory. They are not built into Prodigy or Debtmap. You can find example command implementations in the Debtmap repository or create your own based on the parameter descriptions below.
 
 Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:
 
@@ -718,17 +734,17 @@ prodigy run workflows/debtmap-reduce.yml -y
 
 #### MapReduce-Specific Variables
 
-Available in `agent_template` commands:
-
-- `${item}`: The full JSON object for current item
-- `${item_id}`: Unique ID for current item (auto-generated)
-- `${validation.gaps}`: List of validation gaps from failed validation
-- `${validation.attempt_number}`: Current retry attempt number (1, 2, 3, etc.)
-- `${shell.output}`: Output from previous shell command
-- `${map.results}`: All map agent results (available in reduce phase)
-- `${map.successful}`: Count of successful map agents (reduce phase)
-- `${map.failed}`: Count of failed map agents (reduce phase)
-- `${map.total}`: Total number of map agents (reduce phase)
+| Variable | Available In | Type | Description |
+|----------|--------------|------|-------------|
+| `${item}` | map phase | JSON | The full JSON object for current item |
+| `${item_id}` | map phase | string | Unique ID for current item (auto-generated) |
+| `${validation.gaps}` | map phase | array | List of validation gaps from failed validation |
+| `${validation.attempt_number}` | map phase | number | Current retry attempt number (1, 2, 3, etc.) |
+| `${shell.output}` | both phases | string | Output from previous shell command |
+| `${map.results}` | reduce phase | array | All map agent results as JSON |
+| `${map.successful}` | reduce phase | number | Count of successful map agents |
+| `${map.failed}` | reduce phase | number | Count of failed map agents |
+| `${map.total}` | reduce phase | number | Total number of map agents |
 
 ### MapReduce Architecture
 
@@ -1418,7 +1434,8 @@ Then create a workflow using this command for targeted refactoring.
 
 ## See Also
 
-- [Debtmap CLI Reference](./cli-reference.md) - Debtmap command options
-- [Configuration](./configuration.md) - Debtmap configuration
-- [Tiered Prioritization](./tiered-prioritization.md) - Understanding priority tiers
-- [Prodigy Documentation](https://github.com/iepathos/prodigy) - Full Prodigy reference
+- [Debtmap CLI Reference](./cli-reference.md) - All Debtmap command options including `analyze`, `compare`, and `validate`
+- [Coverage Integration](./coverage-integration.md) - Generating and using LCOV coverage data with Debtmap
+- [Configuration](./configuration.md) - Debtmap configuration file options
+- [Tiered Prioritization](./tiered-prioritization.md) - Understanding how Debtmap scores and prioritizes debt items
+- [Prodigy Documentation](https://github.com/iepathos/prodigy) - Full Prodigy reference and advanced features
