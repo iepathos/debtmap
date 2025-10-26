@@ -108,7 +108,7 @@ This configures Rayon to use a specific number of worker threads for all paralle
 The `get_worker_count()` function determines how many threads to use:
 
 ```rust
-// From src/main.rs:660-669
+// From src/main.rs:750-758
 fn get_worker_count(jobs: usize) -> usize {
     if jobs == 0 {
         std::thread::available_parallelism()
