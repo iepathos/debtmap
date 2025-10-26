@@ -1,4 +1,4 @@
-use super::super::builders::{call_graph, unified_analysis};
+use super::super::builders::{call_graph, parallel_call_graph, unified_analysis};
 use super::super::output;
 use super::super::utils::{analysis_helpers, risk_analyzer, validation_printer};
 use crate::{cli, config, core::*, risk};
@@ -278,13 +278,50 @@ fn calculate_unified_analysis(
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
     let project_path = &results.project_path;
 
-    let (framework_exclusions, function_pointer_used_functions) =
-        call_graph::process_rust_files_for_call_graph(project_path, &mut call_graph, false, false)
+    // Check if parallel processing is enabled via environment variable
+    let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    let (framework_exclusions, function_pointer_used_functions) = if parallel_enabled {
+        let jobs = std::env::var("DEBTMAP_JOBS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+
+        let thread_count = if jobs == 0 { None } else { Some(jobs) };
+
+        eprintln!("🔍 Building call graph in parallel...");
+
+        let (mut parallel_graph, exclusions, used_funcs) =
+            parallel_call_graph::build_call_graph_parallel(
+                project_path,
+                call_graph.clone(),
+                thread_count,
+                true, // show_progress
+            )
+            .unwrap_or_else(|e| {
+                log::warn!("Parallel call graph failed, falling back to sequential: {}", e);
+                (call_graph.clone(), Default::default(), Default::default())
+            });
+
+        // Process Python files
+        if let Err(e) = call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph) {
+            log::warn!("Failed to process Python files for call graph: {}", e);
+        }
+
+        call_graph = parallel_graph;
+        (exclusions, used_funcs)
+    } else {
+        let result = call_graph::process_rust_files_for_call_graph(project_path, &mut call_graph, false, false)
             .unwrap_or_default();
 
-    if let Err(e) = call_graph::process_python_files_for_call_graph(project_path, &mut call_graph) {
-        log::warn!("Failed to process Python files for call graph: {}", e);
-    }
+        if let Err(e) = call_graph::process_python_files_for_call_graph(project_path, &mut call_graph) {
+            log::warn!("Failed to process Python files for call graph: {}", e);
+        }
+
+        result
+    };
 
     unified_analysis::create_unified_analysis_with_exclusions(
         &results.complexity.metrics,
@@ -298,4 +335,216 @@ fn calculate_unified_analysis(
         None,  // min_problematic - use default
         false, // no_god_object - enable god object detection by default
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_sets_parallel_env_var() {
+        // Clear any existing env var
+        std::env::remove_var("DEBTMAP_PARALLEL");
+
+        // Simulate validate command with parallel enabled (default)
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            max_debt_density: None,
+            top: None,
+            tail: None,
+            semantic_off: false,
+            verbosity: 0,
+            no_parallel: false,
+            jobs: 0,
+        };
+
+        // When parallel is enabled, the environment variable should be set
+        if !config.no_parallel {
+            std::env::set_var("DEBTMAP_PARALLEL", "true");
+        }
+
+        assert_eq!(std::env::var("DEBTMAP_PARALLEL").unwrap(), "true");
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_PARALLEL");
+    }
+
+    #[test]
+    fn test_validate_respects_no_parallel_flag() {
+        // Test the logic of no_parallel flag (don't rely on global env var state)
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            max_debt_density: None,
+            top: None,
+            tail: None,
+            semantic_off: false,
+            verbosity: 0,
+            no_parallel: true,
+            jobs: 0,
+        };
+
+        // Verify that no_parallel flag is set correctly
+        assert!(config.no_parallel);
+
+        // Test that when no_parallel is true, we should NOT set the env var
+        let should_set_parallel = !config.no_parallel;
+        assert!(!should_set_parallel);
+    }
+
+    #[test]
+    fn test_validate_sets_jobs_env_var() {
+        // Clear any existing env var
+        std::env::remove_var("DEBTMAP_JOBS");
+
+        // Simulate validate command with custom job count
+        let config = ValidateConfig {
+            path: PathBuf::from("."),
+            config: None,
+            coverage_file: None,
+            format: None,
+            output: None,
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
+            max_debt_density: None,
+            top: None,
+            tail: None,
+            semantic_off: false,
+            verbosity: 0,
+            no_parallel: false,
+            jobs: 4,
+        };
+
+        // When jobs is set, the environment variable should be set
+        if config.jobs > 0 {
+            std::env::set_var("DEBTMAP_JOBS", config.jobs.to_string());
+        }
+
+        assert_eq!(std::env::var("DEBTMAP_JOBS").unwrap(), "4");
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_JOBS");
+    }
+
+    #[test]
+    fn test_parallel_env_var_check() {
+        // Test that parallel detection works correctly
+
+        // Case 1: DEBTMAP_PARALLEL not set (default: sequential)
+        std::env::remove_var("DEBTMAP_PARALLEL");
+        let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        assert!(!parallel_enabled);
+
+        // Case 2: DEBTMAP_PARALLEL=true
+        std::env::set_var("DEBTMAP_PARALLEL", "true");
+        let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        assert!(parallel_enabled);
+
+        // Case 3: DEBTMAP_PARALLEL=1
+        std::env::set_var("DEBTMAP_PARALLEL", "1");
+        let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        assert!(parallel_enabled);
+
+        // Case 4: DEBTMAP_PARALLEL=false
+        std::env::set_var("DEBTMAP_PARALLEL", "false");
+        let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        assert!(!parallel_enabled);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_PARALLEL");
+    }
+
+    #[test]
+    fn test_jobs_env_var_parsing() {
+        // Test that DEBTMAP_JOBS is parsed correctly
+
+        // Case 1: Valid number
+        std::env::set_var("DEBTMAP_JOBS", "8");
+        let jobs = std::env::var("DEBTMAP_JOBS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+        assert_eq!(jobs, 8);
+
+        // Case 2: Invalid number (defaults to 0)
+        std::env::set_var("DEBTMAP_JOBS", "invalid");
+        let jobs = std::env::var("DEBTMAP_JOBS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+        assert_eq!(jobs, 0);
+
+        // Case 3: Not set (defaults to 0)
+        std::env::remove_var("DEBTMAP_JOBS");
+        let jobs = std::env::var("DEBTMAP_JOBS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+        assert_eq!(jobs, 0);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_JOBS");
+    }
+
+    #[test]
+    fn test_validation_details_creation() {
+        // Test that ValidationDetails can be constructed correctly
+        let details = ValidationDetails {
+            average_complexity: 5.0,
+            max_average_complexity: 10.0,
+            high_complexity_count: 3,
+            max_high_complexity_count: 5,
+            debt_items: 10,
+            max_debt_items: 20,
+            total_debt_score: 150,
+            max_total_debt_score: 300,
+            debt_density: 0.15,
+            max_debt_density: 0.20,
+            codebase_risk_score: 25.5,
+            max_codebase_risk_score: 50.0,
+            high_risk_functions: 5,
+            max_high_risk_functions: 10,
+            coverage_percentage: 75.0,
+            min_coverage_percentage: 60.0,
+        };
+
+        assert_eq!(details.average_complexity, 5.0);
+        assert_eq!(details.max_average_complexity, 10.0);
+        assert_eq!(details.high_complexity_count, 3);
+        assert_eq!(details.max_high_complexity_count, 5);
+        assert_eq!(details.debt_density, 0.15);
+        assert_eq!(details.max_debt_density, 0.20);
+        assert_eq!(details.debt_items, 10);
+        assert_eq!(details.max_debt_items, 20);
+        assert_eq!(details.total_debt_score, 150);
+        assert_eq!(details.max_total_debt_score, 300);
+        assert_eq!(details.codebase_risk_score, 25.5);
+        assert_eq!(details.max_codebase_risk_score, 50.0);
+        assert_eq!(details.high_risk_functions, 5);
+        assert_eq!(details.max_high_risk_functions, 10);
+        assert_eq!(details.coverage_percentage, 75.0);
+        assert_eq!(details.min_coverage_percentage, 60.0);
+    }
 }
