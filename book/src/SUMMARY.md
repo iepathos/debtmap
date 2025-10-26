@@ -9,6 +9,7 @@
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide.md)
 - [Configuration](configuration.md)
+- [Threshold Configuration](threshold-configuration.md)
 - [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
 
