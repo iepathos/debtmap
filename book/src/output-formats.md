@@ -138,17 +138,16 @@ See the [Analysis Guide](./analysis-guide.md) for metric explanations.
 For environments without color support or when piping to tools, use `--plain`:
 
 ```bash
-# ASCII-only output, no colors, no emoji
+# ASCII-only output, no colors
 debtmap analyze . --plain
 ```
 
 Plain mode:
 - Removes ANSI color codes
-- Replaces emoji with text labels
 - Uses ASCII box-drawing characters
 - Machine-parseable structure
 
-> **Note:** Terminal output formatting can be customized via `FormattingConfig`, which controls color mode and emoji mode. The `--plain` flag uses this configuration to disable both colors and emoji. Additionally, you can control formatting through environment variables:
+> **Note:** Terminal output formatting can be customized via `FormattingConfig`, which controls color mode. The `--plain` flag uses this configuration to disable colors. Additionally, you can control formatting through environment variables:
 > - `NO_COLOR=1` - Disables colors (per [no-color.org](https://no-color.org) standard)
 > - `CLICOLOR=0` - Disables colors
 > - `CLICOLOR_FORCE=1` - Forces colors even when output is not a terminal
@@ -216,6 +215,33 @@ Total debt score: 156 (threshold: 100)
     Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
     Cache hit rate: 84%
 ```
+
+### Understanding Metrics
+
+To get detailed explanations of how metrics are calculated, use the `--explain-metrics` flag:
+
+```bash
+# Get explanations of metric definitions and formulas
+debtmap analyze . --explain-metrics
+```
+
+This flag provides:
+- **Metric definitions** - Detailed explanations of what each metric measures
+- **Calculation formulas** - How scores are computed from raw data
+- **Measured vs estimated** - Which metrics are exact and which are heuristic-based
+- **Interpretation guidance** - How to understand and act on metric values
+
+The explanations appear inline with the analysis output, helping you understand:
+- What cyclomatic and cognitive complexity measure
+- How debt scores are calculated
+- What entropy metrics indicate
+- How risk scores are determined
+
+This is particularly useful when:
+- Learning how debtmap evaluates code quality
+- Understanding why certain functions have high scores
+- Explaining analysis results to team members
+- Tuning thresholds based on metric meanings
 
 ### Risk Analysis Output
 
@@ -483,9 +509,85 @@ debtmap analyze . --format json --output-format unified
 
 > **Note:** The `--output-format` flag only applies when using `--format json`. It has no effect with markdown or terminal formats.
 
+#### Format Comparison
+
 **Legacy format:** Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tooling.
 
 **Unified format:** Consistent structure with a `type` field, making parsing simpler and more predictable. Recommended for new integrations.
+
+**When to use each format:**
+
+- **Use legacy format if:**
+  - You have existing tooling that expects the old structure
+  - You need backward compatibility with version 1.x parsers
+  - You're integrating with third-party tools expecting the legacy format
+
+- **Use unified format for:**
+  - All new integrations and tooling
+  - Cleaner, more predictable JSON parsing
+  - Future-proof implementations
+  - Simpler type discrimination in statically-typed languages
+
+**Migration strategy:**
+
+The legacy format will be maintained for backward compatibility, but unified is the recommended format going forward. If you're starting a new integration, use unified format from the beginning. If migrating existing tooling:
+
+1. Test unified format with a subset of your codebase
+2. Update parsers to handle the `type` field instead of key-based discrimination
+3. Validate results match between legacy and unified formats
+4. Switch to unified format once validation passes
+
+#### Structural Differences
+
+**Legacy format example:**
+```json
+{
+  "complexity": {
+    "metrics": [
+      {
+        "File": {
+          "path": "src/main.rs",
+          "functions": 12,
+          "average_complexity": 5.3
+        }
+      },
+      {
+        "Function": {
+          "name": "calculate_score",
+          "file": "src/scoring.rs",
+          "line": 42,
+          "cyclomatic": 8
+        }
+      }
+    ]
+  }
+}
+```
+
+**Unified format example:**
+```json
+{
+  "complexity": {
+    "metrics": [
+      {
+        "type": "File",
+        "path": "src/main.rs",
+        "functions": 12,
+        "average_complexity": 5.3
+      },
+      {
+        "type": "Function",
+        "name": "calculate_score",
+        "file": "src/scoring.rs",
+        "line": 42,
+        "cyclomatic": 8
+      }
+    ]
+  }
+}
+```
+
+**Key difference:** Legacy uses `{File: {...}}` wrapper objects, while unified uses a flat structure with `"type": "File"` field. This makes unified format easier to parse in most programming languages.
 
 ### Risk Insights JSON
 
@@ -639,16 +741,22 @@ Markdown output includes:
 
 ### Enhanced Markdown Features
 
-Debtmap can generate enhanced markdown reports with additional visualizations and insights:
+The standard markdown output already includes comprehensive analysis sections. The codebase includes additional enhanced markdown capabilities (`EnhancedMarkdownWriter` trait in `src/io/writers/markdown/enhanced.rs`) that provide:
 
-- **Complexity distribution charts** - Visual representation of complexity across codebase
-- **Risk heat maps** - Color-coded risk matrices
-- **Dependency graphs** - Module relationship diagrams
-- **Quick wins section** - Low-effort, high-impact improvements
-- **Strategic priorities** - Long-term architectural improvements
-- **Team guidance** - Role-specific recommendations
+- **Priority-based debt rankings** - Debt items ranked by unified priority scores
+- **Dead code detection** - Identification and reporting of unused code
+- **Call graph insights** - Function dependency and usage analysis
+- **Testing recommendations** - Targeted suggestions for improving test coverage
 
-> **Note:** Enhanced markdown features are implemented in the codebase (`src/io/writers/enhanced_markdown/` module) but the specific flags or configuration options to enable them are not currently documented. Refer to the source code or use `--help` to discover available options.
+These enhanced features are available through the `EnhancedMarkdownWriter` trait when using debtmap as a library. The standard `--format markdown` CLI output uses the base `MarkdownWriter` which provides comprehensive reports including:
+
+- Executive summary with health dashboard
+- Complexity analysis with refactoring recommendations
+- Technical debt categorization by priority
+- Dependency analysis with circular reference detection
+- Actionable recommendations
+
+For additional visualization capabilities, the `src/io/writers/enhanced_markdown/` module provides building blocks for custom report generation when using debtmap as a library in your own tools.
 
 ### Rendering to HTML/PDF
 
