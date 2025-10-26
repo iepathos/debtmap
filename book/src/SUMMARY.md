@@ -20,6 +20,7 @@
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
 - [Entropy Analysis](entropy-analysis.md)
+- [Error Handling Analysis](error-handling-analysis.md)
 - [God Object Detection](god-object-detection.md)
 - [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
