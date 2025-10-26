@@ -1,6 +1,8 @@
 use super::super::builders::unified_analysis;
+use super::super::commands::analyze;
 use super::super::output;
-use super::super::utils::{analysis_helpers, risk_analyzer, validation_printer};
+use super::super::utils::{risk_analyzer, validation_printer};
+use crate::formatting::FormattingConfig;
 use crate::{cli, config, core::*, risk};
 use anyhow::Result;
 use std::path::PathBuf;
@@ -68,11 +70,13 @@ pub fn validate_project(config: ValidateConfig) -> Result<()> {
         std::env::set_var("DEBTMAP_JOBS", jobs.to_string());
     }
 
-    let results = analysis_helpers::analyze_project(
+    let results = analyze::analyze_project(
         config.path.clone(),
         vec![Language::Rust, Language::Python],
         complexity_threshold,
         duplication_threshold,
+        parallel_enabled,
+        FormattingConfig::default(),
     )?;
 
     let risk_insights = get_risk_insights(&config, &results)?;
@@ -204,7 +208,8 @@ fn validate_with_risk(
         .filter(|f| f.risk_score > risk_threshold)
         .count();
 
-    let unified = calculate_unified_analysis(results, lcov_data, config.verbosity);
+    let unified =
+        calculate_unified_analysis(results, config.coverage_file.as_ref(), config.verbosity);
     let total_debt_score = unified.total_debt_score as u32;
     let debt_density = unified.debt_density;
 
@@ -287,7 +292,8 @@ fn validate_with_risk(
 
 fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, ValidationDetails) {
     let thresholds = config::get_validation_thresholds();
-    let unified = calculate_unified_analysis(results, None, config.verbosity);
+    let unified =
+        calculate_unified_analysis(results, config.coverage_file.as_ref(), config.verbosity);
     let total_debt_score = unified.total_debt_score as u32;
     let debt_density = unified.debt_density;
 
@@ -349,7 +355,7 @@ fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, 
 /// Calculate unified analysis using the shared pipeline (spec 130)
 fn calculate_unified_analysis(
     results: &AnalysisResults,
-    _lcov_data: Option<&risk::lcov::LcovData>,
+    coverage_file: Option<&std::path::PathBuf>,
     verbosity: u8,
 ) -> crate::priority::UnifiedAnalysis {
     // Check if parallel processing is enabled via environment variable
@@ -361,12 +367,6 @@ fn calculate_unified_analysis(
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(0);
-
-    // Coverage file path is needed for unified analysis
-    // If lcov_data is provided, we assume it was loaded from a file
-    // For validate, we typically don't have the original file path accessible here
-    // So we pass None, which means coverage data will be passed directly via results
-    let coverage_file = None;
 
     // Use the shared unified analysis pipeline (spec 130)
     let unified = unified_analysis::perform_unified_analysis_with_options(

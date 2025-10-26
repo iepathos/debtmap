@@ -234,7 +234,7 @@ fn set_threshold_preset(preset: Option<cli::ThresholdPreset>) {
     }
 }
 
-fn analyze_project(
+pub fn analyze_project(
     path: PathBuf,
     languages: Vec<Language>,
     complexity_threshold: u32,
