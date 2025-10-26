@@ -1,383 +1,668 @@
 # Architectural Analysis
 
-Debtmap provides comprehensive architectural analysis including circular dependency detection, coupling metrics, stability analysis, and code duplication detection. This helps identify structural issues that impact maintainability and testability.
+Debtmap provides comprehensive architectural analysis capabilities based on Robert C. Martin's software engineering principles. These tools help identify structural issues, coupling problems, and architectural anti-patterns in your codebase.
 
 ## Overview
 
-Architectural analysis identifies:
-- Circular dependencies between modules
-- Coupling issues (afferent and efferent coupling)
-- Bidirectional dependencies
-- Violations of stable dependencies principle
-- Zone of pain and zone of uselessness
-- Code duplication
+Architectural analysis examines module-level relationships and dependencies to identify:
+
+- **Circular Dependencies** - Modules that create dependency cycles
+- **Coupling Metrics** - Afferent and efferent coupling measurements
+- **Bidirectional Dependencies** - Inappropriate intimacy between modules
+- **Stable Dependencies Principle Violations** - Unstable modules being depended upon
+- **Zone of Pain** - Rigid, concrete implementations heavily depended upon
+- **Zone of Uselessness** - Overly abstract, unstable modules
+- **Code Duplication** - Identical or similar code blocks across files
+
+These analyses help you maintain clean architecture and identify refactoring opportunities.
 
 ## Circular Dependency Detection
 
-Circular dependencies create tight coupling and make code harder to test and maintain.
+Circular dependencies occur when modules form a dependency cycle (A depends on B, B depends on C, C depends on A). These violations break architectural boundaries and make code harder to understand, test, and maintain.
 
-### Detection Method
+### How It Works
 
-Uses depth-first search (DFS) cycle detection in the module dependency graph.
+Debtmap builds a **dependency graph** from module imports and uses **depth-first search (DFS)** with recursion stack tracking to detect cycles:
+
+1. Parse all files to extract import/module dependencies
+2. Build a directed graph where nodes are modules and edges are dependencies
+3. Run DFS from each unvisited module
+4. Track visited nodes and recursion stack
+5. When a node is reached that's already in the recursion stack, a cycle is detected
+
+**Implementation:** `src/debt/circular.rs:44-66` (detect_circular_dependencies)
+
+### Example
 
 ```rust
-// Example circular dependency
-// file_a.rs
-use crate::file_b::FunctionB;
+// Module A (src/auth.rs)
+use crate::user::User;
+use crate::session::validate_session;
 
-pub fn function_a() {
-    function_b();
-}
+// Module B (src/user.rs)
+use crate::session::Session;
 
-// file_b.rs
-use crate::file_a::FunctionA;  // Circular!
-
-pub fn function_b() {
-    function_a();
-}
+// Module C (src/session.rs)
+use crate::auth::authenticate; // Creates cycle: auth → session → auth
 ```
 
-### Severity
+**Debtmap detects:**
+```
+Circular dependency detected: auth → session → auth
+```
 
-**High** - Circular dependencies indicate architectural problems
+### Refactoring Recommendations
 
-### Recommendations
+To break circular dependencies:
 
-1. **Introduce mediator module**: Extract shared logic to new module
-2. **Use dependency injection**: Pass dependencies as parameters
-3. **Refactor boundaries**: Separate concerns into distinct layers
-4. **Break cycles**: Move one module's dependency to interface
+1. **Extract Interface** - Create a trait that both modules depend on
+2. **Dependency Inversion** - Introduce an abstraction layer
+3. **Move Shared Code** - Extract common functionality to a new module
+4. **Remove Dependency** - Inline or duplicate small amounts of code
 
 ## Coupling Metrics
 
+Coupling metrics measure how interconnected modules are. Debtmap calculates two primary metrics:
+
 ### Afferent Coupling (Ca)
 
-**Definition:** Number of modules that depend on this module (incoming dependencies)
+**Afferent coupling** is the number of modules that depend on this module. High afferent coupling means many modules rely on this code.
 
-**High afferent coupling** (>5 dependent modules):
-- **Severity:** Medium
-- **Implication:** Module is widely used, changes have broad impact
-- **Recommendation:** Simplify public API, ensure stability
+```rust
+pub struct CouplingMetrics {
+    pub module: String,
+    pub afferent_coupling: usize, // Number depending on this module
+    pub efferent_coupling: usize, // Number this module depends on
+    pub instability: f64,         // Calculated from Ca and Ce
+    pub abstractness: f64,        // Ratio of abstract types
+}
+```
+
+**Implementation:** `src/debt/coupling.rs:6-30`
 
 ### Efferent Coupling (Ce)
 
-**Definition:** Number of modules this module depends on (outgoing dependencies)
+**Efferent coupling** is the number of modules this module depends on. High efferent coupling means this module has many dependencies.
 
-**High efferent coupling** (>5 dependencies):
-- **Severity:** Medium
-- **Implication:** Module has many external dependencies
-- **Recommendation:** Reduce external dependencies, split responsibilities
-
-### Coupling Formulas
+### Example Coupling Analysis
 
 ```
-Afferent Coupling (Ca) = Number of modules depending on this module
-Efferent Coupling (Ce) = Number of modules this module depends on
-Instability (I) = Ce / (Ca + Ce)
+Module: api_handler
+  Afferent coupling (Ca): 8  // 8 modules depend on api_handler
+  Efferent coupling (Ce): 3  // api_handler depends on 3 modules
+  Instability: 0.27          // Relatively stable
 ```
 
-**Instability ranges:**
-- **I = 0**: Maximally stable (only depended upon)
-- **I = 1**: Maximally unstable (only depends on others)
-- **I = 0.5**: Balanced
+High afferent or efferent coupling (typically >5) indicates potential maintainability issues.
 
-## Bidirectional Dependencies
+## Instability Metric
 
-### Detection
+The **instability metric** measures how resistant a module is to change. It's calculated as:
 
-A depends on B **AND** B depends on A
+```
+I = Ce / (Ca + Ce)
+```
+
+**Interpretation:**
+- **I = 0.0** - Maximally stable (no dependencies, many dependents)
+- **I = 1.0** - Maximally unstable (many dependencies, no dependents)
+
+**Implementation:** `src/debt/coupling.rs:16-24` (calculate_instability)
+
+### Stability Guidelines
+
+- **Stable modules (I < 0.3)** - Hard to change but depended upon; should contain stable abstractions
+- **Balanced modules (0.3 ≤ I ≤ 0.7)** - Normal modules with both dependencies and dependents
+- **Unstable modules (I > 0.7)** - Change frequently; should have few or no dependents
+
+### Example
 
 ```rust
-// Module A
-use crate::b::TypeB;
+// Stable module (I = 0.1)
+// core/types.rs - defines fundamental types, depended on by 20 modules
+pub struct User { ... }
+pub struct Session { ... }
 
-pub struct TypeA {
-    b: TypeB,  // A depends on B
-}
-
-// Module B
-use crate::a::TypeA;
-
-pub struct TypeB {
-    a: TypeA,  // B depends on A - Bidirectional!
-}
+// Unstable module (I = 0.9)
+// handlers/admin_dashboard.rs - depends on 10 modules, no dependents
+use crate::auth::*;
+use crate::database::*;
+use crate::templates::*;
+// ... 7 more imports
 ```
-
-### Severity
-
-**High** - Creates tight coupling and circular logic
-
-### Recommendations
-
-1. **Create mediator module**: Extract shared logic to separate module both can depend on
-2. **Use events/callbacks**: Break direct coupling with event system
-3. **Dependency inversion**: Introduce trait/interface both implement
 
 ## Stable Dependencies Principle
 
-### Principle
+The **Stable Dependencies Principle (SDP)** states: *Depend in the direction of stability*. Modules should depend on modules that are more stable than themselves.
 
-Modules should depend in the direction of stability. Unstable modules should not depend on stable modules.
+### SDP Violations
 
-### Violation Detection
+Debtmap flags violations when a module has:
+- **Instability > 0.8** (very unstable)
+- **Afferent coupling > 2** (multiple modules depend on it)
 
-**Formula:** Instability = Efferent / (Afferent + Efferent)
+This means an unstable, frequently changing module is being depended upon by multiple other modules - a recipe for maintenance problems.
 
-**Violation:** Instability >0.8 AND >2 dependents
+**Implementation:** `src/debt/coupling.rs:69-76`
 
-### Severity
+### Example Violation
 
-**Medium** - Indicates architectural instability
+```
+Module 'temp_utils' violates Stable Dependencies Principle
+(instability: 0.85, depended on by 5 modules)
 
-### Recommendations
+Problem: This module changes frequently but is heavily depended upon.
+Solution: Extract stable interface or reduce dependencies on this module.
+```
 
-1. **Increase abstractness**: Introduce traits/interfaces
-2. **Reduce dependencies**: Remove unnecessary external dependencies
-3. **Split module**: Separate stable core from unstable features
+### Fixing SDP Violations
 
-## Zone of Pain
+1. **Increase stability** - Reduce the module's dependencies
+2. **Reduce afferent coupling** - Extract interface, use dependency injection
+3. **Split module** - Separate stable and unstable parts
 
-### Detection Criteria
+## Bidirectional Dependencies
 
-- Low abstractness (<0.2)
-- Low instability (<0.2)
-- More than 3 dependents
+Bidirectional dependencies (also called **inappropriate intimacy**) occur when two modules depend on each other:
 
-### Implications
+```
+Module A depends on Module B
+Module B depends on Module A
+```
 
-**Highly concrete and stable code with many dependents = painful to change**
+This creates tight coupling and makes both modules harder to change, test, or reuse independently.
 
-### Severity
-
-**Medium** - Changes require extensive testing and coordination
-
-### Recommendations
-
-1. **Introduce abstractions**: Create interfaces/traits
-2. **Separate concerns**: Extract configuration from logic
-3. **Create facades**: Simplify complex stable interfaces
+**Implementation:** `src/debt/coupling.rs:98-117` (detect_inappropriate_intimacy)
 
 ### Example
 
 ```rust
-// God object in zone of pain
-pub struct ConfigManager {
-    // Concrete implementation with many fields
-    database_config: DbConfig,
-    api_config: ApiConfig,
-    cache_config: CacheConfig,
-    // ... many more
+// order.rs
+use crate::customer::Customer;
 
-    // Many concrete methods
-    pub fn load_database_config() { }
-    pub fn save_database_config() { }
-    // ... many more
+pub struct Order {
+    customer: Customer,
 }
 
-// Better: Extract interfaces
-pub trait ConfigProvider {
-    fn get(&self, key: &str) -> Option<Value>;
-}
+// customer.rs
+use crate::order::Order; // Bidirectional dependency!
 
-pub struct FileConfigProvider { }
-pub struct EnvConfigProvider { }
+pub struct Customer {
+    orders: Vec<Order>,
+}
 ```
 
-## Zone of Uselessness
+**Debtmap detects:**
+```
+Inappropriate intimacy detected between 'order' and 'customer'
+```
 
-### Detection Criteria
+### Refactoring Recommendations
 
-- High abstractness (>0.8)
-- High instability (>0.8)
+1. **Create Mediator** - Introduce a third module to manage the relationship
+2. **Break into Separate Modules** - Split concerns more clearly
+3. **Use Events** - Replace direct dependencies with event-driven communication
+4. **Dependency Inversion** - Introduce interfaces/traits both depend on
 
-### Implications
+## Zone of Pain Detection
 
-**Highly abstract and unstable = overly complex abstractions with no dependents**
+The **zone of pain** contains modules with:
+- **Low abstractness (< 0.2)** - Concrete implementations, no abstractions
+- **Low instability (< 0.2)** - Stable, hard to change
+- **High afferent coupling (> 3)** - Many modules depend on them
 
-### Severity
+These modules are rigid concrete implementations that are heavily used but hard to change - causing pain when modifications are needed.
 
-**Low** - Unnecessary complexity
+**Implementation:** `src/debt/coupling.rs:125-138`
 
-### Recommendations
+### Example
 
-1. **Simplify abstractions**: Remove unused trait methods
-2. **Consolidate modules**: Merge related abstractions
-3. **Remove if unused**: Delete dead abstraction code
+```
+Module 'database_client' is in the zone of pain (rigid and hard to change)
+  Abstractness: 0.1  (all concrete implementation)
+  Instability: 0.15  (very stable, many dependents)
+  Afferent coupling: 12 (12 modules depend on it)
+
+Problem: This concrete database client is used everywhere.
+Any change to its implementation requires updating many modules.
+```
+
+### Refactoring Recommendations
+
+1. **Extract Interfaces** - Create a `DatabaseClient` trait
+2. **Introduce Abstractions** - Define abstract operations others depend on
+3. **Break into Smaller Modules** - Separate concerns to reduce coupling
+4. **Use Dependency Injection** - Pass implementations via interfaces
+
+## Zone of Uselessness Detection
+
+The **zone of uselessness** contains modules with:
+- **High abstractness (> 0.8)** - Mostly abstract, few concrete implementations
+- **High instability (> 0.8)** - Frequently changing
+
+These modules are overly abstract and unstable, providing little stable value to the system.
+
+**Implementation:** `src/debt/coupling.rs:141-153`
+
+### Example
+
+```
+Module 'base_processor' is in the zone of uselessness
+(too abstract and unstable)
+  Abstractness: 0.9  (mostly traits and interfaces)
+  Instability: 0.85  (changes frequently)
+
+Problem: This module defines many abstractions but provides little
+concrete value. It changes often, breaking implementations.
+```
+
+### Refactoring Recommendations
+
+1. **Add Concrete Implementations** - Make the module useful by implementing functionality
+2. **Remove if Unused** - Delete if no real value is provided
+3. **Stabilize Interfaces** - Stop changing abstractions frequently
+4. **Merge with Implementations** - Combine abstract and concrete code
+
+## Distance from Main Sequence
+
+The **main sequence** represents the ideal balance between abstractness and instability. Modules should lie on the line:
+
+```
+A + I = 1
+```
+
+Where:
+- **A** = Abstractness (ratio of abstract types to total types)
+- **I** = Instability (Ce / (Ca + Ce))
+
+**Distance** from the main sequence:
+
+```
+D = |A + I - 1|
+```
+
+**Implementation:** `src/debt/coupling.rs:119-123`
+
+### Interpretation
+
+- **D ≈ 0.0** - Module is on the main sequence (ideal)
+- **D > 0.5** - Module is far from ideal
+  - High D with low A and I → Zone of Pain
+  - High D with high A and I → Zone of Uselessness
+
+### Visual Representation
+
+```
+Abstractness
+    1.0 ┤        Zone of Uselessness
+        │      ╱
+        │    ╱
+    0.5 ┤  ╱ Main Sequence
+        │╱
+        ╱
+    0.0 ┤──────────────────────────
+        0.0    0.5              1.0
+                 Instability
+
+        Zone of Pain
+```
 
 ## Code Duplication Detection
 
-### Detection Method
+Debtmap detects code duplication using **hash-based chunk comparison**:
 
-Uses SHA256 hash matching of normalized code blocks:
-1. Normalize whitespace and comments
-2. Hash code blocks (5-10 lines minimum)
-3. Find matching hashes
+1. **Extract chunks** - Split files into fixed-size chunks (default: 50 lines)
+2. **Normalize** - Remove whitespace and comments
+3. **Calculate hash** - Compute SHA-256 hash for each normalized chunk
+4. **Match duplicates** - Find chunks with identical hashes
+5. **Merge adjacent** - Consolidate consecutive duplicate blocks
 
-### Configuration
+**Implementation:** `src/debt/duplication.rs:6-44` (detect_duplication)
 
-```toml
-[duplication]
-minimum_chunk_size = 5  # Minimum lines to consider
-ignore_comments = true
-ignore_whitespace = true
-```
-
-### Severity
-
-**Medium** - Duplicated code increases maintenance burden
-
-### Recommendations
-
-1. **Extract to shared function**: Create reusable function
-2. **Introduce abstraction**: Use traits for similar patterns
-3. **Use macros**: For Rust-specific repetition
-4. **Template/generic functions**: Parameterize duplicated logic
-
-### Example
+### Algorithm Details
 
 ```rust
-// Detected duplication
-fn process_user_data(data: &str) -> Result<User> {
-    let trimmed = data.trim();
-    let parsed = serde_json::from_str(trimmed)?;
-    validate_user(&parsed)?;
-    Ok(parsed)
-}
-
-fn process_product_data(data: &str) -> Result<Product> {
-    let trimmed = data.trim();
-    let parsed = serde_json::from_str(trimmed)?;
-    validate_product(&parsed)?;
-    Ok(parsed)
-}
-
-// Better: Extract common logic
-fn parse_and_validate<T: DeserializeOwned + Validate>(
-    data: &str
-) -> Result<T> {
-    let trimmed = data.trim();
-    let parsed = serde_json::from_str(trimmed)?;
-    parsed.validate()?;
-    Ok(parsed)
-}
+pub fn detect_duplication(
+    files: Vec<(PathBuf, String)>,
+    min_lines: usize,           // Default: 50
+    _similarity_threshold: f64, // Currently unused (exact matching)
+) -> Vec<DuplicationBlock>
 ```
+
+The algorithm:
+1. Extracts overlapping chunks from each file
+2. Normalizes by trimming whitespace and removing comments
+3. Calculates SHA-256 hash for each normalized chunk
+4. Groups chunks by hash
+5. Returns groups with 2+ locations (duplicates found)
+
+### Example Output
+
+```
+Code duplication detected:
+  Hash: a3f2b9c1...
+  Lines: 50
+  Locations:
+    - src/handlers/user.rs:120-169
+    - src/handlers/admin.rs:85-134
+    - src/handlers/guest.rs:200-249
+
+Recommendation: Extract common validation logic to shared module
+```
+
+## Duplication Configuration
+
+Configure duplication detection in `.debtmap.toml`:
+
+```toml
+# Minimum lines for duplication detection
+threshold_duplication = 50  # Default value
+
+# Smaller values catch more duplications but increase noise
+# threshold_duplication = 30  # More sensitive
+
+# Larger values only catch major duplications
+# threshold_duplication = 100  # Less noise
+```
+
+**Configuration reference:** `features.json:21` (threshold_duplication)
+
+**Implementation:** `src/debt/duplication.rs:6-10`
+
+### Current Limitations
+
+- **Exact matching only** - Currently uses hash-based exact matching
+- **similarity_threshold parameter** - Defined but not implemented yet
+- **Future enhancement** - Fuzzy matching for near-duplicates
+
+## Refactoring Recommendations
+
+Debtmap provides specific refactoring recommendations for each architectural issue:
+
+### For Circular Dependencies
+
+1. **Extract Interface** - Create shared abstraction both modules use
+2. **Dependency Inversion** - Introduce interfaces to reverse dependency direction
+3. **Move Shared Code** - Extract to new module both can depend on
+4. **Event-Driven** - Replace direct calls with event publishing/subscribing
+
+### For High Coupling
+
+1. **Facade Pattern** - Provide simplified interface hiding complex dependencies
+2. **Reduce Dependencies** - Remove unnecessary imports and calls
+3. **Dependency Injection** - Pass dependencies via constructors/parameters
+4. **Interface Segregation** - Split large interfaces into focused ones
+
+### For Zone of Pain
+
+1. **Introduce Abstractions** - Extract traits/interfaces for flexibility
+2. **Adapter Pattern** - Wrap concrete implementations with adapters
+3. **Strategy Pattern** - Make algorithms pluggable via interfaces
+
+### For Zone of Uselessness
+
+1. **Add Concrete Implementations** - Provide useful functionality
+2. **Remove Unused Code** - Delete if providing no value
+3. **Stabilize Interfaces** - Stop changing abstractions frequently
+
+### For Bidirectional Dependencies
+
+1. **Create Mediator** - Third module manages relationship
+2. **Break into Separate Modules** - Clearer separation of concerns
+3. **Observer Pattern** - One-way communication via observers
+
+### For Code Duplication
+
+1. **Extract Common Code** - Create shared function/module
+2. **Use Inheritance/Composition** - Share via traits or composition
+3. **Parameterize Differences** - Extract variable parts as parameters
+4. **Template Method** - Define algorithm structure, vary specific steps
+
+## Examples and Use Cases
+
+### Running Architectural Analysis
+
+```bash
+# Full analysis with all architectural checks
+debtmap analyze --include-architecture
+
+# Focus on circular dependencies
+debtmap analyze --check circular-deps
+
+# Coupling analysis with custom threshold
+debtmap analyze --coupling-threshold 5
+
+# Duplication detection with custom chunk size
+debtmap analyze --duplication-min-lines 30
+```
+
+### Example: Circular Dependency
+
+**Before:**
+```
+src/auth.rs → src/session.rs → src/user.rs → src/auth.rs
+
+Circular dependency detected: auth → session → user → auth
+```
+
+**After refactoring:**
+```
+src/auth.rs → src/auth_interface.rs ← src/session.rs
+                      ↑
+              src/user.rs
+
+No circular dependencies found.
+```
+
+### Example: Coupling Metrics Table
+
+```
+Module Analysis Results:
+
+Module              Ca    Ce    Instability  Issues
+-------------------------------------------------
+core/types          15     0       0.00      None
+api/handlers         2     8       0.80      High Ce
+database/client      8     2       0.20      None
+utils/temp          5    12       0.71      SDP violation
+auth/session        3     3       0.50      None
+```
+
+### Example: Zone of Pain
+
+**Module:** `legacy_db_client`
+
+```
+Metrics:
+  Abstractness: 0.05 (all concrete code)
+  Instability: 0.12 (depended on by 25 modules)
+  Afferent coupling: 25
+  Distance from main sequence: 0.83
+
+Status: Zone of Pain - rigid and hard to change
+
+Refactoring steps:
+1. Extract interface DatabaseClient trait
+2. Create adapter wrapping legacy implementation
+3. Gradually migrate dependents to use trait
+4. Introduce alternative implementations
+```
+
+## Interpreting Results
+
+### Prioritization
+
+Address architectural issues in this order:
+
+1. **Circular Dependencies** (Highest Priority)
+   - Break architectural boundaries
+   - Make testing impossible
+   - Cause build issues
+
+2. **Bidirectional Dependencies** (High Priority)
+   - Create tight coupling
+   - Prevent independent testing
+   - Block modular changes
+
+3. **Zone of Pain Issues** (Medium-High Priority)
+   - Indicate rigid architecture
+   - Block future changes
+   - High risk for bugs
+
+4. **SDP Violations** (Medium Priority)
+   - Cause ripple effects
+   - Increase maintenance cost
+   - Unstable foundation
+
+5. **High Coupling** (Medium Priority)
+   - Maintainability risk
+   - Testing difficulty
+   - Change amplification
+
+6. **Code Duplication** (Lower Priority)
+   - Maintenance burden
+   - Bug multiplication
+   - Inconsistency risk
+
+### Decision Flowchart
+
+```
+Is there a circular dependency?
+├─ YES → Break immediately (extract interface, DI)
+└─ NO  → Continue
+
+Is there bidirectional dependency?
+├─ YES → Refactor (mediator, event-driven)
+└─ NO  → Continue
+
+Is module in zone of pain?
+├─ YES → Introduce abstractions
+└─ NO  → Continue
+
+Is SDP violated?
+├─ YES → Stabilize or reduce afferent coupling
+└─ NO  → Continue
+
+Is coupling > threshold?
+├─ YES → Reduce dependencies
+└─ NO  → Continue
+
+Is there significant duplication?
+├─ YES → Extract common code
+└─ NO  → Architecture is good!
+```
+
+## Integration with Debt Categories
+
+Architectural analysis results are integrated with debtmap's debt categorization system:
+
+### Debt Type Mapping
+
+- **CircularDependency** - Circular dependency cycles detected
+- **HighCoupling** - Modules exceeding coupling threshold
+- **Duplication** - Duplicated code blocks found
+- **ArchitecturalViolation** - SDP violations, zone issues
+
+**Reference:** `features.json:240-253` (core_patterns section)
+
+### Tiered Prioritization
+
+Architectural issues are assigned priority tiers:
+
+- **Tier 1 (Critical)** - Circular dependencies, bidirectional dependencies
+- **Tier 2 (High)** - Zone of pain, SDP violations
+- **Tier 3 (Medium)** - High coupling, large duplications
+- **Tier 4 (Low)** - Small duplications, minor coupling issues
+
+**Reference:** `features.json:522-560` (tiered prioritization)
+
+## Cohesion Analysis
+
+**Note:** Module cohesion analysis is currently a simplified placeholder implementation.
+
+**Current status:** `src/debt/coupling.rs:82-95` (analyze_module_cohesion)
+
+The function exists but provides basic cohesion calculation. Full cohesion analysis (measuring how well module elements belong together) is planned for a future release.
+
+### Future Enhancement
+
+Full cohesion analysis would measure:
+- Functional cohesion (functions operating on related data)
+- Sequential cohesion (output of one function feeds another)
+- Communicational cohesion (functions operating on same data structures)
 
 ## Configuration
 
-### Enable Architectural Analysis
-
-```bash
-debtmap analyze . --filter-categories Architecture
-```
-
-### Adjust Coupling Thresholds
+Configure architectural analysis thresholds in `.debtmap.toml`:
 
 ```toml
-[architectural_analysis]
-max_afferent_coupling = 5
-max_efferent_coupling = 5
+[architectural]
+# Coupling threshold (modules with more dependencies flagged)
+coupling_threshold = 5
+
+# Minimum lines for duplication detection
+duplication_min_lines = 50
+
+# Instability threshold for SDP violations
 instability_threshold = 0.8
-min_dependents_for_pain = 3
-abstractness_threshold = 0.2
+
+# Minimum afferent coupling for SDP violations
+sdp_afferent_threshold = 2
+
+# Zone of pain thresholds
+zone_pain_abstractness = 0.2
+zone_pain_instability = 0.2
+zone_pain_afferent = 3
+
+# Zone of uselessness thresholds
+zone_useless_abstractness = 0.8
+zone_useless_instability = 0.8
 ```
 
-### Duplication Settings
-
-```toml
-[duplication]
-enabled = true
-minimum_chunk_size = 7
-minimum_occurrences = 2
-ignore_test_code = true
-```
-
-## Best Practices
-
-**Module design:**
-- Keep modules focused and cohesive
-- Minimize inter-module dependencies
-- Follow dependency inversion principle
-- Use interfaces at module boundaries
-
-**Coupling management:**
-- Aim for high cohesion, low coupling
-- Depend on abstractions, not concretions
-- Monitor instability metrics
-- Refactor bidirectional dependencies immediately
-
-**Duplication:**
-- Extract common patterns early
-- Use DRY principle judiciously (avoid premature abstraction)
-- Prefer explicit duplication over wrong abstraction
-- Validate that "duplication" is truly duplicated logic
-
-**Stability:**
-- Stable modules should be abstract
-- Unstable modules can be concrete
-- Dependencies should flow toward stability
-
-## Use Cases
-
-### Architecture Review
-
-```bash
-# Full architectural analysis
-debtmap analyze . --filter-categories Architecture --format markdown
-```
-
-### Dependency Visualization
-
-```bash
-# Generate call graph with architectural metrics
-debtmap analyze . --show-dependencies --format json > architecture.json
-```
-
-### Refactoring Planning
-
-```bash
-# Find zone of pain modules for refactoring
-debtmap analyze . --filter-categories Architecture | grep "Zone of Pain"
-```
-
-### Coupling Audit
-
-```bash
-# Identify high coupling
-debtmap analyze . --filter-categories Architecture --min-priority high
-```
+See [Configuration](configuration.md) for complete options.
 
 ## Troubleshooting
 
-### False Positive Circular Dependencies
+### "No circular dependencies detected but build fails"
 
-**Issue:** Test helpers create apparent cycles
+**Cause:** Circular dependencies at the package/crate level, not module level.
 
-**Solution:**
-- Exclude test directories from analysis
-- Use separate module for test utilities
-- Restructure test dependencies
+**Solution:** Use `cargo tree` to analyze package-level dependencies.
 
-### Duplication in Generated Code
+### "Too many coupling warnings"
 
-**Issue:** Code generation creates duplication
+**Cause:** Default threshold may be too strict for your codebase.
 
-**Solution:**
-- Exclude generated files via config
-- Adjust minimum chunk size
-- Use suppression for unavoidable duplication
+**Solution:** Adjust `coupling_threshold` in `.debtmap.toml` to match your architecture.
 
-### Zone of Pain on Necessary Code
+### "Duplication detected in generated code"
 
-**Issue:** Core stable code flagged
+**Cause:** Code generation tools create similar patterns.
 
-**Solution:**
-- Expected for framework/library core
-- Focus on extracting interfaces
-- Document architectural decisions
-- Use suppression if intentional
+**Solution:** Use suppression patterns to exclude generated files. See [Suppression Patterns](suppression-patterns.md).
 
-## See Also
+### "Zone of pain false positives"
 
-- [God Object Detection](god-object-detection.md) - Related organizational analysis
-- [Configuration](configuration.md) - Configure architectural thresholds
-- [Dependency Analysis](#) - Understanding module dependencies
+**Cause:** Utility modules are intentionally stable and concrete.
+
+**Solution:** This is often correct - utility modules should be stable. Consider whether the module should be more abstract.
+
+## Further Reading
+
+### Robert C. Martin's Principles
+
+The architectural metrics in debtmap are based on:
+
+- **Clean Architecture** by Robert C. Martin
+- **Agile Software Development: Principles, Patterns, and Practices** by Robert C. Martin
+- Stable Dependencies Principle (SDP)
+- Stable Abstractions Principle (SAP)
+- Main Sequence distance metric
+
+### Related Topics
+
+- [Analysis Guide](analysis-guide.md) - Complete analysis workflow
+- [Configuration](configuration.md) - Configuration options
+- [Entropy Analysis](entropy-analysis.md) - Complexity vs. entropy
+- [Scoring Strategies](scoring-strategies.md) - How debt is scored
+- [Tiered Prioritization](tiered-prioritization.md) - Priority assignment

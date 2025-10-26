@@ -1,0 +1,196 @@
+{
+  "chapter_id": "architectural-analysis",
+  "chapter_title": "Architectural Analysis",
+  "chapter_file": "book/src/architectural-analysis.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter does not exist but comprehensive architectural analysis capabilities are implemented in the codebase",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "Chapter file book/src/architectural-analysis.md does not exist",
+      "should_add": "Create comprehensive chapter documenting all architectural analysis features",
+      "fix_suggestion": "Create new chapter covering circular dependency detection, coupling metrics (afferent/efferent), bidirectional dependencies, stable dependencies principle, zone of pain/uselessness detection, code duplication detection, and refactoring recommendations",
+      "source_reference": "src/debt/circular.rs, src/debt/coupling.rs, src/debt/duplication.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Circular Dependency Detection",
+      "description": "No documentation for circular dependency detection",
+      "should_add": "Document DependencyGraph class and circular dependency detection using DFS algorithm",
+      "fix_suggestion": "Add section explaining how debtmap builds dependency graphs from module imports and detects cycles using depth-first search with recursion stack tracking",
+      "source_reference": "src/debt/circular.rs:44-66 (detect_circular_dependencies)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Coupling Metrics",
+      "description": "No documentation for afferent and efferent coupling metrics",
+      "should_add": "Document CouplingMetrics struct with afferent_coupling (Ca) and efferent_coupling (Ce) calculations",
+      "fix_suggestion": "Add section explaining afferent coupling (number of modules depending on this module) and efferent coupling (number of modules this module depends on), including instability calculation: I = Ce / (Ca + Ce)",
+      "source_reference": "src/debt/coupling.rs:6-30 (CouplingMetrics struct and calculate_instability)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Instability Metric",
+      "description": "No documentation for instability metric calculation",
+      "should_add": "Document instability formula and interpretation",
+      "fix_suggestion": "Explain instability metric formula I = Ce / (Ca + Ce) with interpretation: 0 = maximally stable, 1 = maximally unstable. Stable modules (low I) are harder to change but depended upon; unstable modules (high I) change frequently and depend on many others",
+      "source_reference": "src/debt/coupling.rs:16-24 (calculate_instability method)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Stable Dependencies Principle",
+      "description": "No documentation for Stable Dependencies Principle (SDP) violation detection",
+      "should_add": "Document SDP violations and detection logic",
+      "fix_suggestion": "Explain Stable Dependencies Principle: modules should depend on modules that are more stable than themselves. Document that debtmap flags violations when instability > 0.8 and afferent_coupling > 2, meaning unstable modules are being depended upon by multiple other modules",
+      "source_reference": "src/debt/coupling.rs:69-76 (SDP violation detection in identify_coupling_issues)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Bidirectional Dependencies",
+      "description": "No documentation for bidirectional dependency (inappropriate intimacy) detection",
+      "should_add": "Document inappropriate intimacy pattern detection",
+      "fix_suggestion": "Explain how debtmap detects bidirectional dependencies between modules (A depends on B and B depends on A), also known as 'inappropriate intimacy'. These indicate modules are too tightly coupled and should be refactored",
+      "source_reference": "src/debt/coupling.rs:98-117 (detect_inappropriate_intimacy function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Zone of Pain Detection",
+      "description": "No documentation for 'zone of pain' architectural anti-pattern",
+      "should_add": "Document zone of pain detection with criteria and implications",
+      "fix_suggestion": "Explain zone of pain: modules with low abstractness (<0.2) and low instability (<0.2) that are depended upon by many modules (>3). These are rigid, concrete implementations that are hard to change but heavily used. Provide refactoring recommendations: extract interfaces, introduce abstractions, or break into smaller modules",
+      "source_reference": "src/debt/coupling.rs:125-138 (identify_zone_of_pain function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Zone of Uselessness Detection",
+      "description": "No documentation for 'zone of uselessness' architectural anti-pattern",
+      "should_add": "Document zone of uselessness detection with criteria and implications",
+      "fix_suggestion": "Explain zone of uselessness: modules with high abstractness (>0.8) and high instability (>0.8). These are overly abstract and frequently changing, providing little stable value. Recommendations: either add concrete implementations to make them useful, or remove them if truly unused",
+      "source_reference": "src/debt/coupling.rs:141-153 (identify_zone_of_uselessness function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Distance from Main Sequence",
+      "description": "No documentation for distance from main sequence metric",
+      "should_add": "Document the main sequence and distance calculation",
+      "fix_suggestion": "Explain the main sequence concept: ideal modules lie on the line A + I = 1, where A is abstractness and I is instability. Distance D = |A + I - 1| measures deviation from this ideal. Modules far from the main sequence (high D) are in zone of pain or zone of uselessness",
+      "source_reference": "src/debt/coupling.rs:119-123 (calculate_distance_from_main_sequence function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Code Duplication Detection",
+      "description": "No documentation for code duplication detection algorithm",
+      "should_add": "Document duplication detection using hash-based chunk comparison",
+      "fix_suggestion": "Explain how debtmap detects code duplication: extracts fixed-size chunks from files (default 50 lines), normalizes them (removes whitespace, comments), calculates SHA-256 hashes, and identifies duplicates by matching hashes. Document merge_adjacent_duplications for consolidating consecutive duplicate blocks",
+      "source_reference": "src/debt/duplication.rs:6-44 (detect_duplication function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Duplication Configuration",
+      "description": "No documentation for duplication detection configuration options",
+      "should_add": "Document min_lines parameter and similarity_threshold",
+      "fix_suggestion": "Explain that min_lines parameter (default 50 in features.json) controls minimum chunk size for duplication detection. Mention that similarity_threshold parameter exists but is currently unused (exact hash matching is used instead). Link to .debtmap.toml configuration: threshold_duplication option",
+      "source_reference": "src/debt/duplication.rs:6-10 (detect_duplication parameters), features.json:21 (threshold_duplication: default 50)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Refactoring Recommendations",
+      "description": "No documentation for architectural refactoring recommendations",
+      "should_add": "Document the types of refactoring recommendations generated for architectural issues",
+      "fix_suggestion": "Create section listing specific refactoring recommendations: for circular dependencies (extract interface, dependency inversion), for high coupling (facade pattern, reduce dependencies), for zone of pain (introduce abstractions), for zone of uselessness (add concrete implementations or remove), for duplication (extract common code, use inheritance/composition), for bidirectional dependencies (create mediator, break into separate modules)",
+      "source_reference": "Refactoring recommendations appear in various debt pattern detection functions"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Examples and Use Cases",
+      "description": "No practical examples for architectural analysis",
+      "should_add": "Provide real-world examples of each architectural pattern detected",
+      "fix_suggestion": "Add examples showing: 1) A real circular dependency from a codebase with module diagram, 2) Coupling metrics table for a sample project, 3) Zone of pain example with refactoring steps, 4) Code duplication report example, 5) Command examples showing how to run architectural analysis with debtmap",
+      "source_reference": "Use debtmap's own codebase as examples where applicable"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Interpreting Results",
+      "description": "No guidance on interpreting architectural analysis results",
+      "should_add": "Add section on how to interpret and act on architectural analysis findings",
+      "fix_suggestion": "Explain prioritization: circular dependencies and bidirectional dependencies are highest priority (break architectural boundaries), zone of pain issues second (rigid code), high coupling third (maintainability risk), duplication fourth (maintenance burden). Provide decision flowchart for addressing each issue type",
+      "source_reference": "Tiered prioritization system in features.json:522-560"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Cohesion Analysis",
+      "description": "Cohesion analysis function exists but appears to be a placeholder",
+      "should_add": "Document current cohesion analysis status or mark as future work",
+      "fix_suggestion": "Note that analyze_module_cohesion function exists in src/debt/coupling.rs:82-95 but is currently a simplified placeholder. Either document limitations or mark as future enhancement in roadmap",
+      "source_reference": "src/debt/coupling.rs:82-95 (analyze_module_cohesion)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Integration with Debt Categories",
+      "description": "No documentation on how architectural patterns map to debt categories",
+      "should_add": "Explain which architectural issues appear in which debt categories",
+      "fix_suggestion": "Document that circular dependencies appear as 'CircularDependency' debt type, high coupling as 'HighCoupling' debt type, and code duplication as 'Duplication' debt type. Cross-reference with the main debt detection patterns section in features.json:240-253",
+      "source_reference": "features.json:240-253 (core_patterns section)"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive implementation exists with well-tested code",
+    "Multiple architectural analysis features available",
+    "Based on solid software engineering principles (Robert Martin's metrics)",
+    "Functional programming style with pure functions and immutable data",
+    "Good test coverage for each analysis function"
+  ],
+  "improvement_suggestions": [
+    "Create the chapter following mdBook format used in other chapters",
+    "Include visual diagrams for dependency graphs and coupling relationships",
+    "Add command-line examples showing how to use architectural analysis features",
+    "Provide before/after refactoring examples for each pattern",
+    "Link to relevant sections in configuration.md for threshold settings",
+    "Consider adding a 'Quick Start' section for users new to architectural analysis",
+    "Include references to Robert C. Martin's work on coupling and cohesion metrics",
+    "Add troubleshooting section for common architectural analysis questions"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-26",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Circular dependency detection",
+      "Coupling metrics (afferent, efferent)",
+      "Bidirectional dependencies",
+      "Stable dependencies principle",
+      "Zone of pain detection",
+      "Zone of uselessness detection",
+      "Code duplication detection",
+      "Refactoring recommendations"
+    ],
+    "validation_focus": "Check that architectural pattern detection and coupling analysis are documented",
+    "implementation_files_analyzed": [
+      "src/debt/circular.rs",
+      "src/debt/coupling.rs",
+      "src/debt/duplication.rs"
+    ],
+    "related_features": {
+      "debt_patterns": "features.json:240-253",
+      "configuration": "features.json:459-521",
+      "tiered_prioritization": "features.json:522-560"
+    }
+  }
+}
