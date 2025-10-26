@@ -19,7 +19,6 @@
 - [Architecture](architecture.md)
 - [Architectural Analysis](architectural-analysis.md)
 - [Cache Management](cache-management.md)
-- [Compare Analysis](compare-analysis.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
