@@ -42,6 +42,7 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub aggregation_method: Option<String>,
     pub min_problematic: Option<usize>,
     pub no_god_object: bool,
+    pub suppress_coverage_tip: bool,
     pub _formatting_config: crate::formatting::FormattingConfig,
 }
 
@@ -70,6 +71,7 @@ pub fn perform_unified_analysis(
         aggregation_method: None,
         min_problematic: None,
         no_god_object: false,
+        suppress_coverage_tip: false,
         _formatting_config: crate::formatting::FormattingConfig::from_env(),
     })
 }
@@ -94,6 +96,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
+        suppress_coverage_tip,
         _formatting_config,
     } = options;
 
@@ -114,6 +117,7 @@ pub fn perform_unified_analysis_with_options(
         aggregation_method,
         min_problematic,
         no_god_object,
+        suppress_coverage_tip,
         _formatting_config,
     );
 
@@ -140,6 +144,7 @@ fn create_analysis_parameters<'a>(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    suppress_coverage_tip: bool,
     _formatting_config: crate::formatting::FormattingConfig,
 ) -> AnalysisParameters<'a> {
     let files = extract_unique_files(&results.complexity.metrics);
@@ -160,6 +165,7 @@ fn create_analysis_parameters<'a>(
         aggregation_method,
         min_problematic,
         no_god_object,
+        suppress_coverage_tip,
         files,
         cache_config,
         _formatting_config,
@@ -192,6 +198,7 @@ struct AnalysisParameters<'a> {
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    suppress_coverage_tip: bool,
     files: Vec<PathBuf>,
     cache_config: CacheConfiguration,
     _formatting_config: crate::formatting::FormattingConfig,
@@ -301,6 +308,7 @@ fn perform_computation(params: &AnalysisParameters) -> Result<UnifiedAnalysis> {
         params.aggregation_method.clone(),
         params.min_problematic,
         params.no_god_object,
+        params.suppress_coverage_tip,
         params._formatting_config,
     )
 }
@@ -323,6 +331,7 @@ fn perform_unified_analysis_computation(
     aggregation_method: Option<String>,
     min_problematic: Option<usize>,
     no_god_object: bool,
+    suppress_coverage_tip: bool,
     _formatting_config: crate::formatting::FormattingConfig,
 ) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
@@ -383,7 +392,8 @@ fn perform_unified_analysis_computation(
     let coverage_loading_time = coverage_loading_start.elapsed();
 
     // Emit warning if no coverage data provided (spec 108)
-    if coverage_data.is_none() && !quiet_mode {
+    // Suppress for validate command (spec 131)
+    if coverage_data.is_none() && !quiet_mode && !suppress_coverage_tip {
         use colored::*;
         eprintln!();
         eprintln!(

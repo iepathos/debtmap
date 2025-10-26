@@ -165,6 +165,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             aggregation_method: config.aggregation_method.clone(),
             min_problematic: config.min_problematic,
             no_god_object: config.no_god_object,
+            suppress_coverage_tip: false, // Show coverage TIP for analyze command
             _formatting_config: config._formatting_config,
         },
     )?;

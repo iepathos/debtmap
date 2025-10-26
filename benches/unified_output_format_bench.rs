@@ -126,6 +126,7 @@ fn benchmark_unified_format_serialization(c: &mut Criterion) {
                 aggregation_method: Some("weighted_sum".to_string()),
                 min_problematic: None,
                 no_god_object: false,
+                suppress_coverage_tip: false,
                 _formatting_config: Default::default(),
             },
         )
@@ -195,6 +196,7 @@ fn benchmark_legacy_format_serialization(c: &mut Criterion) {
                 aggregation_method: Some("weighted_sum".to_string()),
                 min_problematic: None,
                 no_god_object: false,
+                suppress_coverage_tip: false,
                 _formatting_config: Default::default(),
             },
         )
@@ -254,6 +256,7 @@ fn benchmark_format_comparison(c: &mut Criterion) {
             aggregation_method: Some("weighted_sum".to_string()),
             min_problematic: None,
             no_god_object: false,
+            suppress_coverage_tip: false,
             _formatting_config: Default::default(),
         },
     )
@@ -330,6 +333,7 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
                 aggregation_method: Some("weighted_sum".to_string()),
                 min_problematic: None,
                 no_god_object: false,
+                suppress_coverage_tip: false,
                 _formatting_config: Default::default(),
             },
         )

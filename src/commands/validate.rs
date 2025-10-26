@@ -387,6 +387,7 @@ fn calculate_unified_analysis(
             aggregation_method: None,
             min_problematic: None,
             no_god_object: false,
+            suppress_coverage_tip: true, // Suppress coverage TIP for validate (spec 131)
             _formatting_config: Default::default(),
         },
     )
