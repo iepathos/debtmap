@@ -1,0 +1,179 @@
+{
+  "chapter_id": "error-handling-analysis",
+  "chapter_title": "Error Handling Analysis",
+  "chapter_file": "book/src/error-handling-analysis.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "CHAPTER MISSING: The entire chapter does not exist despite extensive error handling analysis capabilities in the codebase",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "The chapter file 'book/src/error-handling-analysis.md' does not exist, but Debtmap has comprehensive error handling analysis capabilities that need documentation",
+      "should_add": "Create complete chapter documenting all error handling patterns, detection criteria, and analysis capabilities",
+      "fix_suggestion": "Create new chapter covering: (1) Error swallowing detection and patterns, (2) Error propagation analysis, (3) Panic pattern detection in Rust, (4) Python error handling patterns (bare except, silent exceptions), (5) Async error handling, (6) Error context requirements, (7) Severity levels and recommendations, (8) Configuration options for error handling analysis",
+      "source_reference": ".debtmap/book-analysis/features.json:378-384 (error_handling_issues), features.json:324-328 (ErrorSwallowing category)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Error Swallowing Detection",
+      "description": "No documentation exists for error swallowing detection, which is a Major severity debt category (weight 4)",
+      "should_add": "Document error swallowing detection for all supported languages (Rust, Python, JavaScript, TypeScript)",
+      "fix_suggestion": "Add section explaining: (1) What constitutes error swallowing (try/except blocks that silently catch exceptions), (2) How Debtmap detects it in each language, (3) Python-specific: bare except clauses, (4) Why it's classified as Major severity, (5) Examples of good vs bad error handling, (6) How to configure detection thresholds",
+      "source_reference": "features.json:378-380 (error_swallowing definition), features.json:324-328 (ErrorSwallowing category), features.json:178-179 (Python bare except/silent exception detection)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Panic Pattern Detection (Rust)",
+      "description": "No documentation for Rust-specific panic pattern detection (unwrap, expect, panic macros)",
+      "should_add": "Document Rust panic pattern detection as a key error handling analysis capability",
+      "fix_suggestion": "Add section covering: (1) Detection of unwrap() calls in production code, (2) Detection of expect() patterns, (3) Direct panic! macro usage, (4) Why these are problematic in production, (5) Recommended alternatives (?, Result propagation), (6) How to suppress false positives (e.g., in tests), (7) Integration with semantic analysis to distinguish test code from production code",
+      "source_reference": "features.json:136 (Rust error handling analysis capability), features.json:148-150 (Rust panic patterns in debt detection), features.json:383 (panic_patterns in error_handling_issues)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Error Propagation Patterns",
+      "description": "No documentation for error propagation analysis and missing error context detection",
+      "should_add": "Document how Debtmap analyzes error propagation and detects missing context",
+      "fix_suggestion": "Add section explaining: (1) What error propagation means (Result chains in Rust, exception re-raising in Python), (2) How Debtmap detects missing error context, (3) Examples of good error context (using .context() or .with_context() in Rust), (4) Examples of poor error propagation (generic error messages), (5) Best practices for maintaining error context through the call stack, (6) How this integrates with complexity analysis",
+      "source_reference": "features.json:381 (error_propagation definition), features.json:382 (error_context definition), features.json:149 (Rust error propagation issues)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Python Error Handling Patterns",
+      "description": "No documentation for Python-specific error handling analysis (bare except, silent exceptions)",
+      "should_add": "Document Python error handling analysis capabilities",
+      "fix_suggestion": "Add section covering: (1) Bare except clause detection (except: without type specification), (2) Silent exception handling patterns, (3) Exception flow analysis capabilities, (4) Why bare excepts are problematic (catching SystemExit, KeyboardInterrupt), (5) Best practices (specific exception types, proper logging), (6) Examples from Python codebase analysis",
+      "source_reference": "features.json:164-165 (Python exception flow analysis), features.json:178-179 (Python bare except and silent exception detection)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Async Error Handling",
+      "description": "No documentation for async error handling analysis (unhandled promise rejections, missing await)",
+      "should_add": "Document async error handling detection for JavaScript/TypeScript and async Rust",
+      "fix_suggestion": "Add section explaining: (1) Unhandled promise rejection detection in JavaScript/TypeScript, (2) Missing await detection, (3) Async Rust error handling patterns, (4) Common async error anti-patterns, (5) Best practices for async error handling, (6) How Debtmap identifies these issues in code",
+      "source_reference": "features.json:383 (async_errors in error_handling_issues), features.json:135 (Rust async/await pattern detection)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Error Handling Configuration",
+      "description": "No documentation for error handling configuration options in .debtmap.toml",
+      "should_add": "Document error handling configuration section",
+      "fix_suggestion": "Add section showing: (1) [error_handling] section in .debtmap.toml, (2) patterns: which error patterns to detect, (3) severity_levels: severity for different error types, (4) context_requirements: required error context settings, (5) Example configuration with explanations, (6) How to customize detection for project-specific patterns",
+      "source_reference": "features.json:603-607 (error_handling configuration section)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Severity Levels and Prioritization",
+      "description": "No documentation explaining severity levels for error handling issues",
+      "should_add": "Document how error handling issues are prioritized and assigned severity levels",
+      "fix_suggestion": "Add section covering: (1) ErrorSwallowing is Major severity (weight 4), (2) How error handling issues affect risk scoring, (3) How error handling issues combine with complexity and coverage for prioritization, (4) Examples of Critical vs High vs Medium severity error handling issues, (5) How to interpret severity in context of overall project health",
+      "source_reference": "features.json:324-328 (ErrorSwallowing category with weight and severity), features.json:434-456 (risk scoring methodology)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Detection Criteria and Examples",
+      "description": "No examples showing what error handling patterns Debtmap detects vs what it doesn't",
+      "should_add": "Provide comprehensive examples with detection criteria",
+      "fix_suggestion": "Add examples section with: (1) Rust examples: unwrap() detected, ? operator not flagged, (2) Python examples: bare except detected, specific exception types not flagged, (3) JavaScript examples: unhandled promise rejection detected, proper try/catch not flagged, (4) Before/after examples showing how to fix detected issues, (5) Edge cases and when to use suppression comments (debtmap: ignore)",
+      "source_reference": "features.json:136 (Rust error handling analysis), features.json:164-165 (Python exception flow analysis), features.json:427-430 (suppression syntax)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Integration with Other Analysis",
+      "description": "No documentation on how error handling analysis integrates with complexity, coverage, and risk scoring",
+      "should_add": "Document integration with other analysis features",
+      "fix_suggestion": "Add section explaining: (1) How error swallowing contributes to debt_factor in risk scoring, (2) How error handling issues affect overall function risk score, (3) Interaction with coverage analysis (untested error handlers flagged higher), (4) How error handling affects semantic classification (PureLogic vs IOWrapper), (5) Example showing compound risk from high complexity + error swallowing + low coverage",
+      "source_reference": "features.json:447-450 (debt_factor in risk scoring), features.json:715-724 (semantic classification), features.json:645-658 (coverage integration)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Best Practices and Recommendations",
+      "description": "No best practices guide for error handling in analyzed projects",
+      "should_add": "Provide best practices for each supported language",
+      "fix_suggestion": "Add best practices section: (1) Rust: prefer ? operator, use anyhow/thiserror, add context with .context(), (2) Python: specific exception types, proper logging, avoid bare except, (3) JavaScript/TypeScript: handle promise rejections, use async/await properly, (4) When error swallowing is acceptable (with justification and suppression comment), (5) How to improve error handling based on Debtmap reports",
+      "source_reference": "features.json:790-819 (best_practices section - should include error handling), features.json:378-384 (error_handling_issues definitions)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Troubleshooting Error Analysis",
+      "description": "No troubleshooting guidance for error handling analysis issues",
+      "should_add": "Add troubleshooting section for common issues",
+      "fix_suggestion": "Add troubleshooting covering: (1) False positives in error detection (use suppression comments), (2) Error patterns not being detected (check language support, configuration), (3) Too many unwrap detections in test code (Debtmap should filter these with #[cfg(test)]), (4) Disagreement with severity levels (customize in config), (5) How to validate error handling improvements with compare command",
+      "source_reference": "features.json:853-919 (troubleshooting section), features.json:750-769 (comparison workflow for validation)"
+    }
+  ],
+  "positive_aspects": [
+    "N/A - Chapter does not exist"
+  ],
+  "improvement_suggestions": [
+    "Create the entire chapter from scratch",
+    "Organize content into clear sections: Overview, Detection Patterns (by language), Configuration, Severity Levels, Best Practices, Examples, Troubleshooting",
+    "Include code examples for each supported language (Rust, Python, JavaScript, TypeScript)",
+    "Provide before/after examples showing how to fix detected issues",
+    "Show integration with other Debtmap features (complexity, coverage, risk scoring)",
+    "Include configuration examples for .debtmap.toml",
+    "Reference the SUMMARY.md to add this chapter to the book's table of contents",
+    "Link to related chapters (Configuration, CLI Reference, Scoring Strategies)",
+    "Consider adding diagrams showing error handling flow analysis",
+    "Include real-world examples from analyzing actual Rust/Python projects"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-25",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [],
+    "topics_should_cover": [
+      "Error swallowing detection",
+      "Error propagation patterns",
+      "Panic pattern detection (Rust unwrap/expect)",
+      "Python error handling (bare except, silent exceptions)",
+      "Async error handling (unhandled promises, missing await)",
+      "Error context requirements",
+      "Severity levels (ErrorSwallowing = Major severity, weight 4)",
+      "Detection criteria for each language",
+      "Configuration options (error_handling section in .debtmap.toml)",
+      "Best practices and recommendations",
+      "Integration with complexity and risk scoring",
+      "Suppression patterns (debtmap: ignore)",
+      "Examples and troubleshooting"
+    ],
+    "validation_focus": "Check that all error handling patterns are documented with detection criteria",
+    "validation_result": "FAILED - No chapter exists to validate. All error handling patterns from features.json need to be documented.",
+    "codebase_capabilities": {
+      "rust_error_handling": [
+        "Panic pattern detection (unwrap, expect, panic!)",
+        "Error swallowing detection",
+        "Error propagation analysis",
+        "Result type handling"
+      ],
+      "python_error_handling": [
+        "Bare except clause detection",
+        "Silent exception handling",
+        "Exception flow analysis"
+      ],
+      "javascript_typescript_error_handling": [
+        "Unhandled promise rejections",
+        "Missing await detection"
+      ],
+      "cross_language_features": [
+        "Error swallowing (Major severity, weight 4)",
+        "Error context validation",
+        "Integration with risk scoring",
+        "Configurable severity levels",
+        "Suppression comment support"
+      ]
+    }
+  }
+}

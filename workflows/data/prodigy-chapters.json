@@ -266,6 +266,156 @@
       "validation": "Check that all context providers are documented with configuration and use cases",
       "auto_generated": true,
       "source_feature": "context_providers"
+    },
+    {
+      "id": "design-patterns",
+      "title": "Design Pattern Detection",
+      "file": "book/src/design-patterns.md",
+      "topics": [
+        "Observer pattern detection",
+        "Singleton pattern detection",
+        "Factory pattern detection",
+        "Strategy pattern detection",
+        "Callback pattern detection",
+        "Template method pattern detection",
+        "Dependency injection detection",
+        "Builder pattern detection",
+        "Pattern confidence thresholds",
+        "Configuration options"
+      ],
+      "validation": "Check that all 8 design patterns are documented with detection criteria and examples",
+      "auto_generated": true,
+      "source_feature": "design_patterns_detected"
+    },
+    {
+      "id": "compare-analysis",
+      "title": "Compare Analysis",
+      "file": "book/src/compare-analysis.md",
+      "topics": [
+        "Compare command usage",
+        "Target location tracking",
+        "Project health trends",
+        "Regression detection",
+        "Before/after metrics comparison",
+        "Improvement percentage calculations",
+        "Integration with CI/CD"
+      ],
+      "validation": "Check that compare command features and workflow integration are documented",
+      "auto_generated": true,
+      "source_feature": "compare_command"
+    },
+    {
+      "id": "validation-gates",
+      "title": "Validation and Quality Gates",
+      "file": "book/src/validation-gates.md",
+      "topics": [
+        "Validate command usage",
+        "Debt density thresholds",
+        "Quality gate configuration",
+        "CI/CD integration",
+        "Exit codes and automation",
+        "Custom validation rules"
+      ],
+      "validation": "Check that validate command and quality gate configuration are documented",
+      "auto_generated": true,
+      "source_feature": "validate_command"
+    },
+    {
+      "id": "error-handling-analysis",
+      "title": "Error Handling Analysis",
+      "file": "book/src/error-handling-analysis.md",
+      "topics": [
+        "Error swallowing detection",
+        "Error propagation patterns",
+        "Panic pattern detection",
+        "Python error handling patterns",
+        "Best practices",
+        "Severity levels",
+        "Recommendations"
+      ],
+      "validation": "Check that all error handling patterns are documented with detection criteria",
+      "auto_generated": true,
+      "source_feature": "error_handling_patterns"
+    },
+    {
+      "id": "architectural-analysis",
+      "title": "Architectural Analysis",
+      "file": "book/src/architectural-analysis.md",
+      "topics": [
+        "Circular dependency detection",
+        "Coupling metrics (afferent, efferent)",
+        "Bidirectional dependencies",
+        "Stable dependencies principle",
+        "Zone of pain detection",
+        "Zone of uselessness detection",
+        "Code duplication detection",
+        "Refactoring recommendations"
+      ],
+      "validation": "Check that architectural pattern detection and coupling analysis are documented",
+      "auto_generated": true,
+      "source_feature": "architectural_patterns"
+    },
+    {
+      "id": "multi-pass-analysis",
+      "title": "Multi-Pass Analysis",
+      "file": "book/src/multi-pass-analysis.md",
+      "topics": [
+        "Multi-pass analysis overview",
+        "Complexity attribution",
+        "Attribution display options",
+        "Configuration and usage",
+        "Performance considerations"
+      ],
+      "validation": "Check that multi-pass analysis and attribution features are documented",
+      "auto_generated": true,
+      "source_feature": "multi_pass_analysis"
+    },
+    {
+      "id": "functional-analysis",
+      "title": "Functional Composition Analysis",
+      "file": "book/src/functional-analysis.md",
+      "topics": [
+        "AST-based functional analysis",
+        "Pure function detection",
+        "Side effect detection",
+        "Composition pattern recognition",
+        "Purity profiles (strict, balanced, lenient)",
+        "Scoring and distribution analysis"
+      ],
+      "validation": "Check that functional composition analysis features are documented",
+      "auto_generated": true,
+      "source_feature": "functional_composition"
+    },
+    {
+      "id": "threshold-configuration",
+      "title": "Threshold Configuration",
+      "file": "book/src/threshold-configuration.md",
+      "topics": [
+        "Threshold presets (strict, balanced, lenient)",
+        "Custom threshold configuration",
+        "Language-specific thresholds",
+        "Cyclomatic complexity thresholds",
+        "God object thresholds",
+        "Tuning guidelines"
+      ],
+      "validation": "Check that all threshold presets and configuration options are documented",
+      "auto_generated": true,
+      "source_feature": "threshold_presets"
+    },
+    {
+      "id": "dead-code-analysis",
+      "title": "Dead Code Analysis",
+      "file": "book/src/dead-code-analysis.md",
+      "topics": [
+        "Public API detection heuristics",
+        "Confidence thresholds",
+        "Dead code identification",
+        "Configuration options",
+        "Best practices"
+      ],
+      "validation": "Check that dead code analysis and public API detection are documented",
+      "auto_generated": true,
+      "source_feature": "dead_code_analysis"
     }
   ]
 }

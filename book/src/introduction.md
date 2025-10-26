@@ -17,7 +17,7 @@ Debtmap analyzes your codebase to identify complexity hotspots, technical debt p
 - **Multi-Factor Analysis**: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
 - **Reduced False Positives**: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
 - **Actionable Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" with quantified impact metrics
-- **Performance**: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
+- **Performance**: Significantly faster than Java/Python-based competitors (written in Rust with parallel processing)
 
 ## Why Use Debtmap?
 
@@ -28,7 +28,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Assess Risk** - Prioritize improvements based on sophisticated risk scoring that combines complexity, test coverage, and dependency impact
 - **Track Quality** - Monitor code quality metrics over time with the `compare` command (which can use `--plan` to automatically extract target locations from implementation plans and track improvements) to verify that refactoring efforts achieved their goals
 - **Get Actionable Recommendations** - Receive specific guidance like "refactoring this will reduce complexity by 60%" or "testing this will reduce risk by 5%"
-- **Automated Debt Reduction** - Integrates with Prodigy workflows for AI-driven automated refactoring with iterative validation and testing
+- **Automated Debt Reduction** - Integrates with [Prodigy workflows](./prodigy-integration.md) for AI-driven automated refactoring with iterative validation and testing (via external integration)
 
 ## Key Features
 
@@ -84,7 +84,6 @@ Debtmap is designed for:
 ## Getting Started
 
 Ready to analyze your codebase? Check out:
-- [Installation](./installation.md) - Installing Debtmap on your system
 - [Getting Started](./getting-started.md) - Installation and first analysis
 - [Analysis Guide](./analysis-guide.md) - Understanding the metrics and output
 - [Output Formats](./output-formats.md) - JSON, Markdown, and terminal formats

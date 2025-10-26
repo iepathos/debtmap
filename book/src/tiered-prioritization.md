@@ -21,6 +21,7 @@ The tiered prioritization system organizes technical debt into four distinct tie
 **Examples**:
 - Files with 15+ responsibilities
 - Modules with 50+ methods
+- Functions with cyclomatic complexity > 50 (extreme complexity hotspots requiring architectural redesign)
 - God objects flagged by detection algorithms
 - Circular dependencies affecting core modules
 
@@ -28,12 +29,12 @@ The tiered prioritization system organizes technical debt into four distinct tie
 
 ```bash
 # Focus on Tier 1 items
-debtmap analyze . --filter Architecture --min-priority high
+debtmap analyze . --min-priority high --top 5
 ```
 
 ### Tier 2: Complex Untested
 
-**Description**: Untested code with high complexity or critical dependencies
+**Description**: Untested code with high complexity or critical dependencies. Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.
 
 **Priority**: Risk of bugs in critical paths
 
@@ -42,7 +43,8 @@ debtmap analyze . --filter Architecture --min-priority high
 **Action**: Should be tested before refactoring to prevent regressions
 
 **Examples**:
-- Functions with cyclomatic complexity > 15 and 0% coverage
+- Functions with cyclomatic complexity ≥ 15 and 0% coverage
+- Functions with 10+ dependencies and low test coverage
 - Business logic entry points without tests
 - Complex error handling without validation
 
@@ -50,7 +52,7 @@ debtmap analyze . --filter Architecture --min-priority high
 
 ```bash
 # See Tier 2 testing gaps
-debtmap analyze . --lcov coverage.lcov --filter Testing
+debtmap analyze . --lcov coverage.lcov --min-priority high
 ```
 
 ### Tier 3: Testing Gaps
@@ -103,12 +105,11 @@ t3_complexity_threshold = 10         # Lower complexity threshold
 # Display options
 show_t4_in_main_report = false      # Hide Tier 4 from main output
 
-# Tier weights
-[tiers.tier_weights]
-t1 = 1.5    # Critical architecture
-t2 = 1.0    # Complex untested
-t3 = 0.7    # Testing gaps
-t4 = 0.3    # Maintenance
+# Tier weights (multipliers applied to base scores)
+t1_weight = 1.5    # Critical architecture
+t2_weight = 1.0    # Complex untested
+t3_weight = 0.7    # Testing gaps
+t4_weight = 0.3    # Maintenance
 ```
 
 ### Customizing Tier Thresholds
@@ -129,22 +130,24 @@ t3_complexity_threshold = 15
 
 ### Tier Weight Customization
 
+Tier weights are multipliers applied to base debt scores during prioritization. A weight of 1.5 means items in that tier will score 50% higher than equivalent items in a tier with weight 1.0, pushing them higher in priority rankings.
+
 Adjust weights based on your priorities:
 
 ```toml
 # Emphasize testing over architecture
-[tiers.tier_weights]
-t1 = 1.2    # Reduce architecture weight
-t2 = 1.3    # Increase testing weight
-t3 = 0.8
-t4 = 0.3
+[tiers]
+t1_weight = 1.2    # Reduce architecture weight
+t2_weight = 1.3    # Increase testing weight
+t3_weight = 0.8
+t4_weight = 0.3
 
 # Focus on architecture first
-[tiers.tier_weights]
-t1 = 2.0    # Maximize architecture weight
-t2 = 1.0
-t3 = 0.5
-t4 = 0.2
+[tiers]
+t1_weight = 2.0    # Maximize architecture weight
+t2_weight = 1.0
+t3_weight = 0.5
+t4_weight = 0.2
 ```
 
 ## Use Cases
@@ -155,10 +158,10 @@ Use tiered prioritization to allocate work:
 
 ```bash
 # See Tier 1 items for architectural planning
-debtmap analyze . --filter Architecture --top 5
+debtmap analyze . --min-priority high --top 5
 
 # See Tier 2/3 for testing sprint work
-debtmap analyze . --filter Testing --min-priority medium
+debtmap analyze . --lcov coverage.lcov --min-priority medium
 ```
 
 ### Code Review Focus
@@ -173,7 +176,7 @@ Prioritize review attention based on tiers:
 
 ```bash
 # Phase 1: Address Tier 1 architectural issues
-debtmap analyze . --filter Architecture
+debtmap analyze . --min-priority high
 
 # Phase 2: Add tests for Tier 2 complex code
 debtmap analyze . --lcov coverage.lcov --min-priority high
@@ -212,10 +215,12 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   ...
 
 ⚪ TIER 4: MAINTENANCE (120 items) [hidden]
-  Use --show-t4 to display maintenance items
+  To show Tier 4 items, add show_t4_in_main_report = true under [tiers] in .debtmap.toml
 ```
 
 ### JSON Output
+
+Tier values use PascalCase enum variants without underscores: `T1CriticalArchitecture`, `T2ComplexUntested`, `T3TestingGaps`, `T4Maintenance`.
 
 ```json
 {
@@ -227,7 +232,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   },
   "items": [
     {
-      "tier": "T1_CriticalArchitecture",
+      "tier": "T1CriticalArchitecture",
       "priority_weight": 1.5,
       "base_score": 8.5,
       "final_score": 12.75
@@ -242,8 +247,8 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
 
 **Solution**: Lower tier weights or increase thresholds temporarily:
 ```toml
-[tiers.tier_weights]
-t1 = 1.2    # Reduce from 1.5
+[tiers]
+t1_weight = 1.2    # Reduce from 1.5
 ```
 
 **Issue**: Not enough items in Tier 1

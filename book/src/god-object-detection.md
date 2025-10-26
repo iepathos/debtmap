@@ -15,13 +15,28 @@ This chapter explains how Debtmap identifies god objects, calculates their score
 
 ## Detection Criteria
 
-A file or type is classified as a god object based on five key metrics:
+Debtmap uses two distinct detection strategies depending on the file structure:
 
-1. **Method Count** - Total number of methods/functions
+### God Class Criteria
+
+A struct/class is classified as a god class when it violates multiple thresholds:
+
+1. **Method Count** - Number of impl methods on the struct
 2. **Field Count** - Number of struct/class fields
 3. **Responsibility Count** - Distinct responsibilities inferred from method names (max_traits in config)
-4. **Lines of Code** - Total lines in the file
-5. **Complexity Sum** - Combined cyclomatic complexity of all functions
+4. **Lines of Code** - Estimated lines for the struct and its impl blocks
+5. **Complexity Sum** - Combined cyclomatic complexity of struct methods
+
+### God Module Criteria
+
+A file is classified as a god module when it has excessive standalone functions:
+
+1. **Standalone Function Count** - Total standalone functions (not in impl blocks)
+2. **Responsibility Count** - Distinct responsibilities across all functions
+3. **Lines of Code** - Total lines in the file
+4. **Complexity Sum** - Combined cyclomatic complexity (estimated as `function_count × 5`)
+
+**Key Difference:** God class detection focuses on a single struct's methods, while god module detection counts standalone functions across the entire file.
 
 ### Language-Specific Thresholds
 
@@ -51,36 +66,60 @@ A file or type is classified as a god object based on five key metrics:
 
 These thresholds can be customized per-language in your `.debtmap.toml` configuration file.
 
-## File-Level Aggregation
+## God Class vs God Module Detection
 
-An important feature of Debtmap's god object detection is its **file-level aggregation strategy**. When analyzing a file, Debtmap:
+Debtmap distinguishes between two distinct types of god objects:
 
-1. Finds the largest type (struct/class) by `method_count + field_count × 2`
-2. Counts standalone functions in the file
-3. Combines them: `total_methods = type_methods + standalone_functions`
+### God Class Detection
 
-This means files with many standalone functions (like `rust_call_graph.rs` with 270 functions) will be detected as god objects even without a large type. This is crucial for identifying:
+A **god class** is a single struct/class with excessive methods and fields. Debtmap analyzes the largest type in a file using:
 
-- Pure functional modules with excessive functions
-- Utility files that have grown too large
-- Mixed paradigm files (structs + many helper functions)
+1. Find the largest type (struct/class) by `method_count + field_count × 2`
+2. Count **only the impl methods** for that struct
+3. Check against thresholds:
+   - Rust: >20 methods, >15 fields
+   - Python: >15 methods, >10 fields
+   - JavaScript/TypeScript: >15 methods, >20 fields
 
-**Example:** A file containing a struct with 15 methods plus 10 standalone functions will be analyzed as having 25 total methods, likely triggering god object detection.
+**Example:** A struct with 25 methods and 18 fields would be flagged as a god class.
 
-See `src/organization/god_object_detector.rs:66-97` for implementation details.
+### God Module Detection
+
+A **god module** is a file with excessive standalone functions (no dominant struct). Debtmap counts standalone functions when:
+
+1. No struct/class is found, OR
+2. The file has many standalone functions outside of any impl blocks
+
+**Threshold:** Files with >50 standalone functions are considered god modules.
+
+**Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module.
+
+### Why Separate Analysis?
+
+Previously, Debtmap combined standalone functions with struct methods, causing **false positives** for functional/procedural modules. The current implementation analyzes them separately to:
+
+- Avoid penalizing pure functional modules
+- Distinguish between architectural issues (god class) and organizational issues (god module)
+- Provide more accurate refactoring recommendations
+
+**Key Distinction:** A file containing a struct with 15 methods plus 20 standalone functions is analyzed as:
+- **God Class:** No (15 methods < 20 threshold)
+- **God Module:** Possibly (20 standalone functions, approaching threshold)
+
+See `src/organization/god_object_detector.rs:449-505` for implementation details.
 
 ## Confidence Levels
 
-Debtmap assigns confidence levels based on how many thresholds are violated:
+Debtmap assigns confidence levels based **solely on the number of thresholds violated**:
 
-- **Definite** (5 violations) - Clear god object requiring immediate refactoring
-- **Probable** (3-4 violations) - Likely god object that should be refactored
-- **Possible** (1-2 violations) - Potential god object worth reviewing
-- **NotGodObject** (0 violations) - Within acceptable limits
+- **Definite** (5 violations) - All five metrics exceed thresholds - clear god object requiring immediate refactoring
+- **Probable** (3-4 violations) - Most metrics exceed thresholds - likely god object that should be refactored
+- **Possible** (1-2 violations) - Some metrics exceed thresholds - potential god object worth reviewing
+- **NotGodObject** (0 violations) - All metrics within acceptable limits
 
-The final determination also requires `god_object_score >= 70.0`. Both criteria must be met for a definite god object classification.
+**Note:** The confidence level is determined by violation count alone. The god object score (calculated separately) is used for prioritization and ranking, but does not affect the confidence classification.
 
-See `src/organization/god_object_analysis.rs:229-270` and `src/organization/god_object_detector.rs:152-163`.
+See `src/organization/god_object_analysis.rs:236-268` for the `determine_confidence` function.
 
 ## Scoring Algorithms
 
@@ -139,47 +178,66 @@ See `src/organization/god_object_analysis.rs:142-209`.
 This advanced scoring variant reduces the impact of pure functions, preventing pure functional modules from being unfairly penalized. The algorithm:
 
 1. Analyzes each function for purity using three levels:
-   - **Pure** (no side effects): weight multiplier `0.3`
-   - **Probably Pure** (likely no side effects): weight multiplier `0.5`
-   - **Impure** (has side effects): weight multiplier `1.0`
+   - **Pure** (no side effects): Functions with read-only operations, no I/O, no mutation
+     - Weight multiplier: `0.3`
+     - Examples: `calculate_sum()`, `format_string()`, `is_valid()`
 
-2. Combines complexity and purity weights:
+   - **Probably Pure** (likely no side effects): Functions that appear pure but may have hidden side effects
+     - Weight multiplier: `0.5`
+     - Examples: Functions using trait methods (could have side effects), generic operations
+
+   - **Impure** (has side effects): Functions with clear side effects like I/O, mutation, external calls
+     - Weight multiplier: `1.0`
+     - Examples: `save_to_file()`, `update_state()`, `send_request()`
+
+2. Purity Detection Heuristics:
+   - **Pure indicators**: No `mut` references, no I/O operations, no external function calls
+   - **Impure indicators**: File/network operations, mutable state, database access, logging
+   - **Probably Pure**: Generic functions, trait method calls, or ambiguous patterns
+
+3. Combines complexity and purity weights:
    ```
    total_weight = complexity_weight × purity_multiplier
    ```
 
-3. Tracks the `PurityDistribution`:
+   Example: A pure function with complexity 5 contributes only `5 × 0.3 = 1.5` to the weighted count.
+
+4. Tracks the `PurityDistribution`:
    - `pure_count`, `probably_pure_count`, `impure_count`
    - `pure_weight_contribution`, `probably_pure_weight_contribution`, `impure_weight_contribution`
 
-This approach dramatically reduces scores for files with many pure helper functions while still flagging stateful god objects.
+**Impact:** A file with 100 pure helper functions (total complexity 150) might have a weighted method count of only `150 × 0.3 = 45`, avoiding false positives while still catching stateful god objects with many impure methods.
 
 See `src/organization/god_object_detector.rs:196-258` and `src/organization/purity_analyzer.rs`.
 
 ## Responsibility Detection
 
-Responsibilities are inferred from method names using common prefixes. Debtmap recognizes 28 standard prefixes grouped into 10 categories:
+Responsibilities are inferred from method names using common prefixes. Debtmap recognizes the following categories:
 
 | Prefix(es) | Responsibility Category |
 |------------|------------------------|
+| `format`, `render`, `write`, `print` | Formatting & Output |
+| `parse`, `read`, `extract` | Parsing & Input |
+| `filter`, `select`, `find` | Filtering & Selection |
+| `transform`, `convert`, `map`, `apply` | Transformation |
 | `get`, `set` | Data Access |
+| `validate`, `check`, `verify`, `is` | Validation |
 | `calculate`, `compute` | Computation |
-| `validate`, `check`, `verify`, `ensure` | Validation |
-| `save`, `load`, `store`, `retrieve`, `fetch` | Persistence |
-| `create`, `build`, `new`, `make`, `init` | Construction |
-| `send`, `receive`, `handle`, `manage` | Communication |
-| `update`, `modify`, `change`, `edit` | Modification |
-| `delete`, `remove`, `clear`, `reset` | Deletion |
-| `is`, `has`, `can`, `should`, `will` | State Query |
-| `process`, `transform` | Processing |
+| `create`, `build`, `new` | Construction |
+| `save`, `load`, `store` | Persistence |
+| `process`, `handle` | Processing |
+| `send`, `receive` | Communication |
 
-**Fallback:** If a prefix doesn't match any category, Debtmap creates a default responsibility: `"{Prefix} Operations"` (with capitalized first letter).
+**Fallback:** If a method name doesn't match any category, it's classified as `Utilities`.
+
+**Distinct Responsibility Counting:** Debtmap counts the number of **unique** responsibility categories used by a struct/module's methods. A high responsibility count (e.g., >5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.
 
 Responsibility count directly affects:
 - God object scoring (via `responsibility_factor`)
-- Refactoring recommendations (methods grouped by responsibility)
+- Refactoring recommendations (methods grouped by responsibility for suggested splits)
+- Detection confidence (counted as one of the five violation criteria)
 
-See `src/organization/god_object_detector.rs:378-454`.
+See `src/organization/god_object_analysis.rs:318-388` for the `infer_responsibility_from_method` function.
 
 ## Examples and Case Studies
 
@@ -217,18 +275,22 @@ See `src/organization/god_object_detector.rs:378-454`.
 - `DataValidator` (validate/check methods)
 - `DataPersistence` (save/load methods)
 
-### Example 3: Mixed Paradigm File
+### Example 3: Mixed Paradigm File (God Module)
 
-**File:** `utils.rs` with small struct (5 methods, 3 fields) + 20 standalone functions
+**File:** `utils.rs` with small struct (5 methods, 3 fields) + 60 standalone functions
 
 **Detection:**
-- **Is God Object:** Yes
-- **Total Methods:** 25 (5 + 20)
-- **Field Count:** 3
+- **God Class (struct):** No (5 methods < 20 threshold, 3 fields < 15 threshold)
+- **God Module (file):** Yes (60 standalone functions > 50 threshold)
 - **Confidence:** Probable
 - **Score:** ~120
 
-**Note:** Without file-level aggregation, this would be missed. The struct alone is fine, but combined with standalone functions, it indicates an overgrown utility module.
+**Analysis:** The struct and standalone functions are analyzed separately. The struct is not a god class, but the file is a god module due to the excessive standalone functions. This indicates an overgrown utility module that should be split into smaller, focused modules.
+
+**Recommendation:** Split standalone functions into focused utility modules:
+- `StringUtils` (formatting, parsing)
+- `FileUtils` (file operations)
+- `MathUtils` (calculations)
 
 ## Refactoring Recommendations
 
@@ -446,16 +508,29 @@ God object detection affects the overall technical debt prioritization through a
 god_object_multiplier = 2.0 + normalized_god_object_score
 ```
 
-Where `normalized_god_object_score` is scaled to 0-1 range.
+### Normalization
 
-This means:
-1. God objects receive **2-3× higher priority** in debt rankings
-2. Functions within god objects may inherit elevated scores due to architectural concerns
-3. The cascading impact ensures god objects surface in the "top 10 most problematic" lists
+The `normalized_god_object_score` is scaled to the 0-1 range using:
 
-This integration ensures that architectural debt (god objects) is weighted appropriately alongside function-level complexity.
+```
+normalized_score = min(god_object_score / max_expected_score, 1.0)
+```
 
-See `features.json:570` and file-level scoring documentation.
+Where `max_expected_score` is typically based on the maximum score in the analysis (e.g., 1000 for severe violations).
+
+### Impact on Prioritization
+
+This multiplier means:
+1. **Non-god objects** (score = 0): multiplier = 2.0 (baseline)
+2. **Moderate god objects** (score = 200): multiplier ≈ 2.2-2.5
+3. **Severe god objects** (score = 1000+): multiplier ≈ 3.0 (maximum)
+
+**Result:** God objects receive **2-3× higher priority** in debt rankings, ensuring that:
+- Functions within god objects inherit elevated scores due to architectural concerns
+- God objects surface in the "top 10 most problematic" lists
+- Architectural debt is weighted appropriately alongside function-level complexity
+
+See file-level scoring documentation for complete details on how this multiplier integrates into the overall debt calculation.
 
 ## Metrics Tracking (Advanced)
 
@@ -474,12 +549,13 @@ See `src/organization/god_object_metrics.rs:1-228`.
 
 ### "Why is my functional module flagged as a god object?"
 
-**Answer:** Debtmap aggregates standalone functions with struct methods. A file with 100 pure helper functions will be flagged, even though each function is simple.
+**Answer:** Debtmap now analyzes god classes (structs) separately from god modules (standalone functions). If your functional module with 100 pure helper functions is flagged, it's being detected as a **god module** (not a god class), which indicates the file has grown too large and should be split for better organization.
 
 **Solutions:**
-1. Use **purity-weighted scoring** (Rust only) via complexity-weighted analysis - pure functions contribute 0.3× weight
-2. Split the module into smaller, focused utility modules
-3. Use `--min-problematic` to raise the threshold for file-level aggregation
+1. **Accept the finding**: 100+ functions in one file is difficult to navigate and maintain, even if each function is simple
+2. **Split by responsibility**: Organize functions into smaller, focused modules (e.g., `string_utils.rs`, `file_utils.rs`, `math_utils.rs`)
+3. **Use purity-weighted scoring** (Rust only): Pure functions contribute only 0.3× weight, dramatically reducing scores for functional modules
+4. **Adjust thresholds**: Increase `max_methods` in `.debtmap.toml` if your project standards allow larger modules
 
 ### "My god object score seems too high"
 

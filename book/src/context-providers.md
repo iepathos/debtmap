@@ -36,7 +36,7 @@ The Critical Path provider identifies functions that lie on critical execution p
 
 ### Entry Point Detection
 
-The provider automatically detects entry points based on function names and file paths:
+The provider automatically detects entry points based on function names and file paths. These weights determine the base criticality of execution paths:
 
 | Entry Type | Weight | Detection Pattern | User-Facing |
 |------------|--------|-------------------|-------------|
@@ -118,7 +118,7 @@ The provider builds a dependency graph where:
 
 ### Blast Radius Calculation
 
-The blast radius represents how many modules would be affected by changes to a function:
+The blast radius represents how many modules would be affected by changes to a function. It counts unique modules reachable through transitive dependencies by traversing the dependency graph edges.
 
 | Blast Radius | Contribution | Impact Level |
 |--------------|--------------|--------------|
@@ -136,6 +136,8 @@ where:
   criticality_factor = 1.0 + min(0.5, dependents.len() × 0.1)
   dependency_risk = Σ(dependency.risk × coupling_strength × 0.3)
 ```
+
+**Note**: The constants (0.5, 0.1, 0.3) are currently hard-coded based on empirical analysis. Future versions may make these configurable.
 
 **Impact on scoring:**
 ```
@@ -186,6 +188,9 @@ The provider analyzes Git history to calculate:
 - **Bug density**: Ratio of bug fix commits to total commits
 - **Age**: Days since first commit (maturity indicator)
 - **Author count**: Number of unique contributors (complexity indicator)
+- **Total commits**: Total number of commits to the file
+- **Last modified**: Timestamp of the most recent commit
+- **Stability score**: Weighted combination of churn, bug fixes, and age (0.0-1.0)
 
 **What it analyzes:**
 - Commit frequency per file/function
@@ -266,7 +271,11 @@ high_churn_threshold = 10
 git rev-parse --git-dir
 
 # If not a git repo, initialize one or disable git_history provider
-debtmap analyze --disable-context git_history
+# Option 1: Enable context but exclude git_history
+debtmap analyze --context --disable-context git_history
+
+# Option 2: Use only specific providers
+debtmap analyze --context-providers critical_path,dependency
 ```
 
 **Performance issues**: Git history analysis can be slow for large repositories:
@@ -788,7 +797,7 @@ Each function shows:
 
 ### Architecture Exploration
 
-The `ContextAggregator` caches context by `file:function` key. This enables efficient re-analysis:
+The `ContextAggregator` caches context by `file:function` key to avoid redundant analysis during a single run. The cache is in-memory per `ContextAggregator` instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run:
 
 ```rust
 let mut aggregator = ContextAggregator::new()
