@@ -42,24 +42,34 @@ Currently, god object detection counts ALL functions including test functions wh
 
 ## Objective
 
-Exclude test functions from god object detection metrics to ensure recommendations accurately reflect production code complexity, not test infrastructure size.
+Apply context-appropriate test function handling in god object detection:
+- **God Class**: Exclude test methods from complexity metrics (tests don't make a class complex)
+- **God File**: Include test code in size metrics (tests contribute to file navigation problems)
+
+This ensures recommendations accurately reflect both structural complexity and file maintainability concerns.
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Filter Test Functions from Counts**
-   - Exclude functions marked with `#[test]` attribute
-   - Exclude functions in `#[cfg(test)]` modules
-   - Exclude functions with `#[cfg(test)]` attribute
-   - Apply filtering consistently across all god object metrics
+1. **God Class Detection (Struct-Based)**
+   - Exclude test methods from `method_count` for struct analysis
+   - Exclude test methods from complexity calculations
+   - Exclude test methods from responsibility grouping
+   - Test methods don't contribute to god class score
+   - **Rationale**: Tests validate the class but don't add structural complexity
 
-2. **Update All Counting Points**
-   - `method_count` in `GodObjectAnalysis` excludes tests
-   - `standalone_functions` count excludes tests
-   - `weighted_method_count` calculation excludes tests
-   - `purity_weighted_count` calculation excludes tests
-   - Responsibility grouping excludes test functions
+2. **God Module/File Detection (Standalone Functions)**
+   - Include ALL functions (production + tests) in total function count
+   - Include test functions in lines-of-code metrics
+   - Report total file size including test modules
+   - **Rationale**: Large test modules contribute to file navigation problems
+
+3. **Distinguish Detection Type in Output**
+   - Report "GOD_CLASS" when detecting struct-based god objects
+   - Report "GOD_FILE" or "GOD_MODULE" when detecting large files
+   - Use different counting methodology for each type
+   - Clear messaging about what's being measured
 
 3. **Preserve Test Tracking for Other Use Cases**
    - Keep `is_test` flag in `FunctionComplexityInfo`
@@ -80,48 +90,106 @@ Exclude test functions from god object detection metrics to ensure recommendatio
 
 ## Acceptance Criteria
 
-- [ ] `visitor.function_complexity.iter().filter(|f| !f.is_test)` applied at all counting points
-- [ ] `GodObjectAnalysis.method_count` excludes test functions
-- [ ] Standalone function count excludes functions in test modules
-- [ ] `aggregate_weighted_complexity()` filters out test functions
-- [ ] `calculate_purity_weights()` filters out test functions
-- [ ] `group_methods_by_responsibility()` excludes test methods
-- [ ] `formatter.rs` reports ~64 functions instead of 116
-- [ ] `config.rs` reports ~166 functions instead of 217
-- [ ] God object scores decrease for test-heavy modules
-- [ ] All existing tests pass with updated counts
-- [ ] New test validates test function filtering
-- [ ] Documentation updated to clarify counting methodology
-- [ ] CHANGELOG entry documents breaking change
+### God Class Detection
+- [ ] Struct method analysis filters `!f.is_test` for complexity calculations
+- [ ] `method_count` for god class excludes test methods
+- [ ] Responsibility grouping excludes test methods for struct analysis
+- [ ] God class score calculation uses production methods only
+- [ ] Test: Struct with 20 methods + 10 tests reports `method_count: 20`
+
+### God Module/File Detection
+- [ ] Standalone function count includes ALL functions (prod + tests)
+- [ ] Lines-of-code metrics include test module lines
+- [ ] File size reporting unchanged (includes everything)
+- [ ] Test: `formatter.rs` still reports 116 total functions for file size
+- [ ] Test: File with 1800 prod lines + 1000 test lines reports 2800 total lines
+
+### Detection Type Differentiation
+- [ ] Output clearly indicates "GOD_CLASS" vs "GOD_FILE"/"GOD_MODULE"
+- [ ] Different counting strategies applied based on detection type
+- [ ] Recommendation messages reflect appropriate concern (complexity vs size)
+- [ ] JSON output includes `detection_type` field
+
+### Regression and Validation
+- [ ] All existing tests pass with updated logic
+- [ ] New integration test validates both detection types
+- [ ] Documentation clarifies counting methodology per type
+- [ ] CHANGELOG entry explains nuanced approach
 
 ## Technical Details
 
 ### Implementation Approach
 
-**Phase 1: Core Filtering (god_object_detector.rs)**
+**Phase 1: Differentiate God Class vs God File Detection**
 
-1. **Update `analyze_comprehensive()` method (lines 460-625)**:
+1. **Track detection type in `analyze_comprehensive()` (line 460)**:
    ```rust
-   // Filter test functions for all complexity calculations
-   let production_complexity: Vec<_> = visitor.function_complexity
-       .iter()
-       .filter(|f| !f.is_test)
-       .cloned()
-       .collect();
+   pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
+       let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+       visitor.visit_file(ast);
 
-   // Use filtered list for all metrics
-   let weighted_method_count = aggregate_weighted_complexity(&production_complexity);
-   let avg_complexity = calculate_avg_complexity(&production_complexity);
+       // Determine detection type
+       let primary_type = visitor.types.values()
+           .max_by_key(|t| t.method_count + t.field_count * 2);
+
+       let is_god_class = primary_type.is_some() &&
+                          primary_type.unwrap().method_count > 20;
+       let is_god_file = visitor.standalone_functions.len() > 50 ||
+                        total_lines > 1000;
+
+       // Different analysis paths
+       if is_god_class {
+           analyze_as_god_class(&visitor, primary_type.unwrap())
+       } else if is_god_file {
+           analyze_as_god_file(&visitor)
+       } else {
+           // Regular analysis
+       }
+   }
    ```
 
-2. **Update standalone function counting (line 474)**:
+2. **God Class Analysis - Exclude Tests**:
    ```rust
-   // Only count non-test standalone functions
-   let standalone_count = visitor.standalone_functions
-       .iter()
-       .zip(&visitor.function_complexity)
-       .filter(|(_, fc)| !fc.is_test)
-       .count();
+   fn analyze_as_god_class(
+       visitor: &TypeVisitor,
+       type_info: &TypeAnalysis
+   ) -> GodObjectAnalysis {
+       // Filter to production methods only for god class
+       let struct_method_names: HashSet<_> = type_info.methods.iter().collect();
+
+       let production_complexity: Vec<_> = visitor.function_complexity
+           .iter()
+           .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
+           .cloned()
+           .collect();
+
+       let method_count = production_complexity.len();
+       let weighted_count = aggregate_weighted_complexity(&production_complexity);
+
+       // Tests excluded from complexity scoring
+       GodObjectAnalysis {
+           detection_type: DetectionType::GodClass,
+           method_count, // Production methods only
+           // ...
+       }
+   }
+   ```
+
+3. **God File Analysis - Include Tests**:
+   ```rust
+   fn analyze_as_god_file(visitor: &TypeVisitor) -> GodObjectAnalysis {
+       // Include ALL functions for file size concerns
+       let total_functions = visitor.standalone_functions.len(); // Includes tests
+       let all_complexity = &visitor.function_complexity; // All functions
+
+       // File size includes everything
+       GodObjectAnalysis {
+           detection_type: DetectionType::GodFile,
+           method_count: total_functions, // All functions including tests
+           lines_of_code: actual_line_count, // Includes test modules
+           // ...
+       }
+   }
    ```
 
 3. **Filter function items for purity analysis (line 531)**:
@@ -197,39 +265,61 @@ impl GodObjectDetector {
 ### Architecture Changes
 
 **Modified Components**:
-- `src/organization/god_object_detector.rs` - Core filtering logic
-- `src/organization/god_object_analysis.rs` - Documentation updates
-- `src/priority/formatter.rs` - Output message verification
+- `src/organization/god_object_analysis.rs`:
+  ```rust
+  pub struct GodObjectAnalysis {
+      pub detection_type: DetectionType, // NEW FIELD
+      pub method_count: usize,           // Meaning depends on detection_type
+      // ...
+  }
+
+  #[derive(Debug, Clone, Serialize, Deserialize)]
+  pub enum DetectionType {
+      GodClass,    // Struct with too many methods
+      GodFile,     // File with too many functions/lines
+      GodModule,   // Alias for GodFile
+  }
+  ```
+
+- `src/organization/god_object_detector.rs`:
+  - Split analysis into `analyze_as_god_class()` vs `analyze_as_god_file()`
+  - Apply test filtering only for god class detection
+  - Keep all functions for god file detection
+
+- `src/priority/formatter.rs`:
+  - Update messages based on `detection_type`
+  - "GOD_CLASS: Struct Foo has 50 methods" (tests excluded)
+  - "GOD_FILE: Module has 2800 lines, 116 functions" (tests included)
 
 **Unchanged Components**:
 - `FunctionComplexityInfo` struct - keeps `is_test` field
 - Test detection logic - no changes needed
-- God object scoring algorithms - just use filtered inputs
 
 ### Data Flow
 
-**Before**:
+**Before (Incorrect)**:
 ```
 TypeVisitor collects all functions
   ↓
-Counts include tests (116 for formatter.rs)
+All counts include tests uniformly
   ↓
-God object score inflated
-  ↓
-Misleading recommendation
+God class score inflated by test methods
+God file size correct but message unclear
 ```
 
-**After**:
+**After (Correct)**:
 ```
 TypeVisitor collects all functions with is_test flag
   ↓
-Filter: .filter(|f| !f.is_test)
+Determine detection type: God Class vs God File
   ↓
-Counts exclude tests (64 for formatter.rs)
-  ↓
-Accurate god object score
-  ↓
-Correct recommendation
+God Class path:                    God File path:
+- Filter: !f.is_test               - Include all functions
+- Count: 30 methods                - Count: 116 functions
+- Score based on complexity        - Score based on file size
+- Message: "30 methods"            - Message: "2800 lines, 116 functions"
+  ↓                                  ↓
+Accurate complexity assessment     Accurate size assessment
 ```
 
 ### Edge Cases
@@ -429,14 +519,18 @@ excluded from all metrics:
 ```markdown
 ## [0.4.0] - 2025-10-26
 
-### Changed (BREAKING)
-- **God object detection now excludes test functions from counts** (#130)
-  - Function counts in god object reports now reflect production code only
-  - Test functions (marked with `#[test]` or in `#[cfg(test)]` modules) are excluded
-  - This significantly reduces reported function counts for well-tested modules
-  - Example: `formatter.rs` now reports 64 functions instead of 116
-  - God object scores are now more accurate and less influenced by test coverage
-  - **Migration**: Expect lower function counts in reports; this is correct behavior
+### Changed
+- **God object detection now differentiates god class vs god file** (#130)
+  - **God Class** (struct-based): Excludes test methods from complexity metrics
+    - Test methods don't contribute to structural complexity
+    - Method counts reflect production code only
+    - Example: Struct with 40 methods + 8 tests now reports 32 methods
+  - **God File** (file size): Includes all functions and lines
+    - Large test modules contribute to file navigation problems
+    - Function counts include both production and test code
+    - Example: `formatter.rs` still reports 2841 lines, 116 functions (correct)
+  - Output now clearly indicates detection type: "GOD_CLASS" vs "GOD_FILE"
+  - **Migration**: Only god class detection scores may decrease; god file unchanged
 ```
 
 ## Implementation Notes
@@ -489,18 +583,27 @@ Recommendation: **Option 1** - The current behavior is objectively wrong, fix it
 
 ### Breaking Changes
 
-**Impact**: Function counts will decrease for all files with tests
+**Impact**: Function counts will decrease ONLY for god class detection (struct-based)
 
-**Before (v0.3.0)**:
+**God File Detection (No Change)**:
 ```
-#1 SCORE: 74.6 [CRITICAL - FILE - GOD OBJECT]
+# Before and After - Same output
+#1 SCORE: 74.6 [CRITICAL - GOD FILE]
 └─ ./src/priority/formatter.rs (2841 lines, 116 functions)
+└─ WHY: Large file difficult to navigate. Tests contribute to file size problem.
 ```
 
-**After (v0.4.0)**:
+**God Class Detection (Breaking Change)**:
 ```
-#1 SCORE: 68.2 [CRITICAL - FILE - GOD OBJECT]
-└─ ./src/priority/formatter.rs (2841 lines, 64 functions)
+# Before (v0.3.0)
+#2 SCORE: 72.1 [CRITICAL - GOD CLASS]
+└─ src/config.rs: struct Config (40 methods, 25 fields)
+└─ WHY: 40 methods includes 8 test helper methods
+
+# After (v0.4.0)
+#2 SCORE: 65.3 [CRITICAL - GOD CLASS]
+└─ src/config.rs: struct Config (32 methods, 25 fields)
+└─ WHY: 32 production methods (tests excluded from complexity)
 ```
 
 ### Migration Checklist
