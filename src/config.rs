@@ -1251,6 +1251,7 @@ pub struct ValidationThresholds {
 }
 
 impl Default for ValidationThresholds {
+    #[allow(deprecated)]
     fn default() -> Self {
         Self {
             // Primary quality metrics
