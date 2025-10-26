@@ -103,6 +103,16 @@ pub enum OrganizationAntiPattern {
         suggested_struct_name: String,
         locations: Vec<SourceLocation>,
     },
+    StructInitialization {
+        function_name: String,
+        struct_name: String,
+        field_count: usize,
+        cyclomatic_complexity: usize,
+        field_based_complexity: f64,
+        confidence: f64,
+        recommendation: String,
+        location: SourceLocation,
+    },
 }
 
 impl OrganizationAntiPattern {
@@ -114,6 +124,7 @@ impl OrganizationAntiPattern {
             OrganizationAntiPattern::FeatureEnvy { location, .. } => location,
             OrganizationAntiPattern::PrimitiveObsession { locations, .. } => &locations[0],
             OrganizationAntiPattern::DataClump { locations, .. } => &locations[0],
+            OrganizationAntiPattern::StructInitialization { location, .. } => location,
         }
     }
 
@@ -127,6 +138,7 @@ impl OrganizationAntiPattern {
                 locations.iter().collect()
             }
             OrganizationAntiPattern::DataClump { locations, .. } => locations.iter().collect(),
+            OrganizationAntiPattern::StructInitialization { location, .. } => vec![location],
         }
     }
 }
@@ -211,6 +223,7 @@ mod god_object_detector;
 mod magic_value_detector;
 mod parameter_analyzer;
 mod primitive_obsession_detector;
+mod struct_init_detector;
 
 pub mod python;
 
@@ -219,6 +232,7 @@ pub use god_object_detector::GodObjectDetector;
 pub use magic_value_detector::MagicValueDetector;
 pub use parameter_analyzer::ParameterAnalyzer;
 pub use primitive_obsession_detector::PrimitiveObsessionDetector;
+pub use struct_init_detector::StructInitOrganizationDetector;
 
 // Multi-language support exports
 pub use class_ownership::{ClassOwnership, ClassOwnershipAnalyzer};

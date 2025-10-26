@@ -2156,6 +2156,109 @@ min_confidence = 0.8
 - Inter-module observer tracking via type analysis
 - Confidence scoring for ambiguous patterns
 
+## Struct Initialization Pattern Detection
+
+### Overview
+
+DebtMap includes specialized detection for struct initialization/conversion functions where high cyclomatic complexity arises from conditional field assignment rather than complex algorithmic logic. These functions are often incorrectly flagged as overly complex by traditional metrics.
+
+### Problem Statement
+
+Functions that construct structs from configuration or convert between types often exhibit:
+- **High cyclomatic complexity** from field-level conditionals (`unwrap_or`, `match` on `Option<T>`)
+- **Many simple branches** rather than deep algorithmic complexity
+- **Initialization-focused logic** rather than business logic
+
+Traditional cyclomatic complexity metrics penalize these patterns unfairly, treating them as equivalently complex to nested algorithmic logic.
+
+### Detection Strategy
+
+#### Pattern Recognition
+The detector identifies functions matching:
+- **Field count threshold**: ≥15 fields in struct literal
+- **Initialization ratio**: ≥70% of function lines dedicated to field initialization
+- **Low nesting depth**: ≤4 levels (characteristic of simple field mapping)
+- **Result wrapping**: Returns `Result<StructName, E>` or `StructName` directly
+
+#### Field-Based Complexity Metric
+
+Instead of cyclomatic complexity, we calculate a field-based complexity score:
+
+```rust
+field_score = match field_count {
+    0..=20 => 1.0,
+    21..=40 => 2.0,
+    41..=60 => 3.5,
+    _ => 5.0,
+} + (max_nesting_depth * 0.5) + (complex_fields.len() * 1.0)
+```
+
+This provides a more appropriate complexity measure for initialization patterns.
+
+#### Complex Field Detection
+Fields requiring >10 lines of initialization logic are flagged as "complex fields" that may benefit from extraction into helper functions.
+
+#### Field Dependency Analysis
+The detector tracks which fields reference other local variables/fields to identify:
+- **Interdependencies**: Fields that depend on computed values
+- **Derived fields**: Fields calculated from other fields
+- **Simple mappings**: Direct parameter-to-field assignments
+
+### Confidence Scoring
+
+Confidence is calculated based on multiple factors:
+- **Initialization ratio** (0.35 max): Higher ratio = higher confidence
+- **Field count** (0.25 max): More fields = more likely initialization
+- **Low nesting** (0.20 max): Shallow nesting typical of initialization
+- **Struct name patterns** (0.10 max): Names like `Args`, `Config`, `Options`
+- **Complex field penalty**: Many complex fields suggest mixed logic
+
+Threshold: Only patterns with ≥60% confidence are reported.
+
+### Recommendations
+
+Based on detected patterns, the detector provides actionable recommendations:
+
+| Field Count | Max Nesting | Complex Fields | Recommendation |
+|-------------|-------------|----------------|----------------|
+| >50         | any         | any            | Consider builder pattern |
+| any         | any         | >5             | Extract complex field initializations |
+| any         | >3          | any            | Reduce nesting depth |
+| ≤50         | ≤3          | ≤5             | Appropriately complex |
+
+### Integration
+
+The detector is integrated into DebtMap's Rust analyzer as an `OrganizationDetector`, running alongside other anti-pattern detectors (God Object, Feature Envy, etc.).
+
+Output includes:
+- Function name and struct being initialized
+- Field count and cyclomatic complexity (for comparison)
+- Field-based complexity score
+- Confidence percentage
+- Specific recommendation
+
+### Example Output
+
+```
+Struct initialization pattern in 'from_low_args' - 42 fields,
+cyclomatic: 38, field complexity: 2.5, confidence: 85%
+
+Recommendation: Initialization is appropriately complex for field count
+(Use field-based complexity 2.5 instead of cyclomatic 38)
+```
+
+### Limitations
+
+- **Source content dependency**: Requires file content for span analysis
+- **Rust-specific**: Currently only implemented for Rust (syn AST)
+- **Simple heuristics**: May miss complex initialization patterns
+
+### Testing
+
+**Unit Tests**: Core detection logic, field dependency analysis, confidence scoring
+**Integration Tests**: Real-world struct initialization patterns, false positive prevention
+**Property Tests**: Planned for invariant verification
+
 ## Dependencies
 
 ### Core Dependencies

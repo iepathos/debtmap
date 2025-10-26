@@ -223,6 +223,13 @@ impl<'a> StructInitVisitor<'a> {
         // Detect constructor calls
         let calls_constructors = detect_constructor_calls(&function.block);
 
+        // Analyze field dependencies and complexity
+        let (field_dependencies, complex_fields) = analyze_field_dependencies_and_complexity(
+            &function.block,
+            &return_analysis.field_names,
+            self.file_content,
+        );
+
         // Create pattern
         let pattern = StructInitPattern {
             struct_name: return_analysis.struct_name.unwrap_or_default(),
@@ -232,8 +239,8 @@ impl<'a> StructInitVisitor<'a> {
             initialization_ratio,
             avg_nesting_depth: avg_nesting,
             max_nesting_depth: max_nesting,
-            field_dependencies: Vec::new(), // TODO: Implement dependency analysis
-            complex_fields: Vec::new(),     // TODO: Identify complex fields
+            field_dependencies,
+            complex_fields,
             cyclomatic_complexity: cyclomatic,
             is_result_wrapped: return_analysis.is_result_wrapped,
             calls_constructors,
@@ -499,6 +506,114 @@ impl<'ast> Visit<'ast> for ConstructorCallVisitor {
                     }
                 }
             }
+        }
+        syn::visit::visit_expr(self, expr);
+    }
+}
+
+/// Analyze field dependencies and identify complex fields
+fn analyze_field_dependencies_and_complexity(
+    block: &syn::Block,
+    field_names: &[String],
+    file_content: &str,
+) -> (Vec<FieldDependency>, Vec<String>) {
+    let mut field_dependencies = Vec::new();
+    let mut complex_fields = Vec::new();
+
+    // Extract local variable bindings and their initializations
+    let local_bindings = extract_local_bindings(block);
+
+    // For each field, analyze its initialization
+    for field_name in field_names {
+        if let Some(binding) = local_bindings.iter().find(|(name, _)| name == field_name) {
+            let (_name, expr) = binding;
+
+            // Count lines in field initialization
+            let span = expr.span();
+            let start_line = span.start().line;
+            let end_line = span.end().line;
+            let init_lines = count_lines_in_span(file_content, start_line, end_line);
+
+            // Identify complex fields (>10 lines)
+            if init_lines > 10 {
+                complex_fields.push(field_name.clone());
+            }
+
+            // Find dependencies (variables referenced in initialization)
+            let depends_on = find_variable_references(expr, &local_bindings);
+
+            // Only add dependency info if there are actual dependencies
+            if !depends_on.is_empty() || init_lines > 5 {
+                field_dependencies.push(FieldDependency {
+                    field_name: field_name.clone(),
+                    depends_on,
+                    initialization_complexity: init_lines,
+                });
+            }
+        }
+    }
+
+    (field_dependencies, complex_fields)
+}
+
+/// Extract local variable bindings from a block
+fn extract_local_bindings(block: &syn::Block) -> Vec<(String, Expr)> {
+    let mut bindings = Vec::new();
+
+    for stmt in &block.stmts {
+        if let Stmt::Local(local) = stmt {
+            if let syn::Pat::Ident(pat_ident) = &local.pat {
+                let var_name = pat_ident.ident.to_string();
+                if let Some(init) = &local.init {
+                    bindings.push((var_name, (*init.expr).clone()));
+                }
+            }
+        }
+    }
+
+    bindings
+}
+
+/// Find variable references in an expression
+fn find_variable_references(expr: &Expr, local_bindings: &[(String, Expr)]) -> Vec<String> {
+    let mut visitor = VariableRefVisitor {
+        references: Vec::new(),
+        local_vars: local_bindings.iter().map(|(name, _)| name.clone()).collect(),
+    };
+    visitor.visit_expr(expr);
+    visitor.references
+}
+
+/// Visitor to find variable references
+struct VariableRefVisitor {
+    references: Vec<String>,
+    local_vars: Vec<String>,
+}
+
+impl<'ast> Visit<'ast> for VariableRefVisitor {
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            Expr::Path(expr_path) => {
+                if let Some(ident) = expr_path.path.get_ident() {
+                    let var_name = ident.to_string();
+                    // Only track references to local variables
+                    if self.local_vars.contains(&var_name) && !self.references.contains(&var_name) {
+                        self.references.push(var_name);
+                    }
+                }
+            }
+            Expr::Field(expr_field) => {
+                // Handle field access like low.column
+                if let Expr::Path(base_path) = &*expr_field.base {
+                    if let Some(ident) = base_path.path.get_ident() {
+                        let var_name = ident.to_string();
+                        if self.local_vars.contains(&var_name) && !self.references.contains(&var_name) {
+                            self.references.push(var_name);
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
         syn::visit::visit_expr(self, expr);
     }

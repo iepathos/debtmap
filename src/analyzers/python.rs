@@ -233,6 +233,20 @@ fn convert_org_pattern_to_debt_item(
                 suggested_struct_name
             ),
         ),
+        OrganizationAntiPattern::StructInitialization {
+            function_name,
+            field_count,
+            cyclomatic_complexity,
+            field_based_complexity,
+            recommendation,
+            ..
+        } => (
+            DebtType::Complexity,
+            format!(
+                "Struct initialization pattern in '{}' with {} fields (cyclomatic: {}, field-based: {:.1}): {}",
+                function_name, field_count, cyclomatic_complexity, field_based_complexity, recommendation
+            ),
+        ),
     };
 
     let location = pattern.primary_location();

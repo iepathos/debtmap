@@ -29,6 +29,7 @@ use crate::debt::suppression::{parse_suppression_comments, SuppressionContext};
 use crate::organization::{
     FeatureEnvyDetector, GodObjectDetector, MagicValueDetector, MaintainabilityImpact,
     OrganizationAntiPattern, OrganizationDetector, ParameterAnalyzer, PrimitiveObsessionDetector,
+    StructInitOrganizationDetector,
 };
 use crate::priority::call_graph::CallGraph;
 use crate::testing;
@@ -1309,6 +1310,7 @@ fn analyze_organization_patterns(file: &syn::File, path: &Path) -> Vec<DebtItem>
         Box::new(ParameterAnalyzer::new()),
         Box::new(FeatureEnvyDetector::new()),
         Box::new(PrimitiveObsessionDetector::new()),
+        Box::new(StructInitOrganizationDetector::new()),
     ];
 
     let mut organization_items = Vec::new();
@@ -1418,6 +1420,24 @@ fn pattern_to_message_context(pattern: &OrganizationAntiPattern) -> (String, Opt
                 parameter_group.parameters.len()
             ),
             Some(format!("Extract struct: {}", suggested_struct_name)),
+        ),
+        OrganizationAntiPattern::StructInitialization {
+            function_name,
+            field_count,
+            cyclomatic_complexity,
+            field_based_complexity,
+            confidence,
+            recommendation,
+            ..
+        } => (
+            format!(
+                "Struct initialization pattern in '{}' - {} fields, cyclomatic: {}, field complexity: {:.1}, confidence: {:.0}%",
+                function_name, field_count, cyclomatic_complexity, field_based_complexity, confidence * 100.0
+            ),
+            Some(format!(
+                "{} (Use field-based complexity {:.1} instead of cyclomatic {})",
+                recommendation, field_based_complexity, cyclomatic_complexity
+            )),
         ),
     }
 }
