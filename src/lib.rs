@@ -24,6 +24,7 @@ pub mod organization;
 pub mod output;
 pub mod patterns;
 pub mod priority;
+pub mod progress;
 pub mod refactoring;
 pub mod resource;
 pub mod risk;

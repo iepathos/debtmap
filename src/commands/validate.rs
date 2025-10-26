@@ -373,7 +373,6 @@ fn calculate_unified_analysis(
                 project_path,
                 call_graph.clone(),
                 thread_count,
-                true, // show_progress
             )
             .unwrap_or_else(|e| {
                 log::warn!(
