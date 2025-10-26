@@ -123,6 +123,40 @@ impl GodObjectDetector {
         file_path: &Path,
         ast: &syn::File,
     ) -> GodObjectType {
+        // First, check for registry pattern before classifying as god object
+        if let Some(source_content) = &self.source_content {
+            let detector = crate::organization::RegistryPatternDetector::default();
+            if let Some(pattern) = detector.detect(ast, source_content) {
+                let confidence = detector.confidence(&pattern);
+
+                // Calculate what the god object score would have been
+                let original_score = calculate_god_object_score(
+                    total_methods,
+                    per_struct_metrics
+                        .iter()
+                        .map(|s| s.field_count)
+                        .max()
+                        .unwrap_or(0),
+                    per_struct_metrics
+                        .iter()
+                        .flat_map(|s| &s.responsibilities)
+                        .count(),
+                    source_content.lines().count(),
+                    thresholds,
+                );
+
+                let adjusted_score =
+                    crate::organization::adjust_registry_score(original_score, &pattern);
+
+                return GodObjectType::Registry {
+                    pattern,
+                    confidence,
+                    original_score,
+                    adjusted_score,
+                };
+            }
+        }
+
         // Check if any individual struct exceeds thresholds (god class)
         for struct_metrics in per_struct_metrics {
             if struct_metrics.method_count > thresholds.max_methods
@@ -241,6 +275,42 @@ impl GodObjectDetector {
                         file_name, total_structs, total_methods, split_suggestions
                     )
                 }
+            }
+            GodObjectType::Registry {
+                pattern,
+                confidence,
+                original_score,
+                adjusted_score,
+            } => {
+                format!(
+                    "Registry/Catalog Pattern Detected (confidence: {:.0}%)\n\
+                    This file contains {} implementations of the '{}' trait (avg {} lines each).\n\
+                    This is an intentional registry pattern for discoverability and consistency, not a god object requiring splitting.\n\
+                    \n\
+                    Pattern metrics:\n\
+                    - Trait implementations: {}\n\
+                    - Average implementation size: {:.1} lines\n\
+                    - Unit struct ratio: {:.0}%\n\
+                    - Coverage: {:.0}%\n\
+                    \n\
+                    Score adjustment: {:.0} → {:.0} ({}% reduction)\n\
+                    \n\
+                    Consider if registry has grown too large for navigation:\n\
+                    - If trait impls exceed 200, consider logical grouping (e.g., by category)\n\
+                    - Ensure consistent naming and documentation across implementations\n\
+                    - Add table-of-contents or index for discoverability",
+                    confidence * 100.0,
+                    pattern.impl_count,
+                    pattern.trait_name,
+                    pattern.avg_impl_size as usize,
+                    pattern.impl_count,
+                    pattern.avg_impl_size,
+                    pattern.unit_struct_ratio * 100.0,
+                    pattern.trait_impl_coverage * 100.0,
+                    original_score,
+                    adjusted_score,
+                    ((1.0 - adjusted_score / original_score) * 100.0) as usize
+                )
             }
             GodObjectType::NotGodObject => {
                 if per_struct_metrics.is_empty() {

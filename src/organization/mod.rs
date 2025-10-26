@@ -14,6 +14,7 @@ pub mod god_object_metrics;
 pub mod javascript;
 pub mod language;
 pub mod purity_analyzer;
+pub mod registry_pattern;
 pub mod split_validator;
 pub mod struct_ownership;
 
@@ -41,6 +42,10 @@ pub use complexity_weighting::{
 };
 
 pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};
+
+pub use registry_pattern::{
+    adjust_registry_score, RegistryPattern, RegistryPatternDetector, TraitImplInfo,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrganizationAntiPattern {

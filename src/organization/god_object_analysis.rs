@@ -414,6 +414,13 @@ pub enum GodObjectType {
         largest_struct: StructMetrics,
         suggested_splits: Vec<ModuleSplit>,
     },
+    /// Registry/catalog pattern - intentional centralization of trait implementations
+    Registry {
+        pattern: crate::organization::registry_pattern::RegistryPattern,
+        confidence: f64,
+        original_score: f64,
+        adjusted_score: f64,
+    },
     /// No god object detected
     NotGodObject,
 }
