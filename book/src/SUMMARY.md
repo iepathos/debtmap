@@ -21,6 +21,7 @@
 - [Coverage Integration](coverage-integration.md)
 - [Entropy Analysis](entropy-analysis.md)
 - [God Object Detection](god-object-detection.md)
+- [Multi-Pass Analysis](multi-pass-analysis.md)
 - [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
 - [Responsibility Analysis](responsibility-analysis.md)
