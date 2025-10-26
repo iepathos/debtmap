@@ -138,6 +138,10 @@ fn validate_and_report(
         None
     };
 
+    // Check for deprecated threshold usage and warn user
+    let thresholds = config::get_validation_thresholds();
+    warn_deprecated_thresholds(&thresholds);
+
     let (pass, details) = risk_insights
         .as_ref()
         .map(|insights| validate_with_risk(results, insights, lcov_data.as_ref(), config))
@@ -153,6 +157,35 @@ fn validate_and_report(
             config.verbosity,
         );
         anyhow::bail!("Validation failed")
+    }
+}
+
+/// Warn users about deprecated validation thresholds
+#[allow(deprecated)]
+fn warn_deprecated_thresholds(thresholds: &config::ValidationThresholds) {
+    let mut deprecated = Vec::new();
+
+    if thresholds.max_high_complexity_count.is_some() {
+        deprecated.push("max_high_complexity_count");
+    }
+    if thresholds.max_debt_items.is_some() {
+        deprecated.push("max_debt_items");
+    }
+    if thresholds.max_high_risk_functions.is_some() {
+        deprecated.push("max_high_risk_functions");
+    }
+
+    if !deprecated.is_empty() {
+        eprintln!("\n⚠️  DEPRECATION WARNING:");
+        eprintln!("   The following validation thresholds are deprecated:");
+        for metric in &deprecated {
+            eprintln!("   - {}", metric);
+        }
+        eprintln!("\n   These scale-dependent metrics will be removed in v1.0.");
+        eprintln!("   Please migrate to density-based validation:");
+        eprintln!("     - Use 'max_debt_density' instead of absolute counts");
+        eprintln!("     - Density metrics remain stable as your codebase grows");
+        eprintln!("     - See: https://github.com/your-repo/debtmap#density-based-validation\n");
     }
 }
 
@@ -183,33 +216,60 @@ fn validate_with_risk(
         .max_debt_density
         .unwrap_or(thresholds.max_debt_density);
 
+    // === PRIMARY QUALITY METRICS (Scale-Independent) ===
+    // These are the core validation criteria that measure actual code quality
     let avg_complexity_pass =
         results.complexity.summary.average_complexity <= thresholds.max_average_complexity;
-    let high_complexity_pass =
-        results.complexity.summary.high_complexity_count <= thresholds.max_high_complexity_count;
-    let debt_items_pass = results.technical_debt.items.len() <= thresholds.max_debt_items;
-    let debt_score_pass = total_debt_score <= thresholds.max_total_debt_score;
+
     let debt_density_pass = debt_density <= max_debt_density;
+
     let codebase_risk_pass = insights.codebase_risk_score <= thresholds.max_codebase_risk_score;
-    let high_risk_func_pass = high_risk_count <= thresholds.max_high_risk_functions;
+
+    // === SAFETY NET ===
+    // High ceiling to catch extreme cases only
+    let debt_score_pass = total_debt_score <= thresholds.max_total_debt_score;
+
+    // === OPTIONAL: Coverage Requirement ===
     let coverage_pass = coverage_percentage >= thresholds.min_coverage_percentage;
 
+    // === DEPRECATED METRICS (Warn but allow) ===
+    // Only validate if explicitly set by user
+    #[allow(deprecated)]
+    let high_complexity_pass = thresholds
+        .max_high_complexity_count
+        .map(|threshold| results.complexity.summary.high_complexity_count <= threshold)
+        .unwrap_or(true);
+
+    #[allow(deprecated)]
+    let debt_items_pass = thresholds
+        .max_debt_items
+        .map(|threshold| results.technical_debt.items.len() <= threshold)
+        .unwrap_or(true);
+
+    #[allow(deprecated)]
+    let high_risk_func_pass = thresholds
+        .max_high_risk_functions
+        .map(|threshold| high_risk_count <= threshold)
+        .unwrap_or(true);
+
+    // Primary validation based on density and quality ratios
     let pass = avg_complexity_pass
-        && high_complexity_pass
-        && debt_items_pass
-        && debt_score_pass
         && debt_density_pass
         && codebase_risk_pass
-        && high_risk_func_pass
-        && coverage_pass;
+        && debt_score_pass
+        && coverage_pass
+        && high_complexity_pass
+        && debt_items_pass
+        && high_risk_func_pass;
 
+    #[allow(deprecated)]
     let details = ValidationDetails {
         average_complexity: results.complexity.summary.average_complexity,
         max_average_complexity: thresholds.max_average_complexity,
         high_complexity_count: results.complexity.summary.high_complexity_count,
-        max_high_complexity_count: thresholds.max_high_complexity_count,
+        max_high_complexity_count: thresholds.max_high_complexity_count.unwrap_or(0),
         debt_items: results.technical_debt.items.len(),
-        max_debt_items: thresholds.max_debt_items,
+        max_debt_items: thresholds.max_debt_items.unwrap_or(0),
         total_debt_score,
         max_total_debt_score: thresholds.max_total_debt_score,
         debt_density,
@@ -217,7 +277,7 @@ fn validate_with_risk(
         codebase_risk_score: insights.codebase_risk_score,
         max_codebase_risk_score: thresholds.max_codebase_risk_score,
         high_risk_functions: high_risk_count,
-        max_high_risk_functions: thresholds.max_high_risk_functions,
+        max_high_risk_functions: thresholds.max_high_risk_functions.unwrap_or(0),
         coverage_percentage,
         min_coverage_percentage: thresholds.min_coverage_percentage,
     };
@@ -235,27 +295,42 @@ fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, 
         .max_debt_density
         .unwrap_or(thresholds.max_debt_density);
 
+    // === PRIMARY QUALITY METRICS (Scale-Independent) ===
     let avg_complexity_pass =
         results.complexity.summary.average_complexity <= thresholds.max_average_complexity;
-    let high_complexity_pass =
-        results.complexity.summary.high_complexity_count <= thresholds.max_high_complexity_count;
-    let debt_items_pass = results.technical_debt.items.len() <= thresholds.max_debt_items;
-    let debt_score_pass = total_debt_score <= thresholds.max_total_debt_score;
+
     let debt_density_pass = debt_density <= max_debt_density;
 
-    let pass = avg_complexity_pass
-        && high_complexity_pass
-        && debt_items_pass
-        && debt_score_pass
-        && debt_density_pass;
+    // === SAFETY NET ===
+    let debt_score_pass = total_debt_score <= thresholds.max_total_debt_score;
 
+    // === DEPRECATED METRICS (Warn but allow) ===
+    #[allow(deprecated)]
+    let high_complexity_pass = thresholds
+        .max_high_complexity_count
+        .map(|threshold| results.complexity.summary.high_complexity_count <= threshold)
+        .unwrap_or(true);
+
+    #[allow(deprecated)]
+    let debt_items_pass = thresholds
+        .max_debt_items
+        .map(|threshold| results.technical_debt.items.len() <= threshold)
+        .unwrap_or(true);
+
+    let pass = avg_complexity_pass
+        && debt_density_pass
+        && debt_score_pass
+        && high_complexity_pass
+        && debt_items_pass;
+
+    #[allow(deprecated)]
     let details = ValidationDetails {
         average_complexity: results.complexity.summary.average_complexity,
         max_average_complexity: thresholds.max_average_complexity,
         high_complexity_count: results.complexity.summary.high_complexity_count,
-        max_high_complexity_count: thresholds.max_high_complexity_count,
+        max_high_complexity_count: thresholds.max_high_complexity_count.unwrap_or(0),
         debt_items: results.technical_debt.items.len(),
-        max_debt_items: thresholds.max_debt_items,
+        max_debt_items: thresholds.max_debt_items.unwrap_or(0),
         total_debt_score,
         max_total_debt_score: thresholds.max_total_debt_score,
         debt_density,
@@ -263,7 +338,7 @@ fn validate_basic(results: &AnalysisResults, config: &ValidateConfig) -> (bool, 
         codebase_risk_score: 0.0,
         max_codebase_risk_score: thresholds.max_codebase_risk_score,
         high_risk_functions: 0,
-        max_high_risk_functions: thresholds.max_high_risk_functions,
+        max_high_risk_functions: thresholds.max_high_risk_functions.unwrap_or(0),
         coverage_percentage: 0.0,
         min_coverage_percentage: thresholds.min_coverage_percentage,
     };
