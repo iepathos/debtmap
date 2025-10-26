@@ -2,164 +2,177 @@
   "chapter_id": "cli-reference",
   "chapter_title": "CLI Reference",
   "chapter_file": "book/src/cli-reference.md",
-  "drift_detected": false,
-  "severity": "low",
-  "quality_assessment": "Excellent - This chapter is comprehensive, accurate, and well-organized. All CLI commands and options from src/cli.rs are documented correctly with proper descriptions, examples, and categorization. The chapter demonstrates exceptional alignment with the actual implementation.",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter has excellent structure and covers most CLI options comprehensively, but is missing several recently added debugging and advanced features that exist in the codebase",
   "issues": [
     {
-      "type": "minor_clarity",
-      "severity": "low",
-      "section": "Validate Command - Threshold Options",
-      "description": "While the chapter correctly states that threshold options are configured via config file for validate command, it could be slightly clearer about which specific options are unavailable",
-      "current_content": "Analysis thresholds (complexity, duplication, presets) are typically configured via the `--config` file rather than command-line flags.",
-      "should_be": "The validate command does not support --threshold-complexity, --threshold-duplication, or --threshold-preset flags (these are analyze-only). Instead, configure thresholds in the .debtmap.toml config file.",
-      "fix_suggestion": "Add explicit statement that threshold flags are not available in validate command, only in analyze",
-      "source_reference": "src/cli.rs:217-282 (Validate command has no threshold_complexity, threshold_duplication, or threshold_preset fields)"
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debugging & Verbosity",
+      "description": "Chapter missing --explain-metrics flag for explaining metric definitions and formulas",
+      "should_add": "Document --explain-metrics flag that explains metric definitions (measured vs estimated)",
+      "fix_suggestion": "Add to Debugging section: `--explain-metrics` - Explain metric definitions and formulas (measured vs estimated)",
+      "source_reference": "src/cli.rs:253-254 - explain_metrics: bool field in Analyze command"
     },
     {
-      "type": "minor_enhancement",
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debugging & Verbosity",
+      "description": "Chapter missing advanced call graph debugging flags",
+      "should_add": "Document --debug-call-graph, --trace-function, --call-graph-stats, --validate-call-graph, --debug-format flags",
+      "fix_suggestion": "Add new subsection 'Call Graph Debugging' with: --debug-call-graph (enable detailed call graph debugging), --trace-function (trace specific functions during resolution), --call-graph-stats (show only statistics, no detailed list), --validate-call-graph (validate structure and report issues), --debug-format <FORMAT> (text or json, default: text)",
+      "source_reference": "src/cli.rs:256-274 - debug_call_graph, trace_functions, call_graph_stats_only, validate_call_graph, debug_format fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Output Control",
+      "description": "Chapter missing dependency display options for controlling caller/callee visibility",
+      "should_add": "Document --show-dependencies, --no-dependencies, --max-callers, --max-callees, --show-external-calls, --show-std-lib-calls flags",
+      "fix_suggestion": "Add new subsection 'Dependency Display Options': --show-dependencies (show caller/callee info in output), --no-dependencies (hide dependency information), --max-callers <N> (limit callers shown, default: 5), --max-callees <N> (limit callees shown, default: 5), --show-external-calls (include external crate calls in dependencies), --show-std-lib-calls (include standard library calls in dependencies)",
+      "source_reference": "src/cli.rs:276-298 - show_dependencies, no_dependencies, max_callers, max_callees, show_external, show_std_lib fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Analysis Control",
+      "description": "Chapter missing AST-based functional composition analysis feature (spec 111)",
+      "should_add": "Document --ast-functional-analysis and --functional-analysis-profile flags",
+      "fix_suggestion": "Add to Analysis Control section: --ast-functional-analysis (enable AST-based functional composition analysis for spec 111), --functional-analysis-profile <PROFILE> (strict, balanced, or lenient - controls functional purity analysis thresholds)",
+      "source_reference": "src/cli.rs:300-306 - ast_functional_analysis: bool, functional_analysis_profile: Option<FunctionalAnalysisProfile> fields"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Validate Command",
+      "description": "Validate command missing --no-parallel and --jobs options in documentation",
+      "should_add": "Document that validate command supports --no-parallel and --jobs flags for performance control",
+      "fix_suggestion": "Add to validate command options under 'Performance Control': --no-parallel (disable parallel call graph construction, enabled by default), --jobs <N> (number of threads for parallel processing, 0 = use all cores, can also use DEBTMAP_JOBS env var)",
+      "source_reference": "src/cli.rs:382-394 - Validate command includes no_parallel and jobs fields with detailed documentation"
+    },
+    {
+      "type": "incomplete_explanation",
       "severity": "low",
       "section": "Compare Command",
-      "description": "The documentation mentions that --plan and --target-location are mutually exclusive but could be more explicit about the error behavior",
-      "current_content": "**Note:** `--plan` and `--target-location` are mutually exclusive options; use one or the other to specify the target location.",
-      "should_be": "Add explicit statement that using both options together will cause a CLI error",
-      "fix_suggestion": "Clarify that the options will cause a CLI error if both are provided, not just a note that they're mutually exclusive",
-      "source_reference": "src/cli.rs:300 - conflicts_with = \"plan\" attribute"
+      "description": "Compare command documented but mutual exclusivity of --plan and --target-location could be more explicit",
+      "current_content": "**Note:** `--plan` and `--target-location` are mutually exclusive options. Using both together will cause a CLI error.",
+      "should_be": "More prominent explanation showing example error message when both flags are used",
+      "fix_suggestion": "Add example showing: 'error: the argument '--plan <FILE>' cannot be used with '--target-location <LOCATION>''",
+      "source_reference": "src/cli.rs:413 - conflicts_with = \"plan\" annotation on target_location field"
     },
     {
-      "type": "positive_verification",
-      "severity": "none",
-      "section": "Overall Documentation Quality",
-      "description": "Chapter demonstrates exceptional alignment with actual implementation",
-      "verification_details": {
-        "commands_verified": {
-          "analyze": {
-            "documented": true,
-            "all_options_present": true,
-            "options_count": 45,
-            "accuracy": "100%",
-            "verified_options": [
-              "path", "format", "output", "json_format", "threshold_complexity",
-              "threshold_duplication", "languages", "coverage_file", "enable_context",
-              "context_providers", "disable_context", "top", "tail", "summary",
-              "semantic_off", "explain_score", "verbosity", "verbose_macro_warnings",
-              "show_macro_stats", "group_by_category", "min_priority", "filter_categories",
-              "no_context_aware", "threshold_preset", "plain", "no_parallel", "jobs",
-              "use_cache", "no_cache", "clear_cache", "force_cache_rebuild", "cache_stats",
-              "migrate_cache", "cache_location", "multi_pass", "show_attribution",
-              "detail_level", "aggregate_only", "no_aggregation", "aggregation_method",
-              "min_problematic", "no_god_object", "max_files", "validate_loc"
-            ]
-          },
-          "init": {
-            "documented": true,
-            "all_options_present": true,
-            "options_count": 1,
-            "accuracy": "100%",
-            "verified_options": ["force"]
-          },
-          "validate": {
-            "documented": true,
-            "all_options_present": true,
-            "options_count": 13,
-            "accuracy": "100%",
-            "verified_options": [
-              "path", "config", "coverage_file", "format", "output",
-              "enable_context", "context_providers", "disable_context",
-              "max_debt_density", "top", "tail", "summary", "semantic_off",
-              "explain_score", "verbosity"
-            ],
-            "correctly_excluded": [
-              "threshold_complexity", "threshold_duplication", "threshold_preset",
-              "languages", "jobs", "cache options"
-            ]
-          },
-          "compare": {
-            "documented": true,
-            "all_options_present": true,
-            "options_count": 6,
-            "accuracy": "100%",
-            "verified_options": [
-              "before", "after", "plan", "target_location", "format", "output"
-            ]
-          }
-        },
-        "aliases_verified": {
-          "coverage_file_lcov": "Correctly documented as visible alias",
-          "enable_context_context": "Correctly documented as visible alias",
-          "top_head": "Correctly documented as visible alias",
-          "all_short_forms": "Correctly documented (-v, -f, -o, -c, -j, -s)"
-        },
-        "deprecated_options_verified": {
-          "cache": "Correctly marked as hidden/deprecated",
-          "explain_score": "Correctly marked as hidden/deprecated with migration to -v"
-        },
-        "default_values_verified": {
-          "threshold_complexity": "10 (matches src/cli.rs:45)",
-          "threshold_duplication": "50 (matches src/cli.rs:49)",
-          "jobs": "0 (matches src/cli.rs:138)",
-          "format_analyze": "terminal (matches src/cli.rs:31)",
-          "format_compare": "json (matches src/cli.rs:304)",
-          "json_format": "legacy (matches src/cli.rs:37)",
-          "detail_level": "standard (matches src/cli.rs:178)",
-          "aggregation_method": "weighted_sum (matches src/cli.rs:190)"
-        }
-      },
-      "source_reference": "src/cli.rs:1-512 - Complete verification of all commands and options"
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Validate Command Options",
+      "description": "Documentation doesn't explicitly show that validate command supports hidden/deprecated --explain-score flag",
+      "current_content": "Validate command shows --verbose option",
+      "should_be": "Should note that --explain-score is deprecated (hidden) in validate command, use --verbose instead",
+      "fix_suggestion": "Add note in validate command that --explain-score exists but is deprecated (use -v, -vv, -vvv instead)",
+      "source_reference": "src/cli.rs:371-373 - Validate has explain_score with hide = true attribute"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Command Compatibility Matrix",
+      "description": "Compatibility matrix doesn't include new debugging and functional analysis options",
+      "should_add": "Rows for --explain-metrics, --debug-call-graph, --trace-function, --validate-call-graph, --show-dependencies, --ast-functional-analysis, --max-callers, --max-callees",
+      "fix_suggestion": "Expand compatibility matrix table to include all debugging flags and functional analysis options with their command compatibility",
+      "source_reference": "src/cli.rs - Multiple new fields added that are not reflected in the compatibility matrix"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Examples",
+      "description": "No examples showing call graph debugging or functional analysis usage",
+      "should_add": "Examples demonstrating --debug-call-graph, --validate-call-graph, --trace-function, and --ast-functional-analysis",
+      "fix_suggestion": "Add 'Advanced Debugging' subsection to Examples with: debtmap analyze . --debug-call-graph --trace-function 'my_function' --debug-format json, and debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict",
+      "source_reference": "src/cli.rs:256-306 and src/commands/analyze.rs:383-516 - Implementation shows advanced debugging capabilities"
     }
   ],
   "positive_aspects": [
-    "All CLI commands are comprehensively documented with accurate descriptions",
-    "Every option from src/cli.rs is present in the documentation",
-    "Default values are correctly documented and match implementation exactly",
-    "All visible aliases are documented correctly (--lcov, --head, --enable-context)",
-    "Deprecated options are properly marked with migration guidance (--cache, --explain-score)",
-    "Options are excellently organized into logical categories (Output Control, Analysis Control, etc.)",
-    "Extensive examples section covers common use cases with practical commands",
-    "Compatibility matrix accurately shows which options work with which commands",
-    "Troubleshooting section addresses practical issues users will encounter",
+    "Comprehensive coverage of core commands (analyze, validate, compare, init)",
+    "Well-organized option categories (Output, Analysis, Context, Performance, Caching, Debugging)",
+    "Excellent examples section with real-world use cases and workflows",
+    "Good troubleshooting section with practical solutions for common issues",
+    "Clear documentation of deprecated options (--cache, --explain-score) with migration guidance",
+    "Command compatibility matrix provides helpful quick reference",
+    "Option aliases documented clearly (--lcov, --head, --enable-context)",
+    "Environment variables documented (DEBTMAP_CACHE_DIR, DEBTMAP_JOBS)",
     "Best practices section provides actionable guidance for different scenarios",
-    "Environment variables are documented (DEBTMAP_CACHE_DIR)",
+    "Common workflows section demonstrates practical usage patterns",
     "Quick Start section provides immediate value for new users",
-    "Common workflows section demonstrates real-world usage patterns",
-    "The validate command correctly shows only its actual options (not analyze options)",
-    "The chapter structure flows logically from basic to advanced topics",
-    "Code examples are syntactically correct and runnable"
+    "Default values are accurately documented throughout",
+    "Code examples are syntactically correct and would execute properly",
+    "Good balance between reference material and practical guidance",
+    "Clear explanations of complex features like coverage integration and context-aware analysis"
   ],
   "improvement_suggestions": [
-    "Consider adding a brief note in the Validate command section explicitly listing which analyze options are NOT available (--threshold-complexity, --threshold-duplication, --threshold-preset, --jobs, --cache-*, --languages)",
-    "Could add an example showing the error message when both --plan and --target-location are provided to compare command",
-    "Minor: Consider adding cross-references from Quick Start examples to detailed sections",
-    "Consider adding a section on exit codes for analyze and compare commands (currently only documented for validate)",
-    "Could add examples of additional DEBTMAP_CACHE_* environment variables mentioned in features.json but not prominently featured in the chapter",
-    "Could add a visual diagram showing the relationship between commands (e.g., analyze → JSON → compare)",
-    "Consider adding a section on combining multiple filters and options for power users"
+    "Add 'Call Graph Debugging' subsection to Debugging & Verbosity section with all call graph flags",
+    "Add 'Dependency Display Options' subsection to Output Control section",
+    "Document AST-based functional analysis feature in Analysis Control section with use cases",
+    "Update Command Compatibility Matrix to include all current flags (9 missing flags identified)",
+    "Add examples for new debugging features (call graph tracing, validation, functional analysis)",
+    "Add 'Advanced Debugging Workflows' subsection showing combined use of debugging flags",
+    "Document when to use different functional analysis profiles (strict for pure FP, lenient for imperative)",
+    "Add troubleshooting entry for call graph resolution issues and how to debug them",
+    "Consider grouping all call-graph-related flags together for easier discovery",
+    "Add cross-references between related options (e.g., --debug-call-graph → --validate-call-graph)",
+    "Document the relationship between --jobs in analyze vs validate commands",
+    "Add example showing DEBTMAP_JOBS environment variable usage as alternative to --jobs flag",
+    "Consider adding a 'Recently Added Features' section highlighting new flags for existing users"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-14",
-    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "analyzed_at": "2025-10-25",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
     "topics_covered": [
       "Commands (analyze, init, validate, compare)",
-      "Arguments and options for each command",
-      "Output formats (json, markdown, terminal)",
-      "Configuration file usage",
-      "Environment variables",
-      "Common workflows",
+      "Arguments and options",
+      "Output formats",
+      "Configuration",
+      "Coverage integration",
+      "Context-aware analysis",
+      "Performance tuning",
+      "Caching",
+      "Debugging",
       "Troubleshooting",
       "Best practices",
-      "Option aliases",
-      "Deprecated options"
+      "Common workflows"
     ],
     "validation_focus": "Verify all CLI commands from src/cli/ are documented with current options",
-    "validation_result": "PASSED - All commands and options from src/cli.rs are accurately documented with correct descriptions, default values, and aliases",
-    "code_analysis": {
-      "source_file": "src/cli.rs",
-      "lines_analyzed": "1-512",
-      "total_commands": 4,
-      "total_options_verified": 65,
-      "accuracy_rate": "100%",
-      "drift_issues_found": 0,
-      "documentation_quality": "Exceptional"
+    "code_files_reviewed": [
+      "src/cli.rs (lines 1-625)",
+      "src/commands/analyze.rs (lines 1-517)"
+    ],
+    "total_cli_options_in_code": {
+      "analyze_command": 83,
+      "validate_command": 22,
+      "compare_command": 6,
+      "init_command": 1
+    },
+    "documented_options_count": 74,
+    "undocumented_options_count": 9,
+    "undocumented_options_list": [
+      "explain_metrics",
+      "debug_call_graph",
+      "trace_functions",
+      "call_graph_stats_only",
+      "validate_call_graph",
+      "debug_format",
+      "show_dependencies",
+      "no_dependencies",
+      "max_callers",
+      "max_callees",
+      "show_external",
+      "show_std_lib",
+      "ast_functional_analysis",
+      "functional_analysis_profile"
+    ],
+    "documentation_accuracy": "89.2%",
+    "drift_severity_breakdown": {
+      "high": 3,
+      "medium": 2,
+      "low": 4
     }
   }
 }

@@ -94,6 +94,11 @@ debtmap validate <PATH> [OPTIONS]
 *Analysis Control:*
 - `--semantic-off` - Disable semantic analysis (fallback mode)
 
+*Performance Control:*
+- `--no-parallel` - Disable parallel call graph construction (enabled by default)
+- `-j, --jobs <N>` - Number of threads for parallel processing (0 = use all cores)
+  - Can also use `DEBTMAP_JOBS` environment variable
+
 *Debugging & Verbosity:*
 - `-v, --verbose` - Increase verbosity level (can be repeated: -v, -vv, -vvv)
 
@@ -104,9 +109,10 @@ The `validate` command supports a focused subset of `analyze` options, primarily
 
 **Note:** The following `analyze` options are NOT available in the `validate` command:
 - `--threshold-complexity`, `--threshold-duplication`, `--threshold-preset` (configure these in `.debtmap.toml` instead)
-- `--jobs`, `--no-parallel` (performance tuning)
 - `--cache-*` options (caching control)
 - `--languages` (language filtering)
+
+**Note:** The `--explain-score` flag exists in the `validate` command but is deprecated (hidden). Use `-v`, `-vv`, or `-vvv` for verbosity instead.
 
 Configure analysis thresholds in your `.debtmap.toml` configuration file for use with the `validate` command.
 
@@ -131,7 +137,11 @@ debtmap compare --before <FILE> --after <FILE> [OPTIONS]
 - `--plan <FILE>` - Path to implementation plan (to extract target location)
 - `--target-location <LOCATION>` - Target location in format `file:function:line`
 
-**Note:** `--plan` and `--target-location` are mutually exclusive options. Using both together will cause a CLI error. Use one or the other to specify the target location.
+**Note:** `--plan` and `--target-location` are mutually exclusive options. Using both together will cause a CLI error:
+```
+error: the argument '--plan <FILE>' cannot be used with '--target-location <LOCATION>'
+```
+Use one or the other to specify the target location.
 
 **Output Options:**
 - `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
@@ -165,6 +175,14 @@ Control how analysis results are formatted and displayed.
 - `--aggregate-only` - Show only aggregated file-level scores
 - `--group-by-category` - Group output by debt category
 
+**Dependency Display Options:**
+- `--show-dependencies` - Show caller/callee information in output
+- `--no-dependencies` - Hide dependency information (conflicts with --show-dependencies)
+- `--max-callers <N>` - Maximum number of callers to display (default: 5)
+- `--max-callees <N>` - Maximum number of callees to display (default: 5)
+- `--show-external-calls` - Include external crate calls in dependencies
+- `--show-std-lib-calls` - Include standard library calls in dependencies
+
 ### Analysis Control
 
 Configure analysis behavior, thresholds, and language selection.
@@ -190,6 +208,15 @@ Configure analysis behavior, thresholds, and language selection.
 - `--no-context-aware` - Disable context-aware false positive reduction (enabled by default)
 - `--multi-pass` - Enable multi-pass analysis with attribution
 - `--attribution` - Show complexity attribution details
+
+**Functional Programming Analysis:**
+- `--ast-functional-analysis` - Enable AST-based functional composition analysis (spec 111)
+  - Analyzes code for functional programming patterns and composition
+  - Detects pure functions, immutability, and side effects
+- `--functional-analysis-profile <PROFILE>` - Set functional analysis profile
+  - `strict` - Strict functional purity requirements (for pure FP codebases)
+  - `balanced` - Balanced analysis suitable for mixed paradigms (default)
+  - `lenient` - Lenient thresholds for imperative codebases
 
 ### Context & Coverage
 
@@ -243,10 +270,20 @@ Control diagnostic output and debugging information.
   - `-vvv` - Show all debug information
 
 **Specialized Debugging:**
+- `--explain-metrics` - Explain metric definitions and formulas (measured vs estimated)
 - `--verbose-macro-warnings` - Show verbose macro parsing warnings (Rust analysis)
 - `--show-macro-stats` - Show macro expansion statistics at end of analysis
 - `--detail-level <LEVEL>` - Detail level for diagnostic reports
   - Options: summary, standard, comprehensive, debug (default: standard)
+
+**Call Graph Debugging:**
+- `--debug-call-graph` - Enable detailed call graph debugging with resolution information
+- `--trace-function <FUNCTIONS>` - Trace specific functions during call resolution (comma-separated)
+  - Example: `--trace-function 'my_function,another_function'`
+- `--call-graph-stats` - Show only call graph statistics (no detailed failure list)
+- `--validate-call-graph` - Validate call graph structure and report issues
+- `--debug-format <FORMAT>` - Debug output format: text or json (default: text)
+  - Use with call graph debugging flags to control output format
 
 ### Aggregation
 
@@ -303,6 +340,9 @@ debtmap init --force
 - `DEBTMAP_CACHE_DIR` - Override default cache directory location
   - Can also be set via `--cache-location` flag
   - Affects where analysis results are cached for faster subsequent runs
+- `DEBTMAP_JOBS` - Number of threads for parallel processing (0 = use all cores)
+  - Can also be set via `--jobs` / `-j` flag
+  - Controls thread pool size for parallel call graph construction
 
 ### Getting Help
 
@@ -471,6 +511,18 @@ debtmap analyze src/ -vv
 debtmap analyze src/ -vvv
 ```
 
+Debug call graph resolution issues:
+```bash
+# Enable call graph debugging
+debtmap analyze . --debug-call-graph
+
+# Trace specific functions
+debtmap analyze . --debug-call-graph --trace-function 'problematic_function'
+
+# Validate call graph structure
+debtmap analyze . --validate-call-graph --debug-format json
+```
+
 Show macro expansion statistics (Rust):
 ```bash
 debtmap analyze . --show-macro-stats --verbose-macro-warnings
@@ -479,6 +531,15 @@ debtmap analyze . --show-macro-stats --verbose-macro-warnings
 Use detailed diagnostic reports:
 ```bash
 debtmap analyze . --detail-level comprehensive
+```
+
+Analyze functional programming patterns:
+```bash
+# Enable functional analysis
+debtmap analyze . --ast-functional-analysis
+
+# Use strict profile for pure FP codebases
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
 ```
 
 ## Examples
@@ -609,6 +670,27 @@ debtmap analyze . --plain
 debtmap analyze . --format json --plain --output report.json
 ```
 
+### Advanced Debugging
+```bash
+# Call graph debugging with detailed information
+debtmap analyze . --debug-call-graph --debug-format json
+
+# Trace specific functions during call resolution
+debtmap analyze . --debug-call-graph --trace-function 'process_file,analyze_complexity'
+
+# Validate call graph structure
+debtmap analyze . --validate-call-graph
+
+# Show only call graph statistics
+debtmap analyze . --debug-call-graph --call-graph-stats
+
+# Functional programming analysis with strict profile
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
+
+# Explain metric definitions
+debtmap analyze . --explain-metrics -v
+```
+
 ## Command Compatibility Matrix
 
 | Option | analyze | validate | compare | init |
@@ -621,13 +703,28 @@ debtmap analyze . --format json --plain --output report.json
 | `--threshold-*` | ✓ | ✗ | ✗ | ✗ |
 | `--top / --tail` | ✓ | ✓ | ✗ | ✗ |
 | `--cache-*` | ✓ | ✗ | ✗ | ✗ |
-| `--jobs` | ✓ | ✗ | ✗ | ✗ |
+| `--jobs` | ✓ | ✓ | ✗ | ✗ |
+| `--no-parallel` | ✓ | ✓ | ✗ | ✗ |
 | `--verbose` | ✓ | ✓ | ✗ | ✗ |
+| `--explain-metrics` | ✓ | ✗ | ✗ | ✗ |
+| `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ |
+| `--trace-function` | ✓ | ✗ | ✗ | ✗ |
+| `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ |
+| `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ |
+| `--debug-format` | ✓ | ✗ | ✗ | ✗ |
+| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ |
+| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ |
+| `--max-callers` | ✓ | ✗ | ✗ | ✗ |
+| `--max-callees` | ✓ | ✗ | ✗ | ✗ |
+| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ |
+| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ |
+| `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ |
+| `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ |
 | `--config` | ✗ | ✓ | ✗ | ✗ |
 | `--before / --after` | ✗ | ✗ | ✓ | ✗ |
 | `--force` | ✗ | ✗ | ✗ | ✓ |
 
-**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Performance options like `--cache-*` and `--jobs` are specific to the `analyze` command.
+**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), performance control (`--jobs`, `--no-parallel`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the `analyze` command.
 
 ## Troubleshooting
 
