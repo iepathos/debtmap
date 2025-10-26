@@ -360,35 +360,22 @@ fn perform_unified_analysis_computation(
     };
     let call_graph_time = call_graph_start.elapsed();
 
-    if !quiet_mode {
-        eprintln!(" [OK]");
-        eprint!("Resolving trait method calls...");
-        std::io::Write::flush(&mut std::io::stderr()).unwrap();
-    }
-
     // Integrate trait resolution to reduce false positives
     let trait_resolution_start = std::time::Instant::now();
     let trait_resolution_stats =
         integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
     let trait_resolution_time = trait_resolution_start.elapsed();
 
-    if !quiet_mode {
-        eprintln!(" [OK]");
-
-        // Display trait resolution statistics in verbose mode
-        if verbose_macro_warnings {
-            eprintln!(
-                "Resolved {} trait method calls",
-                trait_resolution_stats.resolved_calls
-            );
-            eprintln!(
-                "Marked {} trait implementations as callable",
-                trait_resolution_stats.marked_implementations
-            );
-        }
-
-        eprint!("Loading coverage data...");
-        std::io::Write::flush(&mut std::io::stderr()).unwrap();
+    // Display trait resolution statistics in verbose mode
+    if !quiet_mode && verbose_macro_warnings {
+        log::debug!(
+            "Resolved {} trait method calls",
+            trait_resolution_stats.resolved_calls
+        );
+        log::debug!(
+            "Marked {} trait implementations as callable",
+            trait_resolution_stats.marked_implementations
+        );
     }
 
     let coverage_loading_start = std::time::Instant::now();
@@ -408,12 +395,6 @@ fn perform_unified_analysis_computation(
             "--lcov-file coverage.info".bright_cyan()
         );
         eprintln!();
-    }
-
-    if !quiet_mode {
-        eprintln!(" [OK]");
-        eprint!("Creating unified analysis... ");
-        std::io::Write::flush(&mut std::io::stderr()).unwrap();
     }
 
     // Populate call graph data into function metrics for better analysis
@@ -437,14 +418,6 @@ fn perform_unified_analysis_computation(
         trait_resolution_time,
         coverage_loading_time,
     );
-
-    // Only print the checkmark if not in parallel mode (parallel mode prints its own progress)
-    let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false);
-    if !quiet_mode && !parallel_enabled {
-        eprintln!(" [OK]");
-    }
 
     Ok(result)
 }

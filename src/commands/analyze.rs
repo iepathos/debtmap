@@ -11,7 +11,6 @@ use crate::{
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rayon::prelude::*;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -247,8 +246,16 @@ fn analyze_project(
         std::env::set_var("DEBTMAP_PARALLEL", "true");
     }
     let config = config::get_config();
+
+    // Create progress spinner for file discovery
+    let discovery_progress = ProgressManager::global()
+        .map(|pm| pm.create_spinner("Discovering project files"))
+        .unwrap_or_else(indicatif::ProgressBar::hidden);
+
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
+
+    discovery_progress.finish_with_message(format!("Found {} files to analyze", files.len()));
 
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
@@ -334,45 +341,38 @@ fn analyze_and_configure_project_size(
         match file_count {
             0..=100 => {
                 // Small project - no warnings needed
-                eprintln!("Analyzing {} files (small project)", file_count);
+                log::info!("Analyzing {} files (small project)", file_count);
             }
             101..=500 => {
                 // Medium project - inform user
-                eprintln!("Analyzing {} files (medium project)", file_count);
+                log::info!("Analyzing {} files (medium project)", file_count);
                 if parallel_enabled {
-                    eprintln!("Parallel processing enabled for better performance");
+                    log::info!("Parallel processing enabled for better performance");
                 } else {
-                    eprintln!("Using sequential processing (use default for better performance)");
+                    log::warn!("Using sequential processing (use default for better performance)");
                 }
             }
             501..=1000 => {
                 // Large project - inform user
-                eprintln!("Analyzing {} files (large project)", file_count);
+                log::info!("Analyzing {} files (large project)", file_count);
 
                 // Enable parallel processing by default
                 std::env::set_var("RUST_BACKTRACE", "0"); // Reduce noise
             }
             1001..=2000 => {
                 // Very large project - inform user
-                eprintln!("Analyzing {} files (very large project)", file_count);
-                eprint!("Starting analysis...");
+                log::info!("Analyzing {} files (very large project)", file_count);
 
                 // Enable all performance optimizations
                 std::env::set_var("RUST_BACKTRACE", "0");
-                std::io::stderr().flush().unwrap();
             }
             _ => {
                 // Massive project - inform user
-                eprintln!("Analyzing {} files (massive project)", file_count);
-                eprintln!();
-                eprintln!("Suggestions:");
-                eprintln!("   • Use .debtmapignore to exclude test/vendor directories");
-                eprintln!("   • Focus analysis on specific modules with targeted paths");
-                eprintln!();
-                eprint!("Starting analysis...");
+                log::warn!("Analyzing {} files (massive project)", file_count);
+                log::warn!("Consider using .debtmapignore to exclude test/vendor directories");
+                log::warn!("Focus analysis on specific modules with targeted paths");
 
                 std::env::set_var("RUST_BACKTRACE", "0");
-                std::io::stderr().flush().unwrap();
             }
         }
     }

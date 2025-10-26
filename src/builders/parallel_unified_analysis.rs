@@ -42,11 +42,6 @@ mod transformations {
             .map(|m| (m.name.clone(), m.is_pure.unwrap_or(false)))
             .collect()
     }
-
-    /// Pure predicate for determining if progress should be shown
-    pub fn should_show_progress(quiet_mode: bool, progress_enabled: bool) -> bool {
-        !quiet_mode && progress_enabled
-    }
 }
 
 // Pure predicates module for filtering logic
@@ -391,23 +386,13 @@ impl ParallelUnifiedAnalysisBuilder {
         DebtAggregator,
     ) {
         let start = Instant::now();
-        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-        let show_progress =
-            transformations::should_show_progress(quiet_mode, self.options.progress);
-
-        if show_progress {
-            eprintln!(" [OK]");
-            eprintln!("Starting parallel phase 1 (initialization)...");
-        }
 
         // Execute parallel initialization tasks
         let (data_flow, purity, test_funcs, debt_agg) =
             self.execute_phase1_tasks(metrics, debt_items);
 
         let phase1_time = start.elapsed();
-        if show_progress {
-            self.report_phase1_completion(phase1_time);
-        }
+        self.report_phase1_completion(phase1_time);
 
         (data_flow, purity, test_funcs, debt_agg)
     }
@@ -620,7 +605,7 @@ impl ParallelUnifiedAnalysisBuilder {
     }
 
     fn report_phase1_completion(&self, phase1_time: Duration) {
-        eprintln!(
+        log::debug!(
             "Phase 1 complete in {:?} (DF: {:?}, Purity: {:?}, Test: {:?}, Debt: {:?})",
             phase1_time,
             self.timings.data_flow_creation,
@@ -881,7 +866,11 @@ impl ParallelUnifiedAnalysisBuilder {
         coverage_data: Option<&LcovData>,
     ) -> (UnifiedAnalysis, AnalysisPhaseTimings) {
         let start = Instant::now();
-        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+        // Create progress spinner for final aggregation
+        let agg_progress = ProgressManager::global()
+            .map(|pm| pm.create_spinner("Aggregating analysis results"))
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
 
         let mut unified = UnifiedAnalysis::new((*self.call_graph).clone());
         unified.data_flow_graph = data_flow_graph;
@@ -907,6 +896,8 @@ impl ParallelUnifiedAnalysisBuilder {
             unified.add_file_item(file_item);
         }
 
+        agg_progress.set_message("Sorting by priority and calculating impact");
+
         // Final sorting and impact calculation
         unified.sort_by_priority();
         unified.calculate_total_impact();
@@ -917,6 +908,12 @@ impl ParallelUnifiedAnalysisBuilder {
         if let Some(lcov) = coverage_data {
             unified.overall_coverage = Some(lcov.get_overall_coverage());
         }
+
+        agg_progress.finish_with_message(format!(
+            "Analysis complete ({} function items, {} file items)",
+            unified.items.len(),
+            unified.file_items.len()
+        ));
 
         self.timings.sorting = start.elapsed();
         self.timings.total = self.timings.call_graph_building
@@ -931,24 +928,24 @@ impl ParallelUnifiedAnalysisBuilder {
             + self.timings.aggregation
             + self.timings.sorting;
 
-        if !quiet_mode && self.options.progress {
-            eprintln!("Total parallel analysis time: {:?}", self.timings.total);
-            eprintln!(
+        if self.options.progress {
+            log::debug!("Total parallel analysis time: {:?}", self.timings.total);
+            log::debug!(
                 "  - Call graph building: {:?}",
                 self.timings.call_graph_building
             );
-            eprintln!("  - Trait resolution: {:?}", self.timings.trait_resolution);
-            eprintln!("  - Coverage loading: {:?}", self.timings.coverage_loading);
-            eprintln!("  - Data flow: {:?}", self.timings.data_flow_creation);
-            eprintln!("  - Purity: {:?}", self.timings.purity_analysis);
-            eprintln!("  - Test detection: {:?}", self.timings.test_detection);
-            eprintln!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
-            eprintln!(
+            log::debug!("  - Trait resolution: {:?}", self.timings.trait_resolution);
+            log::debug!("  - Coverage loading: {:?}", self.timings.coverage_loading);
+            log::debug!("  - Data flow: {:?}", self.timings.data_flow_creation);
+            log::debug!("  - Purity: {:?}", self.timings.purity_analysis);
+            log::debug!("  - Test detection: {:?}", self.timings.test_detection);
+            log::debug!("  - Debt aggregation: {:?}", self.timings.debt_aggregation);
+            log::debug!(
                 "  - Function analysis: {:?}",
                 self.timings.function_analysis
             );
-            eprintln!("  - File analysis: {:?}", self.timings.file_analysis);
-            eprintln!("  - Sorting: {:?}", self.timings.sorting);
+            log::debug!("  - File analysis: {:?}", self.timings.file_analysis);
+            log::debug!("  - Sorting: {:?}", self.timings.sorting);
         }
 
         (unified, self.timings)

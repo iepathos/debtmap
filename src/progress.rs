@@ -139,9 +139,29 @@ impl ProgressManager {
         pb.set_style(
             ProgressStyle::default_spinner()
                 .template(TEMPLATE_SPINNER)
-                .expect("Invalid spinner template"),
+                .expect("Invalid spinner template")
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
         );
         pb.set_message(msg.to_string());
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        pb
+    }
+
+    /// Create a progress bar that shows counts without a known total
+    pub fn create_counter(&self, template: &str, msg: &str) -> ProgressBar {
+        if !self.config.should_show_progress() {
+            return ProgressBar::hidden();
+        }
+
+        let pb = self.multi.add(ProgressBar::new_spinner());
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template(template)
+                .expect("Invalid counter template")
+                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        pb.set_message(msg.to_string());
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
         pb
     }
 

@@ -144,6 +144,11 @@ impl ParallelCallGraphBuilder {
         parsed_files: &[(PathBuf, String)],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<()> {
+        // Create progress bar for multi-file extraction
+        let progress = crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Extracting cross-file call relationships"))
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
         // Group files into chunks for better parallelization
         let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
 
@@ -167,6 +172,8 @@ impl ParallelCallGraphBuilder {
                 parallel_graph.merge_concurrent(chunk_graph);
             }
         });
+
+        progress.finish_with_message("Cross-file analysis complete");
 
         Ok(())
     }
@@ -217,18 +224,20 @@ impl ParallelCallGraphBuilder {
         progress.finish_with_message("Enhanced analysis complete");
 
         // Cross-module analysis
+        let cross_module_progress = crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Analyzing cross-module calls"))
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
         enhanced_builder.analyze_cross_module(&workspace_files)?;
+        cross_module_progress.finish_with_message("Cross-module analysis complete");
 
         // Finalize trait analysis - detect patterns ONCE after all files processed
-        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-        if !quiet_mode {
-            eprint!("[DEBUG] Resolving trait patterns and method calls...");
-            std::io::Write::flush(&mut std::io::stderr()).ok();
-        }
+        let trait_progress = crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Resolving trait patterns and method calls"))
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
         enhanced_builder.finalize_trait_analysis()?;
-        if !quiet_mode {
-            eprintln!(" done");
-        }
+        trait_progress.finish_with_message("Trait resolution complete");
 
         // Extract results
         let enhanced_graph = enhanced_builder.build();

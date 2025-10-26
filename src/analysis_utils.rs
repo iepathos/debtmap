@@ -6,15 +6,15 @@ use crate::debt;
 use crate::debt::circular::analyze_module_dependencies;
 use crate::{analyzers, core::Language, io};
 use rayon::prelude::*;
-use std::io::{self as stdio, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
+    use crate::progress::{ProgressManager, TEMPLATE_FILE_ANALYSIS};
+    use indicatif::ParallelProgressIterator;
+
     // Only apply file limit if explicitly set by user
     let (total_files, files_to_process) = match std::env::var("DEBTMAP_MAX_FILES")
         .ok()
@@ -41,32 +41,25 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
         }
     };
 
-    // Progress tracking
-    let processed = Arc::new(AtomicUsize::new(0));
-    let show_progress = std::env::var("DEBTMAP_QUIET").is_err() && total_files > 10;
-
-    if show_progress {
-        eprint!("Analyzing files: 0/{}", total_files);
-        let _ = stdio::stderr().flush();
-    }
+    // Create progress bar using global progress manager
+    let progress = ProgressManager::global().map(|pm| {
+        let pb = pm.create_bar(total_files as u64, TEMPLATE_FILE_ANALYSIS);
+        pb.set_message("Analyzing files");
+        pb
+    });
 
     let results: Vec<FileMetrics> = files_to_process
         .par_iter()
-        .filter_map(|path| {
-            let result = analyze_single_file(path.as_path());
-
-            if show_progress {
-                let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
-                eprint!("\rAnalyzing files: {}/{}", count, total_files);
-                let _ = stdio::stderr().flush();
-            }
-
-            result
-        })
+        .progress_with(
+            progress
+                .clone()
+                .unwrap_or_else(indicatif::ProgressBar::hidden),
+        )
+        .filter_map(|path| analyze_single_file(path.as_path()))
         .collect();
 
-    if show_progress {
-        eprintln!("\r[OK] Analyzed {} files successfully", results.len());
+    if let Some(pb) = progress {
+        pb.finish_with_message(format!("Analyzed {} files", results.len()));
     }
 
     results
