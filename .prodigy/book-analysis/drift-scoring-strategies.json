@@ -4,115 +4,91 @@
   "chapter_file": "book/src/scoring-strategies.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Chapter has accurate high-level concepts but contains some outdated details and incomplete information about configuration options",
+  "quality_assessment": "Chapter is generally accurate with comprehensive coverage. Minor drift in file-level scoring formula and coverage factor descriptions. The chapter provides excellent detail on both scoring approaches, but the actual implementation differs slightly in the coverage factor calculation.",
   "issues": [
     {
       "type": "outdated_information",
       "severity": "medium",
-      "section": "Function-Level Scoring - Formula",
-      "description": "Chapter shows formula weights as coverage 40%, complexity 40%, dependency 20%, but actual defaults are coverage 50%, complexity 35%, dependency 15%",
-      "current_content": "Function Score = (Complexity × 0.40) + (Coverage × 0.40) + (Dependency × 0.20)",
-      "should_be": "Function Score = (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15)\n\nNote: These are configurable via .debtmap.toml [scoring] section",
-      "fix_suggestion": "Update formula to match actual defaults from src/config.rs:122-133. Add note that weights are configurable.",
-      "source_reference": "src/config.rs:122-133 (default_coverage_weight, default_complexity_weight, default_dependency_weight)"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "medium",
-      "section": "Function-Level Scoring - Configuration",
-      "description": "Configuration section shows scoring weights as coverage=0.40, complexity=0.40, dependency=0.20, but actual defaults differ",
-      "current_content": "[scoring]\ncoverage = 0.40\ncomplexity = 0.40\ndependency = 0.20",
-      "should_be": "[scoring]\ncoverage = 0.50              # Weight for coverage gaps (default)\ncomplexity = 0.35            # Weight for complexity (default)\ndependency = 0.15            # Weight for dependency impact (default)",
-      "fix_suggestion": "Update example configuration to match actual defaults from src/config.rs",
-      "source_reference": "src/config.rs:122-133, .debtmap.toml:3-8"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "medium",
-      "section": "Function-Level Scoring - Role Multiplier",
-      "description": "Chapter shows role multipliers that differ from actual implementation",
-      "current_content": "Entry points: 1.5x\nBusiness logic: 1.2x\nUtilities: 0.5x",
-      "should_be": "Entry points: 1.5x (in unified_scorer.rs:209)\nPure logic (business): 1.2x-1.3x depending on complexity (line 210-211)\nOrchestrator: 0.8x (line 212)\nIO wrapper: 0.5x (line 213)\nPattern match: 0.6x (line 214)\n\nConfigurable via [role_multipliers] in .debtmap.toml (defaults: src/config.rs:182-204)",
-      "fix_suggestion": "Update role multiplier list to match actual FunctionRole enum variants and their multipliers in unified_scorer.rs. Add note about configurability.",
-      "source_reference": "src/priority/unified_scorer.rs:208-216, src/config.rs:141-204"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Function-Level Scoring - Configuration",
-      "description": "Chapter doesn't mention role multipliers are configurable",
-      "should_add": "[role_multipliers]\nentry_point = 1.5\nbusiness_logic = 1.2\npure_logic = 1.2\norchestrator = 0.8\nio_wrapper = 0.7\nutility = 0.5",
-      "fix_suggestion": "Add [role_multipliers] configuration section to show users they can customize these values",
-      "source_reference": "src/config.rs:141-180 (RoleMultipliers struct)"
+      "section": "File-Level Scoring Formula - Coverage Factor",
+      "description": "Chapter states Coverage Multiplier = '1.0 - coverage_percent', but actual implementation uses Coverage Factor = '(coverage_gap * 2.0) + 1.0' where coverage_gap = '1.0 - coverage_percent'",
+      "current_content": "**Coverage Multiplier**: '1.0 - coverage_percent'\n- Lower coverage increases score multiplicatively\n- Range: 0.0 (100% coverage) to 1.0 (0% coverage)",
+      "should_be": "**Coverage Factor**: '(coverage_gap * 2.0) + 1.0' where coverage_gap = '1.0 - coverage_percent'\n- Lower coverage increases score\n- Range: 1.0 (100% coverage) to 3.0 (0% coverage)\n- This is an additive factor, not a pure multiplier",
+      "fix_suggestion": "Update the formula and explanation to match the actual implementation in src/priority/file_metrics.rs:116-117. The coverage factor is calculated as '(coverage_gap * 2.0) + 1.0', which gives a range of 1.0 to 3.0, not 0.0 to 1.0.",
+      "source_reference": "src/priority/file_metrics.rs:115-117"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "File-Level Scoring - Aggregation Methods",
-      "description": "Chapter lists aggregation methods but doesn't explain how to configure them via CLI",
-      "current_content": "Debtmap supports multiple aggregation methods for file-level scores:\n\n**Weighted Sum (Default)**\n```toml\n[aggregation]\nmethod = \"weighted_sum\"\n```",
-      "should_be": "Debtmap supports multiple aggregation methods for file-level scores, configurable via CLI:\n\n```bash\ndebtmap analyze . --aggregation-method weighted_sum\n```\n\nOr via configuration:\n```toml\n[aggregation]\nmethod = \"weighted_sum\"\n```",
-      "fix_suggestion": "Add CLI flag example (--aggregation-method) before TOML examples. Note that CLI parsing is in src/cli.rs:189-190",
-      "source_reference": "src/cli.rs:189-190"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Score Normalization - Configuration",
-      "description": "Chapter shows normalization configuration but doesn't explain what these parameters do clearly",
-      "should_add": "Explanation:\n- **linear_threshold**: Scores below this value use linear scaling (1:1 mapping)\n- **logarithmic_threshold**: Scores above this use logarithmic dampening to prevent extreme values\n- **sqrt_multiplier**: Applied to scores between linear and logarithmic thresholds\n- **log_multiplier**: Applied to scores above logarithmic threshold\n- **show_raw_scores**: Display both normalized (0-10) and raw scores in output",
-      "fix_suggestion": "Add explanation of what each normalization parameter controls and why they exist",
-      "source_reference": "src/config.rs:271-325 (NormalizationConfig struct)"
+      "section": "File-Level Scoring Formula",
+      "description": "Chapter shows the formula but doesn't fully explain that it's a multiplicative combination",
+      "current_content": "File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores",
+      "should_be": "The formula should clarify that all factors are multiplied together: 'size_factor * complexity_factor * coverage_factor * density_factor * god_object_multiplier * function_factor'",
+      "fix_suggestion": "Add a note explaining that this is a fully multiplicative formula where all factors combine. This means any single factor of 0 would result in a score of 0, and high values in any dimension amplify the overall score exponentially.",
+      "source_reference": "src/priority/file_metrics.rs:138-143"
     },
     {
       "type": "outdated_information",
       "severity": "low",
-      "section": "File-Level Scoring - Formula",
-      "description": "Chapter shows formula but doesn't explain the actual calculation happens in src/priority/file_metrics.rs",
-      "current_content": "File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores",
-      "should_be": "File Score = Size × Complexity × Coverage × Density × GodObject × FunctionScores\n\nWhere:\n- Size = sqrt(total_lines / 100)\n- Complexity = (avg_complexity / 5.0) × sqrt(total_complexity / 50.0)\n- Coverage = (1 - coverage_percent) × 2 + 1\n- Density = max(1.0, function_count / 50) if > 50 functions\n- GodObject = 2.0 + god_object_score if detected\n- FunctionScores = sum(function_scores) / 10",
-      "fix_suggestion": "Add the actual calculation formulas with real numbers from src/priority/file_metrics.rs:77-115",
-      "source_reference": "src/priority/file_metrics.rs:77-115"
+      "section": "Function-Level Scoring - Coverage Multiplier Formula",
+      "description": "Chapter states 'Coverage Multiplier = 1.0 - coverage_percent' but this is misleading. The chapter correctly notes coverage acts as a dampening multiplier, but doesn't show the actual calculation",
+      "current_content": "Coverage Multiplier = 1.0 - coverage_percent\nFinal Score = Base Score × Coverage Multiplier × Role Multiplier",
+      "should_be": "The coverage factor calculation is more complex, involving role-based coverage weights. The simple '1.0 - coverage_percent' is only the starting point before role adjustments.",
+      "fix_suggestion": "Clarify that the coverage multiplier calculation involves role-based weighting: the coverage gap (1.0 - coverage_percent) is adjusted by role-specific coverage weights before being applied as a multiplier. Reference the role-based coverage weighting section for details.",
+      "source_reference": "src/priority/scoring/calculation.rs:calculate_coverage_multiplier"
     },
     {
-      "type": "incomplete_explanation",
+      "type": "missing_content",
       "severity": "low",
-      "section": "File-Level Scoring - Use Cases",
-      "description": "Chapter doesn't mention file-level scoring requires --aggregate-only flag",
-      "current_content": "Use when:\n- Planning architectural refactoring",
-      "should_be": "Use when:\n- Planning architectural refactoring\n\nNote: File-level scoring is enabled with the --aggregate-only flag, which changes output to show only file-level metrics instead of function-level details.",
-      "fix_suggestion": "Add explicit note about --aggregate-only flag requirement for file-level view",
-      "source_reference": "src/cli.rs:177-178 (aggregate_only flag)"
+      "section": "Score Normalization",
+      "description": "Chapter describes multi-phase normalization but doesn't mention it's only used by 'normalize_final_score_with_metadata', not the default normalization",
+      "current_content": "**Default: Linear Clamping**\n\nThe default normalization uses simple linear clamping:\n\n```rust\nscore_normalized = raw_score.clamp(0.0, 100.0)\n```\n\n**Advanced: Multi-Phase Normalization**\n\nFor more sophisticated normalization, debtmap provides 'normalize_final_score_with_metadata'...",
+      "should_be": "Clarify that the default 'normalize_final_score' function (used everywhere) simply clamps to 0-100. The multi-phase normalization is available via 'normalize_final_score_with_metadata' but is not currently used in the main scoring pipeline.",
+      "fix_suggestion": "Add a note that multi-phase normalization is available but not actively used in the current implementation. The default behavior is simple linear clamping. Users who want the multi-phase approach would need to modify the code or request it as a configuration option.",
+      "source_reference": "src/priority/scoring/calculation.rs:210-214 vs 185-207"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Aggregation Methods",
+      "description": "Chapter provides comprehensive aggregation method descriptions, but it's unclear which methods are actually implemented vs theoretical",
+      "current_content": "Lists weighted_sum, sum, logarithmic_sum, and max_plus_average with detailed formulas",
+      "should_be": "Verify which aggregation methods are actually implemented and clearly mark any that are planned but not yet available",
+      "fix_suggestion": "Review the actual aggregation implementation and either (1) confirm all four methods are implemented, or (2) add notes about which methods are available vs planned. Check src/builders/parallel_unified_analysis.rs and related files for the actual implementation.",
+      "source_reference": "CLI shows aggregation-method option with these values: src/cli.rs:208-209"
     }
   ],
   "positive_aspects": [
-    "Clear distinction between file-level and function-level scoring use cases",
-    "Good concrete examples showing when to use each approach",
-    "Helpful comparison examples (God Object Detection, Targeted Function Fix, Balanced Refactoring)",
-    "Well-organized workflow integration guidance",
-    "Clear explanation of normalization strategy at conceptual level",
-    "Team collaboration section provides practical role-based guidance"
+    "Excellent comprehensive coverage of both file-level and function-level scoring",
+    "Clear explanation of when to use each approach with practical use cases",
+    "Detailed breakdown of all scoring factors with rationale",
+    "Good examples showing CLI usage for different scenarios",
+    "Thorough coverage of role-based adjustments and constructor detection",
+    "Strong integration of configuration options with examples",
+    "Helpful comparison examples showing both scoring approaches on the same code",
+    "Well-organized progression from basic concepts to advanced configurations"
   ],
   "improvement_suggestions": [
-    "Update all default weight values to match actual implementation",
-    "Add CLI flag references alongside TOML configuration examples",
-    "Expand role multiplier section to cover all FunctionRole variants",
-    "Add note about configurability of scoring weights via .debtmap.toml",
-    "Include actual formula implementations with concrete numbers from code",
-    "Add troubleshooting section for common scoring configuration issues",
-    "Cross-reference the Configuration chapter for detailed TOML schema",
-    "Add examples of how changing weights affects prioritization"
+    "Verify the exact coverage factor formula matches implementation (currently shows slight drift)",
+    "Add a callout box or warning about the multiplicative nature of file-level scoring",
+    "Clarify which aggregation methods are implemented vs theoretical",
+    "Add more real-world examples showing file vs function scoring trade-offs",
+    "Consider adding a troubleshooting section for unexpected score values",
+    "Add cross-references to the configuration chapter for detailed config options",
+    "Include a flowchart showing when to use file-level vs function-level scoring",
+    "Mention performance implications of different aggregation methods"
   ],
   "metadata": {
-    "analyzed_at": "2025-01-14",
+    "analyzed_at": "2025-10-25",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "File-level scoring",
       "Function-level scoring",
-      "When to use each approach",
       "Aggregation methods",
       "Score normalization",
-      "Use case comparison"
+      "Use case comparison",
+      "Role-based adjustments",
+      "Constructor detection",
+      "Configuration options"
     ],
     "validation_focus": "Check that file-level and function-level scoring differences are explained with use cases"
   }
