@@ -1,0 +1,207 @@
+{
+  "chapter_id": "design-patterns",
+  "chapter_title": "Design Pattern Detection",
+  "chapter_file": "book/src/design-patterns.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter does not exist yet. Must be created from scratch to document all pattern detection capabilities comprehensively.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "Chapter file does not exist - marked as auto_generated: true",
+      "should_add": "Create comprehensive chapter documenting all 9 design patterns with detection criteria, configuration options, and examples",
+      "fix_suggestion": "Create book/src/design-patterns.md with sections for each pattern: Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection, Builder, and Visitor. Include detection criteria, confidence scoring, configuration options, and practical examples for each.",
+      "source_reference": "src/analysis/patterns/mod.rs, features.json:678-699"
+    },
+    {
+      "type": "inconsistency",
+      "severity": "medium",
+      "section": "Pattern Count",
+      "description": "Validation says '8 design patterns' but features.json lists 9 supported patterns",
+      "current_content": "validation: 'Check that all 8 design patterns are documented'",
+      "should_be": "Validation should reference 9 patterns or clarify which patterns are grouped",
+      "fix_suggestion": "Update validation criteria to match actual count. Features.json lists: Observer, Singleton, Factory, Strategy, Callback, Template Method, Builder, Visitor, Dependency Injection (9 total). Validation references 8. Need to align these counts.",
+      "source_reference": "features.json:678-689, workflows/data/debtmap-chapters.json validation field"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Observer Pattern",
+      "description": "Observer pattern detection criteria not documented",
+      "should_add": "Document Observer pattern detection including: abstract base class detection (ABC, Protocol, Interface markers), method prefixes (on_, handle_, notify_), registration methods (add_observer, register, subscribe), cross-file detection capabilities, and confidence scoring",
+      "fix_suggestion": "Add section explaining Observer pattern detection with code examples showing ABC-based interfaces, abstract methods, concrete implementations, and registration patterns. Include configuration options from ObserverConfig.",
+      "source_reference": "src/analysis/patterns/observer.rs, src/analysis/patterns/config.rs:57-105"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Singleton Pattern",
+      "description": "Singleton pattern detection criteria not documented",
+      "should_add": "Document Singleton pattern detection including: module-level singletons, __new__ override detection, decorator-based detection, and configuration options",
+      "fix_suggestion": "Add section with examples of each singleton variant: module-level singleton assignments, classes overriding __new__ to enforce single instance, and @singleton decorator patterns. Include SingletonConfig options.",
+      "source_reference": "src/analysis/patterns/singleton.rs, src/analysis/patterns/config.rs:107-135"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Factory Pattern",
+      "description": "Factory pattern detection criteria not documented",
+      "should_add": "Document Factory pattern detection including: factory functions, factory registries, name patterns (create_, make_, build_, _factory), and configuration options",
+      "fix_suggestion": "Add section showing factory function detection based on naming patterns, registry-based factories, and confidence scoring. Include FactoryConfig options for customizing detection.",
+      "source_reference": "src/analysis/patterns/factory.rs, src/analysis/patterns/config.rs:137-170"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Strategy Pattern",
+      "description": "Strategy pattern detection criteria not documented",
+      "should_add": "Document Strategy pattern detection including detection heuristics, configuration options, and practical examples",
+      "fix_suggestion": "Add section explaining Strategy pattern detection, showing interface-based strategy implementations and how they're distinguished from other patterns.",
+      "source_reference": "src/analysis/patterns/strategy.rs, src/analysis/patterns/config.rs:172-178"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Callback Pattern",
+      "description": "Callback pattern detection criteria not documented",
+      "should_add": "Document Callback pattern detection including: decorator patterns (route, handler, app.), framework integration detection, and confidence scoring",
+      "fix_suggestion": "Add section with examples of callback detection in web frameworks (Flask routes, FastAPI handlers), event handlers, and decorator-based callbacks. Include CallbackConfig decorator patterns.",
+      "source_reference": "src/analysis/patterns/callback.rs, src/analysis/patterns/config.rs:180-202"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Template Method Pattern",
+      "description": "Template method pattern detection criteria not documented",
+      "should_add": "Document Template Method pattern detection including detection heuristics and configuration",
+      "fix_suggestion": "Add section showing template method detection in base classes with abstract hook methods and concrete template methods.",
+      "source_reference": "src/analysis/patterns/template_method.rs, src/analysis/patterns/config.rs:204-210"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Dependency Injection Pattern",
+      "description": "Dependency injection pattern detection not documented",
+      "should_add": "Document Dependency Injection detection including constructor injection, setter injection, and framework-based DI patterns",
+      "fix_suggestion": "Add section explaining DI detection heuristics, showing constructor parameter injection, optional dependency injection, and how confidence is calculated.",
+      "source_reference": "src/analysis/patterns/dependency_injection.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Builder Pattern",
+      "description": "Builder pattern exists but is in organization module, not pattern detection module",
+      "should_add": "Document Builder pattern detection and clarify if it's part of organization analysis or design pattern detection",
+      "fix_suggestion": "Add section for Builder pattern explaining its detection in src/organization/builder_pattern.rs. Clarify whether this is organizational analysis or design pattern detection, and document detection criteria.",
+      "source_reference": "src/organization/builder_pattern.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Visitor Pattern",
+      "description": "Visitor pattern exists in complexity module for pattern-based complexity adjustment, unclear if it's a user-facing design pattern detector",
+      "should_add": "Clarify Visitor pattern scope: is it for complexity reduction or design pattern detection? Document accordingly",
+      "fix_suggestion": "Add section explaining Visitor pattern detection in src/complexity/visitor_detector.rs. Clarify that this is used for complexity normalization (trait-based exhaustive matching) rather than classic Visitor pattern detection. Document if this should be exposed as a design pattern detector.",
+      "source_reference": "src/complexity/visitor_detector.rs, features.json:687 lists 'Visitor pattern'"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Configuration Options",
+      "description": "Pattern detection configuration options not documented",
+      "should_add": "Document all configuration options for pattern detection: --no-pattern-detection, --patterns, --pattern-threshold, --show-pattern-warnings, and .debtmap.toml configuration",
+      "fix_suggestion": "Add dedicated section on configuration showing: CLI flags (--no-pattern-detection to disable, --patterns observer,singleton,factory to enable specific patterns, --pattern-threshold 0.7 for confidence threshold, --show-pattern-warnings for uncertain detections), and .debtmap.toml configuration with per-pattern settings, custom rules, and confidence thresholds.",
+      "source_reference": "src/cli.rs:238-246, src/analysis/patterns/config.rs, features.json:53-58"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Confidence Scoring",
+      "description": "Pattern confidence thresholds and scoring not explained",
+      "should_add": "Document how pattern confidence is calculated (0.0-1.0 scale), default threshold (0.7), how to adjust thresholds, and what different confidence levels mean",
+      "fix_suggestion": "Add section explaining confidence scoring system: each pattern detector assigns confidence based on match quality, default threshold is 0.7, users can adjust via --pattern-threshold, and uncertain patterns can be shown with --show-pattern-warnings. Include examples of high-confidence (0.9+) vs medium-confidence (0.7-0.8) detections.",
+      "source_reference": "src/analysis/patterns/config.rs:44-55, src/analysis/patterns/mod.rs:39"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Cross-File Pattern Detection",
+      "description": "Cross-file pattern detection capability not documented",
+      "should_add": "Document cross-file pattern detection, especially for Observer patterns spanning multiple files with imports",
+      "fix_suggestion": "Add section explaining cross-file detection: how patterns are detected across module boundaries, import tracking for interface implementations, and cross-module context. Show example of Observer interface in one file with implementations in other files.",
+      "source_reference": "src/analysis/patterns/mod.rs:127-183"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Rust Trait-Based Patterns",
+      "description": "Rust-specific trait-based pattern detection not documented",
+      "should_add": "Document Rust trait registry and trait-based pattern detection for Observer and other patterns",
+      "fix_suggestion": "Add section on Rust-specific capabilities: trait registry for tracking trait implementations, trait-based Observer pattern detection, and how patterns map to Rust idioms vs Python/JavaScript patterns.",
+      "source_reference": "src/analysis/patterns/rust_traits.rs, src/analysis/patterns/mod.rs:135-138"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Custom Pattern Rules",
+      "description": "Custom pattern rule configuration not documented",
+      "should_add": "Document how to define custom pattern rules in .debtmap.toml with method_pattern, class_pattern, decorator_pattern regex, and confidence scoring",
+      "fix_suggestion": "Add section with example showing custom pattern definition in .debtmap.toml: custom_rules array with name, method_pattern/class_pattern/decorator_pattern regex fields, and confidence scores. Show practical example of defining project-specific pattern.",
+      "source_reference": "src/analysis/patterns/config.rs:212-233, features.json:42 mentions custom_rules"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Practical Examples",
+      "description": "No practical examples of pattern detection in action",
+      "should_add": "Include real-world code examples showing each pattern being detected, with explanations of why they match and what confidence is assigned",
+      "fix_suggestion": "Add examples section with code snippets for each pattern: Observer with ABC base class and concrete implementations, Singleton module variable, Factory function with create_ prefix, Strategy with interface and multiple implementations, Callback with @app.route decorator, Template Method with base class template and hooks, and DI with constructor injection. Show debtmap analyze output for each.",
+      "source_reference": "Test files: tests/pattern_detection_integration.rs, tests/python_observer_pattern_integration_test.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Integration with Complexity Analysis",
+      "description": "How pattern detection affects complexity scoring not explained",
+      "should_add": "Document how detected patterns reduce complexity scores through pattern-based adjustments and role multipliers",
+      "fix_suggestion": "Add section explaining that detected patterns reduce effective complexity: pattern-match role gets 0.6 multiplier, recognized boilerplate patterns get dampening, and visitor patterns use logarithmic scaling instead of linear. Link to entropy-analysis and scoring-strategies chapters.",
+      "source_reference": "features.json:451-455, src/complexity/pattern_adjustments.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Use Cases",
+      "description": "Pattern detection use cases not documented",
+      "should_add": "Document why pattern detection matters: false positive reduction, architecture documentation, pattern consistency checks",
+      "fix_suggestion": "Add use cases section explaining: reduces false positives for boilerplate code, helps document architecture automatically, validates pattern usage consistency, and identifies pattern violations or incomplete implementations.",
+      "source_reference": "features.json:695-699"
+    }
+  ],
+  "positive_aspects": [],
+  "improvement_suggestions": [
+    "Structure chapter with clear sections: Introduction, Individual Pattern Sections (one per pattern), Configuration, Confidence Scoring, Cross-File Detection, Custom Rules, Examples, and Integration",
+    "Include side-by-side comparison of Python vs Rust pattern detection where they differ",
+    "Add troubleshooting section for common pattern detection issues",
+    "Include flowchart or diagram showing pattern detection pipeline",
+    "Cross-reference related chapters: entropy-analysis for pattern dampening, scoring-strategies for role multipliers, configuration for .debtmap.toml setup",
+    "Add table summarizing all patterns with detection criteria and default confidence",
+    "Include best practices for configuring pattern detection for different project types"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-25",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [],
+    "validation_focus": "Check that all 8 design patterns are documented with detection criteria and examples",
+    "actual_pattern_count": 9,
+    "patterns_in_detection_module": 7,
+    "patterns_in_organization_module": 1,
+    "patterns_in_complexity_module": 1,
+    "issue_count": 19,
+    "critical_issues": 1,
+    "high_severity_issues": 13,
+    "medium_severity_issues": 5,
+    "low_severity_issues": 0
+  }
+}
