@@ -2,11 +2,13 @@ use super::super::commands::validate::ValidationDetails;
 use crate::risk;
 
 pub fn print_validation_success(details: &ValidationDetails, verbosity: u8) {
-    println!("[OK] Validation PASSED - All metrics within thresholds");
+    println!("[OK] Validation PASSED");
+    println!();
+    print_validation_details(details);
 
-    if verbosity > 0 {
-        println!();
-        print_validation_details(details);
+    if verbosity > 1 {
+        // Additional detailed output at higher verbosity levels
+        println!("\n  ✓ All validation checks passed");
     }
 }
 
