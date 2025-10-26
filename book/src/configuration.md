@@ -297,6 +297,8 @@ max_file_length = 500                # Maximum lines per file
 max_function_length = 50             # Maximum lines per function
 ```
 
+**Note:** The TOML configuration accepts `max_file_length` (shown above), which maps to the internal struct field `max_file_lines`. Both names refer to the same setting.
+
 ### Minimum Thresholds
 
 Filter out trivial functions that aren't really technical debt:
@@ -654,11 +656,68 @@ When enabled, public API functions receive higher priority for test coverage.
 
 Debtmap supports additional advanced configuration options:
 
-- **`[loc]`** - Lines of code counting configuration. Controls whether to include tests (`include_tests`), generated files (`include_generated`), comments (`count_comments`), and blank lines (`count_blank_lines`) in LOC counts. All default to false.
+#### Lines of Code Configuration
 
-- **`[tiers]`** - Tier threshold configuration for prioritization. Allows customization of complexity and dependency thresholds for different priority tiers (T2, T3, T4). Used internally for tiered reporting.
+The **`[loc]`** section controls how lines of code are counted for metrics and reporting:
 
-- **`[complexity_thresholds]`** - Enhanced complexity detection thresholds. Configures minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions. Supplements the basic `[thresholds]` section with more granular control.
+```toml
+[loc]
+include_tests = false         # Exclude test files from LOC counts (default: false)
+include_generated = false     # Exclude generated files from LOC counts (default: false)
+count_comments = false        # Include comment lines in LOC counts (default: false)
+count_blank_lines = false     # Include blank lines in LOC counts (default: false)
+```
+
+**Configuration options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `include_tests` | false | Whether to include test files in LOC metrics |
+| `include_generated` | false | Whether to include generated files in LOC metrics |
+| `count_comments` | false | Whether to count comment lines as LOC |
+| `count_blank_lines` | false | Whether to count blank lines as LOC |
+
+**Example - Strict LOC counting:**
+```toml
+[loc]
+include_tests = false         # Focus on production code
+include_generated = false     # Exclude auto-generated code
+count_comments = false        # Only count executable code
+count_blank_lines = false     # Exclude whitespace
+```
+
+#### Tier Configuration
+
+The **`[tiers]`** section configures tier threshold boundaries for prioritization:
+
+```toml
+[tiers]
+t2_complexity_threshold = 15      # Complexity threshold for Tier 2 (default: 15)
+t2_dependency_threshold = 10      # Dependency threshold for Tier 2 (default: 10)
+t3_complexity_threshold = 10      # Complexity threshold for Tier 3 (default: 10)
+show_t4_in_main_report = false    # Show Tier 4 items in main report (default: false)
+```
+
+**Tier priority levels:**
+- **Tier 1 (Critical)**: Highest priority items
+- **Tier 2 (High)**: Items above `t2_*` thresholds
+- **Tier 3 (Medium)**: Items above `t3_*` thresholds
+- **Tier 4 (Low)**: Items below all thresholds
+
+**Example - Stricter tier boundaries:**
+```toml
+[tiers]
+t2_complexity_threshold = 12      # Lower threshold = more items in high priority
+t2_dependency_threshold = 8
+t3_complexity_threshold = 8
+show_t4_in_main_report = true     # Include low-priority items
+```
+
+#### Enhanced Complexity Thresholds
+
+The **`[complexity_thresholds]`** section provides more granular control over complexity detection:
+
+This supplements the basic `[thresholds]` section with minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions.
 
 These options are advanced features with sensible defaults. Most users won't need to configure them explicitly.
 
