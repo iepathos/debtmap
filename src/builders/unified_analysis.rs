@@ -1331,6 +1331,7 @@ fn create_god_object_analysis(
         responsibilities: Vec::new(),
         purity_distribution: None,
         module_structure: file_metrics.god_object_indicators.module_structure.clone(),
+        detection_type: crate::organization::DetectionType::GodFile,
     })
 }
 
