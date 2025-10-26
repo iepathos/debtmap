@@ -54,7 +54,7 @@ pub struct StructInitPattern {
     /// Cyclomatic complexity (for comparison/context)
     pub cyclomatic_complexity: usize,
 
-    /// Whether function wraps result in Result<T>
+    /// Whether function wraps result in `Result<T>`
     pub is_result_wrapped: bool,
 
     /// Whether initialization calls other constructors
@@ -313,10 +313,8 @@ impl<'ast> Visit<'ast> for ReturnStructVisitor {
                         .map(|s| s.ident == "Ok")
                         .unwrap_or(false)
                     {
-                        if let Some(first_arg) = call_expr.args.first() {
-                            if let Expr::Struct(struct_expr) = first_arg {
-                                self.extract_struct_info(struct_expr);
-                            }
+                        if let Some(Expr::Struct(struct_expr)) = call_expr.args.first() {
+                            self.extract_struct_info(struct_expr);
                         }
                     }
                 }
@@ -578,7 +576,10 @@ fn extract_local_bindings(block: &syn::Block) -> Vec<(String, Expr)> {
 fn find_variable_references(expr: &Expr, local_bindings: &[(String, Expr)]) -> Vec<String> {
     let mut visitor = VariableRefVisitor {
         references: Vec::new(),
-        local_vars: local_bindings.iter().map(|(name, _)| name.clone()).collect(),
+        local_vars: local_bindings
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect(),
     };
     visitor.visit_expr(expr);
     visitor.references
@@ -607,7 +608,9 @@ impl<'ast> Visit<'ast> for VariableRefVisitor {
                 if let Expr::Path(base_path) = &*expr_field.base {
                     if let Some(ident) = base_path.path.get_ident() {
                         let var_name = ident.to_string();
-                        if self.local_vars.contains(&var_name) && !self.references.contains(&var_name) {
+                        if self.local_vars.contains(&var_name)
+                            && !self.references.contains(&var_name)
+                        {
                             self.references.push(var_name);
                         }
                     }

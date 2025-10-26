@@ -99,19 +99,28 @@ fn test_struct_init_pattern_detection_with_large_struct() {
 
     let pattern = detector.detect(&file, code);
 
-    assert!(pattern.is_some(), "Should detect struct initialization pattern");
+    assert!(
+        pattern.is_some(),
+        "Should detect struct initialization pattern"
+    );
 
     let pattern = pattern.unwrap();
     assert_eq!(pattern.struct_name, "ConfigArgs");
     assert!(pattern.field_count >= 16, "Should detect 16+ fields");
-    assert!(pattern.initialization_ratio > 0.40, "Should have high initialization ratio");
+    assert!(
+        pattern.initialization_ratio > 0.40,
+        "Should have high initialization ratio"
+    );
 
     // Test complexity scoring
     let field_complexity = detector.calculate_init_complexity_score(&pattern);
     // Field-based complexity should be reasonable for the number of fields
-    assert!(field_complexity > 0.0 && field_complexity < 10.0,
+    assert!(
+        field_complexity > 0.0 && field_complexity < 10.0,
         "Field-based complexity ({}) should be in reasonable range for {} fields",
-        field_complexity, pattern.field_count);
+        field_complexity,
+        pattern.field_count
+    );
 
     // Test confidence
     let confidence = detector.confidence(&pattern);
@@ -119,7 +128,10 @@ fn test_struct_init_pattern_detection_with_large_struct() {
 
     // Test recommendation
     let recommendation = detector.generate_recommendation(&pattern);
-    assert!(!recommendation.is_empty(), "Should provide a recommendation");
+    assert!(
+        !recommendation.is_empty(),
+        "Should provide a recommendation"
+    );
 }
 
 #[test]
@@ -156,7 +168,10 @@ fn test_struct_init_no_false_positives() {
     let pattern = detector.detect(&file, code);
 
     // Business logic should not be detected as initialization pattern
-    assert!(pattern.is_none(), "Should not detect business logic as initialization pattern");
+    assert!(
+        pattern.is_none(),
+        "Should not detect business logic as initialization pattern"
+    );
 }
 
 #[test]
@@ -201,11 +216,15 @@ fn test_field_dependency_detection() {
 
     if let Some(pattern) = pattern {
         // Check that dependencies were detected
-        assert!(!pattern.field_dependencies.is_empty(),
-            "Should detect field dependencies");
+        assert!(
+            !pattern.field_dependencies.is_empty(),
+            "Should detect field dependencies"
+        );
 
         // Verify some dependencies exist
-        let has_dependencies = pattern.field_dependencies.iter()
+        let has_dependencies = pattern
+            .field_dependencies
+            .iter()
             .any(|dep| !dep.depends_on.is_empty());
         assert!(has_dependencies, "Some fields should have dependencies");
     }

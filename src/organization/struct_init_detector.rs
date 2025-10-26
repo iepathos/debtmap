@@ -29,7 +29,9 @@ impl OrganizationDetector for StructInitOrganizationDetector {
         // In real integration, this will be provided via context
         if let Some(pattern) = self.pattern_detector.detect(file, &file_content) {
             let confidence = self.pattern_detector.confidence(&pattern);
-            let field_complexity = self.pattern_detector.calculate_init_complexity_score(&pattern);
+            let field_complexity = self
+                .pattern_detector
+                .calculate_init_complexity_score(&pattern);
             let recommendation = self.pattern_detector.generate_recommendation(&pattern);
 
             // Only report if confidence is high enough
