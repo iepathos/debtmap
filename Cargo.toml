@@ -146,3 +146,7 @@ harness = false
 [[bench]]
 name = "constructor_detection_bench"
 harness = false
+
+[[bench]]
+name = "validate_parallel_bench"
+harness = false

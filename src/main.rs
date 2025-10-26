@@ -464,6 +464,8 @@ fn main() -> Result<()> {
             semantic_off,
             explain_score: _,
             verbosity,
+            no_parallel,
+            jobs,
         } => {
             let validate_config = debtmap::commands::validate::ValidateConfig {
                 path,
@@ -479,6 +481,8 @@ fn main() -> Result<()> {
                 tail,
                 semantic_off,
                 verbosity,
+                no_parallel,
+                jobs,
             };
             debtmap::commands::validate::validate_project(validate_config)?;
             Ok(())
