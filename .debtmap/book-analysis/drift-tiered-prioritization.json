@@ -4,44 +4,104 @@
   "chapter_file": "book/src/tiered-prioritization.md",
   "drift_detected": true,
   "severity": "high",
-  "quality_assessment": "Chapter is mostly accurate but contains one critical factual error about the t2_dependency_threshold default value that will mislead users",
+  "quality_assessment": "Chapter is well-structured and mostly accurate, but contains critical TOML configuration errors that will prevent examples from working. The nested [tiers.tier_weights] table structure doesn't match the flat field structure in the code. Additionally, several CLI examples reference non-existent flags or invalid filter values.",
   "issues": [
     {
-      "type": "outdated_information",
+      "type": "incorrect_example",
+      "severity": "critical",
+      "section": "Configuration - Default Tier Thresholds and Weight Customization",
+      "description": "Chapter shows tier_weights as a nested table under [tiers.tier_weights], but code expects flat structure under [tiers] with field names t1_weight, t2_weight, etc.",
+      "current_content": "[tiers.tier_weights]\nt1 = 1.5\nt2 = 1.0\nt3 = 0.7\nt4 = 0.3",
+      "should_be": "[tiers]\nt1_weight = 1.5\nt2_weight = 1.0\nt3_weight = 0.7\nt4_weight = 0.3",
+      "fix_suggestion": "Update all TOML configuration examples (lines 107-148) to use flat field names directly under [tiers] section. The correct fields are: t1_weight, t2_weight, t3_weight, t4_weight (not a nested tier_weights table with t1, t2, etc.)",
+      "source_reference": "src/priority/tiers.rs:61-86 TierConfig struct with fields t1_weight, t2_weight, t3_weight, t4_weight"
+    },
+    {
+      "type": "missing_content",
       "severity": "high",
-      "section": "Default Tier Thresholds",
-      "description": "Chapter documents t2_dependency_threshold default as 5, but implementation shows default is 10",
-      "current_content": "t2_dependency_threshold = 5          # Dependency count cutoff",
-      "should_be": "t2_dependency_threshold = 10         # Dependency count cutoff",
-      "fix_suggestion": "Update line 98 to reflect the correct default value of 10. This affects when code is classified as Tier 2 Complex Untested based on dependency count.",
-      "source_reference": "src/priority/tiers.rs:92 (TierConfig::default)"
+      "section": "Interpreting Tier Output - Terminal Output Example",
+      "description": "Chapter references --show-t4 CLI flag but this flag doesn't exist in the CLI",
+      "current_content": "Use --show-t4 to display maintenance items",
+      "should_be": "Configure in .debtmap.toml: show_t4_in_main_report = true",
+      "fix_suggestion": "Replace line 215 CLI flag reference with configuration-based approach: 'To show Tier 4 items, add show_t4_in_main_report = true under [tiers] in .debtmap.toml'",
+      "source_reference": "src/priority/tiers.rs:73 show_t4_in_main_report field in TierConfig; src/cli.rs has no --show-t4 flag"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Use Cases - Sprint Planning and Refactoring Strategy",
+      "description": "Multiple examples use --filter Architecture and --filter Testing which are not valid filter category names",
+      "current_content": "debtmap analyze . --filter Architecture --top 5\ndebtmap analyze . --filter Testing --min-priority medium",
+      "should_be": "Use actual debt category names like Complexity, CodeOrganization, or use --min-priority to filter by priority tier",
+      "fix_suggestion": "Replace with valid examples: 'debtmap analyze . --min-priority high --top 5' for Tier 1, or filter by actual categories from features.json (TODO, FIXME, CodeSmell, Complexity, Dependency, CodeOrganization, etc.)",
+      "source_reference": "features.json:292-359 technical_debt_categories; src/cli.rs:136-138 filter_categories accepts category names, not arbitrary strings"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Configuration - Tier Weight Customization",
+      "description": "Examples show weight customization but don't explain how weights affect final scores or interact with base scoring",
+      "should_add": "Explain that tier weights are multipliers applied to base scores: final_score = base_score × tier_weight. Higher weight = higher priority in sorted output.",
+      "fix_suggestion": "Add brief explanation before line 130: 'Tier weights are multipliers applied to base debt scores during prioritization. A weight of 1.5 means items in that tier will score 50% higher than equivalent items in a tier with weight 1.0, pushing them higher in priority rankings.'",
+      "source_reference": "src/priority/tiers.rs:30-37 weight() method returns multiplier for score adjustment"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "The Four Tiers - Tier 1 criteria",
+      "description": "Chapter mentions 'excessive complexity' but doesn't specify the exact threshold that triggers Tier 1",
+      "should_add": "Functions with cyclomatic complexity > 50 are classified as Tier 1 Critical Architecture (extreme complexity hotspots)",
+      "fix_suggestion": "Add to Tier 1 examples section (around line 26): 'Functions with cyclomatic complexity > 50 (extreme complexity hotspots requiring architectural redesign)'",
+      "source_reference": "src/priority/tiers.rs:156 is_architectural_issue checks if cyclomatic > 50 for ComplexityHotspot"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "The Four Tiers - Tier 2 criteria",
+      "description": "Chapter doesn't fully explain that Tier 2 uses OR logic across multiple criteria",
+      "should_add": "Tier 2 classification uses OR logic: complexity >= 15 OR dependencies >= 10 OR is entry point function",
+      "fix_suggestion": "Clarify at line 39 that criteria use OR logic: 'Complex Untested code qualifies for Tier 2 if it meets ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or is an entry point function with any coverage gap'",
+      "source_reference": "src/priority/tiers.rs:162-183 is_complex_untested uses || (OR) for high_complexity, high_dependencies, is_critical_function"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "JSON Output Example",
+      "description": "JSON example shows tier field but doesn't document the exact enum variant names used",
+      "current_content": "\"tier\": \"T1_CriticalArchitecture\"",
+      "should_clarify": "Tier variants in JSON: T1CriticalArchitecture, T2ComplexUntested, T3TestingGaps, T4Maintenance (PascalCase, no underscores)",
+      "fix_suggestion": "Add note at line 230: 'Tier values use PascalCase enum variants without underscores: T1CriticalArchitecture, T2ComplexUntested, T3TestingGaps, T4Maintenance'",
+      "source_reference": "src/priority/tiers.rs:10-26 RecommendationTier enum derives Serialize with default PascalCase"
     }
   ],
   "positive_aspects": [
-    "Tier weights (1.5, 1.0, 0.7, 0.3) are accurate",
+    "Tier weights (1.5, 1.0, 0.7, 0.3) are accurate and match defaults",
     "t2_complexity_threshold default (15) is correct",
+    "t2_dependency_threshold default (10) is correct",
     "t3_complexity_threshold default (10) is correct",
     "show_t4_in_main_report default (false) is correct",
-    "TOML configuration structure matches actual implementation",
-    "Tier descriptions and priorities accurately reflect the code",
-    "Examples are practical and demonstrate real-world usage",
-    "Good progression from basic concepts to advanced customization",
-    "Clear explanations of when to address each tier",
-    "Helpful use cases for sprint planning and code review",
-    "Terminal output example matches actual format",
-    "JSON output structure is accurate",
-    "Troubleshooting section addresses common issues"
+    "Tier descriptions and priorities accurately reflect implementation logic",
+    "Clear progression from overview to configuration to use cases",
+    "Excellent practical examples for sprint planning and code review",
+    "Best practices section provides actionable guidance",
+    "Troubleshooting section addresses common configuration issues",
+    "Visual formatting with emojis and section markers improves readability",
+    "When to Address sections for each tier provide clear guidance"
   ],
   "improvement_suggestions": [
-    "Add example showing how god object detection triggers Tier 1 classification",
-    "Include example of how entry points can trigger Tier 2 even with moderate complexity",
-    "Add note about how tiers interact with other filtering options (--filter, --min-priority)",
-    "Consider adding a visual diagram showing the tier classification decision tree",
-    "Add example showing tier distribution trends over time for project health tracking"
+    "Add complete working TOML configuration example showing all tier settings in one block with correct syntax",
+    "Create a reference table showing all valid filter category names for --filter examples",
+    "Add explanation of tier classification decision tree (architectural check → complexity checks → default to T4)",
+    "Include example showing how god object detection automatically triggers Tier 1",
+    "Show example of entry point functions triggering Tier 2 even with moderate complexity",
+    "Add cross-reference to Scoring Strategies chapter explaining how tier weights combine with unified scoring",
+    "Consider adding flowchart diagram showing tier classification logic flow",
+    "Add example showing how to query items by specific tier in JSON output",
+    "Show example of tracking tier distribution trends over time for project health metrics"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-14",
-    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "analyzed_at": "2025-10-25",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
     "topics_covered": [
       "Tier 1: Critical Architecture",
       "Tier 2: Complex Untested",
@@ -50,6 +110,12 @@
       "Tier weights and configuration",
       "Customizing tier thresholds"
     ],
-    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples"
+    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples",
+    "code_references_checked": [
+      "src/priority/tiers.rs:10-196 (tier classification and configuration)",
+      "src/config.rs:1071 (tiers field in DebtmapConfig)",
+      "src/cli.rs:136-138 (filter_categories CLI option)",
+      "features.json:292-359 (technical debt categories)"
+    ]
   }
 }
