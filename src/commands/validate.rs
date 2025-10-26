@@ -19,6 +19,8 @@ pub struct ValidateConfig {
     pub tail: Option<usize>,
     pub semantic_off: bool,
     pub verbosity: u8,
+    pub no_parallel: bool,
+    pub jobs: usize,
 }
 
 pub struct ValidationDetails {
@@ -43,6 +45,28 @@ pub struct ValidationDetails {
 pub fn validate_project(config: ValidateConfig) -> Result<()> {
     let complexity_threshold = 10;
     let duplication_threshold = 50;
+
+    // Enable parallel processing by default to match analyze command performance.
+    // This significantly improves validation time on multi-core systems by
+    // parallelizing call graph construction and unified analysis.
+    let parallel_enabled = !config.no_parallel;
+    let jobs = config.jobs;
+
+    if parallel_enabled {
+        std::env::set_var("DEBTMAP_PARALLEL", "true");
+        if config.verbosity > 0 {
+            let thread_msg = if jobs == 0 {
+                "all available cores".to_string()
+            } else {
+                format!("{} threads", jobs)
+            };
+            eprintln!("Building call graph using {}...", thread_msg);
+        }
+    }
+
+    if jobs > 0 {
+        std::env::set_var("DEBTMAP_JOBS", jobs.to_string());
+    }
 
     let results = analysis_helpers::analyze_project(
         config.path.clone(),

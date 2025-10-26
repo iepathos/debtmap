@@ -378,6 +378,14 @@ pub enum Commands {
         /// -vvv: Show all debug information
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbosity: u8,
+
+        /// Disable parallel processing (enabled by default)
+        #[arg(long = "no-parallel")]
+        no_parallel: bool,
+
+        /// Number of threads for parallel processing (0 = use all cores)
+        #[arg(long = "jobs", short = 'j', default_value = "0")]
+        jobs: usize,
     },
 
     /// Compare two analysis results and generate diff
