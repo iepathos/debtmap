@@ -301,22 +301,34 @@ fn calculate_unified_analysis(
                 true, // show_progress
             )
             .unwrap_or_else(|e| {
-                log::warn!("Parallel call graph failed, falling back to sequential: {}", e);
+                log::warn!(
+                    "Parallel call graph failed, falling back to sequential: {}",
+                    e
+                );
                 (call_graph.clone(), Default::default(), Default::default())
             });
 
         // Process Python files
-        if let Err(e) = call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph) {
+        if let Err(e) =
+            call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)
+        {
             log::warn!("Failed to process Python files for call graph: {}", e);
         }
 
         call_graph = parallel_graph;
         (exclusions, used_funcs)
     } else {
-        let result = call_graph::process_rust_files_for_call_graph(project_path, &mut call_graph, false, false)
-            .unwrap_or_default();
+        let result = call_graph::process_rust_files_for_call_graph(
+            project_path,
+            &mut call_graph,
+            false,
+            false,
+        )
+        .unwrap_or_default();
 
-        if let Err(e) = call_graph::process_python_files_for_call_graph(project_path, &mut call_graph) {
+        if let Err(e) =
+            call_graph::process_python_files_for_call_graph(project_path, &mut call_graph)
+        {
             log::warn!("Failed to process Python files for call graph: {}", e);
         }
 

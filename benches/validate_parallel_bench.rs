@@ -1,8 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use debtmap::builders::{call_graph, parallel_call_graph};
-use debtmap::core::*;
 use debtmap::priority::call_graph::CallGraph;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Create a test project with multiple Rust files

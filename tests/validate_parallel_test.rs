@@ -54,14 +54,7 @@ fn test_validate_no_parallel_flag() {
 
     // Run validate command with --no-parallel flag
     let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--",
-            "validate",
-            "--no-parallel",
-        ])
+        .args(["run", "--bin", "debtmap", "--", "validate", "--no-parallel"])
         .arg(temp_dir.path())
         .output()
         .expect("Failed to execute validate command");
@@ -158,14 +151,7 @@ fn test_parallel_sequential_equivalence() {
 
     // Run with sequential processing
     let sequential_output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--",
-            "validate",
-            "--no-parallel",
-        ])
+        .args(["run", "--bin", "debtmap", "--", "validate", "--no-parallel"])
         .arg(temp_dir.path())
         .output()
         .expect("Failed to execute sequential validate");
@@ -270,7 +256,7 @@ fn test_validate_parallel_large_project() {
     // The parallel version should show some indication of parallel processing
     // This is a weak assertion - ideally we'd verify performance difference
     assert!(
-        stderr.len() > 0,
+        !stderr.is_empty(),
         "Expected some output from validate command"
     );
 }
