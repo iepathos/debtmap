@@ -15,17 +15,26 @@
 # Advanced Topics
 
 - [Architecture](architecture.md)
+- [Architectural Analysis](architectural-analysis.md)
 - [Cache Management](cache-management.md)
+- [Compare Analysis](compare-analysis.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
+- [Dead Code Analysis](dead-code-analysis.md)
+- [Design Pattern Detection](design-patterns.md)
 - [Entropy Analysis](entropy-analysis.md)
+- [Error Handling Analysis](error-handling-analysis.md)
+- [Functional Composition Analysis](functional-analysis.md)
 - [God Object Detection](god-object-detection.md)
+- [Multi-Pass Analysis](multi-pass-analysis.md)
 - [Parallel Processing](parallel-processing.md)
 - [Prodigy Integration](prodigy-integration.md)
 - [Responsibility Analysis](responsibility-analysis.md)
 - [Scoring Strategies](scoring-strategies.md)
+- [Threshold Configuration](threshold-configuration.md)
 - [Tiered Prioritization](tiered-prioritization.md)
+- [Validation and Quality Gates](validation-gates.md)
 
 # Reference
 

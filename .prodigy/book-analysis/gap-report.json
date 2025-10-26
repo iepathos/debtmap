@@ -1,137 +1,172 @@
 {
-  "analysis_date": "2025-10-20T10:11:20Z",
-  "project_name": "Debtmap",
+  "analysis_date": "2025-10-25T00:00:00Z",
   "features_analyzed": 12,
-  "documented_topics": 11,
-  "gaps_found": 7,
+  "documented_topics": 17,
+  "gaps_found": 9,
   "gaps": [
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "cache_management",
-      "feature_description": "Intelligent cache system for speeding up repeated analyses",
-      "recommended_chapter_id": "cache-management",
-      "recommended_title": "Cache Management",
-      "recommended_location": "book/src/cache-management.md"
+      "feature_category": "design_patterns_detected",
+      "feature_description": "Detection of 8 design patterns including observer, singleton, factory, strategy, callback, template_method, dependency_injection, and builder",
+      "recommended_chapter_id": "design-patterns",
+      "recommended_title": "Design Pattern Detection",
+      "recommended_location": "book/src/design-patterns.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "parallel_processing",
-      "feature_description": "Parallel processing with Rayon for high-performance analysis",
-      "recommended_chapter_id": "parallel-processing",
-      "recommended_title": "Parallel Processing",
-      "recommended_location": "book/src/parallel-processing.md"
+      "feature_category": "compare_command",
+      "feature_description": "Compare analysis features including target tracking, project health trends, regression detection, and metrics comparison",
+      "recommended_chapter_id": "compare-analysis",
+      "recommended_title": "Compare Analysis",
+      "recommended_location": "book/src/compare-analysis.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "entropy_based_analysis",
-      "feature_description": "Entropy-based complexity analysis to reduce false positives",
-      "recommended_chapter_id": "entropy-analysis",
-      "recommended_title": "Entropy Analysis",
-      "recommended_location": "book/src/entropy-analysis.md"
+      "feature_category": "validate_command",
+      "feature_description": "Validation command and quality gates for CI/CD integration",
+      "recommended_chapter_id": "validation-gates",
+      "recommended_title": "Validation and Quality Gates",
+      "recommended_location": "book/src/validation-gates.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "coverage_integration",
-      "feature_description": "LCOV coverage integration for risk-based analysis",
-      "recommended_chapter_id": "coverage-integration",
-      "recommended_title": "Coverage Integration",
-      "recommended_location": "book/src/coverage-integration.md"
+      "feature_category": "error_handling_patterns",
+      "feature_description": "Error swallowing, propagation, panic patterns, and Python error handling detection",
+      "recommended_chapter_id": "error-handling-analysis",
+      "recommended_title": "Error Handling Analysis",
+      "recommended_location": "book/src/error-handling-analysis.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "god_object_detection",
-      "feature_description": "God object detection with responsibility analysis",
-      "recommended_chapter_id": "god-object-detection",
-      "recommended_title": "God Object Detection",
-      "recommended_location": "book/src/god-object-detection.md"
+      "feature_category": "architectural_patterns",
+      "feature_description": "Circular dependencies, coupling metrics, bidirectional dependencies, stable dependencies principle, zone of pain/uselessness, and code duplication",
+      "recommended_chapter_id": "architectural-analysis",
+      "recommended_title": "Architectural Analysis",
+      "recommended_location": "book/src/architectural-analysis.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "suppression",
-      "feature_description": "Inline comment and config-based debt suppression",
-      "recommended_chapter_id": "suppression-patterns",
-      "recommended_title": "Suppression Patterns",
-      "recommended_location": "book/src/suppression-patterns.md"
+      "feature_category": "multi_pass_analysis",
+      "feature_description": "Multi-pass analysis with complexity attribution and attribution display",
+      "recommended_chapter_id": "multi-pass-analysis",
+      "recommended_title": "Multi-Pass Analysis",
+      "recommended_location": "book/src/multi-pass-analysis.md"
     },
     {
       "severity": "high",
       "type": "missing_chapter",
-      "feature_category": "context_providers",
-      "feature_description": "Context-aware analysis with critical path, dependency, and git history providers",
-      "recommended_chapter_id": "context-providers",
-      "recommended_title": "Context Providers",
-      "recommended_location": "book/src/context-providers.md"
+      "feature_category": "functional_composition",
+      "feature_description": "AST-based functional analysis with pure function detection, side effect detection, and composition pattern recognition",
+      "recommended_chapter_id": "functional-analysis",
+      "recommended_title": "Functional Composition Analysis",
+      "recommended_location": "book/src/functional-analysis.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "threshold_presets",
+      "feature_description": "Threshold presets (strict, balanced, lenient) and custom threshold configuration",
+      "recommended_chapter_id": "threshold-configuration",
+      "recommended_title": "Threshold Configuration",
+      "recommended_location": "book/src/threshold-configuration.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "dead_code_analysis",
+      "feature_description": "Public API detection heuristics and dead code identification",
+      "recommended_chapter_id": "dead-code-analysis",
+      "recommended_title": "Dead Code Analysis",
+      "recommended_location": "book/src/dead-code-analysis.md"
     }
   ],
   "actions_taken": [
     {
       "action": "created_chapter_definition",
-      "chapter_id": "cache-management",
+      "chapter_id": "design-patterns",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/cache-management.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "parallel-processing",
+      "chapter_id": "compare-analysis",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/parallel-processing.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "entropy-analysis",
+      "chapter_id": "validation-gates",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/entropy-analysis.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "coverage-integration",
+      "chapter_id": "error-handling-analysis",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/coverage-integration.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "god-object-detection",
+      "chapter_id": "architectural-analysis",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/god-object-detection.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "suppression-patterns",
+      "chapter_id": "multi-pass-analysis",
       "file_path": "workflows/data/prodigy-chapters.json"
-    },
-    {
-      "action": "created_stub_file",
-      "file_path": "book/src/suppression-patterns.md"
     },
     {
       "action": "created_chapter_definition",
-      "chapter_id": "context-providers",
+      "chapter_id": "functional-analysis",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "threshold-configuration",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "dead-code-analysis",
       "file_path": "workflows/data/prodigy-chapters.json"
     },
     {
       "action": "created_stub_file",
-      "file_path": "book/src/context-providers.md"
+      "file_path": "book/src/design-patterns.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/compare-analysis.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/validation-gates.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/error-handling-analysis.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/architectural-analysis.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/multi-pass-analysis.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/functional-analysis.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/threshold-configuration.md"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/dead-code-analysis.md"
     },
     {
       "action": "updated_summary",
