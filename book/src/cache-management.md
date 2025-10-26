@@ -38,11 +38,11 @@ The cache directory contains several subdirectories, each serving a specific pur
 debtmap/
 └── projects/
     └── <project-id>/
-        ├── call_graphs/     # Cached call graph data
-        ├── analysis/        # Cached analysis results
-        ├── metadata/        # Cache metadata and indices
-        ├── temp/            # Temporary files during analysis
-        └── file_metrics/    # Cached file-level metrics
+        ├── call_graphs/     # Call graph computation results
+        ├── analysis/        # Analysis results and metrics
+        ├── metadata/        # Cache indices and metadata
+        ├── temp/            # Temporary files created during analysis operations
+        └── file_metrics/    # File-level complexity scores
 ```
 
 ## Environment Variables
@@ -57,7 +57,7 @@ Debtmap provides extensive cache configuration through environment variables:
 | `DEBTMAP_CACHE_MAX_AGE_DAYS` | Maximum age for cache entries | `30` | `7` |
 | `DEBTMAP_CACHE_MAX_ENTRIES` | Maximum number of cache entries | `10000` | `5000` |
 | `DEBTMAP_CACHE_PRUNE_PERCENTAGE` | Percentage to remove when pruning (0.0-1.0) | `0.25` (25%) | `0.3` (30%) |
-| `DEBTMAP_CACHE_STRATEGY` | Pruning strategy (lru, lfu, fifo, age) | `lru` | `lfu` |
+| `DEBTMAP_CACHE_STRATEGY` | Pruning strategy (lru, lfu, fifo, age). Note: 'age_based' is accepted as an alias for 'age' | `lru` | `lfu` |
 | `DEBTMAP_CACHE_SYNC_PRUNE` | Use synchronous pruning (blocks) | `false` | `true` |
 | `DEBTMAP_CACHE_SCOPE` | Branch-specific cache scope | None | `feature-branch` |
 
@@ -90,7 +90,7 @@ Debtmap provides several CLI flags for cache management:
 | `--force-cache-rebuild` | Force cache rebuild (same as `--clear-cache`) |
 | `--cache-stats` | Show cache statistics and location |
 | `--migrate-cache` | Migrate cache from local to shared location |
-| `--cache-location <path>` | Specify custom cache location for this run |
+| `--cache-location <path>` | Specify custom cache directory path for this run (sets DEBTMAP_CACHE_DIR) |
 
 ### CLI Examples
 
@@ -180,12 +180,12 @@ When pruning is triggered, debtmap removes enough entries to bring the cache bel
 
 ### Cache Benefits
 
-The cache system provides significant performance improvements:
+The cache system provides significant performance improvements by storing various analysis components:
 
-- **Parsed ASTs:** Avoid re-parsing source files that haven't changed
-- **Call graphs:** Reuse expensive call graph computation
-- **Analysis results:** Skip redundant metric calculations
-- **File metrics:** Cache file-level complexity scores
+- **Call graphs** (stored in `call_graphs/`): Reuse expensive call graph computation
+- **Analysis results** (stored in `analysis/`): Skip redundant metric calculations
+- **File metrics** (stored in `file_metrics/`): Cache file-level complexity scores
+- **Metadata** (stored in `metadata/`): Cache indices and project metadata
 
 **Performance impact:** Cache hits can reduce analysis time by 50-90% for large codebases, depending on the number of changed files.
 
