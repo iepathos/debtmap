@@ -71,7 +71,9 @@ debtmap --version
 debtmap --help
 ```
 
-**Common installation issues:**
+## Troubleshooting
+
+### Installation Issues
 
 - **Binary not in PATH**: Add `~/.cargo/bin` or `~/.local/bin` to your PATH
   ```bash
@@ -79,6 +81,32 @@ debtmap --help
   ```
 - **Permission issues**: Run the install script with your current user (don't use sudo)
 - **Cargo not found**: Install Rust from https://rustup.rs
+
+### First Run Issues
+
+- **Empty output or no items found**: Check that your project contains supported source files (`.rs`, `.py`, `.js`, `.ts`, `.tsx`). Verify with `debtmap analyze . -vvv` for debug output.
+
+- **Parser failures**: If analysis fails with parsing errors:
+  ```bash
+  # Run with verbose output to identify problematic files
+  debtmap analyze . -vv
+  # Exclude problematic files temporarily
+  debtmap init  # Creates .debtmap.toml
+  # Edit .debtmap.toml to add ignore patterns
+  ```
+
+- **Unexpected results**: First run builds cache and may take longer. For fresh analysis:
+  ```bash
+  debtmap analyze . --clear-cache
+  ```
+
+- **Performance issues**: For large codebases (10,000+ files):
+  ```bash
+  # Limit parallel jobs to reduce memory usage
+  debtmap analyze . --jobs 4
+  # Or analyze specific directories
+  debtmap analyze ./src
+  ```
 
 ## Quick Start
 
@@ -247,112 +275,42 @@ Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
 - **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS, `%LOCALAPPDATA%/debtmap` on Windows
 - **What's cached**: Parsed ASTs and computed metrics for each file
 - **Invalidation**: Cache is automatically invalidated when files are modified
-
-### Example Output
-
-When you run `debtmap analyze .`, you'll see output like this:
-
-```
-════════════════════════════════════════════
-    PRIORITY TECHNICAL DEBT FIXES
-════════════════════════════════════════════
-
-📊 ANALYSIS SUMMARY
-   Files analyzed: 47
-   Total functions: 234
-   Debt items found: 12
-   Analysis time: 3.2s
-
-🎯 TOP 5 RECOMMENDATIONS
-
-#1 SCORE: 8.9 [CRITICAL]
-├─ TEST GAP: ./src/parser.rs:38 parse_input()
-├─ ACTION: Add 6 unit tests for full coverage
-├─ IMPACT: -3.7 risk reduction
-├─ WHY: Complex logic (cyclo=12) with 0% coverage
-└─ DETAILS: Function has 12 decision points with no test coverage.
-            Untested error paths could cause production failures.
-
-#2 SCORE: 7.2 [HIGH]
-├─ TEST GAP: ./src/analyzer/complexity.rs:145 calculate_entropy()
-├─ ACTION: Add 4 unit tests for edge cases
-├─ IMPACT: -2.8 risk reduction
-├─ WHY: Medium complexity (cyclo=8) with 35% coverage
-└─ DETAILS: Missing tests for error conditions and boundary cases.
-
-#3 SCORE: 5.8 [HIGH]
-├─ COMPLEXITY: ./src/io/formatter.rs:89 format_output()
-├─ ACTION: Extract 3 functions from 16 branches
-├─ IMPACT: -2.1 risk reduction
-├─ WHY: High complexity (cyclo=16, entropy=0.75)
-└─ DETAILS: Function handles multiple output formats with nested conditionals.
-            Consider extracting format-specific logic.
-
-════════════════════════════════════════════
-```
-
-With coverage integration (`--lcov`), you'll see more detailed test gap analysis:
-
-```bash
-debtmap analyze . --lcov target/coverage/lcov.info --top 3
-```
-
-```
-════════════════════════════════════════════
-    PRIORITY TECHNICAL DEBT FIXES
-    (Coverage-Integrated Analysis)
-════════════════════════════════════════════
-
-📊 ANALYSIS SUMMARY
-   Files analyzed: 47
-   Coverage: 68.5% lines, 54.2% branches
-   Critical gaps: 3
-   High-priority gaps: 7
-
-🎯 TOP 3 CRITICAL GAPS
-
-#1 SCORE: 9.1 [CRITICAL]
-├─ TEST GAP: ./src/core/state_machine.rs:67 transition_state()
-├─ COVERAGE: 0% (0/8 branches covered)
-├─ COMPLEXITY: 15 (high entropy: 0.82)
-├─ ACTION: Add 8 unit tests covering all state transitions
-├─ IMPACT: -4.5 risk reduction
-├─ WHY: Core business logic with complex branching, completely untested
-└─ CALL GRAPH: Called from 12 different code paths
-                5 of those callers are also untested
-
-#2 SCORE: 8.4 [CRITICAL]
-├─ TEST GAP: ./src/parser.rs:38 parse_input()
-├─ COVERAGE: 25% (2/8 branches covered)
-├─ COMPLEXITY: 12 (medium entropy: 0.61)
-├─ ACTION: Add 6 tests for untested error paths
-├─ IMPACT: -3.2 risk reduction
-└─ MISSING BRANCHES:
-    • Line 45: Error path for invalid syntax
-    • Line 52: Error path for unexpected EOF
-    • Line 58: Error path for malformed input
-    • Line 63: Edge case: empty input
-    • Line 68: Edge case: very large input
-    • Line 72: Edge case: special characters
-
-════════════════════════════════════════════
-```
-
-**Reading the output:**
-- **Score**: Risk score from 0-10 (higher = more urgent)
-- **Tier**: CRITICAL (8.0+), HIGH (5.0-7.9), MODERATE (2.0-4.9), LOW (<2.0)
-- **Location**: File path, line number, and function name
-- **Action**: Specific steps to address the issue
-- **Impact**: Estimated risk reduction from taking action
-- **Why**: Rationale explaining why this is flagged
 - **Management**: Use `--clear-cache` to clear, `--no-cache` to skip, or `--cache-stats` to view statistics
 
-**Language support**:
-- **Rust**: Full support with advanced features (trait detection, purity analysis, call graphs)
-- **Python**: Partial support (complexity metrics, basic debt detection)
-- **JavaScript/TypeScript**: Partial support (complexity metrics, basic debt detection)
+## Language Support
 
-### Example Output
+Debtmap supports multiple programming languages with varying feature completeness:
+
+### Rust (Full Support)
+All analysis features available:
+- Complexity metrics (cyclomatic, cognitive, nesting, lines)
+- Technical debt detection (code smells, anti-patterns)
+- Test gap analysis with coverage integration
+- Advanced features:
+  - Trait detection and analysis
+  - Function purity analysis
+  - Call graph generation
+  - Macro expansion tracking
+
+### Python (Partial Support)
+Core features available:
+- Complexity metrics (cyclomatic, cognitive, nesting, lines)
+- Basic debt detection (code smells, god objects)
+- Test gap analysis with coverage integration
+
+**Not yet available**: Purity analysis, detailed call graphs
+
+### JavaScript/TypeScript (Partial Support)
+Core features available:
+- Complexity metrics (cyclomatic, cognitive, nesting, lines)
+- Basic debt detection (code smells, god objects)
+- Test gap analysis with coverage integration
+
+**Not yet available**: Purity analysis, detailed call graphs
+
+**Note**: All languages benefit from coverage integration for accurate risk assessment. The core analysis workflow (complexity → debt patterns → prioritization) works consistently across all supported languages.
+
+## Example Output
 
 When you run `debtmap analyze .`, you'll see output like this:
 
@@ -522,6 +480,60 @@ debtmap init
 
 This creates a `.debtmap.toml` file with sensible defaults that you can customize for your project.
 
+**Example Configuration File:**
+
+Here's a typical `.debtmap.toml` with common settings:
+
+```toml
+# Debtmap Configuration File
+# Generated by: debtmap init
+
+# Analysis thresholds
+[thresholds]
+complexity = 10        # Flag functions with cyclomatic complexity > 10
+duplication = 40       # Minimum lines for duplicate code detection
+file_size = 500        # Warn on files exceeding 500 lines
+
+# Priority tier boundaries (for unified priority scores 0-10)
+[tiers]
+critical = 9.0         # Score >= 9.0 = CRITICAL priority
+high = 7.0             # Score >= 7.0 = HIGH priority
+medium = 5.0           # Score >= 5.0 = MEDIUM priority
+# Anything below 5.0 = LOW priority
+
+# Risk scoring weights (must sum to 1.0)
+[weights]
+coverage = 0.4         # Weight for test coverage gaps
+complexity = 0.35      # Weight for complexity metrics
+dependencies = 0.25    # Weight for call graph dependencies
+
+# Language-specific settings
+[languages]
+rust = true            # Enable Rust analysis
+python = true          # Enable Python analysis
+javascript = true      # Enable JavaScript/TypeScript analysis
+
+# Files and directories to ignore
+[ignore]
+patterns = [
+    "**/target/**",     # Rust build artifacts
+    "**/node_modules/**", # JavaScript dependencies
+    "**/__pycache__/**", # Python bytecode
+    "**/tests/**",      # Test directories (optional)
+    "**/*.test.ts",     # Test files (optional)
+]
+
+# God object detection thresholds
+[god_object]
+methods = 20           # Warn on classes/modules with > 20 methods
+lines = 500            # Warn on classes/modules with > 500 lines
+
+# Entropy-based complexity detection
+[entropy]
+enabled = true         # Enable entropy analysis
+threshold = 0.7        # Flag functions with entropy > 0.7
+```
+
 **Key Configuration Options:**
 
 The configuration file allows you to customize:
@@ -537,23 +549,52 @@ See the Configuration chapter for complete documentation of all available option
 
 ### Try Analysis with Coverage
 
-For more accurate risk assessment, run analysis with coverage data:
+For more accurate risk assessment, run analysis with coverage data. Coverage helps Debtmap identify **truly risky code** - functions that are both complex AND untested.
 
+#### Generating Coverage Data
+
+**Rust Projects:**
 ```bash
-# For Rust projects
+# Install cargo-tarpaulin if not already installed
+cargo install cargo-tarpaulin
+
+# Generate LCOV coverage report
 cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Run debtmap with coverage
 debtmap analyze . --lcov target/coverage/lcov.info
-
-# For Python projects
-pytest --cov --cov-report=lcov
-debtmap analyze . --lcov coverage.lcov
-
-# For JavaScript/TypeScript projects
-jest --coverage --coverageReporters=lcov
-debtmap analyze . --lcov coverage/lcov.info
 ```
 
-Coverage data helps Debtmap identify **truly risky code** - functions that are both complex AND untested.
+**Python Projects:**
+```bash
+# Install coverage plugin if not already installed
+pip install pytest-cov
+
+# Generate LCOV coverage report
+pytest --cov=. --cov-report=lcov:coverage.lcov
+
+# Run debtmap with coverage
+debtmap analyze . --lcov coverage.lcov
+```
+
+**JavaScript/TypeScript Projects:**
+```bash
+# Using Jest (add to package.json or run directly)
+jest --coverage --coverageReporters=lcov
+
+# Run debtmap with coverage
+debtmap analyze . --lcov coverage/lcov.info
+
+# Using NYC with other test runners
+npx nyc --reporter=lcovonly npm test
+debtmap analyze . --lcov coverage/lcov.info
+
+# Using Vitest
+vitest run --coverage --coverage.reporter=lcov
+debtmap analyze . --lcov coverage/lcov-report/lcov.info
+```
+
+**Note**: The `--lcov` flag is a shorthand alias for `--coverage-file`. Both accept LCOV format coverage reports.
 
 ---
 
