@@ -2114,11 +2114,6 @@ interface_weight = 0.15
 
         // Safety net - high ceiling
         assert_eq!(thresholds.max_total_debt_score, 10000);
-
-        // Deprecated metrics should be None by default
-        assert_eq!(thresholds.max_high_complexity_count, None);
-        assert_eq!(thresholds.max_debt_items, None);
-        assert_eq!(thresholds.max_high_risk_functions, None);
     }
 
     #[test]
@@ -2366,11 +2361,6 @@ interface_weight = 0.15
 
         // Safety net - high ceiling
         assert_eq!(thresholds.max_total_debt_score, 10000);
-
-        // Deprecated metrics should be None by default
-        assert_eq!(thresholds.max_high_complexity_count, None);
-        assert_eq!(thresholds.max_debt_items, None);
-        assert_eq!(thresholds.max_high_risk_functions, None);
     }
 
     #[test]
