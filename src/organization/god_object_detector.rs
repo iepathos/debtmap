@@ -578,7 +578,7 @@ impl GodObjectDetector {
                             !visitor
                                 .function_complexity
                                 .iter()
-                                .find(|fc| fc.name == item.sig.ident.to_string())
+                                .find(|fc| item.sig.ident == fc.name)
                                 .map(|fc| fc.is_test)
                                 .unwrap_or(false)
                         })
