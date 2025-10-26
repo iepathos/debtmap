@@ -1,0 +1,925 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Compare Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="compare-analysis"><a class="header" href="#compare-analysis">Compare Analysis</a></h1>
+<p>The <code>compare</code> command enables you to track technical debt changes over time by comparing two analysis results. This is essential for validating refactoring efforts, detecting regressions in pull requests, and monitoring project health trends.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The compare command analyzes differences between “before” and “after” debtmap analyses, providing:</p>
+<ul>
+<li><strong>Target location tracking</strong> - Monitor specific functions or files you’re refactoring</li>
+<li><strong>Project health metrics</strong> - Track overall debt trends across your codebase</li>
+<li><strong>Regression detection</strong> - Identify new critical debt items introduced</li>
+<li><strong>Improvement tracking</strong> - Measure and celebrate debt reduction</li>
+<li><strong>CI/CD integration</strong> - Automate quality gates in your pipeline</li>
+</ul>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<h3 id="command-syntax"><a class="header" href="#command-syntax">Command Syntax</a></h3>
+<pre><code class="language-bash">debtmap compare \
+  --before path/to/before.json \
+  --after path/to/after.json \
+  --plan IMPLEMENTATION_PLAN.md \
+  --format json \
+  --output comparison.json
+</code></pre>
+<h3 id="command-line-options"><a class="header" href="#command-line-options">Command-Line Options</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>--before FILE</code></td><td>Yes</td><td>Path to “before” analysis JSON</td></tr>
+<tr><td><code>--after FILE</code></td><td>Yes</td><td>Path to “after” analysis JSON</td></tr>
+<tr><td><code>--plan FILE</code></td><td>No</td><td>Implementation plan to extract target location</td></tr>
+<tr><td><code>--target-location LOCATION</code></td><td>No</td><td>Manual target location (alternative to <code>--plan</code>)</td></tr>
+<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code> or <code>markdown</code> (default: <code>json</code>)</td></tr>
+<tr><td><code>--output FILE</code></td><td>No</td><td>Output file path (default: stdout)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Note</strong>: <code>--plan</code> and <code>--target-location</code> are mutually exclusive. Use one or neither, but not both.</p>
+<h2 id="target-location-tracking"><a class="header" href="#target-location-tracking">Target Location Tracking</a></h2>
+<p>Target location tracking allows you to monitor specific code locations through refactoring changes.</p>
+<h3 id="location-format"><a class="header" href="#location-format">Location Format</a></h3>
+<p>Target locations use the format: <code>file:function:line</code></p>
+<p>Examples:</p>
+<ul>
+<li><code>src/main.rs:complex_function:42</code></li>
+<li><code>lib/parser.rs:parse_expression:156</code></li>
+<li><code>api/handler.rs:process_request:89</code></li>
+</ul>
+<h3 id="specifying-target-locations"><a class="header" href="#specifying-target-locations">Specifying Target Locations</a></h3>
+<h4 id="option-1-via-implementation-plan"><a class="header" href="#option-1-via-implementation-plan">Option 1: Via Implementation Plan</a></h4>
+<p>Create an <code>IMPLEMENTATION_PLAN.md</code> file with a target location section:</p>
+<pre><code class="language-markdown"># Implementation Plan
+
+## Target Item
+**Location**: ./src/example.rs:complex_function:45
+**Current Debt Score**: 85.5
+**Severity**: critical
+
+## Problem Analysis
+The `complex_function` has high cognitive complexity...
+
+## Proposed Solution
+1. Extract nested conditionals into separate functions
+2. Use early returns to reduce nesting depth
+3. Add comprehensive unit tests
+</code></pre>
+<p>Then run compare with the plan:</p>
+<pre><code class="language-bash">debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
+</code></pre>
+<h4 id="option-2-manual-target-location"><a class="header" href="#option-2-manual-target-location">Option 2: Manual Target Location</a></h4>
+<p>Specify the target directly via command-line:</p>
+<pre><code class="language-bash">debtmap compare \
+  --before before.json \
+  --after after.json \
+  --target-location "src/example.rs:complex_function:45"
+</code></pre>
+<h3 id="matching-strategies"><a class="header" href="#matching-strategies">Matching Strategies</a></h3>
+<p>Debtmap uses intelligent matching to find your target item even when code changes:</p>
+<div class="table-wrapper"><table><thead><tr><th>Strategy</th><th>When Used</th><th>Confidence</th></tr></thead><tbody>
+<tr><td><strong>Exact</strong></td><td>Location matches exactly</td><td>1.0</td></tr>
+<tr><td><strong>FuzzyFunction</strong></td><td>Function moved but name unchanged</td><td>0.8 - 0.95</td></tr>
+<tr><td><strong>FuzzyFile</strong></td><td>File changed but function exists</td><td>0.6 - 0.8</td></tr>
+</tbody></table>
+</div>
+<p>The comparison result includes the match strategy and confidence score used.</p>
+<h3 id="target-status-values"><a class="header" href="#target-status-values">Target Status Values</a></h3>
+<p>After comparing, the target item will have one of these statuses:</p>
+<ul>
+<li><strong>Resolved</strong> - Item no longer exists in after analysis (debt eliminated!)</li>
+<li><strong>Improved</strong> - Item exists but with lower debt score</li>
+<li><strong>Unchanged</strong> - Item exists with similar metrics (within 5%)</li>
+<li><strong>Regressed</strong> - Item exists but got worse</li>
+<li><strong>NotFoundBefore</strong> - Item didn’t exist in before analysis</li>
+<li><strong>NotFound</strong> - Item not found in either analysis</li>
+</ul>
+<h2 id="project-health-metrics"><a class="header" href="#project-health-metrics">Project Health Metrics</a></h2>
+<p>The compare command tracks project-wide health metrics to show overall trends.</p>
+<h3 id="tracked-metrics"><a class="header" href="#tracked-metrics">Tracked Metrics</a></h3>
+<pre><code class="language-json">{
+  "project_health": {
+    "before": {
+      "total_debt_score": 450.5,
+      "total_items": 25,
+      "critical_items": 5,
+      "high_priority_items": 12,
+      "average_score": 18.02
+    },
+    "after": {
+      "total_debt_score": 380.2,
+      "total_items": 22,
+      "critical_items": 3,
+      "high_priority_items": 10,
+      "average_score": 17.28
+    },
+    "changes": {
+      "debt_score_change": -70.3,
+      "debt_score_change_pct": -15.6,
+      "items_change": -3,
+      "critical_items_change": -2
+    }
+  }
+}
+</code></pre>
+<h3 id="understanding-metrics"><a class="header" href="#understanding-metrics">Understanding Metrics</a></h3>
+<ul>
+<li><strong>total_debt_score</strong> - Sum of all debt item scores</li>
+<li><strong>total_items</strong> - Total number of debt items detected</li>
+<li><strong>critical_items</strong> - Items with score ≥ 60</li>
+<li><strong>high_priority_items</strong> - Items with score ≥ 40</li>
+<li><strong>average_score</strong> - Mean debt score across all items</li>
+<li><strong>debt_score_change</strong> - Absolute change in total debt</li>
+<li><strong>debt_score_change_pct</strong> - Percentage change in total debt</li>
+</ul>
+<h3 id="debt-trends"><a class="header" href="#debt-trends">Debt Trends</a></h3>
+<p>The comparison calculates an overall debt trend based on the percentage change:</p>
+<ul>
+<li><strong>Improving</strong> - Debt decreased by more than 5%</li>
+<li><strong>Stable</strong> - Debt changed by less than 5% (within normal variance)</li>
+<li><strong>Regressing</strong> - Debt increased by more than 5%</li>
+</ul>
+<h2 id="regression-detection"><a class="header" href="#regression-detection">Regression Detection</a></h2>
+<p>Regressions are new critical debt items (score ≥ 60) that appear in the after analysis.</p>
+<h3 id="what-counts-as-a-regression"><a class="header" href="#what-counts-as-a-regression">What Counts as a Regression</a></h3>
+<p>A regression is detected when:</p>
+<ol>
+<li>An item exists in the after analysis</li>
+<li>The item does NOT exist in the before analysis</li>
+<li>The item has a debt score ≥ 60.0 (critical severity)</li>
+</ol>
+<h3 id="regression-output"><a class="header" href="#regression-output">Regression Output</a></h3>
+<pre><code class="language-json">{
+  "regressions": [
+    {
+      "location": "src/new_feature.rs:process_data:23",
+      "score": 72.5,
+      "debt_type": "high_complexity",
+      "description": "Function has cyclomatic complexity of 12 and cognitive complexity of 15"
+    }
+  ]
+}
+</code></pre>
+<h3 id="using-regressions-in-cicd"><a class="header" href="#using-regressions-in-cicd">Using Regressions in CI/CD</a></h3>
+<p>Fail your CI build if regressions are detected:</p>
+<pre><code class="language-bash"># Run comparison
+debtmap compare --before before.json --after after.json --output result.json
+
+# Check for regressions
+REGRESSION_COUNT=$(jq '.summary.new_critical_count' result.json)
+
+if [ "$REGRESSION_COUNT" -gt 0 ]; then
+  echo "❌ Found $REGRESSION_COUNT new critical debt items"
+  exit 1
+fi
+</code></pre>
+<h2 id="improvement-tracking"><a class="header" href="#improvement-tracking">Improvement Tracking</a></h2>
+<p>Debtmap tracks two types of improvements:</p>
+<h3 id="improvement-types"><a class="header" href="#improvement-types">Improvement Types</a></h3>
+<ol>
+<li><strong>Resolved</strong> - Debt item completely eliminated (no longer in after analysis)</li>
+<li><strong>ScoreReduced</strong> - Debt item still exists but score reduced by ≥ 30%</li>
+</ol>
+<h3 id="improvement-metrics"><a class="header" href="#improvement-metrics">Improvement Metrics</a></h3>
+<p>When comparing target items, debtmap calculates:</p>
+<pre><code class="language-json">{
+  "improvements": {
+    "score_reduction_pct": 45.2,
+    "complexity_reduction_pct": 38.7,
+    "coverage_improvement_pct": 25.0
+  }
+}
+</code></pre>
+<ul>
+<li><strong>score_reduction_pct</strong> - Percentage reduction in overall debt score</li>
+<li><strong>complexity_reduction_pct</strong> - Reduction in cyclomatic/cognitive complexity</li>
+<li><strong>coverage_improvement_pct</strong> - Increase in test coverage</li>
+</ul>
+<h3 id="improvement-items-list"><a class="header" href="#improvement-items-list">Improvement Items List</a></h3>
+<pre><code class="language-json">{
+  "improvements": [
+    {
+      "location": "src/example.rs:complex_function:45",
+      "before_score": 85.5,
+      "after_score": 32.1,
+      "improvement_type": "ScoreReduced"
+    },
+    {
+      "location": "src/legacy.rs:old_code:120",
+      "before_score": 65.0,
+      "after_score": null,
+      "improvement_type": "Resolved"
+    }
+  ]
+}
+</code></pre>
+<h2 id="beforeafter-metrics"><a class="header" href="#beforeafter-metrics">Before/After Metrics</a></h2>
+<p>For target items, debtmap compares detailed metrics:</p>
+<h3 id="target-metrics-structure"><a class="header" href="#target-metrics-structure">Target Metrics Structure</a></h3>
+<pre><code class="language-json">{
+  "target_item": {
+    "location": "src/example.rs:complex_function:45",
+    "match_strategy": "Exact",
+    "match_confidence": 1.0,
+    "matched_items_count": 1,
+    "before": {
+      "score": 85.5,
+      "cyclomatic_complexity": 8,
+      "cognitive_complexity": 15,
+      "coverage": 45.0,
+      "function_length": 120,
+      "nesting_depth": 4
+    },
+    "after": {
+      "score": 32.1,
+      "cyclomatic_complexity": 3,
+      "cognitive_complexity": 5,
+      "coverage": 85.0,
+      "function_length": 45,
+      "nesting_depth": 2
+    },
+    "improvements": {
+      "score_reduction_pct": 62.5,
+      "complexity_reduction_pct": 66.7,
+      "coverage_improvement_pct": 88.9
+    },
+    "status": "Improved"
+  }
+}
+</code></pre>
+<h3 id="metric-aggregation"><a class="header" href="#metric-aggregation">Metric Aggregation</a></h3>
+<p>When multiple items match the target location (due to fuzzy matching), metrics are aggregated:</p>
+<ul>
+<li><strong>score</strong> - Average across matched items</li>
+<li><strong>cyclomatic_complexity</strong> - Average</li>
+<li><strong>cognitive_complexity</strong> - Average</li>
+<li><strong>coverage</strong> - Average</li>
+<li><strong>function_length</strong> - Average</li>
+<li><strong>nesting_depth</strong> - Maximum (worst case)</li>
+</ul>
+<p>The <code>matched_items_count</code> field tells you how many items were aggregated.</p>
+<h3 id="validating-refactoring-success"><a class="header" href="#validating-refactoring-success">Validating Refactoring Success</a></h3>
+<p>Use these metrics to verify your refactoring achieved its goals:</p>
+<pre><code class="language-bash"># Example: Verify complexity reduction
+COMPLEXITY_REDUCTION=$(jq '.target_item.improvements.complexity_reduction_pct' result.json)
+
+if (( $(echo "$COMPLEXITY_REDUCTION &lt; 30" | bc -l) )); then
+  echo "⚠️ Complexity reduction ($COMPLEXITY_REDUCTION%) below 30% target"
+fi
+</code></pre>
+<h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
+<h3 id="json-format"><a class="header" href="#json-format">JSON Format</a></h3>
+<p>The default JSON format provides complete structured data for programmatic use:</p>
+<pre><code class="language-bash">debtmap compare --before before.json --after after.json --format json
+</code></pre>
+<p>The JSON output includes:</p>
+<ul>
+<li><code>metadata</code> - Comparison metadata (date, files, target location)</li>
+<li><code>target_item</code> - Target comparison details (if specified)</li>
+<li><code>project_health</code> - Project-wide metrics and trends</li>
+<li><code>regressions</code> - List of new critical items</li>
+<li><code>improvements</code> - List of resolved/reduced items</li>
+<li><code>summary</code> - High-level summary statistics</li>
+</ul>
+<h3 id="markdown-format"><a class="header" href="#markdown-format">Markdown Format</a></h3>
+<p>For human-readable reports:</p>
+<pre><code class="language-bash">debtmap compare --before before.json --after after.json --format markdown
+</code></pre>
+<p>The markdown output provides a formatted report suitable for:</p>
+<ul>
+<li>Pull request comments</li>
+<li>Documentation</li>
+<li>Email reports</li>
+<li>Team dashboards</li>
+</ul>
+<h2 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h2>
+<h3 id="github-actions-example"><a class="header" href="#github-actions-example">GitHub Actions Example</a></h3>
+<pre><code class="language-yaml">name: Technical Debt Check
+
+on: [pull_request]
+
+jobs:
+  debt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Need history for before/after
+
+      - name: Install debtmap
+        run: cargo install debtmap
+
+      - name: Analyze main branch
+        run: |
+          git checkout main
+          debtmap analyze --output before.json
+
+      - name: Analyze PR branch
+        run: |
+          git checkout ${{ github.head_ref }}
+          debtmap analyze --output after.json
+
+      - name: Compare analyses
+        run: |
+          debtmap compare \
+            --before before.json \
+            --after after.json \
+            --format markdown \
+            --output comparison.md
+
+      - name: Check for regressions
+        run: |
+          REGRESSIONS=$(debtmap compare \
+            --before before.json \
+            --after after.json \
+            --format json | jq '.summary.new_critical_count')
+
+          if [ "$REGRESSIONS" -gt 0 ]; then
+            echo "❌ Found $REGRESSIONS new critical debt items"
+            exit 1
+          fi
+
+      - name: Post comparison to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const comparison = fs.readFileSync('comparison.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comparison
+            });
+</code></pre>
+<h3 id="gitlab-ci-example"><a class="header" href="#gitlab-ci-example">GitLab CI Example</a></h3>
+<pre><code class="language-yaml">debt_check:
+  stage: test
+  script:
+    # Analyze main branch
+    - git fetch origin main
+    - git checkout origin/main
+    - debtmap analyze --output before.json
+
+    # Analyze current branch
+    - git checkout $CI_COMMIT_SHA
+    - debtmap analyze --output after.json
+
+    # Compare and fail on regressions
+    - debtmap compare --before before.json --after after.json --output result.json
+    - |
+      REGRESSIONS=$(jq '.summary.new_critical_count' result.json)
+      if [ "$REGRESSIONS" -gt 0 ]; then
+        echo "Failed: $REGRESSIONS new critical items"
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - before.json
+      - after.json
+      - result.json
+    expire_in: 1 week
+</code></pre>
+<h3 id="best-practices-for-cicd"><a class="header" href="#best-practices-for-cicd">Best Practices for CI/CD</a></h3>
+<ol>
+<li><strong>Store analyses as artifacts</strong> - Keep before/after JSON for debugging</li>
+<li><strong>Set appropriate thresholds</strong> - Don’t fail on minor increases</li>
+<li><strong>Track trends over time</strong> - Store comparison results for historical analysis</li>
+<li><strong>Use target locations for focused work</strong> - Track specific refactoring efforts</li>
+<li><strong>Generate reports</strong> - Use markdown format for team visibility</li>
+<li><strong>Gate deployments</strong> - Require debt improvements for major releases</li>
+</ol>
+<h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
+<h3 id="example-1-basic-comparison"><a class="header" href="#example-1-basic-comparison">Example 1: Basic Comparison</a></h3>
+<p>Compare two analyses without targeting specific items:</p>
+<pre><code class="language-bash"># Run before analysis
+debtmap analyze --output before.json
+
+# Make changes to codebase...
+
+# Run after analysis
+debtmap analyze --output after.json
+
+# Compare
+debtmap compare --before before.json --after after.json --format markdown
+</code></pre>
+<h3 id="example-2-tracking-function-refactoring"><a class="header" href="#example-2-tracking-function-refactoring">Example 2: Tracking Function Refactoring</a></h3>
+<p>Monitor a specific function you’re refactoring:</p>
+<pre><code class="language-bash"># Create implementation plan
+cat &gt; IMPLEMENTATION_PLAN.md &lt;&lt;EOF
+# Refactoring complex_function
+
+## Target Item
+**Location**: ./src/parser.rs:parse_expression:156
+**Current Debt Score**: 78.5
+**Severity**: critical
+EOF
+
+# Run before analysis
+debtmap analyze --output before.json
+
+# Refactor the function...
+
+# Run after analysis
+debtmap analyze --output after.json
+
+# Compare with target tracking
+debtmap compare \
+  --before before.json \
+  --after after.json \
+  --plan IMPLEMENTATION_PLAN.md \
+  --format json \
+  --output result.json
+
+# Check improvement
+jq '.target_item.status' result.json  # Should show "Improved" or "Resolved"
+jq '.target_item.improvements.score_reduction_pct' result.json
+</code></pre>
+<h3 id="example-3-detecting-pr-regressions"><a class="header" href="#example-3-detecting-pr-regressions">Example 3: Detecting PR Regressions</a></h3>
+<p>Check if a pull request introduces new complexity:</p>
+<pre><code class="language-bash"># Analyze base branch
+git checkout main
+debtmap analyze --output main.json
+
+# Analyze PR branch
+git checkout feature/new-feature
+debtmap analyze --output feature.json
+
+# Compare
+debtmap compare \
+  --before main.json \
+  --after feature.json \
+  --output comparison.json
+
+# Extract summary
+jq '.summary' comparison.json
+
+# Example output:
+# {
+#   "target_improved": false,
+#   "new_critical_count": 2,
+#   "resolved_count": 0,
+#   "overall_debt_trend": "Regressing"
+# }
+</code></pre>
+<h3 id="example-4-monitoring-project-health-over-releases"><a class="header" href="#example-4-monitoring-project-health-over-releases">Example 4: Monitoring Project Health Over Releases</a></h3>
+<p>Track overall project health across releases:</p>
+<pre><code class="language-bash"># Analyze release v1.0
+git checkout v1.0
+debtmap analyze --output v1.0.json
+
+# Analyze release v1.1
+git checkout v1.1
+debtmap analyze --output v1.1.json
+
+# Compare
+debtmap compare \
+  --before v1.0.json \
+  --after v1.1.json \
+  --format json \
+  --output v1.0-to-v1.1.json
+
+# Check trend
+jq '.project_health.changes.debt_score_change_pct' v1.0-to-v1.1.json
+# Example: -12.5 (12.5% debt reduction - good!)
+</code></pre>
+<h3 id="example-5-full-cicd-workflow"><a class="header" href="#example-5-full-cicd-workflow">Example 5: Full CI/CD Workflow</a></h3>
+<p>Complete workflow for continuous debt monitoring:</p>
+<pre><code class="language-bash">#!/bin/bash
+# ci-debt-check.sh
+
+set -e
+
+BEFORE="before.json"
+AFTER="after.json"
+RESULT="comparison.json"
+PLAN="IMPLEMENTATION_PLAN.md"
+
+# Step 1: Analyze baseline (main branch)
+echo "📊 Analyzing baseline..."
+git checkout main
+debtmap analyze --output "$BEFORE"
+
+# Step 2: Analyze current branch
+echo "📊 Analyzing current branch..."
+git checkout -
+debtmap analyze --output "$AFTER"
+
+# Step 3: Run comparison
+echo "🔍 Comparing analyses..."
+if [ -f "$PLAN" ]; then
+  debtmap compare \
+    --before "$BEFORE" \
+    --after "$AFTER" \
+    --plan "$PLAN" \
+    --format json \
+    --output "$RESULT"
+else
+  debtmap compare \
+    --before "$BEFORE" \
+    --after "$AFTER" \
+    --format json \
+    --output "$RESULT"
+fi
+
+# Step 4: Extract metrics
+NEW_CRITICAL=$(jq '.summary.new_critical_count' "$RESULT")
+RESOLVED=$(jq '.summary.resolved_count' "$RESULT")
+TREND=$(jq -r '.summary.overall_debt_trend' "$RESULT")
+TARGET_STATUS=$(jq -r '.target_item.status // "N/A"' "$RESULT")
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📈 Technical Debt Comparison Results"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "New Critical Items: $NEW_CRITICAL"
+echo "Resolved Items: $RESOLVED"
+echo "Overall Trend: $TREND"
+echo "Target Status: $TARGET_STATUS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Step 5: Quality gate
+if [ "$NEW_CRITICAL" -gt 0 ]; then
+  echo "❌ FAILED: New critical debt items introduced"
+  exit 1
+fi
+
+if [ "$TREND" = "Regressing" ]; then
+  echo "⚠️  WARNING: Overall debt is regressing"
+  # Don't fail, just warn
+fi
+
+if [ "$TARGET_STATUS" = "Regressed" ]; then
+  echo "❌ FAILED: Target item regressed"
+  exit 1
+fi
+
+echo "✅ PASSED: No regressions detected"
+</code></pre>
+<h3 id="example-6-interpreting-different-status-outcomes"><a class="header" href="#example-6-interpreting-different-status-outcomes">Example 6: Interpreting Different Status Outcomes</a></h3>
+<p>Understanding what each status means:</p>
+<pre><code class="language-bash"># Run comparison
+debtmap compare --before before.json --after after.json --output result.json
+
+# Check target status
+STATUS=$(jq -r '.target_item.status' result.json)
+
+case "$STATUS" in
+  "Resolved")
+    echo "🎉 Success! Target item completely eliminated."
+    echo "The function/file no longer appears in debt analysis."
+    ;;
+  "Improved")
+    REDUCTION=$(jq '.target_item.improvements.score_reduction_pct' result.json)
+    echo "✅ Improvement! Debt score reduced by $REDUCTION%"
+    ;;
+  "Unchanged")
+    echo "➡️  No significant change (within 5% threshold)"
+    echo "Consider further refactoring if debt is still high."
+    ;;
+  "Regressed")
+    BEFORE=$(jq '.target_item.before.score' result.json)
+    AFTER=$(jq '.target_item.after.score' result.json)
+    echo "❌ Regression! Score increased from $BEFORE to $AFTER"
+    echo "Review recent changes to this location."
+    ;;
+  "NotFoundBefore")
+    echo "ℹ️  Target didn't exist in before analysis"
+    echo "This is a new code location."
+    ;;
+esac
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="target-location-not-found"><a class="header" href="#target-location-not-found">Target Location Not Found</a></h3>
+<p><strong>Problem</strong>: <code>Error: Target item not found in before analysis</code></p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Verify the location format: <code>file:function:line</code></li>
+<li>Check that the file path is relative to project root</li>
+<li>Ensure the function exists in the before analysis</li>
+<li>Try a fuzzy match by using just <code>file:function</code> (omit line number)</li>
+</ol>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-bash"># Instead of exact line number
+--target-location "src/parser.rs:parse_expression:156"
+
+# Try without line number for fuzzy matching
+--target-location "src/parser.rs:parse_expression"
+</code></pre>
+<h3 id="location-format-errors"><a class="header" href="#location-format-errors">Location Format Errors</a></h3>
+<p><strong>Problem</strong>: Invalid location format</p>
+<p><strong>Solution</strong>: Ensure format is <code>file:function:line</code> with:</p>
+<ul>
+<li>File path relative to project root (can start with <code>./</code>)</li>
+<li>Function name exactly as it appears in code</li>
+<li>Line number (optional for fuzzy matching)</li>
+</ul>
+<p><strong>Valid examples</strong>:</p>
+<pre><code class="language-bash">src/main.rs:complex_function:42
+./lib/parser.rs:parse_expr:89
+api/handlers.rs:process_request
+</code></pre>
+<h3 id="json-parsing-errors"><a class="header" href="#json-parsing-errors">JSON Parsing Errors</a></h3>
+<p><strong>Problem</strong>: <code>Error parsing JSON file</code></p>
+<p><strong>Solutions</strong>:</p>
+<ol>
+<li>Verify the file is valid JSON: <code>jq . before.json</code></li>
+<li>Ensure the file is a debtmap analysis output</li>
+<li>Check file permissions and path</li>
+<li>Regenerate the analysis if corrupted</li>
+</ol>
+<h3 id="understanding-target-status-values"><a class="header" href="#understanding-target-status-values">Understanding Target Status Values</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Status</th><th>Meaning</th><th>Action Required</th></tr></thead><tbody>
+<tr><td><code>Resolved</code></td><td>Item eliminated</td><td>✅ Celebrate! Document what worked</td></tr>
+<tr><td><code>Improved</code></td><td>Score reduced</td><td>✅ Good progress, consider pushing further</td></tr>
+<tr><td><code>Unchanged</code></td><td>No significant change</td><td>⚠️ Review approach, may need different refactoring</td></tr>
+<tr><td><code>Regressed</code></td><td>Score increased</td><td>❌ Investigate and fix before merging</td></tr>
+<tr><td><code>NotFoundBefore</code></td><td>New item</td><td>ℹ️ Normal for new code, ensure it’s not high debt</td></tr>
+<tr><td><code>NotFound</code></td><td>Missing in both</td><td>❌ Check location format and file path</td></tr>
+</tbody></table>
+</div>
+<h3 id="handling-missing-files"><a class="header" href="#handling-missing-files">Handling Missing Files</a></h3>
+<p><strong>Problem</strong>: <code>No such file or directory</code></p>
+<p><strong>Solutions</strong>:</p>
+<pre><code class="language-bash"># Verify files exist
+ls -la before.json after.json
+
+# Check current directory
+pwd
+
+# Use absolute paths if needed
+debtmap compare \
+  --before /absolute/path/to/before.json \
+  --after /absolute/path/to/after.json
+</code></pre>
+<h3 id="interpreting-edge-cases"><a class="header" href="#interpreting-edge-cases">Interpreting Edge Cases</a></h3>
+<p><strong>Empty After Analysis</strong>:</p>
+<pre><code class="language-json">{
+  "summary": {
+    "resolved_count": 25,
+    "overall_debt_trend": "Improving"
+  }
+}
+</code></pre>
+<p>All debt items resolved - excellent work!</p>
+<p><strong>Empty Before Analysis</strong>:</p>
+<pre><code class="language-json">{
+  "summary": {
+    "new_critical_count": 15,
+    "overall_debt_trend": "Regressing"
+  }
+}
+</code></pre>
+<p>New project or first analysis - establish baseline for future comparisons.</p>
+<p><strong>Identical Analyses</strong>:</p>
+<pre><code class="language-json">{
+  "summary": {
+    "overall_debt_trend": "Stable",
+    "new_critical_count": 0,
+    "resolved_count": 0
+  }
+}
+</code></pre>
+<p>No changes detected - either no code changes or changes were neutral to debt.</p>
+<h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
+<ul>
+<li><a href="validation.html">Validation Command</a> - Validate implementation plans match analysis</li>
+<li><a href="prodigy-integration.html">Prodigy Integration</a> - Automated refactoring workflows</li>
+<li><a href="output-formats.html">Output Formats</a> - Understanding analysis JSON structure</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt scores are calculated</li>
+<li><a href="ci-cd.html">CI/CD Integration</a> - Advanced pipeline configurations</li>
+</ul>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>The compare command is a powerful tool for:</p>
+<ul>
+<li>✅ Validating refactoring efforts with concrete metrics</li>
+<li>✅ Detecting regressions before they reach production</li>
+<li>✅ Tracking project health trends over time</li>
+<li>✅ Automating quality gates in CI/CD pipelines</li>
+<li>✅ Celebrating and documenting technical debt victories</li>
+</ul>
+<p>Use it regularly to maintain visibility into your codebase’s technical health and ensure continuous improvement.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="analysis-guide.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="analysis-guide.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

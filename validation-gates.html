@@ -1,0 +1,931 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Validation and Quality Gates - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="validation-and-quality-gates"><a class="header" href="#validation-and-quality-gates">Validation and Quality Gates</a></h1>
+<p>The <code>validate</code> command enforces quality gates in your development workflow, making it ideal for CI/CD integration. Unlike the <code>analyze</code> command which focuses on exploration and reporting, <code>validate</code> checks your codebase against configured thresholds and returns appropriate exit codes for automated workflows.</p>
+<h2 id="table-of-contents"><a class="header" href="#table-of-contents">Table of Contents</a></h2>
+<ul>
+<li><a href="#validate-vs-analyze">Validate vs Analyze</a></li>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#understanding-density-based-validation">Understanding Density-Based Validation</a></li>
+<li><a href="#configuration-setup">Configuration Setup</a></li>
+<li><a href="#validation-metrics">Validation Metrics</a></li>
+<li><a href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></li>
+<li><a href="#coverage-integration">Coverage Integration</a></li>
+<li><a href="#context-aware-validation">Context-Aware Validation</a></li>
+<li><a href="#cicd-examples">CI/CD Examples</a></li>
+<li><a href="#migrating-from-deprecated-thresholds">Migrating from Deprecated Thresholds</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#best-practices">Best Practices</a></li>
+</ul>
+<h2 id="validate-vs-analyze"><a class="header" href="#validate-vs-analyze">Validate vs Analyze</a></h2>
+<p>Understanding when to use each command is crucial:</p>
+<div class="table-wrapper"><table><thead><tr><th>Aspect</th><th><code>validate</code></th><th><code>analyze</code></th></tr></thead><tbody>
+<tr><td><strong>Purpose</strong></td><td>Enforce quality gates</td><td>Explore and understand debt</td></tr>
+<tr><td><strong>Exit Codes</strong></td><td>Returns non-zero on failure</td><td>Always returns 0 (unless error)</td></tr>
+<tr><td><strong>Thresholds</strong></td><td>From <code>.debtmap.toml</code> config</td><td>Command-line flags</td></tr>
+<tr><td><strong>Use Case</strong></td><td>CI/CD pipelines, pre-commit hooks</td><td>Interactive analysis, reports</td></tr>
+<tr><td><strong>Output Focus</strong></td><td>Pass/fail with violation details</td><td>Comprehensive metrics and insights</td></tr>
+<tr><td><strong>Configuration</strong></td><td>Requires <code>.debtmap.toml</code></td><td>Works without config file</td></tr>
+</tbody></table>
+</div>
+<p><strong>Rule of thumb:</strong> Use <code>validate</code> for automation and <code>analyze</code> for investigation.</p>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<ol>
+<li>
+<p><strong>Initialize configuration:</strong></p>
+<pre><code class="language-bash">debtmap init
+</code></pre>
+</li>
+<li>
+<p><strong>Edit <code>.debtmap.toml</code> to set thresholds:</strong></p>
+<pre><code class="language-toml">[thresholds.validation]
+max_debt_density = 50.0              # Debt items per 1000 LOC
+max_average_complexity = 10.0        # Average cyclomatic complexity
+max_codebase_risk_score = 7.0        # Overall risk level (1-10)
+</code></pre>
+</li>
+<li>
+<p><strong>Run validation:</strong></p>
+<pre><code class="language-bash">debtmap validate .
+</code></pre>
+</li>
+<li>
+<p><strong>Check exit code:</strong></p>
+<pre><code class="language-bash">echo $?  # 0 = pass, non-zero = fail
+</code></pre>
+</li>
+</ol>
+<h2 id="understanding-density-based-validation"><a class="header" href="#understanding-density-based-validation">Understanding Density-Based Validation</a></h2>
+<p>Debtmap uses <strong>density-based metrics</strong> as the primary quality measure. This approach provides several advantages over traditional absolute count metrics.</p>
+<h3 id="why-density-matters"><a class="header" href="#why-density-matters">Why Density Matters</a></h3>
+<p>Traditional metrics like “maximum 50 high-complexity functions” fail as your codebase grows:</p>
+<pre><code>Scenario: Your team adds 10,000 LOC of high-quality code
+- Old metric: "max 50 complex functions" → FAILS (now 55 total)
+- Density metric: "max 50 per 1000 LOC" → PASSES (density improved)
+</code></pre>
+<p><strong>Scale-dependent metrics</strong> (absolute counts):</p>
+<ul>
+<li>Grow linearly with codebase size</li>
+<li>Require constant threshold adjustments</li>
+<li>Punish healthy growth</li>
+<li>Don’t reflect actual code quality</li>
+</ul>
+<p><strong>Density metrics</strong> (per 1000 LOC):</p>
+<ul>
+<li>Remain stable as codebase grows</li>
+<li>Measure true quality ratios</li>
+<li>No adjustment needed for growth</li>
+<li>Directly comparable across projects</li>
+</ul>
+<h3 id="calculating-debt-density"><a class="header" href="#calculating-debt-density">Calculating Debt Density</a></h3>
+<pre><code>Debt Density = (Total Debt Items / Total LOC) × 1000
+</code></pre>
+<p><strong>Example:</strong></p>
+<ul>
+<li>25 debt items in 5,000 LOC project</li>
+<li>Density = (25 / 5000) × 1000 = <strong>5.0 debt items per 1000 LOC</strong></li>
+</ul>
+<p>This density remains meaningful whether your codebase is 5,000 or 500,000 LOC.</p>
+<h3 id="recommended-density-thresholds"><a class="header" href="#recommended-density-thresholds">Recommended Density Thresholds</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Project Type</th><th>max_debt_density</th><th>Rationale</th></tr></thead><tbody>
+<tr><td><strong>New/Greenfield</strong></td><td>20.0</td><td>High quality bar for new code</td></tr>
+<tr><td><strong>Active Development</strong></td><td>50.0</td><td>Balanced quality/velocity (default)</td></tr>
+<tr><td><strong>Legacy Modernization</strong></td><td>100.0</td><td>Prevent regression during refactoring</td></tr>
+<tr><td><strong>Mature/Critical</strong></td><td>30.0</td><td>Maintain quality in stable systems</td></tr>
+</tbody></table>
+</div>
+<h2 id="configuration-setup"><a class="header" href="#configuration-setup">Configuration Setup</a></h2>
+<h3 id="creating-configuration-file"><a class="header" href="#creating-configuration-file">Creating Configuration File</a></h3>
+<p>The <code>debtmap init</code> command generates a <code>.debtmap.toml</code> with sensible defaults:</p>
+<pre><code class="language-bash">debtmap init
+</code></pre>
+<p>This creates:</p>
+<pre><code class="language-toml">[thresholds.validation]
+# Primary quality metrics (scale-independent)
+max_average_complexity = 10.0
+max_debt_density = 50.0
+max_codebase_risk_score = 7.0
+
+# Optional metrics
+min_coverage_percentage = 0.0  # Disabled by default
+
+# Safety net (high ceiling for extreme cases)
+max_total_debt_score = 10000
+</code></pre>
+<h3 id="editing-thresholds"><a class="header" href="#editing-thresholds">Editing Thresholds</a></h3>
+<p>Edit the <code>[thresholds.validation]</code> section to match your quality requirements:</p>
+<pre><code class="language-toml">[thresholds.validation]
+# Enforce stricter quality for new project
+max_debt_density = 30.0              # Tighter density requirement
+max_average_complexity = 8.0         # Lower complexity tolerance
+max_codebase_risk_score = 6.0        # Reduced risk threshold
+min_coverage_percentage = 80.0       # Require 80% test coverage
+</code></pre>
+<h3 id="override-via-command-line"><a class="header" href="#override-via-command-line">Override via Command Line</a></h3>
+<p>You can override the density threshold from the command line:</p>
+<pre><code class="language-bash"># Temporarily use stricter threshold
+debtmap validate . --max-debt-density 40.0
+</code></pre>
+<h2 id="validation-metrics"><a class="header" href="#validation-metrics">Validation Metrics</a></h2>
+<p>Debtmap organizes validation metrics into three categories:</p>
+<h3 id="primary-metrics-scale-independent"><a class="header" href="#primary-metrics-scale-independent">Primary Metrics (Scale-Independent)</a></h3>
+<p>These are the core quality measures that every project should monitor:</p>
+<ol>
+<li>
+<p><strong><code>max_average_complexity</code></strong> (default: 10.0)</p>
+<ul>
+<li>Average cyclomatic complexity per function</li>
+<li>Measures typical function complexity across codebase</li>
+<li>Lower values indicate simpler, more maintainable code</li>
+</ul>
+<pre><code class="language-toml">max_average_complexity = 10.0
+</code></pre>
+</li>
+<li>
+<p><strong><code>max_debt_density</code></strong> (default: 50.0) - <strong>PRIMARY METRIC</strong></p>
+<ul>
+<li>Debt items per 1000 lines of code</li>
+<li>Scale-independent quality measure</li>
+<li>Remains stable as codebase grows</li>
+</ul>
+<pre><code class="language-toml">max_debt_density = 50.0
+</code></pre>
+</li>
+<li>
+<p><strong><code>max_codebase_risk_score</code></strong> (default: 7.0)</p>
+<ul>
+<li>Overall risk level combining complexity, coverage, and criticality</li>
+<li>Score ranges from 1 (low risk) to 10 (high risk)</li>
+<li>Considers context-aware analysis when enabled</li>
+</ul>
+<pre><code class="language-toml">max_codebase_risk_score = 7.0
+</code></pre>
+</li>
+</ol>
+<h3 id="optional-metrics"><a class="header" href="#optional-metrics">Optional Metrics</a></h3>
+<p>Configure these when you want additional quality enforcement:</p>
+<ol start="4">
+<li>
+<p><strong><code>min_coverage_percentage</code></strong> (default: 0.0 - disabled)</p>
+<ul>
+<li>Minimum required test coverage percentage</li>
+<li>Only enforced when coverage data is provided via <code>--coverage-file</code></li>
+<li>Set to 0.0 to disable coverage requirements</li>
+</ul>
+<pre><code class="language-toml">min_coverage_percentage = 75.0  # Require 75% coverage
+</code></pre>
+</li>
+</ol>
+<h3 id="safety-net-metrics"><a class="header" href="#safety-net-metrics">Safety Net Metrics</a></h3>
+<p>High ceilings to catch extreme cases:</p>
+<ol start="5">
+<li>
+<p><strong><code>max_total_debt_score</code></strong> (default: 10000)</p>
+<ul>
+<li>Absolute ceiling on total technical debt</li>
+<li>Prevents runaway growth even if density stays low</li>
+<li>Rarely triggers in normal operation</li>
+</ul>
+<pre><code class="language-toml">max_total_debt_score = 10000
+</code></pre>
+</li>
+</ol>
+<h3 id="metric-priority"><a class="header" href="#metric-priority">Metric Priority</a></h3>
+<p>When validation fails, fix issues in this order:</p>
+<ol>
+<li><strong>Critical:</strong> <code>max_debt_density</code> violations (core quality metric)</li>
+<li><strong>High:</strong> <code>max_average_complexity</code> violations (function-level quality)</li>
+<li><strong>High:</strong> <code>max_codebase_risk_score</code> violations (overall risk)</li>
+<li><strong>Medium:</strong> <code>min_coverage_percentage</code> violations (test coverage)</li>
+<li><strong>Low:</strong> <code>max_total_debt_score</code> violations (extreme cases only)</li>
+</ol>
+<h2 id="exit-codes-and-ci-integration"><a class="header" href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></h2>
+<p>The <code>validate</code> command uses exit codes to signal success or failure:</p>
+<h3 id="exit-code-behavior"><a class="header" href="#exit-code-behavior">Exit Code Behavior</a></h3>
+<pre><code class="language-bash">debtmap validate .
+echo $?
+</code></pre>
+<p><strong>Exit codes:</strong></p>
+<ul>
+<li><strong><code>0</code></strong> - Success: All thresholds passed</li>
+<li><strong>Non-zero</strong> - Failure: One or more thresholds exceeded or errors occurred</li>
+</ul>
+<h3 id="using-exit-codes-in-ci"><a class="header" href="#using-exit-codes-in-ci">Using Exit Codes in CI</a></h3>
+<p>Exit codes integrate naturally with CI/CD systems:</p>
+<p><strong>GitHub Actions:</strong></p>
+<pre><code class="language-yaml">- name: Validate code quality
+  run: debtmap validate .
+  # Step fails automatically if exit code is non-zero
+</code></pre>
+<p><strong>GitLab CI:</strong></p>
+<pre><code class="language-yaml">script:
+  - debtmap validate .
+  # Pipeline fails if exit code is non-zero
+</code></pre>
+<p><strong>Shell scripts:</strong></p>
+<pre><code class="language-bash">#!/bin/bash
+if debtmap validate .; then
+    echo "✅ Validation passed"
+else
+    echo "❌ Validation failed"
+    exit 1
+fi
+</code></pre>
+<h3 id="understanding-validation-output"><a class="header" href="#understanding-validation-output">Understanding Validation Output</a></h3>
+<p><strong>Success output:</strong></p>
+<pre><code>✅ Validation PASSED
+
+Metrics:
+  Average Complexity: 7.2 / 10.0 ✓
+  Debt Density: 32.5 / 50.0 ✓
+  Codebase Risk: 5.8 / 7.0 ✓
+  Total Debt Score: 1250 / 10000 ✓
+</code></pre>
+<p><strong>Failure output:</strong></p>
+<pre><code>❌ Validation FAILED
+
+Metrics:
+  Average Complexity: 12.3 / 10.0 ✗ EXCEEDED
+  Debt Density: 65.8 / 50.0 ✗ EXCEEDED
+  Codebase Risk: 5.2 / 7.0 ✓
+  Total Debt Score: 2100 / 10000 ✓
+
+Failed checks: 2
+</code></pre>
+<h2 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h2>
+<p>Integrate test coverage data to enable risk-based validation:</p>
+<h3 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h3>
+<p><strong>For Rust projects with <code>cargo-tarpaulin</code>:</strong></p>
+<pre><code class="language-bash">cargo tarpaulin --out Lcov --output-dir target/coverage
+</code></pre>
+<p><strong>For Python projects with <code>pytest-cov</code>:</strong></p>
+<pre><code class="language-bash">pytest --cov --cov-report=lcov:coverage/lcov.info
+</code></pre>
+<p><strong>For JavaScript projects with Jest:</strong></p>
+<pre><code class="language-bash">jest --coverage --coverageReporters=lcov
+</code></pre>
+<h3 id="running-validation-with-coverage"><a class="header" href="#running-validation-with-coverage">Running Validation with Coverage</a></h3>
+<pre><code class="language-bash">debtmap validate . --coverage-file target/coverage/lcov.info
+</code></pre>
+<h3 id="benefits-of-coverage-integration"><a class="header" href="#benefits-of-coverage-integration">Benefits of Coverage Integration</a></h3>
+<p>With coverage data, validation gains additional insights:</p>
+<ol>
+<li><strong>Risk-based prioritization</strong> - Identifies untested complex code</li>
+<li><strong>Coverage threshold enforcement</strong> - via <code>min_coverage_percentage</code></li>
+<li><strong>Enhanced risk scoring</strong> - Combines complexity + coverage + context</li>
+<li><strong>Better failure diagnostics</strong> - Shows which untested areas need attention</li>
+</ol>
+<h3 id="coverage-enhanced-output"><a class="header" href="#coverage-enhanced-output">Coverage-Enhanced Output</a></h3>
+<pre><code class="language-bash">debtmap validate . --coverage-file coverage/lcov.info -vv
+</code></pre>
+<p>Output includes:</p>
+<ul>
+<li>Overall coverage percentage</li>
+<li>High-risk uncovered functions</li>
+<li>Coverage-adjusted risk scores</li>
+<li>Prioritized remediation recommendations</li>
+</ul>
+<h2 id="context-aware-validation"><a class="header" href="#context-aware-validation">Context-Aware Validation</a></h2>
+<p>Enable context-aware analysis for deeper risk insights:</p>
+<h3 id="available-context-providers"><a class="header" href="#available-context-providers">Available Context Providers</a></h3>
+<ol>
+<li><strong><code>critical_path</code></strong> - Analyzes call graph to find execution bottlenecks</li>
+<li><strong><code>dependency</code></strong> - Identifies highly-coupled modules</li>
+<li><strong><code>git_history</code></strong> - Detects frequently-changed code (churn)</li>
+</ol>
+<h3 id="enabling-context-providers"><a class="header" href="#enabling-context-providers">Enabling Context Providers</a></h3>
+<p><strong>Enable all providers:</strong></p>
+<pre><code class="language-bash">debtmap validate . --enable-context
+</code></pre>
+<p><strong>Select specific providers:</strong></p>
+<pre><code class="language-bash">debtmap validate . --enable-context --context-providers critical_path,git_history
+</code></pre>
+<p><strong>Disable specific providers:</strong></p>
+<pre><code class="language-bash">debtmap validate . --enable-context --disable-context dependency
+</code></pre>
+<h3 id="context-aware-configuration"><a class="header" href="#context-aware-configuration">Context-Aware Configuration</a></h3>
+<p>Add context settings to <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[analysis]
+enable_context = true
+context_providers = ["critical_path", "git_history"]
+</code></pre>
+<p>Then run validation:</p>
+<pre><code class="language-bash">debtmap validate .  # Uses config settings
+</code></pre>
+<h3 id="context-benefits-for-validation"><a class="header" href="#context-benefits-for-validation">Context Benefits for Validation</a></h3>
+<p>Context-aware analysis improves risk scoring by:</p>
+<ul>
+<li>Prioritizing frequently-called functions</li>
+<li>Weighting high-churn code more heavily</li>
+<li>Identifying architectural bottlenecks</li>
+<li>Surfacing critical code paths</li>
+</ul>
+<h2 id="cicd-examples"><a class="header" href="#cicd-examples">CI/CD Examples</a></h2>
+<h3 id="github-actions"><a class="header" href="#github-actions">GitHub Actions</a></h3>
+<p>Complete workflow with coverage generation and validation:</p>
+<pre><code class="language-yaml">name: Code Quality Validation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate:
+    name: Technical Debt Validation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0  # Full history for git context
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Cache cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install cargo-tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &amp;&gt; /dev/null; then
+          cargo install cargo-tarpaulin
+        fi
+
+    - name: Build debtmap
+      run: cargo build --release
+
+    - name: Generate coverage data
+      run: cargo tarpaulin --out Lcov --output-dir target/coverage --timeout 300
+
+    - name: Run debtmap validation with coverage
+      run: |
+        if [ -f "target/coverage/lcov.info" ]; then
+          ./target/release/debtmap validate . \
+            --coverage-file target/coverage/lcov.info \
+            --enable-context \
+            --format json \
+            --output debtmap-report.json
+        else
+          echo "Warning: LCOV file not found, running without coverage"
+          ./target/release/debtmap validate . \
+            --format json \
+            --output debtmap-report.json
+        fi
+
+    - name: Upload debtmap report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: debtmap-analysis-artifacts
+        path: |
+          debtmap-report.json
+          target/coverage/lcov.info
+        retention-days: 7
+</code></pre>
+<h3 id="gitlab-ci"><a class="header" href="#gitlab-ci">GitLab CI</a></h3>
+<pre><code class="language-yaml">stages:
+  - test
+  - quality
+
+variables:
+  CARGO_HOME: $CI_PROJECT_DIR/.cargo
+
+debtmap:
+  stage: quality
+  image: rust:latest
+
+  cache:
+    paths:
+      - .cargo/
+      - target/
+
+  before_script:
+    # Install debtmap and coverage tools
+    - cargo install debtmap
+    - cargo install cargo-tarpaulin
+
+  script:
+    # Generate coverage
+    - cargo tarpaulin --out Lcov --output-dir coverage
+
+    # Validate with debtmap
+    - debtmap validate . --coverage-file coverage/lcov.info -v
+
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura.xml
+</code></pre>
+<h3 id="circleci"><a class="header" href="#circleci">CircleCI</a></h3>
+<pre><code class="language-yaml">version: 2.1
+
+jobs:
+  validate:
+    docker:
+      - image: cimg/rust:1.75
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+
+      - run:
+          name: Install tools
+          command: |
+            cargo install debtmap
+            cargo install cargo-tarpaulin
+
+      - run:
+          name: Generate coverage
+          command: cargo tarpaulin --out Lcov
+
+      - run:
+          name: Validate code quality
+          command: debtmap validate . --coverage-file lcov.info
+
+      - save_cache:
+          key: cargo-{{ checksum "Cargo.lock" }}
+          paths:
+            - ~/.cargo
+            - target
+
+workflows:
+  version: 2
+  quality:
+    jobs:
+      - validate
+</code></pre>
+<h2 id="migrating-from-deprecated-thresholds"><a class="header" href="#migrating-from-deprecated-thresholds">Migrating from Deprecated Thresholds</a></h2>
+<p>Debtmap version 0.3.0 deprecated scale-dependent absolute count metrics in favor of density-based metrics.</p>
+<h3 id="deprecated-metrics"><a class="header" href="#deprecated-metrics">Deprecated Metrics</a></h3>
+<p>The following metrics will be <strong>removed in v1.0</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Deprecated Metric</th><th>Migration Path</th></tr></thead><tbody>
+<tr><td><code>max_high_complexity_count</code></td><td>Use <code>max_debt_density</code></td></tr>
+<tr><td><code>max_debt_items</code></td><td>Use <code>max_debt_density</code></td></tr>
+<tr><td><code>max_high_risk_functions</code></td><td>Use <code>max_debt_density</code> + <code>max_codebase_risk_score</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="migration-example"><a class="header" href="#migration-example">Migration Example</a></h3>
+<p><strong>Old configuration (deprecated):</strong></p>
+<pre><code class="language-toml">[thresholds.validation]
+max_high_complexity_count = 50    # ❌ Scale-dependent
+max_debt_items = 100               # ❌ Scale-dependent
+max_high_risk_functions = 20       # ❌ Scale-dependent
+</code></pre>
+<p><strong>New configuration (recommended):</strong></p>
+<pre><code class="language-toml">[thresholds.validation]
+max_debt_density = 50.0            # ✅ Scale-independent
+max_average_complexity = 10.0      # ✅ Quality ratio
+max_codebase_risk_score = 7.0      # ✅ Risk level
+</code></pre>
+<h3 id="calculating-equivalent-density-threshold"><a class="header" href="#calculating-equivalent-density-threshold">Calculating Equivalent Density Threshold</a></h3>
+<p>Convert your old absolute thresholds to density:</p>
+<pre><code>Old: max_debt_items = 100 in 10,000 LOC codebase
+New: max_debt_density = (100 / 10000) × 1000 = 10.0
+</code></pre>
+<h3 id="deprecation-warnings"><a class="header" href="#deprecation-warnings">Deprecation Warnings</a></h3>
+<p>When you run <code>validate</code> with deprecated metrics, you’ll see:</p>
+<pre><code>⚠️  DEPRECATION WARNING:
+   The following validation thresholds are deprecated:
+   - max_high_complexity_count
+   - max_debt_items
+
+   These scale-dependent metrics will be removed in v1.0.
+   Please migrate to density-based validation:
+     - Use 'max_debt_density' instead of absolute counts
+     - Density metrics remain stable as your codebase grows
+</code></pre>
+<h3 id="migration-timeline"><a class="header" href="#migration-timeline">Migration Timeline</a></h3>
+<ul>
+<li><strong>v0.3.0</strong> - Density metrics introduced, old metrics deprecated</li>
+<li><strong>v0.4.0 - v0.9.x</strong> - Deprecation warnings shown</li>
+<li><strong>v1.0.0</strong> - Deprecated metrics removed</li>
+</ul>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="debugging-validation-failures"><a class="header" href="#debugging-validation-failures">Debugging Validation Failures</a></h3>
+<p>Use verbosity flags to understand why validation failed:</p>
+<p><strong>Level 1: Basic details</strong></p>
+<pre><code class="language-bash">debtmap validate . -v
+</code></pre>
+<p>Shows which thresholds failed and by how much.</p>
+<p><strong>Level 2: Detailed breakdown</strong></p>
+<pre><code class="language-bash">debtmap validate . -vv
+</code></pre>
+<p>Shows score components and top violating functions.</p>
+<p><strong>Level 3: Full diagnostic output</strong></p>
+<pre><code class="language-bash">debtmap validate . -vvv
+</code></pre>
+<p>Shows complete analysis details including all debt items and risk calculations.</p>
+<h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
+<p><strong>Issue: Validation fails but output unclear</strong></p>
+<pre><code class="language-bash"># Solution: Increase verbosity
+debtmap validate . -vv
+</code></pre>
+<p><strong>Issue: Want to see only the worst problems</strong></p>
+<pre><code class="language-bash"># Solution: Use --top flag
+debtmap validate . --top 10 -v
+</code></pre>
+<p><strong>Issue: Validation passes locally but fails in CI</strong></p>
+<pre><code class="language-bash"># Possible causes:
+# 1. Different code (stale local branch)
+# 2. Different config file (check .debtmap.toml in CI)
+# 3. Missing coverage data (check LCOV generation in CI)
+
+# Debug in CI:
+debtmap validate . -vvv  # Maximum verbosity
+</code></pre>
+<p><strong>Issue: Coverage threshold fails unexpectedly</strong></p>
+<pre><code class="language-bash"># Check if coverage file is being read
+debtmap validate . --coverage-file coverage/lcov.info -v
+
+# Verify coverage file exists and is valid
+ls -lh coverage/lcov.info
+</code></pre>
+<p><strong>Issue: Context providers causing performance issues</strong></p>
+<pre><code class="language-bash"># Disable expensive providers
+debtmap validate . --enable-context --disable-context git_history
+</code></pre>
+<h3 id="validation-report-generation"><a class="header" href="#validation-report-generation">Validation Report Generation</a></h3>
+<p>Generate detailed reports for debugging:</p>
+<p><strong>JSON format for programmatic analysis:</strong></p>
+<pre><code class="language-bash">debtmap validate . --format json --output validation-report.json
+cat validation-report.json | jq '.validation_details'
+</code></pre>
+<p><strong>Markdown format for documentation:</strong></p>
+<pre><code class="language-bash">debtmap validate . --format markdown --output validation-report.md
+</code></pre>
+<p><strong>Terminal format with filtering:</strong></p>
+<pre><code class="language-bash">debtmap validate . --format terminal --top 20 -vv
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="setting-initial-thresholds"><a class="header" href="#setting-initial-thresholds">Setting Initial Thresholds</a></h3>
+<p><strong>1. Establish baseline:</strong></p>
+<pre><code class="language-bash"># Run analysis to see current metrics
+debtmap analyze . --format json &gt; baseline.json
+cat baseline.json | jq '.unified_analysis.debt_density'
+</code></pre>
+<p><strong>2. Set pragmatic thresholds:</strong></p>
+<pre><code class="language-toml">[thresholds.validation]
+# Start slightly above current values to prevent regression
+max_debt_density = 60.0  # Current: 55.0
+max_average_complexity = 12.0  # Current: 10.5
+</code></pre>
+<p><strong>3. Gradually tighten:</strong></p>
+<pre><code class="language-toml"># After 1 month of cleanup
+max_debt_density = 50.0
+max_average_complexity = 10.0
+</code></pre>
+<h3 id="progressive-threshold-tightening"><a class="header" href="#progressive-threshold-tightening">Progressive Threshold Tightening</a></h3>
+<p><strong>Month 1-2: Prevent regression</strong></p>
+<pre><code class="language-toml">max_debt_density = 60.0  # Above current baseline
+</code></pre>
+<p><strong>Month 3-4: Incremental improvement</strong></p>
+<pre><code class="language-toml">max_debt_density = 50.0  # Industry standard
+</code></pre>
+<p><strong>Month 5-6: Quality leadership</strong></p>
+<pre><code class="language-toml">max_debt_density = 30.0  # Best-in-class
+</code></pre>
+<h3 id="project-specific-recommendations"><a class="header" href="#project-specific-recommendations">Project-Specific Recommendations</a></h3>
+<p><strong>Greenfield projects:</strong></p>
+<pre><code class="language-toml"># Start with high quality bar
+max_debt_density = 20.0
+max_average_complexity = 8.0
+min_coverage_percentage = 80.0
+</code></pre>
+<p><strong>Active development:</strong></p>
+<pre><code class="language-toml"># Balanced quality/velocity
+max_debt_density = 50.0
+max_average_complexity = 10.0
+min_coverage_percentage = 70.0
+</code></pre>
+<p><strong>Legacy modernization:</strong></p>
+<pre><code class="language-toml"># Prevent regression during refactoring
+max_debt_density = 100.0
+max_average_complexity = 15.0
+min_coverage_percentage = 50.0
+</code></pre>
+<h3 id="pre-commit-hook-integration"><a class="header" href="#pre-commit-hook-integration">Pre-Commit Hook Integration</a></h3>
+<p>Add validation as a pre-commit hook:</p>
+<pre><code class="language-bash"># .git/hooks/pre-commit
+#!/bin/bash
+echo "Running debtmap validation..."
+if debtmap validate . -v; then
+    echo "✅ Validation passed"
+    exit 0
+else
+    echo "❌ Validation failed - commit blocked"
+    exit 1
+fi
+</code></pre>
+<p>Make it executable:</p>
+<pre><code class="language-bash">chmod +x .git/hooks/pre-commit
+</code></pre>
+<h3 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h3>
+<p><strong>Enable parallel processing:</strong>
+Validation uses parallel processing by default for fast execution on multi-core systems.</p>
+<p><strong>Disable for resource-constrained environments:</strong></p>
+<pre><code class="language-bash"># Limit parallelism
+debtmap validate . --jobs 2
+
+# Disable completely
+debtmap validate . --no-parallel
+</code></pre>
+<p><strong>Performance characteristics:</strong></p>
+<ul>
+<li>Parallel call graph construction</li>
+<li>Multi-threaded file analysis</li>
+<li>Same performance as <code>analyze</code> command</li>
+</ul>
+<h3 id="monitoring-trends"><a class="header" href="#monitoring-trends">Monitoring Trends</a></h3>
+<p>Track validation metrics over time:</p>
+<pre><code class="language-bash"># Generate timestamped reports
+debtmap validate . --format json --output "reports/validation-$(date +%Y%m%d).json"
+
+# Compare trends
+jq -s 'map(.unified_analysis.debt_density)' reports/validation-*.json
+</code></pre>
+<h3 id="documentation"><a class="header" href="#documentation">Documentation</a></h3>
+<p>Document your threshold decisions:</p>
+<pre><code class="language-toml"># .debtmap.toml
+[thresholds.validation]
+# Rationale: Team agreed 50.0 density balances quality and velocity
+# Review: Quarterly (next: 2025-04-01)
+max_debt_density = 50.0
+
+# Rationale: Enforces single-responsibility principle
+# Review: After 3 months of metrics
+max_average_complexity = 10.0
+</code></pre>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>The <code>validate</code> command provides automated quality gates for CI/CD integration:</p>
+<ul>
+<li><strong>Use density-based metrics</strong> for scale-independent quality measurement</li>
+<li><strong>Configure in <code>.debtmap.toml</code></strong> for consistent, version-controlled thresholds</li>
+<li><strong>Integrate with CI/CD</strong> using exit codes for automated enforcement</li>
+<li><strong>Enable coverage and context</strong> for risk-based validation</li>
+<li><strong>Migrate from deprecated metrics</strong> to density-based approach</li>
+<li><strong>Debug with verbosity flags</strong> when validation fails unexpectedly</li>
+<li><strong>Tighten thresholds progressively</strong> as code quality improves</li>
+</ul>
+<p>Next steps:</p>
+<ul>
+<li>Review <a href="./configuration.html">Configuration Reference</a> for detailed threshold options</li>
+<li>See <a href="./examples.html">Examples</a> for more CI/CD integration patterns</li>
+<li>Check <a href="./cli-reference.html">CLI Reference</a> for complete command documentation</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="tiered-prioritization.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="metrics-reference.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="tiered-prioritization.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="metrics-reference.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

@@ -212,11 +212,11 @@
 <pre><code>debtmap/
 └── projects/
     └── &lt;project-id&gt;/
-        ├── call_graphs/     # Cached call graph data
-        ├── analysis/        # Cached analysis results
-        ├── metadata/        # Cache metadata and indices
-        ├── temp/            # Temporary files during analysis
-        └── file_metrics/    # Cached file-level metrics
+        ├── call_graphs/     # Call graph computation results
+        ├── analysis/        # Analysis results and metrics
+        ├── metadata/        # Cache indices and metadata
+        ├── temp/            # Temporary files created during analysis operations
+        └── file_metrics/    # File-level complexity scores
 </code></pre>
 <h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
 <p>Debtmap provides extensive cache configuration through environment variables:</p>
@@ -227,7 +227,7 @@
 <tr><td><code>DEBTMAP_CACHE_MAX_AGE_DAYS</code></td><td>Maximum age for cache entries</td><td><code>30</code></td><td><code>7</code></td></tr>
 <tr><td><code>DEBTMAP_CACHE_MAX_ENTRIES</code></td><td>Maximum number of cache entries</td><td><code>10000</code></td><td><code>5000</code></td></tr>
 <tr><td><code>DEBTMAP_CACHE_PRUNE_PERCENTAGE</code></td><td>Percentage to remove when pruning (0.0-1.0)</td><td><code>0.25</code> (25%)</td><td><code>0.3</code> (30%)</td></tr>
-<tr><td><code>DEBTMAP_CACHE_STRATEGY</code></td><td>Pruning strategy (lru, lfu, fifo, age)</td><td><code>lru</code></td><td><code>lfu</code></td></tr>
+<tr><td><code>DEBTMAP_CACHE_STRATEGY</code></td><td>Pruning strategy (lru, lfu, fifo, age). Note: ‘age_based’ is accepted as an alias for ‘age’</td><td><code>lru</code></td><td><code>lfu</code></td></tr>
 <tr><td><code>DEBTMAP_CACHE_SYNC_PRUNE</code></td><td>Use synchronous pruning (blocks)</td><td><code>false</code></td><td><code>true</code></td></tr>
 <tr><td><code>DEBTMAP_CACHE_SCOPE</code></td><td>Branch-specific cache scope</td><td>None</td><td><code>feature-branch</code></td></tr>
 </tbody></table>
@@ -255,7 +255,7 @@ export DEBTMAP_CACHE_SCOPE="$(git branch --show-current)"
 <tr><td><code>--force-cache-rebuild</code></td><td>Force cache rebuild (same as <code>--clear-cache</code>)</td></tr>
 <tr><td><code>--cache-stats</code></td><td>Show cache statistics and location</td></tr>
 <tr><td><code>--migrate-cache</code></td><td>Migrate cache from local to shared location</td></tr>
-<tr><td><code>--cache-location &lt;path&gt;</code></td><td>Specify custom cache location for this run</td></tr>
+<tr><td><code>--cache-location &lt;path&gt;</code></td><td>Specify custom cache directory path for this run (sets DEBTMAP_CACHE_DIR)</td></tr>
 </tbody></table>
 </div>
 <h3 id="cli-examples"><a class="header" href="#cli-examples">CLI Examples</a></h3>
@@ -316,12 +316,12 @@ debtmap --migrate-cache
 <p>When pruning is triggered, debtmap removes enough entries to bring the cache below the configured limits, plus an additional buffer (based on prune_percentage) to avoid frequent pruning.</p>
 <h2 id="performance-optimization"><a class="header" href="#performance-optimization">Performance Optimization</a></h2>
 <h3 id="cache-benefits"><a class="header" href="#cache-benefits">Cache Benefits</a></h3>
-<p>The cache system provides significant performance improvements:</p>
+<p>The cache system provides significant performance improvements by storing various analysis components:</p>
 <ul>
-<li><strong>Parsed ASTs:</strong> Avoid re-parsing source files that haven’t changed</li>
-<li><strong>Call graphs:</strong> Reuse expensive call graph computation</li>
-<li><strong>Analysis results:</strong> Skip redundant metric calculations</li>
-<li><strong>File metrics:</strong> Cache file-level complexity scores</li>
+<li><strong>Call graphs</strong> (stored in <code>call_graphs/</code>): Reuse expensive call graph computation</li>
+<li><strong>Analysis results</strong> (stored in <code>analysis/</code>): Skip redundant metric calculations</li>
+<li><strong>File metrics</strong> (stored in <code>file_metrics/</code>): Cache file-level complexity scores</li>
+<li><strong>Metadata</strong> (stored in <code>metadata/</code>): Cache indices and project metadata</li>
 </ul>
 <p><strong>Performance impact:</strong> Cache hits can reduce analysis time by 50-90% for large codebases, depending on the number of changed files.</p>
 <h3 id="best-practices-for-ci-environments"><a class="header" href="#best-practices-for-ci-environments">Best Practices for CI Environments</a></h3>
@@ -427,7 +427,7 @@ Cache invalidation relies on file modification times. Ensure your build system d
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="architectural-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -441,7 +441,7 @@ Cache invalidation relies on file modification times. Ensure your build system d
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="architectural-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

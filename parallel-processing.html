@@ -266,7 +266,7 @@ if self.config.num_threads &gt; 0 {
 <p>The <code>get_worker_count()</code> function determines how many threads to use:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/main.rs:660-669
+</span>// From src/main.rs:750-758
 fn get_worker_count(jobs: usize) -&gt; usize {
     if jobs == 0 {
         std::thread::available_parallelism()
@@ -947,7 +947,7 @@ debtmap analyze --jobs 4
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="god-object-detection.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="multi-pass-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -961,7 +961,7 @@ debtmap analyze --jobs 4
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="god-object-detection.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="multi-pass-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

@@ -259,6 +259,15 @@ Creates a <code>debtmap.toml</code> configuration file in the current directory 
 <ul>
 <li><code>--semantic-off</code> - Disable semantic analysis (fallback mode)</li>
 </ul>
+<p><em>Performance Control:</em></p>
+<ul>
+<li><code>--no-parallel</code> - Disable parallel call graph construction (enabled by default)</li>
+<li><code>-j, --jobs &lt;N&gt;</code> - Number of threads for parallel processing (0 = use all cores)
+<ul>
+<li>Can also use <code>DEBTMAP_JOBS</code> environment variable</li>
+</ul>
+</li>
+</ul>
 <p><em>Debugging &amp; Verbosity:</em></p>
 <ul>
 <li><code>-v, --verbose</code> - Increase verbosity level (can be repeated: -v, -vv, -vvv)</li>
@@ -269,10 +278,10 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <p><strong>Note:</strong> The following <code>analyze</code> options are NOT available in the <code>validate</code> command:</p>
 <ul>
 <li><code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code> (configure these in <code>.debtmap.toml</code> instead)</li>
-<li><code>--jobs</code>, <code>--no-parallel</code> (performance tuning)</li>
 <li><code>--cache-*</code> options (caching control)</li>
 <li><code>--languages</code> (language filtering)</li>
 </ul>
+<p><strong>Note:</strong> The <code>--explain-score</code> flag exists in the <code>validate</code> command but is deprecated (hidden). Use <code>-v</code>, <code>-vv</code>, or <code>-vvv</code> for verbosity instead.</p>
 <p>Configure analysis thresholds in your <code>.debtmap.toml</code> configuration file for use with the <code>validate</code> command.</p>
 <p><strong>Exit Codes:</strong></p>
 <ul>
@@ -294,7 +303,10 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 <li><code>--plan &lt;FILE&gt;</code> - Path to implementation plan (to extract target location)</li>
 <li><code>--target-location &lt;LOCATION&gt;</code> - Target location in format <code>file:function:line</code></li>
 </ul>
-<p><strong>Note:</strong> <code>--plan</code> and <code>--target-location</code> are mutually exclusive options. Using both together will cause a CLI error. Use one or the other to specify the target location.</p>
+<p><strong>Note:</strong> <code>--plan</code> and <code>--target-location</code> are mutually exclusive options. Using both together will cause a CLI error:</p>
+<pre><code>error: the argument '--plan &lt;FILE&gt;' cannot be used with '--target-location &lt;LOCATION&gt;'
+</code></pre>
+<p>Use one or the other to specify the target location.</p>
 <p><strong>Output Options:</strong></p>
 <ul>
 <li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
@@ -328,6 +340,15 @@ Compares two analysis results and generates a diff showing improvements or regre
 <li><code>--aggregate-only</code> - Show only aggregated file-level scores</li>
 <li><code>--group-by-category</code> - Group output by debt category</li>
 </ul>
+<p><strong>Dependency Display Options:</strong></p>
+<ul>
+<li><code>--show-dependencies</code> - Show caller/callee information in output</li>
+<li><code>--no-dependencies</code> - Hide dependency information (conflicts with –show-dependencies)</li>
+<li><code>--max-callers &lt;N&gt;</code> - Maximum number of callers to display (default: 5)</li>
+<li><code>--max-callees &lt;N&gt;</code> - Maximum number of callees to display (default: 5)</li>
+<li><code>--show-external-calls</code> - Include external crate calls in dependencies</li>
+<li><code>--show-std-lib-calls</code> - Include standard library calls in dependencies</li>
+</ul>
 <h3 id="analysis-control"><a class="header" href="#analysis-control">Analysis Control</a></h3>
 <p>Configure analysis behavior, thresholds, and language selection.</p>
 <p><strong>Thresholds:</strong></p>
@@ -359,6 +380,22 @@ Compares two analysis results and generates a diff showing improvements or regre
 <li><code>--no-context-aware</code> - Disable context-aware false positive reduction (enabled by default)</li>
 <li><code>--multi-pass</code> - Enable multi-pass analysis with attribution</li>
 <li><code>--attribution</code> - Show complexity attribution details</li>
+</ul>
+<p><strong>Functional Programming Analysis:</strong></p>
+<ul>
+<li><code>--ast-functional-analysis</code> - Enable AST-based functional composition analysis (spec 111)
+<ul>
+<li>Analyzes code for functional programming patterns and composition</li>
+<li>Detects pure functions, immutability, and side effects</li>
+</ul>
+</li>
+<li><code>--functional-analysis-profile &lt;PROFILE&gt;</code> - Set functional analysis profile
+<ul>
+<li><code>strict</code> - Strict functional purity requirements (for pure FP codebases)</li>
+<li><code>balanced</code> - Balanced analysis suitable for mixed paradigms (default)</li>
+<li><code>lenient</code> - Lenient thresholds for imperative codebases</li>
+</ul>
+</li>
 </ul>
 <h3 id="context--coverage"><a class="header" href="#context--coverage">Context &amp; Coverage</a></h3>
 <p>Enable context-aware risk analysis and integrate test coverage data.</p>
@@ -428,11 +465,28 @@ Compares two analysis results and generates a diff showing improvements or regre
 </ul>
 <p><strong>Specialized Debugging:</strong></p>
 <ul>
+<li><code>--explain-metrics</code> - Explain metric definitions and formulas (measured vs estimated)</li>
 <li><code>--verbose-macro-warnings</code> - Show verbose macro parsing warnings (Rust analysis)</li>
 <li><code>--show-macro-stats</code> - Show macro expansion statistics at end of analysis</li>
 <li><code>--detail-level &lt;LEVEL&gt;</code> - Detail level for diagnostic reports
 <ul>
 <li>Options: summary, standard, comprehensive, debug (default: standard)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Call Graph Debugging:</strong></p>
+<ul>
+<li><code>--debug-call-graph</code> - Enable detailed call graph debugging with resolution information</li>
+<li><code>--trace-function &lt;FUNCTIONS&gt;</code> - Trace specific functions during call resolution (comma-separated)
+<ul>
+<li>Example: <code>--trace-function 'my_function,another_function'</code></li>
+</ul>
+</li>
+<li><code>--call-graph-stats</code> - Show only call graph statistics (no detailed failure list)</li>
+<li><code>--validate-call-graph</code> - Validate call graph structure and report issues</li>
+<li><code>--debug-format &lt;FORMAT&gt;</code> - Debug output format: text or json (default: text)
+<ul>
+<li>Use with call graph debugging flags to control output format</li>
 </ul>
 </li>
 </ul>
@@ -493,6 +547,12 @@ debtmap init --force
 <ul>
 <li>Can also be set via <code>--cache-location</code> flag</li>
 <li>Affects where analysis results are cached for faster subsequent runs</li>
+</ul>
+</li>
+<li><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (0 = use all cores)
+<ul>
+<li>Can also be set via <code>--jobs</code> / <code>-j</code> flag</li>
+<li>Controls thread pool size for parallel call graph construction</li>
 </ul>
 </li>
 </ul>
@@ -618,11 +678,28 @@ debtmap analyze src/ -vv
 # Show all debug information
 debtmap analyze src/ -vvv
 </code></pre>
+<p>Debug call graph resolution issues:</p>
+<pre><code class="language-bash"># Enable call graph debugging
+debtmap analyze . --debug-call-graph
+
+# Trace specific functions
+debtmap analyze . --debug-call-graph --trace-function 'problematic_function'
+
+# Validate call graph structure
+debtmap analyze . --validate-call-graph --debug-format json
+</code></pre>
 <p>Show macro expansion statistics (Rust):</p>
 <pre><code class="language-bash">debtmap analyze . --show-macro-stats --verbose-macro-warnings
 </code></pre>
 <p>Use detailed diagnostic reports:</p>
 <pre><code class="language-bash">debtmap analyze . --detail-level comprehensive
+</code></pre>
+<p>Analyze functional programming patterns:</p>
+<pre><code class="language-bash"># Enable functional analysis
+debtmap analyze . --ast-functional-analysis
+
+# Use strict profile for pure FP codebases
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
 </code></pre>
 <h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
 <h3 id="basic-analysis-1"><a class="header" href="#basic-analysis-1">Basic Analysis</a></h3>
@@ -731,6 +808,25 @@ debtmap analyze . --plain
 # Combine with JSON for CI
 debtmap analyze . --format json --plain --output report.json
 </code></pre>
+<h3 id="advanced-debugging"><a class="header" href="#advanced-debugging">Advanced Debugging</a></h3>
+<pre><code class="language-bash"># Call graph debugging with detailed information
+debtmap analyze . --debug-call-graph --debug-format json
+
+# Trace specific functions during call resolution
+debtmap analyze . --debug-call-graph --trace-function 'process_file,analyze_complexity'
+
+# Validate call graph structure
+debtmap analyze . --validate-call-graph
+
+# Show only call graph statistics
+debtmap analyze . --debug-call-graph --call-graph-stats
+
+# Functional programming analysis with strict profile
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
+
+# Explain metric definitions
+debtmap analyze . --explain-metrics -v
+</code></pre>
 <h2 id="command-compatibility-matrix"><a class="header" href="#command-compatibility-matrix">Command Compatibility Matrix</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>Option</th><th>analyze</th><th>validate</th><th>compare</th><th>init</th></tr></thead><tbody>
 <tr><td><code>&lt;PATH&gt;</code> argument</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
@@ -741,14 +837,29 @@ debtmap analyze . --format json --plain --output report.json
 <tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--cache-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--jobs</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
 <tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td></tr>
 <tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
 </tbody></table>
 </div>
-<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Performance options like <code>--cache-*</code> and <code>--jobs</code> are specific to the <code>analyze</code> command.</p>
+<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), performance control (<code>--jobs</code>, <code>--no-parallel</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the <code>analyze</code> command.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="performance-issues"><a class="header" href="#performance-issues">Performance Issues</a></h3>
 <p><strong>Problem:</strong> Analysis is slow on large codebases</p>

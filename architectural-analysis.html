@@ -1,0 +1,797 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Architectural Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="architectural-analysis"><a class="header" href="#architectural-analysis">Architectural Analysis</a></h1>
+<p>Debtmap provides comprehensive architectural analysis capabilities based on Robert C. Martin’s software engineering principles. These tools help identify structural issues, coupling problems, and architectural anti-patterns in your codebase.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Architectural analysis examines module-level relationships and dependencies to identify:</p>
+<ul>
+<li><strong>Circular Dependencies</strong> - Modules that create dependency cycles</li>
+<li><strong>Coupling Metrics</strong> - Afferent and efferent coupling measurements</li>
+<li><strong>Bidirectional Dependencies</strong> - Inappropriate intimacy between modules</li>
+<li><strong>Stable Dependencies Principle Violations</strong> - Unstable modules being depended upon</li>
+<li><strong>Zone of Pain</strong> - Rigid, concrete implementations heavily depended upon</li>
+<li><strong>Zone of Uselessness</strong> - Overly abstract, unstable modules</li>
+<li><strong>Code Duplication</strong> - Identical or similar code blocks across files</li>
+</ul>
+<p>These analyses help you maintain clean architecture and identify refactoring opportunities.</p>
+<h2 id="circular-dependency-detection"><a class="header" href="#circular-dependency-detection">Circular Dependency Detection</a></h2>
+<p>Circular dependencies occur when modules form a dependency cycle (A depends on B, B depends on C, C depends on A). These violations break architectural boundaries and make code harder to understand, test, and maintain.</p>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
+<p>Debtmap builds a <strong>dependency graph</strong> from module imports and uses <strong>depth-first search (DFS)</strong> with recursion stack tracking to detect cycles:</p>
+<ol>
+<li>Parse all files to extract import/module dependencies</li>
+<li>Build a directed graph where nodes are modules and edges are dependencies</li>
+<li>Run DFS from each unvisited module</li>
+<li>Track visited nodes and recursion stack</li>
+<li>When a node is reached that’s already in the recursion stack, a cycle is detected</li>
+</ol>
+<p><strong>Implementation:</strong> <code>src/debt/circular.rs:44-66</code> (detect_circular_dependencies)</p>
+<h3 id="example"><a class="header" href="#example">Example</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Module A (src/auth.rs)
+use crate::user::User;
+use crate::session::validate_session;
+
+// Module B (src/user.rs)
+use crate::session::Session;
+
+// Module C (src/session.rs)
+use crate::auth::authenticate; // Creates cycle: auth → session → auth
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Debtmap detects:</strong></p>
+<pre><code>Circular dependency detected: auth → session → auth
+</code></pre>
+<h3 id="refactoring-recommendations"><a class="header" href="#refactoring-recommendations">Refactoring Recommendations</a></h3>
+<p>To break circular dependencies:</p>
+<ol>
+<li><strong>Extract Interface</strong> - Create a trait that both modules depend on</li>
+<li><strong>Dependency Inversion</strong> - Introduce an abstraction layer</li>
+<li><strong>Move Shared Code</strong> - Extract common functionality to a new module</li>
+<li><strong>Remove Dependency</strong> - Inline or duplicate small amounts of code</li>
+</ol>
+<h2 id="coupling-metrics"><a class="header" href="#coupling-metrics">Coupling Metrics</a></h2>
+<p>Coupling metrics measure how interconnected modules are. Debtmap calculates two primary metrics:</p>
+<h3 id="afferent-coupling-ca"><a class="header" href="#afferent-coupling-ca">Afferent Coupling (Ca)</a></h3>
+<p><strong>Afferent coupling</strong> is the number of modules that depend on this module. High afferent coupling means many modules rely on this code.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CouplingMetrics {
+    pub module: String,
+    pub afferent_coupling: usize, // Number depending on this module
+    pub efferent_coupling: usize, // Number this module depends on
+    pub instability: f64,         // Calculated from Ca and Ce
+    pub abstractness: f64,        // Ratio of abstract types
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:6-30</code></p>
+<h3 id="efferent-coupling-ce"><a class="header" href="#efferent-coupling-ce">Efferent Coupling (Ce)</a></h3>
+<p><strong>Efferent coupling</strong> is the number of modules this module depends on. High efferent coupling means this module has many dependencies.</p>
+<h3 id="example-coupling-analysis"><a class="header" href="#example-coupling-analysis">Example Coupling Analysis</a></h3>
+<pre><code>Module: api_handler
+  Afferent coupling (Ca): 8  // 8 modules depend on api_handler
+  Efferent coupling (Ce): 3  // api_handler depends on 3 modules
+  Instability: 0.27          // Relatively stable
+</code></pre>
+<p>High afferent or efferent coupling (typically &gt;5) indicates potential maintainability issues.</p>
+<h2 id="instability-metric"><a class="header" href="#instability-metric">Instability Metric</a></h2>
+<p>The <strong>instability metric</strong> measures how resistant a module is to change. It’s calculated as:</p>
+<pre><code>I = Ce / (Ca + Ce)
+</code></pre>
+<p><strong>Interpretation:</strong></p>
+<ul>
+<li><strong>I = 0.0</strong> - Maximally stable (no dependencies, many dependents)</li>
+<li><strong>I = 1.0</strong> - Maximally unstable (many dependencies, no dependents)</li>
+</ul>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:16-24</code> (calculate_instability)</p>
+<h3 id="stability-guidelines"><a class="header" href="#stability-guidelines">Stability Guidelines</a></h3>
+<ul>
+<li><strong>Stable modules (I &lt; 0.3)</strong> - Hard to change but depended upon; should contain stable abstractions</li>
+<li><strong>Balanced modules (0.3 ≤ I ≤ 0.7)</strong> - Normal modules with both dependencies and dependents</li>
+<li><strong>Unstable modules (I &gt; 0.7)</strong> - Change frequently; should have few or no dependents</li>
+</ul>
+<h3 id="example-1"><a class="header" href="#example-1">Example</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Stable module (I = 0.1)
+// core/types.rs - defines fundamental types, depended on by 20 modules
+pub struct User { ... }
+pub struct Session { ... }
+
+// Unstable module (I = 0.9)
+// handlers/admin_dashboard.rs - depends on 10 modules, no dependents
+use crate::auth::*;
+use crate::database::*;
+use crate::templates::*;
+// ... 7 more imports
+<span class="boring">}</span></code></pre></pre>
+<h2 id="stable-dependencies-principle"><a class="header" href="#stable-dependencies-principle">Stable Dependencies Principle</a></h2>
+<p>The <strong>Stable Dependencies Principle (SDP)</strong> states: <em>Depend in the direction of stability</em>. Modules should depend on modules that are more stable than themselves.</p>
+<h3 id="sdp-violations"><a class="header" href="#sdp-violations">SDP Violations</a></h3>
+<p>Debtmap flags violations when a module has:</p>
+<ul>
+<li><strong>Instability &gt; 0.8</strong> (very unstable)</li>
+<li><strong>Afferent coupling &gt; 2</strong> (multiple modules depend on it)</li>
+</ul>
+<p>This means an unstable, frequently changing module is being depended upon by multiple other modules - a recipe for maintenance problems.</p>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:69-76</code></p>
+<h3 id="example-violation"><a class="header" href="#example-violation">Example Violation</a></h3>
+<pre><code>Module 'temp_utils' violates Stable Dependencies Principle
+(instability: 0.85, depended on by 5 modules)
+
+Problem: This module changes frequently but is heavily depended upon.
+Solution: Extract stable interface or reduce dependencies on this module.
+</code></pre>
+<h3 id="fixing-sdp-violations"><a class="header" href="#fixing-sdp-violations">Fixing SDP Violations</a></h3>
+<ol>
+<li><strong>Increase stability</strong> - Reduce the module’s dependencies</li>
+<li><strong>Reduce afferent coupling</strong> - Extract interface, use dependency injection</li>
+<li><strong>Split module</strong> - Separate stable and unstable parts</li>
+</ol>
+<h2 id="bidirectional-dependencies"><a class="header" href="#bidirectional-dependencies">Bidirectional Dependencies</a></h2>
+<p>Bidirectional dependencies (also called <strong>inappropriate intimacy</strong>) occur when two modules depend on each other:</p>
+<pre><code>Module A depends on Module B
+Module B depends on Module A
+</code></pre>
+<p>This creates tight coupling and makes both modules harder to change, test, or reuse independently.</p>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:98-117</code> (detect_inappropriate_intimacy)</p>
+<h3 id="example-2"><a class="header" href="#example-2">Example</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// order.rs
+use crate::customer::Customer;
+
+pub struct Order {
+    customer: Customer,
+}
+
+// customer.rs
+use crate::order::Order; // Bidirectional dependency!
+
+pub struct Customer {
+    orders: Vec&lt;Order&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Debtmap detects:</strong></p>
+<pre><code>Inappropriate intimacy detected between 'order' and 'customer'
+</code></pre>
+<h3 id="refactoring-recommendations-1"><a class="header" href="#refactoring-recommendations-1">Refactoring Recommendations</a></h3>
+<ol>
+<li><strong>Create Mediator</strong> - Introduce a third module to manage the relationship</li>
+<li><strong>Break into Separate Modules</strong> - Split concerns more clearly</li>
+<li><strong>Use Events</strong> - Replace direct dependencies with event-driven communication</li>
+<li><strong>Dependency Inversion</strong> - Introduce interfaces/traits both depend on</li>
+</ol>
+<h2 id="zone-of-pain-detection"><a class="header" href="#zone-of-pain-detection">Zone of Pain Detection</a></h2>
+<p>The <strong>zone of pain</strong> contains modules with:</p>
+<ul>
+<li><strong>Low abstractness (&lt; 0.2)</strong> - Concrete implementations, no abstractions</li>
+<li><strong>Low instability (&lt; 0.2)</strong> - Stable, hard to change</li>
+<li><strong>High afferent coupling (&gt; 3)</strong> - Many modules depend on them</li>
+</ul>
+<p>These modules are rigid concrete implementations that are heavily used but hard to change - causing pain when modifications are needed.</p>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:125-138</code></p>
+<h3 id="example-3"><a class="header" href="#example-3">Example</a></h3>
+<pre><code>Module 'database_client' is in the zone of pain (rigid and hard to change)
+  Abstractness: 0.1  (all concrete implementation)
+  Instability: 0.15  (very stable, many dependents)
+  Afferent coupling: 12 (12 modules depend on it)
+
+Problem: This concrete database client is used everywhere.
+Any change to its implementation requires updating many modules.
+</code></pre>
+<h3 id="refactoring-recommendations-2"><a class="header" href="#refactoring-recommendations-2">Refactoring Recommendations</a></h3>
+<ol>
+<li><strong>Extract Interfaces</strong> - Create a <code>DatabaseClient</code> trait</li>
+<li><strong>Introduce Abstractions</strong> - Define abstract operations others depend on</li>
+<li><strong>Break into Smaller Modules</strong> - Separate concerns to reduce coupling</li>
+<li><strong>Use Dependency Injection</strong> - Pass implementations via interfaces</li>
+</ol>
+<h2 id="zone-of-uselessness-detection"><a class="header" href="#zone-of-uselessness-detection">Zone of Uselessness Detection</a></h2>
+<p>The <strong>zone of uselessness</strong> contains modules with:</p>
+<ul>
+<li><strong>High abstractness (&gt; 0.8)</strong> - Mostly abstract, few concrete implementations</li>
+<li><strong>High instability (&gt; 0.8)</strong> - Frequently changing</li>
+</ul>
+<p>These modules are overly abstract and unstable, providing little stable value to the system.</p>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:141-153</code></p>
+<h3 id="example-4"><a class="header" href="#example-4">Example</a></h3>
+<pre><code>Module 'base_processor' is in the zone of uselessness
+(too abstract and unstable)
+  Abstractness: 0.9  (mostly traits and interfaces)
+  Instability: 0.85  (changes frequently)
+
+Problem: This module defines many abstractions but provides little
+concrete value. It changes often, breaking implementations.
+</code></pre>
+<h3 id="refactoring-recommendations-3"><a class="header" href="#refactoring-recommendations-3">Refactoring Recommendations</a></h3>
+<ol>
+<li><strong>Add Concrete Implementations</strong> - Make the module useful by implementing functionality</li>
+<li><strong>Remove if Unused</strong> - Delete if no real value is provided</li>
+<li><strong>Stabilize Interfaces</strong> - Stop changing abstractions frequently</li>
+<li><strong>Merge with Implementations</strong> - Combine abstract and concrete code</li>
+</ol>
+<h2 id="distance-from-main-sequence"><a class="header" href="#distance-from-main-sequence">Distance from Main Sequence</a></h2>
+<p>The <strong>main sequence</strong> represents the ideal balance between abstractness and instability. Modules should lie on the line:</p>
+<pre><code>A + I = 1
+</code></pre>
+<p>Where:</p>
+<ul>
+<li><strong>A</strong> = Abstractness (ratio of abstract types to total types)</li>
+<li><strong>I</strong> = Instability (Ce / (Ca + Ce))</li>
+</ul>
+<p><strong>Distance</strong> from the main sequence:</p>
+<pre><code>D = |A + I - 1|
+</code></pre>
+<p><strong>Implementation:</strong> <code>src/debt/coupling.rs:119-123</code></p>
+<h3 id="interpretation"><a class="header" href="#interpretation">Interpretation</a></h3>
+<ul>
+<li><strong>D ≈ 0.0</strong> - Module is on the main sequence (ideal)</li>
+<li><strong>D &gt; 0.5</strong> - Module is far from ideal
+<ul>
+<li>High D with low A and I → Zone of Pain</li>
+<li>High D with high A and I → Zone of Uselessness</li>
+</ul>
+</li>
+</ul>
+<h3 id="visual-representation"><a class="header" href="#visual-representation">Visual Representation</a></h3>
+<pre><code>Abstractness
+    1.0 ┤        Zone of Uselessness
+        │      ╱
+        │    ╱
+    0.5 ┤  ╱ Main Sequence
+        │╱
+        ╱
+    0.0 ┤──────────────────────────
+        0.0    0.5              1.0
+                 Instability
+
+        Zone of Pain
+</code></pre>
+<h2 id="code-duplication-detection"><a class="header" href="#code-duplication-detection">Code Duplication Detection</a></h2>
+<p>Debtmap detects code duplication using <strong>hash-based chunk comparison</strong>:</p>
+<ol>
+<li><strong>Extract chunks</strong> - Split files into fixed-size chunks (default: 50 lines)</li>
+<li><strong>Normalize</strong> - Remove whitespace and comments</li>
+<li><strong>Calculate hash</strong> - Compute SHA-256 hash for each normalized chunk</li>
+<li><strong>Match duplicates</strong> - Find chunks with identical hashes</li>
+<li><strong>Merge adjacent</strong> - Consolidate consecutive duplicate blocks</li>
+</ol>
+<p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-44</code> (detect_duplication)</p>
+<h3 id="algorithm-details"><a class="header" href="#algorithm-details">Algorithm Details</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn detect_duplication(
+    files: Vec&lt;(PathBuf, String)&gt;,
+    min_lines: usize,           // Default: 50
+    _similarity_threshold: f64, // Currently unused (exact matching)
+) -&gt; Vec&lt;DuplicationBlock&gt;
+<span class="boring">}</span></code></pre></pre>
+<p>The algorithm:</p>
+<ol>
+<li>Extracts overlapping chunks from each file</li>
+<li>Normalizes by trimming whitespace and removing comments</li>
+<li>Calculates SHA-256 hash for each normalized chunk</li>
+<li>Groups chunks by hash</li>
+<li>Returns groups with 2+ locations (duplicates found)</li>
+</ol>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<pre><code>Code duplication detected:
+  Hash: a3f2b9c1...
+  Lines: 50
+  Locations:
+    - src/handlers/user.rs:120-169
+    - src/handlers/admin.rs:85-134
+    - src/handlers/guest.rs:200-249
+
+Recommendation: Extract common validation logic to shared module
+</code></pre>
+<h2 id="duplication-configuration"><a class="header" href="#duplication-configuration">Duplication Configuration</a></h2>
+<p>Configure duplication detection in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml"># Minimum lines for duplication detection
+threshold_duplication = 50  # Default value
+
+# Smaller values catch more duplications but increase noise
+# threshold_duplication = 30  # More sensitive
+
+# Larger values only catch major duplications
+# threshold_duplication = 100  # Less noise
+</code></pre>
+<p><strong>Configuration reference:</strong> <code>features.json:21</code> (threshold_duplication)</p>
+<p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-10</code></p>
+<h3 id="current-limitations"><a class="header" href="#current-limitations">Current Limitations</a></h3>
+<ul>
+<li><strong>Exact matching only</strong> - Currently uses hash-based exact matching</li>
+<li><strong>similarity_threshold parameter</strong> - Defined but not implemented yet</li>
+<li><strong>Future enhancement</strong> - Fuzzy matching for near-duplicates</li>
+</ul>
+<h2 id="refactoring-recommendations-4"><a class="header" href="#refactoring-recommendations-4">Refactoring Recommendations</a></h2>
+<p>Debtmap provides specific refactoring recommendations for each architectural issue:</p>
+<h3 id="for-circular-dependencies"><a class="header" href="#for-circular-dependencies">For Circular Dependencies</a></h3>
+<ol>
+<li><strong>Extract Interface</strong> - Create shared abstraction both modules use</li>
+<li><strong>Dependency Inversion</strong> - Introduce interfaces to reverse dependency direction</li>
+<li><strong>Move Shared Code</strong> - Extract to new module both can depend on</li>
+<li><strong>Event-Driven</strong> - Replace direct calls with event publishing/subscribing</li>
+</ol>
+<h3 id="for-high-coupling"><a class="header" href="#for-high-coupling">For High Coupling</a></h3>
+<ol>
+<li><strong>Facade Pattern</strong> - Provide simplified interface hiding complex dependencies</li>
+<li><strong>Reduce Dependencies</strong> - Remove unnecessary imports and calls</li>
+<li><strong>Dependency Injection</strong> - Pass dependencies via constructors/parameters</li>
+<li><strong>Interface Segregation</strong> - Split large interfaces into focused ones</li>
+</ol>
+<h3 id="for-zone-of-pain"><a class="header" href="#for-zone-of-pain">For Zone of Pain</a></h3>
+<ol>
+<li><strong>Introduce Abstractions</strong> - Extract traits/interfaces for flexibility</li>
+<li><strong>Adapter Pattern</strong> - Wrap concrete implementations with adapters</li>
+<li><strong>Strategy Pattern</strong> - Make algorithms pluggable via interfaces</li>
+</ol>
+<h3 id="for-zone-of-uselessness"><a class="header" href="#for-zone-of-uselessness">For Zone of Uselessness</a></h3>
+<ol>
+<li><strong>Add Concrete Implementations</strong> - Provide useful functionality</li>
+<li><strong>Remove Unused Code</strong> - Delete if providing no value</li>
+<li><strong>Stabilize Interfaces</strong> - Stop changing abstractions frequently</li>
+</ol>
+<h3 id="for-bidirectional-dependencies"><a class="header" href="#for-bidirectional-dependencies">For Bidirectional Dependencies</a></h3>
+<ol>
+<li><strong>Create Mediator</strong> - Third module manages relationship</li>
+<li><strong>Break into Separate Modules</strong> - Clearer separation of concerns</li>
+<li><strong>Observer Pattern</strong> - One-way communication via observers</li>
+</ol>
+<h3 id="for-code-duplication"><a class="header" href="#for-code-duplication">For Code Duplication</a></h3>
+<ol>
+<li><strong>Extract Common Code</strong> - Create shared function/module</li>
+<li><strong>Use Inheritance/Composition</strong> - Share via traits or composition</li>
+<li><strong>Parameterize Differences</strong> - Extract variable parts as parameters</li>
+<li><strong>Template Method</strong> - Define algorithm structure, vary specific steps</li>
+</ol>
+<h2 id="examples-and-use-cases"><a class="header" href="#examples-and-use-cases">Examples and Use Cases</a></h2>
+<h3 id="running-architectural-analysis"><a class="header" href="#running-architectural-analysis">Running Architectural Analysis</a></h3>
+<pre><code class="language-bash"># Full analysis with all architectural checks
+debtmap analyze --include-architecture
+
+# Focus on circular dependencies
+debtmap analyze --check circular-deps
+
+# Coupling analysis with custom threshold
+debtmap analyze --coupling-threshold 5
+
+# Duplication detection with custom chunk size
+debtmap analyze --duplication-min-lines 30
+</code></pre>
+<h3 id="example-circular-dependency"><a class="header" href="#example-circular-dependency">Example: Circular Dependency</a></h3>
+<p><strong>Before:</strong></p>
+<pre><code>src/auth.rs → src/session.rs → src/user.rs → src/auth.rs
+
+Circular dependency detected: auth → session → user → auth
+</code></pre>
+<p><strong>After refactoring:</strong></p>
+<pre><code>src/auth.rs → src/auth_interface.rs ← src/session.rs
+                      ↑
+              src/user.rs
+
+No circular dependencies found.
+</code></pre>
+<h3 id="example-coupling-metrics-table"><a class="header" href="#example-coupling-metrics-table">Example: Coupling Metrics Table</a></h3>
+<pre><code>Module Analysis Results:
+
+Module              Ca    Ce    Instability  Issues
+-------------------------------------------------
+core/types          15     0       0.00      None
+api/handlers         2     8       0.80      High Ce
+database/client      8     2       0.20      None
+utils/temp          5    12       0.71      SDP violation
+auth/session        3     3       0.50      None
+</code></pre>
+<h3 id="example-zone-of-pain"><a class="header" href="#example-zone-of-pain">Example: Zone of Pain</a></h3>
+<p><strong>Module:</strong> <code>legacy_db_client</code></p>
+<pre><code>Metrics:
+  Abstractness: 0.05 (all concrete code)
+  Instability: 0.12 (depended on by 25 modules)
+  Afferent coupling: 25
+  Distance from main sequence: 0.83
+
+Status: Zone of Pain - rigid and hard to change
+
+Refactoring steps:
+1. Extract interface DatabaseClient trait
+2. Create adapter wrapping legacy implementation
+3. Gradually migrate dependents to use trait
+4. Introduce alternative implementations
+</code></pre>
+<h2 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h2>
+<h3 id="prioritization"><a class="header" href="#prioritization">Prioritization</a></h3>
+<p>Address architectural issues in this order:</p>
+<ol>
+<li>
+<p><strong>Circular Dependencies</strong> (Highest Priority)</p>
+<ul>
+<li>Break architectural boundaries</li>
+<li>Make testing impossible</li>
+<li>Cause build issues</li>
+</ul>
+</li>
+<li>
+<p><strong>Bidirectional Dependencies</strong> (High Priority)</p>
+<ul>
+<li>Create tight coupling</li>
+<li>Prevent independent testing</li>
+<li>Block modular changes</li>
+</ul>
+</li>
+<li>
+<p><strong>Zone of Pain Issues</strong> (Medium-High Priority)</p>
+<ul>
+<li>Indicate rigid architecture</li>
+<li>Block future changes</li>
+<li>High risk for bugs</li>
+</ul>
+</li>
+<li>
+<p><strong>SDP Violations</strong> (Medium Priority)</p>
+<ul>
+<li>Cause ripple effects</li>
+<li>Increase maintenance cost</li>
+<li>Unstable foundation</li>
+</ul>
+</li>
+<li>
+<p><strong>High Coupling</strong> (Medium Priority)</p>
+<ul>
+<li>Maintainability risk</li>
+<li>Testing difficulty</li>
+<li>Change amplification</li>
+</ul>
+</li>
+<li>
+<p><strong>Code Duplication</strong> (Lower Priority)</p>
+<ul>
+<li>Maintenance burden</li>
+<li>Bug multiplication</li>
+<li>Inconsistency risk</li>
+</ul>
+</li>
+</ol>
+<h3 id="decision-flowchart"><a class="header" href="#decision-flowchart">Decision Flowchart</a></h3>
+<pre><code>Is there a circular dependency?
+├─ YES → Break immediately (extract interface, DI)
+└─ NO  → Continue
+
+Is there bidirectional dependency?
+├─ YES → Refactor (mediator, event-driven)
+└─ NO  → Continue
+
+Is module in zone of pain?
+├─ YES → Introduce abstractions
+└─ NO  → Continue
+
+Is SDP violated?
+├─ YES → Stabilize or reduce afferent coupling
+└─ NO  → Continue
+
+Is coupling &gt; threshold?
+├─ YES → Reduce dependencies
+└─ NO  → Continue
+
+Is there significant duplication?
+├─ YES → Extract common code
+└─ NO  → Architecture is good!
+</code></pre>
+<h2 id="integration-with-debt-categories"><a class="header" href="#integration-with-debt-categories">Integration with Debt Categories</a></h2>
+<p>Architectural analysis results are integrated with debtmap’s debt categorization system:</p>
+<h3 id="debt-type-mapping"><a class="header" href="#debt-type-mapping">Debt Type Mapping</a></h3>
+<ul>
+<li><strong>CircularDependency</strong> - Circular dependency cycles detected</li>
+<li><strong>HighCoupling</strong> - Modules exceeding coupling threshold</li>
+<li><strong>Duplication</strong> - Duplicated code blocks found</li>
+<li><strong>ArchitecturalViolation</strong> - SDP violations, zone issues</li>
+</ul>
+<p><strong>Reference:</strong> <code>features.json:240-253</code> (core_patterns section)</p>
+<h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
+<p>Architectural issues are assigned priority tiers:</p>
+<ul>
+<li><strong>Tier 1 (Critical)</strong> - Circular dependencies, bidirectional dependencies</li>
+<li><strong>Tier 2 (High)</strong> - Zone of pain, SDP violations</li>
+<li><strong>Tier 3 (Medium)</strong> - High coupling, large duplications</li>
+<li><strong>Tier 4 (Low)</strong> - Small duplications, minor coupling issues</li>
+</ul>
+<p><strong>Reference:</strong> <code>features.json:522-560</code> (tiered prioritization)</p>
+<h2 id="cohesion-analysis"><a class="header" href="#cohesion-analysis">Cohesion Analysis</a></h2>
+<p><strong>Note:</strong> Module cohesion analysis is currently a simplified placeholder implementation.</p>
+<p><strong>Current status:</strong> <code>src/debt/coupling.rs:82-95</code> (analyze_module_cohesion)</p>
+<p>The function exists but provides basic cohesion calculation. Full cohesion analysis (measuring how well module elements belong together) is planned for a future release.</p>
+<h3 id="future-enhancement"><a class="header" href="#future-enhancement">Future Enhancement</a></h3>
+<p>Full cohesion analysis would measure:</p>
+<ul>
+<li>Functional cohesion (functions operating on related data)</li>
+<li>Sequential cohesion (output of one function feeds another)</li>
+<li>Communicational cohesion (functions operating on same data structures)</li>
+</ul>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<p>Configure architectural analysis thresholds in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[architectural]
+# Coupling threshold (modules with more dependencies flagged)
+coupling_threshold = 5
+
+# Minimum lines for duplication detection
+duplication_min_lines = 50
+
+# Instability threshold for SDP violations
+instability_threshold = 0.8
+
+# Minimum afferent coupling for SDP violations
+sdp_afferent_threshold = 2
+
+# Zone of pain thresholds
+zone_pain_abstractness = 0.2
+zone_pain_instability = 0.2
+zone_pain_afferent = 3
+
+# Zone of uselessness thresholds
+zone_useless_abstractness = 0.8
+zone_useless_instability = 0.8
+</code></pre>
+<p>See <a href="configuration.html">Configuration</a> for complete options.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="no-circular-dependencies-detected-but-build-fails"><a class="header" href="#no-circular-dependencies-detected-but-build-fails">“No circular dependencies detected but build fails”</a></h3>
+<p><strong>Cause:</strong> Circular dependencies at the package/crate level, not module level.</p>
+<p><strong>Solution:</strong> Use <code>cargo tree</code> to analyze package-level dependencies.</p>
+<h3 id="too-many-coupling-warnings"><a class="header" href="#too-many-coupling-warnings">“Too many coupling warnings”</a></h3>
+<p><strong>Cause:</strong> Default threshold may be too strict for your codebase.</p>
+<p><strong>Solution:</strong> Adjust <code>coupling_threshold</code> in <code>.debtmap.toml</code> to match your architecture.</p>
+<h3 id="duplication-detected-in-generated-code"><a class="header" href="#duplication-detected-in-generated-code">“Duplication detected in generated code”</a></h3>
+<p><strong>Cause:</strong> Code generation tools create similar patterns.</p>
+<p><strong>Solution:</strong> Use suppression patterns to exclude generated files. See <a href="suppression-patterns.html">Suppression Patterns</a>.</p>
+<h3 id="zone-of-pain-false-positives"><a class="header" href="#zone-of-pain-false-positives">“Zone of pain false positives”</a></h3>
+<p><strong>Cause:</strong> Utility modules are intentionally stable and concrete.</p>
+<p><strong>Solution:</strong> This is often correct - utility modules should be stable. Consider whether the module should be more abstract.</p>
+<h2 id="further-reading"><a class="header" href="#further-reading">Further Reading</a></h2>
+<h3 id="robert-c-martins-principles"><a class="header" href="#robert-c-martins-principles">Robert C. Martin’s Principles</a></h3>
+<p>The architectural metrics in debtmap are based on:</p>
+<ul>
+<li><strong>Clean Architecture</strong> by Robert C. Martin</li>
+<li><strong>Agile Software Development: Principles, Patterns, and Practices</strong> by Robert C. Martin</li>
+<li>Stable Dependencies Principle (SDP)</li>
+<li>Stable Abstractions Principle (SAP)</li>
+<li>Main Sequence distance metric</li>
+</ul>
+<h3 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h3>
+<ul>
+<li><a href="analysis-guide.html">Analysis Guide</a> - Complete analysis workflow</li>
+<li><a href="configuration.html">Configuration</a> - Configuration options</li>
+<li><a href="entropy-analysis.html">Entropy Analysis</a> - Complexity vs. entropy</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt is scored</li>
+<li><a href="tiered-prioritization.html">Tiered Prioritization</a> - Priority assignment</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="cache-management.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="cache-management.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

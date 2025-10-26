@@ -1,0 +1,1121 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Design Pattern Detection - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h1>
+<p>Debtmap automatically detects common design patterns in your codebase to provide better architectural insights and reduce false positives in complexity analysis. When recognized design patterns are detected, Debtmap applies appropriate complexity adjustments to avoid penalizing idiomatic code.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Debtmap detects 9 design patterns across Python, JavaScript, TypeScript, and Rust:</p>
+<div class="table-wrapper"><table><thead><tr><th>Pattern</th><th>Primary Language</th><th>Detection Confidence</th></tr></thead><tbody>
+<tr><td>Observer</td><td>Python, Rust</td><td>High (0.8-0.9)</td></tr>
+<tr><td>Singleton</td><td>Python</td><td>High (0.85-0.95)</td></tr>
+<tr><td>Factory</td><td>Python</td><td>Medium-High (0.7-0.85)</td></tr>
+<tr><td>Strategy</td><td>Python</td><td>Medium (0.7-0.8)</td></tr>
+<tr><td>Callback</td><td>Python, JavaScript</td><td>High (0.8-0.9)</td></tr>
+<tr><td>Template Method</td><td>Python</td><td>Medium (0.7-0.8)</td></tr>
+<tr><td>Dependency Injection</td><td>Python</td><td>Medium (0.65-0.75)</td></tr>
+<tr><td>Builder</td><td>Rust</td><td>Medium (0.7-0.8)</td></tr>
+<tr><td>Visitor</td><td>Rust</td><td>High (0.85-0.95)</td></tr>
+</tbody></table>
+</div>
+<p>Pattern detection serves multiple purposes:</p>
+<ul>
+<li><strong>Reduces false positives</strong>: Avoids flagging idiomatic pattern implementations as overly complex</li>
+<li><strong>Documents architecture</strong>: Automatically identifies architectural patterns in your codebase</li>
+<li><strong>Validates consistency</strong>: Helps ensure patterns are used correctly and completely</li>
+<li><strong>Guides refactoring</strong>: Identifies incomplete pattern implementations</li>
+</ul>
+<h2 id="pattern-detection-details"><a class="header" href="#pattern-detection-details">Pattern Detection Details</a></h2>
+<h3 id="observer-pattern"><a class="header" href="#observer-pattern">Observer Pattern</a></h3>
+<p>The Observer pattern is detected in Python and Rust by identifying abstract base classes with concrete implementations.</p>
+<p><strong>Detection Criteria (Python)</strong>:</p>
+<ul>
+<li>Abstract base class with <code>ABC</code>, <code>Protocol</code>, or <code>Interface</code> markers</li>
+<li>Abstract methods decorated with <code>@abstractmethod</code></li>
+<li>Concrete implementations inheriting from the interface</li>
+<li>Methods prefixed with <code>on_</code>, <code>handle_</code>, or <code>notify_</code></li>
+<li>Registration methods like <code>add_observer</code>, <code>register</code>, or <code>subscribe</code></li>
+<li>Notification methods like <code>notify</code>, <code>notify_all</code>, <code>trigger</code>, <code>emit</code></li>
+</ul>
+<p><strong>Detection Criteria (Rust)</strong>:</p>
+<ul>
+<li>Trait definitions with callback-style methods</li>
+<li>Multiple implementations of the same trait</li>
+<li>Trait registry tracking for cross-module detection</li>
+</ul>
+<p><strong>Example (Python)</strong>:</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+
+class EventObserver(ABC):
+    @abstractmethod
+    def on_event(self, data):
+        """Handle event notification"""
+        pass
+
+class LoggingObserver(EventObserver):
+    def on_event(self, data):
+        print(f"Event occurred: {data}")
+
+class EmailObserver(EventObserver):
+    def on_event(self, data):
+        send_email(f"Alert: {data}")
+
+class EventManager:
+    def __init__(self):
+        self.observers = []
+
+    def add_observer(self, observer: EventObserver):
+        self.observers.append(observer)
+
+    def notify_all(self, data):
+        for observer in self.observers:
+            observer.on_event(data)
+</code></pre>
+<p><strong>Confidence</strong>: High (0.8-0.9) when abstract base class, implementations, and registration/notification methods are present. Lower confidence (0.5-0.7) for partial implementations.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.observer]
+interface_markers = ["ABC", "Protocol", "Interface"]
+registration_methods = ["add_observer", "register", "subscribe"]
+method_prefixes = ["on_", "handle_", "notify_"]
+</code></pre>
+<h3 id="singleton-pattern"><a class="header" href="#singleton-pattern">Singleton Pattern</a></h3>
+<p>Singleton pattern detection identifies three common Python implementations: module-level singletons, <code>__new__</code> override, and decorator-based patterns.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Module-level variable assignments (e.g., <code>instance = MyClass()</code>)</li>
+<li>Classes overriding <code>__new__</code> to enforce single instance</li>
+<li>Classes decorated with <code>@singleton</code> or similar decorators</li>
+<li>Presence of instance caching logic</li>
+</ul>
+<p><strong>Example (Module-level)</strong>:</p>
+<pre><code class="language-python"># config.py
+class Config:
+    def __init__(self):
+        self.settings = {}
+
+    def load(self, path):
+        # Load configuration
+        pass
+
+# Single instance created at module level
+config = Config()
+</code></pre>
+<p><strong>Example (<code>__new__</code> override)</strong>:</p>
+<pre><code class="language-python">class DatabaseConnection:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if not hasattr(self, 'initialized'):
+            self.initialized = True
+            self.connect()
+</code></pre>
+<p><strong>Example (Decorator-based)</strong>:</p>
+<pre><code class="language-python">def singleton(cls):
+    instances = {}
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    return get_instance
+
+@singleton
+class Logger:
+    def __init__(self):
+        self.log_file = open('app.log', 'a')
+</code></pre>
+<p><strong>Confidence</strong>: Very High (0.9-0.95) for <code>__new__</code> override and decorator patterns. High (0.85) for module-level singletons with clear naming.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.singleton]
+# No user-configurable options currently
+# Detection is based on implementation patterns
+</code></pre>
+<h3 id="factory-pattern"><a class="header" href="#factory-pattern">Factory Pattern</a></h3>
+<p>Factory pattern detection identifies factory functions, factory classes, and factory registries based on naming conventions and structural patterns.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Functions with names containing <code>create_</code>, <code>make_</code>, <code>build_</code>, or <code>_factory</code></li>
+<li>Factory registry patterns (dictionaries mapping types to constructors)</li>
+<li>Functions that return instances of different types based on parameters</li>
+<li>Classes with factory methods</li>
+</ul>
+<p><strong>Example (Factory Function)</strong>:</p>
+<pre><code class="language-python">def create_logger(log_type: str):
+    if log_type == "file":
+        return FileLogger()
+    elif log_type == "console":
+        return ConsoleLogger()
+    elif log_type == "network":
+        return NetworkLogger()
+    else:
+        raise ValueError(f"Unknown logger type: {log_type}")
+</code></pre>
+<p><strong>Example (Registry-based Factory)</strong>:</p>
+<pre><code class="language-python"># Parser registry
+PARSERS = {
+    'json': JSONParser,
+    'xml': XMLParser,
+    'yaml': YAMLParser,
+}
+
+def create_parser(format: str):
+    parser_class = PARSERS.get(format)
+    if parser_class is None:
+        raise ValueError(f"No parser for format: {format}")
+    return parser_class()
+</code></pre>
+<p><strong>Example (Factory Method)</strong>:</p>
+<pre><code class="language-python">class DocumentFactory:
+    @staticmethod
+    def create_document(doc_type: str):
+        if doc_type == "pdf":
+            return PDFDocument()
+        elif doc_type == "word":
+            return WordDocument()
+        else:
+            return PlainTextDocument()
+</code></pre>
+<p><strong>Confidence</strong>: Medium-High (0.75-0.85) for functions with factory naming patterns. Lower confidence (0.6-0.7) for registry patterns without factory names.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.factory]
+function_patterns = ["create_", "make_", "build_", "_factory"]
+min_implementations = 2  # Minimum branches/types to consider it a factory
+</code></pre>
+<h3 id="strategy-pattern"><a class="header" href="#strategy-pattern">Strategy Pattern</a></h3>
+<p>Strategy pattern detection identifies interfaces with multiple implementations representing interchangeable algorithms.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Abstract base class or Protocol defining strategy interface</li>
+<li>Multiple concrete implementations</li>
+<li>Strategy interface typically has 1-2 core methods</li>
+<li>Used via composition (strategy object passed to context)</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+
+class CompressionStrategy(ABC):
+    @abstractmethod
+    def compress(self, data: bytes) -&gt; bytes:
+        pass
+
+class ZipCompression(CompressionStrategy):
+    def compress(self, data: bytes) -&gt; bytes:
+        return zlib.compress(data)
+
+class GzipCompression(CompressionStrategy):
+    def compress(self, data: bytes) -&gt; bytes:
+        return gzip.compress(data)
+
+class LzmaCompression(CompressionStrategy):
+    def compress(self, data: bytes) -&gt; bytes:
+        return lzma.compress(data)
+
+class FileCompressor:
+    def __init__(self, strategy: CompressionStrategy):
+        self.strategy = strategy
+
+    def compress_file(self, path):
+        data = read_file(path)
+        return self.strategy.compress(data)
+</code></pre>
+<p><strong>Confidence</strong>: Medium (0.7-0.8) based on interface structure and implementation count.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.strategy]
+min_implementations = 2  # Minimum concrete strategies
+</code></pre>
+<h3 id="callback-pattern"><a class="header" href="#callback-pattern">Callback Pattern</a></h3>
+<p>Callback pattern detection identifies decorator-based callbacks commonly used in web frameworks and event handlers.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Decorators with patterns like <code>@route</code>, <code>@handler</code>, <code>@app.</code>, <code>@on</code>, <code>@callback</code></li>
+<li>Framework-specific decorators (Flask routes, FastAPI endpoints, event handlers)</li>
+<li>Functions registered as callbacks for events or hooks</li>
+</ul>
+<p><strong>Example (Flask Routes)</strong>:</p>
+<pre><code class="language-python">from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/api/users')
+def get_users():
+    return {"users": []}
+
+@app.route('/api/users/&lt;id&gt;')
+def get_user(id):
+    return {"user": find_user(id)}
+</code></pre>
+<p><strong>Example (Event Handler)</strong>:</p>
+<pre><code class="language-python">class EventBus:
+    def __init__(self):
+        self.handlers = {}
+
+    def on(self, event_name):
+        def decorator(func):
+            self.handlers[event_name] = func
+            return func
+        return decorator
+
+bus = EventBus()
+
+@bus.on('user.created')
+def handle_user_created(user):
+    send_welcome_email(user)
+
+@bus.on('order.placed')
+def handle_order_placed(order):
+    process_payment(order)
+</code></pre>
+<p><strong>Confidence</strong>: High (0.8-0.9) for framework decorator patterns. Medium (0.6-0.7) for custom callback implementations.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.callback]
+decorator_patterns = [
+    "route", "handler", "app.", "on", "callback",
+    "post", "get", "put", "delete", "patch"
+]
+</code></pre>
+<h3 id="template-method-pattern"><a class="header" href="#template-method-pattern">Template Method Pattern</a></h3>
+<p>Template method pattern detection identifies base classes with template methods that call abstract hook methods.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Base class with concrete methods (template methods)</li>
+<li>Abstract methods intended to be overridden (hook methods)</li>
+<li>Template method calls hook methods in a defined sequence</li>
+<li>Subclasses override hook methods but not template method</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-python">from abc import ABC, abstractmethod
+
+class DataProcessor(ABC):
+    def process(self, data):
+        """Template method defining the algorithm skeleton"""
+        raw = self.load_data(data)
+        validated = self.validate(raw)
+        transformed = self.transform(validated)
+        self.save(transformed)
+
+    @abstractmethod
+    def load_data(self, source):
+        """Hook: Load data from source"""
+        pass
+
+    @abstractmethod
+    def validate(self, data):
+        """Hook: Validate data"""
+        pass
+
+    def transform(self, data):
+        """Hook: Transform data (optional override)"""
+        return data
+
+    @abstractmethod
+    def save(self, data):
+        """Hook: Save processed data"""
+        pass
+
+class CSVProcessor(DataProcessor):
+    def load_data(self, source):
+        return read_csv(source)
+
+    def validate(self, data):
+        return [row for row in data if row]
+
+    def save(self, data):
+        write_csv('output.csv', data)
+</code></pre>
+<p><strong>Confidence</strong>: Medium (0.7-0.8) based on combination of abstract and concrete methods in base class.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.template_method]
+# Detection based on abstract method patterns
+# No user-configurable options currently
+</code></pre>
+<h3 id="dependency-injection-pattern"><a class="header" href="#dependency-injection-pattern">Dependency Injection Pattern</a></h3>
+<p>Dependency injection pattern detection identifies classes that receive dependencies through constructors or setters rather than creating them internally.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Constructor parameters accepting interface/protocol types</li>
+<li>Setter methods for injecting dependencies</li>
+<li>Optional dependencies with default values</li>
+<li>Absence of hard-coded object instantiation inside the class</li>
+</ul>
+<p><strong>Example (Constructor Injection)</strong>:</p>
+<pre><code class="language-python">class UserService:
+    def __init__(self,
+                 user_repository: UserRepository,
+                 email_service: EmailService,
+                 logger: Logger):
+        self.user_repo = user_repository
+        self.email_service = email_service
+        self.logger = logger
+
+    def create_user(self, username, email):
+        user = self.user_repo.create(username, email)
+        self.email_service.send_welcome(email)
+        self.logger.info(f"Created user: {username}")
+        return user
+</code></pre>
+<p><strong>Example (Setter Injection)</strong>:</p>
+<pre><code class="language-python">class ReportGenerator:
+    def __init__(self):
+        self.data_source = None
+        self.formatter = None
+
+    def set_data_source(self, source):
+        self.data_source = source
+
+    def set_formatter(self, formatter):
+        self.formatter = formatter
+
+    def generate(self):
+        data = self.data_source.fetch()
+        return self.formatter.format(data)
+</code></pre>
+<p><strong>Confidence</strong>: Medium (0.65-0.75) based on constructor signatures and absence of direct instantiation.</p>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml">[patterns.dependency_injection]
+# Detection based on constructor patterns
+# No user-configurable options currently
+</code></pre>
+<h3 id="builder-pattern-rust"><a class="header" href="#builder-pattern-rust">Builder Pattern (Rust)</a></h3>
+<p>Builder pattern detection in Rust identifies builder structs with chaining methods that construct complex objects.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Struct with builder suffix or builder-related naming</li>
+<li>Methods returning <code>Self</code> for chaining</li>
+<li>Final <code>build()</code> method returning the constructed type</li>
+<li>Type-state pattern usage (optional)</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct HttpClient {
+    base_url: String,
+    timeout: Duration,
+    headers: HashMap&lt;String, String&gt;,
+}
+
+pub struct HttpClientBuilder {
+    base_url: Option&lt;String&gt;,
+    timeout: Duration,
+    headers: HashMap&lt;String, String&gt;,
+}
+
+impl HttpClientBuilder {
+    pub fn new() -&gt; Self {
+        Self {
+            base_url: None,
+            timeout: Duration::from_secs(30),
+            headers: HashMap::new(),
+        }
+    }
+
+    pub fn base_url(mut self, url: impl Into&lt;String&gt;) -&gt; Self {
+        self.base_url = Some(url.into());
+        self
+    }
+
+    pub fn timeout(mut self, timeout: Duration) -&gt; Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn header(mut self, key: String, value: String) -&gt; Self {
+        self.headers.insert(key, value);
+        self
+    }
+
+    pub fn build(self) -&gt; Result&lt;HttpClient&gt; {
+        let base_url = self.base_url.ok_or("base_url is required")?;
+        Ok(HttpClient {
+            base_url,
+            timeout: self.timeout,
+            headers: self.headers,
+        })
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Confidence</strong>: Medium-High (0.7-0.8) based on method signatures and naming conventions.</p>
+<p><strong>Source</strong>: Analyzed via <code>src/organization/builder_pattern.rs</code></p>
+<h3 id="visitor-pattern-rust"><a class="header" href="#visitor-pattern-rust">Visitor Pattern (Rust)</a></h3>
+<p>Visitor pattern detection in Rust identifies trait-based exhaustive matching patterns used for complexity normalization.</p>
+<p><strong>Detection Criteria</strong>:</p>
+<ul>
+<li>Trait with visit methods for different types</li>
+<li>Implementations providing behavior for each visited type</li>
+<li>Exhaustive pattern matching across enum variants</li>
+<li>Used primarily for AST traversal or data structure processing</li>
+</ul>
+<p><strong>Note</strong>: Debtmap’s Visitor pattern detection is primarily used internally for complexity analysis adjustments rather than as a general-purpose design pattern detector. It identifies visitor-like patterns to apply logarithmic complexity scaling instead of linear scaling.</p>
+<p><strong>Example</strong> (Internal Usage):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait Visitor {
+    fn visit_function(&amp;mut self, func: &amp;Function);
+    fn visit_class(&amp;mut self, class: &amp;Class);
+    fn visit_module(&amp;mut self, module: &amp;Module);
+}
+
+impl Visitor for ComplexityVisitor {
+    fn visit_function(&amp;mut self, func: &amp;Function) {
+        // Calculate function complexity
+        match &amp;func.body {
+            FunctionBody::Simple =&gt; { /* ... */ }
+            FunctionBody::Complex(statements) =&gt; { /* ... */ }
+        }
+    }
+
+    // Exhaustive matching triggers visitor pattern recognition
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Confidence</strong>: High (0.85-0.95) for trait-based exhaustive matching patterns.</p>
+<p><strong>Source</strong>: Implemented in <code>src/complexity/visitor_detector.rs</code></p>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="cli-options"><a class="header" href="#cli-options">CLI Options</a></h3>
+<p>Enable or configure pattern detection using command-line flags:</p>
+<pre><code class="language-bash"># Disable all pattern detection
+debtmap analyze --no-pattern-detection
+
+# Enable only specific patterns
+debtmap analyze --patterns observer,singleton,factory
+
+# Set confidence threshold (0.0-1.0)
+debtmap analyze --pattern-threshold 0.8
+
+# Show warnings for uncertain pattern detections
+debtmap analyze --show-pattern-warnings
+</code></pre>
+<h3 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h3>
+<p>Configure pattern detection in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[patterns]
+# Enable/disable pattern recognition globally
+enabled = true
+
+# Minimum confidence threshold for pattern detection (0.0 - 1.0)
+confidence_threshold = 0.7
+
+# Observer pattern configuration
+[patterns.observer]
+interface_markers = ["ABC", "Protocol", "Interface"]
+registration_methods = ["add_observer", "register", "subscribe"]
+method_prefixes = ["on_", "handle_", "notify_"]
+
+# Singleton pattern configuration
+[patterns.singleton]
+# Detection is automatic based on implementation patterns
+
+# Factory pattern configuration
+[patterns.factory]
+function_patterns = ["create_", "make_", "build_", "_factory"]
+min_implementations = 2
+
+# Strategy pattern configuration
+[patterns.strategy]
+min_implementations = 2
+
+# Callback pattern configuration
+[patterns.callback]
+decorator_patterns = [
+    "route", "handler", "app.", "on", "callback",
+    "post", "get", "put", "delete", "patch"
+]
+
+# Template method pattern configuration
+[patterns.template_method]
+# Detection is automatic based on abstract methods
+
+# Custom pattern rules (see next section)
+[[patterns.custom_rules]]
+name = "Repository Pattern"
+method_pattern = "^(find|save|update|delete)_"
+confidence = 0.75
+</code></pre>
+<h3 id="custom-pattern-rules"><a class="header" href="#custom-pattern-rules">Custom Pattern Rules</a></h3>
+<p>Define project-specific patterns using custom rules:</p>
+<pre><code class="language-toml">[[patterns.custom_rules]]
+name = "Repository Pattern"
+description = "Data access layer pattern"
+method_pattern = "^(find|save|update|delete|get)_.*"
+class_pattern = ".*Repository$"
+confidence = 0.75
+
+[[patterns.custom_rules]]
+name = "Service Layer"
+description = "Business logic service pattern"
+class_pattern = ".*Service$"
+method_pattern = "^(execute|process|handle)_"
+confidence = 0.7
+
+[[patterns.custom_rules]]
+name = "Command Pattern"
+description = "Command objects with execute method"
+class_pattern = ".*Command$"
+method_pattern = "^execute$"
+confidence = 0.8
+</code></pre>
+<p>Custom rule fields:</p>
+<ul>
+<li><code>name</code>: Pattern name for reporting</li>
+<li><code>description</code>: Optional description</li>
+<li><code>method_pattern</code>: Regular expression for method names</li>
+<li><code>class_pattern</code>: Regular expression for class names</li>
+<li><code>decorator_pattern</code>: Regular expression for decorator names</li>
+<li><code>confidence</code>: Confidence score (0.0-1.0) when pattern matches</li>
+</ul>
+<h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
+<p>Pattern detection uses a confidence scoring system (0.0-1.0) to indicate match quality:</p>
+<ul>
+<li><strong>0.9-1.0</strong>: Very High - Strong structural match with all key elements present</li>
+<li><strong>0.8-0.9</strong>: High - Clear pattern with most elements present</li>
+<li><strong>0.7-0.8</strong>: Medium-High - Pattern present with some uncertainty</li>
+<li><strong>0.6-0.7</strong>: Medium - Possible pattern with limited evidence</li>
+<li><strong>0.5-0.6</strong>: Low - Weak match, may be false positive</li>
+</ul>
+<p><strong>Default Threshold</strong>: 0.7 - Only patterns with 70% or higher confidence are reported by default.</p>
+<p><strong>Adjusting Thresholds</strong>:</p>
+<pre><code class="language-bash"># More strict (fewer patterns, higher confidence)
+debtmap analyze --pattern-threshold 0.85
+
+# More lenient (more patterns, lower confidence)
+debtmap analyze --pattern-threshold 0.6 --show-pattern-warnings
+</code></pre>
+<p><strong>How Confidence is Calculated</strong>:</p>
+<p>Each pattern detector calculates confidence based on:</p>
+<ol>
+<li><strong>Structural completeness</strong>: Are all expected elements present?</li>
+<li><strong>Naming conventions</strong>: Do names match expected patterns?</li>
+<li><strong>Implementation count</strong>: Are there enough implementations to confirm the pattern?</li>
+<li><strong>Cross-validation</strong>: Do different detection heuristics agree?</li>
+</ol>
+<p>Example confidence calculation for Observer pattern:</p>
+<ul>
+<li>Base class with <code>ABC</code> marker: +0.3</li>
+<li>Abstract methods present: +0.2</li>
+<li>Concrete implementations found: +0.2</li>
+<li>Registration methods detected: +0.15</li>
+<li>Notification methods detected: +0.15</li>
+<li><strong>Total</strong>: 0.8 (High confidence)</li>
+</ul>
+<h2 id="cross-file-pattern-detection"><a class="header" href="#cross-file-pattern-detection">Cross-File Pattern Detection</a></h2>
+<p>Debtmap can detect patterns that span multiple files, particularly for the Observer pattern where interfaces and implementations may be in separate modules.</p>
+<p><strong>How Cross-File Detection Works</strong>:</p>
+<ol>
+<li><strong>Import Tracking</strong>: Debtmap tracks imports to understand module dependencies</li>
+<li><strong>Interface Registry</strong>: Abstract base classes are registered globally</li>
+<li><strong>Implementation Matching</strong>: Implementations in other files are matched to registered interfaces</li>
+<li><strong>Cross-Module Context</strong>: A shared context links related files</li>
+</ol>
+<p><strong>Example</strong>:</p>
+<pre><code class="language-python"># interfaces/observer.py
+from abc import ABC, abstractmethod
+
+class EventObserver(ABC):
+    @abstractmethod
+    def on_event(self, data):
+        pass
+
+# observers/logging_observer.py
+from interfaces.observer import EventObserver
+
+class LoggingObserver(EventObserver):
+    def on_event(self, data):
+        log(data)
+
+# observers/email_observer.py
+from interfaces.observer import EventObserver
+
+class EmailObserver(EventObserver):
+    def on_event(self, data):
+        send_email(data)
+</code></pre>
+<p>Debtmap detects this as a single Observer pattern with cross-file implementations.</p>
+<p><strong>Limitations</strong>:</p>
+<ul>
+<li>Only works for explicitly imported interfaces</li>
+<li>Requires static import analysis (dynamic imports may not be tracked)</li>
+<li>Most effective within a single project (not across external dependencies)</li>
+</ul>
+<h2 id="rust-specific-pattern-detection"><a class="header" href="#rust-specific-pattern-detection">Rust-Specific Pattern Detection</a></h2>
+<h3 id="trait-based-patterns"><a class="header" href="#trait-based-patterns">Trait-Based Patterns</a></h3>
+<p>Rust pattern detection leverages the trait system for identifying patterns:</p>
+<p><strong>Trait Registry</strong>: Tracks trait definitions and implementations across modules</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Trait registered for pattern detection
+pub trait EventHandler {
+    fn handle(&amp;self, event: &amp;Event);
+}
+
+// Multiple implementations tracked
+impl EventHandler for LogHandler { /* ... */ }
+impl EventHandler for MetricsHandler { /* ... */ }
+impl EventHandler for AlertHandler { /* ... */ }
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Observer Pattern via Traits</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Observable {
+    fn subscribe(&amp;mut self, observer: Box&lt;dyn Observer&gt;);
+    fn notify(&amp;self, event: &amp;Event);
+}
+
+pub trait Observer {
+    fn on_event(&amp;self, event: &amp;Event);
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Differences from Python Detection</strong>:</p>
+<ul>
+<li>Traits are more explicit than Python’s ABC</li>
+<li>Type system ensures implementation correctness</li>
+<li>No runtime reflection needed for detection</li>
+<li>Pattern matching exhaustiveness helps identify Visitor pattern</li>
+</ul>
+<h2 id="integration-with-complexity-analysis"><a class="header" href="#integration-with-complexity-analysis">Integration with Complexity Analysis</a></h2>
+<p>Pattern detection directly affects complexity scoring through <strong>pattern-based adjustments</strong>:</p>
+<h3 id="role-multipliers"><a class="header" href="#role-multipliers">Role Multipliers</a></h3>
+<p>Functions identified as part of design patterns receive adjusted complexity scores:</p>
+<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Multiplier</th><th>Reasoning</th></tr></thead><tbody>
+<tr><td>Pattern Implementation</td><td>0.6</td><td>Boilerplate pattern code is less concerning</td></tr>
+<tr><td>Factory Method</td><td>0.7</td><td>Expected to have branching logic</td></tr>
+<tr><td>Observer Notification</td><td>0.5</td><td>Simple iteration over observers</td></tr>
+<tr><td>Template Method</td><td>0.8</td><td>Framework method with expected complexity</td></tr>
+</tbody></table>
+</div>
+<h3 id="pattern-dampening"><a class="header" href="#pattern-dampening">Pattern Dampening</a></h3>
+<p>Recognized patterns reduce effective complexity:</p>
+<pre><code>effective_complexity = base_complexity * pattern_multiplier
+</code></pre>
+<p>Example:</p>
+<ul>
+<li>Observer implementation method with cognitive complexity 15</li>
+<li>Pattern multiplier: 0.6</li>
+<li>Effective complexity: 15 * 0.6 = 9</li>
+</ul>
+<h3 id="visitor-pattern-special-case"><a class="header" href="#visitor-pattern-special-case">Visitor Pattern Special Case</a></h3>
+<p>Visitor patterns use <strong>logarithmic scaling</strong> instead of linear:</p>
+<pre><code>visitor_complexity = log2(match_arms) * average_arm_complexity
+</code></pre>
+<p>This prevents exhaustive pattern matching from being flagged as overly complex.</p>
+<p><strong>See Also</strong>:</p>
+<ul>
+<li><a href="./entropy-analysis.html">Entropy Analysis</a> - Pattern dampening in entropy calculations</li>
+<li><a href="./scoring-strategies.html">Scoring Strategies</a> - Role multipliers and complexity adjustments</li>
+<li><a href="./configuration.html">Configuration</a> - Configuring pattern detection in <code>.debtmap.toml</code></li>
+</ul>
+<h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
+<h3 id="example-1-analyzing-a-web-framework"><a class="header" href="#example-1-analyzing-a-web-framework">Example 1: Analyzing a Web Framework</a></h3>
+<p>Analyzing a Flask application with callback patterns:</p>
+<pre><code class="language-bash">debtmap analyze --patterns callback --show-pattern-warnings myapp/
+</code></pre>
+<p>Output excerpt:</p>
+<pre><code>Design Patterns Detected:
+  Callback Pattern (15 instances, confidence: 0.85-0.92)
+    - @app.route decorators: 12
+    - @app.before_request decorators: 2
+    - @app.errorhandler decorators: 1
+
+Complexity Adjustments:
+  - Route handlers: -40% complexity (pattern boilerplate)
+  - Error handlers: -50% complexity (expected pattern)
+</code></pre>
+<h3 id="example-2-detecting-observer-pattern"><a class="header" href="#example-2-detecting-observer-pattern">Example 2: Detecting Observer Pattern</a></h3>
+<p>Analyzing a codebase with event-driven architecture:</p>
+<pre><code class="language-bash">debtmap analyze --patterns observer --pattern-threshold 0.75
+</code></pre>
+<p>Code:</p>
+<pre><code class="language-python"># event_system.py
+from abc import ABC, abstractmethod
+
+class EventListener(ABC):
+    @abstractmethod
+    def on_user_login(self, user):
+        pass
+
+class AuditLogger(EventListener):
+    def on_user_login(self, user):
+        audit_log.write(f"User {user.id} logged in")
+
+class SessionManager(EventListener):
+    def on_user_login(self, user):
+        create_session(user)
+
+class EventDispatcher:
+    def __init__(self):
+        self.listeners = []
+
+    def add_listener(self, listener):
+        self.listeners.append(listener)
+
+    def notify_login(self, user):
+        for listener in self.listeners:
+            listener.on_user_login(user)
+</code></pre>
+<p>Output:</p>
+<pre><code>Design Patterns:
+  Observer Pattern (confidence: 0.88)
+    Interface: EventListener (event_system.py:4)
+    Implementations:
+      - AuditLogger (event_system.py:9)
+      - SessionManager (event_system.py:13)
+    Registration: add_listener (event_system.py:21)
+    Notification: notify_login (event_system.py:24)
+</code></pre>
+<h3 id="example-3-custom-repository-pattern"><a class="header" href="#example-3-custom-repository-pattern">Example 3: Custom Repository Pattern</a></h3>
+<p>Defining and detecting a custom Repository pattern:</p>
+<p><code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[[patterns.custom_rules]]
+name = "Repository Pattern"
+description = "Data access layer"
+class_pattern = ".*Repository$"
+method_pattern = "^(find|get|save|update|delete)_"
+confidence = 0.75
+</code></pre>
+<p>Code:</p>
+<pre><code class="language-python">class UserRepository:
+    def find_by_id(self, user_id):
+        return db.query(User).get(user_id)
+
+    def find_by_email(self, email):
+        return db.query(User).filter_by(email=email).first()
+
+    def save(self, user):
+        db.session.add(user)
+        db.session.commit()
+
+    def delete_by_id(self, user_id):
+        user = self.find_by_id(user_id)
+        db.session.delete(user)
+        db.session.commit()
+</code></pre>
+<p>Analysis:</p>
+<pre><code class="language-bash">debtmap analyze --show-pattern-warnings
+</code></pre>
+<p>Output:</p>
+<pre><code>Custom Patterns Detected:
+  Repository Pattern (confidence: 0.75)
+    - UserRepository (models.py:10)
+      Methods: find_by_id, find_by_email, save, delete_by_id
+</code></pre>
+<h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
+<h3 id="1-false-positive-reduction"><a class="header" href="#1-false-positive-reduction">1. False Positive Reduction</a></h3>
+<p><strong>Problem</strong>: Complex factory functions flagged as too complex
+<strong>Solution</strong>: Enable factory pattern detection to apply appropriate complexity adjustments</p>
+<pre><code class="language-bash">debtmap analyze --patterns factory --pattern-threshold 0.7
+</code></pre>
+<h3 id="2-architecture-documentation"><a class="header" href="#2-architecture-documentation">2. Architecture Documentation</a></h3>
+<p><strong>Problem</strong>: Undocumented design patterns in legacy codebase
+<strong>Solution</strong>: Run pattern detection to automatically identify architectural patterns</p>
+<pre><code class="language-bash">debtmap analyze --patterns all --show-pattern-warnings &gt; architecture-report.txt
+</code></pre>
+<h3 id="3-pattern-consistency-validation"><a class="header" href="#3-pattern-consistency-validation">3. Pattern Consistency Validation</a></h3>
+<p><strong>Problem</strong>: Inconsistent Observer implementations across the codebase
+<strong>Solution</strong>: Use pattern detection to identify all Observer instances and compare their structure</p>
+<pre><code class="language-bash">debtmap analyze --patterns observer --output-format json &gt; observers.json
+</code></pre>
+<h3 id="4-refactoring-guidance"><a class="header" href="#4-refactoring-guidance">4. Refactoring Guidance</a></h3>
+<p><strong>Problem</strong>: Code smells that might be incomplete pattern implementations
+<strong>Solution</strong>: Detect partial patterns with lower confidence thresholds</p>
+<pre><code class="language-bash">debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="pattern-not-detected"><a class="header" href="#pattern-not-detected">Pattern Not Detected</a></h3>
+<p><strong>Symptoms</strong>: Expected pattern not appearing in output</p>
+<p><strong>Possible Causes</strong>:</p>
+<ol>
+<li>Confidence below threshold
+<ul>
+<li>Solution: Lower <code>--pattern-threshold</code> or use <code>--show-pattern-warnings</code></li>
+</ul>
+</li>
+<li>Pattern disabled
+<ul>
+<li>Solution: Check <code>--patterns</code> flag and <code>.debtmap.toml</code> config</li>
+</ul>
+</li>
+<li>Implementation doesn’t match detection criteria
+<ul>
+<li>Solution: Review pattern-specific criteria above or add custom rule</li>
+</ul>
+</li>
+</ol>
+<h3 id="false-positive-detection"><a class="header" href="#false-positive-detection">False Positive Detection</a></h3>
+<p><strong>Symptoms</strong>: Pattern detected incorrectly</p>
+<p><strong>Possible Causes</strong>:</p>
+<ol>
+<li>Naming collision (e.g., <code>create_</code> function that isn’t a factory)
+<ul>
+<li>Solution: Increase <code>--pattern-threshold</code> to require stronger evidence</li>
+</ul>
+</li>
+<li>Coincidental structural match
+<ul>
+<li>Solution: Add exclusion rules in configuration (if supported)</li>
+</ul>
+</li>
+</ol>
+<h3 id="incomplete-cross-file-detection"><a class="header" href="#incomplete-cross-file-detection">Incomplete Cross-File Detection</a></h3>
+<p><strong>Symptoms</strong>: Pattern implementations in other files not linked to interface</p>
+<p><strong>Possible Causes</strong>:</p>
+<ol>
+<li>Dynamic imports not tracked
+<ul>
+<li>Solution: Use static imports where possible</li>
+</ul>
+</li>
+<li>Interface not explicitly imported
+<ul>
+<li>Solution: Add explicit import even if not type-checking</li>
+</ul>
+</li>
+</ol>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Start with defaults</strong>: The default 0.7 threshold works well for most projects</li>
+<li><strong>Use <code>--show-pattern-warnings</code></strong> during initial analysis to see borderline detections</li>
+<li><strong>Configure per-pattern</strong>: Adjust detection criteria for patterns most relevant to your project</li>
+<li><strong>Define custom rules</strong>: Add project-specific patterns to reduce false positives</li>
+<li><strong>Combine with complexity analysis</strong>: Use pattern detection to understand complexity adjustments</li>
+<li><strong>Review low-confidence detections</strong>: They may indicate incomplete implementations worth refactoring</li>
+</ol>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>Debtmap’s design pattern detection provides:</p>
+<ul>
+<li><strong>9 built-in patterns</strong> covering common OOP and functional patterns</li>
+<li><strong>Configurable confidence thresholds</strong> for precision vs. recall tradeoff</li>
+<li><strong>Custom pattern rules</strong> for project-specific patterns</li>
+<li><strong>Cross-file detection</strong> for patterns spanning multiple modules</li>
+<li><strong>Rust trait support</strong> for idiomatic Rust pattern detection</li>
+<li><strong>Complexity integration</strong> to reduce false positives in analysis</li>
+</ul>
+<p>Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="dead-code-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="entropy-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="dead-code-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="entropy-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

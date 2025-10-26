@@ -192,27 +192,29 @@
 <ul>
 <li>Files with 15+ responsibilities</li>
 <li>Modules with 50+ methods</li>
+<li>Functions with cyclomatic complexity &gt; 50 (extreme complexity hotspots requiring architectural redesign)</li>
 <li>God objects flagged by detection algorithms</li>
 <li>Circular dependencies affecting core modules</li>
 </ul>
 <p><strong>When to Address</strong>: Immediately, before sprint work begins. These issues compound over time and block progress.</p>
 <pre><code class="language-bash"># Focus on Tier 1 items
-debtmap analyze . --filter Architecture --min-priority high
+debtmap analyze . --min-priority high --top 5
 </code></pre>
 <h3 id="tier-2-complex-untested"><a class="header" href="#tier-2-complex-untested">Tier 2: Complex Untested</a></h3>
-<p><strong>Description</strong>: Untested code with high complexity or critical dependencies</p>
+<p><strong>Description</strong>: Untested code with high complexity or critical dependencies. Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.</p>
 <p><strong>Priority</strong>: Risk of bugs in critical paths</p>
 <p><strong>Weight</strong>: 1.0x (standard multiplier)</p>
 <p><strong>Action</strong>: Should be tested before refactoring to prevent regressions</p>
 <p><strong>Examples</strong>:</p>
 <ul>
-<li>Functions with cyclomatic complexity &gt; 15 and 0% coverage</li>
+<li>Functions with cyclomatic complexity ≥ 15 and 0% coverage</li>
+<li>Functions with 10+ dependencies and low test coverage</li>
 <li>Business logic entry points without tests</li>
 <li>Complex error handling without validation</li>
 </ul>
 <p><strong>When to Address</strong>: Within current sprint. Add tests before making changes.</p>
 <pre><code class="language-bash"># See Tier 2 testing gaps
-debtmap analyze . --lcov coverage.lcov --filter Testing
+debtmap analyze . --lcov coverage.lcov --min-priority high
 </code></pre>
 <h3 id="tier-3-testing-gaps"><a class="header" href="#tier-3-testing-gaps">Tier 3: Testing Gaps</a></h3>
 <p><strong>Description</strong>: Untested code with moderate complexity</p>
@@ -251,12 +253,11 @@ t3_complexity_threshold = 10         # Lower complexity threshold
 # Display options
 show_t4_in_main_report = false      # Hide Tier 4 from main output
 
-# Tier weights
-[tiers.tier_weights]
-t1 = 1.5    # Critical architecture
-t2 = 1.0    # Complex untested
-t3 = 0.7    # Testing gaps
-t4 = 0.3    # Maintenance
+# Tier weights (multipliers applied to base scores)
+t1_weight = 1.5    # Critical architecture
+t2_weight = 1.0    # Complex untested
+t3_weight = 0.7    # Testing gaps
+t4_weight = 0.3    # Maintenance
 </code></pre>
 <h3 id="customizing-tier-thresholds"><a class="header" href="#customizing-tier-thresholds">Customizing Tier Thresholds</a></h3>
 <p>Adjust thresholds to match your team’s standards:</p>
@@ -271,29 +272,30 @@ t2_complexity_threshold = 20
 t3_complexity_threshold = 15
 </code></pre>
 <h3 id="tier-weight-customization"><a class="header" href="#tier-weight-customization">Tier Weight Customization</a></h3>
+<p>Tier weights are multipliers applied to base debt scores during prioritization. A weight of 1.5 means items in that tier will score 50% higher than equivalent items in a tier with weight 1.0, pushing them higher in priority rankings.</p>
 <p>Adjust weights based on your priorities:</p>
 <pre><code class="language-toml"># Emphasize testing over architecture
-[tiers.tier_weights]
-t1 = 1.2    # Reduce architecture weight
-t2 = 1.3    # Increase testing weight
-t3 = 0.8
-t4 = 0.3
+[tiers]
+t1_weight = 1.2    # Reduce architecture weight
+t2_weight = 1.3    # Increase testing weight
+t3_weight = 0.8
+t4_weight = 0.3
 
 # Focus on architecture first
-[tiers.tier_weights]
-t1 = 2.0    # Maximize architecture weight
-t2 = 1.0
-t3 = 0.5
-t4 = 0.2
+[tiers]
+t1_weight = 2.0    # Maximize architecture weight
+t2_weight = 1.0
+t3_weight = 0.5
+t4_weight = 0.2
 </code></pre>
 <h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
 <h3 id="sprint-planning"><a class="header" href="#sprint-planning">Sprint Planning</a></h3>
 <p>Use tiered prioritization to allocate work:</p>
 <pre><code class="language-bash"># See Tier 1 items for architectural planning
-debtmap analyze . --filter Architecture --top 5
+debtmap analyze . --min-priority high --top 5
 
 # See Tier 2/3 for testing sprint work
-debtmap analyze . --filter Testing --min-priority medium
+debtmap analyze . --lcov coverage.lcov --min-priority medium
 </code></pre>
 <h3 id="code-review-focus"><a class="header" href="#code-review-focus">Code Review Focus</a></h3>
 <p>Prioritize review attention based on tiers:</p>
@@ -305,7 +307,7 @@ debtmap analyze . --filter Testing --min-priority medium
 </ul>
 <h3 id="refactoring-strategy"><a class="header" href="#refactoring-strategy">Refactoring Strategy</a></h3>
 <pre><code class="language-bash"># Phase 1: Address Tier 1 architectural issues
-debtmap analyze . --filter Architecture
+debtmap analyze . --min-priority high
 
 # Phase 2: Add tests for Tier 2 complex code
 debtmap analyze . --lcov coverage.lcov --min-priority high
@@ -340,9 +342,10 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   ...
 
 ⚪ TIER 4: MAINTENANCE (120 items) [hidden]
-  Use --show-t4 to display maintenance items
+  To show Tier 4 items, add show_t4_in_main_report = true under [tiers] in .debtmap.toml
 </code></pre>
 <h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
+<p>Tier values use PascalCase enum variants without underscores: <code>T1CriticalArchitecture</code>, <code>T2ComplexUntested</code>, <code>T3TestingGaps</code>, <code>T4Maintenance</code>.</p>
 <pre><code class="language-json">{
   "tier_distribution": {
     "t1_count": 3,
@@ -352,7 +355,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   },
   "items": [
     {
-      "tier": "T1_CriticalArchitecture",
+      "tier": "T1CriticalArchitecture",
       "priority_weight": 1.5,
       "base_score": 8.5,
       "final_score": 12.75
@@ -363,8 +366,8 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
 <p><strong>Solution</strong>: Lower tier weights or increase thresholds temporarily:</p>
-<pre><code class="language-toml">[tiers.tier_weights]
-t1 = 1.2    # Reduce from 1.5
+<pre><code class="language-toml">[tiers]
+t1_weight = 1.2    # Reduce from 1.5
 </code></pre>
 <p><strong>Issue</strong>: Not enough items in Tier 1</p>
 <p><strong>Solution</strong>: Check if god object detection is enabled:</p>
@@ -392,7 +395,7 @@ minimum_cyclomatic_complexity = 2
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="metrics-reference.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="validation-gates.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -406,7 +409,7 @@ minimum_cyclomatic_complexity = 2
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="metrics-reference.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="validation-gates.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

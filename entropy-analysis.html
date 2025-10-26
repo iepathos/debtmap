@@ -199,7 +199,8 @@
 <li>Low entropy (0.0-0.3) = repetitive patterns</li>
 </ul>
 <h3 id="token-classification"><a class="header" href="#token-classification">Token Classification</a></h3>
-<p>Debtmap classifies tokens by importance:</p>
+<p>Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the <code>use_classification</code> configuration option.</p>
+<p><strong>When enabled (default)</strong>, tokens are weighted by importance:</p>
 <p><strong>High importance (weight: 1.0):</strong></p>
 <ul>
 <li>Control flow keywords (<code>if</code>, <code>match</code>, <code>for</code>, <code>while</code>)</li>
@@ -218,6 +219,7 @@
 <li>Literals (strings, numbers)</li>
 <li>Punctuation</li>
 </ul>
+<p><strong>When disabled</strong> (<code>use_classification = false</code>), all tokens are treated equally, which may be useful for debugging or when you want unweighted entropy scores.</p>
 <h3 id="pattern-repetition-detection"><a class="header" href="#pattern-repetition-detection">Pattern Repetition Detection</a></h3>
 <p>Detects repetitive structures in the AST:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -257,28 +259,46 @@ if needs_auth {
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="effective-complexity-adjustment"><a class="header" href="#effective-complexity-adjustment">Effective Complexity Adjustment</a></h3>
-<p>Adjusts raw cyclomatic complexity based on entropy:</p>
-<pre><code>Effective Complexity = Raw Complexity × (1 - Entropy Adjustment)
-
-Entropy Adjustment = min(
-    max_reduction,
-    (1 - shannon_entropy) × weight +
-    pattern_repetition × weight +
-    branch_similarity × weight
-)
+<p>Debtmap applies complexity dampening based on <strong>Spec 68: Graduated Entropy Dampening</strong> only when code exhibits very low entropy (&lt; 0.2), indicating highly repetitive patterns.</p>
+<h4 id="when-dampening-applies"><a class="header" href="#when-dampening-applies">When Dampening Applies</a></h4>
+<p><strong>Threshold</strong>: Entropy &lt; 0.2 (very low entropy only)</p>
+<ul>
+<li><strong>Entropy &gt;= 0.2</strong>: No dampening applied (preserves 100% of complexity)</li>
+<li><strong>Entropy &lt; 0.2</strong>: Graduated dampening applied (preserves 50-100% of complexity)</li>
+</ul>
+<h4 id="dampening-formula-spec-68"><a class="header" href="#dampening-formula-spec-68">Dampening Formula (Spec 68)</a></h4>
+<p>For very low entropy cases (&lt; 0.2):</p>
+<pre><code>dampening_factor = 0.5 + 0.5 × (entropy / 0.2)
+effective_complexity = raw_complexity × dampening_factor
 </code></pre>
-<p><strong>Example:</strong></p>
+<p>This ensures:</p>
+<ul>
+<li><strong>Maximum reduction</strong>: 50% (when entropy = 0.0)</li>
+<li><strong>Minimum reduction</strong>: 0% (when entropy = 0.2)</li>
+<li><strong>Graduated scaling</strong>: Linear interpolation between these extremes</li>
+</ul>
+<h4 id="example-very-low-entropy-dampening-applies"><a class="header" href="#example-very-low-entropy-dampening-applies">Example: Very Low Entropy (Dampening Applies)</a></h4>
 <pre><code>Raw Complexity: 20
-Shannon Entropy: 0.3 (low variety)
-Pattern Repetition: 0.8 (highly repetitive)
-Branch Similarity: 0.9 (very similar branches)
+Token Entropy: 0.1 (very low - highly repetitive)
 
-Entropy Adjustment = min(0.7, (1 - 0.3) × 0.4 + 0.8 × 0.3 + 0.9 × 0.3)
-                    = min(0.7, 0.28 + 0.24 + 0.27)
-                    = min(0.7, 0.79)
-                    = 0.7
+dampening_factor = 0.5 + 0.5 × (0.1 / 0.2)
+                 = 0.5 + 0.5 × 0.5
+                 = 0.5 + 0.25
+                 = 0.75
 
-Effective Complexity = 20 × (1 - 0.7) = 6
+Effective Complexity = 20 × 0.75 = 15
+
+Result: 25% reduction (preserves 75% of original complexity)
+</code></pre>
+<h4 id="example-normal-entropy-no-dampening"><a class="header" href="#example-normal-entropy-no-dampening">Example: Normal Entropy (No Dampening)</a></h4>
+<pre><code>Raw Complexity: 20
+Token Entropy: 0.5 (normal variety)
+
+dampening_factor = 1.0 (no dampening for entropy &gt;= 0.2)
+
+Effective Complexity = 20 × 1.0 = 20
+
+Result: 0% reduction (preserves 100% of original complexity)
 </code></pre>
 <h2 id="real-world-examples"><a class="header" href="#real-world-examples">Real-World Examples</a></h2>
 <h3 id="example-1-validation-function"><a class="header" href="#example-1-validation-function">Example 1: Validation Function</a></h3>
@@ -357,11 +377,11 @@ Effective Complexity = 20 × (1 - 0.7) = 6
 # Enable entropy analysis (default: true)
 enabled = true
 
-# Weight of entropy in complexity adjustment (0.0-1.0, default: 0.5)
-weight = 0.5
+# Weight of entropy in complexity adjustment (0.0-1.0, default: 1.0)
+weight = 1.0
 
-# Minimum tokens required for entropy calculation (default: 10)
-min_tokens = 10
+# Minimum tokens required for entropy calculation (default: 20)
+min_tokens = 20
 
 # Pattern similarity threshold for detection (0.0-1.0, default: 0.7)
 pattern_threshold = 0.7
@@ -369,14 +389,23 @@ pattern_threshold = 0.7
 # Enable advanced token classification (default: true)
 use_classification = true
 
-# Entropy level below which dampening is applied (default: 0.5)
-entropy_threshold = 0.5
+# Entropy level below which dampening is applied (default: 0.4)
+entropy_threshold = 0.4
 
-# Branch similarity above which dampening is applied (default: 0.7)
-branch_threshold = 0.7
+# Branch similarity above which dampening is applied (default: 0.8)
+branch_threshold = 0.8
 
-# Maximum combined complexity reduction percentage (default: 0.7 = 70%)
-max_combined_reduction = 0.7
+# Maximum reduction from repetition patterns (default: 0.20 = 20%)
+max_repetition_reduction = 0.20
+
+# Maximum reduction from entropy analysis (default: 0.15 = 15%)
+max_entropy_reduction = 0.15
+
+# Maximum reduction from branch similarity (default: 0.25 = 25%)
+max_branch_reduction = 0.25
+
+# Maximum combined complexity reduction percentage (default: 0.30 = 30%)
+max_combined_reduction = 0.30
 </code></pre>
 <h3 id="tuning-for-your-project"><a class="header" href="#tuning-for-your-project">Tuning for Your Project</a></h3>
 <p><strong>Strict mode (fewer false positive reductions):</strong></p>
@@ -395,9 +424,11 @@ max_combined_reduction = 0.9
 <pre><code class="language-toml">[entropy]
 enabled = false
 </code></pre>
-<p>Or via CLI:</p>
-<pre><code class="language-bash">debtmap analyze . --semantic-off
+<p>Or via CLI (disables entropy-based complexity adjustments):</p>
+<pre><code class="language-bash"># Disables semantic analysis features including entropy dampening
+debtmap analyze . --semantic-off
 </code></pre>
+<p><strong>Note</strong>: The <code>--semantic-off</code> flag disables all semantic analysis features, including entropy-based complexity adjustments. This is useful when you want raw cyclomatic complexity without any dampening.</p>
 <h2 id="understanding-the-impact"><a class="header" href="#understanding-the-impact">Understanding the Impact</a></h2>
 <h3 id="measuring-false-positive-reduction"><a class="header" href="#measuring-false-positive-reduction">Measuring False Positive Reduction</a></h3>
 <p>Run analysis with and without entropy:</p>
@@ -469,11 +500,11 @@ max_combined_reduction = 0.5  # Limit maximum reduction
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="coverage-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="design-patterns.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="god-object-detection.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="error-handling-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -483,11 +514,11 @@ max_combined_reduction = 0.5  # Limit maximum reduction
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="coverage-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="design-patterns.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="god-object-detection.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="error-handling-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

@@ -417,6 +417,7 @@ duplication = 50                     # Duplication threshold
 max_file_length = 500                # Maximum lines per file
 max_function_length = 50             # Maximum lines per function
 </code></pre>
+<p><strong>Note:</strong> The TOML configuration accepts <code>max_file_length</code> (shown above), which maps to the internal struct field <code>max_file_lines</code>. Both names refer to the same setting.</p>
 <h3 id="minimum-thresholds"><a class="header" href="#minimum-thresholds">Minimum Thresholds</a></h3>
 <p>Filter out trivial functions that aren’t really technical debt:</p>
 <pre><code class="language-toml">[thresholds]
@@ -694,17 +695,54 @@ api_files = []                      # Explicitly mark API files
 <p>When enabled, public API functions receive higher priority for test coverage.</p>
 <h3 id="additional-advanced-options"><a class="header" href="#additional-advanced-options">Additional Advanced Options</a></h3>
 <p>Debtmap supports additional advanced configuration options:</p>
+<h4 id="lines-of-code-configuration"><a class="header" href="#lines-of-code-configuration">Lines of Code Configuration</a></h4>
+<p>The <strong><code>[loc]</code></strong> section controls how lines of code are counted for metrics and reporting:</p>
+<pre><code class="language-toml">[loc]
+include_tests = false         # Exclude test files from LOC counts (default: false)
+include_generated = false     # Exclude generated files from LOC counts (default: false)
+count_comments = false        # Include comment lines in LOC counts (default: false)
+count_blank_lines = false     # Include blank lines in LOC counts (default: false)
+</code></pre>
+<p><strong>Configuration options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>include_tests</code></td><td>false</td><td>Whether to include test files in LOC metrics</td></tr>
+<tr><td><code>include_generated</code></td><td>false</td><td>Whether to include generated files in LOC metrics</td></tr>
+<tr><td><code>count_comments</code></td><td>false</td><td>Whether to count comment lines as LOC</td></tr>
+<tr><td><code>count_blank_lines</code></td><td>false</td><td>Whether to count blank lines as LOC</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example - Strict LOC counting:</strong></p>
+<pre><code class="language-toml">[loc]
+include_tests = false         # Focus on production code
+include_generated = false     # Exclude auto-generated code
+count_comments = false        # Only count executable code
+count_blank_lines = false     # Exclude whitespace
+</code></pre>
+<h4 id="tier-configuration"><a class="header" href="#tier-configuration">Tier Configuration</a></h4>
+<p>The <strong><code>[tiers]</code></strong> section configures tier threshold boundaries for prioritization:</p>
+<pre><code class="language-toml">[tiers]
+t2_complexity_threshold = 15      # Complexity threshold for Tier 2 (default: 15)
+t2_dependency_threshold = 10      # Dependency threshold for Tier 2 (default: 10)
+t3_complexity_threshold = 10      # Complexity threshold for Tier 3 (default: 10)
+show_t4_in_main_report = false    # Show Tier 4 items in main report (default: false)
+</code></pre>
+<p><strong>Tier priority levels:</strong></p>
 <ul>
-<li>
-<p><strong><code>[loc]</code></strong> - Lines of code counting configuration. Controls whether to include tests (<code>include_tests</code>), generated files (<code>include_generated</code>), comments (<code>count_comments</code>), and blank lines (<code>count_blank_lines</code>) in LOC counts. All default to false.</p>
-</li>
-<li>
-<p><strong><code>[tiers]</code></strong> - Tier threshold configuration for prioritization. Allows customization of complexity and dependency thresholds for different priority tiers (T2, T3, T4). Used internally for tiered reporting.</p>
-</li>
-<li>
-<p><strong><code>[complexity_thresholds]</code></strong> - Enhanced complexity detection thresholds. Configures minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions. Supplements the basic <code>[thresholds]</code> section with more granular control.</p>
-</li>
+<li><strong>Tier 1 (Critical)</strong>: Highest priority items</li>
+<li><strong>Tier 2 (High)</strong>: Items above <code>t2_*</code> thresholds</li>
+<li><strong>Tier 3 (Medium)</strong>: Items above <code>t3_*</code> thresholds</li>
+<li><strong>Tier 4 (Low)</strong>: Items below all thresholds</li>
 </ul>
+<p><strong>Example - Stricter tier boundaries:</strong></p>
+<pre><code class="language-toml">[tiers]
+t2_complexity_threshold = 12      # Lower threshold = more items in high priority
+t2_dependency_threshold = 8
+t3_complexity_threshold = 8
+show_t4_in_main_report = true     # Include low-priority items
+</code></pre>
+<h4 id="enhanced-complexity-thresholds"><a class="header" href="#enhanced-complexity-thresholds">Enhanced Complexity Thresholds</a></h4>
+<p>The <strong><code>[complexity_thresholds]</code></strong> section provides more granular control over complexity detection:</p>
+<p>This supplements the basic <code>[thresholds]</code> section with minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions.</p>
 <p>These options are advanced features with sensible defaults. Most users won’t need to configure them explicitly.</p>
 <h2 id="cli-integration"><a class="header" href="#cli-integration">CLI Integration</a></h2>
 <p>CLI flags can override configuration file settings:</p>
@@ -927,11 +965,11 @@ patterns = [
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="analysis-guide.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="compare-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="suppression-patterns.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="threshold-configuration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -941,11 +979,11 @@ patterns = [
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="analysis-guide.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="compare-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="suppression-patterns.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="threshold-configuration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

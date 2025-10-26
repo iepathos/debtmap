@@ -251,18 +251,28 @@ def mock_api_responses():
 // FIXME: But complexity issues would still be detected
 <span class="boring">}</span></code></pre></pre>
 <h3 id="supported-debt-types"><a class="header" href="#supported-debt-types">Supported Debt Types</a></h3>
+<p>You can suppress the following debt types by name in bracket notation:</p>
+<p><strong>Currently Supported:</strong></p>
 <ul>
-<li><code>todo</code> - TODO comments</li>
+<li><code>todo</code> - TODO comments (also detects test-specific TODOs)</li>
 <li><code>fixme</code> - FIXME comments</li>
-<li><code>hack</code> - HACK markers</li>
 <li><code>smell</code> or <code>codesmell</code> - Code smell patterns</li>
-<li><code>complexity</code> - High cognitive complexity</li>
-<li><code>duplication</code> - Code duplication</li>
-<li><code>god_object</code> - God object warnings</li>
-<li><code>testing</code> - Testing gap warnings</li>
+<li><code>complexity</code> - High cognitive complexity (also detects test complexity)</li>
+<li><code>duplication</code> or <code>duplicate</code> - Code duplication (also detects test duplication)</li>
 <li><code>dependency</code> - Dependency issues</li>
 <li><code>*</code> - All types (wildcard)</li>
 </ul>
+<p><strong>Auto-Detected Types</strong> (can be suppressed but not from inline comments):</p>
+<p>These types are detected by code analysis rather than comment scanning. To suppress them, use inline suppression markers (<code>debtmap:ignore</code>) on the relevant lines:</p>
+<ul>
+<li><code>error_swallowing</code> - Error handling issues (empty catch blocks, ignored errors)</li>
+<li><code>resource_management</code> - Resource cleanup issues (file handles, connections)</li>
+<li><code>code_organization</code> - Structural issues (god objects, large classes)</li>
+<li><code>test_quality</code> - Test-specific quality issues</li>
+</ul>
+<blockquote>
+<p><strong>Note:</strong> Additional type names like <code>hack</code>, <code>god_object</code>, and <code>testing</code> may be supported in future versions. Use the types listed above for reliable suppression.</p>
+</blockquote>
 <h3 id="wildcard-suppression"><a class="header" href="#wildcard-suppression">Wildcard Suppression</a></h3>
 <p>Use <code>[*]</code> to explicitly suppress all types (equivalent to no bracket notation):</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -317,9 +327,13 @@ patterns = [
     "third_party/**",         # Third-party code
 ]
 </code></pre>
-<h3 id="function-name-exclusions"><a class="header" href="#function-name-exclusions">Function Name Exclusions</a></h3>
-<p>Exclude entire function families by name pattern:</p>
-<pre><code class="language-toml">[ignore.functions]
+<h3 id="function-name-exclusions-planned"><a class="header" href="#function-name-exclusions-planned">Function Name Exclusions (Planned)</a></h3>
+<blockquote>
+<p><strong>Note:</strong> Function-level exclusions by name pattern are not yet implemented. This is a planned feature for a future release.</p>
+</blockquote>
+<p>When implemented, you will be able to exclude entire function families by name pattern:</p>
+<pre><code class="language-toml"># Planned feature - not yet available
+[ignore.functions]
 patterns = [
     # Test setup functions
     "setup_test_*",
@@ -343,7 +357,7 @@ patterns = [
     "from_json",
 ]
 </code></pre>
-<p>Function patterns use wildcard matching where <code>*</code> matches any characters.</p>
+<p><strong>Current workaround:</strong> Use inline suppression comments (<code>debtmap:ignore</code>) for specific functions, or use file pattern exclusions to exclude entire test files.</p>
 <h2 id="glob-pattern-syntax"><a class="header" href="#glob-pattern-syntax">Glob Pattern Syntax</a></h2>
 <p>File patterns use standard glob syntax:</p>
 <div class="table-wrapper"><table><thead><tr><th>Pattern</th><th>Matches</th><th>Example</th></tr></thead><tbody>
@@ -360,9 +374,13 @@ patterns = [
     "src/**/*_generated.rs",  # Generated files in any subdirectory
     "**/test_*.py",           # Python test files anywhere
     "legacy/**/[!i]*.js",     # Legacy JS files not starting with 'i'
-    "**/*.{min.js,min.css}",  # Minified assets
+    "**/*.min.js",            # Minified JavaScript
+    "**/*.min.css",           # Minified CSS
 ]
 </code></pre>
+<blockquote>
+<p><strong>Note:</strong> Brace expansion (e.g., <code>*.{js,css}</code>) is not supported. Use separate patterns for each file extension.</p>
+</blockquote>
 <h2 id="language-specific-comment-syntax"><a class="header" href="#language-specific-comment-syntax">Language-Specific Comment Syntax</a></h2>
 <p>Debtmap automatically uses the correct comment syntax for each language:</p>
 <div class="table-wrapper"><table><thead><tr><th>Language</th><th>Comment Prefix</th><th>Example</th></tr></thead><tbody>
@@ -384,13 +402,13 @@ debtmap analyze src/test_helper.rs
 </code></pre>
 <p>This ensures you can always analyze specific files when needed, even if they match an ignore pattern.</p>
 <h2 id="suppression-statistics"><a class="header" href="#suppression-statistics">Suppression Statistics</a></h2>
-<p>Debtmap tracks suppression usage and can detect issues:</p>
+<p>Debtmap internally tracks suppression usage during analysis:</p>
 <ul>
-<li><strong>Total suppressions</strong>: Count of active suppressions</li>
+<li><strong>Total suppressions</strong>: Count of active suppressions across all files</li>
 <li><strong>Suppressions by type</strong>: How many of each debt type are suppressed</li>
 <li><strong>Unclosed blocks</strong>: Detection of <code>ignore-start</code> without matching <code>ignore-end</code></li>
 </ul>
-<p>Future versions may include a command to report suppression statistics for your codebase.</p>
+<p>These statistics are tracked in real-time as files are analyzed. Future CLI enhancements may expose these statistics through a dedicated command to help you audit suppression usage across your codebase.</p>
 <h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
 <h3 id="use-suppressions-sparingly"><a class="header" href="#use-suppressions-sparingly">Use Suppressions Sparingly</a></h3>
 <p>Suppressions hide information, so use them intentionally:</p>
@@ -471,27 +489,23 @@ patterns = [
     "**/test_*.py",
     "**/fixtures/**",
 ]
-
-[ignore.functions]
-patterns = [
-    "test_*",
-    "setup_*",
-    "teardown_*",
-    "mock_*",
-]
 </code></pre>
+<p>For test functions within production files, use inline suppressions:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    // debtmap:ignore-start -- Test code
+    fn setup_test_environment() { }
+    // debtmap:ignore-end
+}
+<span class="boring">}</span></code></pre></pre>
 <h3 id="suppressing-generated-code"><a class="header" href="#suppressing-generated-code">Suppressing Generated Code</a></h3>
 <pre><code class="language-toml">[ignore]
 patterns = [
     "**/*_generated.*",
     "**/proto/**",
     "**/bindings/**",
-]
-
-[ignore.functions]
-patterns = [
-    "derive_*",
-    "__*",
 ]
 </code></pre>
 <h3 id="temporary-suppressions-with-timeline"><a class="header" href="#temporary-suppressions-with-timeline">Temporary Suppressions with Timeline</a></h3>
@@ -595,11 +609,11 @@ patterns = [
 ]
 </code></pre>
 <h3 id="function-suppression-not-working"><a class="header" href="#function-suppression-not-working">Function Suppression Not Working</a></h3>
-<p>If function name patterns aren’t working:</p>
+<p>Function-level exclusions by name pattern are not yet implemented. To suppress specific functions:</p>
 <ol>
-<li>Verify the pattern is under <code>[ignore.functions]</code>, not <code>[ignore]</code></li>
-<li>Check the function name exactly matches (case-sensitive)</li>
-<li>Remember <code>*</code> is a wildcard: <code>test_*</code> matches <code>test_foo</code> but not <code>my_test</code></li>
+<li>Use inline suppressions: <code>// debtmap:ignore</code> before the function</li>
+<li>Use block suppressions: <code>// debtmap:ignore-start</code> … <code>// debtmap:ignore-end</code></li>
+<li>Exclude entire files using <code>[ignore]</code> patterns if the functions are in dedicated files</li>
 </ol>
 <h2 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h2>
 <ul>
@@ -614,8 +628,7 @@ patterns = [
 <li><strong>Inline comments</strong>: <code>debtmap:ignore</code>, <code>ignore-next-line</code>, <code>ignore-start/end</code></li>
 <li><strong>Type-specific</strong>: Use <code>[type1,type2]</code> to suppress selectively</li>
 <li><strong>Reasons</strong>: Always use <code>-- reason</code> to document why</li>
-<li><strong>Config patterns</strong>: Use <code>.debtmap.toml</code> for systematic exclusions</li>
-<li><strong>Function patterns</strong>: Use <code>[ignore.functions]</code> for function name matching</li>
+<li><strong>Config patterns</strong>: Use <code>.debtmap.toml</code> for systematic file exclusions</li>
 <li><strong>Best practices</strong>: Use sparingly, prefer specific over broad, review periodically</li>
 </ul>
 <p>With proper use of suppressions, your Debtmap reports show only the debt that matters to your team.</p>
@@ -624,7 +637,7 @@ patterns = [
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="threshold-configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -638,7 +651,7 @@ patterns = [
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="threshold-configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

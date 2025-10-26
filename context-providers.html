@@ -204,7 +204,7 @@
 <h2 id="critical-path-provider"><a class="header" href="#critical-path-provider">Critical Path Provider</a></h2>
 <p>The Critical Path provider identifies functions that lie on critical execution paths through your application. Functions on these paths have elevated risk because failures directly impact user-facing functionality.</p>
 <h3 id="entry-point-detection"><a class="header" href="#entry-point-detection">Entry Point Detection</a></h3>
-<p>The provider automatically detects entry points based on function names and file paths:</p>
+<p>The provider automatically detects entry points based on function names and file paths. These weights determine the base criticality of execution paths:</p>
 <div class="table-wrapper"><table><thead><tr><th>Entry Type</th><th>Weight</th><th>Detection Pattern</th><th>User-Facing</th></tr></thead><tbody>
 <tr><td>Main</td><td>10.0</td><td>Function named <code>main</code></td><td>Yes</td></tr>
 <tr><td>API Endpoint</td><td>8.0</td><td><code>handle_*</code>, <code>*_handler</code>, <code>get_*</code>, <code>post_*</code> in <code>api/</code>, <code>handler/</code>, <code>route/</code> paths</td><td>Yes</td></tr>
@@ -278,7 +278,7 @@ business_logic_multiplier = 1.2
 <li>Dependency criticality</li>
 </ul>
 <h3 id="blast-radius-calculation"><a class="header" href="#blast-radius-calculation">Blast Radius Calculation</a></h3>
-<p>The blast radius represents how many modules would be affected by changes to a function:</p>
+<p>The blast radius represents how many modules would be affected by changes to a function. It counts unique modules reachable through transitive dependencies by traversing the dependency graph edges.</p>
 <div class="table-wrapper"><table><thead><tr><th>Blast Radius</th><th>Contribution</th><th>Impact Level</th></tr></thead><tbody>
 <tr><td>&gt; 10 modules</td><td>1.5</td><td>Critical dependency affecting many modules</td></tr>
 <tr><td>6-10 modules</td><td>1.0</td><td>Important dependency with moderate impact</td></tr>
@@ -295,6 +295,7 @@ where:
   criticality_factor = 1.0 + min(0.5, dependents.len() × 0.1)
   dependency_risk = Σ(dependency.risk × coupling_strength × 0.3)
 <span class="boring">}</span></code></pre></pre>
+<p><strong>Note</strong>: The constants (0.5, 0.1, 0.3) are currently hard-coded based on empirical analysis. Future versions may make these configurable.</p>
 <p><strong>Impact on scoring:</strong></p>
 <pre><code>dependency_factor = normalized_to_0_10(upstream + downstream)
 
@@ -334,6 +335,9 @@ max_depth = 5
 <li><strong>Bug density</strong>: Ratio of bug fix commits to total commits</li>
 <li><strong>Age</strong>: Days since first commit (maturity indicator)</li>
 <li><strong>Author count</strong>: Number of unique contributors (complexity indicator)</li>
+<li><strong>Total commits</strong>: Total number of commits to the file</li>
+<li><strong>Last modified</strong>: Timestamp of the most recent commit</li>
+<li><strong>Stability score</strong>: Weighted combination of churn, bug fixes, and age (0.0-1.0)</li>
 </ul>
 <p><strong>What it analyzes:</strong></p>
 <ul>
@@ -401,7 +405,11 @@ high_churn_threshold = 10
 git rev-parse --git-dir
 
 # If not a git repo, initialize one or disable git_history provider
-debtmap analyze --disable-context git_history
+# Option 1: Enable context but exclude git_history
+debtmap analyze --context --disable-context git_history
+
+# Option 2: Use only specific providers
+debtmap analyze --context-providers critical_path,dependency
 </code></pre>
 <p><strong>Performance issues</strong>: Git history analysis can be slow for large repositories:</p>
 <pre><code class="language-bash"># Use only lightweight providers
@@ -779,7 +787,7 @@ debtmap analyze --context -vvv
 <li>Provider-specific explanations</li>
 </ul>
 <h3 id="architecture-exploration"><a class="header" href="#architecture-exploration">Architecture Exploration</a></h3>
-<p>The <code>ContextAggregator</code> caches context by <code>file:function</code> key. This enables efficient re-analysis:</p>
+<p>The <code>ContextAggregator</code> caches context by <code>file:function</code> key to avoid redundant analysis during a single run. The cache is in-memory per <code>ContextAggregator</code> instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let mut aggregator = ContextAggregator::new()

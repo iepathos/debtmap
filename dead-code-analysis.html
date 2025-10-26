@@ -1,0 +1,788 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Dead Code Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="dead-code-analysis"><a class="header" href="#dead-code-analysis">Dead Code Analysis</a></h1>
+<p>Debtmap’s Python dead code detection system uses advanced static analysis to identify unused functions with high accuracy and low false positive rates. The analyzer integrates multiple detection systems to provide confidence-scored results that help you make informed decisions about code removal.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>The dead code analyzer combines several detection techniques:</p>
+<ul>
+<li><strong>Static call graph analysis</strong> - Tracks which functions call each other across your codebase</li>
+<li><strong>Framework pattern detection</strong> - Recognizes entry points from Flask, Django, FastAPI, Click, pytest, and more</li>
+<li><strong>Test detection</strong> - Identifies test functions and test files to avoid false positives</li>
+<li><strong>Callback tracking</strong> - Detects functions registered as callbacks or event handlers</li>
+<li><strong>Import analysis</strong> - Tracks which functions are imported and exported by other modules</li>
+<li><strong>Coverage integration</strong> - Uses test coverage data when available to identify live code</li>
+<li><strong>Public API detection</strong> - Uses heuristics to identify external API functions</li>
+</ul>
+<p>This multi-layered approach achieves a target false positive rate of less than 10%, compared to 30-40% for naive call graph analysis.</p>
+<h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
+<p>Every analysis result includes a confidence score to help you prioritize code removal:</p>
+<h3 id="high-confidence-08-10"><a class="header" href="#high-confidence-08-10">High Confidence (0.8-1.0)</a></h3>
+<p><strong>Safe to remove</strong> - These functions are very likely dead code.</p>
+<p>Characteristics:</p>
+<ul>
+<li>No static callers found in the codebase</li>
+<li>Not a framework entry point (route, command, view, etc.)</li>
+<li>Not a test function or in a test file</li>
+<li>Not registered as a callback or event handler</li>
+<li>Not exported in <code>__all__</code> or used in public API patterns</li>
+<li>Often private functions (starting with <code>_</code>)</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Function: _old_helper
+Confidence: High (0.95)
+Suggestion: High confidence this function is dead code and can be safely removed.
+</code></pre>
+<h3 id="medium-confidence-05-08"><a class="header" href="#medium-confidence-05-08">Medium Confidence (0.5-0.8)</a></h3>
+<p><strong>Review recommended</strong> - These functions might be dead code but require manual verification.</p>
+<p>Characteristics:</p>
+<ul>
+<li>No static callers but function is public</li>
+<li>In a test file but not called by any tests</li>
+<li>Might be used dynamically (via <code>getattr</code>, plugins, etc.)</li>
+<li>Public API that might be used by external code</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Function: legacy_api_method
+Confidence: Medium (0.65)
+Suggestion: Medium confidence this function is dead code. Manual verification recommended.
+Risks:
+  - Function is public and may be used by external code.
+</code></pre>
+<h3 id="low-confidence-00-05"><a class="header" href="#low-confidence-00-05">Low Confidence (0.0-0.5)</a></h3>
+<p><strong>Likely in use</strong> - These functions are probably not dead code.</p>
+<p>Characteristics:</p>
+<ul>
+<li>Has static callers in the codebase</li>
+<li>Framework entry point (Flask route, Django view, Click command)</li>
+<li>Test function (starts with <code>test_</code>, in test file)</li>
+<li>Callback target or event handler</li>
+<li>Magic method (<code>__init__</code>, <code>__str__</code>, etc.)</li>
+<li>Property accessor or descriptor</li>
+</ul>
+<p>Example output:</p>
+<pre><code>Function: index
+Confidence: Low (0.15)
+Result: LIVE
+Reasons:
+  - Framework entry point (Flask route)
+  - Function is public
+</code></pre>
+<h2 id="public-api-detection"><a class="header" href="#public-api-detection">Public API Detection</a></h2>
+<p>Debtmap uses advanced heuristics to identify functions that are likely part of your project’s external API (introduced in Spec 113). This prevents false positives when analyzing library code.</p>
+<h3 id="detection-heuristics"><a class="header" href="#detection-heuristics">Detection Heuristics</a></h3>
+<p>The public API detector considers:</p>
+<ol>
+<li><strong>Public visibility</strong> - Function doesn’t start with <code>_</code></li>
+<li><strong>File location patterns</strong> - Functions in <code>api/</code>, <code>public/</code>, or top-level <code>__init__.py</code> files</li>
+<li><strong>Naming conventions</strong> - Functions following API naming patterns</li>
+<li><strong>Export declarations</strong> - Functions listed in <code>__all__</code></li>
+<li><strong>Explicit configuration</strong> - Functions marked as API in <code>.debtmap.toml</code></li>
+</ol>
+<h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
+<p>Configure public API detection in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[external_api]
+# Enable/disable automatic public API detection (default: true)
+detect_external_api = true
+
+# Explicitly mark specific functions as external APIs
+api_functions = [
+    "calculate_score",           # Just function name
+    "mylib.api::process_data",   # Module-qualified name
+]
+
+# Mark entire files as containing external APIs (supports glob patterns)
+api_files = [
+    "src/api/*.py",              # All files in api directory
+    "src/public_interface.py",   # Specific file
+    "**/__init__.py",            # All __init__.py files
+]
+</code></pre>
+<p>Functions identified as public APIs receive lower dead code confidence scores, even if they have no internal callers.</p>
+<h2 id="framework-support"><a class="header" href="#framework-support">Framework Support</a></h2>
+<p>The analyzer recognizes entry points from popular Python frameworks to avoid false positives:</p>
+<h3 id="web-frameworks"><a class="header" href="#web-frameworks">Web Frameworks</a></h3>
+<ul>
+<li><strong>Flask</strong>: <code>@app.route</code>, <code>@app.before_request</code>, <code>@app.after_request</code>, <code>@app.errorhandler</code></li>
+<li><strong>Django</strong>: View functions, admin actions, signal handlers, middleware methods</li>
+<li><strong>FastAPI</strong>: <code>@app.get</code>, <code>@app.post</code>, <code>@app.put</code>, <code>@app.delete</code>, route decorators</li>
+</ul>
+<h3 id="cli-frameworks"><a class="header" href="#cli-frameworks">CLI Frameworks</a></h3>
+<ul>
+<li><strong>Click</strong>: <code>@click.command</code>, <code>@click.group</code>, subcommand handlers</li>
+<li><strong>argparse</strong>: Functions registered as subcommand handlers</li>
+</ul>
+<h3 id="testing-frameworks"><a class="header" href="#testing-frameworks">Testing Frameworks</a></h3>
+<ul>
+<li><strong>pytest</strong>: Functions starting with <code>test_</code>, <code>@pytest.fixture</code>, parametrized tests</li>
+<li><strong>unittest</strong>: <code>TestCase</code> methods, <code>setUp</code>, <code>tearDown</code>, <code>setUpClass</code>, <code>tearDownClass</code></li>
+</ul>
+<h3 id="event-systems"><a class="header" href="#event-systems">Event Systems</a></h3>
+<ul>
+<li><strong>Qt/PyQt</strong>: Signal connections, slot decorators</li>
+<li><strong>Tkinter</strong>: Event bindings, button command callbacks</li>
+</ul>
+<p>See <a href="context-providers.html">Framework Patterns documentation</a> for comprehensive framework support details.</p>
+<h2 id="confidence-thresholds"><a class="header" href="#confidence-thresholds">Confidence Thresholds</a></h2>
+<p>You can customize confidence thresholds based on your project’s tolerance for false positives vs. false negatives:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
+
+let config = AnalysisConfig {
+    high_confidence_threshold: 0.8,      // Default: 0.8
+    medium_confidence_threshold: 0.5,    // Default: 0.5
+    respect_suppression_comments: true,  // Default: true
+    include_private_api: true,           // Default: true
+    enable_public_api_detection: true,   // Default: true (Spec 113)
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Tuning recommendations:</strong></p>
+<ul>
+<li><strong>Conservative projects</strong> (libraries, public APIs): Raise thresholds to 0.9/0.7 to reduce false positives</li>
+<li><strong>Aggressive cleanup</strong> (internal tools): Lower thresholds to 0.7/0.4 to catch more dead code</li>
+<li><strong>Balanced approach</strong> (most projects): Use defaults of 0.8/0.5</li>
+</ul>
+<h2 id="suppressing-false-positives"><a class="header" href="#suppressing-false-positives">Suppressing False Positives</a></h2>
+<p>Mark functions as intentionally unused with suppression comments:</p>
+<pre><code class="language-python"># debtmap: not-dead
+def future_api_endpoint():
+    """Will be activated in v2.0"""
+    pass
+
+def compatibility_shim():  # noqa: dead-code
+    """Kept for backwards compatibility"""
+    pass
+</code></pre>
+<h3 id="supported-comment-formats"><a class="header" href="#supported-comment-formats">Supported Comment Formats</a></h3>
+<p>All of these formats are recognized:</p>
+<ul>
+<li><code># debtmap: not-dead</code> (recommended)</li>
+<li><code># debtmap:not-dead</code></li>
+<li><code># noqa: dead-code</code></li>
+<li><code># noqa:dead-code</code></li>
+</ul>
+<h3 id="comment-placement"><a class="header" href="#comment-placement">Comment Placement</a></h3>
+<p>Suppression comments can appear:</p>
+<ul>
+<li>
+<p><strong>Above the function</strong> (most common):</p>
+<pre><code class="language-python"># debtmap: not-dead
+def my_function():
+    pass
+</code></pre>
+</li>
+<li>
+<p><strong>Same line as function definition</strong>:</p>
+<pre><code class="language-python">def my_function():  # debtmap: not-dead
+    pass
+</code></pre>
+</li>
+<li>
+<p><strong>Below the function definition</strong> (less common):</p>
+<pre><code class="language-python">def my_function():
+# debtmap: not-dead
+    pass
+</code></pre>
+</li>
+</ul>
+<h2 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h2>
+<p>When test coverage data is available, the analyzer uses it to dramatically improve accuracy by marking covered functions as live:</p>
+<h3 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h3>
+<pre><code class="language-bash"># With pytest and pytest-cov
+pytest --cov=myapp --cov-report=json
+
+# With coverage.py directly
+coverage run -m pytest
+coverage json
+
+# Debtmap automatically detects and uses coverage.json
+debtmap analyze myapp/
+</code></pre>
+<h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
+<p>Functions that appear in coverage data are considered live, even if:</p>
+<ul>
+<li>No static callers are found</li>
+<li>They’re private functions</li>
+<li>They’re not framework entry points</li>
+</ul>
+<p>This catches functions called:</p>
+<ul>
+<li>Dynamically via <code>getattr()</code> or <code>exec()</code></li>
+<li>Through plugin systems</li>
+<li>By external libraries or C extensions</li>
+</ul>
+<h3 id="accuracy-improvement"><a class="header" href="#accuracy-improvement">Accuracy Improvement</a></h3>
+<p>Coverage integration typically provides:</p>
+<ul>
+<li><strong>60-70% reduction</strong> in false positives for complex codebases</li>
+<li><strong>Near-zero false positives</strong> for functions with test coverage</li>
+<li><strong>Confidence in removal</strong> for uncovered code</li>
+</ul>
+<h2 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h2>
+<p>Complete dead code analysis configuration in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml"># External API detection (Spec 113)
+[external_api]
+detect_external_api = true
+
+api_functions = [
+    "public_function_name",
+    "module::qualified_name",
+]
+
+api_files = [
+    "src/api/**/*.py",           # Glob patterns supported
+    "src/public_interface.py",   # Exact file paths
+]
+
+# Note: Confidence thresholds are configured programmatically
+# via AnalysisConfig in the Rust API
+</code></pre>
+<h2 id="understanding-results"><a class="header" href="#understanding-results">Understanding Results</a></h2>
+<h3 id="interpreting-output"><a class="header" href="#interpreting-output">Interpreting Output</a></h3>
+<p>When you run dead code analysis, you’ll see results like:</p>
+<pre><code>Dead code analysis for 'calculate_total':
+  Result: LIVE
+  Confidence: Low (0.2)
+
+  Reasons it's LIVE:
+    - HasStaticCallers (called by 3 functions)
+    - PublicApi
+
+  Suggestion:
+    Function appears to be in use or is a framework/test entry point.
+</code></pre>
+<h3 id="decision-guide"><a class="header" href="#decision-guide">Decision Guide</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Result</th><th>Confidence</th><th>Action</th></tr></thead><tbody>
+<tr><td><code>is_dead: true</code></td><td>High (0.8-1.0)</td><td><strong>Safe to remove</strong> - Very likely unused</td></tr>
+<tr><td><code>is_dead: true</code></td><td>Medium (0.5-0.8)</td><td><strong>Review manually</strong> - Might be dead, verify first</td></tr>
+<tr><td><code>is_dead: true</code></td><td>Low (0.0-0.5)</td><td><strong>Keep</strong> - Likely used dynamically</td></tr>
+<tr><td><code>is_dead: false</code></td><td>Any</td><td><strong>Keep</strong> - Function is in use</td></tr>
+</tbody></table>
+</div>
+<h3 id="cli-filtering-by-confidence"><a class="header" href="#cli-filtering-by-confidence">CLI Filtering by Confidence</a></h3>
+<pre><code class="language-bash"># Show only high confidence dead code
+debtmap analyze --min-confidence=0.8
+
+# Show high and medium confidence
+debtmap analyze --min-confidence=0.5
+
+# Show all results (including low confidence)
+debtmap analyze --min-confidence=0.0
+</code></pre>
+<p>See <a href="cli-reference.html">CLI Reference</a> for complete command options.</p>
+<h2 id="common-patterns"><a class="header" href="#common-patterns">Common Patterns</a></h2>
+<h3 id="false-positives-and-how-to-handle-them"><a class="header" href="#false-positives-and-how-to-handle-them">False Positives (and How to Handle Them)</a></h3>
+<p><strong>Public API methods</strong></p>
+<pre><code class="language-python">class Calculator:
+    def add(self, a, b):  # Might be used by external code
+        return a + b
+</code></pre>
+<p><em>Solution</em>: Add to <code>api_functions</code> in <code>.debtmap.toml</code> or use suppression comment</p>
+<p><strong>Dynamic imports</strong></p>
+<pre><code class="language-python"># Module loaded dynamically via importlib
+def handle_command(cmd):  # Called via getattr()
+    pass
+</code></pre>
+<p><em>Solution</em>: Add <code># debtmap: not-dead</code> suppression comment</p>
+<p><strong>Plugin registration</strong></p>
+<pre><code class="language-python">@registry.register
+def handler():  # Registered at import time
+    pass
+</code></pre>
+<p><em>Solution</em>: Should be detected by callback tracker; if not, add suppression comment</p>
+<h3 id="true-positives-safe-to-remove"><a class="header" href="#true-positives-safe-to-remove">True Positives (Safe to Remove)</a></h3>
+<p><strong>Old implementations</strong></p>
+<pre><code class="language-python">def _old_calculate(x):  # Replaced but not removed
+    return x * 2
+</code></pre>
+<p><em>Action</em>: Safe to remove (high confidence)</p>
+<p><strong>Unused helper functions</strong></p>
+<pre><code class="language-python">def _format_date(date):  # Was used but caller was removed
+    return date.strftime("%Y-%m-%d")
+</code></pre>
+<p><em>Action</em>: Safe to remove (high confidence)</p>
+<p><strong>Commented-out code alternatives</strong></p>
+<pre><code class="language-python">def process_v1(data):  # Old version, v2 is now used
+    pass
+</code></pre>
+<p><em>Action</em>: Safe to remove (high confidence)</p>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="workflow-recommendations"><a class="header" href="#workflow-recommendations">Workflow Recommendations</a></h3>
+<ol>
+<li>
+<p><strong>Start with high confidence items</strong> - Remove functions with 0.8+ confidence first to build trust in the tool</p>
+</li>
+<li>
+<p><strong>Run with coverage data</strong> - Generate <code>coverage.json</code> to dramatically improve accuracy:</p>
+<pre><code class="language-bash">pytest --cov=myapp --cov-report=json
+debtmap analyze myapp/
+</code></pre>
+</li>
+<li>
+<p><strong>Review medium confidence items</strong> - These often find real dead code but need manual verification</p>
+</li>
+<li>
+<p><strong>Use suppression comments liberally</strong> - Better to mark something as intentionally unused than to have noise in results</p>
+</li>
+<li>
+<p><strong>Check git history</strong> - Before removing, verify the function wasn’t recently added:</p>
+<pre><code class="language-bash">git log -p -- path/to/file.py | grep -A5 "def function_name"
+</code></pre>
+</li>
+<li>
+<p><strong>Remove incrementally</strong> - Remove a few functions, run tests, commit. Don’t remove everything at once:</p>
+<pre><code class="language-bash"># Remove 3-5 high confidence functions
+pytest  # Verify tests still pass
+git commit -m "Remove dead code: _old_helper, _unused_formatter"
+</code></pre>
+</li>
+<li>
+<p><strong>Look for patterns</strong> - If multiple related functions are flagged, they might all be part of an abandoned feature</p>
+</li>
+</ol>
+<h3 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h3>
+<p>Prevent dead code from accumulating by integrating into your CI pipeline:</p>
+<pre><code class="language-bash"># .github/workflows/dead-code.yml
+- name: Check for dead code
+  run: |
+    debtmap analyze --min-confidence=0.8 --format=json &gt; dead-code.json
+    # Fail if high-confidence dead code is found
+    if [ $(jq '.dead_code | length' dead-code.json) -gt 0 ]; then
+      echo "High-confidence dead code detected!"
+      jq '.dead_code[] | "\(.file):\(.line) - \(.function)"' dead-code.json
+      exit 1
+    fi
+</code></pre>
+<h2 id="limitations"><a class="header" href="#limitations">Limitations</a></h2>
+<h3 id="what-the-analyzer-can-detect"><a class="header" href="#what-the-analyzer-can-detect">What the Analyzer CAN Detect</a></h3>
+<ul>
+<li>✅ Static function calls across modules</li>
+<li>✅ Framework entry points via decorators</li>
+<li>✅ Test functions in test files</li>
+<li>✅ Callback registrations and event handlers</li>
+<li>✅ Functions in <code>__all__</code> exports</li>
+<li>✅ Property decorators and descriptors</li>
+<li>✅ Magic methods (<code>__init__</code>, <code>__str__</code>, etc.)</li>
+<li>✅ Functions covered by test coverage data</li>
+</ul>
+<h3 id="what-the-analyzer-cannot-detect"><a class="header" href="#what-the-analyzer-cannot-detect">What the Analyzer CANNOT Detect</a></h3>
+<ul>
+<li>❌ <code>eval()</code> or <code>exec()</code> usage - arbitrary code execution</li>
+<li>❌ <code>getattr()</code> with dynamic string names - runtime attribute lookup</li>
+<li>❌ Reflection-based calls - <code>inspect</code> module usage</li>
+<li>❌ Functions called from C extensions</li>
+<li>❌ Plugin systems using string-based loading - dynamic imports</li>
+</ul>
+<h3 id="mitigation-strategies"><a class="header" href="#mitigation-strategies">Mitigation Strategies</a></h3>
+<p>For functions the analyzer cannot detect, use suppression comments:</p>
+<pre><code class="language-python"># Called dynamically via getattr in plugin system
+# debtmap: not-dead
+def handle_dynamic_command():
+    pass
+
+# Loaded via string-based plugin system
+# debtmap: not-dead
+def plugin_entrypoint():
+    pass
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="function-marked-as-dead-but-its-actually-used"><a class="header" href="#function-marked-as-dead-but-its-actually-used">“Function marked as dead but it’s actually used”</a></h3>
+<p><strong>Possible causes and solutions:</strong></p>
+<ol>
+<li>
+<p><strong>Dynamic call via <code>getattr()</code> or <code>exec()</code></strong></p>
+<ul>
+<li><em>Solution</em>: Add <code># debtmap: not-dead</code> suppression comment</li>
+<li><em>Example</em>: Plugin systems, command dispatchers</li>
+</ul>
+</li>
+<li>
+<p><strong>Called from external code or C extension</strong></p>
+<ul>
+<li><em>Solution</em>: Add function to <code>api_functions</code> in <code>.debtmap.toml</code></li>
+<li><em>Example</em>: Public library APIs</li>
+</ul>
+</li>
+<li>
+<p><strong>Framework pattern not recognized</strong></p>
+<ul>
+<li><em>Solution</em>: Report issue on GitHub with framework details</li>
+<li><em>Workaround</em>: Add suppression comment</li>
+</ul>
+</li>
+<li>
+<p><strong>Callback registration not detected</strong></p>
+<ul>
+<li><em>Solution</em>: Check if decorator is supported; add suppression if not</li>
+<li><em>Example</em>: Custom registration decorators</li>
+</ul>
+</li>
+</ol>
+<h3 id="too-many-false-positives-in-my-codebase"><a class="header" href="#too-many-false-positives-in-my-codebase">“Too many false positives in my codebase”</a></h3>
+<p><strong>Solutions to try (in order):</strong></p>
+<ol>
+<li>
+<p><strong>Run with coverage data</strong> - Biggest impact on accuracy:</p>
+<pre><code class="language-bash">pytest --cov=myapp --cov-report=json
+debtmap analyze myapp/
+</code></pre>
+</li>
+<li>
+<p><strong>Configure public API detection</strong> - Mark your external APIs:</p>
+<pre><code class="language-toml">[external_api]
+api_files = ["src/api/**/*.py", "src/public/**/*.py"]
+</code></pre>
+</li>
+<li>
+<p><strong>Add framework patterns</strong> - Report unrecognized frameworks on GitHub</p>
+</li>
+<li>
+<p><strong>Add suppression comments</strong> - Mark intentionally unused functions</p>
+</li>
+<li>
+<p><strong>Adjust confidence thresholds</strong> - Raise to 0.9/0.7 for conservative analysis</p>
+</li>
+</ol>
+<h3 id="low-confidence-on-obviously-dead-code"><a class="header" href="#low-confidence-on-obviously-dead-code">“Low confidence on obviously dead code”</a></h3>
+<p>This is working as intended - the analyzer is <strong>conservative</strong> to avoid false positives.</p>
+<p><strong>What to do:</strong></p>
+<ol>
+<li><strong>Review the “Reasons it’s LIVE”</strong> - Understand why confidence is low</li>
+<li><strong>Check if function is truly unused</strong> - Verify no dynamic calls</li>
+<li><strong>Run with coverage</strong> - Coverage data will increase confidence for truly dead code</li>
+<li><strong>Accept medium/low confidence</strong> - Manual review is valuable for complex cases</li>
+</ol>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<h3 id="example-1-flask-application"><a class="header" href="#example-1-flask-application">Example 1: Flask Application</a></h3>
+<pre><code class="language-python">from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def index():  # ✅ LIVE - Framework entry point
+    return helper()
+
+def helper():  # ✅ LIVE - Called by index()
+    return format_response("Hello")
+
+def format_response(msg):  # ✅ LIVE - Called by helper()
+    return f"&lt;html&gt;{msg}&lt;/html&gt;"
+
+def _old_route():  # ❌ DEAD - No callers, not a route (High: 0.95)
+    return "Unused"
+</code></pre>
+<p><strong>Analysis results:</strong></p>
+<ul>
+<li><code>index</code>: LIVE (Low: 0.15) - Flask route decorator detected</li>
+<li><code>helper</code>: LIVE (Low: 0.25) - Has static caller (index)</li>
+<li><code>format_response</code>: LIVE (Low: 0.30) - Has static caller (helper)</li>
+<li><code>_old_route</code>: DEAD (High: 0.95) - No callers, private function</li>
+</ul>
+<h3 id="example-2-test-file"><a class="header" href="#example-2-test-file">Example 2: Test File</a></h3>
+<pre><code class="language-python">import pytest
+
+def test_addition():  # ✅ LIVE - Test function
+    assert add(1, 2) == 3
+
+def add(a, b):  # ✅ LIVE - Called by test
+    return a + b
+
+@pytest.fixture
+def sample_data():  # ✅ LIVE - pytest fixture
+    return [1, 2, 3]
+
+def _unused_helper():  # ❌ DEAD - No callers (High: 0.90)
+    return 42
+
+def _old_test_helper():  # ❌ DEAD - Was used, now orphaned (High: 0.92)
+    return "test data"
+</code></pre>
+<p><strong>Analysis results:</strong></p>
+<ul>
+<li><code>test_addition</code>: LIVE (Low: 0.10) - Test function pattern</li>
+<li><code>add</code>: LIVE (Low: 0.20) - Called by test</li>
+<li><code>sample_data</code>: LIVE (Low: 0.15) - pytest fixture decorator</li>
+<li><code>_unused_helper</code>: DEAD (High: 0.90) - No callers in test file</li>
+<li><code>_old_test_helper</code>: DEAD (High: 0.92) - Orphaned helper</li>
+</ul>
+<h3 id="example-3-public-api-with-configuration"><a class="header" href="#example-3-public-api-with-configuration">Example 3: Public API with Configuration</a></h3>
+<pre><code class="language-python"># src/api/calculator.py
+
+__all__ = ['calculate', 'format_result']
+
+def calculate(x):  # ✅ LIVE - Exported in __all__
+    return _internal_multiply(x, 2)
+
+def format_result(x):  # ✅ LIVE - Exported in __all__
+    return f"Result: {x}"
+
+def _internal_multiply(a, b):  # ✅ LIVE - Called by calculate
+    return a * b
+
+def _internal_helper():  # ❌ DEAD - Not exported, no callers (High: 0.88)
+    return None
+
+# Public API but not in __all__
+def legacy_api():  # ⚠️ MEDIUM - Public but no callers (Medium: 0.65)
+    """Kept for backwards compatibility"""
+    pass
+</code></pre>
+<p><strong>.debtmap.toml configuration:</strong></p>
+<pre><code class="language-toml">[external_api]
+api_files = ["src/api/**/*.py"]
+
+# Explicitly mark legacy API
+api_functions = ["legacy_api"]
+</code></pre>
+<p><strong>Analysis results:</strong></p>
+<ul>
+<li><code>calculate</code>: LIVE (Low: 0.20) - In <code>__all__</code>, has callers</li>
+<li><code>format_result</code>: LIVE (Low: 0.25) - In <code>__all__</code></li>
+<li><code>_internal_multiply</code>: LIVE (Low: 0.30) - Called by calculate</li>
+<li><code>_internal_helper</code>: DEAD (High: 0.88) - Private, no callers</li>
+<li><code>legacy_api</code>: LIVE (Low: 0.35) - Marked as API in config</li>
+</ul>
+<h2 id="getting-help"><a class="header" href="#getting-help">Getting Help</a></h2>
+<ul>
+<li><strong>Documentation</strong>: See <a href="troubleshooting.html">Troubleshooting Guide</a> for common issues</li>
+<li><strong>Report issues</strong>: https://github.com/anthropics/debtmap/issues</li>
+<li><strong>Examples</strong>: Check the <a href="examples.html">Examples chapter</a> for more scenarios</li>
+<li><strong>Related topics</strong>:
+<ul>
+<li><a href="coverage-integration.html">Coverage Integration</a> - Detailed coverage setup</li>
+<li><a href="suppression-patterns.html">Suppression Patterns</a> - Advanced suppression techniques</li>
+<li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
+</ul>
+</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="coverage-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="design-patterns.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="coverage-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="design-patterns.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

@@ -224,8 +224,9 @@
 <p><strong>Density Factor</strong>: Penalizes files with excessive function count</p>
 <ul>
 <li>Triggers when function count &gt; 50</li>
-<li><code>1.0 + ((function_count - 50) × 0.02)</code> for function_count &gt; 50, else 1.0</li>
+<li>Formula: <code>1.0 + ((function_count - 50) * 0.02)</code> if function_count &gt; 50, else 1.0</li>
 <li>Creates a gradual linear increase: 51 functions = 1.02x, 75 functions = 1.50x, 100 functions = 2.0x</li>
+<li>Example: A file with 75 functions gets 1.0 + ((75 - 50) * 0.02) = 1.0 + 0.50 = 1.50x multiplier</li>
 <li>Rationale: Files with many functions likely violate single responsibility</li>
 </ul>
 <p><strong>God Object Multiplier</strong>: <code>2.0 + god_object_score</code> when detected</p>
@@ -346,12 +347,24 @@ max_responsibilities = 5
 <h2 id="function-level-scoring"><a class="header" href="#function-level-scoring">Function-Level Scoring</a></h2>
 <p>Function-level scoring identifies specific functions needing attention for targeted improvements.</p>
 <h3 id="formula-1"><a class="header" href="#formula-1">Formula</a></h3>
-<pre><code>Base Score = (Complexity × 0.40) + (Dependency × 0.20)
+<pre><code>Base Score = (Complexity Factor × 10 × 0.50) + (Dependency Factor × 10 × 0.25)
 Coverage Multiplier = 1.0 - coverage_percent
 Final Score = Base Score × Coverage Multiplier × Role Multiplier
 </code></pre>
-<p><strong>Note</strong>: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights for complexity and dependency are configurable via the <code>[scoring]</code> section in <code>.debtmap.toml</code>. See <a href="#configuration">Configuration</a> below.</p>
-<p><strong>Migration Note</strong>: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.</p>
+<p><strong>Formula Breakdown:</strong></p>
+<ol>
+<li><strong>Complexity Factor</strong>: Raw complexity / 2.0, clamped to 0-10 range (complexity of 20+ maps to 10.0)</li>
+<li><strong>Dependency Factor</strong>: Upstream dependency count / 2.0, capped at 10.0 (20+ dependencies map to 10.0)</li>
+<li><strong>Base Score</strong>: (Complexity Factor × 10 × 0.50) + (Dependency Factor × 10 × 0.25)
+<ul>
+<li>50% weight on complexity, 25% weight on dependencies</li>
+</ul>
+</li>
+<li><strong>Coverage Multiplier</strong>: 1.0 - coverage_percent (0% coverage = 1.0, 100% coverage = 0.0)</li>
+<li><strong>Final Score</strong>: Base Score × Coverage Multiplier × Role Multiplier</li>
+</ol>
+<p><strong>Note</strong>: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights (0.50 for complexity, 0.25 for dependencies) are hard-coded in the implementation.</p>
+<p><strong>Migration Note</strong>: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model (spec 122) uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.</p>
 <h3 id="metrics"><a class="header" href="#metrics">Metrics</a></h3>
 <p><strong>Cyclomatic Complexity</strong></p>
 <ul>
@@ -714,35 +727,34 @@ debtmap analyze . --lcov coverage.lcov --filter Testing --top 15
 debtmap analyze . --filter Performance --context --top 10
 </code></pre>
 <h3 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h3>
-<p>Complete configuration file example (<code>.debtmap.toml</code>):</p>
-<pre><code class="language-toml"># Scoring weights (current model uses coverage as multiplier, not additive)
-[scoring]
-complexity = 0.40            # Weight for complexity in base score
-dependency = 0.20            # Weight for dependency impact in base score
+<p>Complete configuration file example showing all scoring-related sections.</p>
+<p><strong>File name</strong>: <code>.debtmap.toml</code> (must be placed in your project root)</p>
+<pre><code class="language-toml"># .debtmap.toml - Complete scoring configuration
 
-# Role multipliers (applied to final score)
+# Role multipliers (applied to final score after coverage multiplier)
 [role_multipliers]
-pure_logic = 1.2             # Core business rules
-unknown = 1.0                # Unclassified functions
-entry_point = 0.9            # Public APIs, main functions
-orchestrator = 0.8           # Coordination functions
+pure_logic = 1.2             # Core business rules and algorithms
+unknown = 1.0                # Functions without clear classification
+entry_point = 0.9            # Public APIs, main functions, HTTP handlers
+orchestrator = 0.8           # Functions that coordinate other functions
 io_wrapper = 0.7             # File/network I/O wrappers
-pattern_match = 0.6          # Pattern matching functions
+pattern_match = 0.6          # Functions primarily doing pattern matching
 
 # Aggregation settings (for file-level scoring)
 [aggregation]
 method = "weighted_sum"      # Options: weighted_sum, sum, logarithmic_sum, max_plus_average
 min_problematic = 3          # Minimum number of problematic functions to report file
 
-# Normalization settings
+# Normalization settings (for advanced multi-phase normalization)
 [normalization]
-linear_threshold = 10.0      # Scores below this use linear scaling
+linear_threshold = 10.0       # Scores below this use linear scaling (1:1 mapping)
 logarithmic_threshold = 100.0 # Scores above this use logarithmic dampening
-sqrt_multiplier = 3.33       # Applied to mid-range scores
-log_multiplier = 10.0        # Applied to high scores
-show_raw_scores = true       # Display both normalized and raw scores
+sqrt_multiplier = 3.33        # Applied to scores between linear and log thresholds
+log_multiplier = 10.0         # Applied to scores above logarithmic threshold
+show_raw_scores = true        # Display both normalized (0-100) and raw scores in output
 </code></pre>
-<p><strong>Note</strong>: The configuration file must be named <code>.debtmap.toml</code> and placed in your project root.</p>
+<p><strong>Note on Scoring Weights</strong>: The base scoring weights for complexity (50%) and dependencies (25%) are hard-coded in the implementation and not configurable via the config file. Coverage is applied as a multiplicative dampener (1.0 - coverage_percent), not as an additive weight.</p>
+<p><strong>Note</strong>: The configuration file must be named <code>.debtmap.toml</code> (not <code>debtmap.yml</code> or other variants) and placed in your project root directory.</p>
 <h2 id="when-to-use-each-approach"><a class="header" href="#when-to-use-each-approach">When to Use Each Approach</a></h2>
 <h3 id="use-file-level-scoring-when"><a class="header" href="#use-file-level-scoring-when">Use File-Level Scoring When:</a></h3>
 <p>✅ Planning architectural refactoring
@@ -817,12 +829,12 @@ normalize_results() - Score: 7.5 (0% coverage)
 <p>Both scoring approaches normalize to a 0-10 scale for consistency.</p>
 <h3 id="normalization-strategies"><a class="header" href="#normalization-strategies">Normalization Strategies</a></h3>
 <p><strong>Default: Linear Clamping</strong></p>
-<p>The default normalization uses simple linear clamping:</p>
+<p>The default normalization (<code>normalize_final_score</code>) uses simple linear clamping:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>score_normalized = raw_score.clamp(0.0, 100.0)
 <span class="boring">}</span></code></pre></pre>
-<p>This ensures scores stay within the expected range without additional transformations.</p>
+<p>This ensures scores stay within the expected 0-100 range without additional transformations. This is the normalization method used in production output.</p>
 <p><strong>Advanced: Multi-Phase Normalization</strong></p>
 <p>For more sophisticated normalization, debtmap provides <code>normalize_final_score_with_metadata</code> which uses different scaling for different score ranges:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -830,12 +842,12 @@ normalize_results() - Score: 7.5 (0% coverage)
 </span>score_normalized = if raw_score &lt; 10.0 {
     raw_score  // Linear below 10
 } else if raw_score &lt; 100.0 {
-    10.0 + (raw_score - 10.0).sqrt() × 3.33  // Square root 10-100
+    10.0 + (raw_score - 10.0).sqrt() * 3.33  // Square root 10-100
 } else {
-    41.59 + (raw_score / 100.0).ln() × 10.0  // Logarithmic above 100
+    41.59 + (raw_score / 100.0).ln() * 10.0  // Logarithmic above 100
 }
 <span class="boring">}</span></code></pre></pre>
-<p>This multi-phase approach dampens extreme values while preserving distinctions in the normal range.</p>
+<p>This multi-phase approach dampens extreme values while preserving distinctions in the normal range. Note that this advanced normalization is available but may not be used by default in all outputs.</p>
 <h3 id="configuration-2"><a class="header" href="#configuration-2">Configuration</a></h3>
 <pre><code class="language-toml">[normalization]
 linear_threshold = 10.0       # Scores below this use linear scaling (1:1 mapping)
@@ -886,12 +898,12 @@ debtmap analyze . --min-priority critical --format json -o critical-items.json
 method = "logarithmic_sum"  # Dampen scores
 </code></pre>
 <p><strong>Issue</strong>: Function-level scores all similar</p>
-<p><strong>Solution</strong>: Adjust scoring weights to emphasize different factors:</p>
-<pre><code class="language-toml">[scoring]
-coverage = 0.60    # Emphasize testing gaps more
-complexity = 0.30
-dependency = 0.10
+<p><strong>Solution</strong>: Adjust role multipliers to create more differentiation:</p>
+<pre><code class="language-toml">[role_multipliers]
+pure_logic = 1.5     # Emphasize business logic more
+io_wrapper = 0.5     # De-emphasize I/O wrappers more
 </code></pre>
+<p><strong>Note</strong>: Base scoring weights (complexity 50%, dependency 25%) are hard-coded and cannot be configured.</p>
 <p><strong>Issue</strong>: Too many low-priority items</p>
 <p><strong>Solution</strong>: Use minimum thresholds:</p>
 <pre><code class="language-toml">[thresholds]

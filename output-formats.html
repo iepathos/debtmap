@@ -298,18 +298,17 @@ BENEFIT: Pure functions are easily testable and composable
 <p>See the <a href="./analysis-guide.html">Analysis Guide</a> for metric explanations.</p>
 <h3 id="plain-terminal-mode"><a class="header" href="#plain-terminal-mode">Plain Terminal Mode</a></h3>
 <p>For environments without color support or when piping to tools, use <code>--plain</code>:</p>
-<pre><code class="language-bash"># ASCII-only output, no colors, no emoji
+<pre><code class="language-bash"># ASCII-only output, no colors
 debtmap analyze . --plain
 </code></pre>
 <p>Plain mode:</p>
 <ul>
 <li>Removes ANSI color codes</li>
-<li>Replaces emoji with text labels</li>
 <li>Uses ASCII box-drawing characters</li>
 <li>Machine-parseable structure</li>
 </ul>
 <blockquote>
-<p><strong>Note:</strong> Terminal output formatting can be customized via <code>FormattingConfig</code>, which controls color mode and emoji mode. The <code>--plain</code> flag uses this configuration to disable both colors and emoji. Additionally, you can control formatting through environment variables:</p>
+<p><strong>Note:</strong> Terminal output formatting can be customized via <code>FormattingConfig</code>, which controls color mode. The <code>--plain</code> flag uses this configuration to disable colors. Additionally, you can control formatting through environment variables:</p>
 <ul>
 <li><code>NO_COLOR=1</code> - Disables colors (per <a href="https://no-color.org">no-color.org</a> standard)</li>
 <li><code>CLICOLOR=0</code> - Disables colors</li>
@@ -368,6 +367,32 @@ debtmap analyze . -vvv
     Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
     Cache hit rate: 84%
 </code></pre>
+<h3 id="understanding-metrics"><a class="header" href="#understanding-metrics">Understanding Metrics</a></h3>
+<p>To get detailed explanations of how metrics are calculated, use the <code>--explain-metrics</code> flag:</p>
+<pre><code class="language-bash"># Get explanations of metric definitions and formulas
+debtmap analyze . --explain-metrics
+</code></pre>
+<p>This flag provides:</p>
+<ul>
+<li><strong>Metric definitions</strong> - Detailed explanations of what each metric measures</li>
+<li><strong>Calculation formulas</strong> - How scores are computed from raw data</li>
+<li><strong>Measured vs estimated</strong> - Which metrics are exact and which are heuristic-based</li>
+<li><strong>Interpretation guidance</strong> - How to understand and act on metric values</li>
+</ul>
+<p>The explanations appear inline with the analysis output, helping you understand:</p>
+<ul>
+<li>What cyclomatic and cognitive complexity measure</li>
+<li>How debt scores are calculated</li>
+<li>What entropy metrics indicate</li>
+<li>How risk scores are determined</li>
+</ul>
+<p>This is particularly useful when:</p>
+<ul>
+<li>Learning how debtmap evaluates code quality</li>
+<li>Understanding why certain functions have high scores</li>
+<li>Explaining analysis results to team members</li>
+<li>Tuning thresholds based on metric meanings</li>
+</ul>
 <h3 id="risk-analysis-output"><a class="header" href="#risk-analysis-output">Risk Analysis Output</a></h3>
 <p>When coverage data is provided via <code>--lcov</code>, terminal output includes a dedicated risk analysis section:</p>
 <pre><code>═══════════════════════════════════════════
@@ -653,8 +678,83 @@ debtmap analyze . --format json --output-format unified
 <blockquote>
 <p><strong>Note:</strong> The <code>--output-format</code> flag only applies when using <code>--format json</code>. It has no effect with markdown or terminal formats.</p>
 </blockquote>
+<h4 id="format-comparison"><a class="header" href="#format-comparison">Format Comparison</a></h4>
 <p><strong>Legacy format:</strong> Uses <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers for backward compatibility with existing tooling.</p>
 <p><strong>Unified format:</strong> Consistent structure with a <code>type</code> field, making parsing simpler and more predictable. Recommended for new integrations.</p>
+<p><strong>When to use each format:</strong></p>
+<ul>
+<li>
+<p><strong>Use legacy format if:</strong></p>
+<ul>
+<li>You have existing tooling that expects the old structure</li>
+<li>You need backward compatibility with version 1.x parsers</li>
+<li>You’re integrating with third-party tools expecting the legacy format</li>
+</ul>
+</li>
+<li>
+<p><strong>Use unified format for:</strong></p>
+<ul>
+<li>All new integrations and tooling</li>
+<li>Cleaner, more predictable JSON parsing</li>
+<li>Future-proof implementations</li>
+<li>Simpler type discrimination in statically-typed languages</li>
+</ul>
+</li>
+</ul>
+<p><strong>Migration strategy:</strong></p>
+<p>The legacy format will be maintained for backward compatibility, but unified is the recommended format going forward. If you’re starting a new integration, use unified format from the beginning. If migrating existing tooling:</p>
+<ol>
+<li>Test unified format with a subset of your codebase</li>
+<li>Update parsers to handle the <code>type</code> field instead of key-based discrimination</li>
+<li>Validate results match between legacy and unified formats</li>
+<li>Switch to unified format once validation passes</li>
+</ol>
+<h4 id="structural-differences"><a class="header" href="#structural-differences">Structural Differences</a></h4>
+<p><strong>Legacy format example:</strong></p>
+<pre><code class="language-json">{
+  "complexity": {
+    "metrics": [
+      {
+        "File": {
+          "path": "src/main.rs",
+          "functions": 12,
+          "average_complexity": 5.3
+        }
+      },
+      {
+        "Function": {
+          "name": "calculate_score",
+          "file": "src/scoring.rs",
+          "line": 42,
+          "cyclomatic": 8
+        }
+      }
+    ]
+  }
+}
+</code></pre>
+<p><strong>Unified format example:</strong></p>
+<pre><code class="language-json">{
+  "complexity": {
+    "metrics": [
+      {
+        "type": "File",
+        "path": "src/main.rs",
+        "functions": 12,
+        "average_complexity": 5.3
+      },
+      {
+        "type": "Function",
+        "name": "calculate_score",
+        "file": "src/scoring.rs",
+        "line": 42,
+        "cyclomatic": 8
+      }
+    ]
+  }
+}
+</code></pre>
+<p><strong>Key difference:</strong> Legacy uses <code>{File: {...}}</code> wrapper objects, while unified uses a flat structure with <code>"type": "File"</code> field. This makes unified format easier to parse in most programming languages.</p>
 <h3 id="risk-insights-json"><a class="header" href="#risk-insights-json">Risk Insights JSON</a></h3>
 <p>When using <code>--lcov</code>, debtmap also outputs risk analysis in JSON:</p>
 <pre><code class="language-json">{
@@ -793,18 +893,22 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
    - Estimated effort: 2-3 hours
 </code></pre>
 <h3 id="enhanced-markdown-features"><a class="header" href="#enhanced-markdown-features">Enhanced Markdown Features</a></h3>
-<p>Debtmap can generate enhanced markdown reports with additional visualizations and insights:</p>
+<p>The standard markdown output already includes comprehensive analysis sections. The codebase includes additional enhanced markdown capabilities (<code>EnhancedMarkdownWriter</code> trait in <code>src/io/writers/markdown/enhanced.rs</code>) that provide:</p>
 <ul>
-<li><strong>Complexity distribution charts</strong> - Visual representation of complexity across codebase</li>
-<li><strong>Risk heat maps</strong> - Color-coded risk matrices</li>
-<li><strong>Dependency graphs</strong> - Module relationship diagrams</li>
-<li><strong>Quick wins section</strong> - Low-effort, high-impact improvements</li>
-<li><strong>Strategic priorities</strong> - Long-term architectural improvements</li>
-<li><strong>Team guidance</strong> - Role-specific recommendations</li>
+<li><strong>Priority-based debt rankings</strong> - Debt items ranked by unified priority scores</li>
+<li><strong>Dead code detection</strong> - Identification and reporting of unused code</li>
+<li><strong>Call graph insights</strong> - Function dependency and usage analysis</li>
+<li><strong>Testing recommendations</strong> - Targeted suggestions for improving test coverage</li>
 </ul>
-<blockquote>
-<p><strong>Note:</strong> Enhanced markdown features are implemented in the codebase (<code>src/io/writers/enhanced_markdown/</code> module) but the specific flags or configuration options to enable them are not currently documented. Refer to the source code or use <code>--help</code> to discover available options.</p>
-</blockquote>
+<p>These enhanced features are available through the <code>EnhancedMarkdownWriter</code> trait when using debtmap as a library. The standard <code>--format markdown</code> CLI output uses the base <code>MarkdownWriter</code> which provides comprehensive reports including:</p>
+<ul>
+<li>Executive summary with health dashboard</li>
+<li>Complexity analysis with refactoring recommendations</li>
+<li>Technical debt categorization by priority</li>
+<li>Dependency analysis with circular reference detection</li>
+<li>Actionable recommendations</li>
+</ul>
+<p>For additional visualization capabilities, the <code>src/io/writers/enhanced_markdown/</code> module provides building blocks for custom report generation when using debtmap as a library in your own tools.</p>
 <h3 id="rendering-to-htmlpdf"><a class="header" href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a></h3>
 <p>Markdown reports can be converted to other formats:</p>
 <pre><code class="language-bash"># Generate markdown

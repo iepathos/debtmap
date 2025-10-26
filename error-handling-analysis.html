@@ -1,0 +1,952 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Error Handling Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="error-handling-analysis"><a class="header" href="#error-handling-analysis">Error Handling Analysis</a></h1>
+<p>Debtmap provides comprehensive error handling analysis across all supported languages (Rust, Python, JavaScript, TypeScript), detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability. Debtmap detects:</p>
+<ul>
+<li><strong>Error swallowing</strong>: Exception handlers that silently catch errors without logging or re-raising</li>
+<li><strong>Panic patterns</strong>: Rust code that can panic in production (unwrap, expect, panic!)</li>
+<li><strong>Error propagation issues</strong>: Missing error context in Result chains</li>
+<li><strong>Async error handling</strong>: Unhandled promise rejections, dropped futures, missing await</li>
+<li><strong>Python-specific patterns</strong>: Bare except clauses, silent exception handling</li>
+</ul>
+<p>All error handling patterns are filtered intelligently - code detected in test modules (e.g., <code>#[cfg(test)]</code>, <code>test_</code> prefixes) receives lower priority or is excluded entirely.</p>
+<h2 id="rust-error-handling-analysis"><a class="header" href="#rust-error-handling-analysis">Rust Error Handling Analysis</a></h2>
+<h3 id="panic-pattern-detection"><a class="header" href="#panic-pattern-detection">Panic Pattern Detection</a></h3>
+<p>Debtmap identifies Rust code that can panic at runtime instead of returning <code>Result</code>:</p>
+<p><strong>Detected patterns:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ CRITICAL: Direct panic in production code
+fn process_data(value: Option&lt;i32&gt;) -&gt; i32 {
+    panic!("not implemented");  // Detected: PanicInNonTest
+}
+
+// ❌ HIGH: Unwrap on Result
+fn read_config(path: &amp;Path) -&gt; Config {
+    let content = fs::read_to_string(path).unwrap();  // Detected: UnwrapOnResult
+    parse_config(&amp;content)
+}
+
+// ❌ HIGH: Unwrap on Option
+fn get_user(id: u32) -&gt; User {
+    users.get(&amp;id).unwrap()  // Detected: UnwrapOnOption
+}
+
+// ❌ MEDIUM: Expect with generic message
+fn parse_value(s: &amp;str) -&gt; i32 {
+    s.parse().expect("parse failed")  // Detected: ExpectWithGenericMessage
+}
+
+// ❌ MEDIUM: TODO in production
+fn calculate_tax(amount: f64) -&gt; f64 {
+    todo!("implement tax calculation")  // Detected: TodoInProduction
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Recommended alternatives:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ✅ GOOD: Propagate errors with ?
+fn read_config(path: &amp;Path) -&gt; Result&lt;Config&gt; {
+    let content = fs::read_to_string(path)?;
+    parse_config(&amp;content)
+}
+
+// ✅ GOOD: Handle Option explicitly
+fn get_user(id: u32) -&gt; Result&lt;User&gt; {
+    users.get(&amp;id)
+        .ok_or_else(|| anyhow!("User {} not found", id))
+}
+
+// ✅ GOOD: Add meaningful context
+fn parse_value(s: &amp;str) -&gt; Result&lt;i32&gt; {
+    s.parse()
+        .with_context(|| format!("Failed to parse '{}' as integer", s))
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Test code exceptions:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_parsing() {
+        let result = "42".parse::&lt;i32&gt;().unwrap();  // ✅ OK in tests (LOW priority)
+        assert_eq!(result, 42);
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Debtmap detects <code>#[cfg(test)]</code> attributes and test function contexts, automatically assigning <strong>Low priority</strong> to panic patterns in test code.</p>
+<h3 id="error-propagation-analysis"><a class="header" href="#error-propagation-analysis">Error Propagation Analysis</a></h3>
+<p>Debtmap detects missing error context in Result chains:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ Missing context - which file failed? What was the error?
+fn load_multiple_configs(paths: &amp;[PathBuf]) -&gt; Result&lt;Vec&lt;Config&gt;&gt; {
+    paths.iter()
+        .map(|p| fs::read_to_string(p))  // Error loses file path information
+        .collect::&lt;Result&lt;Vec&lt;_&gt;&gt;&gt;()?
+        .into_iter()
+        .map(|c| parse_config(&amp;c))  // Error loses which config failed
+        .collect()
+}
+
+// ✅ GOOD: Preserve context through the chain
+fn load_multiple_configs(paths: &amp;[PathBuf]) -&gt; Result&lt;Vec&lt;Config&gt;&gt; {
+    paths.iter()
+        .map(|p| {
+            fs::read_to_string(p)
+                .with_context(|| format!("Failed to read config from {}", p.display()))
+        })
+        .collect::&lt;Result&lt;Vec&lt;_&gt;&gt;&gt;()?
+        .into_iter()
+        .enumerate()
+        .map(|(i, content)| {
+            parse_config(&amp;content)
+                .with_context(|| format!("Failed to parse config #{}", i))
+        })
+        .collect()
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Best practices:</strong></p>
+<ul>
+<li>Use <code>.context()</code> or <code>.with_context()</code> from <code>anyhow</code> or <code>thiserror</code></li>
+<li>Include relevant values in error messages (file paths, indices, input values)</li>
+<li>Maintain error context at each transformation in the chain</li>
+</ul>
+<h3 id="error-swallowing-in-rust"><a class="header" href="#error-swallowing-in-rust">Error Swallowing in Rust</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ Silent error swallowing
+fn try_parse(s: &amp;str) -&gt; Option&lt;i32&gt; {
+    match s.parse::&lt;i32&gt;() {
+        Ok(v) =&gt; Some(v),
+        Err(_) =&gt; None,  // Detected: Error swallowed without logging
+    }
+}
+
+// ✅ GOOD: Log the error
+fn try_parse(s: &amp;str) -&gt; Option&lt;i32&gt; {
+    match s.parse::&lt;i32&gt;() {
+        Ok(v) =&gt; Some(v),
+        Err(e) =&gt; {
+            log::warn!("Failed to parse '{}': {}", s, e);
+            None
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="python-error-handling-analysis"><a class="header" href="#python-error-handling-analysis">Python Error Handling Analysis</a></h2>
+<h3 id="bare-except-clause-detection"><a class="header" href="#bare-except-clause-detection">Bare Except Clause Detection</a></h3>
+<p>Python’s bare <code>except:</code> catches all exceptions, including system exits and keyboard interrupts:</p>
+<pre><code class="language-python"># ❌ CRITICAL: Bare except catches everything
+def process_file(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except:  # Detected: BareExceptClause
+        return None  # Catches SystemExit, KeyboardInterrupt, etc.
+
+# ❌ HIGH: Catching Exception is too broad
+def load_config(path):
+    try:
+        return yaml.load(open(path))
+    except Exception:  # Detected: OverlyBroadException
+        return {}  # Silent failure loses error information
+
+# ✅ GOOD: Specific exception types
+def process_file(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except FileNotFoundError:
+        log.error(f"File not found: {path}")
+        return None
+    except PermissionError:
+        log.error(f"Permission denied: {path}")
+        return None
+</code></pre>
+<p><strong>Why bare except is dangerous:</strong></p>
+<ul>
+<li>Catches <code>SystemExit</code> (prevents clean shutdown)</li>
+<li>Catches <code>KeyboardInterrupt</code> (prevents Ctrl+C)</li>
+<li>Catches <code>GeneratorExit</code> (breaks generator protocol)</li>
+<li>Masks programming errors like <code>NameError</code>, <code>AttributeError</code></li>
+</ul>
+<p><strong>Best practices:</strong></p>
+<ul>
+<li>Always specify exception types: <code>except ValueError</code>, <code>except (TypeError, KeyError)</code></li>
+<li>Use <code>except Exception</code> only when truly catching all application errors</li>
+<li>Never use bare <code>except:</code> in production code</li>
+<li>Log exceptions with full context before suppressing</li>
+</ul>
+<h3 id="silent-exception-handling"><a class="header" href="#silent-exception-handling">Silent Exception Handling</a></h3>
+<pre><code class="language-python"># ❌ Silent exception handling
+def get_user_age(user_id):
+    try:
+        user = db.get_user(user_id)
+        return user.age
+    except:  # Detected: SilentException (no logging, no re-raise)
+        pass
+
+# ✅ GOOD: Log and provide meaningful default
+def get_user_age(user_id):
+    try:
+        user = db.get_user(user_id)
+        return user.age
+    except UserNotFound:
+        logger.warning(f"User {user_id} not found")
+        return None
+    except DatabaseError as e:
+        logger.error(f"Database error fetching user {user_id}: {e}")
+        raise  # Re-raise for caller to handle
+</code></pre>
+<h3 id="exception-flow-analysis"><a class="header" href="#exception-flow-analysis">Exception Flow Analysis</a></h3>
+<p>Debtmap analyzes exception propagation through Python codebases:</p>
+<pre><code class="language-python"># Detected: Exception raised but never caught at top level
+def process_batch(items):
+    for item in items:
+        validate_item(item)  # Can raise ValueError
+        transform_item(item)  # Can raise TransformError
+        save_item(item)  # Can raise DatabaseError
+
+# ✅ GOOD: Handle exceptions appropriately
+def process_batch(items):
+    results = {"success": 0, "failed": 0}
+    for item in items:
+        try:
+            validate_item(item)
+            transform_item(item)
+            save_item(item)
+            results["success"] += 1
+        except ValueError as e:
+            logger.warning(f"Invalid item {item.id}: {e}")
+            results["failed"] += 1
+        except (TransformError, DatabaseError) as e:
+            logger.error(f"Failed to process item {item.id}: {e}")
+            results["failed"] += 1
+            # Optionally re-raise critical errors
+            if isinstance(e, DatabaseError):
+                raise
+    return results
+</code></pre>
+<h2 id="async-error-handling"><a class="header" href="#async-error-handling">Async Error Handling</a></h2>
+<h3 id="unhandled-promise-rejections-javascripttypescript"><a class="header" href="#unhandled-promise-rejections-javascripttypescript">Unhandled Promise Rejections (JavaScript/TypeScript)</a></h3>
+<pre><code class="language-javascript">// ❌ CRITICAL: Unhandled promise rejection
+async function loadUserData(userId) {
+    const response = await fetch(`/api/users/${userId}`);
+    // If fetch rejects, promise is unhandled
+    return response.json();
+}
+
+loadUserData(123);  // Detected: UnhandledPromiseRejection
+
+// ✅ GOOD: Handle rejections
+async function loadUserData(userId) {
+    try {
+        const response = await fetch(`/api/users/${userId}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error(`Failed to load user ${userId}:`, error);
+        throw error;  // Re-throw or return default
+    }
+}
+
+loadUserData(123).catch(err =&gt; {
+    console.error("Top-level error handler:", err);
+});
+</code></pre>
+<h3 id="missing-await-detection"><a class="header" href="#missing-await-detection">Missing Await Detection</a></h3>
+<pre><code class="language-javascript">// ❌ HIGH: Missing await - promise dropped
+async function saveAndNotify(data) {
+    await saveToDatabase(data);
+    sendNotification(data.userId);  // Detected: MissingAwait
+    // Function returns before notification completes
+}
+
+// ✅ GOOD: Await all async operations
+async function saveAndNotify(data) {
+    await saveToDatabase(data);
+    await sendNotification(data.userId);
+}
+</code></pre>
+<h3 id="async-rust-error-handling"><a class="header" href="#async-rust-error-handling">Async Rust Error Handling</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ HIGH: Dropped future without error handling
+async fn process_requests(requests: Vec&lt;Request&gt;) {
+    for req in requests {
+        tokio::spawn(async move {
+            handle_request(req).await  // Detected: DroppedFuture
+            // Errors silently dropped
+        });
+    }
+}
+
+// ✅ GOOD: Join handles and propagate errors
+async fn process_requests(requests: Vec&lt;Request&gt;) -&gt; Result&lt;()&gt; {
+    let handles: Vec&lt;_&gt; = requests.into_iter()
+        .map(|req| {
+            tokio::spawn(async move {
+                handle_request(req).await
+            })
+        })
+        .collect();
+
+    for handle in handles {
+        handle.await??;  // Propagate both JoinError and handler errors
+    }
+    Ok(())
+}
+
+// ❌ HIGH: Task panic silently ignored
+tokio::spawn(async {
+    panic!("task failed");  // Detected: SilentTaskPanic
+});
+
+// ✅ GOOD: Handle task panics
+let handle = tokio::spawn(async {
+    critical_operation().await
+});
+
+match handle.await {
+    Ok(Ok(result)) =&gt; println!("Success: {:?}", result),
+    Ok(Err(e)) =&gt; eprintln!("Task failed: {}", e),
+    Err(e) =&gt; eprintln!("Task panicked: {}", e),
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="severity-levels-and-prioritization"><a class="header" href="#severity-levels-and-prioritization">Severity Levels and Prioritization</a></h2>
+<p>Error handling issues are assigned severity based on their impact:</p>
+<div class="table-wrapper"><table><thead><tr><th>Pattern</th><th>Severity</th><th>Weight</th><th>Priority</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>Panic in production</td><td>CRITICAL</td><td>4</td><td>Critical</td><td>Crashes the process</td></tr>
+<tr><td>Bare except clause</td><td>CRITICAL</td><td>4</td><td>Critical</td><td>Masks system signals</td></tr>
+<tr><td>Silent task panic</td><td>CRITICAL</td><td>4</td><td>Critical</td><td>Hidden failures</td></tr>
+<tr><td>Unwrap on Result/Option</td><td>HIGH</td><td>4</td><td>High</td><td>Likely to panic</td></tr>
+<tr><td>Dropped future</td><td>HIGH</td><td>4</td><td>High</td><td>Lost error information</td></tr>
+<tr><td>Unhandled promise rejection</td><td>HIGH</td><td>4</td><td>High</td><td>Silently fails</td></tr>
+<tr><td>Error swallowing</td><td>MEDIUM</td><td>4</td><td>Medium</td><td>Loses debugging context</td></tr>
+<tr><td>Missing error context</td><td>MEDIUM</td><td>4</td><td>Medium</td><td>Hard to debug</td></tr>
+<tr><td>Expect with generic message</td><td>MEDIUM</td><td>4</td><td>Medium</td><td>Uninformative errors</td></tr>
+<tr><td>TODO in production</td><td>MEDIUM</td><td>4</td><td>Medium</td><td>Incomplete implementation</td></tr>
+</tbody></table>
+</div>
+<p>All ErrorSwallowing debt has <strong>weight 4</strong> (Major severity), but individual patterns receive different priorities based on production impact.</p>
+<h3 id="integration-with-risk-scoring"><a class="header" href="#integration-with-risk-scoring">Integration with Risk Scoring</a></h3>
+<p>Error handling issues contribute to the <code>debt_factor</code> in Debtmap’s risk scoring formula:</p>
+<pre><code>risk_score = (complexity_factor * 0.4) + (debt_factor * 0.3) + (coverage_factor * 0.3)
+
+where debt_factor includes:
+- ErrorSwallowing count * weight (4)
+- Combined with other debt types
+</code></pre>
+<p><strong>Compound risk example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// HIGH RISK: High complexity + error swallowing + low coverage
+fn process_transaction(tx: Transaction) -&gt; bool {  // Cyclomatic: 12, Cognitive: 18
+    if tx.amount &gt; 1000 {
+        if tx.verified {
+            if validate_funds(&amp;tx).unwrap() {  // ❌ Panic pattern
+                if tx.user_type == "premium" {
+                    match apply_premium_discount(&amp;tx) {
+                        Ok(_) =&gt; {},
+                        Err(_) =&gt; return false,  // ❌ Error swallowed
+                    }
+                }
+                charge_account(&amp;tx).unwrap();  // ❌ Another panic
+                return true;
+            }
+        }
+    }
+    false
+}
+// Coverage: 45% (untested error paths)
+// Risk Score: Very High (complexity + error handling + coverage gaps)
+<span class="boring">}</span></code></pre></pre>
+<p>This function would be flagged as <strong>Priority 1</strong> in Debtmap’s output due to:</p>
+<ul>
+<li>High cyclomatic complexity (12)</li>
+<li>Multiple panic patterns (unwrap calls)</li>
+<li>Error swallowing (ignored Result)</li>
+<li>Coverage gaps in error handling paths</li>
+</ul>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="error-handling-configuration-options"><a class="header" href="#error-handling-configuration-options">Error Handling Configuration Options</a></h3>
+<p>Configure error handling analysis in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[error_handling]
+# Patterns to detect (all enabled by default)
+patterns = [
+    "panic_patterns",        # Rust unwrap/expect/panic
+    "error_swallowing",      # Silent exception handling
+    "bare_except",           # Python bare except clauses
+    "async_errors",          # Unhandled promises, dropped futures
+    "missing_context",       # Error propagation without context
+]
+
+# Severity levels for different error types
+severity_levels = { panic = "critical", bare_except = "critical", error_swallowing = "major" }
+
+# Error context requirements
+context_requirements = { min_context_length = 10, require_values = true }
+
+# Exclude specific patterns (useful for legacy code migration)
+exclude_patterns = [
+    # "unwrap_in_tests",  # Already excluded by default
+]
+</code></pre>
+<h3 id="custom-severity-overrides"><a class="header" href="#custom-severity-overrides">Custom Severity Overrides</a></h3>
+<pre><code class="language-toml">[debt_categories.ErrorSwallowing]
+weight = 4  # Default is 4 (Major severity)
+severity = "Major"
+description = "Silenced exceptions"
+
+# Lower weight for gradual adoption
+# weight = 2
+# severity = "Warning"
+</code></pre>
+<h2 id="detection-examples"><a class="header" href="#detection-examples">Detection Examples</a></h2>
+<h3 id="what-gets-detected-vs-not-detected"><a class="header" href="#what-gets-detected-vs-not-detected">What Gets Detected vs. Not Detected</a></h3>
+<p><strong>Rust examples:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// ❌ Detected: unwrap() in production code
+pub fn get_config() -&gt; Config {
+    load_config().unwrap()
+}
+
+// ✅ Not detected: ? operator (proper error propagation)
+pub fn get_config() -&gt; Result&lt;Config&gt; {
+    load_config()?
+}
+
+// ✅ Not detected: unwrap() in test
+#[test]
+fn test_config() {
+    let config = load_config().unwrap();  // OK in tests
+    assert_eq!(config.port, 8080);
+}
+
+// ❌ Detected: expect() with generic message
+let value = map.get("key").expect("missing");
+
+// ✅ Not detected: expect() with descriptive context
+let value = map.get("key")
+    .expect("Configuration must contain 'key' field");
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Python examples:</strong></p>
+<pre><code class="language-python"># ❌ Detected: bare except
+try:
+    risky_operation()
+except:
+    pass
+
+# ✅ Not detected: specific exception
+try:
+    risky_operation()
+except ValueError:
+    handle_value_error()
+
+# ❌ Detected: silent exception (no logging/re-raise)
+try:
+    db.save(record)
+except DatabaseError:
+    pass  # Silent failure
+
+# ✅ Not detected: logged exception
+try:
+    db.save(record)
+except DatabaseError as e:
+    logger.error(f"Failed to save record: {e}")
+    raise
+</code></pre>
+<h2 id="suppression-patterns"><a class="header" href="#suppression-patterns">Suppression Patterns</a></h2>
+<p>For cases where error handling patterns are intentional, use suppression comments:</p>
+<p><strong>Rust:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// debtmap: ignore - Unwrap is safe here due to prior validation
+let value = validated_map.get("key").unwrap();
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">try:
+    experimental_feature()
+except:  # debtmap: ignore - Intentional catch-all during migration
+    use_fallback()
+</code></pre>
+<p>See <a href="suppression-patterns.html">Suppression Patterns</a> for complete syntax and usage.</p>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="rust-error-handling"><a class="header" href="#rust-error-handling">Rust Error Handling</a></h3>
+<ol>
+<li>
+<p><strong>Prefer <code>?</code> operator over unwrap/expect</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Instead of: fs::read_to_string(path).unwrap()
+// Use: fs::read_to_string(path)?
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Use anyhow for application errors, thiserror for libraries</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use anyhow::{Context, Result};
+
+fn load_data(path: &amp;Path) -&gt; Result&lt;Data&gt; {
+    let content = fs::read_to_string(path)
+        .with_context(|| format!("Failed to read {}", path.display()))?;
+    parse_data(&amp;content)
+        .context("Invalid data format")
+}
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Add context at each error boundary</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>.with_context(|| format!("meaningful message with {}", value))
+<span class="boring">}</span></code></pre></pre>
+</li>
+<li>
+<p><strong>Handle Option explicitly</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>map.get(key).ok_or_else(|| anyhow!("Missing key: {}", key))?
+<span class="boring">}</span></code></pre></pre>
+</li>
+</ol>
+<h3 id="python-error-handling"><a class="header" href="#python-error-handling">Python Error Handling</a></h3>
+<ol>
+<li>
+<p><strong>Always use specific exception types</strong></p>
+<pre><code class="language-python">except (ValueError, KeyError) as e:
+</code></pre>
+</li>
+<li>
+<p><strong>Log before suppressing</strong></p>
+<pre><code class="language-python">except DatabaseError as e:
+    logger.error(f"Database operation failed: {e}", exc_info=True)
+    # Then decide: re-raise, return default, or handle
+</code></pre>
+</li>
+<li>
+<p><strong>Avoid bare except completely</strong></p>
+<pre><code class="language-python"># If you must catch everything:
+except Exception as e:  # Not bare except:
+    logger.exception("Unexpected error")
+    raise
+</code></pre>
+</li>
+<li>
+<p><strong>Use context managers for resource cleanup</strong></p>
+<pre><code class="language-python">with open(path) as f:  # Ensures cleanup even on exception
+    process(f)
+</code></pre>
+</li>
+</ol>
+<h3 id="javascripttypescript-error-handling"><a class="header" href="#javascripttypescript-error-handling">JavaScript/TypeScript Error Handling</a></h3>
+<ol>
+<li>
+<p><strong>Always handle promise rejections</strong></p>
+<pre><code class="language-javascript">fetchData().catch(err =&gt; console.error(err));
+// Or use try/catch with async/await
+</code></pre>
+</li>
+<li>
+<p><strong>Use async/await consistently</strong></p>
+<pre><code class="language-javascript">async function process() {
+    try {
+        const data = await fetchData();
+        await saveData(data);
+    } catch (error) {
+        console.error("Failed:", error);
+        throw error;
+    }
+}
+</code></pre>
+</li>
+<li>
+<p><strong>Don’t forget await</strong></p>
+<pre><code class="language-javascript">await asyncOperation();  // Don't drop promises
+</code></pre>
+</li>
+</ol>
+<h2 id="improving-error-handling-based-on-debtmap-reports"><a class="header" href="#improving-error-handling-based-on-debtmap-reports">Improving Error Handling Based on Debtmap Reports</a></h2>
+<h3 id="workflow"><a class="header" href="#workflow">Workflow</a></h3>
+<ol>
+<li>
+<p><strong>Run analysis with error focus</strong></p>
+<pre><code class="language-bash">debtmap analyze --debt-type ErrorSwallowing
+</code></pre>
+</li>
+<li>
+<p><strong>Review priority issues first</strong></p>
+<ul>
+<li>Address CRITICAL (panic in production, bare except) immediately</li>
+<li>Schedule HIGH (unwrap, dropped futures) for next sprint</li>
+<li>Plan MEDIUM (missing context) for gradual improvement</li>
+</ul>
+</li>
+<li>
+<p><strong>Fix systematically</strong></p>
+<ul>
+<li>One file or module at a time</li>
+<li>Add tests as you improve error handling</li>
+<li>Run debtmap after each fix to verify</li>
+</ul>
+</li>
+<li>
+<p><strong>Validate improvements</strong></p>
+<pre><code class="language-bash"># Before fixes
+debtmap analyze --output before.json
+
+# After fixes
+debtmap analyze --output after.json
+
+# Compare
+debtmap compare before.json after.json
+</code></pre>
+</li>
+</ol>
+<h3 id="migration-strategy-for-legacy-code"><a class="header" href="#migration-strategy-for-legacy-code">Migration Strategy for Legacy Code</a></h3>
+<pre><code class="language-toml"># .debtmap.toml - Gradual adoption
+[error_handling]
+# Start with just critical issues
+patterns = ["panic_patterns", "bare_except"]
+
+# After fixing critical issues, add more patterns
+# patterns = ["panic_patterns", "bare_except", "error_swallowing"]
+
+# Eventually enable all patterns
+# patterns = ["panic_patterns", "error_swallowing", "bare_except", "async_errors", "missing_context"]
+</code></pre>
+<p>Track progress over time:</p>
+<pre><code class="language-bash"># Weekly error handling health check
+debtmap analyze --debt-type ErrorSwallowing | tee weekly-error-health.txt
+</code></pre>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
+<p><strong>Problem:</strong> Debtmap flagging <code>unwrap()</code> in test functions</p>
+<p><strong>Solution:</strong> Debtmap should automatically detect test code via:</p>
+<ul>
+<li><code>#[cfg(test)]</code> modules in Rust</li>
+<li><code>#[test]</code> attributes</li>
+<li><code>test_</code> function name prefix in Python</li>
+<li><code>*.test.ts</code>, <code>*.spec.js</code> file patterns</li>
+</ul>
+<p>If false positives persist:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Use suppression comment
+let value = result.unwrap();  // debtmap: ignore - Test assertion
+<span class="boring">}</span></code></pre></pre>
+<h3 id="error-patterns-not-being-detected"><a class="header" href="#error-patterns-not-being-detected">Error Patterns Not Being Detected</a></h3>
+<p><strong>Problem:</strong> Known error patterns not appearing in report</p>
+<p><strong>Causes and solutions:</strong></p>
+<ol>
+<li>
+<p><strong>Language support not enabled</strong></p>
+<pre><code class="language-bash">debtmap analyze --languages rust,python,javascript
+</code></pre>
+</li>
+<li>
+<p><strong>Pattern disabled in config</strong></p>
+<pre><code class="language-toml">[error_handling]
+patterns = ["panic_patterns", "error_swallowing"]  # Ensure pattern is listed
+</code></pre>
+</li>
+<li>
+<p><strong>Suppression comment present</strong></p>
+<ul>
+<li>Check for <code>debtmap: ignore</code> comments</li>
+<li>Review <code>.debtmap.toml</code> ignore patterns</li>
+</ul>
+</li>
+</ol>
+<h3 id="disagreement-with-severity-levels"><a class="header" href="#disagreement-with-severity-levels">Disagreement with Severity Levels</a></h3>
+<p><strong>Problem:</strong> Severity feels too high/low for your codebase</p>
+<p><strong>Solution:</strong> Customize in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[debt_categories.ErrorSwallowing]
+weight = 2  # Reduce from default 4 to Warning level
+severity = "Warning"
+
+# Or increase for stricter enforcement
+# weight = 5
+# severity = "Critical"
+</code></pre>
+<h3 id="cant-find-which-line-has-the-issue"><a class="header" href="#cant-find-which-line-has-the-issue">Can’t Find Which Line Has the Issue</a></h3>
+<p><strong>Problem:</strong> Debtmap reports error at wrong line number</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>Source code changed since analysis</li>
+<li>Parser approximation for line numbers</li>
+</ul>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li>Re-run analysis: <code>debtmap analyze</code></li>
+<li>Search for pattern: <code>rg "\.unwrap\(\)" src/</code></li>
+<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+</ol>
+<h3 id="validating-error-handling-improvements"><a class="header" href="#validating-error-handling-improvements">Validating Error Handling Improvements</a></h3>
+<p><strong>Problem:</strong> Unsure if fixes actually improved code quality</p>
+<p><strong>Solution:</strong> Use compare workflow:</p>
+<pre><code class="language-bash"># Baseline before fixes
+git checkout main
+debtmap analyze --output baseline.json
+
+# After fixes
+git checkout feature/improve-errors
+debtmap analyze --output improved.json
+
+# Compare reports
+debtmap compare baseline.json improved.json
+</code></pre>
+<p>Look for:</p>
+<ul>
+<li>Reduced ErrorSwallowing debt count</li>
+<li>Lower risk scores for affected functions</li>
+<li>Improved coverage of error paths (if running with coverage)</li>
+</ul>
+<h2 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h2>
+<ul>
+<li><a href="configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
+<li><a href="suppression-patterns.html">Suppression Patterns</a> - Suppress false positives</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How error handling affects risk scores</li>
+<li><a href="coverage-integration.html">Coverage Integration</a> - Detect untested error paths</li>
+<li><a href="cli-reference.html">CLI Reference</a> - Command-line options for error analysis</li>
+<li><a href="troubleshooting.html">Troubleshooting</a> - General debugging guide</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="entropy-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="functional-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="entropy-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="functional-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

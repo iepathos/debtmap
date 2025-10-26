@@ -1,0 +1,656 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Threshold Configuration - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="threshold-configuration"><a class="header" href="#threshold-configuration">Threshold Configuration</a></h1>
+<p>Debtmap uses configurable thresholds to determine when code complexity, duplication, or structural issues should be flagged as technical debt. This chapter explains how to configure thresholds to match your project’s quality standards.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Thresholds control what gets flagged as technical debt. You can configure thresholds using:</p>
+<ol>
+<li><strong>Preset configurations</strong> - Quick start with strict, balanced, or lenient settings</li>
+<li><strong>CLI flags</strong> - Override thresholds for a single analysis run</li>
+<li><strong>Configuration file</strong> - Project-specific thresholds in <code>.debtmap.toml</code></li>
+</ol>
+<h2 id="threshold-presets"><a class="header" href="#threshold-presets">Threshold Presets</a></h2>
+<p>Debtmap provides three preset threshold configurations to match different project needs:</p>
+<h3 id="preset-comparison"><a class="header" href="#preset-comparison">Preset Comparison</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Threshold</th><th>Strict</th><th>Balanced (Default)</th><th>Lenient</th></tr></thead><tbody>
+<tr><td>Cyclomatic Complexity</td><td>3</td><td>5</td><td>10</td></tr>
+<tr><td>Cognitive Complexity</td><td>7</td><td>10</td><td>20</td></tr>
+<tr><td>Total Complexity</td><td>5</td><td>8</td><td>15</td></tr>
+<tr><td>Function Length (lines)</td><td>15</td><td>20</td><td>50</td></tr>
+<tr><td>Match Arms</td><td>3</td><td>4</td><td>8</td></tr>
+<tr><td>If-Else Chain</td><td>2</td><td>3</td><td>5</td></tr>
+</tbody></table>
+</div>
+<h3 id="when-to-use-each-preset"><a class="header" href="#when-to-use-each-preset">When to Use Each Preset</a></h3>
+<p><strong>Strict Preset</strong></p>
+<ul>
+<li>New projects aiming for high code quality standards</li>
+<li>Libraries and reusable components</li>
+<li>Critical systems requiring high reliability</li>
+<li>Teams enforcing strict coding standards</li>
+</ul>
+<pre><code class="language-bash">debtmap analyze . --threshold-preset strict
+</code></pre>
+<p><strong>Balanced Preset (Default)</strong></p>
+<ul>
+<li>Typical production applications</li>
+<li>Projects with moderate complexity tolerance</li>
+<li>Recommended starting point for most projects</li>
+<li>Good balance between catching issues and avoiding false positives</li>
+</ul>
+<pre><code class="language-bash">debtmap analyze .  # Uses balanced preset by default
+</code></pre>
+<p><strong>Lenient Preset</strong></p>
+<ul>
+<li>Legacy codebases during initial assessment</li>
+<li>Complex domains (compilers, scientific computing)</li>
+<li>Gradual debt reduction strategies</li>
+<li>Temporary relaxation during major refactoring</li>
+</ul>
+<pre><code class="language-bash">debtmap analyze . --threshold-preset lenient
+</code></pre>
+<h2 id="understanding-complexity-thresholds"><a class="header" href="#understanding-complexity-thresholds">Understanding Complexity Thresholds</a></h2>
+<p>Debtmap tracks multiple complexity metrics. A function must exceed <strong>ALL</strong> thresholds to be flagged:</p>
+<h3 id="cyclomatic-complexity"><a class="header" href="#cyclomatic-complexity">Cyclomatic Complexity</a></h3>
+<p>Counts decision points in code: <code>if</code>, <code>while</code>, <code>for</code>, <code>match</code>, <code>&amp;&amp;</code>, <code>||</code>, etc.</p>
+<ul>
+<li><strong>What it measures</strong>: Number of independent paths through code</li>
+<li><strong>Why it matters</strong>: More paths = harder to test completely</li>
+<li><strong>Default threshold</strong>: 5</li>
+</ul>
+<h3 id="cognitive-complexity"><a class="header" href="#cognitive-complexity">Cognitive Complexity</a></h3>
+<p>Measures the mental effort required to understand code by weighing nested structures and breaks in linear flow.</p>
+<ul>
+<li><strong>What it measures</strong>: How hard code is to read and comprehend</li>
+<li><strong>Why it matters</strong>: High cognitive load = maintenance burden</li>
+<li><strong>Default threshold</strong>: 10</li>
+</ul>
+<h3 id="total-complexity"><a class="header" href="#total-complexity">Total Complexity</a></h3>
+<p>Sum of cyclomatic and cognitive complexity.</p>
+<ul>
+<li><strong>What it measures</strong>: Combined complexity burden</li>
+<li><strong>Why it matters</strong>: Catches functions high in either metric</li>
+<li><strong>Default threshold</strong>: 8</li>
+</ul>
+<h3 id="function-length"><a class="header" href="#function-length">Function Length</a></h3>
+<p>Number of lines of code in the function body.</p>
+<ul>
+<li><strong>What it measures</strong>: Physical size of function</li>
+<li><strong>Why it matters</strong>: Long functions are hard to understand and test</li>
+<li><strong>Default threshold</strong>: 20 lines</li>
+</ul>
+<h3 id="structural-complexity"><a class="header" href="#structural-complexity">Structural Complexity</a></h3>
+<p>Additional metrics for specific patterns:</p>
+<ul>
+<li><strong>Match arms</strong>: Flags large match/switch statements (default: 4)</li>
+<li><strong>If-else chains</strong>: Flags long conditional chains (default: 3)</li>
+</ul>
+<p><strong>Important</strong>: Functions are only flagged when they exceed ALL applicable thresholds, not just one.</p>
+<h2 id="role-based-multipliers"><a class="header" href="#role-based-multipliers">Role-Based Multipliers</a></h2>
+<p>Debtmap automatically adjusts thresholds based on function role, recognizing that different types of functions have different complexity expectations:</p>
+<div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Multiplier</th><th>Effect</th><th>Examples</th></tr></thead><tbody>
+<tr><td>Entry Points</td><td>1.5x</td><td>More lenient</td><td><code>main()</code>, HTTP handlers, CLI commands</td></tr>
+<tr><td>Core Logic</td><td>1.0x</td><td>Standard</td><td>Business logic, algorithms</td></tr>
+<tr><td>Utility Functions</td><td>0.8x</td><td>Stricter</td><td>Getters, setters, simple helpers</td></tr>
+<tr><td>Test Functions</td><td>2.0x - 3.0x</td><td>Most lenient</td><td>Unit tests, integration tests</td></tr>
+</tbody></table>
+</div>
+<p><strong>How multipliers work:</strong></p>
+<p>A higher multiplier makes thresholds more lenient. For example, with balanced preset (cyclomatic=5):</p>
+<ul>
+<li>Entry point: flagged at complexity 8 (5 × 1.5)</li>
+<li>Core logic: flagged at complexity 5 (5 × 1.0)</li>
+<li>Utility function: flagged at complexity 4 (5 × 0.8)</li>
+<li>Test function: flagged at complexity 10+ (5 × 2.0-3.0)</li>
+</ul>
+<p>This allows test functions and entry points to be more complex without false positives, while keeping utility functions clean and simple.</p>
+<h2 id="cli-threshold-flags"><a class="header" href="#cli-threshold-flags">CLI Threshold Flags</a></h2>
+<p>Override thresholds for a single analysis run:</p>
+<h3 id="complexity-threshold"><a class="header" href="#complexity-threshold">Complexity Threshold</a></h3>
+<pre><code class="language-bash"># Set cyclomatic complexity threshold
+debtmap analyze . --threshold-complexity 15
+</code></pre>
+<h3 id="duplication-threshold"><a class="header" href="#duplication-threshold">Duplication Threshold</a></h3>
+<pre><code class="language-bash"># Set duplication threshold (in lines)
+debtmap analyze . --threshold-duplication 30
+</code></pre>
+<h3 id="combining-flags"><a class="header" href="#combining-flags">Combining Flags</a></h3>
+<pre><code class="language-bash"># Use custom thresholds for both complexity and duplication
+debtmap analyze . --threshold-complexity 15 --threshold-duplication 30
+</code></pre>
+<h3 id="preset-flag"><a class="header" href="#preset-flag">Preset Flag</a></h3>
+<pre><code class="language-bash"># Use a preset configuration
+debtmap analyze . --threshold-preset strict
+</code></pre>
+<p><strong>Note</strong>: CLI flags override configuration file settings for that run only.</p>
+<h2 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h2>
+<p>For project-specific thresholds, create a <code>.debtmap.toml</code> file in your project root.</p>
+<h3 id="basic-threshold-configuration"><a class="header" href="#basic-threshold-configuration">Basic Threshold Configuration</a></h3>
+<pre><code class="language-toml">[thresholds]
+# Complexity thresholds
+complexity = 15
+cognitive = 20
+max_file_length = 500
+
+# Structural thresholds
+match_arms = 6
+if_else_chain = 4
+function_length = 25
+</code></pre>
+<h3 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h3>
+<pre><code class="language-toml"># Complexity thresholds for flagging functions
+[thresholds]
+complexity = 15                # Cyclomatic complexity threshold
+cognitive = 20                 # Cognitive complexity threshold
+max_file_length = 500         # Maximum file length in lines
+
+# Validation thresholds for CI/CD
+[thresholds.validation]
+max_average_complexity = 10.0      # Maximum average complexity across codebase
+max_debt_density = 50.0           # Maximum debt items per 1000 LOC
+max_codebase_risk_score = 7.0     # Maximum overall risk score
+min_coverage_percentage = 0.0     # Minimum test coverage (0 = disabled)
+max_total_debt_score = 10000      # Safety net for total debt score
+
+# God object detection
+[god_object]
+enabled = true
+
+# Rust-specific thresholds
+[god_object.rust]
+max_methods = 20        # Maximum methods before flagging as god object
+max_fields = 15         # Maximum fields
+max_traits = 5          # Maximum trait implementations
+max_lines = 1000        # Maximum lines in impl block
+max_complexity = 200    # Maximum total complexity
+
+# Python-specific thresholds
+[god_object.python]
+max_methods = 15
+max_fields = 10
+max_traits = 3
+max_lines = 500
+max_complexity = 150
+
+# JavaScript/TypeScript-specific thresholds
+[god_object.javascript]
+max_methods = 15
+max_fields = 20
+max_traits = 3
+max_lines = 500
+max_complexity = 150
+</code></pre>
+<h3 id="using-configuration-file"><a class="header" href="#using-configuration-file">Using Configuration File</a></h3>
+<pre><code class="language-bash"># Initialize with default configuration
+debtmap init
+
+# Edit .debtmap.toml to customize thresholds
+# Then run analysis (automatically uses config file)
+debtmap analyze .
+
+# Validate against thresholds in CI/CD
+debtmap validate . --config .debtmap.toml
+</code></pre>
+<h2 id="god-object-thresholds"><a class="header" href="#god-object-thresholds">God Object Thresholds</a></h2>
+<p>God objects are classes/structs with too many responsibilities. Debtmap uses language-specific thresholds to detect them:</p>
+<h3 id="rust-thresholds"><a class="header" href="#rust-thresholds">Rust Thresholds</a></h3>
+<pre><code class="language-toml">[god_object.rust]
+max_methods = 20        # Methods in impl blocks
+max_fields = 15         # Struct fields
+max_traits = 5          # Trait implementations
+max_lines = 1000        # Lines in impl blocks
+max_complexity = 200    # Total complexity
+</code></pre>
+<h3 id="python-thresholds"><a class="header" href="#python-thresholds">Python Thresholds</a></h3>
+<pre><code class="language-toml">[god_object.python]
+max_methods = 15
+max_fields = 10
+max_traits = 3          # Base classes
+max_lines = 500
+max_complexity = 150
+</code></pre>
+<h3 id="javascripttypescript-thresholds"><a class="header" href="#javascripttypescript-thresholds">JavaScript/TypeScript Thresholds</a></h3>
+<pre><code class="language-toml">[god_object.javascript]
+max_methods = 15
+max_fields = 20
+max_traits = 3          # Extended classes
+max_lines = 500
+max_complexity = 150
+</code></pre>
+<p><strong>Why language-specific thresholds?</strong></p>
+<p>Different languages have different idioms:</p>
+<ul>
+<li><strong>Rust</strong>: Encourages small traits and composition, so lower thresholds</li>
+<li><strong>Python</strong>: Duck typing allows more fields, but fewer methods</li>
+<li><strong>JavaScript</strong>: Prototype-based, typically has more properties</li>
+</ul>
+<h2 id="validation-thresholds"><a class="header" href="#validation-thresholds">Validation Thresholds</a></h2>
+<p>Use validation thresholds in CI/CD pipelines to enforce quality gates:</p>
+<h3 id="scale-independent-metrics-recommended"><a class="header" href="#scale-independent-metrics-recommended">Scale-Independent Metrics (Recommended)</a></h3>
+<p>These metrics work for codebases of any size:</p>
+<pre><code class="language-toml">[thresholds.validation]
+# Average complexity per function (default: 10.0)
+max_average_complexity = 10.0
+
+# Debt items per 1000 lines of code (default: 50.0)
+max_debt_density = 50.0
+
+# Overall risk score 0-10 (default: 7.0)
+max_codebase_risk_score = 7.0
+</code></pre>
+<h3 id="optional-metrics"><a class="header" href="#optional-metrics">Optional Metrics</a></h3>
+<pre><code class="language-toml">[thresholds.validation]
+# Minimum test coverage percentage (default: 0.0 = disabled)
+min_coverage_percentage = 80.0
+
+# Safety net for total debt score (default: 10000)
+max_total_debt_score = 5000
+</code></pre>
+<h3 id="using-validation-in-cicd"><a class="header" href="#using-validation-in-cicd">Using Validation in CI/CD</a></h3>
+<pre><code class="language-bash"># Run validation (exits with error if thresholds exceeded)
+debtmap validate . --config .debtmap.toml
+
+# Example CI/CD workflow
+debtmap analyze . --output report.json
+debtmap validate . --config .debtmap.toml || exit 1
+</code></pre>
+<p><strong>CI/CD Best Practices:</strong></p>
+<ul>
+<li>Start with lenient thresholds to establish baseline</li>
+<li>Gradually tighten thresholds as you pay down debt</li>
+<li>Use <code>max_debt_density</code> for stable quality metric</li>
+<li>Track trends over time, not just point-in-time values</li>
+</ul>
+<h2 id="tuning-guidelines"><a class="header" href="#tuning-guidelines">Tuning Guidelines</a></h2>
+<p>How to choose and adjust thresholds for your project:</p>
+<h3 id="1-start-with-defaults"><a class="header" href="#1-start-with-defaults">1. Start with Defaults</a></h3>
+<p>Begin with the balanced preset to understand your codebase:</p>
+<pre><code class="language-bash">debtmap analyze .
+</code></pre>
+<p>Review the output to see what gets flagged and what doesn’t.</p>
+<h3 id="2-run-baseline-analysis"><a class="header" href="#2-run-baseline-analysis">2. Run Baseline Analysis</a></h3>
+<p>Understand your current state:</p>
+<pre><code class="language-bash"># Analyze and save results
+debtmap analyze . --output baseline.json
+
+# Review high-priority items
+debtmap analyze . --top 20
+</code></pre>
+<h3 id="3-adjust-based-on-project-type"><a class="header" href="#3-adjust-based-on-project-type">3. Adjust Based on Project Type</a></h3>
+<p><strong>New Projects:</strong></p>
+<ul>
+<li>Use strict preset to enforce high quality from the start</li>
+<li>Prevents accumulation of technical debt</li>
+</ul>
+<p><strong>Typical Projects:</strong></p>
+<ul>
+<li>Use balanced preset (recommended)</li>
+<li>Good middle ground for most teams</li>
+</ul>
+<p><strong>Legacy Codebases:</strong></p>
+<ul>
+<li>Use lenient preset initially</li>
+<li>Focus on worst offenders first</li>
+<li>Gradually tighten thresholds as you refactor</li>
+</ul>
+<h3 id="4-fine-tune-in-configuration-file"><a class="header" href="#4-fine-tune-in-configuration-file">4. Fine-Tune in Configuration File</a></h3>
+<p>Create <code>.debtmap.toml</code> and adjust specific thresholds:</p>
+<pre><code class="language-bash"># Initialize config file
+debtmap init
+
+# Edit .debtmap.toml
+# Adjust thresholds based on your baseline analysis
+</code></pre>
+<h3 id="5-validate-and-iterate"><a class="header" href="#5-validate-and-iterate">5. Validate and Iterate</a></h3>
+<pre><code class="language-bash"># Test your thresholds
+debtmap validate . --config .debtmap.toml
+
+# Adjust if needed
+# Iterate until you find the right balance
+</code></pre>
+<h3 id="troubleshooting-threshold-configuration"><a class="header" href="#troubleshooting-threshold-configuration">Troubleshooting Threshold Configuration</a></h3>
+<p><strong>Too many false positives?</strong></p>
+<ul>
+<li>Increase thresholds or switch to lenient preset</li>
+<li>Check if role multipliers are appropriate</li>
+<li>Review god object thresholds for your language</li>
+</ul>
+<p><strong>Missing important issues?</strong></p>
+<ul>
+<li>Decrease thresholds or switch to strict preset</li>
+<li>Verify <code>.debtmap.toml</code> is being loaded</li>
+<li>Check for suppression patterns hiding issues</li>
+</ul>
+<p><strong>Different standards for tests?</strong></p>
+<ul>
+<li>Don’t worry - role multipliers automatically handle this</li>
+<li>Test functions get 2-3x multiplier by default</li>
+</ul>
+<p><strong>Inconsistent results?</strong></p>
+<ul>
+<li>Ensure <code>.debtmap.toml</code> is in project root</li>
+<li>CLI flags override config file - remove them for consistency</li>
+<li>Use <code>--config</code> flag to specify config file explicitly</li>
+</ul>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<h3 id="example-1-quick-analysis-with-strict-preset"><a class="header" href="#example-1-quick-analysis-with-strict-preset">Example 1: Quick Analysis with Strict Preset</a></h3>
+<pre><code class="language-bash"># Use strict thresholds for new project
+debtmap analyze . --threshold-preset strict
+</code></pre>
+<h3 id="example-2-custom-cli-thresholds"><a class="header" href="#example-2-custom-cli-thresholds">Example 2: Custom CLI Thresholds</a></h3>
+<pre><code class="language-bash"># Analyze with custom thresholds (no config file)
+debtmap analyze . \
+  --threshold-complexity 15 \
+  --threshold-duplication 30
+</code></pre>
+<h3 id="example-3-project-specific-configuration"><a class="header" href="#example-3-project-specific-configuration">Example 3: Project-Specific Configuration</a></h3>
+<pre><code class="language-bash"># Initialize configuration
+debtmap init
+
+# Creates .debtmap.toml - edit to customize
+# Example: Increase complexity threshold to 15
+
+# Run analysis with project config
+debtmap analyze .
+</code></pre>
+<h3 id="example-4-cicd-validation"><a class="header" href="#example-4-cicd-validation">Example 4: CI/CD Validation</a></h3>
+<pre><code class="language-bash"># Create strict validation configuration
+cat &gt; .debtmap.toml &lt;&lt; EOF
+[thresholds.validation]
+max_average_complexity = 8.0
+max_debt_density = 30.0
+max_codebase_risk_score = 6.0
+min_coverage_percentage = 75.0
+EOF
+
+# Run in CI/CD pipeline
+debtmap analyze . --output report.json
+debtmap validate . --config .debtmap.toml
+</code></pre>
+<h3 id="example-5-gradual-debt-reduction"><a class="header" href="#example-5-gradual-debt-reduction">Example 5: Gradual Debt Reduction</a></h3>
+<pre><code class="language-bash"># Month 1: Start lenient
+debtmap analyze . --threshold-preset lenient --output month1.json
+
+# Month 2: Switch to balanced
+debtmap analyze . --threshold-preset balanced --output month2.json
+
+# Month 3: Tighten further
+debtmap analyze . --threshold-preset strict --output month3.json
+
+# Compare progress
+debtmap analyze . --output current.json
+# Review trend: month1.json -&gt; month2.json -&gt; month3.json -&gt; current.json
+</code></pre>
+<h2 id="decision-tree-choosing-your-preset"><a class="header" href="#decision-tree-choosing-your-preset">Decision Tree: Choosing Your Preset</a></h2>
+<pre><code>Start here: What kind of project are you working on?
+│
+├─ New project or library
+│  └─ Use STRICT preset
+│     └─ Prevent debt accumulation from day one
+│
+├─ Existing production application
+│  └─ What's your goal?
+│     ├─ Maintain current quality
+│     │  └─ Use BALANCED preset
+│     │     └─ Good default for most teams
+│     │
+│     └─ Reduce existing debt gradually
+│        └─ Start with LENIENT preset
+│           └─ Focus on worst issues first
+│           └─ Tighten thresholds over time
+│
+└─ Legacy codebase or complex domain
+   └─ Use LENIENT preset
+      └─ Avoid overwhelming with false positives
+      └─ Create baseline and improve incrementally
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Start with defaults</strong> - Don’t over-customize initially</li>
+<li><strong>Track trends</strong> - Monitor debt over time, not just point values</li>
+<li><strong>Be consistent</strong> - Use same thresholds across team</li>
+<li><strong>Document choices</strong> - Comment your <code>.debtmap.toml</code> to explain custom thresholds</li>
+<li><strong>Automate validation</strong> - Run <code>debtmap validate</code> in CI/CD</li>
+<li><strong>Review regularly</strong> - Reassess thresholds quarterly</li>
+<li><strong>Gradual tightening</strong> - Don’t make thresholds stricter too quickly</li>
+<li><strong>Trust role multipliers</strong> - Let Debtmap handle different function types</li>
+</ol>
+<h2 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h2>
+<ul>
+<li><a href="getting-started.html">Getting Started</a> - Initial setup and first analysis</li>
+<li><a href="cli-reference.html">CLI Reference</a> - Complete command-line flag documentation</li>
+<li><a href="configuration.html">Configuration</a> - Full <code>.debtmap.toml</code> reference</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How thresholds affect debt scores</li>
+<li><a href="god-object-detection.html">God Object Detection</a> - Deep dive into god object analysis</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="configuration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="suppression-patterns.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="configuration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="suppression-patterns.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

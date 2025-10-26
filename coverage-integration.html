@@ -268,26 +268,24 @@ gocover-cobertura &lt; coverage.out &gt; coverage.xml
 </code></pre>
 <p><strong>Note</strong>: Go’s native coverage format requires conversion. Most CI systems support LCOV conversion plugins.</p>
 <h2 id="how-coverage-affects-scoring"><a class="header" href="#how-coverage-affects-scoring">How Coverage Affects Scoring</a></h2>
-<p>Coverage data impacts Debtmap’s unified scoring system in two ways: the <strong>coverage factor</strong> and <strong>coverage dampening</strong>.</p>
-<h3 id="coverage-factor-40-weight"><a class="header" href="#coverage-factor-40-weight">Coverage Factor (40% Weight)</a></h3>
-<p>The coverage factor contributes <strong>40%</strong> to the unified debt score:</p>
-<pre><code>Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
+<p>Coverage data fundamentally changes how Debtmap calculates debt scores. The scoring system operates in <strong>two different modes</strong> depending on whether coverage data is available.</p>
+<h3 id="scoring-modes"><a class="header" href="#scoring-modes">Scoring Modes</a></h3>
+<p><strong>Mode 1: With Coverage Data (Dampening Multiplier)</strong></p>
+<p>When you provide an LCOV file with <code>--lcov</code>, coverage acts as a <strong>dampening multiplier</strong> that reduces scores for well-tested code:</p>
+<pre><code>Base Score = (Complexity Factor × 0.50) + (Dependency Factor × 0.25)
+Coverage Multiplier = 1.0 - coverage_percentage
+Final Score = Base Score × Coverage Multiplier
 </code></pre>
-<p><strong>Examples:</strong></p>
-<ul>
-<li>0% coverage → Factor = 10.0 (maximum penalty)</li>
-<li>50% coverage → Factor = 5.0 (moderate penalty)</li>
-<li>100% coverage → Factor = 0.0 (no penalty)</li>
-</ul>
-<p><strong>Special Cases:</strong></p>
-<ul>
-<li><strong>Test functions</strong>: Coverage factor = 0 (tests don’t need their own coverage)</li>
-<li><strong>No coverage data</strong>: Assumes worst case (factor = 10.0)</li>
-<li><strong>Entry points</strong>: Weighted at 0.6x (entry points naturally have low coverage)</li>
-</ul>
-<h3 id="coverage-dampening-score-multiplier"><a class="header" href="#coverage-dampening-score-multiplier">Coverage Dampening (Score Multiplier)</a></h3>
-<p>After base scores are calculated, coverage <em>dampens</em> the final debt score:</p>
-<pre><code>Final Score = Base Score × (1.0 - coverage_percentage)
+<p>This is the <strong>current implementation</strong> as of spec 122. Coverage dampens the base score rather than contributing as an additive component.</p>
+<p><strong>Mode 2: Without Coverage Data (Weighted Sum)</strong></p>
+<p>When no coverage data is available, Debtmap falls back to a weighted sum model:</p>
+<pre><code>Final Score = (Coverage × 0.50) + (Complexity × 0.35) + (Dependency × 0.15)
+</code></pre>
+<p>In this mode, coverage is assumed to be 0% (worst case), giving it a weight of 50% in the total score. See <code>src/priority/scoring/calculation.rs:119-129</code> for the implementation.</p>
+<h3 id="coverage-dampening-multiplier"><a class="header" href="#coverage-dampening-multiplier">Coverage Dampening Multiplier</a></h3>
+<p>When coverage data is provided, it acts as a <strong>multiplier</strong> that dampens the base score:</p>
+<pre><code>Coverage Multiplier = 1.0 - coverage_percentage
+Final Score = Base Score × Coverage Multiplier
 </code></pre>
 <p><strong>Examples:</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Base Score</th><th>Coverage</th><th>Multiplier</th><th>Final Score</th><th>Priority</th></tr></thead><tbody>
@@ -297,7 +295,13 @@ gocover-cobertura &lt; coverage.out &gt; coverage.xml
 </tbody></table>
 </div>
 <p><strong>Key Insight</strong>: Complex but well-tested code automatically drops in priority, while untested complex code rises to the top.</p>
+<p><strong>Special Cases:</strong></p>
+<ul>
+<li><strong>Test functions</strong>: Coverage multiplier = 0.0 (tests get near-zero scores regardless of complexity)</li>
+<li><strong>Entry points</strong>: Handled through semantic classification (FunctionRole) system with role multipliers, not coverage-specific weighting</li>
+</ul>
 <p><strong>Invariant</strong>: Total debt score with coverage ≤ total debt score without coverage.</p>
+<p><strong>Implementation</strong>: See <code>src/priority/scoring/calculation.rs:68-82</code> for the coverage dampening calculation.</p>
 <h2 id="transitive-coverage-propagation"><a class="header" href="#transitive-coverage-propagation">Transitive Coverage Propagation</a></h2>
 <p>Debtmap doesn’t just look at <em>direct</em> coverage—it propagates coverage through the <strong>call graph</strong> using transitive analysis.</p>
 <h3 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h3>
@@ -339,6 +343,7 @@ fn process_request(input: String) -&gt; Result&lt;()&gt; {
 <li><strong>Analysis Overhead</strong>: ~2.5x baseline (target: ≤3x)</li>
 </ul>
 <p><strong>Result</strong>: Coverage integration adds minimal overhead even on projects with thousands of functions.</p>
+<p><strong>Implementation</strong>: See <code>src/risk/coverage_index.rs:13-38</code> for the CoverageIndex struct and performance documentation.</p>
 <h2 id="cli-options-reference"><a class="header" href="#cli-options-reference">CLI Options Reference</a></h2>
 <h3 id="primary-coverage-options"><a class="header" href="#primary-coverage-options">Primary Coverage Options</a></h3>
 <pre><code class="language-bash"># Provide LCOV coverage file
@@ -504,16 +509,17 @@ Entry points and infrastructure code have natural coverage patterns. Focus unit 
 </li>
 <li>
 <p><strong>Don’t Over-Test Entry Points</strong>:
-Entry points (main, handlers) are better tested with integration tests, not unit tests. Debtmap weights their coverage factor at 0.6x to account for this.</p>
+Entry points (main, handlers) are better tested with integration tests, not unit tests. Debtmap applies role multipliers through its semantic classification system (FunctionRole) to adjust scoring for different function types. See <code>src/priority/unified_scorer.rs:149</code> and <code>src/priority/scoring/classification.rs</code> for the classification system.</p>
 </li>
 </ol>
 <h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
 <p>In <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[scoring]
-# Adjust coverage weight if your project prioritizes coverage differently
-coverage = 0.40  # Default: 40%
-complexity = 0.40
-dependency = 0.20
+# Default weights for scoring WITHOUT coverage data
+# When coverage data IS provided, it acts as a dampening multiplier instead
+coverage = 0.50  # Default: 50% (only used when no LCOV provided)
+complexity = 0.35  # Default: 35%
+dependency = 0.15  # Default: 15%
 
 [thresholds]
 # Set minimum risk score to filter low-priority items
@@ -522,6 +528,7 @@ minimum_risk_score = 15.0
 # Skip simple functions even if uncovered
 minimum_cyclomatic_complexity = 5
 </code></pre>
+<p><strong>Important</strong>: These weights only apply when coverage data is <strong>not</strong> available. When you provide <code>--lcov</code>, coverage acts as a dampening multiplier instead of a weighted component. See <code>src/config.rs:122-132</code> for default weight definitions.</p>
 <p>See <a href="configuration.html">Configuration</a> for complete options.</p>
 <h3 id="ci-integration"><a class="header" href="#ci-integration">CI Integration</a></h3>
 <p><strong>Example GitHub Actions Workflow</strong>:</p>
@@ -648,7 +655,7 @@ debtmap analyze . --lcov coverage.lcov --languages go
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="entropy-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="dead-code-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -662,7 +669,7 @@ debtmap analyze . --lcov coverage.lcov --languages go
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="entropy-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="dead-code-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
