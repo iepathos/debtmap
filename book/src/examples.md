@@ -89,6 +89,14 @@ debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 - **Balanced**: Default thresholds suitable for typical projects
 - **Lenient**: Higher thresholds designed for legacy codebases with existing technical debt
 
+**Preset Threshold Values:**
+
+| Preset | Complexity | Duplication | Max Function Lines | Max Nesting Depth |
+|--------|-----------|-------------|-------------------|-------------------|
+| Strict | 8 | 30 | 30 | 3 |
+| Balanced | 10 | 50 | 50 | 4 |
+| Lenient | 15 | 75 | 80 | 5 |
+
 ### God Object Detection
 
 Identify classes and modules with too many responsibilities:
@@ -744,6 +752,8 @@ debtmap analyze . --min-priority high --top 10
 
 ### Verbosity Levels
 
+Control the level of diagnostic output for debugging and understanding analysis decisions:
+
 ```bash
 # Level 1: Show main score factors
 debtmap analyze . -v
@@ -761,7 +771,14 @@ debtmap analyze . --verbose
 debtmap analyze . --verbose-macro-warnings --show-macro-stats
 ```
 
+**What each level shows:**
+- **-v**: Score factor breakdowns and purity distribution in god object analysis
+- **-vv**: Detailed calculations, coverage lookups, and metric computations
+- **-vvv**: Full debug information including AST details and parser internals
+
 ### Parallel Processing Control
+
+Control thread count for CPU-bound systems or to limit resource usage in CI environments. By default, Debtmap uses all available cores for optimal performance.
 
 ```bash
 # Use 8 parallel jobs
@@ -770,6 +787,12 @@ debtmap analyze . --jobs 8
 # Disable parallel processing
 debtmap analyze . --no-parallel
 ```
+
+**When to adjust:**
+- **CI environments**: Limit thread count to avoid resource contention with other jobs
+- **CPU-bound systems**: Reduce threads if machine is under load
+- **Large codebases**: Default parallelism provides best performance
+- **Debugging**: Use `--no-parallel` to simplify sequential execution when troubleshooting
 
 ## Configuration Examples
 
