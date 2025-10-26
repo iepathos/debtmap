@@ -8,6 +8,7 @@
 - [Getting Started](getting-started.md)
 - [CLI Reference](cli-reference.md)
 - [Analysis Guide](analysis-guide.md)
+- [Compare Analysis](compare-analysis.md)
 - [Configuration](configuration.md)
 - [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
