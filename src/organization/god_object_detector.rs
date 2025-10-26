@@ -125,9 +125,9 @@ impl GodObjectDetector {
     ) -> GodObjectType {
         // First, check for registry pattern before classifying as god object
         if let Some(source_content) = &self.source_content {
-            let detector = crate::organization::RegistryPatternDetector::default();
-            if let Some(pattern) = detector.detect(ast, source_content) {
-                let confidence = detector.confidence(&pattern);
+            let registry_detector = crate::organization::RegistryPatternDetector::default();
+            if let Some(pattern) = registry_detector.detect(ast, source_content) {
+                let confidence = registry_detector.confidence(&pattern);
 
                 // Calculate what the god object score would have been
                 let original_score = calculate_god_object_score(
@@ -149,6 +149,38 @@ impl GodObjectDetector {
                     crate::organization::adjust_registry_score(original_score, &pattern);
 
                 return GodObjectType::Registry {
+                    pattern,
+                    confidence,
+                    original_score,
+                    adjusted_score,
+                };
+            }
+
+            // Second, check for builder pattern before classifying as god object
+            let builder_detector = crate::organization::BuilderPatternDetector::default();
+            if let Some(pattern) = builder_detector.detect(ast, source_content) {
+                let confidence = builder_detector.confidence(&pattern);
+
+                // Calculate what the god object score would have been
+                let original_score = calculate_god_object_score(
+                    total_methods,
+                    per_struct_metrics
+                        .iter()
+                        .map(|s| s.field_count)
+                        .max()
+                        .unwrap_or(0),
+                    per_struct_metrics
+                        .iter()
+                        .flat_map(|s| &s.responsibilities)
+                        .count(),
+                    source_content.lines().count(),
+                    thresholds,
+                );
+
+                let adjusted_score =
+                    crate::organization::adjust_builder_score(original_score, &pattern);
+
+                return GodObjectType::Builder {
                     pattern,
                     confidence,
                     original_score,
@@ -310,6 +342,72 @@ impl GodObjectDetector {
                     original_score,
                     adjusted_score,
                     ((1.0 - adjusted_score / original_score) * 100.0) as usize
+                )
+            }
+            GodObjectType::Builder {
+                pattern,
+                confidence,
+                original_score,
+                adjusted_score,
+            } => {
+                let severity = if pattern.total_file_lines > 3000 {
+                    "Medium"
+                } else {
+                    "Low"
+                };
+
+                format!(
+                    "Builder Pattern Detected (confidence: {:.0}%)\n\
+                    This file contains a builder with {} fluent setters ({:.0}% of methods).\n\
+                    Builder patterns naturally have many setter methods - one per configuration option.\n\
+                    \n\
+                    Pattern metrics:\n\
+                    - Setter count: {}\n\
+                    - Setter ratio: {:.0}%\n\
+                    - Average setter size: {:.1} lines\n\
+                    - File size: {} lines\n\
+                    {}\
+                    \n\
+                    Score adjustment: {:.0} → {:.0} ({}% reduction)\n\
+                    \n\
+                    {}\
+                    \n\
+                    Evaluation criteria:\n\
+                    - Setter count is expected and appropriate for configuration builders\n\
+                    - Focus on file size and logical cohesion, not setter count\n\
+                    - Ensure all setters serve the same configuration domain",
+                    confidence * 100.0,
+                    pattern.setter_count,
+                    pattern.setter_ratio * 100.0,
+                    pattern.setter_count,
+                    pattern.setter_ratio * 100.0,
+                    pattern.avg_setter_size,
+                    pattern.total_file_lines,
+                    if !pattern.build_methods.is_empty() {
+                        format!("- Build methods: {}\n", pattern.build_methods.join(", "))
+                    } else {
+                        String::new()
+                    },
+                    original_score,
+                    adjusted_score,
+                    ((1.0 - adjusted_score / original_score) * 100.0) as usize,
+                    if pattern.total_file_lines > 3000 {
+                        format!(
+                            "Severity: {}\n\
+                            File is {} lines. Consider splitting by logical concerns:\n\
+                            1) Extract separate config struct if not present\n\
+                            2) Identify multiple unrelated configuration domains\n\
+                            3) Move complex implementation logic to separate modules\n\
+                            4) Keep all setters together for API consistency",
+                            severity, pattern.total_file_lines
+                        )
+                    } else {
+                        format!(
+                            "Severity: {}\n\
+                            Builder with {} setters is appropriately sized. No refactoring needed.",
+                            severity, pattern.setter_count
+                        )
+                    }
                 )
             }
             GodObjectType::NotGodObject => {

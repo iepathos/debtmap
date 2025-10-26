@@ -1,6 +1,7 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod builder_pattern;
 pub mod call_graph_cohesion;
 pub mod class_ownership;
 pub mod cohesion_calculator;
@@ -42,6 +43,10 @@ pub use complexity_weighting::{
 };
 
 pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};
+
+pub use builder_pattern::{
+    adjust_builder_score, BuilderPattern, BuilderPatternDetector, MethodInfo, MethodReturnType,
+};
 
 pub use registry_pattern::{
     adjust_registry_score, RegistryPattern, RegistryPatternDetector, TraitImplInfo,
