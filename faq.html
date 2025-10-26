@@ -181,6 +181,39 @@
                         <h1 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h1>
 <p>Common questions about debtmap’s features, usage, and comparison with other tools.</p>
 <h2 id="features--capabilities"><a class="header" href="#features--capabilities">Features &amp; Capabilities</a></h2>
+<h3 id="whats-the-difference-between-measured-and-estimated-metrics"><a class="header" href="#whats-the-difference-between-measured-and-estimated-metrics">What’s the difference between measured and estimated metrics?</a></h3>
+<p>Debtmap distinguishes between two types of metrics (Spec 118):</p>
+<p><strong>Measured Metrics</strong> - Precise values from AST analysis:</p>
+<ul>
+<li><code>cyclomatic_complexity</code>: Exact count of decision points</li>
+<li><code>cognitive_complexity</code>: Weighted readability measure</li>
+<li><code>nesting_depth</code>: Maximum nesting levels</li>
+<li><code>loc</code>: Lines of code</li>
+<li>These are suitable for CI/CD quality gates and thresholds</li>
+</ul>
+<p><strong>Estimated Metrics</strong> - Heuristic approximations:</p>
+<ul>
+<li><code>est_branches</code>: Estimated execution paths (formula-based)
+<ul>
+<li>Formula: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
+<li>Use for: Estimating test cases needed</li>
+<li>Don’t use for: Hard quality gates</li>
+</ul>
+</li>
+</ul>
+<p><strong>Why it matters:</strong></p>
+<ul>
+<li>Use <strong>measured</strong> metrics for thresholds and gates (precise, repeatable)</li>
+<li>Use <strong>estimated</strong> metrics for prioritization and effort estimation (heuristic, approximate)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># GOOD: Use measured metric for quality gate
+debtmap validate . --threshold-complexity 15
+
+# GOOD: Use estimated metric for test prioritization
+debtmap analyze . --top 10  # Considers est_branches for ranking
+</code></pre>
+<p>See <a href="metrics-reference.html">Metrics Reference</a> for complete details.</p>
 <h3 id="what-is-entropy-based-complexity-analysis"><a class="header" href="#what-is-entropy-based-complexity-analysis">What is entropy-based complexity analysis?</a></h3>
 <p>Entropy analysis uses information theory to distinguish between genuinely complex code and repetitive pattern-based code. Traditional cyclomatic complexity counts branches, but not all branches are equal in cognitive load.</p>
 <p>For example, a function with 20 identical if/return validation checks has the same cyclomatic complexity as a function with 20 diverse conditional branches handling different business logic. Entropy analysis gives the validation function a much lower effective complexity score because it follows a simple, repetitive pattern.</p>
@@ -215,6 +248,33 @@ debtmap analyze . --lcov target/coverage/lcov.info
 <li>C/C++ (target: Q4 2025)</li>
 </ul>
 <p>Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.</p>
+<h3 id="why-was-branches-renamed-to-est_branches"><a class="header" href="#why-was-branches-renamed-to-est_branches">Why was “branches” renamed to “est_branches”?</a></h3>
+<p>The metric was renamed in Spec 118 to make it clear that this is an <strong>estimated</strong> value, not a precise measurement.</p>
+<p><strong>Problem with old name (“branches”):</strong></p>
+<ul>
+<li>Users thought it was a direct count from AST analysis (it’s not)</li>
+<li>Caused confusion with cyclomatic complexity (which counts actual branches)</li>
+<li>Unclear that the value was formula-based</li>
+</ul>
+<p><strong>Benefits of new name (“est_branches”):</strong></p>
+<ul>
+<li>The “est_” prefix makes the estimation explicit</li>
+<li>Clearly distinguishes it from measured metrics</li>
+<li>Sets correct user expectations</li>
+</ul>
+<p><strong>What changed:</strong></p>
+<ul>
+<li>Terminal output: <code>branches=8</code> → <code>est_branches=8</code></li>
+<li>Internal variable names updated for clarity</li>
+<li>Documentation updated to explain the distinction</li>
+</ul>
+<p><strong>What didn’t change:</strong></p>
+<ul>
+<li>The formula remains the same: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
+<li>JSON output (this field was never serialized to JSON)</li>
+<li>Scoring and prioritization logic</li>
+</ul>
+<p>See <a href="metrics-reference.html#terminology-change-spec-118">Metrics Reference</a> for more details.</p>
 <h3 id="can-i-customize-the-complexity-thresholds"><a class="header" href="#can-i-customize-the-complexity-thresholds">Can I customize the complexity thresholds?</a></h3>
 <p>Yes! Configure thresholds in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[thresholds]

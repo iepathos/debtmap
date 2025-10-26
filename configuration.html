@@ -248,17 +248,166 @@ pattern_match = 0.6     # Reduce for pattern matching (default: 0.6)
 unknown = 1.0           # No adjustment (default: 1.0)
 </code></pre>
 <p>These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels.</p>
-<h3 id="role-coverage-weights"><a class="header" href="#role-coverage-weights">Role Coverage Weights</a></h3>
-<p>Adjust how coverage gaps are weighted based on function role:</p>
-<pre><code class="language-toml">[role_coverage_weights]
+<h3 id="role-based-scoring-configuration"><a class="header" href="#role-based-scoring-configuration">Role-Based Scoring Configuration</a></h3>
+<p>DebtMap uses a two-stage role adjustment mechanism to accurately score functions based on their architectural role and testing strategy. This section explains how to configure both stages.</p>
+<h4 id="stage-1-role-coverage-weights"><a class="header" href="#stage-1-role-coverage-weights">Stage 1: Role Coverage Weights</a></h4>
+<p>The first stage adjusts how much coverage gaps penalize different function types. This recognizes that not all functions need the same level of unit test coverage.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_coverage_weights]</code>):</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
 entry_point = 0.6       # Reduce coverage penalty (often integration tested)
 orchestrator = 0.8      # Reduce coverage penalty (tested via higher-level tests)
-pure_logic = 1.0        # Full penalty (should have unit tests)
-io_wrapper = 1.0        # Full penalty (should have unit tests)
-pattern_match = 1.0     # Full penalty (should have unit tests)
-unknown = 1.0           # Full penalty (default behavior)
+pure_logic = 1.2        # Increase penalty (should have unit tests)
+io_wrapper = 0.7        # Reduce penalty (often integration tested)
+pattern_match = 1.0     # Standard penalty
+unknown = 1.0           # Standard penalty (default behavior)
 </code></pre>
-<p>Entry points and orchestrators get reduced coverage penalties since they’re often tested through integration tests rather than unit tests.</p>
+<p><strong>Rationale</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Weight</th><th>Why This Value?</th></tr></thead><tbody>
+<tr><td><strong>Entry Point</strong></td><td>0.6</td><td>CLI handlers, HTTP routes, <code>main</code> functions are integration tested, not unit tested</td></tr>
+<tr><td><strong>Orchestrator</strong></td><td>0.8</td><td>Coordination functions tested via higher-level tests</td></tr>
+<tr><td><strong>Pure Logic</strong></td><td>1.2</td><td>Core business logic should have comprehensive unit tests</td></tr>
+<tr><td><strong>I/O Wrapper</strong></td><td>0.7</td><td>File/network operations tested via integration tests</td></tr>
+<tr><td><strong>Pattern Match</strong></td><td>1.0</td><td>Standard coverage expectations</td></tr>
+<tr><td><strong>Unknown</strong></td><td>1.0</td><td>Default when role cannot be determined</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example Impact</strong>:</p>
+<pre><code class="language-toml"># Emphasize pure logic testing strongly
+[scoring.role_coverage_weights]
+pure_logic = 1.5        # 50% higher penalty for untested logic
+entry_point = 0.5       # 50% lower penalty for untested entry points
+io_wrapper = 0.5        # 50% lower penalty for untested I/O
+
+# Conservative approach (smaller adjustments)
+[scoring.role_coverage_weights]
+pure_logic = 1.1        # Only 10% increase
+entry_point = 0.9       # Only 10% decrease
+</code></pre>
+<p><strong>How It Works</strong>:</p>
+<p>When a function has 0% coverage:</p>
+<ul>
+<li><strong>Entry Point</strong> (weight 0.6): Gets 40% penalty instead of 100% penalty</li>
+<li><strong>Pure Logic</strong> (weight 1.2): Gets 120% penalty (extra emphasis on testing)</li>
+<li><strong>I/O Wrapper</strong> (weight 0.7): Gets 70% penalty</li>
+</ul>
+<p>This prevents entry points from dominating the priority list due to low unit test coverage while emphasizing the importance of testing pure business logic.</p>
+<h4 id="stage-2-role-multiplier-with-clamping"><a class="header" href="#stage-2-role-multiplier-with-clamping">Stage 2: Role Multiplier with Clamping</a></h4>
+<p>The second stage applies a final role-based multiplier to reflect architectural importance. This multiplier is <strong>clamped by default</strong> to prevent extreme score variations.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_multiplier]</code>):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+</code></pre>
+<p><strong>Parameters</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>clamp_min</code></td><td>0.3</td><td>Minimum allowed multiplier - prevents functions from becoming invisible</td></tr>
+<tr><td><code>clamp_max</code></td><td>1.8</td><td>Maximum allowed multiplier - prevents extreme score spikes</td></tr>
+<tr><td><code>enable_clamping</code></td><td>true</td><td>Whether to apply clamping (disable for prototyping only)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Clamp Range Rationale</strong>:</p>
+<p><strong>Default [0.3, 1.8]</strong>: Balances differentiation with stability</p>
+<ul>
+<li>
+<p><strong>Lower bound (0.3)</strong>: I/O wrappers still contribute 30% of their base score</p>
+<ul>
+<li>Prevents them from becoming invisible in the priority list</li>
+<li>Ensures simple wrappers aren’t completely ignored</li>
+</ul>
+</li>
+<li>
+<p><strong>Upper bound (1.8)</strong>: Critical functions get at most 180% of base score</p>
+<ul>
+<li>Prevents one complex function from dominating the entire list</li>
+<li>Maintains balanced prioritization across different issues</li>
+</ul>
+</li>
+</ul>
+<p><strong>When to Adjust Clamp Range</strong>:</p>
+<pre><code class="language-toml"># Wider range for more differentiation
+[scoring.role_multiplier]
+clamp_min = 0.2           # Allow more reduction
+clamp_max = 2.5           # Allow more emphasis
+
+# Narrower range for more stability
+[scoring.role_multiplier]
+clamp_min = 0.5           # Less reduction
+clamp_max = 1.5           # Less emphasis
+
+# Disable clamping (not recommended for production)
+[scoring.role_multiplier]
+enable_clamping = false   # Allow unclamped multipliers
+# Warning: May cause unstable prioritization
+</code></pre>
+<p><strong>When to Disable Clamping</strong>:</p>
+<ul>
+<li><strong>Prototyping</strong>: Testing extreme multiplier values for custom scoring strategies</li>
+<li><strong>Special cases</strong>: Very specific project needs requiring wide multiplier ranges</li>
+<li><strong>Not recommended</strong> for production use as it can lead to unstable prioritization</li>
+</ul>
+<p><strong>Example Impact</strong>:</p>
+<p>Without clamping:</p>
+<pre><code>Function: critical_business_logic (Pure Logic)
+  Base Score: 45.0
+  Role Multiplier: 2.5 (unclamped)
+  Final Score: 112.5 (dominates entire list)
+</code></pre>
+<p>With clamping (default):</p>
+<pre><code>Function: critical_business_logic (Pure Logic)
+  Base Score: 45.0
+  Role Multiplier: 1.8 (clamped from 2.5)
+  Final Score: 81.0 (high priority, but balanced)
+</code></pre>
+<h4 id="complete-example-configuration"><a class="header" href="#complete-example-configuration">Complete Example Configuration</a></h4>
+<p>Here’s a complete example showing both stages configured together:</p>
+<pre><code class="language-toml"># Stage 1: Coverage weight adjustments
+[scoring.role_coverage_weights]
+pure_logic = 1.2        # Emphasize testing pure logic
+entry_point = 0.6       # Reduce penalty for integration-tested entry points
+orchestrator = 0.8      # Partially reduce penalty for orchestrators
+io_wrapper = 0.7        # Reduce penalty for integration-tested I/O
+pattern_match = 1.0     # Standard
+unknown = 1.0           # Standard
+
+# Stage 2: Role multiplier with clamping
+[scoring.role_multiplier]
+clamp_min = 0.3         # I/O wrappers contribute at least 30%
+clamp_max = 1.8         # Critical functions get at most 180%
+enable_clamping = true  # Keep clamping enabled for stability
+</code></pre>
+<h4 id="how-the-two-stages-work-together"><a class="header" href="#how-the-two-stages-work-together">How the Two Stages Work Together</a></h4>
+<p>The two-stage approach ensures role-based coverage adjustments and architectural importance multipliers work independently:</p>
+<p><strong>Example Workflow</strong>:</p>
+<pre><code>1. Calculate base score from complexity (10) and dependencies (5)
+   → Base = 15.0
+
+2. Stage 1: Apply coverage weight based on role (Entry Point, weight 0.6)
+   → Coverage penalty reduced from 1.0 to 0.4
+   → Preliminary score = 15.0 × 0.4 = 6.0
+
+3. Stage 2: Apply clamped role multiplier (Entry Point, multiplier 1.2)
+   → Clamped to [0.3, 1.8] → stays 1.2
+   → Final score = 6.0 × 1.2 = 7.2
+</code></pre>
+<p><strong>Key Benefits</strong>:</p>
+<ul>
+<li>Coverage adjustments don’t interfere with role multiplier</li>
+<li>Both mechanisms contribute independently to final score</li>
+<li>Clamping prevents instability from extreme values</li>
+<li>Configuration flexibility for different project needs</li>
+</ul>
+<h4 id="verification"><a class="header" href="#verification">Verification</a></h4>
+<p>To see how role-based adjustments affect your codebase:</p>
+<pre><code class="language-bash"># Show detailed scoring breakdown
+debtmap analyze . --verbose
+
+# Look for lines like:
+#   Coverage Weight: 0.6 (Entry Point adjustment)
+#   Adjusted Coverage Penalty: 0.4 (reduced from 1.0)
+#   Role Multiplier: 1.2 (clamped from 1.5)
+</code></pre>
+<p>For more details on how role-based adjustments reduce false positives, see the <a href="./scoring-strategies.html#role-based-adjustments">Role-Based Adjustments</a> section in the Scoring Strategies guide.</p>
 <h2 id="thresholds-configuration"><a class="header" href="#thresholds-configuration">Thresholds Configuration</a></h2>
 <h3 id="basic-thresholds"><a class="header" href="#basic-thresholds">Basic Thresholds</a></h3>
 <p>Control when code is flagged as technical debt:</p>
@@ -479,6 +628,62 @@ pattern = "unwrap"
 context = "test"
 severity = "low"        # Unwrap is acceptable in test code
 </code></pre>
+<h3 id="pure-mapping-pattern-detection"><a class="header" href="#pure-mapping-pattern-detection">Pure Mapping Pattern Detection</a></h3>
+<p>Configure detection of pure mapping patterns to reduce false positives from exhaustive match expressions:</p>
+<pre><code class="language-toml">[mapping_patterns]
+enabled = true                      # Enable mapping pattern detection (default: true)
+complexity_reduction = 0.30         # Reduce complexity by 30% (default: 0.30)
+min_branches = 3                    # Minimum match arms to consider (default: 3)
+</code></pre>
+<p><strong>What are pure mapping patterns?</strong></p>
+<p>Pure mapping patterns are exhaustive match expressions that transform input to output without side effects. These patterns have high cyclomatic complexity due to many branches, but are actually simple and maintainable because:</p>
+<ul>
+<li>Each branch is independent and straightforward</li>
+<li>No mutation or side effects occur</li>
+<li>The pattern is predictable and easy to understand</li>
+<li>Adding new cases requires minimal changes</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn status_to_string(status: Status) -&gt; &amp;'static str {
+    match status {
+        Status::Success =&gt; "success",
+        Status::Pending =&gt; "pending",
+        Status::Failed =&gt; "failed",
+        Status::Cancelled =&gt; "cancelled",
+        // ... many more cases
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This function has high cyclomatic complexity (one branch per case), but is simple to maintain. Mapping pattern detection recognizes this and reduces the complexity score appropriately.</p>
+<p><strong>Configuration options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td>true</td><td>Enable mapping pattern detection</td></tr>
+<tr><td><code>complexity_reduction</code></td><td>0.30</td><td>Percentage to reduce complexity (0.0-1.0)</td></tr>
+<tr><td><code>min_branches</code></td><td>3</td><td>Minimum match arms to be considered a mapping pattern</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example configuration:</strong></p>
+<pre><code class="language-toml"># Conservative reduction
+[mapping_patterns]
+complexity_reduction = 0.20         # Only 20% reduction
+
+# Aggressive reduction for codebases with many mapping patterns
+[mapping_patterns]
+complexity_reduction = 0.50         # 50% reduction
+
+# Disable if you want to see all match complexity
+[mapping_patterns]
+enabled = false
+</code></pre>
+<p><strong>When to adjust:</strong></p>
+<ul>
+<li><strong>Increase <code>complexity_reduction</code></strong> if you have many simple mapping functions being flagged as complex</li>
+<li><strong>Decrease <code>complexity_reduction</code></strong> if you want more conservative adjustments</li>
+<li><strong>Increase <code>min_branches</code></strong> to only apply reduction to very large match statements</li>
+<li><strong>Disable entirely</strong> if you want raw complexity scores without adjustment</li>
+</ul>
 <h3 id="external-api-configuration"><a class="header" href="#external-api-configuration">External API Configuration</a></h3>
 <p>Mark functions as public API for enhanced testing recommendations:</p>
 <pre><code class="language-toml">[external_api]

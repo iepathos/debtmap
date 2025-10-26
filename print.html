@@ -183,7 +183,7 @@
 <blockquote>
 <p>🚧 <strong>Early Prototype</strong> - This project is under active development and APIs may change</p>
 </blockquote>
-<p>Debtmap is a fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.</p>
+<p>Debtmap is a code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
 <p>Unlike traditional static analysis tools that simply flag complex code, Debtmap answers two critical questions:</p>
 <ol>
@@ -193,10 +193,10 @@
 <p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.</p>
 <p><strong>What Makes Debtmap Different:</strong></p>
 <ul>
-<li><strong>Entropy-Based Complexity Analysis</strong>: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%</li>
-<li><strong>Coverage-Risk Correlation</strong>: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
-<li><strong>Risk-Driven Prioritization</strong>: Prioritizes refactoring and testing efforts based on complexity, coverage, and dependency factors</li>
-<li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” rather than just flagging issues</li>
+<li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
+<li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
+<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%</li>
+<li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
 <li><strong>Performance</strong>: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)</li>
 </ul>
 <h2 id="why-use-debtmap"><a class="header" href="#why-use-debtmap">Why Use Debtmap?</a></h2>
@@ -213,7 +213,7 @@
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
 <li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
-<li><strong>Entropy-based complexity analysis</strong> - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory</li>
+<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)</li>
 <li><strong>Token classification system</strong> - Advanced token categorization with weighted entropy for accurate complexity assessment</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)</li>
@@ -1949,6 +1949,73 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
 <li>Harder to test thoroughly</li>
 <li>Often violates single responsibility</li>
 <li>Difficult to reuse</li>
+</ul>
+<h3 id="constructor-detection"><a class="header" href="#constructor-detection">Constructor Detection</a></h3>
+<p>Debtmap identifies constructor functions using AST-based analysis (Spec 122), which goes beyond simple name-based detection to catch non-standard constructor patterns.</p>
+<p><strong>Detection Strategy:</strong></p>
+<ol>
+<li><strong>Return Type Analysis</strong>: Functions returning <code>Self</code>, <code>Result&lt;Self&gt;</code>, or <code>Option&lt;Self&gt;</code></li>
+<li><strong>Body Pattern Analysis</strong>: Struct initialization or simple field assignments</li>
+<li><strong>Complexity Check</strong>: Low cyclomatic complexity (≤5), no loops, minimal branching</li>
+</ol>
+<p><strong>Why AST-based detection?</strong></p>
+<p>Name-based detection (looking for <code>new</code>, <code>new_*</code>, <code>from_*</code>) misses non-standard constructors:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Caught by name-based detection
+fn new() -&gt; Self {
+    Self { timeout: 30 }
+}
+
+// Missed by name-based, caught by AST detection
+pub fn create_default_client() -&gt; Self {
+    Self { timeout: Duration::from_secs(30) }
+}
+
+pub fn initialized() -&gt; Self {
+    Self::new()
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Builder vs Constructor:</strong></p>
+<p>AST analysis distinguishes between constructors and builder methods:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Constructor: creates new instance
+pub fn new(timeout: u32) -&gt; Self {
+    Self { timeout }
+}
+
+// Builder method: modifies existing instance (NOT a constructor)
+pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
+    self.timeout = timeout;
+    self  // Returns modified self, not new instance
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Detection Criteria:</strong></p>
+<p>A function is classified as a constructor if:</p>
+<ul>
+<li>Returns <code>Self</code>, <code>Result&lt;Self&gt;</code>, or <code>Option&lt;Self&gt;</code></li>
+<li>Contains struct initialization (<code>Self { ... }</code>) without loops</li>
+<li>OR delegates to another constructor (<code>Self::new()</code>) with minimal logic</li>
+</ul>
+<p><strong>Fallback Behavior:</strong></p>
+<p>If AST parsing fails (syntax errors, unsupported language), Debtmap gracefully falls back to name-based detection (Spec 117):</p>
+<ul>
+<li><code>new</code>, <code>new_*</code></li>
+<li><code>try_new*</code></li>
+<li><code>from_*</code></li>
+</ul>
+<p>This ensures analysis always completes, even on partially broken code.</p>
+<p><strong>Performance:</strong></p>
+<p>AST-based detection adds &lt; 5% overhead compared to name-only detection. See benchmarks:</p>
+<pre><code class="language-bash">cargo bench --bench constructor_detection_bench
+</code></pre>
+<p><strong>Why it matters:</strong></p>
+<p>Accurately identifying constructors helps:</p>
+<ul>
+<li>Exclude them from complexity thresholds (constructors naturally have high complexity)</li>
+<li>Focus refactoring on business logic, not initialization code</li>
+<li>Understand initialization patterns across the codebase</li>
 </ul>
 <h2 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h2>
 <p>Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
@@ -4142,17 +4209,166 @@ pattern_match = 0.6     # Reduce for pattern matching (default: 0.6)
 unknown = 1.0           # No adjustment (default: 1.0)
 </code></pre>
 <p>These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels.</p>
-<h3 id="role-coverage-weights"><a class="header" href="#role-coverage-weights">Role Coverage Weights</a></h3>
-<p>Adjust how coverage gaps are weighted based on function role:</p>
-<pre><code class="language-toml">[role_coverage_weights]
+<h3 id="role-based-scoring-configuration"><a class="header" href="#role-based-scoring-configuration">Role-Based Scoring Configuration</a></h3>
+<p>DebtMap uses a two-stage role adjustment mechanism to accurately score functions based on their architectural role and testing strategy. This section explains how to configure both stages.</p>
+<h4 id="stage-1-role-coverage-weights"><a class="header" href="#stage-1-role-coverage-weights">Stage 1: Role Coverage Weights</a></h4>
+<p>The first stage adjusts how much coverage gaps penalize different function types. This recognizes that not all functions need the same level of unit test coverage.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_coverage_weights]</code>):</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
 entry_point = 0.6       # Reduce coverage penalty (often integration tested)
 orchestrator = 0.8      # Reduce coverage penalty (tested via higher-level tests)
-pure_logic = 1.0        # Full penalty (should have unit tests)
-io_wrapper = 1.0        # Full penalty (should have unit tests)
-pattern_match = 1.0     # Full penalty (should have unit tests)
-unknown = 1.0           # Full penalty (default behavior)
+pure_logic = 1.2        # Increase penalty (should have unit tests)
+io_wrapper = 0.7        # Reduce penalty (often integration tested)
+pattern_match = 1.0     # Standard penalty
+unknown = 1.0           # Standard penalty (default behavior)
 </code></pre>
-<p>Entry points and orchestrators get reduced coverage penalties since they’re often tested through integration tests rather than unit tests.</p>
+<p><strong>Rationale</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Weight</th><th>Why This Value?</th></tr></thead><tbody>
+<tr><td><strong>Entry Point</strong></td><td>0.6</td><td>CLI handlers, HTTP routes, <code>main</code> functions are integration tested, not unit tested</td></tr>
+<tr><td><strong>Orchestrator</strong></td><td>0.8</td><td>Coordination functions tested via higher-level tests</td></tr>
+<tr><td><strong>Pure Logic</strong></td><td>1.2</td><td>Core business logic should have comprehensive unit tests</td></tr>
+<tr><td><strong>I/O Wrapper</strong></td><td>0.7</td><td>File/network operations tested via integration tests</td></tr>
+<tr><td><strong>Pattern Match</strong></td><td>1.0</td><td>Standard coverage expectations</td></tr>
+<tr><td><strong>Unknown</strong></td><td>1.0</td><td>Default when role cannot be determined</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example Impact</strong>:</p>
+<pre><code class="language-toml"># Emphasize pure logic testing strongly
+[scoring.role_coverage_weights]
+pure_logic = 1.5        # 50% higher penalty for untested logic
+entry_point = 0.5       # 50% lower penalty for untested entry points
+io_wrapper = 0.5        # 50% lower penalty for untested I/O
+
+# Conservative approach (smaller adjustments)
+[scoring.role_coverage_weights]
+pure_logic = 1.1        # Only 10% increase
+entry_point = 0.9       # Only 10% decrease
+</code></pre>
+<p><strong>How It Works</strong>:</p>
+<p>When a function has 0% coverage:</p>
+<ul>
+<li><strong>Entry Point</strong> (weight 0.6): Gets 40% penalty instead of 100% penalty</li>
+<li><strong>Pure Logic</strong> (weight 1.2): Gets 120% penalty (extra emphasis on testing)</li>
+<li><strong>I/O Wrapper</strong> (weight 0.7): Gets 70% penalty</li>
+</ul>
+<p>This prevents entry points from dominating the priority list due to low unit test coverage while emphasizing the importance of testing pure business logic.</p>
+<h4 id="stage-2-role-multiplier-with-clamping"><a class="header" href="#stage-2-role-multiplier-with-clamping">Stage 2: Role Multiplier with Clamping</a></h4>
+<p>The second stage applies a final role-based multiplier to reflect architectural importance. This multiplier is <strong>clamped by default</strong> to prevent extreme score variations.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_multiplier]</code>):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+</code></pre>
+<p><strong>Parameters</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>clamp_min</code></td><td>0.3</td><td>Minimum allowed multiplier - prevents functions from becoming invisible</td></tr>
+<tr><td><code>clamp_max</code></td><td>1.8</td><td>Maximum allowed multiplier - prevents extreme score spikes</td></tr>
+<tr><td><code>enable_clamping</code></td><td>true</td><td>Whether to apply clamping (disable for prototyping only)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Clamp Range Rationale</strong>:</p>
+<p><strong>Default [0.3, 1.8]</strong>: Balances differentiation with stability</p>
+<ul>
+<li>
+<p><strong>Lower bound (0.3)</strong>: I/O wrappers still contribute 30% of their base score</p>
+<ul>
+<li>Prevents them from becoming invisible in the priority list</li>
+<li>Ensures simple wrappers aren’t completely ignored</li>
+</ul>
+</li>
+<li>
+<p><strong>Upper bound (1.8)</strong>: Critical functions get at most 180% of base score</p>
+<ul>
+<li>Prevents one complex function from dominating the entire list</li>
+<li>Maintains balanced prioritization across different issues</li>
+</ul>
+</li>
+</ul>
+<p><strong>When to Adjust Clamp Range</strong>:</p>
+<pre><code class="language-toml"># Wider range for more differentiation
+[scoring.role_multiplier]
+clamp_min = 0.2           # Allow more reduction
+clamp_max = 2.5           # Allow more emphasis
+
+# Narrower range for more stability
+[scoring.role_multiplier]
+clamp_min = 0.5           # Less reduction
+clamp_max = 1.5           # Less emphasis
+
+# Disable clamping (not recommended for production)
+[scoring.role_multiplier]
+enable_clamping = false   # Allow unclamped multipliers
+# Warning: May cause unstable prioritization
+</code></pre>
+<p><strong>When to Disable Clamping</strong>:</p>
+<ul>
+<li><strong>Prototyping</strong>: Testing extreme multiplier values for custom scoring strategies</li>
+<li><strong>Special cases</strong>: Very specific project needs requiring wide multiplier ranges</li>
+<li><strong>Not recommended</strong> for production use as it can lead to unstable prioritization</li>
+</ul>
+<p><strong>Example Impact</strong>:</p>
+<p>Without clamping:</p>
+<pre><code>Function: critical_business_logic (Pure Logic)
+  Base Score: 45.0
+  Role Multiplier: 2.5 (unclamped)
+  Final Score: 112.5 (dominates entire list)
+</code></pre>
+<p>With clamping (default):</p>
+<pre><code>Function: critical_business_logic (Pure Logic)
+  Base Score: 45.0
+  Role Multiplier: 1.8 (clamped from 2.5)
+  Final Score: 81.0 (high priority, but balanced)
+</code></pre>
+<h4 id="complete-example-configuration"><a class="header" href="#complete-example-configuration">Complete Example Configuration</a></h4>
+<p>Here’s a complete example showing both stages configured together:</p>
+<pre><code class="language-toml"># Stage 1: Coverage weight adjustments
+[scoring.role_coverage_weights]
+pure_logic = 1.2        # Emphasize testing pure logic
+entry_point = 0.6       # Reduce penalty for integration-tested entry points
+orchestrator = 0.8      # Partially reduce penalty for orchestrators
+io_wrapper = 0.7        # Reduce penalty for integration-tested I/O
+pattern_match = 1.0     # Standard
+unknown = 1.0           # Standard
+
+# Stage 2: Role multiplier with clamping
+[scoring.role_multiplier]
+clamp_min = 0.3         # I/O wrappers contribute at least 30%
+clamp_max = 1.8         # Critical functions get at most 180%
+enable_clamping = true  # Keep clamping enabled for stability
+</code></pre>
+<h4 id="how-the-two-stages-work-together"><a class="header" href="#how-the-two-stages-work-together">How the Two Stages Work Together</a></h4>
+<p>The two-stage approach ensures role-based coverage adjustments and architectural importance multipliers work independently:</p>
+<p><strong>Example Workflow</strong>:</p>
+<pre><code>1. Calculate base score from complexity (10) and dependencies (5)
+   → Base = 15.0
+
+2. Stage 1: Apply coverage weight based on role (Entry Point, weight 0.6)
+   → Coverage penalty reduced from 1.0 to 0.4
+   → Preliminary score = 15.0 × 0.4 = 6.0
+
+3. Stage 2: Apply clamped role multiplier (Entry Point, multiplier 1.2)
+   → Clamped to [0.3, 1.8] → stays 1.2
+   → Final score = 6.0 × 1.2 = 7.2
+</code></pre>
+<p><strong>Key Benefits</strong>:</p>
+<ul>
+<li>Coverage adjustments don’t interfere with role multiplier</li>
+<li>Both mechanisms contribute independently to final score</li>
+<li>Clamping prevents instability from extreme values</li>
+<li>Configuration flexibility for different project needs</li>
+</ul>
+<h4 id="verification"><a class="header" href="#verification">Verification</a></h4>
+<p>To see how role-based adjustments affect your codebase:</p>
+<pre><code class="language-bash"># Show detailed scoring breakdown
+debtmap analyze . --verbose
+
+# Look for lines like:
+#   Coverage Weight: 0.6 (Entry Point adjustment)
+#   Adjusted Coverage Penalty: 0.4 (reduced from 1.0)
+#   Role Multiplier: 1.2 (clamped from 1.5)
+</code></pre>
+<p>For more details on how role-based adjustments reduce false positives, see the <a href="./scoring-strategies.html#role-based-adjustments">Role-Based Adjustments</a> section in the Scoring Strategies guide.</p>
 <h2 id="thresholds-configuration"><a class="header" href="#thresholds-configuration">Thresholds Configuration</a></h2>
 <h3 id="basic-thresholds"><a class="header" href="#basic-thresholds">Basic Thresholds</a></h3>
 <p>Control when code is flagged as technical debt:</p>
@@ -4373,6 +4589,62 @@ pattern = "unwrap"
 context = "test"
 severity = "low"        # Unwrap is acceptable in test code
 </code></pre>
+<h3 id="pure-mapping-pattern-detection"><a class="header" href="#pure-mapping-pattern-detection">Pure Mapping Pattern Detection</a></h3>
+<p>Configure detection of pure mapping patterns to reduce false positives from exhaustive match expressions:</p>
+<pre><code class="language-toml">[mapping_patterns]
+enabled = true                      # Enable mapping pattern detection (default: true)
+complexity_reduction = 0.30         # Reduce complexity by 30% (default: 0.30)
+min_branches = 3                    # Minimum match arms to consider (default: 3)
+</code></pre>
+<p><strong>What are pure mapping patterns?</strong></p>
+<p>Pure mapping patterns are exhaustive match expressions that transform input to output without side effects. These patterns have high cyclomatic complexity due to many branches, but are actually simple and maintainable because:</p>
+<ul>
+<li>Each branch is independent and straightforward</li>
+<li>No mutation or side effects occur</li>
+<li>The pattern is predictable and easy to understand</li>
+<li>Adding new cases requires minimal changes</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn status_to_string(status: Status) -&gt; &amp;'static str {
+    match status {
+        Status::Success =&gt; "success",
+        Status::Pending =&gt; "pending",
+        Status::Failed =&gt; "failed",
+        Status::Cancelled =&gt; "cancelled",
+        // ... many more cases
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This function has high cyclomatic complexity (one branch per case), but is simple to maintain. Mapping pattern detection recognizes this and reduces the complexity score appropriately.</p>
+<p><strong>Configuration options:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead><tbody>
+<tr><td><code>enabled</code></td><td>true</td><td>Enable mapping pattern detection</td></tr>
+<tr><td><code>complexity_reduction</code></td><td>0.30</td><td>Percentage to reduce complexity (0.0-1.0)</td></tr>
+<tr><td><code>min_branches</code></td><td>3</td><td>Minimum match arms to be considered a mapping pattern</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example configuration:</strong></p>
+<pre><code class="language-toml"># Conservative reduction
+[mapping_patterns]
+complexity_reduction = 0.20         # Only 20% reduction
+
+# Aggressive reduction for codebases with many mapping patterns
+[mapping_patterns]
+complexity_reduction = 0.50         # 50% reduction
+
+# Disable if you want to see all match complexity
+[mapping_patterns]
+enabled = false
+</code></pre>
+<p><strong>When to adjust:</strong></p>
+<ul>
+<li><strong>Increase <code>complexity_reduction</code></strong> if you have many simple mapping functions being flagged as complex</li>
+<li><strong>Decrease <code>complexity_reduction</code></strong> if you want more conservative adjustments</li>
+<li><strong>Increase <code>min_branches</code></strong> to only apply reduction to very large match statements</li>
+<li><strong>Disable entirely</strong> if you want raw complexity scores without adjustment</li>
+</ul>
 <h3 id="external-api-configuration"><a class="header" href="#external-api-configuration">External API Configuration</a></h3>
 <p>Mark functions as public API for enhanced testing recommendations:</p>
 <pre><code class="language-toml">[external_api]
@@ -7479,6 +7751,221 @@ let contribution = context.total_contribution();
 <li><a href="parallel-processing.html">Parallel Processing</a> - Performance optimization</li>
 <li><a href="troubleshooting.html">Troubleshooting</a> - Common issues and solutions</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="coverage-gap-analysis"><a class="header" href="#coverage-gap-analysis">Coverage Gap Analysis</a></h1>
+<p>Debtmap provides precise line-level coverage gap reporting to help you understand exactly which lines of code lack test coverage, rather than relying on misleading function-level percentages.</p>
+<h2 id="understanding-coverage-gaps"><a class="header" href="#understanding-coverage-gaps">Understanding Coverage Gaps</a></h2>
+<p>A <strong>coverage gap</strong> represents the portion of a function that is not executed during tests. Traditional tools report this as a simple percentage (e.g., “50% covered”), but this can be misleading:</p>
+<ul>
+<li>A 100-line function with 1 uncovered line shows “99% covered” - sounds great!</li>
+<li>A 10-line function with 1 uncovered line shows “90% covered” - sounds worse, but is actually better</li>
+</ul>
+<p>Debtmap improves on this by:</p>
+<ol>
+<li>Reporting the actual number of uncovered lines</li>
+<li>Showing which specific lines are uncovered</li>
+<li>Calculating the gap as a percentage of instrumented lines (not total lines)</li>
+<li>Providing visual severity indicators based on gap size</li>
+</ol>
+<h2 id="precise-vs-estimated-gaps"><a class="header" href="#precise-vs-estimated-gaps">Precise vs Estimated Gaps</a></h2>
+<p>Debtmap uses different precision levels depending on available coverage data:</p>
+<h3 id="precise-gaps-line-level-data-available"><a class="header" href="#precise-gaps-line-level-data-available">Precise Gaps (Line-Level Data Available)</a></h3>
+<p>When LCOV coverage data is available, debtmap provides exact line-level reporting:</p>
+<pre><code>Business logic - 1 line uncovered (11% gap) - line 52
+Complex calculation - 4 lines uncovered (20% gap) - lines 10-12, 15
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Exact line numbers for uncovered code</li>
+<li>Accurate gap percentage based on instrumented lines</li>
+<li>Compact line range formatting (e.g., “10-12, 15, 20-21”)</li>
+<li>Distinguishes between code that can’t be instrumented vs uncovered code</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Debtmap reads LCOV coverage data from your test runs</li>
+<li>Matches functions by file path and name</li>
+<li>Extracts precise uncovered line numbers</li>
+<li>Calculates percentage as: <code>(uncovered_lines / instrumented_lines) * 100</code></li>
+</ul>
+<h3 id="estimated-gaps-function-level-data-only"><a class="header" href="#estimated-gaps-function-level-data-only">Estimated Gaps (Function-Level Data Only)</a></h3>
+<p>When only function-level coverage percentages are available:</p>
+<pre><code>Data processing - ~50% gap (estimated, ~25 lines)
+Helper function - ~100% gap (estimated, 15 lines)
+Utility - ~3% gap (mostly covered)
+</code></pre>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Estimates uncovered line count from percentage</li>
+<li>Uses tilde (~) prefix to indicate estimation</li>
+<li>Special cases:
+<ul>
+<li>≥99% gap → “~100% gap”</li>
+<li>&lt;5% gap → “mostly covered”</li>
+<li>Otherwise → “~X% gap (estimated, ~Y lines)”</li>
+</ul>
+</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Falls back when LCOV data unavailable or function not found</li>
+<li>Calculates: <code>estimated_uncovered = total_lines * (gap_percentage / 100)</code></li>
+<li>Useful for quick overview but less actionable than precise gaps</li>
+</ul>
+<h3 id="unknown-coverage"><a class="header" href="#unknown-coverage">Unknown Coverage</a></h3>
+<p>When no coverage data is available:</p>
+<pre><code>Untested module - Coverage data unavailable (42 lines)
+</code></pre>
+<p>This typically occurs when:</p>
+<ul>
+<li>No coverage collection has been run</li>
+<li>File not included in coverage report</li>
+<li>Coverage data file path mismatch</li>
+</ul>
+<h2 id="gap-severity-indicators"><a class="header" href="#gap-severity-indicators">Gap Severity Indicators</a></h2>
+<p>Debtmap uses visual indicators to quickly identify the severity of coverage gaps:</p>
+<div class="table-wrapper"><table><thead><tr><th>Indicator</th><th>Range</th><th>Severity</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>🟡</td><td>1-25%</td><td>LOW</td><td>Minor gaps, mostly covered</td></tr>
+<tr><td>🟠</td><td>26-50%</td><td>MODERATE</td><td>Significant gaps, needs attention</td></tr>
+<tr><td>🔴</td><td>51-75%</td><td>HIGH</td><td>Major gaps, high priority</td></tr>
+<tr><td>🔴🔴</td><td>76-100%</td><td>CRITICAL</td><td>Severe gaps, critical priority</td></tr>
+</tbody></table>
+</div>
+<p>These indicators appear in debtmap’s priority output to help you quickly identify which functions need testing most urgently.</p>
+<h3 id="severity-calculation"><a class="header" href="#severity-calculation">Severity Calculation</a></h3>
+<p>Gap severity is based on the percentage of uncovered code:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn get_severity(gap_percentage: f64) -&gt; &amp;'static str {
+    match gap_percentage {
+        p if p &lt;= 25.0 =&gt; "🟡 LOW",
+        p if p &lt;= 50.0 =&gt; "🟠 MODERATE",
+        p if p &lt;= 75.0 =&gt; "🔴 HIGH",
+        _ =&gt; "🔴🔴 CRITICAL"
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This works for both precise and estimated gaps, ensuring consistent severity classification across your codebase.</p>
+<h2 id="example-output-2"><a class="header" href="#example-output-2">Example Output</a></h2>
+<h3 id="high-verbosity-mode"><a class="header" href="#high-verbosity-mode">High Verbosity Mode</a></h3>
+<pre><code>Priority 1: Authentication Logic (CRITICAL)
+  File: src/auth/login.rs:45
+  Coverage Gap: 2 lines uncovered (89% gap) 🔴🔴 - lines 67, 89
+  Complexity: Cyclomatic 8, Cognitive 12
+  Impact: High-risk business logic with critical coverage gaps
+
+Priority 2: Data Validation (HIGH)
+  File: src/validation/rules.rs:120
+  Coverage Gap: 15 lines uncovered (65% gap) 🔴 - lines 145-152, 167-173
+  Complexity: Cyclomatic 5, Cognitive 8
+  Impact: Complex validation logic needs comprehensive testing
+
+Priority 3: Helper Function (MODERATE)
+  File: src/utils/helpers.rs:30
+  Coverage Gap: ~45% gap (estimated, ~12 lines) 🟠
+  Complexity: Cyclomatic 3, Cognitive 4
+  Impact: Moderate complexity with estimated coverage gaps
+</code></pre>
+<h3 id="standard-mode"><a class="header" href="#standard-mode">Standard Mode</a></h3>
+<pre><code>1. Authentication Logic (src/auth/login.rs:45)
+   Gap: 2 lines uncovered (89%) 🔴🔴 [lines 67, 89]
+
+2. Data Validation (src/validation/rules.rs:120)
+   Gap: 15 lines uncovered (65%) 🔴 [lines 145-152, 167-173]
+
+3. Helper Function (src/utils/helpers.rs:30)
+   Gap: ~45% (estimated) 🟠
+</code></pre>
+<h2 id="integration-with-coverage-tools"><a class="header" href="#integration-with-coverage-tools">Integration with Coverage Tools</a></h2>
+<h3 id="generating-lcov-data"><a class="header" href="#generating-lcov-data">Generating LCOV Data</a></h3>
+<p>For precise gap reporting, generate LCOV coverage data with your test framework:</p>
+<p><strong>Rust (using cargo-tarpaulin):</strong></p>
+<pre><code class="language-bash">cargo tarpaulin --out Lcov --output-dir ./coverage
+</code></pre>
+<p><strong>Python (using pytest-cov):</strong></p>
+<pre><code class="language-bash">pytest --cov=mypackage --cov-report=lcov:coverage/lcov.info
+</code></pre>
+<p><strong>JavaScript (using Jest):</strong></p>
+<pre><code class="language-bash">jest --coverage --coverageReporters=lcov
+</code></pre>
+<h3 id="configuring-debtmap"><a class="header" href="#configuring-debtmap">Configuring Debtmap</a></h3>
+<p>Point debtmap to your coverage data:</p>
+<pre><code class="language-bash">debtmap analyze --coverage-path ./coverage/lcov.info
+</code></pre>
+<p>Or in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[coverage]
+lcov_path = "./coverage/lcov.info"
+</code></pre>
+<h2 id="best-practices-4"><a class="header" href="#best-practices-4">Best Practices</a></h2>
+<h3 id="1-use-precise-gaps-when-possible"><a class="header" href="#1-use-precise-gaps-when-possible">1. Use Precise Gaps When Possible</a></h3>
+<p>Always generate LCOV data for actionable coverage insights:</p>
+<ul>
+<li>Precise line numbers help you quickly locate untested code</li>
+<li>Accurate percentages prevent over/under-estimating gaps</li>
+<li>Line ranges show if gaps are concentrated or scattered</li>
+</ul>
+<h3 id="2-focus-on-high-severity-gaps-first"><a class="header" href="#2-focus-on-high-severity-gaps-first">2. Focus on High Severity Gaps First</a></h3>
+<p>Prioritize based on severity indicators:</p>
+<ol>
+<li>🔴🔴 CRITICAL (76-100%) - Address immediately</li>
+<li>🔴 HIGH (51-75%) - Schedule for next sprint</li>
+<li>🟠 MODERATE (26-50%) - Address when convenient</li>
+<li>🟡 LOW (1-25%) - Acceptable for some code</li>
+</ol>
+<h3 id="3-consider-context"><a class="header" href="#3-consider-context">3. Consider Context</a></h3>
+<p>Gap severity should be weighted by:</p>
+<ul>
+<li><strong>Function role</strong>: Business logic vs utilities</li>
+<li><strong>Complexity</strong>: High complexity + high gap = top priority</li>
+<li><strong>Change frequency</strong>: Frequently changed code needs better coverage</li>
+<li><strong>Risk</strong>: Security, data integrity, financial calculations</li>
+</ul>
+<h3 id="4-track-progress-over-time"><a class="header" href="#4-track-progress-over-time">4. Track Progress Over Time</a></h3>
+<p>Run debtmap regularly to track coverage improvements:</p>
+<pre><code class="language-bash"># Weekly coverage check
+debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
+</code></pre>
+<p>Compare reports to see gap reduction progress.</p>
+<h2 id="troubleshooting-6"><a class="header" href="#troubleshooting-6">Troubleshooting</a></h2>
+<h3 id="coverage-data-unavailable-for-all-functions"><a class="header" href="#coverage-data-unavailable-for-all-functions">“Coverage data unavailable” for all functions</a></h3>
+<p><strong>Cause</strong>: Debtmap can’t find or parse LCOV file</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify <code>--coverage-path</code> points to valid LCOV file</li>
+<li>Ensure LCOV file was generated recently</li>
+<li>Check file permissions (readable by debtmap)</li>
+<li>Validate LCOV format: <code>head -20 ./coverage/lcov.info</code></li>
+</ul>
+<h3 id="line-numbers-dont-match-source-code"><a class="header" href="#line-numbers-dont-match-source-code">Line numbers don’t match source code</a></h3>
+<p><strong>Cause</strong>: Source code changed since coverage was generated</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Re-run tests with coverage collection</li>
+<li>Ensure clean build before coverage run</li>
+<li>Commit code before running coverage</li>
+</ul>
+<h3 id="estimated-gaps-for-functions-with-lcov-data"><a class="header" href="#estimated-gaps-for-functions-with-lcov-data">Estimated gaps for functions with LCOV data</a></h3>
+<p><strong>Cause</strong>: Function name or path mismatch</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check function names match exactly (case-sensitive)</li>
+<li>Verify file paths are consistent (relative vs absolute)</li>
+<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+</ul>
+<h3 id="missing-functions-in-coverage-report"><a class="header" href="#missing-functions-in-coverage-report">Missing functions in coverage report</a></h3>
+<p><strong>Cause</strong>: Functions not instrumented or filtered out</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check coverage tool configuration</li>
+<li>Ensure test execution reaches those functions</li>
+<li>Verify functions aren’t in excluded paths</li>
+</ul>
+<h2 id="related-topics-1"><a class="header" href="#related-topics-1">Related Topics</a></h2>
+<ul>
+<li><a href="coverage-integration.html">Coverage Integration</a> - Detailed coverage tool setup</li>
+<li><a href="tiered-prioritization.html">Tiered Prioritization</a> - How coverage gaps affect priority</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - Coverage weight in debt scoring</li>
+<li><a href="metrics-reference.html">Metrics Reference</a> - All coverage-related metrics</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="coverage-integration-1"><a class="header" href="#coverage-integration-1">Coverage Integration</a></h1>
 <p>Coverage integration is one of Debtmap’s most powerful capabilities, enabling <strong>risk-based prioritization</strong> by correlating complexity metrics with test coverage. This helps you identify truly risky code—functions that are both complex and untested—rather than just highlighting complex but well-tested functions.</p>
 <h2 id="why-coverage-matters"><a class="header" href="#why-coverage-matters">Why Coverage Matters</a></h2>
@@ -7745,7 +8232,7 @@ debtmap analyze . --lcov ./target/coverage/lcov.info
 <li>Regenerate coverage with explicit LCOV format flag</li>
 </ul>
 <p>See <a href="troubleshooting.html">Troubleshooting</a> for more debugging tips.</p>
-<h2 id="best-practices-4"><a class="header" href="#best-practices-4">Best Practices</a></h2>
+<h2 id="best-practices-5"><a class="header" href="#best-practices-5">Best Practices</a></h2>
 <h3 id="analysis-workflow"><a class="header" href="#analysis-workflow">Analysis Workflow</a></h3>
 <ol>
 <li>
@@ -8190,7 +8677,7 @@ diff without_entropy.txt with_entropy.txt
 weight = 0.3  # Reduce impact
 max_combined_reduction = 0.5  # Limit maximum reduction
 </code></pre>
-<h2 id="best-practices-5"><a class="header" href="#best-practices-5">Best Practices</a></h2>
+<h2 id="best-practices-6"><a class="header" href="#best-practices-6">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - They work well for most projects</li>
 <li><strong>Verify results</strong> - Spot-check top-priority items to ensure correctness</li>
@@ -8607,7 +9094,7 @@ Score: 1350 (Confidence: Definite)
 </ul>
 <p>This enables longitudinal analysis: “Are we reducing god objects sprint-over-sprint?”</p>
 <p>See <code>src/organization/god_object_metrics.rs:1-228</code>.</p>
-<h2 id="troubleshooting-6"><a class="header" href="#troubleshooting-6">Troubleshooting</a></h2>
+<h2 id="troubleshooting-7"><a class="header" href="#troubleshooting-7">Troubleshooting</a></h2>
 <h3 id="why-is-my-functional-module-flagged-as-a-god-object"><a class="header" href="#why-is-my-functional-module-flagged-as-a-god-object">“Why is my functional module flagged as a god object?”</a></h3>
 <p><strong>Answer:</strong> Debtmap aggregates standalone functions with struct methods. A file with 100 pure helper functions will be flagged, even though each function is simple.</p>
 <p><strong>Solutions:</strong></p>
@@ -8631,7 +9118,7 @@ Score: 1350 (Confidence: Definite)
 <li>Use <code>--no-aggregation</code> to skip file-level analysis</li>
 <li>Adjust thresholds in <code>.debtmap.toml</code> to be more lenient</li>
 </ol>
-<h2 id="best-practices-6"><a class="header" href="#best-practices-6">Best Practices</a></h2>
+<h2 id="best-practices-7"><a class="header" href="#best-practices-7">Best Practices</a></h2>
 <p>To avoid god objects:</p>
 <ol>
 <li><strong>Follow Single Responsibility Principle</strong> - Each module should have one clear purpose</li>
@@ -9295,7 +9782,7 @@ time debtmap analyze --no-parallel  # Sequential
 <pre><code class="language-bash"># Monitor peak memory usage
 /usr/bin/time -v debtmap analyze --jobs 8
 </code></pre>
-<h2 id="best-practices-7"><a class="header" href="#best-practices-7">Best Practices</a></h2>
+<h2 id="best-practices-8"><a class="header" href="#best-practices-8">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - Debtmap auto-detects optimal thread count</li>
 <li><strong>Limit threads in CI</strong> - Use <code>--jobs 2</code> or <code>--jobs 4</code> in shared environments</li>
@@ -9303,7 +9790,7 @@ time debtmap analyze --no-parallel  # Sequential
 <li><strong>Consider I/O</strong> - If using slow storage, reduce thread count</li>
 <li><strong>Cache aggressively</strong> - Large caches reduce repeated work</li>
 </ol>
-<h2 id="troubleshooting-7"><a class="header" href="#troubleshooting-7">Troubleshooting</a></h2>
+<h2 id="troubleshooting-8"><a class="header" href="#troubleshooting-8">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-despite-parallelism"><a class="header" href="#analysis-is-slow-despite-parallelism">Analysis is Slow Despite Parallelism</a></h3>
 <p><strong>Possible causes:</strong></p>
 <ol>
@@ -10162,7 +10649,7 @@ prodigy run workflows/debtmap.yml -yn 20
 <li>Run linting (with auto-fixing)</li>
 </ol>
 <p>The workflow continues to the next iteration automatically if all steps succeed.</p>
-<h3 id="example-output-2"><a class="header" href="#example-output-2">Example Output</a></h3>
+<h3 id="example-output-3"><a class="header" href="#example-output-3">Example Output</a></h3>
 <pre><code>Iteration 1:
   - Fixed: parse_expression() (9.2 → 5.1)
   - Fixed: calculate_score() (8.8 → 4.2)
@@ -10338,7 +10825,7 @@ jobs:
 <li><strong>Timeout</strong>: CI jobs may need extended timeout for multiple iterations</li>
 <li><strong>Review</strong>: Always create a PR for human review before merging automated changes</li>
 </ul>
-<h2 id="best-practices-8"><a class="header" href="#best-practices-8">Best Practices</a></h2>
+<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
 <h3 id="1-start-small"><a class="header" href="#1-start-small">1. Start Small</a></h3>
 <p>Begin with low iteration counts:</p>
 <pre><code class="language-bash"># First run: 1 iteration to test workflow
@@ -10397,7 +10884,7 @@ debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-a
 # View detailed metrics
 cat .prodigy/comparison.json | jq
 </code></pre>
-<h2 id="troubleshooting-8"><a class="header" href="#troubleshooting-8">Troubleshooting</a></h2>
+<h2 id="troubleshooting-9"><a class="header" href="#troubleshooting-9">Troubleshooting</a></h2>
 <h3 id="workflow-fails-to-start"><a class="header" href="#workflow-fails-to-start">Workflow Fails to Start</a></h3>
 <p><strong>Issue</strong>: “Prodigy not found” or “API key missing”</p>
 <p><strong>Solution</strong>:</p>
@@ -10649,9 +11136,573 @@ Arguments: --module &lt;module_name&gt;
 <li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - Understanding priority tiers</li>
 <li><a href="https://github.com/iepathos/prodigy">Prodigy Documentation</a> - Full Prodigy reference</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="responsibility-analysis"><a class="header" href="#responsibility-analysis">Responsibility Analysis</a></h1>
+<h2 id="overview-5"><a class="header" href="#overview-5">Overview</a></h2>
+<p>Responsibility analysis is a core feature of Debtmap that helps identify violations of the <strong>Single Responsibility Principle (SRP)</strong>, one of the fundamental SOLID design principles. By analyzing function and method names, Debtmap automatically infers the distinct functional responsibilities within a code unit and detects when a single module, struct, or class has taken on too many concerns.</p>
+<p>This chapter provides an in-depth look at how Debtmap determines responsibilities, categorizes them, and uses this information to guide refactoring decisions.</p>
+<h2 id="what-are-responsibilities"><a class="header" href="#what-are-responsibilities">What Are Responsibilities?</a></h2>
+<p>In the context of Debtmap, a <strong>responsibility</strong> is a distinct functional domain or concern that a code unit handles. Examples include:</p>
+<ul>
+<li><strong>Data Access</strong> - Getting and setting values from data structures</li>
+<li><strong>Validation</strong> - Checking inputs, verifying constraints, ensuring correctness</li>
+<li><strong>Persistence</strong> - Saving and loading data to/from storage</li>
+<li><strong>Computation</strong> - Performing calculations and transformations</li>
+<li><strong>Communication</strong> - Sending and receiving messages or events</li>
+</ul>
+<p>According to the Single Responsibility Principle, each module should have <strong>one and only one reason to change</strong>. When a module handles multiple unrelated responsibilities (e.g., validation, persistence, AND computation), it becomes:</p>
+<ul>
+<li><strong>Harder to understand</strong> - Developers must mentally juggle multiple concerns</li>
+<li><strong>More fragile</strong> - Changes to one responsibility can break others</li>
+<li><strong>Difficult to test</strong> - Testing requires complex setup across multiple domains</li>
+<li><strong>Prone to coupling</strong> - Dependencies from different domains become entangled</li>
+</ul>
+<p>Debtmap’s responsibility analysis automatically identifies these violations and provides concrete recommendations for splitting modules along responsibility boundaries.</p>
+<h2 id="how-responsibilities-are-detected"><a class="header" href="#how-responsibilities-are-detected">How Responsibilities Are Detected</a></h2>
+<h3 id="pattern-based-inference"><a class="header" href="#pattern-based-inference">Pattern-Based Inference</a></h3>
+<p>Debtmap uses <strong>prefix-based pattern matching</strong> to infer responsibilities from function and method names. This approach is both simple and effective because well-named functions naturally express their intent through conventional prefixes.</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:316-386</code></p>
+<p>The <code>infer_responsibility_from_method()</code> function performs case-insensitive prefix matching:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn infer_responsibility_from_method(method_name: &amp;str) -&gt; String {
+    let lower_name = method_name.to_lowercase();
+
+    if lower_name.starts_with("format_") || lower_name.starts_with("render_") {
+        return "Formatting &amp; Output".to_string();
+    }
+    if lower_name.starts_with("parse_") || lower_name.starts_with("read_") {
+        return "Parsing &amp; Input".to_string();
+    }
+    // ... additional patterns
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This approach works across languages (Rust, Python, JavaScript/TypeScript) because naming conventions are relatively consistent in modern codebases.</p>
+<h3 id="responsibility-categories"><a class="header" href="#responsibility-categories">Responsibility Categories</a></h3>
+<p>Debtmap recognizes <strong>11 built-in responsibility categories</strong> plus a generic “Utilities” fallback:</p>
+<div class="table-wrapper"><table><thead><tr><th>Category</th><th>Prefixes</th><th>Examples</th></tr></thead><tbody>
+<tr><td><strong>Formatting &amp; Output</strong></td><td><code>format_</code>, <code>render_</code>, <code>write_</code>, <code>print_</code></td><td><code>format_json()</code>, <code>render_table()</code>, <code>write_report()</code></td></tr>
+<tr><td><strong>Parsing &amp; Input</strong></td><td><code>parse_</code>, <code>read_</code>, <code>extract_</code></td><td><code>parse_config()</code>, <code>read_file()</code>, <code>extract_fields()</code></td></tr>
+<tr><td><strong>Filtering &amp; Selection</strong></td><td><code>filter_</code>, <code>select_</code>, <code>find_</code></td><td><code>filter_results()</code>, <code>select_top()</code>, <code>find_item()</code></td></tr>
+<tr><td><strong>Transformation</strong></td><td><code>transform_</code>, <code>convert_</code>, <code>map_</code>, <code>apply_</code></td><td><code>transform_data()</code>, <code>convert_type()</code>, <code>map_fields()</code></td></tr>
+<tr><td><strong>Data Access</strong></td><td><code>get_</code>, <code>set_</code></td><td><code>get_value()</code>, <code>set_name()</code></td></tr>
+<tr><td><strong>Validation</strong></td><td><code>validate_</code>, <code>check_</code>, <code>verify_</code>, <code>is_*</code></td><td><code>validate_input()</code>, <code>check_bounds()</code>, <code>is_valid()</code></td></tr>
+<tr><td><strong>Computation</strong></td><td><code>calculate_</code>, <code>compute_</code></td><td><code>calculate_score()</code>, <code>compute_sum()</code></td></tr>
+<tr><td><strong>Construction</strong></td><td><code>create_</code>, <code>build_</code>, <code>new_*</code>, <code>make_</code></td><td><code>create_instance()</code>, <code>build_config()</code>, <code>new_user()</code></td></tr>
+<tr><td><strong>Persistence</strong></td><td><code>save_</code>, <code>load_</code>, <code>store_</code></td><td><code>save_data()</code>, <code>load_cache()</code>, <code>store_result()</code></td></tr>
+<tr><td><strong>Processing</strong></td><td><code>process_</code>, <code>handle_</code></td><td><code>process_request()</code>, <code>handle_error()</code></td></tr>
+<tr><td><strong>Communication</strong></td><td><code>send_</code>, <code>receive_</code></td><td><code>send_message()</code>, <code>receive_data()</code></td></tr>
+<tr><td><strong>Utilities</strong></td><td><em>(all others)</em></td><td><code>helper()</code>, <code>do_work()</code>, <code>utility_fn()</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="grouping-methods-by-responsibility"><a class="header" href="#grouping-methods-by-responsibility">Grouping Methods by Responsibility</a></h3>
+<p>Once individual methods are categorized, Debtmap groups them using <code>group_methods_by_responsibility()</code>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:268-280</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn group_methods_by_responsibility(methods: &amp;[String]) -&gt; HashMap&lt;String, Vec&lt;String&gt;&gt; {
+    let mut groups: HashMap&lt;String, Vec&lt;String&gt;&gt; = HashMap::new();
+    for method in methods {
+        let responsibility = infer_responsibility_from_method(method);
+        groups.entry(responsibility).or_default().push(method.clone());
+    }
+    groups
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Output Structure:</strong></p>
+<ul>
+<li><strong>Keys</strong>: Responsibility category names (e.g., “Data Access”, “Validation”)</li>
+<li><strong>Values</strong>: Lists of method names belonging to each category</li>
+</ul>
+<p>The <strong>responsibility count</strong> is simply the number of unique keys in this HashMap.</p>
+<h3 id="example-analysis"><a class="header" href="#example-analysis">Example Analysis</a></h3>
+<p>Consider a Rust struct with these methods:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl UserManager {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt; { }
+    fn set_password(&amp;mut self, id: UserId, password: &amp;str) { }
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool { }
+    fn validate_password(&amp;self, password: &amp;str) -&gt; bool { }
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt; { }
+    fn load_user(&amp;self, id: UserId) -&gt; Result&lt;User&gt; { }
+    fn send_notification(&amp;self, user_id: UserId, msg: &amp;str) { }
+    fn format_user_profile(&amp;self, user: &amp;User) -&gt; String { }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Debtmap’s Analysis:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Method</th><th>Inferred Responsibility</th></tr></thead><tbody>
+<tr><td><code>get_user</code></td><td>Data Access</td></tr>
+<tr><td><code>set_password</code></td><td>Data Access</td></tr>
+<tr><td><code>validate_email</code></td><td>Validation</td></tr>
+<tr><td><code>validate_password</code></td><td>Validation</td></tr>
+<tr><td><code>save_user</code></td><td>Persistence</td></tr>
+<tr><td><code>load_user</code></td><td>Persistence</td></tr>
+<tr><td><code>send_notification</code></td><td>Communication</td></tr>
+<tr><td><code>format_user_profile</code></td><td>Formatting &amp; Output</td></tr>
+</tbody></table>
+</div>
+<p><strong>Result:</strong></p>
+<ul>
+<li><strong>Responsibility Count</strong>: 5 (Data Access, Validation, Persistence, Communication, Formatting)</li>
+<li><strong>Assessment</strong>: This violates SRP - <code>UserManager</code> has too many distinct concerns</li>
+</ul>
+<h2 id="responsibility-scoring"><a class="header" href="#responsibility-scoring">Responsibility Scoring</a></h2>
+<h3 id="integration-with-god-object-detection"><a class="header" href="#integration-with-god-object-detection">Integration with God Object Detection</a></h3>
+<p>Responsibility count is a critical factor in <a href="./god-object-detection.html">God Object Detection</a>. The scoring algorithm includes:</p>
+<pre><code>responsibility_factor = min(responsibility_count / 3.0, 3.0)
+god_object_score = method_factor × field_factor × responsibility_factor × size_factor
+</code></pre>
+<p><strong>Why divide by 3.0?</strong></p>
+<ul>
+<li><strong>1-3 responsibilities</strong>: Normal, well-scoped module</li>
+<li><strong>4-6 responsibilities</strong>: Warning signs, approaching problematic territory</li>
+<li><strong>7+ responsibilities</strong>: Severe violation, likely a god object</li>
+</ul>
+<h3 id="language-specific-thresholds-1"><a class="header" href="#language-specific-thresholds-1">Language-Specific Thresholds</a></h3>
+<p>Different languages have different expectations for responsibility counts:</p>
+<div class="table-wrapper"><table><thead><tr><th>Language</th><th>Max Responsibilities</th><th>Rationale</th></tr></thead><tbody>
+<tr><td><strong>Rust</strong></td><td>5</td><td>Strong module system encourages tight boundaries</td></tr>
+<tr><td><strong>Python</strong></td><td>3</td><td>Duck typing makes mixing concerns more dangerous</td></tr>
+<tr><td><strong>JavaScript/TypeScript</strong></td><td>3</td><td>Prototype-based, benefits from focused classes</td></tr>
+</tbody></table>
+</div>
+<p>These thresholds can be customized in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 5      # max_traits = max responsibilities
+
+[god_object_detection.python]
+max_traits = 3
+</code></pre>
+<h3 id="confidence-determination"><a class="header" href="#confidence-determination">Confidence Determination</a></h3>
+<p>Responsibility count contributes to overall confidence levels:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:234-266</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn determine_confidence(
+    method_count: usize,
+    field_count: usize,
+    responsibility_count: usize,
+    lines_of_code: usize,
+    complexity_sum: u32,
+    thresholds: &amp;GodObjectThresholds,
+) -&gt; GodObjectConfidence {
+    let mut violations = 0;
+
+    if responsibility_count &gt; thresholds.max_traits {
+        violations += 1;
+    }
+    // ... check other metrics
+
+    match violations {
+        5 =&gt; GodObjectConfidence::Definite,
+        3..=4 =&gt; GodObjectConfidence::Probable,
+        1..=2 =&gt; GodObjectConfidence::Possible,
+        _ =&gt; GodObjectConfidence::NotGodObject,
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="advanced-responsibility-detection"><a class="header" href="#advanced-responsibility-detection">Advanced Responsibility Detection</a></h2>
+<h3 id="module-level-analysis"><a class="header" href="#module-level-analysis">Module-Level Analysis</a></h3>
+<p>For large modules without a single dominant struct, Debtmap performs <strong>module-level responsibility detection</strong>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_detector.rs:682-697</code></p>
+<p>The <code>classify_responsibility()</code> function provides extended categorization:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn classify_responsibility(prefix: &amp;str) -&gt; String {
+    match prefix {
+        "get" | "set" =&gt; "Data Access",
+        "calculate" | "compute" =&gt; "Computation",
+        "validate" | "check" | "verify" | "ensure" =&gt; "Validation",
+        "save" | "load" | "store" | "retrieve" | "fetch" =&gt; "Persistence",
+        "create" | "build" | "new" | "make" | "init" =&gt; "Construction",
+        "send" | "receive" | "handle" | "manage" =&gt; "Communication",
+        "update" | "modify" | "change" | "edit" =&gt; "Modification",
+        "delete" | "remove" | "clear" | "reset" =&gt; "Deletion",
+        "is" | "has" | "can" | "should" | "will" =&gt; "State Query",
+        "process" | "transform" =&gt; "Processing",
+        _ =&gt; format!("{} Operations", capitalize_first(prefix)),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This extended mapping covers 10 core categories plus dynamic fallback for custom prefixes.</p>
+<h3 id="responsibility-groups"><a class="header" href="#responsibility-groups">Responsibility Groups</a></h3>
+<p>The <code>ResponsibilityGroup</code> data structure tracks detailed information about each responsibility:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/mod.rs:156-161</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone, PartialEq)]
+pub struct ResponsibilityGroup {
+    pub name: String,           // e.g., "DataAccessManager"
+    pub methods: Vec&lt;String&gt;,   // Methods in this group
+    pub fields: Vec&lt;String&gt;,    // Associated fields
+    pub responsibility: String, // e.g., "Data Access"
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This structure enables:</p>
+<ul>
+<li><strong>Refactoring recommendations</strong> - Suggest splitting by responsibility group</li>
+<li><strong>Cohesion analysis</strong> - Measure how tightly methods are related</li>
+<li><strong>Field-method correlation</strong> - Identify which fields belong to which responsibilities</li>
+</ul>
+<h2 id="refactoring-based-on-responsibilities"><a class="header" href="#refactoring-based-on-responsibilities">Refactoring Based on Responsibilities</a></h2>
+<h3 id="recommended-module-splits"><a class="header" href="#recommended-module-splits">Recommended Module Splits</a></h3>
+<p>When Debtmap detects a module with multiple responsibilities, it generates actionable refactoring recommendations using <code>recommend_module_splits()</code>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_detector.rs:165-177</code></p>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Group all methods by their inferred responsibilities</li>
+<li>Create a <code>ModuleSplit</code> for each responsibility group</li>
+<li>Suggest module names (e.g., “DataAccessManager”, “ValidationManager”)</li>
+<li>Estimate lines of code for each new module</li>
+<li>Order by cohesion (most focused groups first)</li>
+</ol>
+<p><strong>Example Output:</strong></p>
+<pre><code>Recommended Splits for UserManager:
+  1. DataAccessManager (5 methods, ~80 lines)
+     - get_user, set_password, get_email, set_email, update_profile
+
+  2. ValidationManager (4 methods, ~60 lines)
+     - validate_email, validate_password, check_permissions, verify_token
+
+  3. PersistenceManager (3 methods, ~50 lines)
+     - save_user, load_user, delete_user
+
+  4. NotificationManager (2 methods, ~30 lines)
+     - send_notification, send_bulk_notifications
+</code></pre>
+<h3 id="practical-refactoring-patterns"><a class="header" href="#practical-refactoring-patterns">Practical Refactoring Patterns</a></h3>
+<h4 id="pattern-1-extract-service-classes"><a class="header" href="#pattern-1-extract-service-classes">Pattern 1: Extract Service Classes</a></h4>
+<p><strong>Before (God Object):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct UserManager {
+    db: Database,
+    cache: Cache,
+    notifier: Notifier,
+}
+
+impl UserManager {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt; { }
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool { }
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt; { }
+    fn send_notification(&amp;self, id: UserId, msg: &amp;str) { }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>After (Split by Responsibility):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Data Access
+struct UserRepository {
+    db: Database,
+    cache: Cache,
+}
+
+// Validation
+struct UserValidator;
+
+// Persistence
+struct UserPersistence {
+    db: Database,
+}
+
+// Communication
+struct NotificationService {
+    notifier: Notifier,
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="pattern-2-use-facade-for-composition"><a class="header" href="#pattern-2-use-facade-for-composition">Pattern 2: Use Facade for Composition</a></h4>
+<p>After splitting, create a facade to coordinate:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct UserFacade {
+    repository: UserRepository,
+    validator: UserValidator,
+    persistence: UserPersistence,
+    notifier: NotificationService,
+}
+
+impl UserFacade {
+    fn register_user(&amp;mut self, user: User) -&gt; Result&lt;()&gt; {
+        self.validator.validate_email(&amp;user.email)?;
+        self.persistence.save_user(&amp;user)?;
+        self.notifier.send_welcome(&amp;user.id)?;
+        Ok(())
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="pattern-3-trait-based-separation-rust"><a class="header" href="#pattern-3-trait-based-separation-rust">Pattern 3: Trait-Based Separation (Rust)</a></h4>
+<p>Use traits to define responsibility boundaries:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait DataAccess {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt;;
+}
+
+trait Validation {
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool;
+}
+
+trait Persistence {
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt;;
+}
+
+// Implement only the needed traits per struct
+impl DataAccess for UserRepository { }
+impl Validation for UserValidator { }
+impl Persistence for UserPersistence { }
+<span class="boring">}</span></code></pre></pre>
+<h2 id="data-structures"><a class="header" href="#data-structures">Data Structures</a></h2>
+<h3 id="godobjectanalysis"><a class="header" href="#godobjectanalysis">GodObjectAnalysis</a></h3>
+<p>The main result structure includes responsibility information:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:5-18</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct GodObjectAnalysis {
+    pub is_god_object: bool,
+    pub method_count: usize,
+    pub field_count: usize,
+    pub responsibility_count: usize,      // Number of distinct responsibilities
+    pub lines_of_code: usize,
+    pub complexity_sum: u32,
+    pub god_object_score: f64,
+    pub recommended_splits: Vec&lt;ModuleSplit&gt;,
+    pub confidence: GodObjectConfidence,
+    pub responsibilities: Vec&lt;String&gt;,    // List of responsibility names
+    pub purity_distribution: Option&lt;PurityDistribution&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="modulesplit"><a class="header" href="#modulesplit">ModuleSplit</a></h3>
+<p>Recommendations for splitting modules:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:40-45</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct ModuleSplit {
+    pub suggested_name: String,         // e.g., "ValidationManager"
+    pub methods_to_move: Vec&lt;String&gt;,   // Methods for this module
+    pub responsibility: String,          // Responsibility category
+    pub estimated_lines: usize,         // Approximate LOC
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="testing-responsibility-detection"><a class="header" href="#testing-responsibility-detection">Testing Responsibility Detection</a></h2>
+<p>Debtmap includes comprehensive tests for responsibility detection:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:623-838</code></p>
+<h3 id="test-coverage"><a class="header" href="#test-coverage">Test Coverage</a></h3>
+<p><strong>Key test cases:</strong></p>
+<ul>
+<li><strong>Prefix recognition</strong> - Each of the 11 categories is tested individually</li>
+<li><strong>Case insensitivity</strong> - <code>Format_Output</code> and <code>format_output</code> both map to “Formatting &amp; Output”</li>
+<li><strong>Multiple responsibilities</strong> - Grouping diverse methods correctly</li>
+<li><strong>Empty input handling</strong> - Graceful handling of empty method lists</li>
+<li><strong>Edge cases</strong> - Methods without recognized prefixes default to “Utilities”</li>
+</ul>
+<p><strong>Example Test:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_multiple_responsibility_groups() {
+    let methods = vec![
+        "format_output".to_string(),
+        "parse_input".to_string(),
+        "get_value".to_string(),
+        "validate_data".to_string(),
+    ];
+
+    let groups = group_methods_by_responsibility(&amp;methods);
+
+    assert_eq!(groups.len(), 4); // 4 distinct responsibilities
+    assert!(groups.contains_key("Formatting &amp; Output"));
+    assert!(groups.contains_key("Parsing &amp; Input"));
+    assert!(groups.contains_key("Data Access"));
+    assert!(groups.contains_key("Validation"));
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="configuration-6"><a class="header" href="#configuration-6">Configuration</a></h2>
+<h3 id="toml-configuration-1"><a class="header" href="#toml-configuration-1">TOML Configuration</a></h3>
+<p>Customize responsibility thresholds in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[god_object_detection]
+enabled = true
+
+[god_object_detection.rust]
+max_traits = 5      # Max responsibilities for Rust
+
+[god_object_detection.python]
+max_traits = 3      # Max responsibilities for Python
+
+[god_object_detection.javascript]
+max_traits = 3      # Max responsibilities for JavaScript/TypeScript
+</code></pre>
+<h3 id="tuning-guidelines-1"><a class="header" href="#tuning-guidelines-1">Tuning Guidelines</a></h3>
+<p><strong>Strict SRP Enforcement:</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 3
+</code></pre>
+<ul>
+<li>Enforces very tight single responsibility</li>
+<li>Suitable for greenfield projects or strict refactoring efforts</li>
+</ul>
+<p><strong>Balanced Approach (Default):</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 5
+</code></pre>
+<ul>
+<li>Allows some flexibility while catching major violations</li>
+<li>Works well for most projects</li>
+</ul>
+<p><strong>Lenient Mode:</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 7
+</code></pre>
+<ul>
+<li>Only flags severe SRP violations</li>
+<li>Useful for large legacy codebases during initial assessment</li>
+</ul>
+<h2 id="output-and-reporting"><a class="header" href="#output-and-reporting">Output and Reporting</a></h2>
+<h3 id="console-output"><a class="header" href="#console-output">Console Output</a></h3>
+<p>When analyzing a file with multiple responsibilities:</p>
+<pre><code>src/services/user_manager.rs
+  ⚠️ God Object: 18 methods, 8 fields, 5 responsibilities
+     Score: 185 (Confidence: Probable)
+
+     Responsibilities:
+       - Data Access (5 methods)
+       - Validation (4 methods)
+       - Persistence (3 methods)
+       - Communication (3 methods)
+       - Formatting &amp; Output (3 methods)
+
+     Recommended Splits:
+       1. DataAccessManager (5 methods, ~75 lines)
+       2. ValidationManager (4 methods, ~60 lines)
+       3. PersistenceManager (3 methods, ~45 lines)
+</code></pre>
+<h3 id="json-output-1"><a class="header" href="#json-output-1">JSON Output</a></h3>
+<p>For programmatic analysis, use <code>--format json</code>:</p>
+<pre><code class="language-json">{
+  "file": "src/services/user_manager.rs",
+  "is_god_object": true,
+  "responsibility_count": 5,
+  "responsibilities": [
+    "Data Access",
+    "Validation",
+    "Persistence",
+    "Communication",
+    "Formatting &amp; Output"
+  ],
+  "recommended_splits": [
+    {
+      "suggested_name": "DataAccessManager",
+      "methods_to_move": ["get_user", "set_password", "get_email"],
+      "responsibility": "Data Access",
+      "estimated_lines": 75
+    }
+  ]
+}
+</code></pre>
+<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
+<h3 id="writing-srp-compliant-code"><a class="header" href="#writing-srp-compliant-code">Writing SRP-Compliant Code</a></h3>
+<ol>
+<li><strong>Name functions descriptively</strong> - Use standard prefixes (<code>get_</code>, <code>validate_</code>, etc.)</li>
+<li><strong>Group related functions</strong> - Keep similar responsibilities together</li>
+<li><strong>Limit responsibility count</strong> - Aim for 1-3 responsibilities per module</li>
+<li><strong>Review regularly</strong> - Run Debtmap periodically to catch responsibility creep</li>
+<li><strong>Refactor early</strong> - Split modules before they hit thresholds</li>
+</ol>
+<h3 id="code-review-guidelines"><a class="header" href="#code-review-guidelines">Code Review Guidelines</a></h3>
+<p>When reviewing responsibility analysis results:</p>
+<ol>
+<li><strong>Check responsibility boundaries</strong> - Are they logically distinct?</li>
+<li><strong>Validate groupings</strong> - Do the recommended splits make sense?</li>
+<li><strong>Consider dependencies</strong> - Will splitting introduce more coupling?</li>
+<li><strong>Estimate refactoring cost</strong> - Is the improvement worth the effort?</li>
+<li><strong>Prioritize by score</strong> - Focus on high-scoring god objects first</li>
+</ol>
+<h3 id="team-adoption"><a class="header" href="#team-adoption">Team Adoption</a></h3>
+<p><strong>Phase 1: Assessment</strong></p>
+<ul>
+<li>Run Debtmap on codebase</li>
+<li>Review responsibility violations</li>
+<li>Identify top 10 problematic modules</li>
+</ul>
+<p><strong>Phase 2: Education</strong></p>
+<ul>
+<li>Share responsibility analysis results with team</li>
+<li>Discuss SRP and its benefits</li>
+<li>Agree on responsibility threshold standards</li>
+</ul>
+<p><strong>Phase 3: Incremental Refactoring</strong></p>
+<ul>
+<li>Start with highest-scoring modules</li>
+<li>Apply recommended splits</li>
+<li>Measure improvement with follow-up analysis</li>
+</ul>
+<p><strong>Phase 4: Continuous Monitoring</strong></p>
+<ul>
+<li>Integrate Debtmap into CI/CD</li>
+<li>Track responsibility counts over time</li>
+<li>Prevent new SRP violations from merging</li>
+</ul>
+<h2 id="limitations-and-edge-cases"><a class="header" href="#limitations-and-edge-cases">Limitations and Edge Cases</a></h2>
+<h3 id="false-positives"><a class="header" href="#false-positives">False Positives</a></h3>
+<p><strong>Scenario 1: Utilities Module</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// utilities.rs - 15 helper functions with different prefixes
+fn format_date() { }
+fn parse_config() { }
+fn validate_email() { }
+// ... 12 more diverse utilities
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Issue:</strong> Flagged as having multiple responsibilities, but it’s intentionally a utility collection.</p>
+<p><strong>Solution:</strong> Either accept the flagging (utilities should perhaps be split) or increase <code>max_traits</code> threshold.</p>
+<h3 id="false-negatives"><a class="header" href="#false-negatives">False Negatives</a></h3>
+<p><strong>Scenario 2: Poor Naming</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl DataProcessor {
+    fn process_data(&amp;mut self) { /* does everything */ }
+    fn handle_stuff(&amp;mut self) { /* also does everything */ }
+    fn do_work(&amp;mut self) { /* yet more mixed concerns */ }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Issue:</strong> All methods map to “Processing” or “Utilities”, so responsibility count is low despite clear SRP violations.</p>
+<p><strong>Solution:</strong> Encourage better naming conventions in your team. Debtmap relies on descriptive function names.</p>
+<h3 id="language-specific-challenges"><a class="header" href="#language-specific-challenges">Language-Specific Challenges</a></h3>
+<p><strong>Rust:</strong> Trait implementations may group methods by trait rather than responsibility, artificially inflating counts.</p>
+<p><strong>Python:</strong> Dynamic typing and duck typing make responsibility boundaries less clear from signatures alone.</p>
+<p><strong>JavaScript:</strong> Prototype methods and closures may not follow conventional naming patterns.</p>
+<h2 id="integration-with-other-features"><a class="header" href="#integration-with-other-features">Integration with Other Features</a></h2>
+<h3 id="god-object-detection-2"><a class="header" href="#god-object-detection-2">God Object Detection</a></h3>
+<p>Responsibility analysis is a core component of <a href="./god-object-detection.html">God Object Detection</a>. The responsibility count contributes to:</p>
+<ul>
+<li>God object scoring</li>
+<li>Confidence level determination</li>
+<li>Refactoring recommendations</li>
+</ul>
+<h3 id="tiered-prioritization-1"><a class="header" href="#tiered-prioritization-1">Tiered Prioritization</a></h3>
+<p>High responsibility counts increase priority in <a href="./tiered-prioritization.html">Tiered Prioritization</a> through the god object multiplier.</p>
+<h3 id="risk-assessment"><a class="header" href="#risk-assessment">Risk Assessment</a></h3>
+<p>Modules with multiple responsibilities receive higher risk scores in risk assessment, as they are more prone to bugs and harder to maintain.</p>
+<h2 id="related-documentation-1"><a class="header" href="#related-documentation-1">Related Documentation</a></h2>
+<ul>
+<li><a href="./god-object-detection.html">God Object Detection</a> - Full god object analysis including responsibility detection</li>
+<li><a href="./configuration.html">Configuration</a> - TOML configuration reference</li>
+<li><a href="./metrics-reference.html">Metrics Reference</a> - All metrics including responsibility count</li>
+<li><a href="./architecture.html">Architecture</a> - High-level design including analysis pipelines</li>
+</ul>
+<h2 id="summary-4"><a class="header" href="#summary-4">Summary</a></h2>
+<p>Responsibility analysis in Debtmap:</p>
+<ul>
+<li><strong>Automatically detects SRP violations</strong> through pattern-based method name analysis</li>
+<li><strong>Categorizes methods</strong> into 11 built-in responsibility types</li>
+<li><strong>Provides actionable refactoring recommendations</strong> with suggested module splits</li>
+<li><strong>Integrates with god object detection</strong> for holistic architectural analysis</li>
+<li><strong>Supports language-specific thresholds</strong> for Rust, Python, and JavaScript/TypeScript</li>
+<li><strong>Is fully configurable</strong> via <code>.debtmap.toml</code> and CLI flags</li>
+</ul>
+<p>By surfacing responsibility violations early and suggesting concrete refactoring paths, Debtmap helps teams maintain clean, modular architectures that follow the Single Responsibility Principle.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="scoring-strategies"><a class="header" href="#scoring-strategies">Scoring Strategies</a></h1>
 <p>Debtmap provides two complementary scoring approaches: <strong>file-level</strong> and <strong>function-level</strong>. Understanding when to use each approach helps you make better refactoring decisions and prioritize work effectively.</p>
-<h2 id="overview-5"><a class="header" href="#overview-5">Overview</a></h2>
+<h2 id="overview-6"><a class="header" href="#overview-6">Overview</a></h2>
 <p>Different refactoring scenarios require different levels of granularity:</p>
 <ul>
 <li><strong>File-level scoring</strong>: Identifies architectural issues and planning major refactoring initiatives</li>
@@ -10803,7 +11854,7 @@ method = "max_plus_average"
 <tr><td>Trend analysis</td><td><code>sum</code></td><td>Simple, consistent metric over time</td></tr>
 </tbody></table>
 </div>
-<h3 id="configuration-6"><a class="header" href="#configuration-6">Configuration</a></h3>
+<h3 id="configuration-7"><a class="header" href="#configuration-7">Configuration</a></h3>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
 min_problematic = 3              # Need 3+ problematic functions for file-level score
@@ -10856,6 +11907,310 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 </tbody></table>
 </div>
 <p><strong>Note</strong>: Role multipliers are configurable via the <code>[role_multipliers]</code> section in <code>.debtmap.toml</code>. The multipliers have been rebalanced to be less extreme than earlier versions - pure logic was reduced from 1.5x to 1.2x, while orchestrator and IO wrapper were increased to better reflect their importance in modern codebases.</p>
+<h3 id="constructor-detection-1"><a class="header" href="#constructor-detection-1">Constructor Detection</a></h3>
+<p>Debtmap includes intelligent constructor detection to prevent false positives where trivial initialization functions are misclassified as critical business logic.</p>
+<p><strong>Problem</strong>: Simple constructors like <code>new()</code>, <code>default()</code>, or <code>from_config()</code> often have low complexity but were being flagged as high-priority pure logic functions.</p>
+<p><strong>Solution</strong>: Constructor detection automatically identifies and classifies these functions as <code>IOWrapper</code> (low priority) instead of <code>PureLogic</code> (high priority).</p>
+<p><strong>Detection Criteria</strong>:</p>
+<p>A function is considered a simple constructor if it meets ALL of the following:</p>
+<ol>
+<li>
+<p><strong>Name matches a constructor pattern</strong> (configurable):</p>
+<ul>
+<li>Exact match: <code>new</code>, <code>default</code>, <code>empty</code>, <code>zero</code>, <code>any</code></li>
+<li>Prefix match: <code>from_*</code>, <code>with_*</code>, <code>create_*</code>, <code>make_*</code>, <code>build_*</code>, <code>of_*</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Low cyclomatic complexity</strong> (≤ 2 by default)</p>
+</li>
+<li>
+<p><strong>Short length</strong> (&lt; 15 lines by default)</p>
+</li>
+<li>
+<p><strong>Minimal nesting</strong> (≤ 1 level by default)</p>
+</li>
+<li>
+<p><strong>Low cognitive complexity</strong> (≤ 3 by default)</p>
+</li>
+</ol>
+<p><strong>Example</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Simple constructor - detected and classified as IOWrapper
+fn new() -&gt; Self {
+    Self {
+        field1: 0,
+        field2: String::new(),
+    }
+}
+
+// Complex factory - NOT detected as constructor, remains PureLogic
+fn create_with_validation(data: Data) -&gt; Result&lt;Self&gt; {
+    validate(&amp;data)?;
+    // ... 30 lines of logic
+    Ok(Self { ... })
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Configuration</strong>:</p>
+<p>Constructor detection is fully configurable in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[classification.constructors]
+# Enable AST-based constructor detection (default: true)
+# When enabled, uses Abstract Syntax Tree analysis for accurate detection
+# Disable only if experiencing performance issues with very large codebases
+ast_detection = true
+
+# Constructor name patterns
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "create_",
+    "make_",
+    "build_",
+    "of_",
+    "empty",
+    "zero",
+    "any",
+]
+
+# Complexity thresholds
+max_cyclomatic = 2     # Maximum cyclomatic complexity
+max_cognitive = 3      # Maximum cognitive complexity
+max_length = 15        # Maximum lines
+max_nesting = 1        # Maximum nesting depth
+</code></pre>
+<p><strong>Customization Example</strong>:</p>
+<p>To add custom constructor patterns or adjust thresholds:</p>
+<pre><code class="language-toml">[classification.constructors]
+ast_detection = true      # Keep AST detection enabled (recommended)
+
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "init_",        # Add custom pattern
+    "setup_",       # Add custom pattern
+]
+max_cyclomatic = 3    # Allow slightly more complex constructors
+max_length = 20       # Allow longer constructors
+</code></pre>
+<p>To disable AST-based detection (if experiencing performance issues):</p>
+<pre><code class="language-toml">[classification.constructors]
+ast_detection = false     # Fall back to pattern-only matching
+# Note: May reduce detection accuracy but improves performance
+</code></pre>
+<p>This feature is part of spec 117 and helps reduce false positives in priority scoring.</p>
+<h3 id="role-based-adjustments"><a class="header" href="#role-based-adjustments">Role-Based Adjustments</a></h3>
+<p>DebtMap uses a sophisticated two-stage role adjustment mechanism to ensure that scores accurately reflect both the testing strategy appropriate for each function type and the architectural importance of different roles.</p>
+<h4 id="why-role-based-adjustments"><a class="header" href="#why-role-based-adjustments">Why Role-Based Adjustments?</a></h4>
+<p><strong>Problem</strong>: Traditional scoring treats all functions equally, leading to false positives:</p>
+<ol>
+<li>
+<p><strong>Entry points</strong> (CLI handlers, HTTP routes, <code>main</code> functions) typically use integration tests rather than unit tests</p>
+<ul>
+<li>Flagging them for “low unit test coverage” misses that they’re tested differently</li>
+<li>They orchestrate other code but contain minimal business logic</li>
+</ul>
+</li>
+<li>
+<p><strong>Pure business logic</strong> functions should have comprehensive unit tests</p>
+<ul>
+<li>Easy to test in isolation with deterministic inputs/outputs</li>
+<li>Core value of the application lives here</li>
+</ul>
+</li>
+<li>
+<p><strong>I/O wrappers</strong> are often tested implicitly through integration tests</p>
+<ul>
+<li>Thin abstractions over file system, network, or database operations</li>
+<li>Unit testing them provides limited value compared to integration testing</li>
+</ul>
+</li>
+</ol>
+<p><strong>Solution</strong>: DebtMap applies role-based adjustments in two stages to address both coverage expectations and architectural importance.</p>
+<h4 id="stage-1-role-based-coverage-weighting"><a class="header" href="#stage-1-role-based-coverage-weighting">Stage 1: Role-Based Coverage Weighting</a></h4>
+<p>The first stage adjusts coverage penalty expectations based on function role. This prevents functions that use different testing strategies from unfairly dominating the priority list.</p>
+<p><strong>How It Works</strong>:</p>
+<p>For each function, DebtMap:</p>
+<ol>
+<li>Detects the function’s role (entry point, pure logic, I/O wrapper, etc.)</li>
+<li>Applies a coverage weight multiplier based on that role</li>
+<li>Reduces or increases the coverage penalty accordingly</li>
+</ol>
+<p><strong>Default Coverage Weights</strong> (configurable in <code>.debtmap.toml</code>):</p>
+<div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Coverage Weight</th><th>Impact on Scoring</th></tr></thead><tbody>
+<tr><td>Pure Logic</td><td>1.2</td><td>Higher coverage penalty (should have unit tests)</td></tr>
+<tr><td>Unknown</td><td>1.0</td><td>Standard penalty</td></tr>
+<tr><td>Pattern Match</td><td>1.0</td><td>Standard penalty</td></tr>
+<tr><td>Orchestrator</td><td>0.8</td><td>Reduced penalty (partially integration tested)</td></tr>
+<tr><td>I/O Wrapper</td><td>0.7</td><td>Reduced penalty (often integration tested)</td></tr>
+<tr><td>Entry Point</td><td>0.6</td><td>Significantly reduced penalty (integration tested)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example Score Changes</strong>:</p>
+<p><strong>Before role-based coverage adjustment</strong>:</p>
+<pre><code>Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Raw Coverage Penalty: 1.0 (full penalty)
+  Score: 8.5 (flagged as high priority)
+</code></pre>
+<p><strong>After role-based coverage adjustment</strong>:</p>
+<pre><code>Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 0.4 (60% reduction via 0.6 weight)
+  Score: 4.2 (medium priority - more realistic)
+
+  Rationale: Entry points are integration tested, not unit tested.
+  This function is likely tested via API/CLI integration tests.
+</code></pre>
+<p><strong>Comparison with Pure Logic</strong>:</p>
+<pre><code>Function: calculate_discount (Pure Logic)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 1.2 (20% increase via 1.2 weight)
+  Score: 9.8 (critical priority)
+
+  Rationale: Pure logic should have unit tests.
+  This function needs immediate test coverage.
+</code></pre>
+<h4 id="stage-2-role-multiplier"><a class="header" href="#stage-2-role-multiplier">Stage 2: Role Multiplier</a></h4>
+<p>The second stage applies a final role-based multiplier to reflect architectural importance. This multiplier is <strong>clamped by default</strong> to prevent extreme score swings.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_multiplier]</code>):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+</code></pre>
+<p><strong>Clamp Range Rationale</strong>:</p>
+<ul>
+<li><strong>Default [0.3, 1.8]</strong>: Balances differentiation with stability</li>
+<li><strong>Lower bound (0.3)</strong>: I/O wrappers still contribute 30% of base score (not invisible)</li>
+<li><strong>Upper bound (1.8)</strong>: Critical entry points don’t overwhelm other issues (max 180%)</li>
+<li><strong>Configurable</strong>: Adjust based on project priorities</li>
+</ul>
+<p><strong>Example with Clamping</strong>:</p>
+<pre><code>Function: process_data (Complex Pure Logic)
+  Base Score: 45.0
+  Unclamped Role Multiplier: 2.5
+  Clamped Multiplier: 1.8 (clamp_max)
+  Final Score: 45.0 × 1.8 = 81.0
+
+  Effect: Prevents one complex function from dominating entire priority list
+</code></pre>
+<h4 id="why-two-stages"><a class="header" href="#why-two-stages">Why Two Stages?</a></h4>
+<p>The separation of coverage weight adjustment and role multiplier ensures they work together without interfering:</p>
+<p><strong>Stage 1 (Coverage Weight)</strong>: Adjusts testing expectations</p>
+<ul>
+<li><strong>Question</strong>: “How much should we penalize missing unit tests for this type of function?”</li>
+<li><strong>Example</strong>: Entry points get 60% of normal coverage penalty (they’re integration tested)</li>
+</ul>
+<p><strong>Stage 2 (Role Multiplier)</strong>: Adjusts architectural importance</p>
+<ul>
+<li><strong>Question</strong>: “How important is this function relative to others with similar complexity?”</li>
+<li><strong>Example</strong>: Critical entry points might get a 1.2x multiplier (clamped), while simple I/O wrappers get 0.5x (clamped)</li>
+</ul>
+<p><strong>Independent Contributions</strong>:</p>
+<pre><code>1. Calculate base score from complexity + dependencies
+2. Apply coverage weight by role → adjusted coverage penalty
+3. Combine into preliminary score
+4. Apply clamped role multiplier → final score
+</code></pre>
+<p>This approach ensures:</p>
+<ul>
+<li>Coverage adjustments don’t interfere with role multiplier</li>
+<li>Both mechanisms contribute independently</li>
+<li>Clamping prevents instability from extreme multipliers</li>
+</ul>
+<h4 id="how-this-reduces-false-positives"><a class="header" href="#how-this-reduces-false-positives">How This Reduces False Positives</a></h4>
+<p><strong>False Positive #1: Entry Points Flagged for Low Coverage</strong></p>
+<p><strong>Before</strong>:</p>
+<pre><code>Top Priority Items:
+1. main() - Score: 9.2 (0% unit test coverage)
+2. handle_cli_command() - Score: 8.8 (5% unit test coverage)
+3. run_server() - Score: 8.5 (0% unit test coverage)
+</code></pre>
+<p><strong>After</strong>:</p>
+<pre><code>Top Priority Items:
+1. calculate_tax() - Score: 9.8 (0% coverage, Pure Logic)
+2. validate_payment() - Score: 9.2 (10% coverage, Pure Logic)
+3. main() - Score: 4.2 (0% coverage, Entry Point - integration tested)
+</code></pre>
+<p><strong>Result</strong>: Business logic functions that actually need unit tests rise to the top.</p>
+<p><strong>False Positive #2: I/O Wrappers Over-Prioritized</strong></p>
+<p><strong>Before</strong>:</p>
+<pre><code>Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Score: 7.5 (high priority)
+
+  Issue: This is a thin wrapper over std::fs::read_to_string.
+  Unit testing it provides minimal value vs integration tests.
+</code></pre>
+<p><strong>After</strong>:</p>
+<pre><code>Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Adjusted Coverage Weight: 0.7
+  Score: 3.2 (low priority)
+
+  Rationale: I/O wrappers are integration tested.
+  Focus on business logic instead.
+</code></pre>
+<h4 id="configuration-examples-1"><a class="header" href="#configuration-examples-1">Configuration Examples</a></h4>
+<p><strong>Emphasize Pure Logic Testing</strong>:</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
+pure_logic = 1.5        # Strong penalty for untested pure logic
+entry_point = 0.5       # Minimal penalty for untested entry points
+io_wrapper = 0.5        # Minimal penalty for untested I/O wrappers
+</code></pre>
+<p><strong>Conservative Approach (Smaller Adjustments)</strong>:</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
+pure_logic = 1.1        # Slight increase
+entry_point = 0.9       # Slight decrease
+io_wrapper = 0.9        # Slight decrease
+</code></pre>
+<p><strong>Disable Multiplier Clamping</strong> (not recommended for production):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+enable_clamping = false   # Allow unclamped multipliers
+# Warning: May cause unstable prioritization
+</code></pre>
+<h4 id="verification-1"><a class="header" href="#verification-1">Verification</a></h4>
+<p>To see how role-based adjustments affect your codebase:</p>
+<pre><code class="language-bash"># Show detailed scoring breakdown
+debtmap analyze . --verbose
+
+# Compare with role adjustments disabled
+debtmap analyze . --config minimal.toml
+</code></pre>
+<p><strong>Sample verbose output</strong>:</p>
+<pre><code>Function: src/handlers/request.rs:handle_request
+  Role: Entry Point
+  Complexity: 5
+  Coverage: 0%
+  Coverage Weight: 0.6 (Entry Point adjustment)
+  Adjusted Coverage Penalty: 0.4 (reduced from 1.0)
+  Base Score: 15.0
+  Role Multiplier: 1.2 (clamped from 1.5)
+  Final Score: 18.0
+
+  Interpretation:
+    - Entry point gets 60% coverage penalty instead of 100%
+    - Likely tested via integration tests
+    - Still flagged due to complexity, but not over-penalized for coverage
+</code></pre>
+<h4 id="benefits-summary"><a class="header" href="#benefits-summary">Benefits Summary</a></h4>
+<ul>
+<li><strong>Fewer false positives</strong>: Entry points and I/O wrappers no longer dominate priority lists</li>
+<li><strong>Better resource allocation</strong>: Testing efforts focus on pure logic where unit tests provide most value</li>
+<li><strong>Recognition of testing strategies</strong>: Integration tests are valued equally with unit tests</li>
+<li><strong>Stable prioritization</strong>: Clamping prevents extreme multipliers from causing volatile rankings</li>
+<li><strong>Configurable</strong>: Adjust weights and clamp ranges to match your project’s testing philosophy</li>
+</ul>
 <h3 id="use-cases-4"><a class="header" href="#use-cases-4">Use Cases</a></h3>
 <p><strong>1. Identifying Specific Hot Spots</strong></p>
 <pre><code class="language-bash"># Show top 20 functions needing attention
@@ -10880,7 +12235,7 @@ debtmap analyze . --lcov coverage.lcov --filter Testing --top 15
 <pre><code class="language-bash"># Find complex hot paths
 debtmap analyze . --filter Performance --context --top 10
 </code></pre>
-<h3 id="configuration-7"><a class="header" href="#configuration-7">Configuration</a></h3>
+<h3 id="configuration-8"><a class="header" href="#configuration-8">Configuration</a></h3>
 <p>Complete configuration file example (<code>.debtmap.toml</code>):</p>
 <pre><code class="language-toml"># Scoring weights (current model uses coverage as multiplier, not additive)
 [scoring]
@@ -11003,7 +12358,7 @@ normalize_results() - Score: 7.5 (0% coverage)
 }
 <span class="boring">}</span></code></pre></pre>
 <p>This multi-phase approach dampens extreme values while preserving distinctions in the normal range.</p>
-<h3 id="configuration-8"><a class="header" href="#configuration-8">Configuration</a></h3>
+<h3 id="configuration-9"><a class="header" href="#configuration-9">Configuration</a></h3>
 <pre><code class="language-toml">[normalization]
 linear_threshold = 10.0       # Scores below this use linear scaling (1:1 mapping)
 logarithmic_threshold = 100.0 # Scores above this use logarithmic dampening
@@ -11019,7 +12374,7 @@ show_raw_scores = true        # Display both normalized (0-10) and raw scores in
 <li><strong>log_multiplier</strong>: Logarithmic dampening factor for very high scores</li>
 <li><strong>show_raw_scores</strong>: When enabled, output includes both the normalized 0-10 score and the raw calculated score</li>
 </ul>
-<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
+<h2 id="best-practices-11"><a class="header" href="#best-practices-11">Best Practices</a></h2>
 <h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <p><strong>Week 1: File-Level Assessment</strong></p>
 <pre><code class="language-bash"># Identify architectural problems
@@ -11046,7 +12401,7 @@ debtmap analyze . --aggregate-only --format json -o file-scores.json
 # Gate: No new critical function-level issues
 debtmap analyze . --min-priority critical --format json -o critical-items.json
 </code></pre>
-<h2 id="troubleshooting-9"><a class="header" href="#troubleshooting-9">Troubleshooting</a></h2>
+<h2 id="troubleshooting-10"><a class="header" href="#troubleshooting-10">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: File-level scores seem too high</p>
 <p><strong>Solution</strong>: Check aggregation method:</p>
 <pre><code class="language-toml">[aggregation]
@@ -11070,9 +12425,9 @@ minimum_debt_score = 3.0
 <li><a href="./configuration.html">Configuration</a> - Scoring and aggregation configuration</li>
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="tiered-prioritization-1"><a class="header" href="#tiered-prioritization-1">Tiered Prioritization</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tiered-prioritization-2"><a class="header" href="#tiered-prioritization-2">Tiered Prioritization</a></h1>
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
-<h2 id="overview-6"><a class="header" href="#overview-6">Overview</a></h2>
+<h2 id="overview-7"><a class="header" href="#overview-7">Overview</a></h2>
 <p>The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents “walls of similar-scored items” and ensures critical issues don’t get lost among minor problems.</p>
 <h2 id="the-four-tiers"><a class="header" href="#the-four-tiers">The Four Tiers</a></h2>
 <h3 id="tier-1-critical-architecture"><a class="header" href="#tier-1-critical-architecture">Tier 1: Critical Architecture</a></h3>
@@ -11130,7 +12485,7 @@ debtmap analyze . --lcov coverage.lcov --filter Testing
 <li>Minor duplication in test code</li>
 </ul>
 <p><strong>When to Address</strong>: During cleanup sprints or when refactoring nearby code.</p>
-<h2 id="configuration-9"><a class="header" href="#configuration-9">Configuration</a></h2>
+<h2 id="configuration-10"><a class="header" href="#configuration-10">Configuration</a></h2>
 <h3 id="default-tier-thresholds"><a class="header" href="#default-tier-thresholds">Default Tier Thresholds</a></h3>
 <pre><code class="language-toml">[tiers]
 # Tier 2 thresholds (Complex Untested)
@@ -11205,7 +12560,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority high
 # Phase 3: Improve Tier 3 coverage
 debtmap analyze . --lcov coverage.lcov --min-priority medium
 </code></pre>
-<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
+<h2 id="best-practices-12"><a class="header" href="#best-practices-12">Best Practices</a></h2>
 <ol>
 <li><strong>Always address Tier 1 before feature work</strong> - Architectural issues compound</li>
 <li><strong>Test Tier 2 items before refactoring</strong> - Avoid regressions</li>
@@ -11234,7 +12589,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
 ⚪ TIER 4: MAINTENANCE (120 items) [hidden]
   Use --show-t4 to display maintenance items
 </code></pre>
-<h3 id="json-output-1"><a class="header" href="#json-output-1">JSON Output</a></h3>
+<h3 id="json-output-2"><a class="header" href="#json-output-2">JSON Output</a></h3>
 <pre><code class="language-json">{
   "tier_distribution": {
     "t1_count": 3,
@@ -11252,7 +12607,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   ]
 }
 </code></pre>
-<h2 id="troubleshooting-10"><a class="header" href="#troubleshooting-10">Troubleshooting</a></h2>
+<h2 id="troubleshooting-11"><a class="header" href="#troubleshooting-11">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
 <p><strong>Solution</strong>: Lower tier weights or increase thresholds temporarily:</p>
 <pre><code class="language-toml">[tiers.tier_weights]
@@ -11275,6 +12630,323 @@ minimum_cyclomatic_complexity = 2
 <li><a href="./configuration.html">Configuration</a> - Complete configuration reference</li>
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="metrics-reference"><a class="header" href="#metrics-reference">Metrics Reference</a></h1>
+<p>Comprehensive guide to all metrics calculated by Debtmap and how to interpret them.</p>
+<h2 id="metric-categories-spec-118"><a class="header" href="#metric-categories-spec-118">Metric Categories (Spec 118)</a></h2>
+<p>Debtmap distinguishes between two fundamental categories of metrics:</p>
+<h3 id="measured-metrics"><a class="header" href="#measured-metrics">Measured Metrics</a></h3>
+<p><strong>Definition</strong>: Metrics directly computed from the Abstract Syntax Tree (AST) through precise analysis.</p>
+<p>These metrics are:</p>
+<ul>
+<li><strong>Deterministic</strong>: Same code always produces the same metric value</li>
+<li><strong>Precise</strong>: Exact counts from syntax analysis, not estimates</li>
+<li><strong>Suitable for thresholds</strong>: Reliable for CI/CD quality gates</li>
+<li><strong>Language-specific</strong>: Computed using language parsers (syn for Rust, tree-sitter for others)</li>
+</ul>
+<p><strong>Measured metrics include:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Metric</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>cyclomatic_complexity</code></td><td>Count of decision points (if, match, while, for, etc.)</td><td>Function with 3 if statements = complexity 4</td></tr>
+<tr><td><code>cognitive_complexity</code></td><td>Weighted measure of code understandability</td><td>Nested loops increase cognitive load</td></tr>
+<tr><td><code>nesting_depth</code></td><td>Maximum levels of nested control structures</td><td>3 nested if statements = depth 3</td></tr>
+<tr><td><code>loc</code></td><td>Lines of code in the function</td><td>Physical line count</td></tr>
+<tr><td><code>parameter_count</code></td><td>Number of function parameters</td><td><code>fn foo(a: i32, b: String)</code> = 2</td></tr>
+</tbody></table>
+</div>
+<h3 id="estimated-metrics"><a class="header" href="#estimated-metrics">Estimated Metrics</a></h3>
+<p><strong>Definition</strong>: Heuristic approximations calculated using formulas, not direct AST measurements.</p>
+<p>These metrics are:</p>
+<ul>
+<li><strong>Heuristic</strong>: Based on mathematical formulas and assumptions</li>
+<li><strong>Approximate</strong>: Close estimates, not exact counts</li>
+<li><strong>Useful for prioritization</strong>: Help estimate effort and risk</li>
+<li><strong>Not suitable for hard thresholds</strong>: Use for relative comparisons, not absolute gates</li>
+</ul>
+<p><strong>Estimated metrics include:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Metric</th><th>Formula</th><th>Purpose</th><th>Example</th></tr></thead><tbody>
+<tr><td><code>est_branches</code></td><td><code>max(nesting, 1) × cyclomatic ÷ 3</code></td><td>Estimate test cases needed for branch coverage</td><td>Complexity 12, nesting 3 → ~12 branches</td></tr>
+</tbody></table>
+</div>
+<p><strong>Important</strong>: The <code>est_branches</code> metric was previously called <code>branches</code>. It was renamed in Spec 118 to make it explicit that this is an <strong>estimate</strong>, not a precise count from the AST.</p>
+<h2 id="why-the-distinction-matters"><a class="header" href="#why-the-distinction-matters">Why the Distinction Matters</a></h2>
+<h3 id="for-code-quality-gates"><a class="header" href="#for-code-quality-gates">For Code Quality Gates</a></h3>
+<pre><code class="language-bash"># GOOD: Use measured metrics for CI/CD thresholds
+debtmap validate . --threshold-complexity 15
+
+# AVOID: Don't use estimated metrics for hard gates
+# (est_branches is not exposed as a threshold flag)
+</code></pre>
+<p><strong>Rationale</strong>: Measured metrics are deterministic and precise, making them suitable for build-breaking quality gates.</p>
+<h3 id="for-prioritization"><a class="header" href="#for-prioritization">For Prioritization</a></h3>
+<pre><code class="language-bash"># GOOD: Use est_branches for prioritization
+debtmap analyze . --top 10  # Sorts by est_branches (among other factors)
+
+# GOOD: Estimated metrics help understand testing effort
+debtmap analyze . --lcov coverage.info --verbose
+</code></pre>
+<p><strong>Rationale</strong>: Estimated metrics provide useful heuristics for understanding where to focus testing and refactoring efforts.</p>
+<h3 id="for-comparison-across-codebases"><a class="header" href="#for-comparison-across-codebases">For Comparison Across Codebases</a></h3>
+<ul>
+<li><strong>Measured metrics</strong>: Comparable across projects (cyclomatic 10 means the same everywhere)</li>
+<li><strong>Estimated metrics</strong>: Project-specific heuristics (est_branches depends on nesting patterns)</li>
+</ul>
+<h2 id="detailed-metric-descriptions"><a class="header" href="#detailed-metric-descriptions">Detailed Metric Descriptions</a></h2>
+<h3 id="cyclomatic-complexity-measured"><a class="header" href="#cyclomatic-complexity-measured">Cyclomatic Complexity (Measured)</a></h3>
+<p><strong>What it measures</strong>: The number of linearly independent paths through a function’s control flow.</p>
+<p><strong>How it’s calculated</strong>:</p>
+<ul>
+<li>Start with a base of 1</li>
+<li>Add 1 for each decision point:
+<ul>
+<li><code>if</code>, <code>else if</code></li>
+<li><code>match</code> arms</li>
+<li><code>while</code>, <code>for</code>, <code>loop</code></li>
+<li><code>&amp;&amp;</code>, <code>||</code> in conditions</li>
+<li><code>?</code> operator (early return)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn example(x: i32, y: i32) -&gt; bool {
+    if x &gt; 0 {        // +1
+        if y &gt; 0 {    // +1
+            true
+        } else {      // implicit in if/else
+            false
+        }
+    } else if x &lt; 0 { // +1
+        false
+    } else {
+        y == 0        // no additional branches
+    }
+}
+// Cyclomatic complexity = 1 + 3 = 4
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Thresholds</strong>:</p>
+<ul>
+<li><strong>1-5</strong>: Simple, easy to test</li>
+<li><strong>6-10</strong>: Moderate, manageable complexity</li>
+<li><strong>11-20</strong>: Complex, consider refactoring</li>
+<li><strong>21+</strong>: Very complex, high maintenance cost</li>
+</ul>
+<h3 id="cognitive-complexity-measured"><a class="header" href="#cognitive-complexity-measured">Cognitive Complexity (Measured)</a></h3>
+<p><strong>What it measures</strong>: How difficult the code is for humans to understand.</p>
+<p><strong>How it differs from cyclomatic</strong>:</p>
+<ul>
+<li>Weights nested structures more heavily (nested if is worse than sequential if)</li>
+<li>Ignores shorthand structures (early returns, guard clauses)</li>
+<li>Focuses on readability, not just logic paths</li>
+</ul>
+<p><strong>Example</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn cyclomatic_low_cognitive_low(status: Status) -&gt; bool {
+    match status {  // Cyclomatic: 4, Cognitive: 1
+        Status::Active =&gt; true,
+        Status::Pending =&gt; false,
+        Status::Closed =&gt; false,
+        Status::Error =&gt; false,
+    }
+}
+
+fn cyclomatic_low_cognitive_high(x: i32, y: i32, z: i32) -&gt; bool {
+    if x &gt; 0 {
+        if y &gt; 0 {      // Nested: +2 cognitive penalty
+            if z &gt; 0 {  // Deeply nested: +3 cognitive penalty
+                return true;
+            }
+        }
+    }
+    false
+}
+// Cyclomatic: 4, Cognitive: 7 (nesting penalty applied)
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Thresholds</strong>:</p>
+<ul>
+<li><strong>1-5</strong>: Easy to understand</li>
+<li><strong>6-10</strong>: Moderate mental load</li>
+<li><strong>11-15</strong>: Difficult to follow</li>
+<li><strong>16+</strong>: Refactor recommended</li>
+</ul>
+<h3 id="estimated-branches-estimated"><a class="header" href="#estimated-branches-estimated">Estimated Branches (Estimated)</a></h3>
+<p><strong>What it estimates</strong>: Approximate number of execution paths that would need test coverage.</p>
+<p><strong>Formula</strong>:</p>
+<pre><code>est_branches = max(nesting_depth, 1) × cyclomatic_complexity ÷ 3
+</code></pre>
+<p><strong>Why this formula</strong>:</p>
+<ul>
+<li><strong>Nesting multiplier</strong>: Deeper nesting creates more combinations</li>
+<li><strong>Cyclomatic base</strong>: Higher complexity → more paths</li>
+<li><strong>÷ 3 adjustment</strong>: Empirical factor to align with typical branch coverage needs</li>
+</ul>
+<p><strong>Example scenarios</strong>:</p>
+<div class="table-wrapper"><table><thead><tr><th>Cyclomatic</th><th>Nesting</th><th>est_branches</th><th>Interpretation</th></tr></thead><tbody>
+<tr><td>3</td><td>1</td><td>1</td><td>Simple linear code</td></tr>
+<tr><td>12</td><td>1</td><td>4</td><td>Multiple sequential branches</td></tr>
+<tr><td>12</td><td>3</td><td>12</td><td>Nested conditions, many paths</td></tr>
+<tr><td>20</td><td>5</td><td>33</td><td>Complex nested logic</td></tr>
+</tbody></table>
+</div>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li>Estimating test case requirements</li>
+<li>Prioritizing untested complex code</li>
+<li>Understanding coverage gaps</li>
+</ul>
+<p><strong>Limitations</strong>:</p>
+<ul>
+<li><strong>Not a precise count</strong>: This is a heuristic approximation</li>
+<li><strong>Don’t use for coverage percentage calculation</strong>: Use actual coverage tools</li>
+<li><strong>Varies by code style</strong>: Heavily nested code scores higher</li>
+</ul>
+<h2 id="terminology-change-spec-118"><a class="header" href="#terminology-change-spec-118">Terminology Change (Spec 118)</a></h2>
+<h3 id="before-branches"><a class="header" href="#before-branches">Before: <code>branches</code></a></h3>
+<p>Previously, this metric was displayed as <code>branches=X</code>, which was confusing because:</p>
+<ol>
+<li>Users thought it was a precise count from AST analysis</li>
+<li>It was mistaken for cyclomatic complexity (actual branch count)</li>
+<li>The estimation nature was not obvious</li>
+</ol>
+<h3 id="after-est_branches"><a class="header" href="#after-est_branches">After: <code>est_branches</code></a></h3>
+<p>Now displayed as <code>est_branches=X</code> to:</p>
+<ol>
+<li><strong>Make estimation explicit</strong>: “est_” prefix indicates this is approximate</li>
+<li><strong>Avoid confusion</strong>: Clearly different from cyclomatic complexity</li>
+<li><strong>Set correct expectations</strong>: Users know this is a heuristic, not a measurement</li>
+</ol>
+<h3 id="migration-guide"><a class="header" href="#migration-guide">Migration Guide</a></h3>
+<p><strong>Terminal Output</strong>:</p>
+<ul>
+<li>Old: <code>COMPLEXITY: cyclomatic=12, branches=8, cognitive=15</code></li>
+<li>New: <code>COMPLEXITY: cyclomatic=12, est_branches=8, cognitive=15</code></li>
+</ul>
+<p><strong>Code</strong>:</p>
+<ul>
+<li>Internal variable names updated from <code>branches</code> to <code>est_branches</code></li>
+<li>Comments added explaining the estimation formula</li>
+</ul>
+<p><strong>JSON Output</strong>:</p>
+<ul>
+<li>No change: The ComplexityMetrics struct does not include this field</li>
+<li><code>est_branches</code> is calculated on-demand for display purposes only</li>
+</ul>
+<h2 id="practical-usage-examples"><a class="header" href="#practical-usage-examples">Practical Usage Examples</a></h2>
+<h3 id="example-1-code-quality-gate"><a class="header" href="#example-1-code-quality-gate">Example 1: Code Quality Gate</a></h3>
+<pre><code class="language-bash"># Fail build if any function exceeds cyclomatic complexity 15
+debtmap validate . --threshold-complexity 15 --max-high 0
+
+# Why: Cyclomatic is measured, precise, and repeatable
+</code></pre>
+<h3 id="example-2-prioritize-testing-effort"><a class="header" href="#example-2-prioritize-testing-effort">Example 2: Prioritize Testing Effort</a></h3>
+<pre><code class="language-bash"># Show top 10 functions by risk (uses est_branches in scoring)
+debtmap analyze . --lcov coverage.info --top 10
+
+# Functions with high est_branches and low coverage appear first
+</code></pre>
+<h3 id="example-3-understanding-test-requirements"><a class="header" href="#example-3-understanding-test-requirements">Example 3: Understanding Test Requirements</a></h3>
+<pre><code class="language-bash"># Verbose output shows est_branches for each function
+debtmap analyze . --verbose
+
+# Output:
+# └─ COMPLEXITY: cyclomatic=12, est_branches=8, cognitive=15, nesting=2
+#
+# Interpretation: ~8 test cases likely needed for good branch coverage
+</code></pre>
+<h3 id="example-4-explaining-metrics-to-team"><a class="header" href="#example-4-explaining-metrics-to-team">Example 4: Explaining Metrics to Team</a></h3>
+<pre><code class="language-bash"># Display comprehensive metric definitions
+debtmap analyze --explain-metrics
+
+# Shows:
+# - Measured vs Estimated categories
+# - Formulas and thresholds
+# - When to use each metric
+</code></pre>
+<h2 id="metric-selection-guide"><a class="header" href="#metric-selection-guide">Metric Selection Guide</a></h2>
+<h3 id="when-to-use-cyclomatic-complexity"><a class="header" href="#when-to-use-cyclomatic-complexity">When to Use Cyclomatic Complexity</a></h3>
+<p>✅ <strong>Use for:</strong></p>
+<ul>
+<li>CI/CD quality gates</li>
+<li>Code review guidelines</li>
+<li>Consistent cross-project comparison</li>
+<li>Identifying refactoring candidates</li>
+</ul>
+<p>❌ <strong>Don’t use for:</strong></p>
+<ul>
+<li>Estimating test effort (use est_branches)</li>
+<li>Readability assessment (use cognitive complexity)</li>
+</ul>
+<h3 id="when-to-use-cognitive-complexity"><a class="header" href="#when-to-use-cognitive-complexity">When to Use Cognitive Complexity</a></h3>
+<p>✅ <strong>Use for:</strong></p>
+<ul>
+<li>Readability reviews</li>
+<li>Identifying hard-to-maintain code</li>
+<li>Onboarding difficulty assessment</li>
+</ul>
+<p>❌ <strong>Don’t use for:</strong></p>
+<ul>
+<li>Test coverage planning</li>
+<li>Strict quality gates (more subjective than cyclomatic)</li>
+</ul>
+<h3 id="when-to-use-est_branches"><a class="header" href="#when-to-use-est_branches">When to Use est_branches</a></h3>
+<p>✅ <strong>Use for:</strong></p>
+<ul>
+<li>Estimating test case requirements</li>
+<li>Prioritizing test coverage work</li>
+<li>Understanding coverage gaps</li>
+</ul>
+<p>❌ <strong>Don’t use for:</strong></p>
+<ul>
+<li>CI/CD quality gates (it’s an estimate)</li>
+<li>Calculating coverage percentages (use actual coverage data)</li>
+<li>Cross-project comparison (formula is heuristic)</li>
+</ul>
+<h2 id="combining-metrics-for-insights"><a class="header" href="#combining-metrics-for-insights">Combining Metrics for Insights</a></h2>
+<h3 id="high-complexity-low-coverage"><a class="header" href="#high-complexity-low-coverage">High Complexity, Low Coverage</a></h3>
+<pre><code>cyclomatic=18, est_branches=12, coverage=0%
+</code></pre>
+<p><strong>Interpretation</strong>: High-risk code needing ~12 test cases for adequate coverage.</p>
+<p><strong>Action</strong>: Prioritize writing tests, consider refactoring.</p>
+<h3 id="high-cyclomatic-low-cognitive"><a class="header" href="#high-cyclomatic-low-cognitive">High Cyclomatic, Low Cognitive</a></h3>
+<pre><code>cyclomatic=15, cognitive=5
+</code></pre>
+<p><strong>Interpretation</strong>: Many branches, but simple linear logic (e.g., validation checks).</p>
+<p><strong>Action</strong>: Acceptable pattern, tests should be straightforward.</p>
+<h3 id="low-cyclomatic-high-cognitive"><a class="header" href="#low-cyclomatic-high-cognitive">Low Cyclomatic, High Cognitive</a></h3>
+<pre><code>cyclomatic=8, cognitive=18
+</code></pre>
+<p><strong>Interpretation</strong>: Deeply nested logic, hard to understand despite fewer branches.</p>
+<p><strong>Action</strong>: Refactor to reduce nesting, extract functions.</p>
+<h3 id="high-est_branches-low-cyclomatic"><a class="header" href="#high-est_branches-low-cyclomatic">High est_branches, Low Cyclomatic</a></h3>
+<pre><code>cyclomatic=9, nesting=5, est_branches=15
+</code></pre>
+<p><strong>Interpretation</strong>: Deep nesting creates many path combinations.</p>
+<p><strong>Action</strong>: Flatten nesting, use early returns, extract nested logic.</p>
+<h2 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h2>
+<h3 id="q-why-is-est_branches-different-from-cyclomatic-complexity"><a class="header" href="#q-why-is-est_branches-different-from-cyclomatic-complexity">Q: Why is est_branches different from cyclomatic complexity?</a></h3>
+<p><strong>A</strong>: Cyclomatic is the <strong>measured</strong> count of decision points. <code>est_branches</code> is an <strong>estimated</strong> number of execution paths, calculated using nesting depth to account for path combinations.</p>
+<h3 id="q-can-i-use-est_branches-in-cicd-thresholds"><a class="header" href="#q-can-i-use-est_branches-in-cicd-thresholds">Q: Can I use est_branches in CI/CD thresholds?</a></h3>
+<p><strong>A</strong>: No. Use measured metrics (cyclomatic_complexity, cognitive_complexity) for quality gates. <code>est_branches</code> is a heuristic for prioritization, not a precise measurement.</p>
+<h3 id="q-why-did-the-metric-name-change-from-branches-to-est_branches"><a class="header" href="#q-why-did-the-metric-name-change-from-branches-to-est_branches">Q: Why did the metric name change from “branches” to “est_branches”?</a></h3>
+<p><strong>A</strong>: To make it explicit that this is an <strong>estimate</strong>, not a measured value. Users were confused, thinking it was a precise count from the AST.</p>
+<h3 id="q-how-accurate-is-est_branches-for-estimating-test-cases"><a class="header" href="#q-how-accurate-is-est_branches-for-estimating-test-cases">Q: How accurate is est_branches for estimating test cases?</a></h3>
+<p><strong>A</strong>: It’s a <strong>rough approximation</strong>. Actual test case requirements depend on:</p>
+<ul>
+<li>Business logic complexity</li>
+<li>Edge cases</li>
+<li>Error handling paths</li>
+<li>Integration points</li>
+</ul>
+<p>Use <code>est_branches</code> as a starting point, not an exact requirement.</p>
+<h3 id="q-should-i-refactor-code-with-high-est_branches"><a class="header" href="#q-should-i-refactor-code-with-high-est_branches">Q: Should I refactor code with high est_branches?</a></h3>
+<p><strong>A</strong>: Not necessarily. High <code>est_branches</code> indicates complex logic that may need thorough testing. If the logic is unavoidable (e.g., state machines, complex business rules), focus on comprehensive test coverage rather than refactoring.</p>
+<h2 id="further-reading-1"><a class="header" href="#further-reading-1">Further Reading</a></h2>
+<ul>
+<li><a href="why-debtmap.html#entropy-based-complexity-analysis">Why Debtmap? - Entropy Analysis</a></li>
+<li><a href="configuration.html#thresholds">Configuration - Complexity Thresholds</a></li>
+<li><a href="coverage-integration.html">Coverage Integration</a></li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a></li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="examples-1"><a class="header" href="#examples-1">Examples</a></h1>
 <p>This chapter provides practical, real-world examples of using Debtmap across different project types and workflows. All examples use current CLI syntax verified against the source code.</p>
 <blockquote>
@@ -11283,7 +12955,7 @@ minimum_cyclomatic_complexity = 2
 <blockquote>
 <p><strong>Quick Navigation</strong>: For detailed explanations of all CLI options, see the <a href="cli-reference.html">CLI Reference</a> chapter.</p>
 </blockquote>
-<h2 id="overview-7"><a class="header" href="#overview-7">Overview</a></h2>
+<h2 id="overview-8"><a class="header" href="#overview-8">Overview</a></h2>
 <p>This chapter demonstrates:</p>
 <ul>
 <li><strong>Language-specific analysis</strong>: Rust, Python, JavaScript/TypeScript with their respective testing tools</li>
@@ -11355,7 +13027,7 @@ debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 <li><strong>Balanced</strong>: Default thresholds suitable for typical projects</li>
 <li><strong>Lenient</strong>: Higher thresholds designed for legacy codebases with existing technical debt</li>
 </ul>
-<h3 id="god-object-detection-2"><a class="header" href="#god-object-detection-2">God Object Detection</a></h3>
+<h3 id="god-object-detection-3"><a class="header" href="#god-object-detection-3">God Object Detection</a></h3>
 <p>Identify classes and modules with too many responsibilities:</p>
 <pre><code class="language-bash"># Standard analysis includes god object detection
 debtmap analyze .
@@ -11764,7 +13436,7 @@ debtmap compare \
 📊 TOTAL DEBT SCORE: 4907
 📈 OVERALL COVERAGE: 67.12%
 </code></pre>
-<h3 id="json-output-2"><a class="header" href="#json-output-2">JSON Output</a></h3>
+<h3 id="json-output-3"><a class="header" href="#json-output-3">JSON Output</a></h3>
 <p>Machine-readable format for CI/CD integration:</p>
 <pre><code class="language-bash">debtmap analyze . --format json --output report.json
 </code></pre>
@@ -11908,7 +13580,7 @@ debtmap analyze . --jobs 8
 # Disable parallel processing
 debtmap analyze . --no-parallel
 </code></pre>
-<h2 id="configuration-examples-1"><a class="header" href="#configuration-examples-1">Configuration Examples</a></h2>
+<h2 id="configuration-examples-2"><a class="header" href="#configuration-examples-2">Configuration Examples</a></h2>
 <h3 id="basic-configuration"><a class="header" href="#basic-configuration">Basic Configuration</a></h3>
 <p>Create <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[thresholds]
@@ -12144,9 +13816,42 @@ debtmap compare \
 <li><a href="analysis-guide.html">Analysis Guide</a> - Understanding analysis results</li>
 <li><a href="configuration.html">Configuration</a> - Advanced configuration options</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="frequently-asked-questions"><a class="header" href="#frequently-asked-questions">Frequently Asked Questions</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="frequently-asked-questions-1"><a class="header" href="#frequently-asked-questions-1">Frequently Asked Questions</a></h1>
 <p>Common questions about debtmap’s features, usage, and comparison with other tools.</p>
 <h2 id="features--capabilities"><a class="header" href="#features--capabilities">Features &amp; Capabilities</a></h2>
+<h3 id="whats-the-difference-between-measured-and-estimated-metrics"><a class="header" href="#whats-the-difference-between-measured-and-estimated-metrics">What’s the difference between measured and estimated metrics?</a></h3>
+<p>Debtmap distinguishes between two types of metrics (Spec 118):</p>
+<p><strong>Measured Metrics</strong> - Precise values from AST analysis:</p>
+<ul>
+<li><code>cyclomatic_complexity</code>: Exact count of decision points</li>
+<li><code>cognitive_complexity</code>: Weighted readability measure</li>
+<li><code>nesting_depth</code>: Maximum nesting levels</li>
+<li><code>loc</code>: Lines of code</li>
+<li>These are suitable for CI/CD quality gates and thresholds</li>
+</ul>
+<p><strong>Estimated Metrics</strong> - Heuristic approximations:</p>
+<ul>
+<li><code>est_branches</code>: Estimated execution paths (formula-based)
+<ul>
+<li>Formula: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
+<li>Use for: Estimating test cases needed</li>
+<li>Don’t use for: Hard quality gates</li>
+</ul>
+</li>
+</ul>
+<p><strong>Why it matters:</strong></p>
+<ul>
+<li>Use <strong>measured</strong> metrics for thresholds and gates (precise, repeatable)</li>
+<li>Use <strong>estimated</strong> metrics for prioritization and effort estimation (heuristic, approximate)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># GOOD: Use measured metric for quality gate
+debtmap validate . --threshold-complexity 15
+
+# GOOD: Use estimated metric for test prioritization
+debtmap analyze . --top 10  # Considers est_branches for ranking
+</code></pre>
+<p>See <a href="metrics-reference.html">Metrics Reference</a> for complete details.</p>
 <h3 id="what-is-entropy-based-complexity-analysis"><a class="header" href="#what-is-entropy-based-complexity-analysis">What is entropy-based complexity analysis?</a></h3>
 <p>Entropy analysis uses information theory to distinguish between genuinely complex code and repetitive pattern-based code. Traditional cyclomatic complexity counts branches, but not all branches are equal in cognitive load.</p>
 <p>For example, a function with 20 identical if/return validation checks has the same cyclomatic complexity as a function with 20 diverse conditional branches handling different business logic. Entropy analysis gives the validation function a much lower effective complexity score because it follows a simple, repetitive pattern.</p>
@@ -12181,6 +13886,33 @@ debtmap analyze . --lcov target/coverage/lcov.info
 <li>C/C++ (target: Q4 2025)</li>
 </ul>
 <p>Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.</p>
+<h3 id="why-was-branches-renamed-to-est_branches"><a class="header" href="#why-was-branches-renamed-to-est_branches">Why was “branches” renamed to “est_branches”?</a></h3>
+<p>The metric was renamed in Spec 118 to make it clear that this is an <strong>estimated</strong> value, not a precise measurement.</p>
+<p><strong>Problem with old name (“branches”):</strong></p>
+<ul>
+<li>Users thought it was a direct count from AST analysis (it’s not)</li>
+<li>Caused confusion with cyclomatic complexity (which counts actual branches)</li>
+<li>Unclear that the value was formula-based</li>
+</ul>
+<p><strong>Benefits of new name (“est_branches”):</strong></p>
+<ul>
+<li>The “est_” prefix makes the estimation explicit</li>
+<li>Clearly distinguishes it from measured metrics</li>
+<li>Sets correct user expectations</li>
+</ul>
+<p><strong>What changed:</strong></p>
+<ul>
+<li>Terminal output: <code>branches=8</code> → <code>est_branches=8</code></li>
+<li>Internal variable names updated for clarity</li>
+<li>Documentation updated to explain the distinction</li>
+</ul>
+<p><strong>What didn’t change:</strong></p>
+<ul>
+<li>The formula remains the same: <code>max(nesting, 1) × cyclomatic ÷ 3</code></li>
+<li>JSON output (this field was never serialized to JSON)</li>
+<li>Scoring and prioritization logic</li>
+</ul>
+<p>See <a href="metrics-reference.html#terminology-change-spec-118">Metrics Reference</a> for more details.</p>
 <h3 id="can-i-customize-the-complexity-thresholds"><a class="header" href="#can-i-customize-the-complexity-thresholds">Can I customize the complexity thresholds?</a></h3>
 <p>Yes! Configure thresholds in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[thresholds]
@@ -12430,7 +14162,7 @@ jobs:
       - name: Analyze debt
         run: debtmap validate . --lcov lcov.info --max-critical 0
 </code></pre>
-<h2 id="troubleshooting-11"><a class="header" href="#troubleshooting-11">Troubleshooting</a></h2>
+<h2 id="troubleshooting-12"><a class="header" href="#troubleshooting-12">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-on-my-large-codebase"><a class="header" href="#analysis-is-slow-on-my-large-codebase">Analysis is slow on my large codebase</a></h3>
 <p><strong>Optimization strategies:</strong></p>
 <p><strong>1. Exclude unnecessary files:</strong></p>
@@ -12595,7 +14327,7 @@ debtmap compare main --show-new-only
 <li><strong>Discussions:</strong> <a href="https://github.com/prodigy-tools/debtmap/discussions">Ask questions</a></li>
 <li><strong>Examples:</strong> See <a href="examples.html">Examples</a> for real-world use cases</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting-12"><a class="header" href="#troubleshooting-12">Troubleshooting</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h1>
 <p>Common issues and solutions for using debtmap effectively.</p>
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
@@ -13200,7 +14932,7 @@ debtmap --min-problematic 5
 <li>Filters at analysis level vs display level</li>
 <li>Lower values = more issues shown</li>
 </ul>
-<h3 id="god-object-detection-3"><a class="header" href="#god-object-detection-3">God Object Detection</a></h3>
+<h3 id="god-object-detection-4"><a class="header" href="#god-object-detection-4">God Object Detection</a></h3>
 <p><strong>Flag</strong>: <code>--no-god-object</code></p>
 <p>Disables god object (large class/module) detection.</p>
 <pre><code class="language-bash"># Disable god object detection
@@ -13573,7 +15305,7 @@ debtmap
 <li>Exclude problematic files if needed</li>
 <li>Report unsupported patterns as feature requests</li>
 </ul>
-<h3 id="false-positives"><a class="header" href="#false-positives">False Positives</a></h3>
+<h3 id="false-positives-1"><a class="header" href="#false-positives-1">False Positives</a></h3>
 <p>Reduce false positives for validation functions and repetitive code patterns using entropy analysis:</p>
 <p><strong>Enable and Configure Entropy Analysis</strong>:</p>
 <pre><code class="language-toml"># In .debtmap.toml
@@ -14115,7 +15847,7 @@ export DEBTMAP_CACHE_DIR=~/.cache/debtmap
 <li>Update to latest version</li>
 <li>Search existing issues on GitHub</li>
 </ol>
-<h2 id="related-documentation-1"><a class="header" href="#related-documentation-1">Related Documentation</a></h2>
+<h2 id="related-documentation-2"><a class="header" href="#related-documentation-2">Related Documentation</a></h2>
 <ul>
 <li><strong><a href="./configuration.html">Configuration Guide</a></strong>: Configure debtmap behavior</li>
 <li><strong><a href="./cli-reference.html">CLI Reference</a></strong>: Complete CLI flag documentation</li>

@@ -1,0 +1,448 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Coverage Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="coverage-gap-analysis"><a class="header" href="#coverage-gap-analysis">Coverage Gap Analysis</a></h1>
+<p>Debtmap provides precise line-level coverage gap reporting to help you understand exactly which lines of code lack test coverage, rather than relying on misleading function-level percentages.</p>
+<h2 id="understanding-coverage-gaps"><a class="header" href="#understanding-coverage-gaps">Understanding Coverage Gaps</a></h2>
+<p>A <strong>coverage gap</strong> represents the portion of a function that is not executed during tests. Traditional tools report this as a simple percentage (e.g., “50% covered”), but this can be misleading:</p>
+<ul>
+<li>A 100-line function with 1 uncovered line shows “99% covered” - sounds great!</li>
+<li>A 10-line function with 1 uncovered line shows “90% covered” - sounds worse, but is actually better</li>
+</ul>
+<p>Debtmap improves on this by:</p>
+<ol>
+<li>Reporting the actual number of uncovered lines</li>
+<li>Showing which specific lines are uncovered</li>
+<li>Calculating the gap as a percentage of instrumented lines (not total lines)</li>
+<li>Providing visual severity indicators based on gap size</li>
+</ol>
+<h2 id="precise-vs-estimated-gaps"><a class="header" href="#precise-vs-estimated-gaps">Precise vs Estimated Gaps</a></h2>
+<p>Debtmap uses different precision levels depending on available coverage data:</p>
+<h3 id="precise-gaps-line-level-data-available"><a class="header" href="#precise-gaps-line-level-data-available">Precise Gaps (Line-Level Data Available)</a></h3>
+<p>When LCOV coverage data is available, debtmap provides exact line-level reporting:</p>
+<pre><code>Business logic - 1 line uncovered (11% gap) - line 52
+Complex calculation - 4 lines uncovered (20% gap) - lines 10-12, 15
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Exact line numbers for uncovered code</li>
+<li>Accurate gap percentage based on instrumented lines</li>
+<li>Compact line range formatting (e.g., “10-12, 15, 20-21”)</li>
+<li>Distinguishes between code that can’t be instrumented vs uncovered code</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Debtmap reads LCOV coverage data from your test runs</li>
+<li>Matches functions by file path and name</li>
+<li>Extracts precise uncovered line numbers</li>
+<li>Calculates percentage as: <code>(uncovered_lines / instrumented_lines) * 100</code></li>
+</ul>
+<h3 id="estimated-gaps-function-level-data-only"><a class="header" href="#estimated-gaps-function-level-data-only">Estimated Gaps (Function-Level Data Only)</a></h3>
+<p>When only function-level coverage percentages are available:</p>
+<pre><code>Data processing - ~50% gap (estimated, ~25 lines)
+Helper function - ~100% gap (estimated, 15 lines)
+Utility - ~3% gap (mostly covered)
+</code></pre>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Estimates uncovered line count from percentage</li>
+<li>Uses tilde (~) prefix to indicate estimation</li>
+<li>Special cases:
+<ul>
+<li>≥99% gap → “~100% gap”</li>
+<li>&lt;5% gap → “mostly covered”</li>
+<li>Otherwise → “~X% gap (estimated, ~Y lines)”</li>
+</ul>
+</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<ul>
+<li>Falls back when LCOV data unavailable or function not found</li>
+<li>Calculates: <code>estimated_uncovered = total_lines * (gap_percentage / 100)</code></li>
+<li>Useful for quick overview but less actionable than precise gaps</li>
+</ul>
+<h3 id="unknown-coverage"><a class="header" href="#unknown-coverage">Unknown Coverage</a></h3>
+<p>When no coverage data is available:</p>
+<pre><code>Untested module - Coverage data unavailable (42 lines)
+</code></pre>
+<p>This typically occurs when:</p>
+<ul>
+<li>No coverage collection has been run</li>
+<li>File not included in coverage report</li>
+<li>Coverage data file path mismatch</li>
+</ul>
+<h2 id="gap-severity-indicators"><a class="header" href="#gap-severity-indicators">Gap Severity Indicators</a></h2>
+<p>Debtmap uses visual indicators to quickly identify the severity of coverage gaps:</p>
+<div class="table-wrapper"><table><thead><tr><th>Indicator</th><th>Range</th><th>Severity</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>🟡</td><td>1-25%</td><td>LOW</td><td>Minor gaps, mostly covered</td></tr>
+<tr><td>🟠</td><td>26-50%</td><td>MODERATE</td><td>Significant gaps, needs attention</td></tr>
+<tr><td>🔴</td><td>51-75%</td><td>HIGH</td><td>Major gaps, high priority</td></tr>
+<tr><td>🔴🔴</td><td>76-100%</td><td>CRITICAL</td><td>Severe gaps, critical priority</td></tr>
+</tbody></table>
+</div>
+<p>These indicators appear in debtmap’s priority output to help you quickly identify which functions need testing most urgently.</p>
+<h3 id="severity-calculation"><a class="header" href="#severity-calculation">Severity Calculation</a></h3>
+<p>Gap severity is based on the percentage of uncovered code:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn get_severity(gap_percentage: f64) -&gt; &amp;'static str {
+    match gap_percentage {
+        p if p &lt;= 25.0 =&gt; "🟡 LOW",
+        p if p &lt;= 50.0 =&gt; "🟠 MODERATE",
+        p if p &lt;= 75.0 =&gt; "🔴 HIGH",
+        _ =&gt; "🔴🔴 CRITICAL"
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This works for both precise and estimated gaps, ensuring consistent severity classification across your codebase.</p>
+<h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
+<h3 id="high-verbosity-mode"><a class="header" href="#high-verbosity-mode">High Verbosity Mode</a></h3>
+<pre><code>Priority 1: Authentication Logic (CRITICAL)
+  File: src/auth/login.rs:45
+  Coverage Gap: 2 lines uncovered (89% gap) 🔴🔴 - lines 67, 89
+  Complexity: Cyclomatic 8, Cognitive 12
+  Impact: High-risk business logic with critical coverage gaps
+
+Priority 2: Data Validation (HIGH)
+  File: src/validation/rules.rs:120
+  Coverage Gap: 15 lines uncovered (65% gap) 🔴 - lines 145-152, 167-173
+  Complexity: Cyclomatic 5, Cognitive 8
+  Impact: Complex validation logic needs comprehensive testing
+
+Priority 3: Helper Function (MODERATE)
+  File: src/utils/helpers.rs:30
+  Coverage Gap: ~45% gap (estimated, ~12 lines) 🟠
+  Complexity: Cyclomatic 3, Cognitive 4
+  Impact: Moderate complexity with estimated coverage gaps
+</code></pre>
+<h3 id="standard-mode"><a class="header" href="#standard-mode">Standard Mode</a></h3>
+<pre><code>1. Authentication Logic (src/auth/login.rs:45)
+   Gap: 2 lines uncovered (89%) 🔴🔴 [lines 67, 89]
+
+2. Data Validation (src/validation/rules.rs:120)
+   Gap: 15 lines uncovered (65%) 🔴 [lines 145-152, 167-173]
+
+3. Helper Function (src/utils/helpers.rs:30)
+   Gap: ~45% (estimated) 🟠
+</code></pre>
+<h2 id="integration-with-coverage-tools"><a class="header" href="#integration-with-coverage-tools">Integration with Coverage Tools</a></h2>
+<h3 id="generating-lcov-data"><a class="header" href="#generating-lcov-data">Generating LCOV Data</a></h3>
+<p>For precise gap reporting, generate LCOV coverage data with your test framework:</p>
+<p><strong>Rust (using cargo-tarpaulin):</strong></p>
+<pre><code class="language-bash">cargo tarpaulin --out Lcov --output-dir ./coverage
+</code></pre>
+<p><strong>Python (using pytest-cov):</strong></p>
+<pre><code class="language-bash">pytest --cov=mypackage --cov-report=lcov:coverage/lcov.info
+</code></pre>
+<p><strong>JavaScript (using Jest):</strong></p>
+<pre><code class="language-bash">jest --coverage --coverageReporters=lcov
+</code></pre>
+<h3 id="configuring-debtmap"><a class="header" href="#configuring-debtmap">Configuring Debtmap</a></h3>
+<p>Point debtmap to your coverage data:</p>
+<pre><code class="language-bash">debtmap analyze --coverage-path ./coverage/lcov.info
+</code></pre>
+<p>Or in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[coverage]
+lcov_path = "./coverage/lcov.info"
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="1-use-precise-gaps-when-possible"><a class="header" href="#1-use-precise-gaps-when-possible">1. Use Precise Gaps When Possible</a></h3>
+<p>Always generate LCOV data for actionable coverage insights:</p>
+<ul>
+<li>Precise line numbers help you quickly locate untested code</li>
+<li>Accurate percentages prevent over/under-estimating gaps</li>
+<li>Line ranges show if gaps are concentrated or scattered</li>
+</ul>
+<h3 id="2-focus-on-high-severity-gaps-first"><a class="header" href="#2-focus-on-high-severity-gaps-first">2. Focus on High Severity Gaps First</a></h3>
+<p>Prioritize based on severity indicators:</p>
+<ol>
+<li>🔴🔴 CRITICAL (76-100%) - Address immediately</li>
+<li>🔴 HIGH (51-75%) - Schedule for next sprint</li>
+<li>🟠 MODERATE (26-50%) - Address when convenient</li>
+<li>🟡 LOW (1-25%) - Acceptable for some code</li>
+</ol>
+<h3 id="3-consider-context"><a class="header" href="#3-consider-context">3. Consider Context</a></h3>
+<p>Gap severity should be weighted by:</p>
+<ul>
+<li><strong>Function role</strong>: Business logic vs utilities</li>
+<li><strong>Complexity</strong>: High complexity + high gap = top priority</li>
+<li><strong>Change frequency</strong>: Frequently changed code needs better coverage</li>
+<li><strong>Risk</strong>: Security, data integrity, financial calculations</li>
+</ul>
+<h3 id="4-track-progress-over-time"><a class="header" href="#4-track-progress-over-time">4. Track Progress Over Time</a></h3>
+<p>Run debtmap regularly to track coverage improvements:</p>
+<pre><code class="language-bash"># Weekly coverage check
+debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
+</code></pre>
+<p>Compare reports to see gap reduction progress.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="coverage-data-unavailable-for-all-functions"><a class="header" href="#coverage-data-unavailable-for-all-functions">“Coverage data unavailable” for all functions</a></h3>
+<p><strong>Cause</strong>: Debtmap can’t find or parse LCOV file</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Verify <code>--coverage-path</code> points to valid LCOV file</li>
+<li>Ensure LCOV file was generated recently</li>
+<li>Check file permissions (readable by debtmap)</li>
+<li>Validate LCOV format: <code>head -20 ./coverage/lcov.info</code></li>
+</ul>
+<h3 id="line-numbers-dont-match-source-code"><a class="header" href="#line-numbers-dont-match-source-code">Line numbers don’t match source code</a></h3>
+<p><strong>Cause</strong>: Source code changed since coverage was generated</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Re-run tests with coverage collection</li>
+<li>Ensure clean build before coverage run</li>
+<li>Commit code before running coverage</li>
+</ul>
+<h3 id="estimated-gaps-for-functions-with-lcov-data"><a class="header" href="#estimated-gaps-for-functions-with-lcov-data">Estimated gaps for functions with LCOV data</a></h3>
+<p><strong>Cause</strong>: Function name or path mismatch</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check function names match exactly (case-sensitive)</li>
+<li>Verify file paths are consistent (relative vs absolute)</li>
+<li>Enable debug logging: <code>debtmap analyze --log-level debug</code></li>
+</ul>
+<h3 id="missing-functions-in-coverage-report"><a class="header" href="#missing-functions-in-coverage-report">Missing functions in coverage report</a></h3>
+<p><strong>Cause</strong>: Functions not instrumented or filtered out</p>
+<p><strong>Solutions</strong>:</p>
+<ul>
+<li>Check coverage tool configuration</li>
+<li>Ensure test execution reaches those functions</li>
+<li>Verify functions aren’t in excluded paths</li>
+</ul>
+<h2 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h2>
+<ul>
+<li><a href="coverage-integration.html">Coverage Integration</a> - Detailed coverage tool setup</li>
+<li><a href="tiered-prioritization.html">Tiered Prioritization</a> - How coverage gaps affect priority</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - Coverage weight in debt scoring</li>
+<li><a href="metrics-reference.html">Metrics Reference</a> - All coverage-related metrics</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="context-providers.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="coverage-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="context-providers.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="coverage-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

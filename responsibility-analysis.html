@@ -1,0 +1,797 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Responsibility Analysis - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="responsibility-analysis"><a class="header" href="#responsibility-analysis">Responsibility Analysis</a></h1>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Responsibility analysis is a core feature of Debtmap that helps identify violations of the <strong>Single Responsibility Principle (SRP)</strong>, one of the fundamental SOLID design principles. By analyzing function and method names, Debtmap automatically infers the distinct functional responsibilities within a code unit and detects when a single module, struct, or class has taken on too many concerns.</p>
+<p>This chapter provides an in-depth look at how Debtmap determines responsibilities, categorizes them, and uses this information to guide refactoring decisions.</p>
+<h2 id="what-are-responsibilities"><a class="header" href="#what-are-responsibilities">What Are Responsibilities?</a></h2>
+<p>In the context of Debtmap, a <strong>responsibility</strong> is a distinct functional domain or concern that a code unit handles. Examples include:</p>
+<ul>
+<li><strong>Data Access</strong> - Getting and setting values from data structures</li>
+<li><strong>Validation</strong> - Checking inputs, verifying constraints, ensuring correctness</li>
+<li><strong>Persistence</strong> - Saving and loading data to/from storage</li>
+<li><strong>Computation</strong> - Performing calculations and transformations</li>
+<li><strong>Communication</strong> - Sending and receiving messages or events</li>
+</ul>
+<p>According to the Single Responsibility Principle, each module should have <strong>one and only one reason to change</strong>. When a module handles multiple unrelated responsibilities (e.g., validation, persistence, AND computation), it becomes:</p>
+<ul>
+<li><strong>Harder to understand</strong> - Developers must mentally juggle multiple concerns</li>
+<li><strong>More fragile</strong> - Changes to one responsibility can break others</li>
+<li><strong>Difficult to test</strong> - Testing requires complex setup across multiple domains</li>
+<li><strong>Prone to coupling</strong> - Dependencies from different domains become entangled</li>
+</ul>
+<p>Debtmap’s responsibility analysis automatically identifies these violations and provides concrete recommendations for splitting modules along responsibility boundaries.</p>
+<h2 id="how-responsibilities-are-detected"><a class="header" href="#how-responsibilities-are-detected">How Responsibilities Are Detected</a></h2>
+<h3 id="pattern-based-inference"><a class="header" href="#pattern-based-inference">Pattern-Based Inference</a></h3>
+<p>Debtmap uses <strong>prefix-based pattern matching</strong> to infer responsibilities from function and method names. This approach is both simple and effective because well-named functions naturally express their intent through conventional prefixes.</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:316-386</code></p>
+<p>The <code>infer_responsibility_from_method()</code> function performs case-insensitive prefix matching:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn infer_responsibility_from_method(method_name: &amp;str) -&gt; String {
+    let lower_name = method_name.to_lowercase();
+
+    if lower_name.starts_with("format_") || lower_name.starts_with("render_") {
+        return "Formatting &amp; Output".to_string();
+    }
+    if lower_name.starts_with("parse_") || lower_name.starts_with("read_") {
+        return "Parsing &amp; Input".to_string();
+    }
+    // ... additional patterns
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This approach works across languages (Rust, Python, JavaScript/TypeScript) because naming conventions are relatively consistent in modern codebases.</p>
+<h3 id="responsibility-categories"><a class="header" href="#responsibility-categories">Responsibility Categories</a></h3>
+<p>Debtmap recognizes <strong>11 built-in responsibility categories</strong> plus a generic “Utilities” fallback:</p>
+<div class="table-wrapper"><table><thead><tr><th>Category</th><th>Prefixes</th><th>Examples</th></tr></thead><tbody>
+<tr><td><strong>Formatting &amp; Output</strong></td><td><code>format_</code>, <code>render_</code>, <code>write_</code>, <code>print_</code></td><td><code>format_json()</code>, <code>render_table()</code>, <code>write_report()</code></td></tr>
+<tr><td><strong>Parsing &amp; Input</strong></td><td><code>parse_</code>, <code>read_</code>, <code>extract_</code></td><td><code>parse_config()</code>, <code>read_file()</code>, <code>extract_fields()</code></td></tr>
+<tr><td><strong>Filtering &amp; Selection</strong></td><td><code>filter_</code>, <code>select_</code>, <code>find_</code></td><td><code>filter_results()</code>, <code>select_top()</code>, <code>find_item()</code></td></tr>
+<tr><td><strong>Transformation</strong></td><td><code>transform_</code>, <code>convert_</code>, <code>map_</code>, <code>apply_</code></td><td><code>transform_data()</code>, <code>convert_type()</code>, <code>map_fields()</code></td></tr>
+<tr><td><strong>Data Access</strong></td><td><code>get_</code>, <code>set_</code></td><td><code>get_value()</code>, <code>set_name()</code></td></tr>
+<tr><td><strong>Validation</strong></td><td><code>validate_</code>, <code>check_</code>, <code>verify_</code>, <code>is_*</code></td><td><code>validate_input()</code>, <code>check_bounds()</code>, <code>is_valid()</code></td></tr>
+<tr><td><strong>Computation</strong></td><td><code>calculate_</code>, <code>compute_</code></td><td><code>calculate_score()</code>, <code>compute_sum()</code></td></tr>
+<tr><td><strong>Construction</strong></td><td><code>create_</code>, <code>build_</code>, <code>new_*</code>, <code>make_</code></td><td><code>create_instance()</code>, <code>build_config()</code>, <code>new_user()</code></td></tr>
+<tr><td><strong>Persistence</strong></td><td><code>save_</code>, <code>load_</code>, <code>store_</code></td><td><code>save_data()</code>, <code>load_cache()</code>, <code>store_result()</code></td></tr>
+<tr><td><strong>Processing</strong></td><td><code>process_</code>, <code>handle_</code></td><td><code>process_request()</code>, <code>handle_error()</code></td></tr>
+<tr><td><strong>Communication</strong></td><td><code>send_</code>, <code>receive_</code></td><td><code>send_message()</code>, <code>receive_data()</code></td></tr>
+<tr><td><strong>Utilities</strong></td><td><em>(all others)</em></td><td><code>helper()</code>, <code>do_work()</code>, <code>utility_fn()</code></td></tr>
+</tbody></table>
+</div>
+<h3 id="grouping-methods-by-responsibility"><a class="header" href="#grouping-methods-by-responsibility">Grouping Methods by Responsibility</a></h3>
+<p>Once individual methods are categorized, Debtmap groups them using <code>group_methods_by_responsibility()</code>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:268-280</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn group_methods_by_responsibility(methods: &amp;[String]) -&gt; HashMap&lt;String, Vec&lt;String&gt;&gt; {
+    let mut groups: HashMap&lt;String, Vec&lt;String&gt;&gt; = HashMap::new();
+    for method in methods {
+        let responsibility = infer_responsibility_from_method(method);
+        groups.entry(responsibility).or_default().push(method.clone());
+    }
+    groups
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Output Structure:</strong></p>
+<ul>
+<li><strong>Keys</strong>: Responsibility category names (e.g., “Data Access”, “Validation”)</li>
+<li><strong>Values</strong>: Lists of method names belonging to each category</li>
+</ul>
+<p>The <strong>responsibility count</strong> is simply the number of unique keys in this HashMap.</p>
+<h3 id="example-analysis"><a class="header" href="#example-analysis">Example Analysis</a></h3>
+<p>Consider a Rust struct with these methods:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl UserManager {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt; { }
+    fn set_password(&amp;mut self, id: UserId, password: &amp;str) { }
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool { }
+    fn validate_password(&amp;self, password: &amp;str) -&gt; bool { }
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt; { }
+    fn load_user(&amp;self, id: UserId) -&gt; Result&lt;User&gt; { }
+    fn send_notification(&amp;self, user_id: UserId, msg: &amp;str) { }
+    fn format_user_profile(&amp;self, user: &amp;User) -&gt; String { }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Debtmap’s Analysis:</strong></p>
+<div class="table-wrapper"><table><thead><tr><th>Method</th><th>Inferred Responsibility</th></tr></thead><tbody>
+<tr><td><code>get_user</code></td><td>Data Access</td></tr>
+<tr><td><code>set_password</code></td><td>Data Access</td></tr>
+<tr><td><code>validate_email</code></td><td>Validation</td></tr>
+<tr><td><code>validate_password</code></td><td>Validation</td></tr>
+<tr><td><code>save_user</code></td><td>Persistence</td></tr>
+<tr><td><code>load_user</code></td><td>Persistence</td></tr>
+<tr><td><code>send_notification</code></td><td>Communication</td></tr>
+<tr><td><code>format_user_profile</code></td><td>Formatting &amp; Output</td></tr>
+</tbody></table>
+</div>
+<p><strong>Result:</strong></p>
+<ul>
+<li><strong>Responsibility Count</strong>: 5 (Data Access, Validation, Persistence, Communication, Formatting)</li>
+<li><strong>Assessment</strong>: This violates SRP - <code>UserManager</code> has too many distinct concerns</li>
+</ul>
+<h2 id="responsibility-scoring"><a class="header" href="#responsibility-scoring">Responsibility Scoring</a></h2>
+<h3 id="integration-with-god-object-detection"><a class="header" href="#integration-with-god-object-detection">Integration with God Object Detection</a></h3>
+<p>Responsibility count is a critical factor in <a href="./god-object-detection.html">God Object Detection</a>. The scoring algorithm includes:</p>
+<pre><code>responsibility_factor = min(responsibility_count / 3.0, 3.0)
+god_object_score = method_factor × field_factor × responsibility_factor × size_factor
+</code></pre>
+<p><strong>Why divide by 3.0?</strong></p>
+<ul>
+<li><strong>1-3 responsibilities</strong>: Normal, well-scoped module</li>
+<li><strong>4-6 responsibilities</strong>: Warning signs, approaching problematic territory</li>
+<li><strong>7+ responsibilities</strong>: Severe violation, likely a god object</li>
+</ul>
+<h3 id="language-specific-thresholds"><a class="header" href="#language-specific-thresholds">Language-Specific Thresholds</a></h3>
+<p>Different languages have different expectations for responsibility counts:</p>
+<div class="table-wrapper"><table><thead><tr><th>Language</th><th>Max Responsibilities</th><th>Rationale</th></tr></thead><tbody>
+<tr><td><strong>Rust</strong></td><td>5</td><td>Strong module system encourages tight boundaries</td></tr>
+<tr><td><strong>Python</strong></td><td>3</td><td>Duck typing makes mixing concerns more dangerous</td></tr>
+<tr><td><strong>JavaScript/TypeScript</strong></td><td>3</td><td>Prototype-based, benefits from focused classes</td></tr>
+</tbody></table>
+</div>
+<p>These thresholds can be customized in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 5      # max_traits = max responsibilities
+
+[god_object_detection.python]
+max_traits = 3
+</code></pre>
+<h3 id="confidence-determination"><a class="header" href="#confidence-determination">Confidence Determination</a></h3>
+<p>Responsibility count contributes to overall confidence levels:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:234-266</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn determine_confidence(
+    method_count: usize,
+    field_count: usize,
+    responsibility_count: usize,
+    lines_of_code: usize,
+    complexity_sum: u32,
+    thresholds: &amp;GodObjectThresholds,
+) -&gt; GodObjectConfidence {
+    let mut violations = 0;
+
+    if responsibility_count &gt; thresholds.max_traits {
+        violations += 1;
+    }
+    // ... check other metrics
+
+    match violations {
+        5 =&gt; GodObjectConfidence::Definite,
+        3..=4 =&gt; GodObjectConfidence::Probable,
+        1..=2 =&gt; GodObjectConfidence::Possible,
+        _ =&gt; GodObjectConfidence::NotGodObject,
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="advanced-responsibility-detection"><a class="header" href="#advanced-responsibility-detection">Advanced Responsibility Detection</a></h2>
+<h3 id="module-level-analysis"><a class="header" href="#module-level-analysis">Module-Level Analysis</a></h3>
+<p>For large modules without a single dominant struct, Debtmap performs <strong>module-level responsibility detection</strong>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_detector.rs:682-697</code></p>
+<p>The <code>classify_responsibility()</code> function provides extended categorization:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn classify_responsibility(prefix: &amp;str) -&gt; String {
+    match prefix {
+        "get" | "set" =&gt; "Data Access",
+        "calculate" | "compute" =&gt; "Computation",
+        "validate" | "check" | "verify" | "ensure" =&gt; "Validation",
+        "save" | "load" | "store" | "retrieve" | "fetch" =&gt; "Persistence",
+        "create" | "build" | "new" | "make" | "init" =&gt; "Construction",
+        "send" | "receive" | "handle" | "manage" =&gt; "Communication",
+        "update" | "modify" | "change" | "edit" =&gt; "Modification",
+        "delete" | "remove" | "clear" | "reset" =&gt; "Deletion",
+        "is" | "has" | "can" | "should" | "will" =&gt; "State Query",
+        "process" | "transform" =&gt; "Processing",
+        _ =&gt; format!("{} Operations", capitalize_first(prefix)),
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This extended mapping covers 10 core categories plus dynamic fallback for custom prefixes.</p>
+<h3 id="responsibility-groups"><a class="header" href="#responsibility-groups">Responsibility Groups</a></h3>
+<p>The <code>ResponsibilityGroup</code> data structure tracks detailed information about each responsibility:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/mod.rs:156-161</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone, PartialEq)]
+pub struct ResponsibilityGroup {
+    pub name: String,           // e.g., "DataAccessManager"
+    pub methods: Vec&lt;String&gt;,   // Methods in this group
+    pub fields: Vec&lt;String&gt;,    // Associated fields
+    pub responsibility: String, // e.g., "Data Access"
+}
+<span class="boring">}</span></code></pre></pre>
+<p>This structure enables:</p>
+<ul>
+<li><strong>Refactoring recommendations</strong> - Suggest splitting by responsibility group</li>
+<li><strong>Cohesion analysis</strong> - Measure how tightly methods are related</li>
+<li><strong>Field-method correlation</strong> - Identify which fields belong to which responsibilities</li>
+</ul>
+<h2 id="refactoring-based-on-responsibilities"><a class="header" href="#refactoring-based-on-responsibilities">Refactoring Based on Responsibilities</a></h2>
+<h3 id="recommended-module-splits"><a class="header" href="#recommended-module-splits">Recommended Module Splits</a></h3>
+<p>When Debtmap detects a module with multiple responsibilities, it generates actionable refactoring recommendations using <code>recommend_module_splits()</code>:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_detector.rs:165-177</code></p>
+<p><strong>Process:</strong></p>
+<ol>
+<li>Group all methods by their inferred responsibilities</li>
+<li>Create a <code>ModuleSplit</code> for each responsibility group</li>
+<li>Suggest module names (e.g., “DataAccessManager”, “ValidationManager”)</li>
+<li>Estimate lines of code for each new module</li>
+<li>Order by cohesion (most focused groups first)</li>
+</ol>
+<p><strong>Example Output:</strong></p>
+<pre><code>Recommended Splits for UserManager:
+  1. DataAccessManager (5 methods, ~80 lines)
+     - get_user, set_password, get_email, set_email, update_profile
+
+  2. ValidationManager (4 methods, ~60 lines)
+     - validate_email, validate_password, check_permissions, verify_token
+
+  3. PersistenceManager (3 methods, ~50 lines)
+     - save_user, load_user, delete_user
+
+  4. NotificationManager (2 methods, ~30 lines)
+     - send_notification, send_bulk_notifications
+</code></pre>
+<h3 id="practical-refactoring-patterns"><a class="header" href="#practical-refactoring-patterns">Practical Refactoring Patterns</a></h3>
+<h4 id="pattern-1-extract-service-classes"><a class="header" href="#pattern-1-extract-service-classes">Pattern 1: Extract Service Classes</a></h4>
+<p><strong>Before (God Object):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct UserManager {
+    db: Database,
+    cache: Cache,
+    notifier: Notifier,
+}
+
+impl UserManager {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt; { }
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool { }
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt; { }
+    fn send_notification(&amp;self, id: UserId, msg: &amp;str) { }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>After (Split by Responsibility):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Data Access
+struct UserRepository {
+    db: Database,
+    cache: Cache,
+}
+
+// Validation
+struct UserValidator;
+
+// Persistence
+struct UserPersistence {
+    db: Database,
+}
+
+// Communication
+struct NotificationService {
+    notifier: Notifier,
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="pattern-2-use-facade-for-composition"><a class="header" href="#pattern-2-use-facade-for-composition">Pattern 2: Use Facade for Composition</a></h4>
+<p>After splitting, create a facade to coordinate:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct UserFacade {
+    repository: UserRepository,
+    validator: UserValidator,
+    persistence: UserPersistence,
+    notifier: NotificationService,
+}
+
+impl UserFacade {
+    fn register_user(&amp;mut self, user: User) -&gt; Result&lt;()&gt; {
+        self.validator.validate_email(&amp;user.email)?;
+        self.persistence.save_user(&amp;user)?;
+        self.notifier.send_welcome(&amp;user.id)?;
+        Ok(())
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h4 id="pattern-3-trait-based-separation-rust"><a class="header" href="#pattern-3-trait-based-separation-rust">Pattern 3: Trait-Based Separation (Rust)</a></h4>
+<p>Use traits to define responsibility boundaries:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>trait DataAccess {
+    fn get_user(&amp;self, id: UserId) -&gt; Option&lt;User&gt;;
+}
+
+trait Validation {
+    fn validate_email(&amp;self, email: &amp;str) -&gt; bool;
+}
+
+trait Persistence {
+    fn save_user(&amp;self, user: &amp;User) -&gt; Result&lt;()&gt;;
+}
+
+// Implement only the needed traits per struct
+impl DataAccess for UserRepository { }
+impl Validation for UserValidator { }
+impl Persistence for UserPersistence { }
+<span class="boring">}</span></code></pre></pre>
+<h2 id="data-structures"><a class="header" href="#data-structures">Data Structures</a></h2>
+<h3 id="godobjectanalysis"><a class="header" href="#godobjectanalysis">GodObjectAnalysis</a></h3>
+<p>The main result structure includes responsibility information:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:5-18</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct GodObjectAnalysis {
+    pub is_god_object: bool,
+    pub method_count: usize,
+    pub field_count: usize,
+    pub responsibility_count: usize,      // Number of distinct responsibilities
+    pub lines_of_code: usize,
+    pub complexity_sum: u32,
+    pub god_object_score: f64,
+    pub recommended_splits: Vec&lt;ModuleSplit&gt;,
+    pub confidence: GodObjectConfidence,
+    pub responsibilities: Vec&lt;String&gt;,    // List of responsibility names
+    pub purity_distribution: Option&lt;PurityDistribution&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="modulesplit"><a class="header" href="#modulesplit">ModuleSplit</a></h3>
+<p>Recommendations for splitting modules:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:40-45</code></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct ModuleSplit {
+    pub suggested_name: String,         // e.g., "ValidationManager"
+    pub methods_to_move: Vec&lt;String&gt;,   // Methods for this module
+    pub responsibility: String,          // Responsibility category
+    pub estimated_lines: usize,         // Approximate LOC
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="testing-responsibility-detection"><a class="header" href="#testing-responsibility-detection">Testing Responsibility Detection</a></h2>
+<p>Debtmap includes comprehensive tests for responsibility detection:</p>
+<p><strong>Implementation Location:</strong> <code>src/organization/god_object_analysis.rs:623-838</code></p>
+<h3 id="test-coverage"><a class="header" href="#test-coverage">Test Coverage</a></h3>
+<p><strong>Key test cases:</strong></p>
+<ul>
+<li><strong>Prefix recognition</strong> - Each of the 11 categories is tested individually</li>
+<li><strong>Case insensitivity</strong> - <code>Format_Output</code> and <code>format_output</code> both map to “Formatting &amp; Output”</li>
+<li><strong>Multiple responsibilities</strong> - Grouping diverse methods correctly</li>
+<li><strong>Empty input handling</strong> - Graceful handling of empty method lists</li>
+<li><strong>Edge cases</strong> - Methods without recognized prefixes default to “Utilities”</li>
+</ul>
+<p><strong>Example Test:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_multiple_responsibility_groups() {
+    let methods = vec![
+        "format_output".to_string(),
+        "parse_input".to_string(),
+        "get_value".to_string(),
+        "validate_data".to_string(),
+    ];
+
+    let groups = group_methods_by_responsibility(&amp;methods);
+
+    assert_eq!(groups.len(), 4); // 4 distinct responsibilities
+    assert!(groups.contains_key("Formatting &amp; Output"));
+    assert!(groups.contains_key("Parsing &amp; Input"));
+    assert!(groups.contains_key("Data Access"));
+    assert!(groups.contains_key("Validation"));
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<h3 id="toml-configuration"><a class="header" href="#toml-configuration">TOML Configuration</a></h3>
+<p>Customize responsibility thresholds in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[god_object_detection]
+enabled = true
+
+[god_object_detection.rust]
+max_traits = 5      # Max responsibilities for Rust
+
+[god_object_detection.python]
+max_traits = 3      # Max responsibilities for Python
+
+[god_object_detection.javascript]
+max_traits = 3      # Max responsibilities for JavaScript/TypeScript
+</code></pre>
+<h3 id="tuning-guidelines"><a class="header" href="#tuning-guidelines">Tuning Guidelines</a></h3>
+<p><strong>Strict SRP Enforcement:</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 3
+</code></pre>
+<ul>
+<li>Enforces very tight single responsibility</li>
+<li>Suitable for greenfield projects or strict refactoring efforts</li>
+</ul>
+<p><strong>Balanced Approach (Default):</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 5
+</code></pre>
+<ul>
+<li>Allows some flexibility while catching major violations</li>
+<li>Works well for most projects</li>
+</ul>
+<p><strong>Lenient Mode:</strong></p>
+<pre><code class="language-toml">[god_object_detection.rust]
+max_traits = 7
+</code></pre>
+<ul>
+<li>Only flags severe SRP violations</li>
+<li>Useful for large legacy codebases during initial assessment</li>
+</ul>
+<h2 id="output-and-reporting"><a class="header" href="#output-and-reporting">Output and Reporting</a></h2>
+<h3 id="console-output"><a class="header" href="#console-output">Console Output</a></h3>
+<p>When analyzing a file with multiple responsibilities:</p>
+<pre><code>src/services/user_manager.rs
+  ⚠️ God Object: 18 methods, 8 fields, 5 responsibilities
+     Score: 185 (Confidence: Probable)
+
+     Responsibilities:
+       - Data Access (5 methods)
+       - Validation (4 methods)
+       - Persistence (3 methods)
+       - Communication (3 methods)
+       - Formatting &amp; Output (3 methods)
+
+     Recommended Splits:
+       1. DataAccessManager (5 methods, ~75 lines)
+       2. ValidationManager (4 methods, ~60 lines)
+       3. PersistenceManager (3 methods, ~45 lines)
+</code></pre>
+<h3 id="json-output"><a class="header" href="#json-output">JSON Output</a></h3>
+<p>For programmatic analysis, use <code>--format json</code>:</p>
+<pre><code class="language-json">{
+  "file": "src/services/user_manager.rs",
+  "is_god_object": true,
+  "responsibility_count": 5,
+  "responsibilities": [
+    "Data Access",
+    "Validation",
+    "Persistence",
+    "Communication",
+    "Formatting &amp; Output"
+  ],
+  "recommended_splits": [
+    {
+      "suggested_name": "DataAccessManager",
+      "methods_to_move": ["get_user", "set_password", "get_email"],
+      "responsibility": "Data Access",
+      "estimated_lines": 75
+    }
+  ]
+}
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="writing-srp-compliant-code"><a class="header" href="#writing-srp-compliant-code">Writing SRP-Compliant Code</a></h3>
+<ol>
+<li><strong>Name functions descriptively</strong> - Use standard prefixes (<code>get_</code>, <code>validate_</code>, etc.)</li>
+<li><strong>Group related functions</strong> - Keep similar responsibilities together</li>
+<li><strong>Limit responsibility count</strong> - Aim for 1-3 responsibilities per module</li>
+<li><strong>Review regularly</strong> - Run Debtmap periodically to catch responsibility creep</li>
+<li><strong>Refactor early</strong> - Split modules before they hit thresholds</li>
+</ol>
+<h3 id="code-review-guidelines"><a class="header" href="#code-review-guidelines">Code Review Guidelines</a></h3>
+<p>When reviewing responsibility analysis results:</p>
+<ol>
+<li><strong>Check responsibility boundaries</strong> - Are they logically distinct?</li>
+<li><strong>Validate groupings</strong> - Do the recommended splits make sense?</li>
+<li><strong>Consider dependencies</strong> - Will splitting introduce more coupling?</li>
+<li><strong>Estimate refactoring cost</strong> - Is the improvement worth the effort?</li>
+<li><strong>Prioritize by score</strong> - Focus on high-scoring god objects first</li>
+</ol>
+<h3 id="team-adoption"><a class="header" href="#team-adoption">Team Adoption</a></h3>
+<p><strong>Phase 1: Assessment</strong></p>
+<ul>
+<li>Run Debtmap on codebase</li>
+<li>Review responsibility violations</li>
+<li>Identify top 10 problematic modules</li>
+</ul>
+<p><strong>Phase 2: Education</strong></p>
+<ul>
+<li>Share responsibility analysis results with team</li>
+<li>Discuss SRP and its benefits</li>
+<li>Agree on responsibility threshold standards</li>
+</ul>
+<p><strong>Phase 3: Incremental Refactoring</strong></p>
+<ul>
+<li>Start with highest-scoring modules</li>
+<li>Apply recommended splits</li>
+<li>Measure improvement with follow-up analysis</li>
+</ul>
+<p><strong>Phase 4: Continuous Monitoring</strong></p>
+<ul>
+<li>Integrate Debtmap into CI/CD</li>
+<li>Track responsibility counts over time</li>
+<li>Prevent new SRP violations from merging</li>
+</ul>
+<h2 id="limitations-and-edge-cases"><a class="header" href="#limitations-and-edge-cases">Limitations and Edge Cases</a></h2>
+<h3 id="false-positives"><a class="header" href="#false-positives">False Positives</a></h3>
+<p><strong>Scenario 1: Utilities Module</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// utilities.rs - 15 helper functions with different prefixes
+fn format_date() { }
+fn parse_config() { }
+fn validate_email() { }
+// ... 12 more diverse utilities
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Issue:</strong> Flagged as having multiple responsibilities, but it’s intentionally a utility collection.</p>
+<p><strong>Solution:</strong> Either accept the flagging (utilities should perhaps be split) or increase <code>max_traits</code> threshold.</p>
+<h3 id="false-negatives"><a class="header" href="#false-negatives">False Negatives</a></h3>
+<p><strong>Scenario 2: Poor Naming</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl DataProcessor {
+    fn process_data(&amp;mut self) { /* does everything */ }
+    fn handle_stuff(&amp;mut self) { /* also does everything */ }
+    fn do_work(&amp;mut self) { /* yet more mixed concerns */ }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Issue:</strong> All methods map to “Processing” or “Utilities”, so responsibility count is low despite clear SRP violations.</p>
+<p><strong>Solution:</strong> Encourage better naming conventions in your team. Debtmap relies on descriptive function names.</p>
+<h3 id="language-specific-challenges"><a class="header" href="#language-specific-challenges">Language-Specific Challenges</a></h3>
+<p><strong>Rust:</strong> Trait implementations may group methods by trait rather than responsibility, artificially inflating counts.</p>
+<p><strong>Python:</strong> Dynamic typing and duck typing make responsibility boundaries less clear from signatures alone.</p>
+<p><strong>JavaScript:</strong> Prototype methods and closures may not follow conventional naming patterns.</p>
+<h2 id="integration-with-other-features"><a class="header" href="#integration-with-other-features">Integration with Other Features</a></h2>
+<h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
+<p>Responsibility analysis is a core component of <a href="./god-object-detection.html">God Object Detection</a>. The responsibility count contributes to:</p>
+<ul>
+<li>God object scoring</li>
+<li>Confidence level determination</li>
+<li>Refactoring recommendations</li>
+</ul>
+<h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
+<p>High responsibility counts increase priority in <a href="./tiered-prioritization.html">Tiered Prioritization</a> through the god object multiplier.</p>
+<h3 id="risk-assessment"><a class="header" href="#risk-assessment">Risk Assessment</a></h3>
+<p>Modules with multiple responsibilities receive higher risk scores in risk assessment, as they are more prone to bugs and harder to maintain.</p>
+<h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
+<ul>
+<li><a href="./god-object-detection.html">God Object Detection</a> - Full god object analysis including responsibility detection</li>
+<li><a href="./configuration.html">Configuration</a> - TOML configuration reference</li>
+<li><a href="./metrics-reference.html">Metrics Reference</a> - All metrics including responsibility count</li>
+<li><a href="./architecture.html">Architecture</a> - High-level design including analysis pipelines</li>
+</ul>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>Responsibility analysis in Debtmap:</p>
+<ul>
+<li><strong>Automatically detects SRP violations</strong> through pattern-based method name analysis</li>
+<li><strong>Categorizes methods</strong> into 11 built-in responsibility types</li>
+<li><strong>Provides actionable refactoring recommendations</strong> with suggested module splits</li>
+<li><strong>Integrates with god object detection</strong> for holistic architectural analysis</li>
+<li><strong>Supports language-specific thresholds</strong> for Rust, Python, and JavaScript/TypeScript</li>
+<li><strong>Is fully configurable</strong> via <code>.debtmap.toml</code> and CLI flags</li>
+</ul>
+<p>By surfacing responsibility violations early and suggesting concrete refactoring paths, Debtmap helps teams maintain clean, modular architectures that follow the Single Responsibility Principle.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="prodigy-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="scoring-strategies.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="prodigy-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="scoring-strategies.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

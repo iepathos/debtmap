@@ -182,7 +182,7 @@
 <blockquote>
 <p>🚧 <strong>Early Prototype</strong> - This project is under active development and APIs may change</p>
 </blockquote>
-<p>Debtmap is a fast code complexity and technical debt analyzer written in Rust. Debtmap identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction, providing data-driven prioritization for both.</p>
+<p>Debtmap is a code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
 <p>Unlike traditional static analysis tools that simply flag complex code, Debtmap answers two critical questions:</p>
 <ol>
@@ -192,10 +192,10 @@
 <p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.</p>
 <p><strong>What Makes Debtmap Different:</strong></p>
 <ul>
-<li><strong>Entropy-Based Complexity Analysis</strong>: Uses information theory to distinguish genuinely complex code from pattern-based repetitive code, reducing false positives by up to 70%</li>
-<li><strong>Coverage-Risk Correlation</strong>: The only tool that combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
-<li><strong>Risk-Driven Prioritization</strong>: Prioritizes refactoring and testing efforts based on complexity, coverage, and dependency factors</li>
-<li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” rather than just flagging issues</li>
+<li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
+<li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
+<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%</li>
+<li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
 <li><strong>Performance</strong>: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)</li>
 </ul>
 <h2 id="why-use-debtmap"><a class="header" href="#why-use-debtmap">Why Use Debtmap?</a></h2>
@@ -212,7 +212,7 @@
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
 <li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
-<li><strong>Entropy-based complexity analysis</strong> - Distinguishes between genuinely complex code and pattern-based repetitive code using information theory</li>
+<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)</li>
 <li><strong>Token classification system</strong> - Advanced token categorization with weighted entropy for accurate complexity assessment</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)</li>

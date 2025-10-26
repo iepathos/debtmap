@@ -398,6 +398,73 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
 <li>Often violates single responsibility</li>
 <li>Difficult to reuse</li>
 </ul>
+<h3 id="constructor-detection"><a class="header" href="#constructor-detection">Constructor Detection</a></h3>
+<p>Debtmap identifies constructor functions using AST-based analysis (Spec 122), which goes beyond simple name-based detection to catch non-standard constructor patterns.</p>
+<p><strong>Detection Strategy:</strong></p>
+<ol>
+<li><strong>Return Type Analysis</strong>: Functions returning <code>Self</code>, <code>Result&lt;Self&gt;</code>, or <code>Option&lt;Self&gt;</code></li>
+<li><strong>Body Pattern Analysis</strong>: Struct initialization or simple field assignments</li>
+<li><strong>Complexity Check</strong>: Low cyclomatic complexity (≤5), no loops, minimal branching</li>
+</ol>
+<p><strong>Why AST-based detection?</strong></p>
+<p>Name-based detection (looking for <code>new</code>, <code>new_*</code>, <code>from_*</code>) misses non-standard constructors:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Caught by name-based detection
+fn new() -&gt; Self {
+    Self { timeout: 30 }
+}
+
+// Missed by name-based, caught by AST detection
+pub fn create_default_client() -&gt; Self {
+    Self { timeout: Duration::from_secs(30) }
+}
+
+pub fn initialized() -&gt; Self {
+    Self::new()
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Builder vs Constructor:</strong></p>
+<p>AST analysis distinguishes between constructors and builder methods:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Constructor: creates new instance
+pub fn new(timeout: u32) -&gt; Self {
+    Self { timeout }
+}
+
+// Builder method: modifies existing instance (NOT a constructor)
+pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
+    self.timeout = timeout;
+    self  // Returns modified self, not new instance
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Detection Criteria:</strong></p>
+<p>A function is classified as a constructor if:</p>
+<ul>
+<li>Returns <code>Self</code>, <code>Result&lt;Self&gt;</code>, or <code>Option&lt;Self&gt;</code></li>
+<li>Contains struct initialization (<code>Self { ... }</code>) without loops</li>
+<li>OR delegates to another constructor (<code>Self::new()</code>) with minimal logic</li>
+</ul>
+<p><strong>Fallback Behavior:</strong></p>
+<p>If AST parsing fails (syntax errors, unsupported language), Debtmap gracefully falls back to name-based detection (Spec 117):</p>
+<ul>
+<li><code>new</code>, <code>new_*</code></li>
+<li><code>try_new*</code></li>
+<li><code>from_*</code></li>
+</ul>
+<p>This ensures analysis always completes, even on partially broken code.</p>
+<p><strong>Performance:</strong></p>
+<p>AST-based detection adds &lt; 5% overhead compared to name-only detection. See benchmarks:</p>
+<pre><code class="language-bash">cargo bench --bench constructor_detection_bench
+</code></pre>
+<p><strong>Why it matters:</strong></p>
+<p>Accurately identifying constructors helps:</p>
+<ul>
+<li>Exclude them from complexity thresholds (constructors naturally have high complexity)</li>
+<li>Focus refactoring on business logic, not initialization code</li>
+<li>Understand initialization patterns across the codebase</li>
+</ul>
 <h2 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h2>
 <p>Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
 <h3 id="debt-type-enum"><a class="header" href="#debt-type-enum">Debt Type Enum</a></h3>

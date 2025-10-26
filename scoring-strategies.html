@@ -385,6 +385,310 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 </tbody></table>
 </div>
 <p><strong>Note</strong>: Role multipliers are configurable via the <code>[role_multipliers]</code> section in <code>.debtmap.toml</code>. The multipliers have been rebalanced to be less extreme than earlier versions - pure logic was reduced from 1.5x to 1.2x, while orchestrator and IO wrapper were increased to better reflect their importance in modern codebases.</p>
+<h3 id="constructor-detection"><a class="header" href="#constructor-detection">Constructor Detection</a></h3>
+<p>Debtmap includes intelligent constructor detection to prevent false positives where trivial initialization functions are misclassified as critical business logic.</p>
+<p><strong>Problem</strong>: Simple constructors like <code>new()</code>, <code>default()</code>, or <code>from_config()</code> often have low complexity but were being flagged as high-priority pure logic functions.</p>
+<p><strong>Solution</strong>: Constructor detection automatically identifies and classifies these functions as <code>IOWrapper</code> (low priority) instead of <code>PureLogic</code> (high priority).</p>
+<p><strong>Detection Criteria</strong>:</p>
+<p>A function is considered a simple constructor if it meets ALL of the following:</p>
+<ol>
+<li>
+<p><strong>Name matches a constructor pattern</strong> (configurable):</p>
+<ul>
+<li>Exact match: <code>new</code>, <code>default</code>, <code>empty</code>, <code>zero</code>, <code>any</code></li>
+<li>Prefix match: <code>from_*</code>, <code>with_*</code>, <code>create_*</code>, <code>make_*</code>, <code>build_*</code>, <code>of_*</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Low cyclomatic complexity</strong> (≤ 2 by default)</p>
+</li>
+<li>
+<p><strong>Short length</strong> (&lt; 15 lines by default)</p>
+</li>
+<li>
+<p><strong>Minimal nesting</strong> (≤ 1 level by default)</p>
+</li>
+<li>
+<p><strong>Low cognitive complexity</strong> (≤ 3 by default)</p>
+</li>
+</ol>
+<p><strong>Example</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Simple constructor - detected and classified as IOWrapper
+fn new() -&gt; Self {
+    Self {
+        field1: 0,
+        field2: String::new(),
+    }
+}
+
+// Complex factory - NOT detected as constructor, remains PureLogic
+fn create_with_validation(data: Data) -&gt; Result&lt;Self&gt; {
+    validate(&amp;data)?;
+    // ... 30 lines of logic
+    Ok(Self { ... })
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Configuration</strong>:</p>
+<p>Constructor detection is fully configurable in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[classification.constructors]
+# Enable AST-based constructor detection (default: true)
+# When enabled, uses Abstract Syntax Tree analysis for accurate detection
+# Disable only if experiencing performance issues with very large codebases
+ast_detection = true
+
+# Constructor name patterns
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "create_",
+    "make_",
+    "build_",
+    "of_",
+    "empty",
+    "zero",
+    "any",
+]
+
+# Complexity thresholds
+max_cyclomatic = 2     # Maximum cyclomatic complexity
+max_cognitive = 3      # Maximum cognitive complexity
+max_length = 15        # Maximum lines
+max_nesting = 1        # Maximum nesting depth
+</code></pre>
+<p><strong>Customization Example</strong>:</p>
+<p>To add custom constructor patterns or adjust thresholds:</p>
+<pre><code class="language-toml">[classification.constructors]
+ast_detection = true      # Keep AST detection enabled (recommended)
+
+patterns = [
+    "new",
+    "default",
+    "from_",
+    "with_",
+    "init_",        # Add custom pattern
+    "setup_",       # Add custom pattern
+]
+max_cyclomatic = 3    # Allow slightly more complex constructors
+max_length = 20       # Allow longer constructors
+</code></pre>
+<p>To disable AST-based detection (if experiencing performance issues):</p>
+<pre><code class="language-toml">[classification.constructors]
+ast_detection = false     # Fall back to pattern-only matching
+# Note: May reduce detection accuracy but improves performance
+</code></pre>
+<p>This feature is part of spec 117 and helps reduce false positives in priority scoring.</p>
+<h3 id="role-based-adjustments"><a class="header" href="#role-based-adjustments">Role-Based Adjustments</a></h3>
+<p>DebtMap uses a sophisticated two-stage role adjustment mechanism to ensure that scores accurately reflect both the testing strategy appropriate for each function type and the architectural importance of different roles.</p>
+<h4 id="why-role-based-adjustments"><a class="header" href="#why-role-based-adjustments">Why Role-Based Adjustments?</a></h4>
+<p><strong>Problem</strong>: Traditional scoring treats all functions equally, leading to false positives:</p>
+<ol>
+<li>
+<p><strong>Entry points</strong> (CLI handlers, HTTP routes, <code>main</code> functions) typically use integration tests rather than unit tests</p>
+<ul>
+<li>Flagging them for “low unit test coverage” misses that they’re tested differently</li>
+<li>They orchestrate other code but contain minimal business logic</li>
+</ul>
+</li>
+<li>
+<p><strong>Pure business logic</strong> functions should have comprehensive unit tests</p>
+<ul>
+<li>Easy to test in isolation with deterministic inputs/outputs</li>
+<li>Core value of the application lives here</li>
+</ul>
+</li>
+<li>
+<p><strong>I/O wrappers</strong> are often tested implicitly through integration tests</p>
+<ul>
+<li>Thin abstractions over file system, network, or database operations</li>
+<li>Unit testing them provides limited value compared to integration testing</li>
+</ul>
+</li>
+</ol>
+<p><strong>Solution</strong>: DebtMap applies role-based adjustments in two stages to address both coverage expectations and architectural importance.</p>
+<h4 id="stage-1-role-based-coverage-weighting"><a class="header" href="#stage-1-role-based-coverage-weighting">Stage 1: Role-Based Coverage Weighting</a></h4>
+<p>The first stage adjusts coverage penalty expectations based on function role. This prevents functions that use different testing strategies from unfairly dominating the priority list.</p>
+<p><strong>How It Works</strong>:</p>
+<p>For each function, DebtMap:</p>
+<ol>
+<li>Detects the function’s role (entry point, pure logic, I/O wrapper, etc.)</li>
+<li>Applies a coverage weight multiplier based on that role</li>
+<li>Reduces or increases the coverage penalty accordingly</li>
+</ol>
+<p><strong>Default Coverage Weights</strong> (configurable in <code>.debtmap.toml</code>):</p>
+<div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Coverage Weight</th><th>Impact on Scoring</th></tr></thead><tbody>
+<tr><td>Pure Logic</td><td>1.2</td><td>Higher coverage penalty (should have unit tests)</td></tr>
+<tr><td>Unknown</td><td>1.0</td><td>Standard penalty</td></tr>
+<tr><td>Pattern Match</td><td>1.0</td><td>Standard penalty</td></tr>
+<tr><td>Orchestrator</td><td>0.8</td><td>Reduced penalty (partially integration tested)</td></tr>
+<tr><td>I/O Wrapper</td><td>0.7</td><td>Reduced penalty (often integration tested)</td></tr>
+<tr><td>Entry Point</td><td>0.6</td><td>Significantly reduced penalty (integration tested)</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example Score Changes</strong>:</p>
+<p><strong>Before role-based coverage adjustment</strong>:</p>
+<pre><code>Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Raw Coverage Penalty: 1.0 (full penalty)
+  Score: 8.5 (flagged as high priority)
+</code></pre>
+<p><strong>After role-based coverage adjustment</strong>:</p>
+<pre><code>Function: handle_request (Entry Point)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 0.4 (60% reduction via 0.6 weight)
+  Score: 4.2 (medium priority - more realistic)
+
+  Rationale: Entry points are integration tested, not unit tested.
+  This function is likely tested via API/CLI integration tests.
+</code></pre>
+<p><strong>Comparison with Pure Logic</strong>:</p>
+<pre><code>Function: calculate_discount (Pure Logic)
+  Complexity: 5
+  Coverage: 0%
+  Adjusted Coverage Penalty: 1.2 (20% increase via 1.2 weight)
+  Score: 9.8 (critical priority)
+
+  Rationale: Pure logic should have unit tests.
+  This function needs immediate test coverage.
+</code></pre>
+<h4 id="stage-2-role-multiplier"><a class="header" href="#stage-2-role-multiplier">Stage 2: Role Multiplier</a></h4>
+<p>The second stage applies a final role-based multiplier to reflect architectural importance. This multiplier is <strong>clamped by default</strong> to prevent extreme score swings.</p>
+<p><strong>Configuration</strong> (<code>.debtmap.toml</code> under <code>[scoring.role_multiplier]</code>):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+clamp_min = 0.3           # Minimum multiplier (default: 0.3)
+clamp_max = 1.8           # Maximum multiplier (default: 1.8)
+enable_clamping = true    # Enable clamping (default: true)
+</code></pre>
+<p><strong>Clamp Range Rationale</strong>:</p>
+<ul>
+<li><strong>Default [0.3, 1.8]</strong>: Balances differentiation with stability</li>
+<li><strong>Lower bound (0.3)</strong>: I/O wrappers still contribute 30% of base score (not invisible)</li>
+<li><strong>Upper bound (1.8)</strong>: Critical entry points don’t overwhelm other issues (max 180%)</li>
+<li><strong>Configurable</strong>: Adjust based on project priorities</li>
+</ul>
+<p><strong>Example with Clamping</strong>:</p>
+<pre><code>Function: process_data (Complex Pure Logic)
+  Base Score: 45.0
+  Unclamped Role Multiplier: 2.5
+  Clamped Multiplier: 1.8 (clamp_max)
+  Final Score: 45.0 × 1.8 = 81.0
+
+  Effect: Prevents one complex function from dominating entire priority list
+</code></pre>
+<h4 id="why-two-stages"><a class="header" href="#why-two-stages">Why Two Stages?</a></h4>
+<p>The separation of coverage weight adjustment and role multiplier ensures they work together without interfering:</p>
+<p><strong>Stage 1 (Coverage Weight)</strong>: Adjusts testing expectations</p>
+<ul>
+<li><strong>Question</strong>: “How much should we penalize missing unit tests for this type of function?”</li>
+<li><strong>Example</strong>: Entry points get 60% of normal coverage penalty (they’re integration tested)</li>
+</ul>
+<p><strong>Stage 2 (Role Multiplier)</strong>: Adjusts architectural importance</p>
+<ul>
+<li><strong>Question</strong>: “How important is this function relative to others with similar complexity?”</li>
+<li><strong>Example</strong>: Critical entry points might get a 1.2x multiplier (clamped), while simple I/O wrappers get 0.5x (clamped)</li>
+</ul>
+<p><strong>Independent Contributions</strong>:</p>
+<pre><code>1. Calculate base score from complexity + dependencies
+2. Apply coverage weight by role → adjusted coverage penalty
+3. Combine into preliminary score
+4. Apply clamped role multiplier → final score
+</code></pre>
+<p>This approach ensures:</p>
+<ul>
+<li>Coverage adjustments don’t interfere with role multiplier</li>
+<li>Both mechanisms contribute independently</li>
+<li>Clamping prevents instability from extreme multipliers</li>
+</ul>
+<h4 id="how-this-reduces-false-positives"><a class="header" href="#how-this-reduces-false-positives">How This Reduces False Positives</a></h4>
+<p><strong>False Positive #1: Entry Points Flagged for Low Coverage</strong></p>
+<p><strong>Before</strong>:</p>
+<pre><code>Top Priority Items:
+1. main() - Score: 9.2 (0% unit test coverage)
+2. handle_cli_command() - Score: 8.8 (5% unit test coverage)
+3. run_server() - Score: 8.5 (0% unit test coverage)
+</code></pre>
+<p><strong>After</strong>:</p>
+<pre><code>Top Priority Items:
+1. calculate_tax() - Score: 9.8 (0% coverage, Pure Logic)
+2. validate_payment() - Score: 9.2 (10% coverage, Pure Logic)
+3. main() - Score: 4.2 (0% coverage, Entry Point - integration tested)
+</code></pre>
+<p><strong>Result</strong>: Business logic functions that actually need unit tests rise to the top.</p>
+<p><strong>False Positive #2: I/O Wrappers Over-Prioritized</strong></p>
+<p><strong>Before</strong>:</p>
+<pre><code>Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Score: 7.5 (high priority)
+
+  Issue: This is a thin wrapper over std::fs::read_to_string.
+  Unit testing it provides minimal value vs integration tests.
+</code></pre>
+<p><strong>After</strong>:</p>
+<pre><code>Function: read_config_file
+  Complexity: 3
+  Coverage: 0%
+  Adjusted Coverage Weight: 0.7
+  Score: 3.2 (low priority)
+
+  Rationale: I/O wrappers are integration tested.
+  Focus on business logic instead.
+</code></pre>
+<h4 id="configuration-examples"><a class="header" href="#configuration-examples">Configuration Examples</a></h4>
+<p><strong>Emphasize Pure Logic Testing</strong>:</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
+pure_logic = 1.5        # Strong penalty for untested pure logic
+entry_point = 0.5       # Minimal penalty for untested entry points
+io_wrapper = 0.5        # Minimal penalty for untested I/O wrappers
+</code></pre>
+<p><strong>Conservative Approach (Smaller Adjustments)</strong>:</p>
+<pre><code class="language-toml">[scoring.role_coverage_weights]
+pure_logic = 1.1        # Slight increase
+entry_point = 0.9       # Slight decrease
+io_wrapper = 0.9        # Slight decrease
+</code></pre>
+<p><strong>Disable Multiplier Clamping</strong> (not recommended for production):</p>
+<pre><code class="language-toml">[scoring.role_multiplier]
+enable_clamping = false   # Allow unclamped multipliers
+# Warning: May cause unstable prioritization
+</code></pre>
+<h4 id="verification"><a class="header" href="#verification">Verification</a></h4>
+<p>To see how role-based adjustments affect your codebase:</p>
+<pre><code class="language-bash"># Show detailed scoring breakdown
+debtmap analyze . --verbose
+
+# Compare with role adjustments disabled
+debtmap analyze . --config minimal.toml
+</code></pre>
+<p><strong>Sample verbose output</strong>:</p>
+<pre><code>Function: src/handlers/request.rs:handle_request
+  Role: Entry Point
+  Complexity: 5
+  Coverage: 0%
+  Coverage Weight: 0.6 (Entry Point adjustment)
+  Adjusted Coverage Penalty: 0.4 (reduced from 1.0)
+  Base Score: 15.0
+  Role Multiplier: 1.2 (clamped from 1.5)
+  Final Score: 18.0
+
+  Interpretation:
+    - Entry point gets 60% coverage penalty instead of 100%
+    - Likely tested via integration tests
+    - Still flagged due to complexity, but not over-penalized for coverage
+</code></pre>
+<h4 id="benefits-summary"><a class="header" href="#benefits-summary">Benefits Summary</a></h4>
+<ul>
+<li><strong>Fewer false positives</strong>: Entry points and I/O wrappers no longer dominate priority lists</li>
+<li><strong>Better resource allocation</strong>: Testing efforts focus on pure logic where unit tests provide most value</li>
+<li><strong>Recognition of testing strategies</strong>: Integration tests are valued equally with unit tests</li>
+<li><strong>Stable prioritization</strong>: Clamping prevents extreme multipliers from causing volatile rankings</li>
+<li><strong>Configurable</strong>: Adjust weights and clamp ranges to match your project’s testing philosophy</li>
+</ul>
 <h3 id="use-cases-1"><a class="header" href="#use-cases-1">Use Cases</a></h3>
 <p><strong>1. Identifying Specific Hot Spots</strong></p>
 <pre><code class="language-bash"># Show top 20 functions needing attention
@@ -604,7 +908,7 @@ minimum_debt_score = 3.0
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="prodigy-integration.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="responsibility-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -618,7 +922,7 @@ minimum_debt_score = 3.0
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="prodigy-integration.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="responsibility-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
