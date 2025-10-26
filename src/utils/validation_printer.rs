@@ -8,7 +8,7 @@ pub fn print_validation_success(details: &ValidationDetails, verbosity: u8) {
 
     if verbosity > 1 {
         // Additional detailed output at higher verbosity levels
-        println!("\n  ✓ All validation checks passed");
+        println!("\n  All validation checks passed");
     }
 }
 
@@ -37,7 +37,7 @@ pub fn print_validation_details(details: &ValidationDetails) {
 
     // Emphasize debt density as THE primary metric
     println!(
-        "    📊 Debt Density: {:.1} per 1K LOC (threshold: {:.1})",
+        "    Debt Density: {:.1} per 1K LOC (threshold: {:.1})",
         details.debt_density, details.max_debt_density
     );
 
@@ -74,7 +74,7 @@ pub fn print_validation_details(details: &ValidationDetails) {
     }
 
     // Show absolute counts as informational (not primary validation criteria)
-    println!("\n  📈 Codebase Statistics (informational):");
+    println!("\n  Codebase Statistics (informational):");
     println!(
         "    High complexity functions: {}",
         details.high_complexity_count
@@ -87,7 +87,7 @@ pub fn print_validation_details(details: &ValidationDetails) {
 
     // Show deprecated metrics only if they are set (non-zero)
     if details.max_high_complexity_count > 0 || details.max_debt_items > 0 {
-        println!("\n  ⚠️  Deprecated Thresholds (if configured):");
+        println!("\n  [WARNING] Deprecated Thresholds (if configured):");
         if details.max_high_complexity_count > 0 {
             println!(
                 "    High complexity functions: {} (threshold: {})",
