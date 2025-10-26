@@ -61,6 +61,9 @@ Unlike traditional static analysis tools that simply flag complex code, debtmap 
 ### Install
 ```bash
 curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+
+# For test coverage analysis (optional)
+cargo install cargo-llvm-cov
 ```
 
 ### Analyze
@@ -69,6 +72,11 @@ curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh |
 debtmap analyze .
 
 # With test coverage (recommended)
+# Using cargo-llvm-cov (recommended - faster and more accurate)
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
+debtmap analyze . --lcov target/coverage/lcov.info
+
+# Or using cargo-tarpaulin
 cargo tarpaulin --out lcov --output-dir target/coverage
 debtmap analyze . --lcov target/coverage/lcov.info
 
@@ -342,7 +350,7 @@ just watch       # Run with hot reloading
 
 # CI and quality checks
 just ci          # Run all CI checks locally
-just coverage    # Generate test coverage report
+just coverage    # Generate test coverage report (uses cargo-tarpaulin with LLVM engine)
 
 # See all available commands
 just --list
