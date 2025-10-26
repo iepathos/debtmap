@@ -1,6 +1,6 @@
 # MMM Merge Worktree Command
 
-Intelligently merges MMM worktree branches with automatic conflict resolution into the current branch (or repository's default branch if in detached HEAD state).
+Intelligently merges MMM worktree branches with automatic conflict resolution into the repository's default branch (main or master).
 
 Arguments: $ARGUMENTS
 
@@ -20,13 +20,10 @@ Examples:
    - The branch name is provided as: $ARGUMENTS
    - If no branch name provided (empty $ARGUMENTS), fail with: "Error: Branch name is required. Usage: /prodigy-merge-worktree <branch-name>"
 
-2. **Determine Target Branch**
-   - Get the current branch using `git rev-parse --abbrev-ref HEAD`
-   - If the current branch is a valid branch name (not HEAD), use it as the target
-   - Otherwise, fall back to the default branch:
-     - Check if 'main' branch exists using `git rev-parse --verify refs/heads/main`
-     - If main exists, use 'main', otherwise use 'master'
-   - Switch to the target branch if not already on it
+2. **Determine Default Branch**
+   - Check if 'main' branch exists using `git rev-parse --verify refs/heads/main`
+   - If main exists, use 'main', otherwise use 'master'
+   - Switch to the default branch
 
 3. **Attempt Standard Merge**
    - Execute `git merge --no-ff $ARGUMENTS` to preserve commit history
@@ -87,7 +84,7 @@ Examples:
 ## Merge Commit Format
 
 ```
-Merge worktree '$ARGUMENTS' into <target-branch>
+Merge worktree '$ARGUMENTS' into main
 
 Successfully merged with <N> conflicts resolved:
 
@@ -160,7 +157,7 @@ Found 3 conflicts...
 When `MMM_AUTOMATION=true` is set:
 - No interactive prompts should be shown
 - If branch name is missing or invalid, fail with clear error message
-- Merges to the current branch of the worktree (or falls back to default branch if in detached HEAD state)
+- Always merges to the default branch (main or master)
 
 ## Notes
 
