@@ -545,6 +545,368 @@ Dependency information helps prioritize refactoring:
 - **Entry points** (few/no callers) → Good starting points for testing
 - **Leaf functions** (few/no callees) → Easier to test in isolation
 
+## CI/CD Integration with Density-Based Validation
+
+Debtmap supports **density-based validation metrics** that work consistently across projects of any size. Unlike traditional absolute thresholds (e.g., "max complexity of 1000"), density metrics normalize by codebase size, making them ideal for CI/CD automation.
+
+### Why Density-Based Metrics?
+
+Traditional metrics fail across different project sizes:
+- A 1,000-line project with complexity 500 → 50% of threshold
+- A 100,000-line project with complexity 5,000 → 500% of threshold
+
+Density metrics solve this by measuring per-line or per-function rates:
+- Complexity density = total_complexity / total_functions
+- Same threshold works for any project size
+- Quality standards remain consistent as code grows
+
+### Available Density Metrics
+
+| Metric | Formula | Good Threshold | Description |
+|--------|---------|----------------|-------------|
+| **Complexity Density** | `total_complexity / total_functions` | < 10.0 | Average complexity per function |
+| **Dependency Density** | `(dependencies / lines) * 1000` | < 5.0 | Dependencies per 1,000 lines |
+| **Test Density** | `(tests / lines) * 100` | > 2.0 | Tests per 100 lines |
+
+### Quick Start: GitHub Actions
+
+Add density-based validation to your CI pipeline:
+
+```yaml
+name: Code Quality
+
+on: [push, pull_request]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install debtmap
+        run: curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+
+      - name: Validate code quality
+        run: |
+          debtmap analyze . \
+            --max-complexity-density 10.0 \
+            --max-dependency-density 5.0 \
+            --min-test-density 2.0
+```
+
+**Benefits:**
+- No threshold adjustments needed as your codebase grows
+- Catches quality degradation early
+- Consistent standards across all projects
+- Predictable CI/CD behavior
+
+### Setting Appropriate Thresholds
+
+#### For New Projects
+
+Start with industry best practices:
+
+```bash
+debtmap analyze . \
+  --max-complexity-density 8.0 \    # Excellent: simple functions
+  --max-dependency-density 3.0 \    # Minimal dependencies
+  --min-test-density 2.5            # Comprehensive tests
+```
+
+#### For Existing Projects
+
+1. **Baseline analysis** - Understand current state:
+```bash
+debtmap analyze . --density-metrics > baseline.json
+```
+
+2. **Set initial thresholds** - Current values + 20% buffer:
+```bash
+# Example: Current complexity density is 12.5
+debtmap analyze . --max-complexity-density 15.0
+```
+
+3. **Gradual improvement** - Tighten thresholds quarterly:
+```yaml
+# Q1: Stabilize
+--max-complexity-density 15.0
+
+# Q2: Improve
+--max-complexity-density 13.0
+
+# Q3: Approach best practices
+--max-complexity-density 10.0
+
+# Q4: Maintain excellence
+--max-complexity-density 8.0
+```
+
+### CI/CD Configuration Examples
+
+#### GitHub Actions - Pull Request Validation
+
+```yaml
+name: PR Quality Check
+
+on: pull_request
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for delta comparison
+
+      - name: Install debtmap
+        run: curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+
+      - name: Analyze base branch
+        run: |
+          git checkout ${{ github.base_ref }}
+          debtmap analyze . --density-metrics --format json > base.json
+
+      - name: Analyze PR branch
+        run: |
+          git checkout ${{ github.head_ref }}
+          debtmap analyze . --density-metrics --format json > pr.json
+
+      - name: Check density delta
+        run: |
+          BASE_DENSITY=$(jq '.density_metrics.complexity_density' base.json)
+          PR_DENSITY=$(jq '.density_metrics.complexity_density' pr.json)
+          DELTA=$(echo "$PR_DENSITY - $BASE_DENSITY" | bc)
+
+          if (( $(echo "$DELTA > 0.5" | bc -l) )); then
+            echo "❌ Complexity density increased by $DELTA"
+            exit 1
+          fi
+
+          echo "✅ Complexity density change: $DELTA"
+
+      - name: Enforce absolute limits
+        run: |
+          debtmap analyze . \
+            --max-complexity-density 10.0 \
+            --max-dependency-density 5.0 \
+            --min-test-density 2.0
+```
+
+#### GitLab CI - Multi-Stage Validation
+
+```yaml
+stages:
+  - analyze
+  - validate
+
+code_analysis:
+  stage: analyze
+  script:
+    - curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+    - debtmap analyze . --density-metrics --format json > metrics.json
+  artifacts:
+    paths:
+      - metrics.json
+    expire_in: 1 week
+
+quality_gates:
+  stage: validate
+  dependencies:
+    - code_analysis
+  script:
+    - debtmap analyze . --max-complexity-density 10.0 --max-dependency-density 5.0 --min-test-density 2.0
+  only:
+    - merge_requests
+    - master
+```
+
+#### CircleCI - Density Tracking
+
+```yaml
+version: 2.1
+
+jobs:
+  quality_check:
+    docker:
+      - image: cimg/rust:1.75
+    steps:
+      - checkout
+      - run:
+          name: Install debtmap
+          command: curl -sSL https://raw.githubusercontent.com/iepathos/debtmap/master/install.sh | bash
+
+      - run:
+          name: Analyze and validate
+          command: |
+            debtmap analyze . \
+              --density-metrics \
+              --max-complexity-density 10.0 \
+              --max-dependency-density 5.0 \
+              --min-test-density 2.0 \
+              --format json > /tmp/metrics.json
+
+      - store_artifacts:
+          path: /tmp/metrics.json
+          destination: code-metrics
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - quality_check
+```
+
+### Advanced CI/CD Patterns
+
+#### Progressive Tightening
+
+Automatically adjust thresholds based on historical data:
+
+```bash
+#!/bin/bash
+# progressive-quality.sh
+
+CURRENT_DENSITY=$(debtmap analyze . --density-metrics --format json | jq '.density_metrics.complexity_density')
+HISTORICAL_AVG=12.5  # From last 30 days
+
+if (( $(echo "$CURRENT_DENSITY < $HISTORICAL_AVG" | bc -l) )); then
+  # Quality improved - tighten threshold
+  NEW_THRESHOLD=$(echo "$CURRENT_DENSITY * 1.1" | bc)
+  echo "✅ Quality improved! New threshold: $NEW_THRESHOLD"
+else
+  # Use current average
+  NEW_THRESHOLD=$HISTORICAL_AVG
+fi
+
+debtmap analyze . --max-complexity-density "$NEW_THRESHOLD"
+```
+
+#### Multi-Environment Thresholds
+
+Different standards for different branches:
+
+```yaml
+- name: Validate code quality
+  run: |
+    if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+      # Strict for production
+      debtmap analyze . --max-complexity-density 8.0
+    elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+      # Moderate for development
+      debtmap analyze . --max-complexity-density 10.0
+    else
+      # Lenient for feature branches
+      debtmap analyze . --max-complexity-density 12.0
+    fi
+```
+
+#### Team-Specific Thresholds
+
+Different teams, different standards:
+
+```yaml
+- name: Validate code quality
+  run: |
+    # Detect which team owns the changed files
+    TEAM=$(git diff --name-only ${{ github.base_ref }} | xargs dirname | sort -u | head -1)
+
+    case "$TEAM" in
+      "src/core")
+        # Core team: strict standards
+        debtmap analyze src/core --max-complexity-density 6.0
+        ;;
+      "src/features")
+        # Feature teams: moderate standards
+        debtmap analyze src/features --max-complexity-density 10.0
+        ;;
+      *)
+        # Default standards
+        debtmap analyze . --max-complexity-density 8.0
+        ;;
+    esac
+```
+
+### Monitoring Density Trends
+
+Track density metrics over time to identify trends:
+
+```bash
+# Store metrics with timestamp
+DATE=$(date +%Y-%m-%d)
+debtmap analyze . --density-metrics --format json > "metrics-$DATE.json"
+
+# Plot trend (requires jq and gnuplot)
+for file in metrics-*.json; do
+  DATE=$(echo "$file" | sed 's/metrics-\(.*\)\.json/\1/')
+  DENSITY=$(jq '.density_metrics.complexity_density' "$file")
+  echo "$DATE $DENSITY"
+done | gnuplot -e "
+  set terminal png;
+  set output 'density-trend.png';
+  plot '-' using 1:2 with lines title 'Complexity Density'
+"
+```
+
+### Troubleshooting CI/CD Integration
+
+#### Issue: Thresholds fail on small codebases
+
+**Cause:** Small projects have high variance in density metrics
+**Solution:** Require minimum codebase size:
+
+```bash
+LINES=$(find . -name "*.rs" | xargs wc -l | tail -1 | awk '{print $1}')
+if [ "$LINES" -gt 1000 ]; then
+  debtmap analyze . --max-complexity-density 10.0
+else
+  echo "⚠️  Codebase too small for density validation (${LINES} lines)"
+fi
+```
+
+#### Issue: Density metrics fluctuate wildly
+
+**Cause:** Including/excluding test files inconsistently
+**Solution:** Always exclude test files from production metrics:
+
+```bash
+debtmap analyze . \
+  --exclude "**/tests/**" \
+  --exclude "**/*_test.rs" \
+  --max-complexity-density 10.0
+```
+
+#### Issue: Legacy code dominates metrics
+
+**Cause:** Old code with high complexity affects overall density
+**Solution:** Analyze new and legacy code separately:
+
+```bash
+# Strict for new code
+debtmap analyze src/new_features --max-complexity-density 8.0
+
+# Lenient for legacy
+debtmap analyze src/legacy --max-complexity-density 15.0
+```
+
+### Migration Guide
+
+For detailed information on migrating from scale-dependent to density-based validation, see the [Validation Migration Guide](docs/validation-migration.md).
+
+The guide includes:
+- Why migrate and key benefits
+- Step-by-step migration process
+- Threshold selection guidelines
+- Example configurations for different project sizes
+- Common migration questions and troubleshooting
+
+### Benefits of Density-Based Metrics in Automation
+
+✅ **Size-independent:** Same thresholds work for 1K or 1M lines
+✅ **Predictable:** No surprise CI failures as code grows
+✅ **Meaningful:** Measures actual code quality, not just size
+✅ **Actionable:** Clear signals for refactoring priorities
+✅ **Maintainable:** Set once, rarely need adjustment
+
 ## Roadmap
 
 ### Language Support
