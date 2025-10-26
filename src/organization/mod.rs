@@ -17,6 +17,7 @@ pub mod language;
 pub mod purity_analyzer;
 pub mod registry_pattern;
 pub mod split_validator;
+pub mod struct_initialization;
 pub mod struct_ownership;
 
 pub use god_object_analysis::{
@@ -50,6 +51,10 @@ pub use builder_pattern::{
 
 pub use registry_pattern::{
     adjust_registry_score, RegistryPattern, RegistryPatternDetector, TraitImplInfo,
+};
+
+pub use struct_initialization::{
+    FieldDependency, ReturnAnalysis, StructInitPattern, StructInitPatternDetector,
 };
 
 #[derive(Debug, Clone, PartialEq)]
