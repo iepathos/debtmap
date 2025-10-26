@@ -123,32 +123,39 @@ gocover-cobertura < coverage.out > coverage.xml
 
 ## How Coverage Affects Scoring
 
-Coverage data impacts Debtmap's unified scoring system in two ways: the **coverage factor** and **coverage dampening**.
+Coverage data fundamentally changes how Debtmap calculates debt scores. The scoring system operates in **two different modes** depending on whether coverage data is available.
 
-### Coverage Factor (40% Weight)
+### Scoring Modes
 
-The coverage factor contributes **40%** to the unified debt score:
+**Mode 1: With Coverage Data (Dampening Multiplier)**
 
-```
-Coverage Factor = 10 × (1 - coverage_percentage) × complexity_weight
-```
-
-**Examples:**
-- 0% coverage → Factor = 10.0 (maximum penalty)
-- 50% coverage → Factor = 5.0 (moderate penalty)
-- 100% coverage → Factor = 0.0 (no penalty)
-
-**Special Cases:**
-- **Test functions**: Coverage factor = 0 (tests don't need their own coverage)
-- **No coverage data**: Assumes worst case (factor = 10.0)
-- **Entry points**: Weighted at 0.6x (entry points naturally have low coverage)
-
-### Coverage Dampening (Score Multiplier)
-
-After base scores are calculated, coverage *dampens* the final debt score:
+When you provide an LCOV file with `--lcov`, coverage acts as a **dampening multiplier** that reduces scores for well-tested code:
 
 ```
-Final Score = Base Score × (1.0 - coverage_percentage)
+Base Score = (Complexity Factor × 0.50) + (Dependency Factor × 0.25)
+Coverage Multiplier = 1.0 - coverage_percentage
+Final Score = Base Score × Coverage Multiplier
+```
+
+This is the **current implementation** as of spec 122. Coverage dampens the base score rather than contributing as an additive component.
+
+**Mode 2: Without Coverage Data (Weighted Sum)**
+
+When no coverage data is available, Debtmap falls back to a weighted sum model:
+
+```
+Final Score = (Coverage × 0.50) + (Complexity × 0.35) + (Dependency × 0.15)
+```
+
+In this mode, coverage is assumed to be 0% (worst case), giving it a weight of 50% in the total score. See `src/priority/scoring/calculation.rs:119-129` for the implementation.
+
+### Coverage Dampening Multiplier
+
+When coverage data is provided, it acts as a **multiplier** that dampens the base score:
+
+```
+Coverage Multiplier = 1.0 - coverage_percentage
+Final Score = Base Score × Coverage Multiplier
 ```
 
 **Examples:**
@@ -161,7 +168,13 @@ Final Score = Base Score × (1.0 - coverage_percentage)
 
 **Key Insight**: Complex but well-tested code automatically drops in priority, while untested complex code rises to the top.
 
+**Special Cases:**
+- **Test functions**: Coverage multiplier = 0.0 (tests get near-zero scores regardless of complexity)
+- **Entry points**: Handled through semantic classification (FunctionRole) system with role multipliers, not coverage-specific weighting
+
 **Invariant**: Total debt score with coverage ≤ total debt score without coverage.
+
+**Implementation**: See `src/priority/scoring/calculation.rs:68-82` for the coverage dampening calculation.
 
 ## Transitive Coverage Propagation
 
@@ -212,6 +225,8 @@ Coverage integration is highly optimized for large codebases:
 - **Analysis Overhead**: ~2.5x baseline (target: ≤3x)
 
 **Result**: Coverage integration adds minimal overhead even on projects with thousands of functions.
+
+**Implementation**: See `src/risk/coverage_index.rs:13-38` for the CoverageIndex struct and performance documentation.
 
 ## CLI Options Reference
 
@@ -396,7 +411,7 @@ See [Troubleshooting](troubleshooting.md) for more debugging tips.
    Tests high-dependency functions first—they have the most impact.
 
 4. **Don't Over-Test Entry Points**:
-   Entry points (main, handlers) are better tested with integration tests, not unit tests. Debtmap weights their coverage factor at 0.6x to account for this.
+   Entry points (main, handlers) are better tested with integration tests, not unit tests. Debtmap applies role multipliers through its semantic classification system (FunctionRole) to adjust scoring for different function types. See `src/priority/unified_scorer.rs:149` and `src/priority/scoring/classification.rs` for the classification system.
 
 ### Configuration
 
@@ -404,10 +419,11 @@ In `.debtmap.toml`:
 
 ```toml
 [scoring]
-# Adjust coverage weight if your project prioritizes coverage differently
-coverage = 0.40  # Default: 40%
-complexity = 0.40
-dependency = 0.20
+# Default weights for scoring WITHOUT coverage data
+# When coverage data IS provided, it acts as a dampening multiplier instead
+coverage = 0.50  # Default: 50% (only used when no LCOV provided)
+complexity = 0.35  # Default: 35%
+dependency = 0.15  # Default: 15%
 
 [thresholds]
 # Set minimum risk score to filter low-priority items
@@ -416,6 +432,8 @@ minimum_risk_score = 15.0
 # Skip simple functions even if uncovered
 minimum_cyclomatic_complexity = 5
 ```
+
+**Important**: These weights only apply when coverage data is **not** available. When you provide `--lcov`, coverage acts as a dampening multiplier instead of a weighted component. See `src/config.rs:122-132` for default weight definitions.
 
 See [Configuration](configuration.md) for complete options.
 
