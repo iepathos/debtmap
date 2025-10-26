@@ -458,15 +458,11 @@ mod tests {
         assert!(high_risk_check.is_none());
 
         // Coverage check should not exist when both values are 0.0
-        let coverage_check = checks
-            .iter()
-            .find(|c| c.metric_name == "Code coverage");
+        let coverage_check = checks.iter().find(|c| c.metric_name == "Code coverage");
         assert!(coverage_check.is_none());
 
         // Verify that primary metrics are present
-        assert!(checks
-            .iter()
-            .any(|c| c.metric_name == "Average complexity"));
+        assert!(checks.iter().any(|c| c.metric_name == "Average complexity"));
         assert!(checks.iter().any(|c| c.metric_name == "Debt density"));
         assert!(checks
             .iter()
