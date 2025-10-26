@@ -10,6 +10,7 @@
 - [Analysis Guide](analysis-guide.md)
 - [Compare Analysis](compare-analysis.md)
 - [Configuration](configuration.md)
+- [Threshold Configuration](threshold-configuration.md)
 - [Suppression Patterns](suppression-patterns.md)
 - [Output Formats](output-formats.md)
 
@@ -33,7 +34,6 @@
 - [Prodigy Integration](prodigy-integration.md)
 - [Responsibility Analysis](responsibility-analysis.md)
 - [Scoring Strategies](scoring-strategies.md)
-- [Threshold Configuration](threshold-configuration.md)
 - [Tiered Prioritization](tiered-prioritization.md)
 - [Validation and Quality Gates](validation-gates.md)
 

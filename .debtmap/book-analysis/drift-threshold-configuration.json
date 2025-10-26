@@ -1,0 +1,129 @@
+{
+  "chapter_id": "threshold-configuration",
+  "chapter_title": "Threshold Configuration",
+  "chapter_file": "book/src/threshold-configuration.md",
+  "drift_detected": true,
+  "severity": "critical",
+  "quality_assessment": "Chapter does not exist - this is a completely missing chapter that needs to be created from scratch to document a critical feature",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Entire Chapter",
+      "description": "Chapter file does not exist at all - users have no documentation for threshold configuration",
+      "should_add": "Create complete chapter covering all threshold configuration options",
+      "fix_suggestion": "Create new chapter with sections on: threshold presets, custom thresholds, language-specific god object thresholds, .debtmap.toml configuration, CLI flags, and tuning guidelines",
+      "source_reference": "src/complexity/threshold_manager.rs, src/config.rs, src/cli.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Threshold Presets",
+      "description": "No documentation for the three threshold presets: strict, balanced, lenient",
+      "should_add": "Document all three presets with their specific values and use cases",
+      "fix_suggestion": "Add section showing:\n- Strict preset: cyclomatic=5, cognitive=7, total=5, function_length=15\n- Balanced preset (default): cyclomatic=10, cognitive=15, total=8, function_length=20\n- Lenient preset: cyclomatic=15, cognitive=20, total=15, function_length=50\nWith guidance on when to use each preset",
+      "source_reference": "src/complexity/threshold_manager.rs:120-148"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "CLI Threshold Flags",
+      "description": "CLI flags for threshold configuration not documented",
+      "should_add": "Document --threshold-preset, --threshold-complexity, --threshold-duplication flags",
+      "fix_suggestion": "Add section showing:\n- `--threshold-preset strict|balanced|lenient` - Use preset threshold configuration\n- `--threshold-complexity N` - Set cyclomatic complexity threshold (default: 10)\n- `--threshold-duplication N` - Set duplication threshold in lines (default: 50)\nWith examples of usage",
+      "source_reference": "src/cli.rs:64-69, src/cli.rs:144-146"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "God Object Thresholds",
+      "description": "Language-specific god object thresholds not documented",
+      "should_add": "Document god object detection thresholds for Rust, Python, and JavaScript",
+      "fix_suggestion": "Add section showing language-specific thresholds:\n\nRust:\n- max_methods: 20\n- max_fields: 15\n- max_traits: 5\n- max_lines: 1000\n- max_complexity: 200\n\nPython:\n- max_methods: 15\n- max_fields: 10\n- max_traits: 3\n- max_lines: 500\n- max_complexity: 150\n\nJavaScript:\n- max_methods: 15\n- max_fields: 20\n- max_traits: 3\n- max_lines: 500\n- max_complexity: 150",
+      "source_reference": "src/organization/god_object_analysis.rs:94-123"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": ".debtmap.toml Configuration",
+      "description": "No documentation for configuring thresholds via .debtmap.toml configuration file",
+      "should_add": "Document how to customize thresholds in .debtmap.toml",
+      "fix_suggestion": "Add section with example .debtmap.toml configuration:\n\n```toml\n[thresholds]\ncomplexity = 15\nmax_file_length = 500\ncognitive = 20\n\n[thresholds.validation]\nmax_average_complexity = 10.0\nmax_debt_density = 50.0\nmax_codebase_risk_score = 7.0\nmin_coverage_percentage = 0.0\nmax_total_debt_score = 10000\n\n[god_object]\nenabled = true\n\n[god_object.rust]\nmax_methods = 20\nmax_fields = 15\nmax_traits = 5\nmax_lines = 1000\nmax_complexity = 200\n\n[god_object.python]\nmax_methods = 15\nmax_fields = 10\nmax_traits = 3\nmax_lines = 500\nmax_complexity = 150\n\n[god_object.javascript]\nmax_methods = 15\nmax_fields = 20\nmax_traits = 3\nmax_lines = 500\nmax_complexity = 150\n```",
+      "source_reference": "src/config.rs:850-920, src/config.rs:1150-1172"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Complexity Threshold Details",
+      "description": "No explanation of the different complexity thresholds and what they mean",
+      "should_add": "Explain minimum_total_complexity, minimum_cyclomatic_complexity, minimum_cognitive_complexity",
+      "fix_suggestion": "Add section explaining:\n- minimum_cyclomatic_complexity: Counts decision points (if, while, for, match, etc.)\n- minimum_cognitive_complexity: Measures mental effort to understand code\n- minimum_total_complexity: Combined threshold (cyclomatic + cognitive)\n- minimum_function_length: Lines of code threshold\n- minimum_match_arms: Number of match arms to flag\n- minimum_if_else_chain: Length of if-else chains to flag\n\nNote that ALL thresholds must be exceeded to flag a function",
+      "source_reference": "src/complexity/threshold_manager.rs:16-58"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Role-Based Multipliers",
+      "description": "Role-based threshold multipliers not documented",
+      "should_add": "Document how thresholds are adjusted based on function role",
+      "fix_suggestion": "Add section explaining role multipliers:\n- Entry points (main, handlers): 1.5x multiplier (more lenient)\n- Core logic functions: 1.0x multiplier (standard)\n- Utility functions (getters, setters): 0.8x multiplier (stricter)\n- Test functions: 2.0x multiplier (most lenient)\n\nHigher multiplier = more lenient thresholds for that function type",
+      "source_reference": "src/complexity/threshold_manager.rs:42-58, src/complexity/threshold_manager.rs:180-188"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Tuning Guidelines",
+      "description": "No guidance on how to choose or tune thresholds for your project",
+      "should_add": "Provide practical guidance on threshold selection and tuning",
+      "fix_suggestion": "Add section with tuning guidelines:\n\n1. Start with defaults (balanced preset)\n2. Run baseline analysis to understand current state\n3. Adjust based on project type:\n   - New projects: Use strict preset for high quality standards\n   - Typical projects: Use balanced preset (recommended)\n   - Legacy/complex domains: Use lenient preset initially\n4. Fine-tune individual thresholds in .debtmap.toml\n5. Use `debtmap validate` with threshold configuration for CI/CD\n6. Gradually tighten thresholds as you pay down technical debt\n\nPractical tips:\n- Too many false positives? Increase thresholds or use lenient preset\n- Missing important issues? Decrease thresholds or use strict preset\n- Different standards for tests? Role multipliers handle this automatically",
+      "source_reference": "features.json:798-802 (best_practices.threshold_selection)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Examples",
+      "description": "No practical examples showing threshold configuration in action",
+      "should_add": "Add examples showing threshold configuration usage",
+      "fix_suggestion": "Add examples section:\n\nExample 1: Using preset\n```bash\ndebtmap analyze . --threshold-preset strict\n```\n\nExample 2: Custom CLI thresholds\n```bash\ndebtmap analyze . --threshold-complexity 15 --threshold-duplication 30\n```\n\nExample 3: Project-specific configuration\n```bash\ndebtmap init  # Creates .debtmap.toml\n# Edit .debtmap.toml to customize thresholds\ndebtmap analyze .  # Uses config file thresholds\n```\n\nExample 4: Validation with thresholds\n```bash\ndebtmap validate . --config .debtmap.toml\n```",
+      "source_reference": "src/cli.rs, features.json:821-851"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Validation Thresholds",
+      "description": "Validation thresholds for CI/CD not documented",
+      "should_add": "Document validation thresholds used by `debtmap validate` command",
+      "fix_suggestion": "Add section explaining validation thresholds:\n- max_average_complexity: Maximum average complexity across codebase (default: 10.0)\n- max_debt_density: Maximum debt items per 1000 LOC (default: 50.0)\n- max_codebase_risk_score: Maximum overall risk score (default: 7.0)\n- min_coverage_percentage: Minimum required test coverage (default: 0.0)\n- max_total_debt_score: Maximum total debt score (default: 10000)\n\nThese are used in CI/CD pipelines to fail builds that exceed quality thresholds",
+      "source_reference": "src/config.rs:1199-1260"
+    }
+  ],
+  "positive_aspects": [],
+  "improvement_suggestions": [
+    "Structure chapter with clear sections: Introduction, Presets, CLI Flags, Configuration File, Language-Specific Thresholds, Tuning Guidelines, Examples",
+    "Include decision tree or flowchart for choosing the right preset",
+    "Add comparison table showing all three presets side-by-side",
+    "Include real-world examples of .debtmap.toml configurations for different project types",
+    "Cross-reference to other chapters: Getting Started (for basics), CLI Reference (for full flag documentation), Configuration (for complete .debtmap.toml reference)",
+    "Add troubleshooting section for common threshold-related issues (too strict, too lenient)",
+    "Consider adding a section on how thresholds interact with other features (coverage, context-aware analysis, pattern detection)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-26",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [],
+    "topics_should_cover": [
+      "Threshold presets (strict, balanced, lenient)",
+      "Custom threshold configuration",
+      "Language-specific thresholds",
+      "Cyclomatic complexity thresholds",
+      "Cognitive complexity thresholds",
+      "God object thresholds",
+      "Validation thresholds",
+      "Role-based multipliers",
+      "Tuning guidelines",
+      ".debtmap.toml configuration",
+      "CLI threshold flags"
+    ],
+    "validation_focus": "Check that all threshold presets and configuration options are documented"
+  }
+}
