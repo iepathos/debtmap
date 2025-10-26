@@ -651,6 +651,8 @@ impl ParallelUnifiedAnalysisBuilder {
                 crate::progress::TEMPLATE_FUNCTION_ANALYSIS,
             );
             pb.set_message("Analyzing functions");
+            // Enable steady tick for CPU-intensive parallel processing
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
             pb
         });
 
