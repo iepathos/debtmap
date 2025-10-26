@@ -191,6 +191,18 @@ impl ParallelCallGraphBuilder {
         let base_graph = parallel_graph.to_call_graph();
         let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(base_graph);
 
+        // Create progress bar for enhanced analysis
+        let progress = crate::progress::ProgressManager::global()
+            .map(|pm| {
+                let pb = pm.create_bar(
+                    workspace_files.len() as u64,
+                    "🔧 {msg} {pos}/{len} files ({percent}%) - {eta}",
+                );
+                pb.set_message("Enhanced call graph analysis");
+                pb
+            })
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
         // Process files sequentially for enhanced analysis
         // (This is complex to parallelize due to shared state)
         for (file_path, parsed) in &workspace_files {
@@ -199,7 +211,10 @@ impl ParallelCallGraphBuilder {
                 .analyze_trait_dispatch(file_path, parsed)?
                 .analyze_function_pointers(file_path, parsed)?
                 .analyze_framework_patterns(file_path, parsed)?;
+            progress.inc(1);
         }
+
+        progress.finish_with_message("Enhanced analysis complete");
 
         // Cross-module analysis
         enhanced_builder.analyze_cross_module(&workspace_files)?;

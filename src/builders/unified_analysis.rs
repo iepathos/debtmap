@@ -1405,9 +1405,9 @@ fn integrate_trait_resolution(
     // Detect common trait patterns (Default, Clone, etc.) and mark them as entry points
     trait_registry.detect_common_trait_patterns(call_graph);
 
-    // Create progress bar if global progress manager is available
+    // Create spinner for trait resolution (count unknown upfront)
     let progress = crate::progress::ProgressManager::global()
-        .map(|pm| pm.create_bar(0, crate::progress::TEMPLATE_TRAIT_RESOLUTION))
+        .map(|pm| pm.create_spinner("Resolving trait method calls"))
         .unwrap_or_else(indicatif::ProgressBar::hidden);
 
     // Resolve trait method calls to concrete implementations
