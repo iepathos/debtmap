@@ -8,7 +8,7 @@ use crate::{
         file_metrics::FileDebtItem,
         UnifiedAnalysis, UnifiedDebtItem,
     },
-    progress::ProgressManager,
+    progress::{ProgressManager, TEMPLATE_FILE_ANALYSIS},
     risk::lcov::LcovData,
 };
 use indicatif::ParallelProgressIterator;
@@ -436,6 +436,39 @@ impl ParallelUnifiedAnalysisBuilder {
 
         let timings = Arc::new(Mutex::new(self.timings.clone()));
 
+        // Create progress spinners for Phase 1 tasks if progress manager is available
+        // Only show at verbosity >= 1 (sub-phase progress)
+        let (df_progress, purity_progress, test_progress, debt_progress) =
+            if let Some(pm) = ProgressManager::global() {
+                if pm.verbosity() >= 1 {
+                    (
+                        pm.create_spinner("Initializing data flow graph"),
+                        pm.create_spinner("Analyzing function purity"),
+                        pm.create_spinner("Detecting test functions"),
+                        pm.create_spinner("Aggregating debt items"),
+                    )
+                } else {
+                    (
+                        indicatif::ProgressBar::hidden(),
+                        indicatif::ProgressBar::hidden(),
+                        indicatif::ProgressBar::hidden(),
+                        indicatif::ProgressBar::hidden(),
+                    )
+                }
+            } else {
+                (
+                    indicatif::ProgressBar::hidden(),
+                    indicatif::ProgressBar::hidden(),
+                    indicatif::ProgressBar::hidden(),
+                    indicatif::ProgressBar::hidden(),
+                )
+            };
+
+        let df_progress = Arc::new(df_progress);
+        let purity_progress = Arc::new(purity_progress);
+        let test_progress = Arc::new(test_progress);
+        let debt_progress = Arc::new(debt_progress);
+
         // Execute all 4 initialization steps in parallel
         rayon::scope(|s| {
             // Task 1: Data flow graph creation
@@ -444,6 +477,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 Arc::clone(&call_graph),
                 Arc::clone(&data_flow_result),
                 Arc::clone(&timings),
+                Arc::clone(&df_progress),
             );
 
             // Task 2: Purity analysis
@@ -452,6 +486,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 Arc::clone(&metrics_arc),
                 Arc::clone(&purity_result),
                 Arc::clone(&timings),
+                Arc::clone(&purity_progress),
             );
 
             // Task 3: Test detection
@@ -460,6 +495,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 Arc::clone(&call_graph),
                 Arc::clone(&test_funcs_result),
                 Arc::clone(&timings),
+                Arc::clone(&test_progress),
             );
 
             // Task 4: Debt aggregation
@@ -469,6 +505,7 @@ impl ParallelUnifiedAnalysisBuilder {
                 debt_items_opt,
                 Arc::clone(&debt_agg_result),
                 Arc::clone(&timings),
+                Arc::clone(&debt_progress),
             );
         });
 
@@ -492,8 +529,10 @@ impl ParallelUnifiedAnalysisBuilder {
         call_graph: Arc<CallGraph>,
         result: Arc<Mutex<Option<DataFlowGraph>>>,
         timings: Arc<Mutex<AnalysisPhaseTimings>>,
+        progress: Arc<indicatif::ProgressBar>,
     ) {
         scope.spawn(move |_| {
+            progress.tick();
             let start = Instant::now();
             let data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
             if let Ok(mut t) = timings.lock() {
@@ -502,6 +541,7 @@ impl ParallelUnifiedAnalysisBuilder {
             if let Ok(mut r) = result.lock() {
                 *r = Some(data_flow);
             }
+            progress.finish_with_message("Data flow graph complete");
         });
     }
 
@@ -511,8 +551,10 @@ impl ParallelUnifiedAnalysisBuilder {
         metrics: Arc<Vec<FunctionMetrics>>,
         result: Arc<Mutex<Option<HashMap<String, bool>>>>,
         timings: Arc<Mutex<AnalysisPhaseTimings>>,
+        progress: Arc<indicatif::ProgressBar>,
     ) {
         scope.spawn(move |_| {
+            progress.tick();
             let start = Instant::now();
             let purity_map = transformations::metrics_to_purity_map(&metrics);
             if let Ok(mut t) = timings.lock() {
@@ -521,6 +563,7 @@ impl ParallelUnifiedAnalysisBuilder {
             if let Ok(mut r) = result.lock() {
                 *r = Some(purity_map);
             }
+            progress.finish_with_message("Purity analysis complete");
         });
     }
 
@@ -530,8 +573,10 @@ impl ParallelUnifiedAnalysisBuilder {
         call_graph: Arc<CallGraph>,
         result: Arc<Mutex<Option<HashSet<FunctionId>>>>,
         timings: Arc<Mutex<AnalysisPhaseTimings>>,
+        progress: Arc<indicatif::ProgressBar>,
     ) {
         scope.spawn(move |_| {
+            progress.tick();
             let start = Instant::now();
             let detector = OptimizedTestDetector::new(call_graph);
             let test_funcs = detector.find_all_test_only_functions();
@@ -541,6 +586,7 @@ impl ParallelUnifiedAnalysisBuilder {
             if let Ok(mut r) = result.lock() {
                 *r = Some(test_funcs);
             }
+            progress.finish_with_message("Test detection complete");
         });
     }
 
@@ -551,8 +597,10 @@ impl ParallelUnifiedAnalysisBuilder {
         debt_items: Option<Vec<crate::core::DebtItem>>,
         result: Arc<Mutex<Option<DebtAggregator>>>,
         timings: Arc<Mutex<AnalysisPhaseTimings>>,
+        progress: Arc<indicatif::ProgressBar>,
     ) {
         scope.spawn(move |_| {
+            progress.tick();
             let start = Instant::now();
             let mut debt_aggregator = DebtAggregator::new();
 
@@ -567,6 +615,7 @@ impl ParallelUnifiedAnalysisBuilder {
             if let Ok(mut r) = result.lock() {
                 *r = Some(debt_aggregator);
             }
+            progress.finish_with_message("Debt aggregation complete");
         });
     }
 
@@ -701,11 +750,6 @@ impl ParallelUnifiedAnalysisBuilder {
         no_god_object: bool,
     ) -> Vec<FileDebtItem> {
         let start = Instant::now();
-        let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-
-        if !quiet_mode && self.options.progress {
-            eprintln!("Starting parallel phase 3 (file analysis)...");
-        }
 
         // Group functions by file
         let mut files_map: HashMap<PathBuf, Vec<&FunctionMetrics>> = HashMap::new();
@@ -716,9 +760,24 @@ impl ParallelUnifiedAnalysisBuilder {
                 .push(metric);
         }
 
-        // Analyze files in parallel
+        // Create progress bar if global progress manager is available
+        // Only show at verbosity >= 1 (sub-phase progress)
+        let progress = ProgressManager::global()
+            .and_then(|pm| {
+                if pm.verbosity() >= 1 {
+                    let pb = pm.create_bar(files_map.len() as u64, TEMPLATE_FILE_ANALYSIS);
+                    pb.set_message("Analyzing files");
+                    Some(pb)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| indicatif::ProgressBar::hidden());
+
+        // Analyze files in parallel with progress tracking
         let file_items: Vec<FileDebtItem> = files_map
             .par_iter()
+            .progress_with(progress.clone())
             .filter_map(|(file_path, functions)| {
                 self.analyze_file_parallel(file_path, functions, coverage_data, no_god_object)
             })
@@ -726,13 +785,7 @@ impl ParallelUnifiedAnalysisBuilder {
 
         self.timings.file_analysis = start.elapsed();
 
-        if !quiet_mode && self.options.progress {
-            eprintln!(
-                "Phase 3 complete in {:?} ({} file items)",
-                self.timings.file_analysis,
-                file_items.len()
-            );
-        }
+        progress.finish_and_clear();
 
         file_items
     }

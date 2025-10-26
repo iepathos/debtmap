@@ -1,5 +1,6 @@
 use super::coverage_index::CoverageIndex;
 use anyhow::{Context, Result};
+use indicatif::ProgressBar;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -51,7 +52,13 @@ impl LcovData {
 }
 
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
+    parse_lcov_file_with_progress(path, &ProgressBar::hidden())
+}
+
+pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Result<LcovData> {
     use lcov::{Reader, Record};
+
+    progress.set_message("Loading coverage data");
 
     let reader = Reader::open_file(path)
         .with_context(|| format!("Failed to open LCOV file: {}", path.display()))?;
@@ -62,6 +69,7 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
     let mut file_lines: HashMap<usize, u64> = HashMap::new();
     let mut _lines_found = 0;
     let mut _lines_hit = 0;
+    let mut file_count = 0u64;
 
     for record in reader {
         let record = record.with_context(|| "Failed to parse LCOV record")?;
@@ -138,6 +146,8 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
 
                 file_functions.clear();
                 file_lines.clear();
+                file_count += 1;
+                progress.set_position(file_count);
             }
 
             _ => {} // Ignore other record types
@@ -153,8 +163,11 @@ pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
         }
     }
 
+    progress.set_message("Building coverage index");
     // Build the coverage index once after all data is loaded
     data.build_index();
+
+    progress.finish_and_clear();
 
     Ok(data)
 }

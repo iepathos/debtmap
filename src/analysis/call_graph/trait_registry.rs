@@ -321,9 +321,21 @@ impl TraitRegistry {
         &self,
         call_graph: &mut crate::priority::call_graph::CallGraph,
     ) -> usize {
-        let mut resolved_count = 0;
+        self.resolve_trait_method_calls_with_progress(call_graph, &indicatif::ProgressBar::hidden())
+    }
 
-        for call in self.unresolved_calls.iter() {
+    pub fn resolve_trait_method_calls_with_progress(
+        &self,
+        call_graph: &mut crate::priority::call_graph::CallGraph,
+        progress: &indicatif::ProgressBar,
+    ) -> usize {
+        let mut resolved_count = 0;
+        let total_calls = self.unresolved_calls.len() as u64;
+
+        progress.set_length(total_calls);
+        progress.set_message("Resolving trait method calls");
+
+        for (idx, call) in self.unresolved_calls.iter().enumerate() {
             let implementations = self.resolve_trait_call(call);
 
             for impl_method_id in implementations.iter() {
@@ -339,7 +351,11 @@ impl TraitRegistry {
 
                 resolved_count += 1;
             }
+
+            progress.set_position(idx as u64 + 1);
         }
+
+        progress.finish_and_clear();
 
         resolved_count
     }
