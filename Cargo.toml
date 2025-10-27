@@ -178,3 +178,11 @@ harness = false
 [[bench]]
 name = "ast_parsing_optimization_bench"
 harness = false
+
+[[bench]]
+name = "coverage_performance"
+harness = false
+
+[[bench]]
+name = "coverage_scoring"
+harness = false
