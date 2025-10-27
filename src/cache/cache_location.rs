@@ -12,7 +12,7 @@ pub enum CacheStrategy {
 }
 
 /// Manages cache location and project identification
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CacheLocation {
     pub strategy: CacheStrategy,
     pub base_path: PathBuf,
