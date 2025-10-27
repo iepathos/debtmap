@@ -52,6 +52,20 @@ impl PathResolver {
                     .push(func.clone());
             }
 
+            // Index by module_path + name (qualified path)
+            // This allows resolution of calls like "module_a::target_function"
+            if !func.module_path.is_empty() {
+                let qualified_name = format!("{}::{}", func.module_path, func.name);
+                index
+                    .entry(qualified_name.clone())
+                    .or_default()
+                    .push(func.clone());
+
+                // Also index with "crate::" prefix for fully qualified paths
+                let fully_qualified = format!("crate::{}", qualified_name);
+                index.entry(fully_qualified).or_default().push(func.clone());
+            }
+
             // Index by file + name for same-file lookups
             let file_key = format!("{:?}:{}", func.file, func.name);
             index.entry(file_key).or_default().push(func.clone());
