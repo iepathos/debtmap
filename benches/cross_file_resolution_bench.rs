@@ -72,7 +72,8 @@ fn bench_parallel_resolution(c: &mut Criterion) {
             num_files,
             |b, &num_files| {
                 b.iter(|| {
-                    let mut graph = create_large_graph_with_unresolved_calls(num_files, calls_per_file);
+                    let mut graph =
+                        create_large_graph_with_unresolved_calls(num_files, calls_per_file);
                     black_box(&mut graph).resolve_cross_file_calls();
                 });
             },
@@ -93,7 +94,8 @@ fn bench_sequential_resolution(c: &mut Criterion) {
             num_files,
             |b, &num_files| {
                 b.iter(|| {
-                    let mut graph = create_large_graph_with_unresolved_calls(num_files, calls_per_file);
+                    let mut graph =
+                        create_large_graph_with_unresolved_calls(num_files, calls_per_file);
                     black_box(&mut graph).resolve_cross_file_calls_sequential();
                 });
             },
@@ -139,7 +141,8 @@ fn bench_varying_call_counts(c: &mut Criterion) {
             calls_per_file,
             |b, &calls_per_file| {
                 b.iter(|| {
-                    let mut graph = create_large_graph_with_unresolved_calls(num_files, calls_per_file);
+                    let mut graph =
+                        create_large_graph_with_unresolved_calls(num_files, calls_per_file);
                     black_box(&mut graph).resolve_cross_file_calls();
                 });
             },

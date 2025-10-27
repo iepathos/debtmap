@@ -512,9 +512,7 @@ mod tests {
 
         // Verify all threads complete successfully
         for handle in handles {
-            handle
-                .join()
-                .expect("Thread panicked with shared data");
+            handle.join().expect("Thread panicked with shared data");
         }
     }
 
@@ -528,10 +526,7 @@ mod tests {
         assert_eq!(unresolved.len(), 5, "Expected 5 unresolved calls");
 
         for call in unresolved {
-            assert_eq!(
-                call.callee.line, 0,
-                "Unresolved call should have line = 0"
-            );
+            assert_eq!(call.callee.line, 0, "Unresolved call should have line = 0");
         }
     }
 
