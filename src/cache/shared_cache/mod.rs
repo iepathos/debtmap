@@ -1,4 +1,7 @@
-use crate::cache::atomic_io::RetryStrategy;
+// Module declarations
+pub mod reader;
+pub mod writer;
+
 use crate::cache::auto_pruner::{AutoPruner, BackgroundPruner, PruneStats, PruneStrategy};
 use crate::cache::cache_location::{CacheLocation, CacheStrategy};
 use crate::cache::index_manager::{CacheMetadata, IndexManager};
@@ -7,10 +10,12 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
-// Types now imported from other modules
+// Re-export for backward compatibility
+pub use reader::CacheReader;
+pub use writer::CacheWriter;
 
 /// Type of directory entry for classification
 #[derive(Debug, PartialEq)]
@@ -52,7 +57,9 @@ pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
-    index_manager: IndexManager,
+    reader: CacheReader,
+    writer: CacheWriter,
+    index_manager: Arc<IndexManager>,
     max_cache_size: u64,
     cleanup_threshold: f64,
     auto_pruner: Option<AutoPruner>,
@@ -93,7 +100,12 @@ impl SharedCache {
     fn new_with_location(location: CacheLocation) -> Result<Self> {
         location.ensure_directories()?;
 
-        let index_manager = IndexManager::load_or_create(&location)?;
+        // Create shared IndexManager wrapped in Arc
+        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
+
+        // Create reader and writer with shared index manager
+        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
+        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
 
         // Create auto-pruner from environment or defaults
         let auto_pruner = if std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
@@ -118,6 +130,8 @@ impl SharedCache {
 
         Ok(Self {
             location,
+            reader,
+            writer,
             index_manager,
             max_cache_size,
             cleanup_threshold: 0.9, // Cleanup when 90% full
@@ -126,202 +140,6 @@ impl SharedCache {
         })
     }
 
-    // Pure functions for path operations and atomic file handling
-
-    /// Create a safe temporary file path that avoids collisions
-    fn create_safe_temp_path(target_path: &Path) -> PathBuf {
-        static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos() as u64;
-        let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let process_id = std::process::id();
-
-        // Create a unique temp filename to avoid collisions
-        let temp_name = format!(
-            "{}.tmp.{}.{}.{}",
-            target_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("file"),
-            process_id,
-            timestamp,
-            counter
-        );
-
-        target_path.with_file_name(temp_name)
-    }
-
-    /// Validate that a file path is safe for atomic operations
-    fn validate_file_path(path: &Path) -> Result<()> {
-        // Ensure the path is absolute to avoid ambiguity
-        if !path.is_absolute() {
-            anyhow::bail!(
-                "File path must be absolute for safe atomic operations: {:?}",
-                path
-            );
-        }
-
-        // Check for path traversal attempts
-        if path
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
-        {
-            anyhow::bail!(
-                "File path contains unsafe parent directory references: {:?}",
-                path
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Ensure the parent directory exists for the given path with race condition handling
-    fn ensure_parent_directory(file_path: &Path) -> Result<()> {
-        Self::validate_file_path(file_path)?;
-
-        if let Some(parent) = file_path.parent() {
-            Self::create_directories_safely(parent)
-                .with_context(|| format!("Failed to create parent directory: {:?}", parent))?;
-        }
-        Ok(())
-    }
-
-    /// Execute a fallible operation with exponential backoff retry
-    fn retry_with_backoff<T, F>(operation: F, operation_name: &str) -> Result<T>
-    where
-        F: Fn() -> Result<T>,
-    {
-        const MAX_ATTEMPTS: usize = 3;
-        const BASE_DELAY_MS: u64 = 10;
-
-        // Create retry strategy
-        let retry_strategy = RetryStrategy::new(MAX_ATTEMPTS, BASE_DELAY_MS);
-
-        // Execute with retry logic
-        retry_strategy.execute(operation, operation_name)
-    }
-
-    /// Create directories safely with proper race condition handling and retries
-    fn create_directories_safely(dir_path: &Path) -> Result<()> {
-        use std::io::ErrorKind;
-
-        // Fast path: directory already exists
-        if dir_path.exists() {
-            return Ok(());
-        }
-
-        let dir_path_clone = dir_path.to_path_buf();
-        Self::retry_with_backoff(
-            || {
-                match fs::create_dir_all(&dir_path_clone) {
-                    Ok(()) => Ok(()),
-                    Err(e) if e.kind() == ErrorKind::AlreadyExists => {
-                        // Another thread created it between our check and creation attempt
-                        Ok(())
-                    }
-                    Err(e) => Err(anyhow::Error::from(e)),
-                }
-            },
-            &format!("create directories {:?}", dir_path),
-        )
-        .with_context(|| {
-            format!(
-                "Failed to create directory {:?}. Current working directory: {:?}",
-                dir_path,
-                std::env::current_dir().unwrap_or_else(|_| "<unknown>".into())
-            )
-        })
-    }
-
-    /// Ensure both temp and target file paths have their parent directories created
-    fn ensure_atomic_write_directories(target_path: &Path, temp_path: &Path) -> Result<()> {
-        // Ensure target directory exists
-        Self::ensure_parent_directory(target_path)?;
-
-        // Ensure temp directory exists (might be different from target)
-        if temp_path.parent() != target_path.parent() {
-            Self::ensure_parent_directory(temp_path)?;
-        }
-
-        Ok(())
-    }
-
-    /// Write data to a temporary file with proper error context and retries
-    fn write_temp_file(temp_path: &Path, data: &[u8]) -> Result<()> {
-        let temp_path_clone = temp_path.to_path_buf();
-        let data_len = data.len();
-
-        Self::retry_with_backoff(
-            || {
-                fs::write(&temp_path_clone, data)
-                    .map_err(anyhow::Error::from)
-            },
-            &format!("write temp file {:?}", temp_path),
-        ).with_context(|| {
-            format!(
-                "Failed to write temporary file at {:?}. Size: {} bytes. Parent exists: {}, Temp path valid: {}",
-                temp_path,
-                data_len,
-                temp_path.parent().is_some_and(|p| p.exists()),
-                temp_path.is_absolute()
-            )
-        })
-    }
-
-    /// Flush and sync file data to ensure durability (optional but recommended)
-    fn sync_temp_file(_temp_path: &Path) -> Result<()> {
-        // Note: We could open and sync the temp file here for extra durability,
-        // but for cache files, the performance cost may not be worth it.
-        // This function is a placeholder for future enhancement if needed.
-        Ok(())
-    }
-
-    /// Atomically rename temporary file to target with retries and detailed error context
-    fn atomic_rename(temp_path: &Path, target_path: &Path) -> Result<()> {
-        let temp_path_clone = temp_path.to_path_buf();
-        let target_path_clone = target_path.to_path_buf();
-
-        Self::retry_with_backoff(
-            || {
-                fs::rename(&temp_path_clone, &target_path_clone)
-                    .map_err(anyhow::Error::from)
-            },
-            &format!("atomic rename {:?} -> {:?}", temp_path, target_path),
-        ).with_context(|| {
-            format!(
-                "Failed to rename file atomically: {:?} -> {:?}. Temp exists: {}, Target parent exists: {}, Same filesystem: {}",
-                temp_path,
-                target_path,
-                temp_path.exists(),
-                target_path.parent().is_some_and(|p| p.exists()),
-                Self::paths_on_same_filesystem(temp_path, target_path)
-            )
-        })
-    }
-
-    /// Check if two paths are likely on the same filesystem (heuristic)
-    fn paths_on_same_filesystem(path1: &Path, path2: &Path) -> bool {
-        // Simple heuristic: if both paths have the same root, assume same filesystem
-        // This isn't perfect but gives us debugging info
-        path1.ancestors().last() == path2.ancestors().last()
-    }
-
-    /// Write bytes atomically using temporary file and rename - composed from pure functions
-    fn write_bytes_atomically(target_path: &Path, temp_path: &Path, data: &[u8]) -> Result<()> {
-        // Step 1: Write data to temporary file
-        Self::write_temp_file(temp_path, data)?;
-
-        // Step 2: Optional sync for durability
-        Self::sync_temp_file(temp_path)?;
-
-        // Step 3: Atomic rename
-        Self::atomic_rename(temp_path, target_path)?;
-
-        Ok(())
-    }
 
     /// Save the current index to disk with comprehensive error handling
     pub fn save_index(&self) -> Result<()> {
@@ -330,17 +148,7 @@ impl SharedCache {
 
     /// Get a cache entry
     pub fn get(&self, key: &str, component: &str) -> Result<Vec<u8>> {
-        let cache_path = self.get_cache_file_path(key, component);
-
-        if !cache_path.exists() {
-            anyhow::bail!("Cache entry not found");
-        }
-
-        // Update access metadata
-        self.index_manager.update_access_metadata(key)?;
-
-        fs::read(&cache_path)
-            .with_context(|| format!("Failed to read cache file: {:?}", cache_path))
+        self.reader.get(key, component)
     }
 
     // Pure functions for configuration and decision making
@@ -374,24 +182,6 @@ impl SharedCache {
         size_exceeded || count_exceeded
     }
 
-    /// Create metadata for a new cache entry
-    fn create_cache_metadata(data_len: usize) -> CacheMetadata {
-        CacheMetadata {
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            created_at: SystemTime::now(),
-            last_accessed: SystemTime::now(),
-            access_count: 1,
-            size_bytes: data_len as u64,
-            debtmap_version: env!("CARGO_PKG_VERSION").to_string(),
-        }
-    }
-
-    /// Write cache file atomically to disk
-    fn write_cache_file_atomically(cache_path: &Path, data: &[u8]) -> Result<()> {
-        let temp_path = Self::create_safe_temp_path(cache_path);
-        Self::ensure_atomic_write_directories(cache_path, &temp_path)?;
-        Self::write_bytes_atomically(cache_path, &temp_path, data)
-    }
 
     /// Check if key represents a new entry
     fn is_new_entry(&self, key: &str) -> Result<bool> {
@@ -534,25 +324,10 @@ impl SharedCache {
         }
     }
 
-    /// Execute index update operation with proper lock management
-    fn execute_index_update(&self, key: &str, data_len: usize) -> Result<()> {
-        let metadata = Self::create_cache_metadata(data_len);
-        self.index_manager.add_entry(key.to_string(), metadata)
-    }
-
     /// Execute the core cache storage operation - coordinates all steps
     fn execute_cache_storage(&self, key: &str, component: &str, data: &[u8]) -> Result<()> {
-        // Write cache file atomically
-        let cache_path = self.get_cache_file_path(key, component);
-        Self::write_cache_file_atomically(&cache_path, data)?;
-
-        // Update index with new entry
-        self.execute_index_update(key, data.len())?;
-
-        // Persist index changes
-        self.save_index()?;
-
-        Ok(())
+        // Delegate to writer which handles atomicity and index updates
+        self.writer.put(key, component, data)
     }
 
     /// Store a cache entry with explicit pruning configuration
@@ -580,18 +355,7 @@ impl SharedCache {
 
     /// Compute cache key including file hash
     pub fn compute_cache_key(&self, file_path: &Path) -> Result<String> {
-        if file_path.exists() && file_path.is_file() {
-            let content = fs::read_to_string(file_path)
-                .with_context(|| format!("Failed to read file: {:?}", file_path))?;
-            use sha2::{Digest, Sha256};
-            let mut hasher = Sha256::new();
-            hasher.update(content.as_bytes());
-            let hash = format!("{:x}", hasher.finalize());
-            Ok(format!("{}:{}", file_path.display(), hash))
-        } else {
-            // For non-file paths, just use the path as key
-            Ok(file_path.display().to_string())
-        }
+        self.reader.compute_cache_key(file_path)
     }
 
     /// Store a cache entry
@@ -602,24 +366,12 @@ impl SharedCache {
 
     /// Check if a cache entry exists
     pub fn exists(&self, key: &str, component: &str) -> bool {
-        let cache_path = self.get_cache_file_path(key, component);
-        cache_path.exists()
+        self.reader.exists(key, component)
     }
 
     /// Delete a cache entry
     pub fn delete(&self, key: &str, component: &str) -> Result<()> {
-        let cache_path = self.get_cache_file_path(key, component);
-
-        if cache_path.exists() {
-            fs::remove_file(&cache_path)
-                .with_context(|| format!("Failed to delete cache file: {:?}", cache_path))?;
-        }
-
-        // Update index
-        self.index_manager.remove_entry(key)?;
-
-        self.save_index()?;
-        Ok(())
+        self.writer.delete(key, component)
     }
 
     /// Get the file path for a cache entry
@@ -902,12 +654,20 @@ impl SharedCache {
     pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self> {
         let location = CacheLocation::resolve(repo_path)?;
         location.ensure_directories()?;
-        let index_manager = IndexManager::load_or_create(&location)?;
+
+        // Create shared IndexManager wrapped in Arc
+        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
+
+        // Create reader and writer with shared index manager
+        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
+        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
 
         let background_pruner = BackgroundPruner::new(pruner.clone());
 
         Ok(Self {
             location,
+            reader,
+            writer,
             index_manager,
             max_cache_size: pruner.max_size_bytes as u64,
             cleanup_threshold: 0.9,
@@ -925,12 +685,20 @@ impl SharedCache {
         let strategy = CacheStrategy::Custom(cache_dir);
         let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
         location.ensure_directories()?;
-        let index_manager = IndexManager::load_or_create(&location)?;
+
+        // Create shared IndexManager wrapped in Arc
+        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
+
+        // Create reader and writer with shared index manager
+        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
+        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
 
         let background_pruner = BackgroundPruner::new(pruner.clone());
 
         Ok(Self {
             location,
+            reader,
+            writer,
             index_manager,
             max_cache_size: pruner.max_size_bytes as u64,
             cleanup_threshold: 0.9,
