@@ -3,8 +3,9 @@
 //! This benchmark validates the performance improvement from parsing files once
 //! and reusing the AST instead of re-parsing the same files multiple times.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::io;
+use std::hint::black_box;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
