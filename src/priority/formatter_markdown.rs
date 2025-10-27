@@ -329,7 +329,7 @@ pub fn format_priorities_tiered_markdown(
     .unwrap();
     writeln!(output, "- [CRITICAL] Critical: {} items", critical_count).unwrap();
     writeln!(output, "- [WARN] High: {} items", high_count).unwrap();
-    writeln!(output, "- [STATS] Moderate: {} items", moderate_count).unwrap();
+    writeln!(output, "- Moderate: {} items", moderate_count).unwrap();
     writeln!(output, "- [INFO] Low: {} items", low_count).unwrap();
 
     writeln!(output).unwrap();
@@ -2095,7 +2095,7 @@ mod tests {
         // Check that all tier headers are present (if not empty)
         assert!(output.contains("[CRITICAL] CRITICAL"));
         assert!(output.contains("[WARN] HIGH"));
-        assert!(output.contains("[STATS] MODERATE"));
+        assert!(output.contains("MODERATE"));
         assert!(output.contains("[INFO] LOW"));
 
         // Check that items are in the right sections
@@ -2135,10 +2135,7 @@ mod tests {
             "[CRITICAL] CRITICAL - Immediate Action Required"
         );
         assert_eq!(Tier::High.header(), "[WARN] HIGH - Current Sprint Priority");
-        assert_eq!(
-            Tier::Moderate.header(),
-            "[STATS] MODERATE - Next Sprint Planning"
-        );
+        assert_eq!(Tier::Moderate.header(), "MODERATE - Next Sprint Planning");
         assert_eq!(Tier::Low.header(), "[INFO] LOW - Backlog Consideration");
     }
 

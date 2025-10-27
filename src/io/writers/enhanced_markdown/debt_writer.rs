@@ -56,7 +56,7 @@ pub fn write_debt_categories<W: Write>(writer: &mut W, results: &AnalysisResults
 
 /// Write actionable items section
 pub fn write_actionable_items<W: Write>(writer: &mut W, results: &AnalysisResults) -> Result<()> {
-    writeln!(writer, "### [TARGET] Actionable Items\n")?;
+    writeln!(writer, "### Actionable Items\n")?;
 
     writeln!(writer, "#### Quick Wins (< 1 day effort)\n")?;
 

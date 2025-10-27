@@ -254,7 +254,7 @@ impl DebtCategory {
             DebtCategory::Architecture => "[ARCH]",
             DebtCategory::Testing => "[TEST]",
             DebtCategory::Performance => "[PERF]",
-            DebtCategory::CodeQuality => "[STATS]",
+            DebtCategory::CodeQuality => "",
         }
     }
 
@@ -382,7 +382,7 @@ impl Tier {
         match self {
             Tier::Critical => "[CRITICAL] CRITICAL - Immediate Action Required",
             Tier::High => "[WARN] HIGH - Current Sprint Priority",
-            Tier::Moderate => "[STATS] MODERATE - Next Sprint Planning",
+            Tier::Moderate => "MODERATE - Next Sprint Planning",
             Tier::Low => "[INFO] LOW - Backlog Consideration",
         }
     }

@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(DebtCategory::Performance.icon(), "[PERF]");
 
         assert_eq!(DebtCategory::CodeQuality.name(), "Code Quality");
-        assert_eq!(DebtCategory::CodeQuality.icon(), "[STATS]");
+        assert_eq!(DebtCategory::CodeQuality.icon(), "");
     }
 
     #[test]

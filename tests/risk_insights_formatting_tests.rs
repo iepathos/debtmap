@@ -116,7 +116,7 @@ fn test_format_recommendations_with_single_item() {
 
     let result = format_recommendations(&recommendations);
 
-    assert!(result.contains("[TARGET] TOP 5 TESTING RECOMMENDATIONS"));
+    assert!(result.contains("TOP 5 TESTING RECOMMENDATIONS"));
     assert!(result.contains("Priority: 5.0"));
     assert!(result.contains("test_func()"));
     assert!(result.contains("test.rs:10"));

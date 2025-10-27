@@ -103,7 +103,7 @@ fn classify_risk_level(score: f64) -> ColoredString {
 }
 
 fn print_risk_summary(insights: &RiskInsight) {
-    println!("[STATS] {} Summary", "RISK".bold());
+    println!("{} Summary", "RISK".bold());
     println!("───────────────────────────────────────────");
     println!(
         "Codebase Risk Score: {:.1} ({})",
@@ -157,7 +157,7 @@ fn print_summary(results: &AnalysisResults) {
         results.complexity.metrics.iter().map(|m| &m.file).collect();
     let file_count = unique_files.len();
 
-    println!("[STATS] {} Summary", "CODEBASE".bold());
+    println!("{} Summary", "CODEBASE".bold());
     println!("───────────────────────────────────────────");
     println!("  Files analyzed:      {file_count}");
     println!(
