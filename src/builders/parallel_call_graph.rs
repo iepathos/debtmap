@@ -162,8 +162,16 @@ impl ParallelCallGraphBuilder {
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<()> {
         // Create progress bar for multi-file extraction
+        let total_chunks = parsed_files.len().div_ceil(10); // chunks of size ~10
         let progress = crate::progress::ProgressManager::global()
-            .map(|pm| pm.create_spinner("Extracting cross-file call relationships"))
+            .map(|pm| {
+                let pb = pm.create_bar(
+                    total_chunks as u64,
+                    "🔗 {msg} {pos}/{len} chunks ({percent}%) - {eta}",
+                );
+                pb.set_message("Extracting cross-file call relationships");
+                pb
+            })
             .unwrap_or_else(indicatif::ProgressBar::hidden);
 
         // Group files into chunks for better parallelization
@@ -184,6 +192,8 @@ impl ParallelCallGraphBuilder {
 
                 // Merge into main graph
                 parallel_graph.merge_concurrent(chunk_graph);
+
+                progress.inc(1);
             }
         }
 

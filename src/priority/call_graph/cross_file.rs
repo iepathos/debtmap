@@ -242,9 +242,32 @@ impl CallGraph {
     /// - No shared mutable state between threads
     pub fn resolve_cross_file_calls(&mut self) {
         use rayon::prelude::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
 
         let all_functions: Vec<FunctionId> = self.get_all_functions().cloned().collect();
         let calls_to_resolve = self.find_unresolved_calls();
+        let total_calls = calls_to_resolve.len();
+
+        // Early return if nothing to resolve
+        if total_calls == 0 {
+            return;
+        }
+
+        // Create progress bar showing x/y format
+        let progress = crate::progress::ProgressManager::global()
+            .map(|pm| {
+                let pb = pm.create_bar(
+                    total_calls as u64,
+                    "🔗 {msg} {pos}/{len} calls ({percent}%) - {eta}",
+                );
+                pb.set_message("Resolving cross-file calls");
+                pb
+            })
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
+        // Counter for progress tracking in parallel phase
+        let processed_counter = Arc::new(AtomicUsize::new(0));
 
         // Phase 1: Parallel resolution (read-only, no mutation)
         // This phase can utilize all CPU cores for independent resolutions
@@ -252,7 +275,7 @@ impl CallGraph {
             .par_iter()
             .filter_map(|call| {
                 // Pure function call - safe for parallel execution
-                Self::resolve_call_with_advanced_matching(
+                let result = Self::resolve_call_with_advanced_matching(
                     &all_functions,
                     &call.callee.name,
                     &call.caller.file,
@@ -260,15 +283,32 @@ impl CallGraph {
                 .map(|resolved_callee| {
                     // Return tuple of (original_call, resolved_callee)
                     (call.clone(), resolved_callee)
-                })
+                });
+
+                // Update progress counter
+                let count = processed_counter.fetch_add(1, Ordering::Relaxed) + 1;
+                if count.is_multiple_of(100) || count == total_calls {
+                    progress.set_position(count as u64);
+                }
+
+                result
             })
             .collect();
+
+        // Ensure final position is set
+        progress.set_position(total_calls as u64);
 
         // Phase 2: Sequential bulk update (mutation phase)
         // Apply all resolutions to the graph in sequence
         for (original_call, resolved_callee) in resolutions {
             self.apply_call_resolution(&original_call, &resolved_callee);
         }
+
+        progress.finish_with_message(format!(
+            "Resolved cross-file calls: {}/{}",
+            processed_counter.load(Ordering::Relaxed),
+            total_calls
+        ));
     }
 
     /// Sequential resolution for testing and benchmarking
