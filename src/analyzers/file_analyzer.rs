@@ -277,8 +277,19 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             function_count,
             coverage_metrics.coverage_percent,
         );
-        let god_object_indicators =
-            Self::detect_god_object(function_count, line_metrics.total_lines);
+
+        // BUG FIX: Read file content to properly detect boilerplate patterns
+        // This was missing - we need to analyze the actual file content to detect
+        // boilerplate (like ripgrep's flags/defs.rs trait implementations)
+        let (god_object_indicators, god_object_type) =
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                self.analyze_god_object(&path, &content)
+            } else {
+                // Fallback to simple heuristics if we can't read the file
+                let fallback_indicators =
+                    Self::detect_god_object(function_count, line_metrics.total_lines);
+                (fallback_indicators, None)
+            };
 
         // Calculate individual function scores based on complexity
         let function_scores = Self::calculate_function_scores(functions);
@@ -295,7 +306,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             uncovered_lines: line_metrics.uncovered_lines,
             god_object_indicators,
             function_scores,
-            god_object_type: None,
+            god_object_type,
         }
     }
 }
