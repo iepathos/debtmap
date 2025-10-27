@@ -1,0 +1,679 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Boilerplate vs Complexity - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="boilerplate-vs-complexity"><a class="header" href="#boilerplate-vs-complexity">Boilerplate vs Complexity</a></h1>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Debtmap distinguishes between <strong>boilerplate code</strong> (necessary but mechanical patterns) and <strong>true complexity</strong> (business logic requiring cognitive effort). This distinction is critical for:</p>
+<ul>
+<li>Avoiding false positives in complexity analysis</li>
+<li>Focusing refactoring efforts on actual problems</li>
+<li>Understanding which high-complexity code is acceptable</li>
+<li>Providing actionable recommendations</li>
+</ul>
+<p>This chapter explains how Debtmap identifies boilerplate patterns, why they differ from complexity, and how to interpret the analysis results.</p>
+<h2 id="the-distinction"><a class="header" href="#the-distinction">The Distinction</a></h2>
+<h3 id="what-is-boilerplate"><a class="header" href="#what-is-boilerplate">What is Boilerplate?</a></h3>
+<p>Boilerplate code consists of repetitive, mechanical patterns that are:</p>
+<ol>
+<li><strong>Required by language/framework</strong> - Type conversions, trait implementations, builder patterns</li>
+<li><strong>Structurally necessary</strong> - Match arms for enums, error propagation, validation chains</li>
+<li><strong>Low cognitive load</strong> - Pattern-based code that developers scan rather than deeply analyze</li>
+<li><strong>Not actual complexity</strong> - High cyclomatic complexity but mechanistic structure</li>
+</ol>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>From</code> trait implementations converting between types</li>
+<li><code>Display</code> formatting with exhaustive enum match arms</li>
+<li>Builder pattern setters with validation</li>
+<li>Error conversion implementations</li>
+<li>Serialization/deserialization code</li>
+</ul>
+<h3 id="what-is-true-complexity"><a class="header" href="#what-is-true-complexity">What is True Complexity?</a></h3>
+<p>True complexity consists of business logic that requires:</p>
+<ol>
+<li><strong>Domain understanding</strong> - Knowledge of problem space and requirements</li>
+<li><strong>Cognitive effort</strong> - Careful analysis to understand behavior</li>
+<li><strong>Algorithmic decisions</strong> - Non-obvious control flow or data transformations</li>
+<li><strong>Maintainability risk</strong> - Changes may introduce subtle bugs</li>
+</ol>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Graph traversal algorithms</li>
+<li>Complex business rules with multiple conditions</li>
+<li>State machine implementations with non-trivial transitions</li>
+<li>Performance-critical optimizations</li>
+<li>Error recovery with fallback strategies</li>
+</ul>
+<h2 id="real-example-ripgreps-defsrs"><a class="header" href="#real-example-ripgreps-defsrs">Real Example: ripgrep’s defs.rs</a></h2>
+<p>The ripgrep codebase provides an excellent real-world example of boilerplate vs complexity.</p>
+<h3 id="file-cratesprintersrcdefsrs"><a class="header" href="#file-cratesprintersrcdefsrs">File: <code>crates/printer/src/defs.rs</code></a></h3>
+<p>This file contains type conversion implementations with high cyclomatic complexity scores but minimal actual complexity:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl From&lt;HyperlinkFormat&gt; for ColorHyperlink {
+    fn from(format: HyperlinkFormat) -&gt; ColorHyperlink {
+        match format {
+            HyperlinkFormat::Default =&gt; ColorHyperlink::default(),
+            HyperlinkFormat::Grep =&gt; ColorHyperlink::grep(),
+            HyperlinkFormat::GrepPlus =&gt; ColorHyperlink::grep_plus(),
+            HyperlinkFormat::Ripgrep =&gt; ColorHyperlink::ripgrep(),
+            HyperlinkFormat::FileNone =&gt; ColorHyperlink::file_none(),
+            // ... 10+ more variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Cyclomatic Complexity</strong>: 15+ (one branch per enum variant)</li>
+<li><strong>Cognitive Complexity</strong>: Low (simple delegation pattern)</li>
+<li><strong>Boilerplate Confidence</strong>: 95% (trait implementation with mechanical structure)</li>
+</ul>
+<h3 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h3>
+<p>Without boilerplate detection, this file would be flagged as:</p>
+<ul>
+<li>High complexity debt</li>
+<li>Requiring refactoring</li>
+<li>Priority for review</li>
+</ul>
+<p>With boilerplate detection, it’s correctly classified as:</p>
+<ul>
+<li>Necessary type conversion code</li>
+<li>Low maintenance risk</li>
+<li>Can be safely skipped in debt prioritization</li>
+</ul>
+<h2 id="detection-methodology"><a class="header" href="#detection-methodology">Detection Methodology</a></h2>
+<p>Debtmap uses a multi-phase analysis pipeline to detect boilerplate:</p>
+<h3 id="phase-1-trait-analysis"><a class="header" href="#phase-1-trait-analysis">Phase 1: Trait Analysis</a></h3>
+<p>Identifies trait implementations known to produce boilerplate:</p>
+<p><strong>High-confidence boilerplate traits:</strong></p>
+<ul>
+<li><code>From</code>, <code>Into</code> - Type conversions</li>
+<li><code>Display</code>, <code>Debug</code> - Formatting</li>
+<li><code>Default</code> - Default value construction</li>
+<li><code>Clone</code>, <code>Copy</code> - Value semantics</li>
+<li><code>Eq</code>, <code>PartialEq</code>, <code>Ord</code>, <code>PartialOrd</code> - Comparisons</li>
+<li><code>Hash</code> - Hashing implementations</li>
+</ul>
+<p><strong>Medium-confidence boilerplate traits:</strong></p>
+<ul>
+<li><code>Serialize</code>, <code>Deserialize</code> - Serialization</li>
+<li><code>AsRef</code>, <code>AsMut</code>, <code>Deref</code>, <code>DerefMut</code> - Reference conversions</li>
+<li>Custom builder traits</li>
+</ul>
+<p>See <code>src/debt/boilerplate/boilerplate_traits.rs:10-58</code> for complete trait categorization.</p>
+<h3 id="phase-2-pattern-analysis"><a class="header" href="#phase-2-pattern-analysis">Phase 2: Pattern Analysis</a></h3>
+<p>Analyzes code structure for boilerplate patterns:</p>
+<p><strong>Pattern 1: Simple Delegation</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn operation(&amp;self) -&gt; Result&lt;T&gt; {
+    self.inner.operation()  // Single delegation call
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Score: 90% confidence</p>
+<p><strong>Pattern 2: Trivial Match Arms</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match variant {
+    A =&gt; handler_a(),
+    B =&gt; handler_b(),
+    C =&gt; handler_c(),
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Each arm calls a single function with no additional logic.
+Score: 85% confidence</p>
+<p><strong>Pattern 3: Validation Chains</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn validate(&amp;self) -&gt; Result&lt;()&gt; {
+    check_condition_1()?;
+    check_condition_2()?;
+    check_condition_3()?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Sequential validation with early returns.
+Score: 75% confidence</p>
+<p><strong>Pattern 4: Builder Setters</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn with_field(mut self, value: T) -&gt; Self {
+    self.field = value;
+    self
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Simple field assignment with fluent return.
+Score: 95% confidence</p>
+<p>See <code>src/debt/boilerplate/pattern_detector.rs:18-82</code> for pattern detection logic.</p>
+<h3 id="phase-3-macro-analysis"><a class="header" href="#phase-3-macro-analysis">Phase 3: Macro Analysis</a></h3>
+<p>Detects macro-generated code and provides recommendations:</p>
+<p><strong>Derivable Traits:</strong>
+Debtmap suggests using <code>#[derive(...)]</code> when it detects manual implementations of:</p>
+<ul>
+<li><code>Clone</code>, <code>Copy</code>, <code>Debug</code>, <code>Default</code></li>
+<li><code>Eq</code>, <code>PartialEq</code>, <code>Ord</code>, <code>PartialOrd</code></li>
+<li><code>Hash</code></li>
+</ul>
+<p><strong>Custom Macros:</strong>
+Recommends creating custom derive macros for:</p>
+<ul>
+<li>Repeated builder pattern implementations</li>
+<li>Repeated conversion trait implementations</li>
+<li>Repeated validation logic</li>
+</ul>
+<p><strong>Existing Crates:</strong>
+Suggests established crates for common patterns:</p>
+<ul>
+<li><code>derive_more</code> - Extended derive macros</li>
+<li><code>thiserror</code> - Error type boilerplate</li>
+<li><code>typed-builder</code> - Builder pattern macros</li>
+<li><code>delegate</code> - Delegation patterns</li>
+</ul>
+<p>See <code>src/debt/boilerplate/macro_recommender.rs:9-136</code> for macro recommendation logic.</p>
+<h2 id="common-boilerplate-patterns"><a class="header" href="#common-boilerplate-patterns">Common Boilerplate Patterns</a></h2>
+<h3 id="type-conversions"><a class="header" href="#type-conversions">Type Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High complexity (15+), but boilerplate
+impl From&lt;ConfigFormat&gt; for Config {
+    fn from(format: ConfigFormat) -&gt; Config {
+        match format {
+            ConfigFormat::Json =&gt; Config::json(),
+            ConfigFormat::Yaml =&gt; Config::yaml(),
+            ConfigFormat::Toml =&gt; Config::toml(),
+            // ... many variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 90%+
+<strong>Recommendation</strong>: Consider using a macro if pattern repeats</p>
+<h3 id="error-propagation"><a class="header" href="#error-propagation">Error Propagation</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High nesting, but boilerplate pattern
+fn complex_operation(&amp;self) -&gt; Result&lt;Output&gt; {
+    let step1 = self.step_one()
+        .context("Step one failed")?;
+    let step2 = self.step_two(&amp;step1)
+        .context("Step two failed")?;
+    let step3 = self.step_three(&amp;step2)
+        .context("Step three failed")?;
+    Ok(Output::new(step3))
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 75%
+<strong>Recommendation</strong>: Acceptable pattern for error handling</p>
+<h3 id="builder-patterns"><a class="header" href="#builder-patterns">Builder Patterns</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Many methods, but all boilerplate
+impl ConfigBuilder {
+    pub fn with_timeout(mut self, timeout: Duration) -&gt; Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_retries(mut self, retries: u32) -&gt; Self {
+        self.retries = Some(retries);
+        self
+    }
+
+    // ... 20+ more setters
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 95%
+<strong>Recommendation</strong>: Use <code>typed-builder</code> or similar crate</p>
+<h3 id="display-formatting"><a class="header" href="#display-formatting">Display Formatting</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High complexity due to match, but boilerplate
+impl Display for Status {
+    fn fmt(&amp;self, f: &amp;mut Formatter) -&gt; fmt::Result {
+        match self {
+            Status::Pending =&gt; write!(f, "pending"),
+            Status::Running =&gt; write!(f, "running"),
+            Status::Success =&gt; write!(f, "success"),
+            Status::Failed(err) =&gt; write!(f, "failed: {}", err),
+            // ... many variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 90%
+<strong>Recommendation</strong>: Consider using <code>strum</code> or <code>derive_more</code></p>
+<h2 id="decision-table"><a class="header" href="#decision-table">Decision Table</a></h2>
+<p>Use this table to interpret boilerplate confidence scores:</p>
+<div class="table-wrapper"><table><thead><tr><th>Confidence</th><th>Interpretation</th><th>Action</th></tr></thead><tbody>
+<tr><td>90-100%</td><td>Definite boilerplate</td><td>Exclude from complexity prioritization; consider macro optimization</td></tr>
+<tr><td>70-89%</td><td>Probable boilerplate</td><td>Review pattern; likely acceptable; low refactoring priority</td></tr>
+<tr><td>50-69%</td><td>Mixed boilerplate/logic</td><td>Investigate; may contain hidden complexity; medium priority</td></tr>
+<tr><td>30-49%</td><td>Mostly real complexity</td><td>Standard complexity analysis; normal refactoring priority</td></tr>
+<tr><td>0-29%</td><td>True complexity</td><td>High priority; focus refactoring efforts here</td></tr>
+</tbody></table>
+</div>
+<h3 id="example-classifications"><a class="header" href="#example-classifications">Example Classifications</a></h3>
+<p><strong>Boilerplate (90%+ confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Simple trait delegation - skip in debt analysis
+impl AsRef&lt;str&gt; for CustomString {
+    fn as_ref(&amp;self) -&gt; &amp;str {
+        &amp;self.inner
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Mixed (50-70% confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Match with some logic - review case by case
+fn process_event(&amp;mut self, event: Event) -&gt; Result&lt;()&gt; {
+    match event {
+        Event::Simple =&gt; self.handle_simple(),  // Boilerplate
+        Event::Complex(data) =&gt; {                // Real logic
+            if data.priority &gt; 10 {
+                self.handle_urgent(data)?;
+            } else {
+                self.queue_normal(data)?;
+            }
+            self.update_metrics()?;
+            Ok(())
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>True Complexity (0-30% confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Business logic requiring domain knowledge
+fn calculate_optimal_strategy(&amp;self, market: &amp;Market) -&gt; Strategy {
+    let volatility = market.calculate_volatility();
+    let trend = market.detect_trend();
+
+    if volatility &gt; self.risk_threshold {
+        if trend.is_bullish() &amp;&amp; self.can_hedge() {
+            Strategy::hedged_long(self.calculate_position_size())
+        } else {
+            Strategy::defensive()
+        }
+    } else {
+        Strategy::momentum_based(trend, self.confidence_level())
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="integration-with-complexity-analysis"><a class="header" href="#integration-with-complexity-analysis">Integration with Complexity Analysis</a></h2>
+<h3 id="boilerplate-scoring"><a class="header" href="#boilerplate-scoring">Boilerplate Scoring</a></h3>
+<p>Debtmap calculates a <code>BoilerplateScore</code> for each function:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct BoilerplateScore {
+    pub confidence: f64,              // 0.0-1.0 (0% to 100%)
+    pub primary_pattern: Pattern,     // Strongest detected pattern
+    pub contributing_patterns: Vec&lt;Pattern&gt;,
+    pub macro_recommendation: Option&lt;MacroRecommendation&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="complexity-adjustment"><a class="header" href="#complexity-adjustment">Complexity Adjustment</a></h3>
+<p>High-confidence boilerplate reduces effective complexity:</p>
+<pre><code>effective_complexity = raw_complexity × (1.0 - boilerplate_confidence)
+</code></pre>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Raw cyclomatic complexity: 15</li>
+<li>Boilerplate confidence: 0.90 (90%)</li>
+<li>Effective complexity: 15 × (1.0 - 0.90) = 1.5</li>
+</ul>
+<p>This prevents boilerplate from dominating debt prioritization.</p>
+<h3 id="output-display"><a class="header" href="#output-display">Output Display</a></h3>
+<p>Debtmap annotates boilerplate functions in analysis output:</p>
+<pre><code>src/types/conversions.rs:
+  ├─ from (complexity: 15, boilerplate: 92%)
+  │    Pattern: Trait Implementation (From)
+  │    Recommendation: Consider #[derive(From)] via derive_more
+  │    Priority: Low (boilerplate)
+
+  ├─ process_request (complexity: 12, boilerplate: 15%)
+  │    Priority: High (true complexity)
+</code></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<h3 id="when-to-accept-boilerplate"><a class="header" href="#when-to-accept-boilerplate">When to Accept Boilerplate</a></h3>
+<p><strong>Accept</strong> high-complexity boilerplate when:</p>
+<ol>
+<li><strong>Required by language</strong> - Trait implementations, type conversions</li>
+<li><strong>Pattern is clear</strong> - Developers can scan quickly without deep analysis</li>
+<li><strong>Covered by tests</strong> - Mechanical patterns verified by unit tests</li>
+<li><strong>No simpler alternative</strong> - Refactoring would reduce clarity</li>
+</ol>
+<p><strong>Example:</strong> Exhaustive match arms for enum variants with simple delegation.</p>
+<h3 id="when-to-refactor-boilerplate"><a class="header" href="#when-to-refactor-boilerplate">When to Refactor Boilerplate</a></h3>
+<p><strong>Refactor</strong> boilerplate when:</p>
+<ol>
+<li><strong>Pattern repeats extensively</strong> - 10+ similar implementations</li>
+<li><strong>Macro alternative exists</strong> - Can use derive or custom macro</li>
+<li><strong>Maintenance burden</strong> - Changes require updating many copies</li>
+<li><strong>Error-prone</strong> - Manual pattern increases bug risk</li>
+</ol>
+<p><strong>Example:</strong> 50+ builder setters that could use <code>typed-builder</code> crate.</p>
+<h3 id="configuring-thresholds"><a class="header" href="#configuring-thresholds">Configuring Thresholds</a></h3>
+<p>Adjust boilerplate sensitivity in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[boilerplate_detection]
+enabled = true
+min_confidence_to_exclude = 0.85  # Only exclude 85%+ confidence
+trait_delegation_threshold = 0.90  # Trait impl confidence
+pattern_match_threshold = 0.75     # Match pattern confidence
+</code></pre>
+<p><strong>Strict mode</strong> (minimize false negatives):</p>
+<pre><code class="language-toml">min_confidence_to_exclude = 0.95  # Very high bar for exclusion
+</code></pre>
+<p><strong>Lenient mode</strong> (minimize false positives):</p>
+<pre><code class="language-toml">min_confidence_to_exclude = 0.70  # More aggressive exclusion
+</code></pre>
+<h2 id="validation-and-testing"><a class="header" href="#validation-and-testing">Validation and Testing</a></h2>
+<h3 id="integration-test-example"><a class="header" href="#integration-test-example">Integration Test Example</a></h3>
+<p>Debtmap’s test suite includes real-world boilerplate validation:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_ripgrep_defs_boilerplate() {
+    let code = r#"
+        impl From&lt;HyperlinkFormat&gt; for ColorHyperlink {
+            fn from(format: HyperlinkFormat) -&gt; ColorHyperlink {
+                match format {
+                    HyperlinkFormat::Default =&gt; ColorHyperlink::default(),
+                    // ... 15 variants
+                }
+            }
+        }
+    "#;
+
+    let result = analyze_boilerplate(code);
+    assert!(result.confidence &gt;= 0.85, "Should detect trait boilerplate");
+    assert_eq!(result.primary_pattern, Pattern::TraitImplementation);
+}
+<span class="boring">}</span></code></pre></pre>
+<p>See <code>tests/boilerplate_integration_test.rs</code> for complete test cases.</p>
+<h3 id="performance-overhead"><a class="header" href="#performance-overhead">Performance Overhead</a></h3>
+<p>Boilerplate detection adds minimal overhead:</p>
+<p><strong>Measurement:</strong> &lt;5% increase in analysis time
+<strong>Reason:</strong> Single-pass AST analysis with cached pattern matching
+<strong>Optimization:</strong> Trait analysis uses fast HashMap lookups</p>
+<p>See <code>tests/boilerplate_performance_test.rs</code> for benchmark details.</p>
+<h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
+<h3 id="why-is-my-code-marked-as-boilerplate"><a class="header" href="#why-is-my-code-marked-as-boilerplate">“Why is my code marked as boilerplate?”</a></h3>
+<p><strong>Check:</strong></p>
+<ol>
+<li>Is it a trait implementation? (From, Display, etc.)</li>
+<li>Does it follow a mechanical pattern?</li>
+<li>Are all branches simple delegations?</li>
+</ol>
+<p><strong>If incorrectly classified:</strong></p>
+<ul>
+<li>Adjust <code>min_confidence_to_exclude</code> threshold</li>
+<li>Report false positive if confidence is very high</li>
+</ul>
+<h3 id="my-boilerplate-isnt-detected"><a class="header" href="#my-boilerplate-isnt-detected">“My boilerplate isn’t detected”</a></h3>
+<p><strong>Common causes:</strong></p>
+<ol>
+<li>Custom logic mixed with boilerplate pattern</li>
+<li>Non-standard trait names</li>
+<li>Complex match arm logic</li>
+</ol>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Extract pure boilerplate into separate functions</li>
+<li>Use standard traits when possible</li>
+<li>Check confidence score - may be detected with lower confidence</li>
+</ul>
+<h3 id="boilerplate-detection-seems-too-aggressive"><a class="header" href="#boilerplate-detection-seems-too-aggressive">“Boilerplate detection seems too aggressive”</a></h3>
+<p><strong>Adjust configuration:</strong></p>
+<pre><code class="language-toml">[boilerplate_detection]
+min_confidence_to_exclude = 0.95  # Raise threshold
+trait_delegation_threshold = 0.95
+</code></pre>
+<h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
+<ul>
+<li><a href="./metrics-reference.html">Complexity Metrics</a> - Understanding cyclomatic complexity</li>
+<li><a href="./configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
+<li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - How boilerplate affects debt ranking</li>
+</ul>
+<h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
+<p>Boilerplate detection is a critical feature that:</p>
+<ul>
+<li>Distinguishes mechanical patterns from true complexity</li>
+<li>Reduces false positives in debt analysis</li>
+<li>Provides actionable macro recommendations</li>
+<li>Integrates seamlessly with complexity scoring</li>
+<li>Helps teams focus on real maintainability issues</li>
+</ul>
+<p>By identifying boilerplate with 85%+ confidence, Debtmap ensures that high-complexity scores reflect actual cognitive burden rather than necessary but mechanical code patterns.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="architectural-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="cache-management.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="architectural-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="cache-management.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

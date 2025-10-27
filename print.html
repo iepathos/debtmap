@@ -8832,6 +8832,452 @@ zone_useless_instability = 0.8
 <li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt is scored</li>
 <li><a href="tiered-prioritization.html">Tiered Prioritization</a> - Priority assignment</li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="boilerplate-vs-complexity"><a class="header" href="#boilerplate-vs-complexity">Boilerplate vs Complexity</a></h1>
+<h2 id="overview-4"><a class="header" href="#overview-4">Overview</a></h2>
+<p>Debtmap distinguishes between <strong>boilerplate code</strong> (necessary but mechanical patterns) and <strong>true complexity</strong> (business logic requiring cognitive effort). This distinction is critical for:</p>
+<ul>
+<li>Avoiding false positives in complexity analysis</li>
+<li>Focusing refactoring efforts on actual problems</li>
+<li>Understanding which high-complexity code is acceptable</li>
+<li>Providing actionable recommendations</li>
+</ul>
+<p>This chapter explains how Debtmap identifies boilerplate patterns, why they differ from complexity, and how to interpret the analysis results.</p>
+<h2 id="the-distinction"><a class="header" href="#the-distinction">The Distinction</a></h2>
+<h3 id="what-is-boilerplate"><a class="header" href="#what-is-boilerplate">What is Boilerplate?</a></h3>
+<p>Boilerplate code consists of repetitive, mechanical patterns that are:</p>
+<ol>
+<li><strong>Required by language/framework</strong> - Type conversions, trait implementations, builder patterns</li>
+<li><strong>Structurally necessary</strong> - Match arms for enums, error propagation, validation chains</li>
+<li><strong>Low cognitive load</strong> - Pattern-based code that developers scan rather than deeply analyze</li>
+<li><strong>Not actual complexity</strong> - High cyclomatic complexity but mechanistic structure</li>
+</ol>
+<p><strong>Examples:</strong></p>
+<ul>
+<li><code>From</code> trait implementations converting between types</li>
+<li><code>Display</code> formatting with exhaustive enum match arms</li>
+<li>Builder pattern setters with validation</li>
+<li>Error conversion implementations</li>
+<li>Serialization/deserialization code</li>
+</ul>
+<h3 id="what-is-true-complexity"><a class="header" href="#what-is-true-complexity">What is True Complexity?</a></h3>
+<p>True complexity consists of business logic that requires:</p>
+<ol>
+<li><strong>Domain understanding</strong> - Knowledge of problem space and requirements</li>
+<li><strong>Cognitive effort</strong> - Careful analysis to understand behavior</li>
+<li><strong>Algorithmic decisions</strong> - Non-obvious control flow or data transformations</li>
+<li><strong>Maintainability risk</strong> - Changes may introduce subtle bugs</li>
+</ol>
+<p><strong>Examples:</strong></p>
+<ul>
+<li>Graph traversal algorithms</li>
+<li>Complex business rules with multiple conditions</li>
+<li>State machine implementations with non-trivial transitions</li>
+<li>Performance-critical optimizations</li>
+<li>Error recovery with fallback strategies</li>
+</ul>
+<h2 id="real-example-ripgreps-defsrs"><a class="header" href="#real-example-ripgreps-defsrs">Real Example: ripgrep’s defs.rs</a></h2>
+<p>The ripgrep codebase provides an excellent real-world example of boilerplate vs complexity.</p>
+<h3 id="file-cratesprintersrcdefsrs"><a class="header" href="#file-cratesprintersrcdefsrs">File: <code>crates/printer/src/defs.rs</code></a></h3>
+<p>This file contains type conversion implementations with high cyclomatic complexity scores but minimal actual complexity:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl From&lt;HyperlinkFormat&gt; for ColorHyperlink {
+    fn from(format: HyperlinkFormat) -&gt; ColorHyperlink {
+        match format {
+            HyperlinkFormat::Default =&gt; ColorHyperlink::default(),
+            HyperlinkFormat::Grep =&gt; ColorHyperlink::grep(),
+            HyperlinkFormat::GrepPlus =&gt; ColorHyperlink::grep_plus(),
+            HyperlinkFormat::Ripgrep =&gt; ColorHyperlink::ripgrep(),
+            HyperlinkFormat::FileNone =&gt; ColorHyperlink::file_none(),
+            // ... 10+ more variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Analysis:</strong></p>
+<ul>
+<li><strong>Cyclomatic Complexity</strong>: 15+ (one branch per enum variant)</li>
+<li><strong>Cognitive Complexity</strong>: Low (simple delegation pattern)</li>
+<li><strong>Boilerplate Confidence</strong>: 95% (trait implementation with mechanical structure)</li>
+</ul>
+<h3 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h3>
+<p>Without boilerplate detection, this file would be flagged as:</p>
+<ul>
+<li>High complexity debt</li>
+<li>Requiring refactoring</li>
+<li>Priority for review</li>
+</ul>
+<p>With boilerplate detection, it’s correctly classified as:</p>
+<ul>
+<li>Necessary type conversion code</li>
+<li>Low maintenance risk</li>
+<li>Can be safely skipped in debt prioritization</li>
+</ul>
+<h2 id="detection-methodology"><a class="header" href="#detection-methodology">Detection Methodology</a></h2>
+<p>Debtmap uses a multi-phase analysis pipeline to detect boilerplate:</p>
+<h3 id="phase-1-trait-analysis"><a class="header" href="#phase-1-trait-analysis">Phase 1: Trait Analysis</a></h3>
+<p>Identifies trait implementations known to produce boilerplate:</p>
+<p><strong>High-confidence boilerplate traits:</strong></p>
+<ul>
+<li><code>From</code>, <code>Into</code> - Type conversions</li>
+<li><code>Display</code>, <code>Debug</code> - Formatting</li>
+<li><code>Default</code> - Default value construction</li>
+<li><code>Clone</code>, <code>Copy</code> - Value semantics</li>
+<li><code>Eq</code>, <code>PartialEq</code>, <code>Ord</code>, <code>PartialOrd</code> - Comparisons</li>
+<li><code>Hash</code> - Hashing implementations</li>
+</ul>
+<p><strong>Medium-confidence boilerplate traits:</strong></p>
+<ul>
+<li><code>Serialize</code>, <code>Deserialize</code> - Serialization</li>
+<li><code>AsRef</code>, <code>AsMut</code>, <code>Deref</code>, <code>DerefMut</code> - Reference conversions</li>
+<li>Custom builder traits</li>
+</ul>
+<p>See <code>src/debt/boilerplate/boilerplate_traits.rs:10-58</code> for complete trait categorization.</p>
+<h3 id="phase-2-pattern-analysis"><a class="header" href="#phase-2-pattern-analysis">Phase 2: Pattern Analysis</a></h3>
+<p>Analyzes code structure for boilerplate patterns:</p>
+<p><strong>Pattern 1: Simple Delegation</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn operation(&amp;self) -&gt; Result&lt;T&gt; {
+    self.inner.operation()  // Single delegation call
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Score: 90% confidence</p>
+<p><strong>Pattern 2: Trivial Match Arms</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match variant {
+    A =&gt; handler_a(),
+    B =&gt; handler_b(),
+    C =&gt; handler_c(),
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Each arm calls a single function with no additional logic.
+Score: 85% confidence</p>
+<p><strong>Pattern 3: Validation Chains</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn validate(&amp;self) -&gt; Result&lt;()&gt; {
+    check_condition_1()?;
+    check_condition_2()?;
+    check_condition_3()?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Sequential validation with early returns.
+Score: 75% confidence</p>
+<p><strong>Pattern 4: Builder Setters</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn with_field(mut self, value: T) -&gt; Self {
+    self.field = value;
+    self
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Simple field assignment with fluent return.
+Score: 95% confidence</p>
+<p>See <code>src/debt/boilerplate/pattern_detector.rs:18-82</code> for pattern detection logic.</p>
+<h3 id="phase-3-macro-analysis"><a class="header" href="#phase-3-macro-analysis">Phase 3: Macro Analysis</a></h3>
+<p>Detects macro-generated code and provides recommendations:</p>
+<p><strong>Derivable Traits:</strong>
+Debtmap suggests using <code>#[derive(...)]</code> when it detects manual implementations of:</p>
+<ul>
+<li><code>Clone</code>, <code>Copy</code>, <code>Debug</code>, <code>Default</code></li>
+<li><code>Eq</code>, <code>PartialEq</code>, <code>Ord</code>, <code>PartialOrd</code></li>
+<li><code>Hash</code></li>
+</ul>
+<p><strong>Custom Macros:</strong>
+Recommends creating custom derive macros for:</p>
+<ul>
+<li>Repeated builder pattern implementations</li>
+<li>Repeated conversion trait implementations</li>
+<li>Repeated validation logic</li>
+</ul>
+<p><strong>Existing Crates:</strong>
+Suggests established crates for common patterns:</p>
+<ul>
+<li><code>derive_more</code> - Extended derive macros</li>
+<li><code>thiserror</code> - Error type boilerplate</li>
+<li><code>typed-builder</code> - Builder pattern macros</li>
+<li><code>delegate</code> - Delegation patterns</li>
+</ul>
+<p>See <code>src/debt/boilerplate/macro_recommender.rs:9-136</code> for macro recommendation logic.</p>
+<h2 id="common-boilerplate-patterns"><a class="header" href="#common-boilerplate-patterns">Common Boilerplate Patterns</a></h2>
+<h3 id="type-conversions"><a class="header" href="#type-conversions">Type Conversions</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High complexity (15+), but boilerplate
+impl From&lt;ConfigFormat&gt; for Config {
+    fn from(format: ConfigFormat) -&gt; Config {
+        match format {
+            ConfigFormat::Json =&gt; Config::json(),
+            ConfigFormat::Yaml =&gt; Config::yaml(),
+            ConfigFormat::Toml =&gt; Config::toml(),
+            // ... many variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 90%+
+<strong>Recommendation</strong>: Consider using a macro if pattern repeats</p>
+<h3 id="error-propagation"><a class="header" href="#error-propagation">Error Propagation</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High nesting, but boilerplate pattern
+fn complex_operation(&amp;self) -&gt; Result&lt;Output&gt; {
+    let step1 = self.step_one()
+        .context("Step one failed")?;
+    let step2 = self.step_two(&amp;step1)
+        .context("Step two failed")?;
+    let step3 = self.step_three(&amp;step2)
+        .context("Step three failed")?;
+    Ok(Output::new(step3))
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 75%
+<strong>Recommendation</strong>: Acceptable pattern for error handling</p>
+<h3 id="builder-patterns"><a class="header" href="#builder-patterns">Builder Patterns</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Many methods, but all boilerplate
+impl ConfigBuilder {
+    pub fn with_timeout(mut self, timeout: Duration) -&gt; Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
+    pub fn with_retries(mut self, retries: u32) -&gt; Self {
+        self.retries = Some(retries);
+        self
+    }
+
+    // ... 20+ more setters
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 95%
+<strong>Recommendation</strong>: Use <code>typed-builder</code> or similar crate</p>
+<h3 id="display-formatting"><a class="header" href="#display-formatting">Display Formatting</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// High complexity due to match, but boilerplate
+impl Display for Status {
+    fn fmt(&amp;self, f: &amp;mut Formatter) -&gt; fmt::Result {
+        match self {
+            Status::Pending =&gt; write!(f, "pending"),
+            Status::Running =&gt; write!(f, "running"),
+            Status::Success =&gt; write!(f, "success"),
+            Status::Failed(err) =&gt; write!(f, "failed: {}", err),
+            // ... many variants
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Boilerplate Confidence</strong>: 90%
+<strong>Recommendation</strong>: Consider using <code>strum</code> or <code>derive_more</code></p>
+<h2 id="decision-table"><a class="header" href="#decision-table">Decision Table</a></h2>
+<p>Use this table to interpret boilerplate confidence scores:</p>
+<div class="table-wrapper"><table><thead><tr><th>Confidence</th><th>Interpretation</th><th>Action</th></tr></thead><tbody>
+<tr><td>90-100%</td><td>Definite boilerplate</td><td>Exclude from complexity prioritization; consider macro optimization</td></tr>
+<tr><td>70-89%</td><td>Probable boilerplate</td><td>Review pattern; likely acceptable; low refactoring priority</td></tr>
+<tr><td>50-69%</td><td>Mixed boilerplate/logic</td><td>Investigate; may contain hidden complexity; medium priority</td></tr>
+<tr><td>30-49%</td><td>Mostly real complexity</td><td>Standard complexity analysis; normal refactoring priority</td></tr>
+<tr><td>0-29%</td><td>True complexity</td><td>High priority; focus refactoring efforts here</td></tr>
+</tbody></table>
+</div>
+<h3 id="example-classifications"><a class="header" href="#example-classifications">Example Classifications</a></h3>
+<p><strong>Boilerplate (90%+ confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Simple trait delegation - skip in debt analysis
+impl AsRef&lt;str&gt; for CustomString {
+    fn as_ref(&amp;self) -&gt; &amp;str {
+        &amp;self.inner
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Mixed (50-70% confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Match with some logic - review case by case
+fn process_event(&amp;mut self, event: Event) -&gt; Result&lt;()&gt; {
+    match event {
+        Event::Simple =&gt; self.handle_simple(),  // Boilerplate
+        Event::Complex(data) =&gt; {                // Real logic
+            if data.priority &gt; 10 {
+                self.handle_urgent(data)?;
+            } else {
+                self.queue_normal(data)?;
+            }
+            self.update_metrics()?;
+            Ok(())
+        }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>True Complexity (0-30% confidence):</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Business logic requiring domain knowledge
+fn calculate_optimal_strategy(&amp;self, market: &amp;Market) -&gt; Strategy {
+    let volatility = market.calculate_volatility();
+    let trend = market.detect_trend();
+
+    if volatility &gt; self.risk_threshold {
+        if trend.is_bullish() &amp;&amp; self.can_hedge() {
+            Strategy::hedged_long(self.calculate_position_size())
+        } else {
+            Strategy::defensive()
+        }
+    } else {
+        Strategy::momentum_based(trend, self.confidence_level())
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="integration-with-complexity-analysis"><a class="header" href="#integration-with-complexity-analysis">Integration with Complexity Analysis</a></h2>
+<h3 id="boilerplate-scoring"><a class="header" href="#boilerplate-scoring">Boilerplate Scoring</a></h3>
+<p>Debtmap calculates a <code>BoilerplateScore</code> for each function:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct BoilerplateScore {
+    pub confidence: f64,              // 0.0-1.0 (0% to 100%)
+    pub primary_pattern: Pattern,     // Strongest detected pattern
+    pub contributing_patterns: Vec&lt;Pattern&gt;,
+    pub macro_recommendation: Option&lt;MacroRecommendation&gt;,
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="complexity-adjustment"><a class="header" href="#complexity-adjustment">Complexity Adjustment</a></h3>
+<p>High-confidence boilerplate reduces effective complexity:</p>
+<pre><code>effective_complexity = raw_complexity × (1.0 - boilerplate_confidence)
+</code></pre>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Raw cyclomatic complexity: 15</li>
+<li>Boilerplate confidence: 0.90 (90%)</li>
+<li>Effective complexity: 15 × (1.0 - 0.90) = 1.5</li>
+</ul>
+<p>This prevents boilerplate from dominating debt prioritization.</p>
+<h3 id="output-display"><a class="header" href="#output-display">Output Display</a></h3>
+<p>Debtmap annotates boilerplate functions in analysis output:</p>
+<pre><code>src/types/conversions.rs:
+  ├─ from (complexity: 15, boilerplate: 92%)
+  │    Pattern: Trait Implementation (From)
+  │    Recommendation: Consider #[derive(From)] via derive_more
+  │    Priority: Low (boilerplate)
+
+  ├─ process_request (complexity: 12, boilerplate: 15%)
+  │    Priority: High (true complexity)
+</code></pre>
+<h2 id="best-practices-4"><a class="header" href="#best-practices-4">Best Practices</a></h2>
+<h3 id="when-to-accept-boilerplate"><a class="header" href="#when-to-accept-boilerplate">When to Accept Boilerplate</a></h3>
+<p><strong>Accept</strong> high-complexity boilerplate when:</p>
+<ol>
+<li><strong>Required by language</strong> - Trait implementations, type conversions</li>
+<li><strong>Pattern is clear</strong> - Developers can scan quickly without deep analysis</li>
+<li><strong>Covered by tests</strong> - Mechanical patterns verified by unit tests</li>
+<li><strong>No simpler alternative</strong> - Refactoring would reduce clarity</li>
+</ol>
+<p><strong>Example:</strong> Exhaustive match arms for enum variants with simple delegation.</p>
+<h3 id="when-to-refactor-boilerplate"><a class="header" href="#when-to-refactor-boilerplate">When to Refactor Boilerplate</a></h3>
+<p><strong>Refactor</strong> boilerplate when:</p>
+<ol>
+<li><strong>Pattern repeats extensively</strong> - 10+ similar implementations</li>
+<li><strong>Macro alternative exists</strong> - Can use derive or custom macro</li>
+<li><strong>Maintenance burden</strong> - Changes require updating many copies</li>
+<li><strong>Error-prone</strong> - Manual pattern increases bug risk</li>
+</ol>
+<p><strong>Example:</strong> 50+ builder setters that could use <code>typed-builder</code> crate.</p>
+<h3 id="configuring-thresholds"><a class="header" href="#configuring-thresholds">Configuring Thresholds</a></h3>
+<p>Adjust boilerplate sensitivity in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[boilerplate_detection]
+enabled = true
+min_confidence_to_exclude = 0.85  # Only exclude 85%+ confidence
+trait_delegation_threshold = 0.90  # Trait impl confidence
+pattern_match_threshold = 0.75     # Match pattern confidence
+</code></pre>
+<p><strong>Strict mode</strong> (minimize false negatives):</p>
+<pre><code class="language-toml">min_confidence_to_exclude = 0.95  # Very high bar for exclusion
+</code></pre>
+<p><strong>Lenient mode</strong> (minimize false positives):</p>
+<pre><code class="language-toml">min_confidence_to_exclude = 0.70  # More aggressive exclusion
+</code></pre>
+<h2 id="validation-and-testing"><a class="header" href="#validation-and-testing">Validation and Testing</a></h2>
+<h3 id="integration-test-example"><a class="header" href="#integration-test-example">Integration Test Example</a></h3>
+<p>Debtmap’s test suite includes real-world boilerplate validation:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn test_ripgrep_defs_boilerplate() {
+    let code = r#"
+        impl From&lt;HyperlinkFormat&gt; for ColorHyperlink {
+            fn from(format: HyperlinkFormat) -&gt; ColorHyperlink {
+                match format {
+                    HyperlinkFormat::Default =&gt; ColorHyperlink::default(),
+                    // ... 15 variants
+                }
+            }
+        }
+    "#;
+
+    let result = analyze_boilerplate(code);
+    assert!(result.confidence &gt;= 0.85, "Should detect trait boilerplate");
+    assert_eq!(result.primary_pattern, Pattern::TraitImplementation);
+}
+<span class="boring">}</span></code></pre></pre>
+<p>See <code>tests/boilerplate_integration_test.rs</code> for complete test cases.</p>
+<h3 id="performance-overhead"><a class="header" href="#performance-overhead">Performance Overhead</a></h3>
+<p>Boilerplate detection adds minimal overhead:</p>
+<p><strong>Measurement:</strong> &lt;5% increase in analysis time
+<strong>Reason:</strong> Single-pass AST analysis with cached pattern matching
+<strong>Optimization:</strong> Trait analysis uses fast HashMap lookups</p>
+<p>See <code>tests/boilerplate_performance_test.rs</code> for benchmark details.</p>
+<h2 id="troubleshooting-7"><a class="header" href="#troubleshooting-7">Troubleshooting</a></h2>
+<h3 id="why-is-my-code-marked-as-boilerplate"><a class="header" href="#why-is-my-code-marked-as-boilerplate">“Why is my code marked as boilerplate?”</a></h3>
+<p><strong>Check:</strong></p>
+<ol>
+<li>Is it a trait implementation? (From, Display, etc.)</li>
+<li>Does it follow a mechanical pattern?</li>
+<li>Are all branches simple delegations?</li>
+</ol>
+<p><strong>If incorrectly classified:</strong></p>
+<ul>
+<li>Adjust <code>min_confidence_to_exclude</code> threshold</li>
+<li>Report false positive if confidence is very high</li>
+</ul>
+<h3 id="my-boilerplate-isnt-detected"><a class="header" href="#my-boilerplate-isnt-detected">“My boilerplate isn’t detected”</a></h3>
+<p><strong>Common causes:</strong></p>
+<ol>
+<li>Custom logic mixed with boilerplate pattern</li>
+<li>Non-standard trait names</li>
+<li>Complex match arm logic</li>
+</ol>
+<p><strong>Solutions:</strong></p>
+<ul>
+<li>Extract pure boilerplate into separate functions</li>
+<li>Use standard traits when possible</li>
+<li>Check confidence score - may be detected with lower confidence</li>
+</ul>
+<h3 id="boilerplate-detection-seems-too-aggressive"><a class="header" href="#boilerplate-detection-seems-too-aggressive">“Boilerplate detection seems too aggressive”</a></h3>
+<p><strong>Adjust configuration:</strong></p>
+<pre><code class="language-toml">[boilerplate_detection]
+min_confidence_to_exclude = 0.95  # Raise threshold
+trait_delegation_threshold = 0.95
+</code></pre>
+<h2 id="related-documentation-1"><a class="header" href="#related-documentation-1">Related Documentation</a></h2>
+<ul>
+<li><a href="./metrics-reference.html">Complexity Metrics</a> - Understanding cyclomatic complexity</li>
+<li><a href="./configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
+<li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - How boilerplate affects debt ranking</li>
+</ul>
+<h2 id="summary-2"><a class="header" href="#summary-2">Summary</a></h2>
+<p>Boilerplate detection is a critical feature that:</p>
+<ul>
+<li>Distinguishes mechanical patterns from true complexity</li>
+<li>Reduces false positives in debt analysis</li>
+<li>Provides actionable macro recommendations</li>
+<li>Integrates seamlessly with complexity scoring</li>
+<li>Helps teams focus on real maintainability issues</li>
+</ul>
+<p>By identifying boilerplate with 85%+ confidence, Debtmap ensures that high-complexity scores reflect actual cognitive burden rather than necessary but mechanical code patterns.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="cache-management-1"><a class="header" href="#cache-management-1">Cache Management</a></h1>
 <p>Debtmap includes a comprehensive caching system designed to significantly speed up repeated analyses, particularly beneficial for large codebases and CI/CD pipelines. The cache stores parsed ASTs, call graphs, analysis results, and file metrics to avoid redundant computation.</p>
 <h2 id="cache-location-and-configuration"><a class="header" href="#cache-location-and-configuration">Cache Location and Configuration</a></h2>
@@ -9078,7 +9524,7 @@ Cache invalidation relies on file modification times. Ensure your build system d
 <p>After migration, you can safely delete the old cache directory.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="context-providers"><a class="header" href="#context-providers">Context Providers</a></h1>
 <p>Context providers enhance debtmap’s risk analysis by incorporating additional factors beyond complexity and test coverage. They analyze critical execution paths, dependency relationships, and version control history to provide a more comprehensive understanding of technical risk.</p>
-<h2 id="overview-4"><a class="header" href="#overview-4">Overview</a></h2>
+<h2 id="overview-5"><a class="header" href="#overview-5">Overview</a></h2>
 <p>Context providers implement the <code>ContextProvider</code> trait, which gathers risk-relevant information about functions and modules. Each provider analyzes a specific dimension of risk:</p>
 <ul>
 <li><strong>Critical Path Provider</strong>: Identifies functions on critical execution paths</li>
@@ -9297,7 +9743,7 @@ time_range_days = 90
 # Minimum commits to consider "high churn" (default: 10)
 high_churn_threshold = 10
 </code></pre>
-<h3 id="troubleshooting-7"><a class="header" href="#troubleshooting-7">Troubleshooting</a></h3>
+<h3 id="troubleshooting-8"><a class="header" href="#troubleshooting-8">Troubleshooting</a></h3>
 <p><strong>Git repository not found</strong>: The provider requires a Git repository. If analysis fails:</p>
 <pre><code class="language-bash"># Verify you're in a git repository
 git rev-parse --git-dir
@@ -9605,7 +10051,7 @@ debtmap analyze . --no-context-aware
 <tr><td>CI/CD integration</td><td><code>critical_path,dependency</code> (faster)</td></tr>
 </tbody></table>
 </div>
-<h2 id="troubleshooting-8"><a class="header" href="#troubleshooting-8">Troubleshooting</a></h2>
+<h2 id="troubleshooting-9"><a class="header" href="#troubleshooting-9">Troubleshooting</a></h2>
 <h3 id="git-history-analysis-slow"><a class="header" href="#git-history-analysis-slow">Git History Analysis Slow</a></h3>
 <p><strong>Issue:</strong> Analysis takes much longer with git history enabled</p>
 <p><strong>Solutions:</strong></p>
@@ -9720,7 +10166,7 @@ let contribution = context.total_contribution();
 }
 <span class="boring">}</span></code></pre></pre>
 <p>This will allow manual prioritization based on business requirements through code annotations or configuration files.</p>
-<h2 id="best-practices-4"><a class="header" href="#best-practices-4">Best Practices</a></h2>
+<h2 id="best-practices-5"><a class="header" href="#best-practices-5">Best Practices</a></h2>
 <ol>
 <li><strong>Use all providers for comprehensive analysis</strong> - Especially for production code</li>
 <li><strong>Disable git history in CI</strong> - Use shallow clones or disable for speed</li>
@@ -9728,7 +10174,7 @@ let contribution = context.total_contribution();
 <li><strong>Tune multipliers for your project</strong> - Adjust in config based on architecture</li>
 <li><strong>Combine with coverage data</strong> - Context providers enhance coverage-based risk analysis</li>
 </ol>
-<h2 id="summary-2"><a class="header" href="#summary-2">Summary</a></h2>
+<h2 id="summary-3"><a class="header" href="#summary-3">Summary</a></h2>
 <p>Context providers transform debtmap from a static complexity analyzer into a comprehensive risk assessment tool. By combining:</p>
 <ul>
 <li><strong>Critical path analysis</strong> for user impact</li>
@@ -9888,7 +10334,7 @@ Priority 3: Helper Function (MODERATE)
 <pre><code class="language-toml">[coverage]
 lcov_path = "./coverage/lcov.info"
 </code></pre>
-<h2 id="best-practices-5"><a class="header" href="#best-practices-5">Best Practices</a></h2>
+<h2 id="best-practices-6"><a class="header" href="#best-practices-6">Best Practices</a></h2>
 <h3 id="1-use-precise-gaps-when-possible"><a class="header" href="#1-use-precise-gaps-when-possible">1. Use Precise Gaps When Possible</a></h3>
 <p>Always generate LCOV data for actionable coverage insights:</p>
 <ul>
@@ -9918,7 +10364,7 @@ lcov_path = "./coverage/lcov.info"
 debtmap analyze --coverage-path ./coverage/lcov.info &gt; weekly-gaps.txt
 </code></pre>
 <p>Compare reports to see gap reduction progress.</p>
-<h2 id="troubleshooting-9"><a class="header" href="#troubleshooting-9">Troubleshooting</a></h2>
+<h2 id="troubleshooting-10"><a class="header" href="#troubleshooting-10">Troubleshooting</a></h2>
 <h3 id="coverage-data-unavailable-for-all-functions"><a class="header" href="#coverage-data-unavailable-for-all-functions">“Coverage data unavailable” for all functions</a></h3>
 <p><strong>Cause</strong>: Debtmap can’t find or parse LCOV file</p>
 <p><strong>Solutions</strong>:</p>
@@ -10230,7 +10676,7 @@ debtmap analyze . --lcov ./target/coverage/lcov.info
 <li>Regenerate coverage with explicit LCOV format flag</li>
 </ul>
 <p>See <a href="troubleshooting.html">Troubleshooting</a> for more debugging tips.</p>
-<h2 id="best-practices-6"><a class="header" href="#best-practices-6">Best Practices</a></h2>
+<h2 id="best-practices-7"><a class="header" href="#best-practices-7">Best Practices</a></h2>
 <h3 id="analysis-workflow"><a class="header" href="#analysis-workflow">Analysis Workflow</a></h3>
 <ol>
 <li>
@@ -10429,7 +10875,7 @@ debtmap analyze . --lcov coverage.lcov --languages go
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="dead-code-analysis"><a class="header" href="#dead-code-analysis">Dead Code Analysis</a></h1>
 <p>Debtmap’s Python dead code detection system uses advanced static analysis to identify unused functions with high accuracy and low false positive rates. The analyzer integrates multiple detection systems to provide confidence-scored results that help you make informed decisions about code removal.</p>
-<h2 id="overview-5"><a class="header" href="#overview-5">Overview</a></h2>
+<h2 id="overview-6"><a class="header" href="#overview-6">Overview</a></h2>
 <p>The dead code analyzer combines several detection techniques:</p>
 <ul>
 <li><strong>Static call graph analysis</strong> - Tracks which functions call each other across your codebase</li>
@@ -10734,7 +11180,7 @@ def handler():  # Registered at import time
     pass
 </code></pre>
 <p><em>Action</em>: Safe to remove (high confidence)</p>
-<h2 id="best-practices-7"><a class="header" href="#best-practices-7">Best Practices</a></h2>
+<h2 id="best-practices-8"><a class="header" href="#best-practices-8">Best Practices</a></h2>
 <h3 id="workflow-recommendations"><a class="header" href="#workflow-recommendations">Workflow Recommendations</a></h3>
 <ol>
 <li>
@@ -10813,7 +11259,7 @@ def handle_dynamic_command():
 def plugin_entrypoint():
     pass
 </code></pre>
-<h2 id="troubleshooting-10"><a class="header" href="#troubleshooting-10">Troubleshooting</a></h2>
+<h2 id="troubleshooting-11"><a class="header" href="#troubleshooting-11">Troubleshooting</a></h2>
 <h3 id="function-marked-as-dead-but-its-actually-used"><a class="header" href="#function-marked-as-dead-but-its-actually-used">“Function marked as dead but it’s actually used”</a></h3>
 <p><strong>Possible causes and solutions:</strong></p>
 <ol>
@@ -10984,7 +11430,7 @@ api_functions = ["legacy_api"]
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h1>
 <p>Debtmap automatically detects common design patterns in your codebase to provide better architectural insights and reduce false positives in complexity analysis. When recognized design patterns are detected, Debtmap applies appropriate complexity adjustments to avoid penalizing idiomatic code.</p>
-<h2 id="overview-6"><a class="header" href="#overview-6">Overview</a></h2>
+<h2 id="overview-7"><a class="header" href="#overview-7">Overview</a></h2>
 <p>Debtmap detects 9 design patterns across Python, JavaScript, TypeScript, and Rust:</p>
 <div class="table-wrapper"><table><thead><tr><th>Pattern</th><th>Primary Language</th><th>Detection Confidence</th></tr></thead><tbody>
 <tr><td>Observer</td><td>Python, Rust</td><td>High (0.8-0.9)</td></tr>
@@ -11652,7 +12098,7 @@ pub trait Observer {
 <li>No runtime reflection needed for detection</li>
 <li>Pattern matching exhaustiveness helps identify Visitor pattern</li>
 </ul>
-<h2 id="integration-with-complexity-analysis"><a class="header" href="#integration-with-complexity-analysis">Integration with Complexity Analysis</a></h2>
+<h2 id="integration-with-complexity-analysis-1"><a class="header" href="#integration-with-complexity-analysis-1">Integration with Complexity Analysis</a></h2>
 <p>Pattern detection directly affects complexity scoring through <strong>pattern-based adjustments</strong>:</p>
 <h3 id="role-multipliers-1"><a class="header" href="#role-multipliers-1">Role Multipliers</a></h3>
 <p>Functions identified as part of design patterns receive adjusted complexity scores:</p>
@@ -11799,7 +12245,7 @@ confidence = 0.75
 <strong>Solution</strong>: Detect partial patterns with lower confidence thresholds</p>
 <pre><code class="language-bash">debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 </code></pre>
-<h2 id="troubleshooting-11"><a class="header" href="#troubleshooting-11">Troubleshooting</a></h2>
+<h2 id="troubleshooting-12"><a class="header" href="#troubleshooting-12">Troubleshooting</a></h2>
 <h3 id="pattern-not-detected"><a class="header" href="#pattern-not-detected">Pattern Not Detected</a></h3>
 <p><strong>Symptoms</strong>: Expected pattern not appearing in output</p>
 <p><strong>Possible Causes</strong>:</p>
@@ -11850,7 +12296,7 @@ confidence = 0.75
 </ul>
 </li>
 </ol>
-<h2 id="best-practices-8"><a class="header" href="#best-practices-8">Best Practices</a></h2>
+<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
 <ol>
 <li><strong>Start with defaults</strong>: The default 0.7 threshold works well for most projects</li>
 <li><strong>Use <code>--show-pattern-warnings</code></strong> during initial analysis to see borderline detections</li>
@@ -11859,7 +12305,7 @@ confidence = 0.75
 <li><strong>Combine with complexity analysis</strong>: Use pattern detection to understand complexity adjustments</li>
 <li><strong>Review low-confidence detections</strong>: They may indicate incomplete implementations worth refactoring</li>
 </ol>
-<h2 id="summary-3"><a class="header" href="#summary-3">Summary</a></h2>
+<h2 id="summary-4"><a class="header" href="#summary-4">Summary</a></h2>
 <p>Debtmap’s design pattern detection provides:</p>
 <ul>
 <li><strong>9 built-in patterns</strong> covering common OOP and functional patterns</li>
@@ -11872,7 +12318,7 @@ confidence = 0.75
 <p>Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="entropy-analysis"><a class="header" href="#entropy-analysis">Entropy Analysis</a></h1>
 <p>Entropy analysis is Debtmap’s unique approach to distinguishing genuinely complex code from repetitive pattern-based code. This reduces false positives by 60-75% compared to traditional cyclomatic complexity metrics.</p>
-<h2 id="overview-7"><a class="header" href="#overview-7">Overview</a></h2>
+<h2 id="overview-8"><a class="header" href="#overview-8">Overview</a></h2>
 <p>Traditional static analysis tools flag code as “complex” based purely on cyclomatic complexity or lines of code. However, not all complexity is equal:</p>
 <ul>
 <li><strong>Repetitive patterns</strong> (validation functions, dispatchers) have high cyclomatic complexity but low cognitive load</li>
@@ -12151,7 +12597,7 @@ diff without_entropy.txt with_entropy.txt
 weight = 0.3  # Reduce impact
 max_combined_reduction = 0.5  # Limit maximum reduction
 </code></pre>
-<h2 id="best-practices-9"><a class="header" href="#best-practices-9">Best Practices</a></h2>
+<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - They work well for most projects</li>
 <li><strong>Verify results</strong> - Spot-check top-priority items to ensure correctness</li>
@@ -12189,7 +12635,7 @@ max_combined_reduction = 0.5  # Limit maximum reduction
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="error-handling-analysis"><a class="header" href="#error-handling-analysis">Error Handling Analysis</a></h1>
 <p>Debtmap provides comprehensive error handling analysis across all supported languages (Rust, Python, JavaScript, TypeScript), detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.</p>
-<h2 id="overview-8"><a class="header" href="#overview-8">Overview</a></h2>
+<h2 id="overview-9"><a class="header" href="#overview-9">Overview</a></h2>
 <p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability. Debtmap detects:</p>
 <ul>
 <li><strong>Error swallowing</strong>: Exception handlers that silently catch errors without logging or re-raising</li>
@@ -12665,7 +13111,7 @@ except:  # debtmap: ignore - Intentional catch-all during migration
     use_fallback()
 </code></pre>
 <p>See <a href="suppression-patterns.html">Suppression Patterns</a> for complete syntax and usage.</p>
-<h2 id="best-practices-10"><a class="header" href="#best-practices-10">Best Practices</a></h2>
+<h2 id="best-practices-11"><a class="header" href="#best-practices-11">Best Practices</a></h2>
 <h3 id="rust-error-handling"><a class="header" href="#rust-error-handling">Rust Error Handling</a></h3>
 <ol>
 <li>
@@ -12814,7 +13260,7 @@ patterns = ["panic_patterns", "bare_except"]
 <pre><code class="language-bash"># Weekly error handling health check
 debtmap analyze --debt-type ErrorSwallowing | tee weekly-error-health.txt
 </code></pre>
-<h2 id="troubleshooting-12"><a class="header" href="#troubleshooting-12">Troubleshooting</a></h2>
+<h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
 <h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
 <p><strong>Problem:</strong> Debtmap flagging <code>unwrap()</code> in test functions</p>
 <p><strong>Solution:</strong> Debtmap should automatically detect test code via:</p>
@@ -12908,7 +13354,7 @@ debtmap compare baseline.json improved.json
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="functional-composition-analysis"><a class="header" href="#functional-composition-analysis">Functional Composition Analysis</a></h1>
 <p>Debtmap provides deep AST-based analysis to detect and evaluate functional programming patterns in Rust code. This feature helps you understand how effectively your codebase uses functional composition patterns like iterator pipelines, identify opportunities for refactoring imperative code to functional style, and rewards pure, side-effect-free functions in complexity scoring.</p>
-<h2 id="overview-9"><a class="header" href="#overview-9">Overview</a></h2>
+<h2 id="overview-10"><a class="header" href="#overview-10">Overview</a></h2>
 <p>Functional analysis examines your code at the AST level to detect:</p>
 <ul>
 <li><strong>Iterator pipelines</strong> - Chains like <code>.iter().map().filter().collect()</code></li>
@@ -13530,7 +13976,7 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 // Immutability ratio: 0.0 (mutable parameter)
 // Side effects: I/O (println), mutation
 <span class="boring">}</span></code></pre></pre>
-<h2 id="best-practices-11"><a class="header" href="#best-practices-11">Best Practices</a></h2>
+<h2 id="best-practices-12"><a class="header" href="#best-practices-12">Best Practices</a></h2>
 <h3 id="writing-functional-rust-code"><a class="header" href="#writing-functional-rust-code">Writing Functional Rust Code</a></h3>
 <p>To achieve high composition quality scores:</p>
 <ol>
@@ -13686,7 +14132,7 @@ debtmap analyze src/core/ --functional-analysis-profile strict
 <pre><code class="language-bash"># Show functional patterns in codebase
 debtmap analyze . --functional-analysis-profile balanced --summary
 </code></pre>
-<h2 id="troubleshooting-13"><a class="header" href="#troubleshooting-13">Troubleshooting</a></h2>
+<h2 id="troubleshooting-14"><a class="header" href="#troubleshooting-14">Troubleshooting</a></h2>
 <h3 id="no-pipelines-detected-but-i-have-iterator-chains"><a class="header" href="#no-pipelines-detected-but-i-have-iterator-chains">“No pipelines detected” but I have iterator chains</a></h3>
 <ul>
 <li><strong>Check pipeline depth</strong>: Your chains may be too short for the profile
@@ -13758,7 +14204,7 @@ items.map(process_item)
 <li><a href="./configuration.html">Configuration</a> - Advanced functional analysis configuration options</li>
 <li><a href="refactoring-guide.html">Refactoring</a> - Extracting pure functions</li>
 </ul>
-<h2 id="summary-4"><a class="header" href="#summary-4">Summary</a></h2>
+<h2 id="summary-5"><a class="header" href="#summary-5">Summary</a></h2>
 <p>Functional composition analysis helps you:</p>
 <ul>
 <li><strong>Identify functional patterns</strong> in your Rust codebase through AST-based pipeline detection</li>
@@ -13769,7 +14215,7 @@ items.map(process_item)
 </ul>
 <p>Enable it with <code>--functional-analysis-profile</code> to start benefiting from functional programming insights in your technical debt analysis.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="god-object-detection-1"><a class="header" href="#god-object-detection-1">God Object Detection</a></h1>
-<h2 id="overview-10"><a class="header" href="#overview-10">Overview</a></h2>
+<h2 id="overview-11"><a class="header" href="#overview-11">Overview</a></h2>
 <p>Debtmap includes sophisticated god object detection that identifies files and types that have grown too large and taken on too many responsibilities. God objects (also called “god classes” or “god modules”) are a significant source of technical debt as they:</p>
 <ul>
 <li>Violate the Single Responsibility Principle</li>
@@ -14182,7 +14628,7 @@ max_traits = 7
 </code></pre>
 <p><strong>Use case:</strong> Avoid flagging files with only 1-2 complex functions as god objects.</p>
 <p>See <code>features.json:65-71</code> and <code>features.json:507-512</code>.</p>
-<h2 id="output-display"><a class="header" href="#output-display">Output Display</a></h2>
+<h2 id="output-display-1"><a class="header" href="#output-display-1">Output Display</a></h2>
 <h3 id="file-level-display"><a class="header" href="#file-level-display">File-Level Display</a></h3>
 <p>When a god object is detected, Debtmap displays:</p>
 <pre><code>⚠️ God Object: 270 methods, 0 fields, 8 responsibilities
@@ -14227,7 +14673,7 @@ Score: 1350 (Confidence: Definite)
 </ul>
 <p>This enables longitudinal analysis: “Are we reducing god objects sprint-over-sprint?”</p>
 <p>See <code>src/organization/god_object_metrics.rs:1-228</code>.</p>
-<h2 id="troubleshooting-14"><a class="header" href="#troubleshooting-14">Troubleshooting</a></h2>
+<h2 id="troubleshooting-15"><a class="header" href="#troubleshooting-15">Troubleshooting</a></h2>
 <h3 id="why-is-my-functional-module-flagged-as-a-god-object"><a class="header" href="#why-is-my-functional-module-flagged-as-a-god-object">“Why is my functional module flagged as a god object?”</a></h3>
 <p><strong>Answer:</strong> Debtmap now analyzes god classes (structs) separately from god modules (standalone functions). If your functional module with 100 pure helper functions is flagged, it’s being detected as a <strong>god module</strong> (not a god class), which indicates the file has grown too large and should be split for better organization.</p>
 <p><strong>Solutions:</strong></p>
@@ -14252,7 +14698,7 @@ Score: 1350 (Confidence: Definite)
 <li>Use <code>--no-aggregation</code> to skip file-level analysis</li>
 <li>Adjust thresholds in <code>.debtmap.toml</code> to be more lenient</li>
 </ol>
-<h2 id="best-practices-12"><a class="header" href="#best-practices-12">Best Practices</a></h2>
+<h2 id="best-practices-13"><a class="header" href="#best-practices-13">Best Practices</a></h2>
 <p>To avoid god objects:</p>
 <ol>
 <li><strong>Follow Single Responsibility Principle</strong> - Each module should have one clear purpose</li>
@@ -14279,14 +14725,14 @@ Score: 1350 (Confidence: Definite)
 <li>❌ Allow technical debt to grow</li>
 </ul>
 <p><strong>Recommended:</strong> Start with defaults, then adjust based on your codebase’s characteristics. Use metrics tracking to monitor trends over time.</p>
-<h2 id="related-documentation-1"><a class="header" href="#related-documentation-1">Related Documentation</a></h2>
+<h2 id="related-documentation-2"><a class="header" href="#related-documentation-2">Related Documentation</a></h2>
 <ul>
 <li><a href="./file-level-scoring.html">File-Level Scoring</a> - How god objects affect overall file scores</li>
 <li><a href="./configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
 <li><a href="./cli-reference.html">CLI Reference</a> - All command-line options</li>
 <li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - How god objects are prioritized</li>
 </ul>
-<h2 id="summary-5"><a class="header" href="#summary-5">Summary</a></h2>
+<h2 id="summary-6"><a class="header" href="#summary-6">Summary</a></h2>
 <p>God object detection is a powerful architectural analysis feature that:</p>
 <ul>
 <li>Identifies files/types violating single responsibility principle</li>
@@ -14298,7 +14744,7 @@ Score: 1350 (Confidence: Definite)
 <p>By combining quantitative metrics (method count, LOC, complexity) with qualitative analysis (responsibility detection, purity), Debtmap helps teams systematically address architectural debt.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h1>
 <p>Multi-pass analysis is an advanced feature that performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
-<h2 id="overview-11"><a class="header" href="#overview-11">Overview</a></h2>
+<h2 id="overview-12"><a class="header" href="#overview-12">Overview</a></h2>
 <p>Traditional complexity analysis treats all code as-is, which means formatting choices like multiline expressions, whitespace, and indentation can artificially inflate complexity metrics. Multi-pass analysis solves this problem by:</p>
 <ol>
 <li><strong>Raw Analysis</strong> - Measures complexity of code exactly as written</li>
@@ -14699,7 +15145,7 @@ Overhead: 121.7% vs single-pass (145ms baseline)
 <li><strong>Total time</strong> - Complete multi-pass analysis duration</li>
 <li><strong>Memory used</strong> - Additional memory for two-pass analysis</li>
 </ul>
-<h3 id="performance-overhead"><a class="header" href="#performance-overhead">Performance Overhead</a></h3>
+<h3 id="performance-overhead-1"><a class="header" href="#performance-overhead-1">Performance Overhead</a></h3>
 <p><strong>Target Overhead</strong>: ≤25% compared to single-pass analysis</p>
 <p>Multi-pass analysis aims to add no more than 25% overhead versus standard single-pass analysis. If overhead exceeds this threshold, a warning is issued.</p>
 <p><strong>Typical Overhead:</strong></p>
@@ -14936,7 +15382,7 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li>More precise refactoring suggestions</li>
 <li>Better complexity trend tracking at fine granularity</li>
 </ul>
-<h2 id="summary-6"><a class="header" href="#summary-6">Summary</a></h2>
+<h2 id="summary-7"><a class="header" href="#summary-7">Summary</a></h2>
 <p>Multi-pass analysis provides deep insights into your code’s complexity by:</p>
 <ol>
 <li><strong>Separating signal from noise</strong> - Distinguishing logical complexity from formatting artifacts</li>
@@ -14957,7 +15403,7 @@ let analyzer = MultiPassAnalyzer::new(options);
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="parallel-processing"><a class="header" href="#parallel-processing">Parallel Processing</a></h1>
 <p>Debtmap leverages Rust’s powerful parallel processing capabilities to analyze large codebases efficiently. Built on Rayon for data parallelism and DashMap for lock-free concurrent data structures, debtmap achieves 10-100x faster performance than Java/Python-based competitors.</p>
-<h2 id="overview-12"><a class="header" href="#overview-12">Overview</a></h2>
+<h2 id="overview-13"><a class="header" href="#overview-13">Overview</a></h2>
 <p>Debtmap’s parallel processing architecture uses a three-phase approach:</p>
 <ol>
 <li><strong>Parallel File Parsing</strong> - Parse source files concurrently across all available CPU cores</li>
@@ -15575,7 +16021,7 @@ time debtmap analyze --no-parallel  # Sequential
 <pre><code class="language-bash"># Monitor peak memory usage
 /usr/bin/time -v debtmap analyze --jobs 8
 </code></pre>
-<h2 id="best-practices-13"><a class="header" href="#best-practices-13">Best Practices</a></h2>
+<h2 id="best-practices-14"><a class="header" href="#best-practices-14">Best Practices</a></h2>
 <ol>
 <li><strong>Use default settings</strong> - Debtmap auto-detects optimal thread count</li>
 <li><strong>Limit threads in CI</strong> - Use <code>--jobs 2</code> or <code>--jobs 4</code> in shared environments</li>
@@ -15583,7 +16029,7 @@ time debtmap analyze --no-parallel  # Sequential
 <li><strong>Consider I/O</strong> - If using slow storage, reduce thread count</li>
 <li><strong>Cache aggressively</strong> - Large caches reduce repeated work</li>
 </ol>
-<h2 id="troubleshooting-15"><a class="header" href="#troubleshooting-15">Troubleshooting</a></h2>
+<h2 id="troubleshooting-16"><a class="header" href="#troubleshooting-16">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-despite-parallelism"><a class="header" href="#analysis-is-slow-despite-parallelism">Analysis is Slow Despite Parallelism</a></h3>
 <p><strong>Possible causes:</strong></p>
 <ol>
@@ -15709,7 +16155,7 @@ debtmap analyze --jobs 4
 <li><a href="./faq.html">FAQ - Reducing Parallelism</a> - Common questions about parallel processing</li>
 <li><a href="./architecture.html">Architecture</a> - High-level system design</li>
 </ul>
-<h2 id="summary-7"><a class="header" href="#summary-7">Summary</a></h2>
+<h2 id="summary-8"><a class="header" href="#summary-8">Summary</a></h2>
 <p>Debtmap’s parallel processing architecture provides:</p>
 <ul>
 <li><strong>10-100x speedup</strong> over sequential analysis using Rayon parallel iterators</li>
@@ -16643,7 +17089,7 @@ jobs:
 <li><strong>Timeout</strong>: CI jobs may need extended timeout for multiple iterations</li>
 <li><strong>Review</strong>: Always create a PR for human review before merging automated changes</li>
 </ul>
-<h2 id="best-practices-14"><a class="header" href="#best-practices-14">Best Practices</a></h2>
+<h2 id="best-practices-15"><a class="header" href="#best-practices-15">Best Practices</a></h2>
 <h3 id="1-start-small"><a class="header" href="#1-start-small">1. Start Small</a></h3>
 <p>Begin with low iteration counts:</p>
 <pre><code class="language-bash"># First run: 1 iteration to test workflow
@@ -16702,7 +17148,7 @@ debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-a
 # View detailed metrics
 cat .prodigy/comparison.json | jq
 </code></pre>
-<h2 id="troubleshooting-16"><a class="header" href="#troubleshooting-16">Troubleshooting</a></h2>
+<h2 id="troubleshooting-17"><a class="header" href="#troubleshooting-17">Troubleshooting</a></h2>
 <h3 id="workflow-fails-to-start"><a class="header" href="#workflow-fails-to-start">Workflow Fails to Start</a></h3>
 <p><strong>Issue</strong>: “Prodigy not found” or “API key missing”</p>
 <p><strong>Solution</strong>:</p>
@@ -16956,7 +17402,7 @@ Arguments: --module &lt;module_name&gt;
 <li><a href="https://github.com/iepathos/prodigy">Prodigy Documentation</a> - Full Prodigy reference and advanced features</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="responsibility-analysis"><a class="header" href="#responsibility-analysis">Responsibility Analysis</a></h1>
-<h2 id="overview-13"><a class="header" href="#overview-13">Overview</a></h2>
+<h2 id="overview-14"><a class="header" href="#overview-14">Overview</a></h2>
 <p>Responsibility analysis is a core feature of Debtmap that helps identify violations of the <strong>Single Responsibility Principle (SRP)</strong>, one of the fundamental SOLID design principles. By analyzing function and method names, Debtmap automatically infers the distinct functional responsibilities within a code unit and detects when a single module, struct, or class has taken on too many concerns.</p>
 <p>This chapter provides an in-depth look at how Debtmap determines responsibilities, categorizes them, and uses this information to guide refactoring decisions.</p>
 <h2 id="what-are-responsibilities"><a class="header" href="#what-are-responsibilities">What Are Responsibilities?</a></h2>
@@ -17417,7 +17863,7 @@ max_traits = 7
   ]
 }
 </code></pre>
-<h2 id="best-practices-15"><a class="header" href="#best-practices-15">Best Practices</a></h2>
+<h2 id="best-practices-16"><a class="header" href="#best-practices-16">Best Practices</a></h2>
 <h3 id="writing-srp-compliant-code"><a class="header" href="#writing-srp-compliant-code">Writing SRP-Compliant Code</a></h3>
 <ol>
 <li><strong>Name functions descriptively</strong> - Use standard prefixes (<code>get_</code>, <code>validate_</code>, etc.)</li>
@@ -17501,14 +17947,14 @@ fn validate_email() { }
 <p>High responsibility counts increase priority in <a href="./tiered-prioritization.html">Tiered Prioritization</a> through the god object multiplier.</p>
 <h3 id="risk-assessment"><a class="header" href="#risk-assessment">Risk Assessment</a></h3>
 <p>Modules with multiple responsibilities receive higher risk scores in risk assessment, as they are more prone to bugs and harder to maintain.</p>
-<h2 id="related-documentation-2"><a class="header" href="#related-documentation-2">Related Documentation</a></h2>
+<h2 id="related-documentation-3"><a class="header" href="#related-documentation-3">Related Documentation</a></h2>
 <ul>
 <li><a href="./god-object-detection.html">God Object Detection</a> - Full god object analysis including responsibility detection</li>
 <li><a href="./configuration.html">Configuration</a> - TOML configuration reference</li>
 <li><a href="./metrics-reference.html">Metrics Reference</a> - All metrics including responsibility count</li>
 <li><a href="./architecture.html">Architecture</a> - High-level design including analysis pipelines</li>
 </ul>
-<h2 id="summary-8"><a class="header" href="#summary-8">Summary</a></h2>
+<h2 id="summary-9"><a class="header" href="#summary-9">Summary</a></h2>
 <p>Responsibility analysis in Debtmap:</p>
 <ul>
 <li><strong>Automatically detects SRP violations</strong> through pattern-based method name analysis</li>
@@ -17521,7 +17967,7 @@ fn validate_email() { }
 <p>By surfacing responsibility violations early and suggesting concrete refactoring paths, Debtmap helps teams maintain clean, modular architectures that follow the Single Responsibility Principle.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="scoring-strategies"><a class="header" href="#scoring-strategies">Scoring Strategies</a></h1>
 <p>Debtmap provides two complementary scoring approaches: <strong>file-level</strong> and <strong>function-level</strong>. Understanding when to use each approach helps you make better refactoring decisions and prioritize work effectively.</p>
-<h2 id="overview-14"><a class="header" href="#overview-14">Overview</a></h2>
+<h2 id="overview-15"><a class="header" href="#overview-15">Overview</a></h2>
 <p>Different refactoring scenarios require different levels of granularity:</p>
 <ul>
 <li><strong>File-level scoring</strong>: Identifies architectural issues and planning major refactoring initiatives</li>
@@ -18205,7 +18651,7 @@ show_raw_scores = true        # Display both normalized (0-10) and raw scores in
 <li><strong>log_multiplier</strong>: Logarithmic dampening factor for very high scores</li>
 <li><strong>show_raw_scores</strong>: When enabled, output includes both the normalized 0-10 score and the raw calculated score</li>
 </ul>
-<h2 id="best-practices-16"><a class="header" href="#best-practices-16">Best Practices</a></h2>
+<h2 id="best-practices-17"><a class="header" href="#best-practices-17">Best Practices</a></h2>
 <h3 id="workflow-integration"><a class="header" href="#workflow-integration">Workflow Integration</a></h3>
 <p><strong>Week 1: File-Level Assessment</strong></p>
 <pre><code class="language-bash"># Identify architectural problems
@@ -18232,7 +18678,7 @@ debtmap analyze . --aggregate-only --format json -o file-scores.json
 # Gate: No new critical function-level issues
 debtmap analyze . --min-priority critical --format json -o critical-items.json
 </code></pre>
-<h2 id="troubleshooting-17"><a class="header" href="#troubleshooting-17">Troubleshooting</a></h2>
+<h2 id="troubleshooting-18"><a class="header" href="#troubleshooting-18">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: File-level scores seem too high</p>
 <p><strong>Solution</strong>: Check aggregation method:</p>
 <pre><code class="language-toml">[aggregation]
@@ -18258,7 +18704,7 @@ minimum_debt_score = 3.0
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="tiered-prioritization-3"><a class="header" href="#tiered-prioritization-3">Tiered Prioritization</a></h1>
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>
-<h2 id="overview-15"><a class="header" href="#overview-15">Overview</a></h2>
+<h2 id="overview-16"><a class="header" href="#overview-16">Overview</a></h2>
 <p>The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents “walls of similar-scored items” and ensures critical issues don’t get lost among minor problems.</p>
 <h2 id="the-four-tiers"><a class="header" href="#the-four-tiers">The Four Tiers</a></h2>
 <h3 id="tier-1-critical-architecture"><a class="header" href="#tier-1-critical-architecture">Tier 1: Critical Architecture</a></h3>
@@ -18393,7 +18839,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority high
 # Phase 3: Improve Tier 3 coverage
 debtmap analyze . --lcov coverage.lcov --min-priority medium
 </code></pre>
-<h2 id="best-practices-17"><a class="header" href="#best-practices-17">Best Practices</a></h2>
+<h2 id="best-practices-18"><a class="header" href="#best-practices-18">Best Practices</a></h2>
 <ol>
 <li><strong>Always address Tier 1 before feature work</strong> - Architectural issues compound</li>
 <li><strong>Test Tier 2 items before refactoring</strong> - Avoid regressions</li>
@@ -18441,7 +18887,7 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
   ]
 }
 </code></pre>
-<h2 id="troubleshooting-18"><a class="header" href="#troubleshooting-18">Troubleshooting</a></h2>
+<h2 id="troubleshooting-19"><a class="header" href="#troubleshooting-19">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
 <p><strong>Solution</strong>: Lower tier weights or increase thresholds temporarily:</p>
 <pre><code class="language-toml">[tiers]
@@ -18990,7 +19436,7 @@ New: max_debt_density = (100 / 10000) × 1000 = 10.0
 <li><strong>v0.4.0 - v0.9.x</strong> - Deprecation warnings shown</li>
 <li><strong>v1.0.0</strong> - Deprecated metrics removed</li>
 </ul>
-<h2 id="troubleshooting-19"><a class="header" href="#troubleshooting-19">Troubleshooting</a></h2>
+<h2 id="troubleshooting-20"><a class="header" href="#troubleshooting-20">Troubleshooting</a></h2>
 <h3 id="debugging-validation-failures"><a class="header" href="#debugging-validation-failures">Debugging Validation Failures</a></h3>
 <p>Use verbosity flags to understand why validation failed:</p>
 <p><strong>Level 1: Basic details</strong></p>
@@ -19046,7 +19492,7 @@ cat validation-report.json | jq '.validation_details'
 <p><strong>Terminal format with filtering:</strong></p>
 <pre><code class="language-bash">debtmap validate . --format terminal --top 20 -vv
 </code></pre>
-<h2 id="best-practices-18"><a class="header" href="#best-practices-18">Best Practices</a></h2>
+<h2 id="best-practices-19"><a class="header" href="#best-practices-19">Best Practices</a></h2>
 <h3 id="setting-initial-thresholds"><a class="header" href="#setting-initial-thresholds">Setting Initial Thresholds</a></h3>
 <p><strong>1. Establish baseline:</strong></p>
 <pre><code class="language-bash"># Run analysis to see current metrics
@@ -19145,7 +19591,7 @@ max_debt_density = 50.0
 # Review: After 3 months of metrics
 max_average_complexity = 10.0
 </code></pre>
-<h2 id="summary-9"><a class="header" href="#summary-9">Summary</a></h2>
+<h2 id="summary-10"><a class="header" href="#summary-10">Summary</a></h2>
 <p>The <code>validate</code> command provides automated quality gates for CI/CD integration:</p>
 <ul>
 <li><strong>Use density-based metrics</strong> for scale-independent quality measurement</li>
@@ -19487,7 +19933,7 @@ debtmap analyze --explain-metrics
 <blockquote>
 <p><strong>Quick Navigation</strong>: For detailed explanations of all CLI options, see the <a href="cli-reference.html">CLI Reference</a> chapter.</p>
 </blockquote>
-<h2 id="overview-16"><a class="header" href="#overview-16">Overview</a></h2>
+<h2 id="overview-17"><a class="header" href="#overview-17">Overview</a></h2>
 <p>This chapter demonstrates:</p>
 <ul>
 <li><strong>Language-specific analysis</strong>: Rust, Python, JavaScript/TypeScript with their respective testing tools</li>
@@ -20716,7 +21162,7 @@ jobs:
       - name: Analyze debt
         run: debtmap validate . --lcov lcov.info --max-critical 0
 </code></pre>
-<h2 id="troubleshooting-20"><a class="header" href="#troubleshooting-20">Troubleshooting</a></h2>
+<h2 id="troubleshooting-21"><a class="header" href="#troubleshooting-21">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-on-my-large-codebase"><a class="header" href="#analysis-is-slow-on-my-large-codebase">Analysis is slow on my large codebase</a></h3>
 <p><strong>Optimization strategies:</strong></p>
 <p><strong>1. Exclude unnecessary files:</strong></p>
@@ -20881,7 +21327,7 @@ debtmap compare main --show-new-only
 <li><strong>Discussions:</strong> <a href="https://github.com/prodigy-tools/debtmap/discussions">Ask questions</a></li>
 <li><strong>Examples:</strong> See <a href="examples.html">Examples</a> for real-world use cases</li>
 </ul>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting-21"><a class="header" href="#troubleshooting-21">Troubleshooting</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="troubleshooting-22"><a class="header" href="#troubleshooting-22">Troubleshooting</a></h1>
 <p>Common issues and solutions for using debtmap effectively.</p>
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
@@ -22429,7 +22875,7 @@ export DEBTMAP_CACHE_DIR=~/.cache/debtmap
 <li>Update to latest version</li>
 <li>Search existing issues on GitHub</li>
 </ol>
-<h2 id="related-documentation-3"><a class="header" href="#related-documentation-3">Related Documentation</a></h2>
+<h2 id="related-documentation-4"><a class="header" href="#related-documentation-4">Related Documentation</a></h2>
 <ul>
 <li><strong><a href="./configuration.html">Configuration Guide</a></strong>: Configure debtmap behavior</li>
 <li><strong><a href="./cli-reference.html">CLI Reference</a></strong>: Complete CLI flag documentation</li>
