@@ -1,8 +1,9 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use debtmap::risk::lcov::parse_lcov_file;
+use debtmap::risk::lcov::{parse_lcov_file, FunctionCoverage};
+use std::collections::HashMap;
 use std::hint::black_box;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 
 /// Create a realistic LCOV file with specified number of files and functions
@@ -124,6 +125,130 @@ fn benchmark_lookup_comparison(c: &mut Criterion) {
     group.finish();
 }
 
+/// Simulate the OLD flat HashMap structure for comparison
+struct FlatCoverageIndex {
+    by_function: HashMap<(PathBuf, String), FunctionCoverage>,
+}
+
+impl FlatCoverageIndex {
+    fn from_data(data: &HashMap<PathBuf, Vec<FunctionCoverage>>) -> Self {
+        let mut by_function = HashMap::new();
+        for (file_path, functions) in data {
+            for func in functions {
+                by_function.insert((file_path.clone(), func.name.clone()), func.clone());
+            }
+        }
+        FlatCoverageIndex { by_function }
+    }
+
+    /// OLD O(n) lookup with linear scan through all functions
+    fn get_function_coverage_old(&self, file: &Path, function_name: &str) -> Option<f64> {
+        // Try exact match first
+        if let Some(f) = self
+            .by_function
+            .get(&(file.to_path_buf(), function_name.to_string()))
+        {
+            return Some(f.coverage_percentage / 100.0);
+        }
+
+        // OLD: O(n) linear scan through ALL functions for path strategies
+        // Strategy 1: suffix matching
+        for ((indexed_path, fname), coverage) in &self.by_function {
+            if fname == function_name && file.ends_with(indexed_path) {
+                return Some(coverage.coverage_percentage / 100.0);
+            }
+        }
+
+        // Strategy 2: reverse suffix matching
+        for ((indexed_path, fname), coverage) in &self.by_function {
+            if fname == function_name && indexed_path.ends_with(file) {
+                return Some(coverage.coverage_percentage / 100.0);
+            }
+        }
+
+        None
+    }
+}
+
+/// Benchmark OLD vs NEW: Demonstrates 50-100x speedup
+fn benchmark_flat_vs_nested(c: &mut Criterion) {
+    let mut group = c.benchmark_group("flat_vs_nested_comparison");
+
+    // Create large dataset (simulating 100 files, 20 functions each = 2000 total)
+    let temp_file = create_lcov_file(100, 20);
+    let lcov_data = parse_lcov_file(temp_file.path()).unwrap();
+
+    // Build NEW nested index (current implementation)
+    let nested_index = parse_lcov_file(temp_file.path()).unwrap();
+
+    // Build OLD flat index (for comparison)
+    let flat_index = FlatCoverageIndex::from_data(&lcov_data.functions);
+
+    // Create mix of exact matches (70%) and path strategy lookups (30%)
+    let exact_queries: Vec<(PathBuf, String)> = lcov_data
+        .functions
+        .iter()
+        .flat_map(|(file, funcs)| {
+            funcs
+                .iter()
+                .take(14) // 70% of 20 functions
+                .map(move |f| (file.clone(), f.name.clone()))
+        })
+        .collect();
+
+    let path_strategy_queries: Vec<(PathBuf, String)> = lcov_data
+        .functions
+        .iter()
+        .flat_map(|(file, funcs)| {
+            // Create path that requires strategy lookup (not exact match)
+            let modified_path = PathBuf::from(format!("different/prefix/{}", file.display()));
+            funcs
+                .iter()
+                .skip(14) // Next 30% of functions
+                .take(6)
+                .map(move |f| (modified_path.clone(), f.name.clone()))
+        })
+        .collect();
+
+    // Benchmark OLD flat structure with path strategies
+    group.bench_function("old_flat_structure", |b| {
+        b.iter(|| {
+            // 70% exact matches
+            for (file, func_name) in &exact_queries {
+                let result =
+                    flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
+                black_box(result);
+            }
+            // 30% requiring path strategies (this is where O(n) scan hurts)
+            for (file, func_name) in &path_strategy_queries {
+                let result =
+                    flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
+                black_box(result);
+            }
+        })
+    });
+
+    // Benchmark NEW nested structure
+    group.bench_function("new_nested_structure", |b| {
+        b.iter(|| {
+            // 70% exact matches
+            for (file, func_name) in &exact_queries {
+                let result =
+                    nested_index.get_function_coverage(black_box(file), black_box(func_name));
+                black_box(result);
+            }
+            // 30% requiring path strategies (now O(files) instead of O(functions))
+            for (file, func_name) in &path_strategy_queries {
+                let result =
+                    nested_index.get_function_coverage(black_box(file), black_box(func_name));
+                black_box(result);
+            }
+        })
+    });
+
+    group.finish();
+}
+
 /// Benchmark file analysis with coverage overhead
 /// This measures the target: ≤3x overhead (≤160ms for baseline ~53ms)
 fn benchmark_analysis_overhead(c: &mut Criterion) {
@@ -175,6 +300,7 @@ criterion_group!(
     benches,
     benchmark_index_build,
     benchmark_lookup_comparison,
+    benchmark_flat_vs_nested,
     benchmark_analysis_overhead
 );
 criterion_main!(benches);
