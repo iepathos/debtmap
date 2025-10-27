@@ -2,10 +2,10 @@ use super::coverage_index::CoverageIndex;
 use anyhow::{Context, Result};
 use indicatif::ProgressBar;
 use rayon::prelude::*;
+use rustc_demangle;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use rustc_demangle;
 
 #[derive(Debug, Clone)]
 pub struct FunctionCoverage {
