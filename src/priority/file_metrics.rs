@@ -14,7 +14,20 @@ pub struct FileDebtMetrics {
     pub uncovered_lines: usize,
     pub god_object_indicators: GodObjectIndicators,
     pub function_scores: Vec<f64>,
-    /// The specific type of god object detected (if any)
+    /// The specific type of god object detected (if any).
+    ///
+    /// This field contains the classification of god object patterns:
+    /// - `GodModule`: A module with too many related structs/types that should be split
+    /// - `TraditionalGodObject`: A single class/struct with too many responsibilities
+    /// - `Boilerplate`: Repetitive code that should be macro-ified (NOT a god object)
+    /// - `Registry`: A lookup table or mapping structure (NOT a god object)
+    ///
+    /// This type is used to determine the appropriate recommendation, following this precedence:
+    /// 1. Boilerplate → recommend macros/codegen
+    /// 2. Registry → recommend keeping as-is or data-driven approach
+    /// 3. TraditionalGodObject → recommend extracting classes/modules
+    /// 4. GodModule → recommend splitting into multiple modules
+    /// 5. None → use general refactoring recommendations based on size/complexity
     #[serde(skip_serializing_if = "Option::is_none")]
     pub god_object_type: Option<crate::organization::GodObjectType>,
 }
@@ -146,6 +159,37 @@ impl FileDebtMetrics {
             * function_factor
     }
 
+    /// Generate a recommendation for addressing this file's technical debt.
+    ///
+    /// This function uses a **precedence-based strategy** to select the most appropriate
+    /// recommendation type, checking patterns in this order:
+    ///
+    /// 1. **Boilerplate Pattern** (highest priority)
+    ///    - Detected when file has many repetitive trait implementations
+    ///    - Recommendation: Use macros or code generation to reduce repetition
+    ///    - Example: ripgrep's flags/defs.rs with 888 Flag trait implementations
+    ///
+    /// 2. **Registry Pattern**
+    ///    - Detected when file is primarily a lookup table or data mapping
+    ///    - Recommendation: Keep as-is or convert to data-driven approach
+    ///    - Example: Error code registries, configuration tables
+    ///
+    /// 3. **God Object**
+    ///    - Detected when file has too many responsibilities (via god_object_indicators)
+    ///    - Recommendation: Split into multiple focused modules
+    ///    - Context-specific advice based on file type (parser, cache, analyzer, etc.)
+    ///
+    /// 4. **Large File** (>500 lines)
+    ///    - Recommendation: Extract complex functions to reduce size
+    ///
+    /// 5. **Complex Functions** (avg complexity >10)
+    ///    - Recommendation: Simplify logic, extract helper functions
+    ///
+    /// 6. **Low Coverage** (<50%)
+    ///    - Recommendation: Add tests for uncovered code
+    ///
+    /// The precedence ensures that boilerplate files don't get incorrectly flagged
+    /// as god objects requiring module splitting.
     pub fn generate_recommendation(&self) -> String {
         // First check for boilerplate pattern - highest priority
         if let Some(crate::organization::GodObjectType::BoilerplatePattern {
