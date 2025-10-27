@@ -101,6 +101,11 @@ coverage:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
+    echo "Setting up LLVM tools..."
+    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
+    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
+    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
+    export LLVM_COV="$LLVM_DIR/llvm-cov"
     echo "Cleaning previous coverage data..."
     cargo llvm-cov clean
     echo "Generating code coverage report with cargo-llvm-cov..."
@@ -112,6 +117,11 @@ coverage-lcov:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
+    echo "Setting up LLVM tools..."
+    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
+    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
+    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
+    export LLVM_COV="$LLVM_DIR/llvm-cov"
     echo "Cleaning previous coverage data..."
     cargo llvm-cov clean
     echo "Generating code coverage report with cargo-llvm-cov (lcov format)..."
@@ -123,6 +133,11 @@ coverage-check:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
+    echo "Setting up LLVM tools..."
+    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
+    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
+    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
+    export LLVM_COV="$LLVM_DIR/llvm-cov"
     echo "Checking code coverage threshold..."
     cargo llvm-cov clean
     cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
@@ -144,6 +159,11 @@ analyze-self:
     #!/usr/bin/env bash
     echo "Building debtmap..."
     cargo build --bin debtmap
+    echo "Setting up LLVM tools..."
+    RUSTUP_TOOLCHAIN=$(rustup show active-toolchain | cut -d' ' -f1)
+    LLVM_DIR=$(rustup which rustc | xargs dirname | xargs dirname)/lib/rustlib/$(rustc -vV | grep host | cut -d' ' -f2)/bin
+    export LLVM_PROFDATA="$LLVM_DIR/llvm-profdata"
+    export LLVM_COV="$LLVM_DIR/llvm-cov"
     echo "Generating code coverage (lcov format)..."
     cargo llvm-cov clean
     cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
