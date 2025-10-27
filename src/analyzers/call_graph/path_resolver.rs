@@ -12,49 +12,74 @@ use super::module_tree::ModuleTree;
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+
 /// Path resolver combining all resolution strategies
 #[derive(Debug, Clone)]
 pub struct PathResolver {
     import_map: ImportMap,
     module_tree: ModuleTree,
+    /// Pre-built function index for O(1) lookups instead of O(n) searches
+    function_index: HashMap<String, Vec<FunctionId>>,
 }
 
 impl PathResolver {
-    /// Create a new path resolver
+    /// Create a new path resolver with pre-built function index
     pub fn new(import_map: ImportMap, module_tree: ModuleTree) -> Self {
         Self {
             import_map,
             module_tree,
+            function_index: HashMap::new(),
         }
     }
 
+    /// Build function index from call graph (call once after construction)
+    pub fn with_function_index(mut self, call_graph: &CallGraph) -> Self {
+        let mut index: HashMap<String, Vec<FunctionId>> = HashMap::new();
+
+        for func in call_graph.get_all_functions() {
+            // Index by full name
+            index
+                .entry(func.name.clone())
+                .or_default()
+                .push(func.clone());
+
+            // Index by simple name (last component)
+            if let Some(simple_name) = func.name.split("::").last() {
+                index
+                    .entry(simple_name.to_string())
+                    .or_default()
+                    .push(func.clone());
+            }
+
+            // Index by file + name for same-file lookups
+            let file_key = format!("{:?}:{}", func.file, func.name);
+            index.entry(file_key).or_default().push(func.clone());
+        }
+
+        self.function_index = index;
+        self
+    }
+
     /// Resolve a function call to a FunctionId using multiple strategies
-    pub fn resolve_call(
-        &self,
-        caller_file: &Path,
-        callee_name: &str,
-        call_graph: &CallGraph,
-    ) -> Option<FunctionId> {
+    pub fn resolve_call(&self, caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         // Strategy 1: Exact match (highest priority)
-        if let Some(resolved) = self.resolve_exact_match(caller_file, callee_name, call_graph) {
+        if let Some(resolved) = self.resolve_exact_match(caller_file, callee_name) {
             return Some(resolved);
         }
 
         // Strategy 2: Import-based resolution
-        if let Some(resolved) =
-            self.resolve_through_imports_enhanced(caller_file, callee_name, call_graph)
-        {
+        if let Some(resolved) = self.resolve_through_imports_enhanced(caller_file, callee_name) {
             return Some(resolved);
         }
 
         // Strategy 3: Module hierarchy search
-        if let Some(resolved) = self.resolve_through_hierarchy(caller_file, callee_name, call_graph)
-        {
+        if let Some(resolved) = self.resolve_through_hierarchy(caller_file, callee_name) {
             return Some(resolved);
         }
 
         // Strategy 4: Fuzzy matching with generic stripping
-        if let Some(resolved) = self.resolve_fuzzy(caller_file, callee_name, call_graph) {
+        if let Some(resolved) = self.resolve_fuzzy(caller_file, callee_name) {
             return Some(resolved);
         }
 
@@ -62,22 +87,17 @@ impl PathResolver {
     }
 
     /// Strategy 1: Exact match resolution
-    fn resolve_exact_match(
-        &self,
-        caller_file: &Path,
-        callee_name: &str,
-        call_graph: &CallGraph,
-    ) -> Option<FunctionId> {
+    fn resolve_exact_match(&self, caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         // Try exact name match in same file first
         if !callee_name.contains("::") {
-            if let Some(resolved) = self.find_in_same_file(caller_file, callee_name, call_graph) {
+            if let Some(resolved) = self.find_in_same_file(caller_file, callee_name) {
                 return Some(resolved);
             }
         }
 
         // Try exact qualified path match
         if callee_name.contains("::") {
-            if let Some(resolved) = self.find_function_by_path(callee_name, call_graph) {
+            if let Some(resolved) = self.find_function_by_path(callee_name) {
                 return Some(resolved);
             }
         }
@@ -90,16 +110,15 @@ impl PathResolver {
         &self,
         caller_file: &Path,
         callee_name: &str,
-        call_graph: &CallGraph,
     ) -> Option<FunctionId> {
         // Simple name - check imports
         if !callee_name.contains("::") {
-            return self.resolve_through_imports(caller_file, callee_name, call_graph);
+            return self.resolve_through_imports(caller_file, callee_name);
         }
 
         // Qualified path - check if first segment is imported
         if callee_name.contains("::") {
-            return self.resolve_qualified_path(caller_file, callee_name, call_graph);
+            return self.resolve_qualified_path(caller_file, callee_name);
         }
 
         None
@@ -110,7 +129,6 @@ impl PathResolver {
         &self,
         caller_file: &Path,
         callee_name: &str,
-        call_graph: &CallGraph,
     ) -> Option<FunctionId> {
         // Get current module
         let current_module = self.module_tree.get_module(caller_file)?;
@@ -119,7 +137,7 @@ impl PathResolver {
         if !callee_name.contains("::") {
             // Search in current module
             let current_module_prefix = format!("{}::{}", current_module, callee_name);
-            if let Some(resolved) = self.find_function_by_path(&current_module_prefix, call_graph) {
+            if let Some(resolved) = self.find_function_by_path(&current_module_prefix) {
                 return Some(resolved);
             }
 
@@ -127,7 +145,7 @@ impl PathResolver {
             let mut parent_module = self.module_tree.get_parent(current_module);
             while let Some(parent) = parent_module {
                 let parent_prefix = format!("{}::{}", parent, callee_name);
-                if let Some(resolved) = self.find_function_by_path(&parent_prefix, call_graph) {
+                if let Some(resolved) = self.find_function_by_path(&parent_prefix) {
                     return Some(resolved);
                 }
                 parent_module = self.module_tree.get_parent(parent);
@@ -135,34 +153,25 @@ impl PathResolver {
         }
 
         // Check re-exports as part of hierarchy search
-        self.resolve_through_reexports(caller_file, callee_name, call_graph)
+        self.resolve_through_reexports(caller_file, callee_name)
     }
 
     /// Strategy 4: Fuzzy matching with generic parameter stripping
-    fn resolve_fuzzy(
-        &self,
-        _caller_file: &Path,
-        callee_name: &str,
-        call_graph: &CallGraph,
-    ) -> Option<FunctionId> {
+    fn resolve_fuzzy(&self, _caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         use crate::analyzers::call_graph::CallResolver;
 
         // Normalize by stripping generic parameters
         let normalized_name = CallResolver::strip_generic_params(callee_name);
 
-        // Search for functions with matching normalized names
-        for func in call_graph.get_all_functions() {
-            let normalized_func_name = CallResolver::strip_generic_params(&func.name);
-
-            // Check if normalized names match
-            if normalized_func_name == normalized_name {
-                return Some(func.clone());
-            }
-
-            // Also check base name match
-            if let Some(base) = normalized_func_name.split("::").last() {
-                if let Some(search_base) = normalized_name.split("::").last() {
-                    if base == search_base && normalized_func_name.ends_with(&normalized_name) {
+        // Try simple name lookup with fuzzy matching
+        if let Some(simple_name) = normalized_name.split("::").last() {
+            if let Some(candidates) = self.function_index.get(simple_name) {
+                for func in candidates {
+                    let normalized_func_name = CallResolver::strip_generic_params(&func.name);
+                    if normalized_func_name == normalized_name {
+                        return Some(func.clone());
+                    }
+                    if normalized_func_name.ends_with(&normalized_name) {
                         return Some(func.clone());
                     }
                 }
@@ -173,17 +182,12 @@ impl PathResolver {
     }
 
     /// Resolve through import statements
-    fn resolve_through_imports(
-        &self,
-        caller_file: &Path,
-        callee_name: &str,
-        call_graph: &CallGraph,
-    ) -> Option<FunctionId> {
+    fn resolve_through_imports(&self, caller_file: &Path, callee_name: &str) -> Option<FunctionId> {
         let imported_paths = self.import_map.resolve_import(caller_file, callee_name)?;
 
         // Try each imported path
         for import_path in &imported_paths {
-            if let Some(func) = self.find_function_by_path(import_path, call_graph) {
+            if let Some(func) = self.find_function_by_path(import_path) {
                 return Some(func);
             }
         }
@@ -196,7 +200,6 @@ impl PathResolver {
         &self,
         caller_file: &Path,
         qualified_name: &str,
-        call_graph: &CallGraph,
     ) -> Option<FunctionId> {
         let segments: Vec<String> = qualified_name.split("::").map(|s| s.to_string()).collect();
 
@@ -242,7 +245,7 @@ impl PathResolver {
                         full_path
                     );
 
-                    if let Some(func) = self.find_function_by_path(&full_path, call_graph) {
+                    if let Some(func) = self.find_function_by_path(&full_path) {
                         return Some(func);
                     }
                 }
@@ -252,7 +255,7 @@ impl PathResolver {
         // Strategy 2: Try using module tree resolution
         if let Some(current_module) = self.module_tree.get_module(caller_file) {
             if let Some(resolved_path) = self.module_tree.resolve_path(current_module, &segments) {
-                if let Some(func) = self.find_function_by_path(&resolved_path, call_graph) {
+                if let Some(func) = self.find_function_by_path(&resolved_path) {
                     return Some(func);
                 }
             }
@@ -260,7 +263,7 @@ impl PathResolver {
 
         // Strategy 3: Try direct lookup (for crate::... paths)
         if let Some(resolved) = self.import_map.resolve_qualified_path(&segments) {
-            if let Some(func) = self.find_function_by_path(&resolved, call_graph) {
+            if let Some(func) = self.find_function_by_path(&resolved) {
                 return Some(func);
             }
         }
@@ -273,7 +276,6 @@ impl PathResolver {
         &self,
         _caller_file: &Path,
         callee_name: &str,
-        call_graph: &CallGraph,
     ) -> Option<FunctionId> {
         // Extract module and function name
         let parts: Vec<&str> = callee_name.rsplitn(2, "::").collect();
@@ -288,71 +290,42 @@ impl PathResolver {
         let target = self.import_map.resolve_reexport(module_path, func_name)?;
 
         // Find function at target
-        self.find_function_by_path(&target, call_graph)
+        self.find_function_by_path(&target)
     }
 
     /// Find a function in the same file
-    fn find_in_same_file(
-        &self,
-        file: &Path,
-        name: &str,
-        call_graph: &CallGraph,
-    ) -> Option<FunctionId> {
-        call_graph
-            .get_all_functions()
-            .find(|func| func.file == file && Self::matches_name(&func.name, name))
-            .cloned()
-    }
+    fn find_in_same_file(&self, file: &Path, name: &str) -> Option<FunctionId> {
+        // Use file + name key for O(1) lookup
+        let file_key = format!("{:?}:{}", file, name);
+        if let Some(funcs) = self.function_index.get(&file_key) {
+            return funcs.first().cloned();
+        }
 
-    /// Find a function by its module path
-    fn find_function_by_path(&self, path: &str, call_graph: &CallGraph) -> Option<FunctionId> {
-        // Try exact match first
-        for func in call_graph.get_all_functions() {
-            if func.name == path || func.name.ends_with(&format!("::{}", path)) {
-                return Some(func.clone());
+        // Fallback: search by name in the index and filter by file
+        if let Some(candidates) = self.function_index.get(name) {
+            for func in candidates {
+                if func.file == file && Self::matches_name(&func.name, name) {
+                    return Some(func.clone());
+                }
             }
         }
 
-        // Try matching by module_path + function name
-        // Split path into potential module path and function name
+        None
+    }
+
+    /// Find a function by its module path using O(1) index lookup
+    fn find_function_by_path(&self, path: &str) -> Option<FunctionId> {
+        // Try exact match first - O(1) lookup
+        if let Some(funcs) = self.function_index.get(path) {
+            return funcs.first().cloned();
+        }
+
+        // Try matching by simple name and filtering
         if let Some(base_name) = path.split("::").last() {
-            // Try different ways to split the path
-            let path_parts: Vec<&str> = path.split("::").collect();
-
-            for i in 0..path_parts.len() {
-                let potential_module = path_parts[0..i].join("::");
-                let potential_func_path = path_parts[i..].join("::");
-
-                for func in call_graph.get_all_functions() {
-                    // Match if:
-                    // 1. Function name matches the remaining path
-                    // 2. Module path matches (if we have module_path)
-                    if func.name == potential_func_path
-                        && (potential_module.is_empty() || func.module_path == potential_module)
-                    {
-                        return Some(func.clone());
-                    }
-
-                    // Also try matching just the function name with module_path check
-                    if Self::matches_name(&func.name, base_name)
-                        && !potential_module.is_empty()
-                        && func.module_path == path_parts[0..path_parts.len() - 1].join("::")
-                    {
-                        return Some(func.clone());
-                    }
-                }
-            }
-
-            // Fallback: if module_path is not populated (empty string), just match by function name
-            // This is a temporary workaround until spec 142 is fully implemented
-            for func in call_graph.get_all_functions() {
-                if Self::matches_name(&func.name, base_name) && func.module_path.is_empty() {
-                    // Verify the file path contains the expected module name
-                    let file_path_str = func.file.to_string_lossy();
-                    let expected_module = &path_parts[..path_parts.len() - 1].join("/");
-                    if file_path_str.contains(expected_module)
-                        || expected_module.starts_with("crate")
-                    {
+            if let Some(candidates) = self.function_index.get(base_name) {
+                // Filter candidates that match the full path
+                for func in candidates {
+                    if func.name == path || func.name.ends_with(&format!("::{}", path)) {
                         return Some(func.clone());
                     }
                 }
@@ -537,7 +510,7 @@ mod tests {
             0,
         );
 
-        let resolved = resolver.resolve_call(&file1, "foo", &graph);
+        let resolved = resolver.resolve_call(&file1, "foo");
         // Note: This test requires full integration with CallGraphExtractor
         // to populate module_path fields correctly
         assert!(resolved.is_some());

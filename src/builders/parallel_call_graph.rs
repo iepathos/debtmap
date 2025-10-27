@@ -155,49 +155,30 @@ impl ParallelCallGraphBuilder {
     /// Phase 2: Extract multi-file call graph from pre-parsed ASTs
     ///
     /// Uses pre-parsed ASTs to avoid redundant parsing operations.
-    /// Processes files sequentially due to syn::File not being Send+Sync.
+    /// Processes all files at once for optimal cross-file call resolution.
     fn parallel_multi_file_extraction(
         &self,
         parsed_files: &[(PathBuf, syn::File)],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<()> {
-        // Create progress bar for multi-file extraction
-        let total_chunks = parsed_files.len().div_ceil(10); // chunks of size ~10
-        let progress = crate::progress::ProgressManager::global()
-            .map(|pm| {
-                let pb = pm.create_bar(
-                    total_chunks as u64,
-                    "🔗 {msg} {pos}/{len} chunks ({percent}%) - {eta}",
-                );
-                pb.set_message("Extracting cross-file call relationships");
-                pb
-            })
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
+        // Process ALL files at once (no chunking)
+        // This enables optimal cross-file call resolution with a single PathResolver
+        // and complete visibility of all functions across the entire codebase.
+        // Progress tracking is handled inside extract_call_graph_multi_file()
+        let files_for_extraction: Vec<_> = parsed_files
+            .iter()
+            .map(|(path, parsed)| (parsed.clone(), path.clone()))
+            .collect();
 
-        // Group files into chunks for better parallelization
-        let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
+        // Extract call graph for all files with full cross-file resolution
+        // This will show progress for:
+        // - Phase 1: Analyzing functions and imports (X/Y files)
+        // - Phase 2: Resolving function calls (X/Y calls)
+        // - Phase 3: Final cross-file resolution (X/Y calls)
+        let graph = extract_call_graph_multi_file(&files_for_extraction);
 
-        // Process files in chunks (sequentially due to syn::File limitations)
-        for chunk in parsed_files.chunks(chunk_size) {
-            if !chunk.is_empty() {
-                // Convert to format expected by extract_call_graph_multi_file
-                // No re-parsing needed!
-                let chunk_for_extraction: Vec<_> = chunk
-                    .iter()
-                    .map(|(path, parsed)| (parsed.clone(), path.clone()))
-                    .collect();
-
-                // Extract call graph for this chunk
-                let chunk_graph = extract_call_graph_multi_file(&chunk_for_extraction);
-
-                // Merge into main graph
-                parallel_graph.merge_concurrent(chunk_graph);
-
-                progress.inc(1);
-            }
-        }
-
-        progress.finish_with_message("Cross-file analysis complete");
+        // Merge into main graph
+        parallel_graph.merge_concurrent(graph);
 
         Ok(())
     }
