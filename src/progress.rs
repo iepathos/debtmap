@@ -169,6 +169,14 @@ impl ProgressManager {
     pub fn verbosity(&self) -> u8 {
         self.config.verbosity
     }
+
+    /// Clear all progress bars from the display
+    ///
+    /// This should be called before printing final output to ensure progress bars
+    /// don't interfere with the terminal display.
+    pub fn clear(&self) -> std::io::Result<()> {
+        self.multi.clear()
+    }
 }
 
 #[cfg(test)]

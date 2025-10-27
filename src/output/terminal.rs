@@ -1,5 +1,5 @@
 use super::formatters::determine_priority_output_format;
-use crate::{formatting::FormattingConfig, priority};
+use crate::{formatting::FormattingConfig, priority, progress::ProgressManager};
 use anyhow::Result;
 use std::fs;
 use std::io::Write;
@@ -47,6 +47,11 @@ pub fn output_terminal_with_mode(
             formatting_config,
         )
     };
+
+    // Clear all progress bars before printing final output to prevent formatting issues
+    if let Some(pm) = ProgressManager::global() {
+        let _ = pm.clear(); // Ignore errors if clearing fails
+    }
 
     if let Some(path) = output_file {
         if let Some(parent) = path.parent() {
