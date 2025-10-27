@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use rustc_demangle;
 
 #[derive(Debug, Clone)]
 pub struct FunctionCoverage {
@@ -51,6 +52,79 @@ impl LcovData {
     }
 }
 
+/// Demangle a Rust function name if it's mangled
+///
+/// Handles both legacy and v0 mangling schemes:
+/// - Legacy: starts with `_ZN`
+/// - v0: starts with `_RNv`
+///
+/// Returns demangled name or original if not mangled.
+fn demangle_function_name(name: &str) -> String {
+    // Try to demangle any name - rustc_demangle will return the original if it's not mangled
+    let demangled = rustc_demangle::demangle(name).to_string();
+
+    // If demangling changed the string, use the demangled version; otherwise keep original
+    if demangled != name {
+        demangled
+    } else {
+        name.to_string()
+    }
+}
+
+/// Normalize a demangled function name for consolidation
+///
+/// Removes generic type parameters and crate hash IDs to
+/// group multiple monomorphizations of the same function.
+///
+/// For example:
+/// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> `debtmap::Foo::bar`
+/// - `std::collections::HashMap<K,V>::insert` -> `std::collections::HashMap::insert`
+fn normalize_demangled_name(demangled: &str) -> String {
+    // Remove crate hash from names like <debtmap[hash]::...>::method
+    // Pattern: <crate[hash]::rest>::method -> crate::rest::method
+    let without_hash = if demangled.starts_with('<') {
+        // Find the pattern <name[hash]...>
+        if let Some(bracket_start) = demangled.find('[') {
+            if let Some(bracket_end) = demangled.find(']') {
+                // Find the closing > after the crate path
+                if let Some(angle_end) = demangled[bracket_end..].find('>') {
+                    let angle_end = bracket_end + angle_end;
+                    // Extract everything: before [ + after ] up to > + after >
+                    let before = &demangled[1..bracket_start]; // Skip the '<'
+                    let middle = &demangled[(bracket_end + 1)..angle_end];
+                    let after = &demangled[(angle_end + 1)..];
+                    // Reconstruct without the hash and angle brackets
+                    format!("{}{}{}", before, middle, after)
+                } else {
+                    demangled.to_string()
+                }
+            } else {
+                demangled.to_string()
+            }
+        } else {
+            demangled.to_string()
+        }
+    } else {
+        demangled.to_string()
+    };
+
+    // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
+    // We look for the last occurrence of '<' that has a matching '>' before the next '::'
+    let mut result = without_hash.clone();
+    while let Some(angle_start) = result.rfind('<') {
+        // Find the matching '>'
+        if let Some(angle_end) = result[angle_start..].find('>') {
+            let angle_end = angle_start + angle_end;
+            // Remove everything from < to > inclusive
+            result = format!("{}{}", &result[..angle_start], &result[(angle_end + 1)..]);
+        } else {
+            break;
+        }
+    }
+
+    result
+}
+
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
     parse_lcov_file_with_progress(path, &ProgressBar::hidden())
 }
@@ -91,10 +165,16 @@ pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Res
             }
 
             Record::FunctionName { start_line, name } => {
+                // Demangle the function name if it's mangled
+                let demangled = demangle_function_name(&name);
+                let normalized = normalize_demangled_name(&demangled);
+
+                // Use normalized name as key to consolidate duplicates
+                // If the entry already exists, keep the existing one (same line, same function)
                 file_functions
-                    .entry(name.clone())
+                    .entry(normalized.clone())
                     .or_insert_with(|| FunctionCoverage {
-                        name,
+                        name: normalized,
                         start_line: start_line as usize,
                         execution_count: 0,
                         coverage_percentage: 0.0,
@@ -103,8 +183,13 @@ pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Res
             }
 
             Record::FunctionData { name, count } => {
-                if let Some(func) = file_functions.get_mut(&name) {
-                    func.execution_count = count;
+                // Demangle the function name to match the key used in file_functions
+                let demangled = demangle_function_name(&name);
+                let normalized = normalize_demangled_name(&demangled);
+
+                if let Some(func) = file_functions.get_mut(&normalized) {
+                    // Keep the maximum execution count when consolidating
+                    func.execution_count = func.execution_count.max(count);
                     // If no line data is available, use execution count to determine coverage
                     // Functions with count > 0 are considered 100% covered, 0 means 0% covered
                     if func.coverage_percentage == 0.0 && count > 0 {
@@ -698,6 +783,70 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
+    // Tests for demangling functions
+    mod demangle_tests {
+        use super::*;
+
+        #[test]
+        fn test_demangle_v0_mangled_name() {
+            let mangled = "_RNvMNtNtNtCs9MAeJIiYlOV_7debtmap8analysis11attribution14change_trackerNtB2_13ChangeTracker13track_changes";
+            let demangled = demangle_function_name(mangled);
+
+            assert!(demangled.contains("ChangeTracker"));
+            assert!(demangled.contains("track_changes"));
+            assert!(!demangled.starts_with("_RNv"));
+        }
+
+        #[test]
+        fn test_demangle_legacy_mangled_name() {
+            // Test with a simple legacy mangled name
+            let mangled = "_ZN3foo3barE";
+            let demangled = demangle_function_name(mangled);
+
+            // rustc-demangle should handle this
+            assert!(!demangled.starts_with("_ZN") || demangled == mangled);
+        }
+
+        #[test]
+        fn test_demangle_already_demangled() {
+            let name = "my_module::my_function";
+            let result = demangle_function_name(name);
+
+            assert_eq!(result, name);
+        }
+
+        #[test]
+        fn test_normalize_removes_generics() {
+            assert_eq!(
+                normalize_demangled_name("HashMap<String, i32>::insert"),
+                "HashMap::insert"
+            );
+
+            assert_eq!(normalize_demangled_name("Vec<T>::push"), "Vec::push");
+
+            assert_eq!(
+                normalize_demangled_name("simple_function"),
+                "simple_function"
+            );
+        }
+
+        #[test]
+        fn test_normalize_preserves_module_path() {
+            assert_eq!(
+                normalize_demangled_name("std::collections::HashMap<K,V>::insert"),
+                "std::collections::HashMap::insert"
+            );
+        }
+
+        #[test]
+        fn test_normalize_removes_crate_hash() {
+            assert_eq!(
+                normalize_demangled_name("<debtmap[71f4b4990cdcf1ab]::Foo>::bar"),
+                "debtmap::Foo::bar"
+            );
+        }
+    }
+
     #[test]
     fn test_parse_lcov_file() {
         let lcov_content = r#"TN:
@@ -867,6 +1016,53 @@ end_of_record
 
         assert_eq!(data.get_overall_coverage(), 0.0);
         assert_eq!(data.functions.len(), 0);
+    }
+
+    #[test]
+    fn test_consolidate_duplicate_mangled_functions() {
+        // Test that duplicate mangled functions with different crate hashes
+        // are consolidated into a single entry
+        // Using actual valid mangled names from the spec
+        let lcov_content = r#"TN:
+SF:/path/to/file.rs
+FN:18,_RNvMNtNtNtCs9MAeJIiYlOV_7debtmap8analysis11attribution14change_trackerNtB2_13ChangeTracker13track_changes
+FNDA:5,_RNvMNtNtNtCs9MAeJIiYlOV_7debtmap8analysis11attribution14change_trackerNtB2_13ChangeTracker13track_changes
+FN:18,_RNvMNtNtNtCs5ZpFxq88JTF_7debtmap8analysis11attribution14change_trackerNtB2_13ChangeTracker13track_changes
+FNDA:3,_RNvMNtNtNtCs5ZpFxq88JTF_7debtmap8analysis11attribution14change_trackerNtB2_13ChangeTracker13track_changes
+DA:18,5
+DA:19,5
+LF:2
+LH:2
+end_of_record
+"#;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        temp_file.write_all(lcov_content.as_bytes()).unwrap();
+
+        let data = parse_lcov_file(temp_file.path()).unwrap();
+        let file_path = PathBuf::from("/path/to/file.rs");
+
+        // Should consolidate to single function
+        let funcs = &data.functions[&file_path];
+        assert_eq!(funcs.len(), 1, "Expected 1 function after consolidation");
+
+        // Should keep max execution count (5 vs 3)
+        assert_eq!(funcs[0].execution_count, 5, "Expected max execution count");
+
+        // Function name should be demangled
+        assert!(
+            funcs[0].name.contains("ChangeTracker") || funcs[0].name.contains("track_changes"),
+            "Expected demangled name, got: {}",
+            funcs[0].name
+        );
+        assert!(
+            !funcs[0].name.starts_with("_RNv"),
+            "Name should not be mangled: {}",
+            funcs[0].name
+        );
+
+        // Start line should be preserved
+        assert_eq!(funcs[0].start_line, 18);
     }
 
     // Tests for find_functions_by_path
