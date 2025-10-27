@@ -37,15 +37,23 @@ impl UnifiedFileAnalyzer {
         content.lines().count()
     }
 
-    fn analyze_god_object(&self, path: &Path, content: &str) -> GodObjectIndicators {
+    fn analyze_god_object(
+        &self,
+        path: &Path,
+        content: &str,
+    ) -> (
+        GodObjectIndicators,
+        Option<crate::organization::GodObjectType>,
+    ) {
         // Use the comprehensive god object detector for Rust files
         if path.extension().and_then(|s| s.to_str()) == Some("rs") {
             if let Ok(ast) = syn::parse_file(content) {
                 let detector = GodObjectDetector::with_source_content(content);
-                let analysis = detector.analyze_comprehensive(path, &ast);
+                let enhanced_analysis = detector.analyze_enhanced(path, &ast);
 
                 // Convert recommended splits to our format
-                let recommended_splits: Vec<ModuleSplit> = analysis
+                let recommended_splits: Vec<ModuleSplit> = enhanced_analysis
+                    .file_metrics
                     .recommended_splits
                     .iter()
                     .map(|split| ModuleSplit {
@@ -60,16 +68,19 @@ impl UnifiedFileAnalyzer {
                     })
                     .collect();
 
-                return GodObjectIndicators {
-                    methods_count: analysis.method_count,
-                    fields_count: analysis.field_count,
-                    responsibilities: analysis.responsibility_count,
-                    is_god_object: analysis.is_god_object,
-                    god_object_score: analysis.god_object_score.min(100.0) / 100.0, // Normalize to 0-1
-                    responsibility_names: analysis.responsibilities.clone(),
+                let indicators = GodObjectIndicators {
+                    methods_count: enhanced_analysis.file_metrics.method_count,
+                    fields_count: enhanced_analysis.file_metrics.field_count,
+                    responsibilities: enhanced_analysis.file_metrics.responsibility_count,
+                    is_god_object: enhanced_analysis.file_metrics.is_god_object,
+                    god_object_score: enhanced_analysis.file_metrics.god_object_score.min(100.0)
+                        / 100.0, // Normalize to 0-1
+                    responsibility_names: enhanced_analysis.file_metrics.responsibilities.clone(),
                     recommended_splits,
-                    module_structure: analysis.module_structure.clone(),
+                    module_structure: enhanced_analysis.file_metrics.module_structure.clone(),
                 };
+
+                return (indicators, Some(enhanced_analysis.classification));
             }
         }
 
@@ -88,16 +99,19 @@ impl UnifiedFileAnalyzer {
             0.0
         };
 
-        GodObjectIndicators {
-            methods_count: function_count,
-            fields_count: field_count,
-            responsibilities: if is_god_object { 5 } else { 1 },
-            is_god_object,
-            god_object_score: god_object_score.min(1.0),
-            responsibility_names: Vec::new(),
-            recommended_splits: Vec::new(),
-            module_structure: None,
-        }
+        (
+            GodObjectIndicators {
+                methods_count: function_count,
+                fields_count: field_count,
+                responsibilities: if is_god_object { 5 } else { 1 },
+                is_god_object,
+                god_object_score: god_object_score.min(1.0),
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+            },
+            None,
+        )
     }
 
     fn get_file_coverage(&self, path: &Path) -> f64 {
@@ -228,7 +242,7 @@ impl UnifiedFileAnalyzer {
 impl FileAnalyzer for UnifiedFileAnalyzer {
     fn analyze_file(&self, path: &Path, content: &str) -> Result<FileDebtMetrics> {
         let total_lines = Self::count_lines(content);
-        let god_object_indicators = self.analyze_god_object(path, content);
+        let (god_object_indicators, god_object_type) = self.analyze_god_object(path, content);
         let coverage_percent = self.get_file_coverage(path);
         let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
 
@@ -244,6 +258,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             uncovered_lines,
             god_object_indicators,
             function_scores: Vec::new(),
+            god_object_type,
         })
     }
 
@@ -280,6 +295,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             uncovered_lines: line_metrics.uncovered_lines,
             god_object_indicators,
             function_scores,
+            god_object_type: None,
         }
     }
 }

@@ -1318,6 +1318,7 @@ mod tests {
                         module_structure: None,
                     },
                     function_scores: vec![],
+                    god_object_type: None,
                 },
                 score: 10.0,
                 priority_rank: 1,
@@ -1806,6 +1807,7 @@ mod tests {
                 module_structure: None,
             },
             function_scores: vec![],
+            god_object_type: None,
         };
 
         let items = vec![
@@ -1971,6 +1973,7 @@ mod tests {
                 module_structure: None,
             },
             function_scores: vec![],
+            god_object_type: None,
         };
 
         let file_item = DebtItem::File(Box::new(FileDebtItem {

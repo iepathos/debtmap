@@ -1147,6 +1147,7 @@ mod tests {
                     module_structure: None,
                 },
                 function_scores: vec![],
+                god_object_type: None,
             },
             score: 50.0,
             priority_rank: 1,

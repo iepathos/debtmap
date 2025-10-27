@@ -414,6 +414,7 @@ mod tests {
                     module_structure: None,
                 },
                 function_scores: vec![],
+                god_object_type: None,
             },
             score: 606.0, // Higher than function items
             priority_rank: 1,
