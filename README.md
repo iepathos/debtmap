@@ -72,12 +72,11 @@ cargo install cargo-llvm-cov
 debtmap analyze .
 
 # With test coverage (recommended)
-# Using cargo-llvm-cov (recommended - faster and more accurate)
 cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 debtmap analyze . --lcov target/coverage/lcov.info
 
-# Or using cargo-tarpaulin
-cargo tarpaulin --out lcov --output-dir target/coverage
+# Or using just command
+just coverage
 debtmap analyze . --lcov target/coverage/lcov.info
 
 # Generate JSON report
@@ -350,7 +349,7 @@ just watch       # Run with hot reloading
 
 # CI and quality checks
 just ci          # Run all CI checks locally
-just coverage    # Generate test coverage report (uses cargo-tarpaulin with LLVM engine)
+just coverage    # Generate test coverage report (uses cargo-llvm-cov)
 
 # See all available commands
 just --list

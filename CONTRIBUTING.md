@@ -14,7 +14,7 @@ Before you begin, ensure you have the following installed:
 
 Optional but recommended:
 - **cargo-nextest**: Faster test runner - `cargo install cargo-nextest`
-- **cargo-tarpaulin**: Code coverage - `cargo install cargo-tarpaulin`
+- **cargo-llvm-cov**: Code coverage - `cargo install cargo-llvm-cov`
 - **cargo-watch**: Auto-rebuild on file changes - `cargo install cargo-watch`
 
 ### Clone and Build
