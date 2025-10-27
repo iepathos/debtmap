@@ -109,12 +109,22 @@ fn normalize_demangled_name(demangled: &str) -> String {
     };
 
     // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
+    // BUT preserve impl blocks: "<impl Trait for Type>" should be kept
     // We look for the last occurrence of '<' that has a matching '>' before the next '::'
     let mut result = without_hash.clone();
     while let Some(angle_start) = result.rfind('<') {
         // Find the matching '>'
         if let Some(angle_end) = result[angle_start..].find('>') {
             let angle_end = angle_start + angle_end;
+
+            // Check if this is an impl block (starts with "impl ")
+            // If so, preserve it
+            let content = &result[angle_start + 1..angle_end];
+            if content.trim().starts_with("impl ") {
+                // This is an impl block, preserve it
+                break;
+            }
+
             // Remove everything from < to > inclusive
             result = format!("{}{}", &result[..angle_start], &result[(angle_end + 1)..]);
         } else {
