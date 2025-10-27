@@ -105,36 +105,58 @@ fn debug_25_flag_structs() {
     if metrics.impl_block_count >= detector.min_impl_blocks {
         let normalized = (metrics.impl_block_count as f64 / 100.0).min(1.0);
         let contribution = 30.0 * normalized;
-        println!("Signal 1 (impl count >= {}): +{:.2} (normalized: {:.2})", detector.min_impl_blocks, contribution, normalized);
+        println!(
+            "Signal 1 (impl count >= {}): +{:.2} (normalized: {:.2})",
+            detector.min_impl_blocks, contribution, normalized
+        );
         score += contribution;
     } else {
-        println!("Signal 1 FAILED: {} < {}", metrics.impl_block_count, detector.min_impl_blocks);
+        println!(
+            "Signal 1 FAILED: {} < {}",
+            metrics.impl_block_count, detector.min_impl_blocks
+        );
     }
 
     // Signal 2: uniformity
     if metrics.method_uniformity >= detector.method_uniformity_threshold {
         let contribution = 25.0 * metrics.method_uniformity;
-        println!("Signal 2 (uniformity >= {:.2}): +{:.2}", detector.method_uniformity_threshold, contribution);
+        println!(
+            "Signal 2 (uniformity >= {:.2}): +{:.2}",
+            detector.method_uniformity_threshold, contribution
+        );
         score += contribution;
     } else {
-        println!("Signal 2 FAILED: {:.2} < {:.2}", metrics.method_uniformity, detector.method_uniformity_threshold);
+        println!(
+            "Signal 2 FAILED: {:.2} < {:.2}",
+            metrics.method_uniformity, detector.method_uniformity_threshold
+        );
     }
 
     // Signal 3: complexity
     if metrics.avg_method_complexity < detector.max_avg_complexity {
-        let inverse_complexity = 1.0 - (metrics.avg_method_complexity / detector.max_avg_complexity);
+        let inverse_complexity =
+            1.0 - (metrics.avg_method_complexity / detector.max_avg_complexity);
         let contribution = 20.0 * inverse_complexity;
-        println!("Signal 3 (complexity < {:.2}): +{:.2} (inverse: {:.2})", detector.max_avg_complexity, contribution, inverse_complexity);
+        println!(
+            "Signal 3 (complexity < {:.2}): +{:.2} (inverse: {:.2})",
+            detector.max_avg_complexity, contribution, inverse_complexity
+        );
         score += contribution;
     } else {
-        println!("Signal 3 FAILED: {:.2} >= {:.2}", metrics.avg_method_complexity, detector.max_avg_complexity);
+        println!(
+            "Signal 3 FAILED: {:.2} >= {:.2}",
+            metrics.avg_method_complexity, detector.max_avg_complexity
+        );
     }
 
     // Signal 4: variance
     if metrics.complexity_variance < 2.0 {
         let normalized = 1.0 - (metrics.complexity_variance / 10.0).min(1.0);
         let contribution = 15.0 * normalized;
-        println!("Signal 4 (variance < 2.0): +{:.2} (normalized: {:.2})", contribution, normalized);
+        println!(
+            "Signal 4 (variance < 2.0): +{:.2} (normalized: {:.2})",
+            contribution, normalized
+        );
         score += contribution;
     } else {
         println!("Signal 4 FAILED: {:.2} >= 2.0", metrics.complexity_variance);
@@ -145,7 +167,10 @@ fn debug_25_flag_structs() {
         let ratio = *count as f64 / metrics.impl_block_count as f64;
         if ratio > 0.8 {
             let contribution = 10.0 * ratio;
-            println!("Signal 5 (ratio > 0.8): +{:.2} (ratio: {:.2})", contribution, ratio);
+            println!(
+                "Signal 5 (ratio > 0.8): +{:.2} (ratio: {:.2})",
+                contribution, ratio
+            );
             score += contribution;
         } else {
             println!("Signal 5 FAILED: ratio {:.2} <= 0.8", ratio);
@@ -155,7 +180,11 @@ fn debug_25_flag_structs() {
     }
 
     let final_confidence = (score / 100.0).min(1.0);
-    println!("Total score: {:.2}/100.0 = {:.2}% confidence", score, final_confidence * 100.0);
+    println!(
+        "Total score: {:.2}/100.0 = {:.2}% confidence",
+        score,
+        final_confidence * 100.0
+    );
     println!("======================================\n");
 
     // Should have 25 impl blocks

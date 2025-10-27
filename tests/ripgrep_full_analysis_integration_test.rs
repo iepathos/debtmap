@@ -17,7 +17,10 @@ fn test_ripgrep_full_analysis_integration() {
 
     if !flags_file.exists() {
         println!("\n⚠️  Skipping integration test - ripgrep source not found");
-        println!("   Expected location: {:?}", ripgrep_path.canonicalize().ok());
+        println!(
+            "   Expected location: {:?}",
+            ripgrep_path.canonicalize().ok()
+        );
         println!("   To run this test:");
         println!("   1. Clone ripgrep: git clone https://github.com/BurntSushi/ripgrep ../ripgrep");
         println!("   2. Re-run: cargo test test_ripgrep_full_analysis_integration");
@@ -29,9 +32,9 @@ fn test_ripgrep_full_analysis_integration() {
 
     // Run debtmap analyze command on ripgrep
     let output = Command::new("cargo")
-        .args(&["run", "--", "analyze", "--path"])
+        .args(["run", "--", "analyze", "--path"])
         .arg(ripgrep_path.to_str().unwrap())
-        .args(&["--format", "json"])
+        .args(["--format", "json"])
         .output()
         .expect("Failed to run debtmap analyze command");
 
@@ -45,24 +48,24 @@ fn test_ripgrep_full_analysis_integration() {
     println!("Analysis completed. Output size: {} bytes", stdout.len());
 
     // Parse JSON output
-    let results: serde_json::Value = serde_json::from_str(&stdout)
-        .expect("Failed to parse debtmap JSON output");
+    let results: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse debtmap JSON output");
 
     // Find flags/defs.rs in the results
-    let files = results["files"].as_array()
+    let files = results["files"]
+        .as_array()
         .expect("Expected 'files' array in output");
 
     println!("Total files analyzed: {}", files.len());
 
-    let flags_result = files.iter()
-        .find(|f| {
-            let path = f["path"].as_str().unwrap_or("");
-            path.contains("flags") && path.contains("defs.rs")
-        });
+    let flags_result = files.iter().find(|f| {
+        let path = f["path"].as_str().unwrap_or("");
+        path.contains("flags") && path.contains("defs.rs")
+    });
 
     let flags_data = flags_result.expect(
         "flags/defs.rs not found in analysis results. \
-         This may indicate the analysis didn't complete or the file wasn't analyzed."
+         This may indicate the analysis didn't complete or the file wasn't analyzed.",
     );
 
     println!("\n=== FLAGS/DEFS.RS ANALYSIS RESULT ===");
@@ -71,7 +74,8 @@ fn test_ripgrep_full_analysis_integration() {
     println!("Functions: {}", flags_data["metrics"]["function_count"]);
 
     // Extract recommendation
-    let recommendation = flags_data["recommendation"].as_str()
+    let recommendation = flags_data["recommendation"]
+        .as_str()
         .expect("No recommendation field in flags/defs.rs result");
 
     println!("\n=== RECOMMENDATION ===");
@@ -101,8 +105,8 @@ fn test_ripgrep_full_analysis_integration() {
 
     // Verify it explicitly says NOT to split into modules
     assert!(
-        recommendation.contains("NOT") &&
-        (recommendation.contains("god object") || recommendation.contains("module split")),
+        recommendation.contains("NOT")
+            && (recommendation.contains("god object") || recommendation.contains("module split")),
         "Expected recommendation to clarify this is NOT a module splitting case, got: {}",
         recommendation
     );
@@ -112,7 +116,10 @@ fn test_ripgrep_full_analysis_integration() {
     let confidence_pct = if let Some(conf) = flags_data["confidence"].as_f64() {
         Some(conf * 100.0)
     } else if let Some(god_type) = flags_data["metrics"]["god_object_type"].as_object() {
-        god_type.get("confidence").and_then(|c| c.as_f64()).map(|c| c * 100.0)
+        god_type
+            .get("confidence")
+            .and_then(|c| c.as_f64())
+            .map(|c| c * 100.0)
     } else {
         None
     };
@@ -123,7 +130,7 @@ fn test_ripgrep_full_analysis_integration() {
         // For 888 implementations, we expect ~87-88% confidence
         // Allow some variance (85-95% range is acceptable)
         assert!(
-            conf >= 85.0 && conf <= 95.0,
+            (85.0..=95.0).contains(&conf),
             "Expected confidence in 85-95% range for 888 implementations, got {:.1}%",
             conf
         );
