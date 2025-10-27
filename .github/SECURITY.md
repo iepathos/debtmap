@@ -66,7 +66,7 @@ Please report (suspected) security vulnerabilities to **[iepathos@gmail.com](mai
 ## Security Contacts
 
 - **Primary**: Glen Baker (iepathos@gmail.com)
-- **Repository**: https://github.com/iepathos/claudeforge
+- **Repository**: https://github.com/iepathos/debtmap
 - **Security Advisory**: GitHub Security Advisories
 
 ## Hall of Fame
