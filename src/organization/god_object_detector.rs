@@ -693,6 +693,13 @@ impl GodObjectDetector {
                 None
             };
 
+        // Calculate visibility breakdown for Rust files (Spec 134)
+        let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            Some(Self::calculate_visibility_breakdown(&visitor, &all_methods))
+        } else {
+            None
+        };
+
         GodObjectAnalysis {
             is_god_object,
             method_count: total_methods,
@@ -707,7 +714,60 @@ impl GodObjectDetector {
             purity_distribution,
             module_structure,
             detection_type,
+            visibility_breakdown,
         }
+    }
+
+    /// Calculate visibility breakdown from TypeVisitor data (Spec 134)
+    fn calculate_visibility_breakdown(
+        visitor: &TypeVisitor,
+        method_names: &[String],
+    ) -> crate::organization::god_object_analysis::FunctionVisibilityBreakdown {
+        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+
+        let mut breakdown = FunctionVisibilityBreakdown::new();
+
+        // Count visibility for function items (standalone functions)
+        for func_item in &visitor.function_items {
+            let name = func_item.sig.ident.to_string();
+            if !method_names.contains(&name) {
+                continue;
+            }
+
+            match &func_item.vis {
+                syn::Visibility::Public(_) => breakdown.public += 1,
+                syn::Visibility::Restricted(r) => {
+                    if let Some(ident) = r.path.get_ident() {
+                        if ident == "crate" {
+                            breakdown.pub_crate += 1;
+                        } else if ident == "super" {
+                            breakdown.pub_super += 1;
+                        } else {
+                            breakdown.private += 1;
+                        }
+                    } else {
+                        breakdown.private += 1;
+                    }
+                }
+                syn::Visibility::Inherited => breakdown.private += 1,
+            }
+        }
+
+        // Count visibility for impl methods
+        for type_info in visitor.types.values() {
+            for method_name in &type_info.methods {
+                if !method_names.contains(method_name) {
+                    continue;
+                }
+
+                // For methods in impl blocks, check if they're marked pub
+                // This requires tracking visibility in TypeVisitor for impl methods
+                // For now, count methods as private by default (conservative)
+                breakdown.private += 1;
+            }
+        }
+
+        breakdown
     }
 
     /// Calculate purity-weighted function contributions

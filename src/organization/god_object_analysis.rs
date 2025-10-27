@@ -32,6 +32,123 @@ pub struct GodObjectAnalysis {
     pub module_structure: Option<crate::analysis::ModuleStructure>,
     /// Type of god object detection (class vs file/module)
     pub detection_type: DetectionType,
+    /// Function visibility breakdown (added for spec 134)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility_breakdown: Option<FunctionVisibilityBreakdown>,
+}
+
+impl GodObjectAnalysis {
+    /// Validate metric consistency (Spec 134)
+    ///
+    /// Checks for contradictions in metrics such as:
+    /// - Visibility breakdown sums to total method count
+    /// - Responsibility count matches named responsibilities
+    /// - Method count is consistent with detection type
+    pub fn validate(&self) -> Result<(), MetricInconsistency> {
+        // Rule 1: If visibility breakdown exists, it must sum to method_count
+        if let Some(ref visibility) = self.visibility_breakdown {
+            let vis_total = visibility.total();
+            if vis_total != self.method_count {
+                return Err(MetricInconsistency::VisibilityMismatch {
+                    visibility_total: vis_total,
+                    method_count: self.method_count,
+                });
+            }
+        }
+
+        // Rule 2: Responsibility count must match number of named responsibilities
+        if self.responsibility_count != self.responsibilities.len() {
+            return Err(MetricInconsistency::ResponsibilityCountMismatch {
+                declared_count: self.responsibility_count,
+                actual_count: self.responsibilities.len(),
+            });
+        }
+
+        // Rule 3: If functions exist, must have at least one responsibility
+        if self.method_count > 0 && self.responsibilities.is_empty() {
+            return Err(MetricInconsistency::MissingResponsibilities {
+                method_count: self.method_count,
+            });
+        }
+
+        Ok(())
+    }
+}
+
+/// Errors indicating metric inconsistencies (Spec 134)
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetricInconsistency {
+    VisibilityMismatch {
+        visibility_total: usize,
+        method_count: usize,
+    },
+    ResponsibilityCountMismatch {
+        declared_count: usize,
+        actual_count: usize,
+    },
+    MissingResponsibilities {
+        method_count: usize,
+    },
+}
+
+impl std::fmt::Display for MetricInconsistency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetricInconsistency::VisibilityMismatch {
+                visibility_total,
+                method_count,
+            } => write!(
+                f,
+                "Visibility breakdown ({}) does not match method count ({})",
+                visibility_total, method_count
+            ),
+            MetricInconsistency::ResponsibilityCountMismatch {
+                declared_count,
+                actual_count,
+            } => write!(
+                f,
+                "Declared responsibility count ({}) does not match actual named responsibilities ({})",
+                declared_count, actual_count
+            ),
+            MetricInconsistency::MissingResponsibilities { method_count } => write!(
+                f,
+                "Functions exist ({}) but no responsibilities identified",
+                method_count
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MetricInconsistency {}
+
+/// Breakdown of functions by visibility
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FunctionVisibilityBreakdown {
+    pub public: usize,
+    pub pub_crate: usize,
+    pub pub_super: usize,
+    pub private: usize,
+}
+
+impl FunctionVisibilityBreakdown {
+    pub fn total(&self) -> usize {
+        self.public + self.pub_crate + self.pub_super + self.private
+    }
+
+    pub fn new() -> Self {
+        Self {
+            public: 0,
+            pub_crate: 0,
+            pub_super: 0,
+            private: 0,
+        }
+    }
+}
+
+impl Default for FunctionVisibilityBreakdown {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Distribution of functions by purity level
@@ -871,5 +988,140 @@ mod tests {
             "Parsing & Input"
         );
         assert_eq!(infer_responsibility_from_method("IS_VALID"), "Validation");
+    }
+
+    // Spec 134: Tests for metric validation
+    #[test]
+    fn test_validation_passes_consistent_metrics() {
+        let analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 3,
+            field_count: 5,
+            responsibility_count: 2,
+            lines_of_code: 100,
+            complexity_sum: 20,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            visibility_breakdown: Some(FunctionVisibilityBreakdown {
+                public: 1,
+                pub_crate: 1,
+                pub_super: 0,
+                private: 1,
+            }),
+        };
+
+        assert!(analysis.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validation_detects_visibility_mismatch() {
+        let analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 10,
+            field_count: 5,
+            responsibility_count: 2,
+            lines_of_code: 100,
+            complexity_sum: 20,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            visibility_breakdown: Some(FunctionVisibilityBreakdown {
+                public: 2,
+                pub_crate: 1,
+                pub_super: 0,
+                private: 1,
+            }),
+        };
+
+        let result = analysis.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            MetricInconsistency::VisibilityMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validation_detects_responsibility_count_mismatch() {
+        let analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 3,
+            field_count: 5,
+            responsibility_count: 5, // Says 5 but only provides 2 names
+            lines_of_code: 100,
+            complexity_sum: 20,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            visibility_breakdown: Some(FunctionVisibilityBreakdown {
+                public: 1,
+                pub_crate: 1,
+                pub_super: 0,
+                private: 1,
+            }),
+        };
+
+        let result = analysis.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            MetricInconsistency::ResponsibilityCountMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn test_validation_detects_missing_responsibilities() {
+        let analysis = GodObjectAnalysis {
+            is_god_object: true,
+            method_count: 10, // Has methods
+            field_count: 5,
+            responsibility_count: 0,
+            lines_of_code: 100,
+            complexity_sum: 20,
+            god_object_score: 75.0,
+            recommended_splits: vec![],
+            confidence: GodObjectConfidence::Probable,
+            responsibilities: vec![], // But no responsibilities
+            purity_distribution: None,
+            module_structure: None,
+            detection_type: DetectionType::GodClass,
+            visibility_breakdown: Some(FunctionVisibilityBreakdown {
+                public: 5,
+                pub_crate: 3,
+                pub_super: 0,
+                private: 2,
+            }),
+        };
+
+        let result = analysis.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            MetricInconsistency::MissingResponsibilities { .. }
+        ));
+    }
+
+    #[test]
+    fn test_function_visibility_breakdown_total() {
+        let breakdown = FunctionVisibilityBreakdown {
+            public: 5,
+            pub_crate: 3,
+            pub_super: 2,
+            private: 10,
+        };
+        assert_eq!(breakdown.total(), 20);
     }
 }

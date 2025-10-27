@@ -60,6 +60,7 @@ fn create_god_object_analysis(
         purity_distribution: None,
         module_structure: None,
         detection_type: crate::organization::DetectionType::GodFile,
+        visibility_breakdown: None, // Spec 134: Added for compatibility
     }
 }
 

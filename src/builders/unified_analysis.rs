@@ -1342,6 +1342,7 @@ fn create_god_object_analysis(
         purity_distribution: None,
         module_structure: file_metrics.god_object_indicators.module_structure.clone(),
         detection_type: crate::organization::DetectionType::GodFile,
+        visibility_breakdown: None, // Spec 134: Added for compatibility
     })
 }
 
