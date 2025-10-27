@@ -259,9 +259,10 @@ fn test_large_codebase_parallel_analysis() {
     assert!(timings.total > Duration::from_secs(0));
 
     // Performance check - should be fast even for 500 functions
-    // Allow up to 15 seconds to account for coverage instrumentation overhead
+    // Allow up to 25 seconds to account for coverage instrumentation overhead
+    // Coverage instrumentation can add 2-3x overhead on macOS
     assert!(
-        duration.as_secs() < 15,
+        duration.as_secs() < 25,
         "Large codebase analysis took too long: {:?}",
         duration
     );
