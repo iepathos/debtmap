@@ -178,7 +178,7 @@ pub struct TraitPatternMetrics {
 /// Information about a single impl block
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-struct ImplBlockInfo {
+pub struct ImplBlockInfo {
     trait_name: Option<String>,
     type_name: String,
     method_names: Vec<String>,

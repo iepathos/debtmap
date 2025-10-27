@@ -1109,7 +1109,8 @@ pub struct DebtmapConfig {
 
     /// Boilerplate detection configuration (spec 131)
     #[serde(default)]
-    pub boilerplate_detection: Option<crate::organization::boilerplate_detector::BoilerplateDetectionConfig>,
+    pub boilerplate_detection:
+        Option<crate::organization::boilerplate_detector::BoilerplateDetectionConfig>,
 }
 
 /// Classification configuration

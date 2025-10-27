@@ -1,4 +1,6 @@
-use debtmap::organization::boilerplate_detector::{BoilerplateDetector, BoilerplateDetectionConfig};
+use debtmap::organization::boilerplate_detector::{
+    BoilerplateDetectionConfig, BoilerplateDetector,
+};
 use std::path::Path;
 
 /// Integration test for boilerplate detection analyzing trait implementation patterns
@@ -186,7 +188,11 @@ fn test_ripgrep_style_trait_boilerplate() {
     let result = detector.detect(Path::new("test.rs"), &syntax);
 
     // Debug output
-    eprintln!("Detection result: is_boilerplate={}, confidence={:.2}%", result.is_boilerplate, result.confidence * 100.0);
+    eprintln!(
+        "Detection result: is_boilerplate={}, confidence={:.2}%",
+        result.is_boilerplate,
+        result.confidence * 100.0
+    );
     eprintln!("Pattern type: {:?}", result.pattern_type);
     eprintln!("Signals: {:?}", result.signals);
 

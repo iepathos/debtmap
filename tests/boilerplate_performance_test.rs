@@ -1,4 +1,6 @@
-use debtmap::organization::boilerplate_detector::{BoilerplateDetector, BoilerplateDetectionConfig};
+use debtmap::organization::boilerplate_detector::{
+    BoilerplateDetectionConfig, BoilerplateDetector,
+};
 use std::path::Path;
 use std::time::Instant;
 
@@ -54,7 +56,10 @@ fn test_boilerplate_detection_overhead() {
     println!("\nPerformance Results:");
     println!("  Baseline (disabled): {:.2}ms", baseline_ms);
     println!("  Full (enabled):      {:.2}ms", full_ms);
-    println!("  Overhead:            {:.2}ms ({:.2}%)", overhead_ms, overhead_percent);
+    println!(
+        "  Overhead:            {:.2}ms ({:.2}%)",
+        overhead_ms, overhead_percent
+    );
 
     // Validate spec requirement: < 5% overhead
     // Note: For very fast operations, allow more tolerance due to measurement noise
@@ -76,7 +81,10 @@ fn generate_test_code_with_traits(num_impls: usize) -> String {
     code.push_str("pub struct Target { value: i32 }\n\n");
 
     for i in 0..num_impls {
-        code.push_str(&format!("pub trait Trait{} {{ fn method_{}(&self) -> i32; }}\n", i, i));
+        code.push_str(&format!(
+            "pub trait Trait{} {{ fn method_{}(&self) -> i32; }}\n",
+            i, i
+        ));
         code.push_str(&format!(
             "impl Trait{} for Target {{ fn method_{}(&self) -> i32 {{ self.value + {} }} }}\n\n",
             i, i, i
@@ -154,6 +162,14 @@ fn test_boilerplate_detection_consistency() {
     );
 
     println!("\nConsistency Results:");
-    println!("  Run 1: is_boilerplate={}, confidence={:.2}%", result1.is_boilerplate, result1.confidence * 100.0);
-    println!("  Run 2: is_boilerplate={}, confidence={:.2}%", result2.is_boilerplate, result2.confidence * 100.0);
+    println!(
+        "  Run 1: is_boilerplate={}, confidence={:.2}%",
+        result1.is_boilerplate,
+        result1.confidence * 100.0
+    );
+    println!(
+        "  Run 2: is_boilerplate={}, confidence={:.2}%",
+        result2.is_boilerplate,
+        result2.confidence * 100.0
+    );
 }
