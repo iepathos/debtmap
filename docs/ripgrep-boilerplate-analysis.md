@@ -2,13 +2,14 @@
 
 ## Executive Summary
 
-Ripgrep's `crates/core/flags/defs.rs` contains **7,775 lines** with **888 functions** spread across **104 struct types**. Standard code analysis tools flag this as a "god object" requiring module splitting. However, deeper analysis reveals this is **repetitive boilerplate** that should be **macro-ified or consolidated**, not split into modules.
+Ripgrep's `crates/core/flags/defs.rs` contains **7,775 lines** with **888 functions** spread across **104 struct types**. Traditional code metrics tools (like Mozilla's rust-code-analysis) would measure high cyclomatic complexity and large file size, but provide no actionable recommendations. A naive analysis might suggest splitting this into modules. However, deeper analysis reveals this is **repetitive boilerplate** that should be **macro-ified or consolidated**, not split into modules.
 
 This document analyzes:
 - Why 104 separate modules would make things worse
 - How Rust macros can reduce this to ~900 lines (88% reduction)
 - An even better alternative: data-driven design (~800 lines, 90% reduction)
 - How debtmap detects the difference between complexity and boilerplate
+- Why existing Rust tools don't provide this kind of guidance
 
 ## The Problem: 7,775 Lines of Boilerplate
 
@@ -675,12 +676,67 @@ Raw metrics alone can't distinguish:
 
 Advanced analysis (uniformity, complexity, variance) reveals the true pattern.
 
+## Why Existing Rust Tools Don't Catch This
+
+### Current Rust Analysis Tools
+
+| Tool | What It Does | What It Doesn't Do |
+|------|--------------|-------------------|
+| **clippy** | Pattern linting (e.g., `unwrap()` usage, inefficient patterns) | ❌ No architecture recommendations<br>❌ No file size warnings<br>❌ No complexity-based refactoring |
+| **rustfmt** | Code formatting | ❌ No analysis, just formatting |
+| **rust-code-analysis** (Mozilla) | Calculates metrics (CC, cognitive complexity, LOC) | ❌ No recommendations<br>❌ No thresholds or warnings<br>❌ Just raw numbers |
+| **tokei/scc** | Count lines of code | ❌ Just counting, no analysis |
+| **cargo-geiger** | Unsafe code detection | ❌ Security-focused only |
+
+### The Gap in Rust Tooling
+
+**None of these tools:**
+- Identify "god objects" or oversized files
+- Recommend architectural refactoring
+- Distinguish between boilerplate and complexity
+- Suggest when to use macros vs module splitting
+- Provide actionable guidance based on code patterns
+
+**What developers currently do:**
+1. Look at raw metrics from rust-code-analysis
+2. Manually decide if action is needed
+3. Guess at the appropriate solution
+4. Hope the refactoring helps
+
+### Debtmap's Unique Value
+
+Debtmap fills this gap by:
+1. **Pattern recognition**: Detects boilerplate vs complexity
+2. **Contextual recommendations**: Macros vs modules vs data structures
+3. **Confidence scoring**: Shows certainty in recommendations
+4. **Actionable advice**: Specific steps with code examples
+5. **Impact estimation**: Expected line reduction and benefits
+
+**Example comparison:**
+
+```
+rust-code-analysis output:
+  CC: 1.2
+  LLOC: 7775
+  NOM: 888
+  (What should I do with these numbers?)
+
+debtmap output:
+  BOILERPLATE PATTERN detected (97% confidence)
+  Recommendation: Macro-ify or consolidate
+  Expected reduction: 88-89%
+  Here's how: [specific macro example]
+```
+
+This is why debtmap's boilerplate detection is a **first-of-its-kind feature** for Rust.
+
 ## References
 
 - **Ripgrep source**: https://github.com/BurntSushi/ripgrep
 - **File analyzed**: `crates/core/flags/defs.rs`
 - **Debtmap spec**: `specs/131-boilerplate-pattern-detection.md`
 - **Rust macro book**: https://doc.rust-lang.org/book/ch19-06-macros.html
+- **rust-code-analysis**: https://github.com/mozilla/rust-code-analysis (metrics only, no recommendations)
 
 ## Appendix: Complete Statistics
 
