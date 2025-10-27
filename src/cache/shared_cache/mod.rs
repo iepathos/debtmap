@@ -140,7 +140,6 @@ impl SharedCache {
         })
     }
 
-
     /// Save the current index to disk with comprehensive error handling
     pub fn save_index(&self) -> Result<()> {
         self.index_manager.save(&self.location)
@@ -181,7 +180,6 @@ impl SharedCache {
         let count_exceeded = stats.entry_count > pruner.max_entries;
         size_exceeded || count_exceeded
     }
-
 
     /// Check if key represents a new entry
     fn is_new_entry(&self, key: &str) -> Result<bool> {
