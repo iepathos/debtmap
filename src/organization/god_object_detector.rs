@@ -753,17 +753,36 @@ impl GodObjectDetector {
             }
         }
 
-        // Count visibility for impl methods
+        // Count visibility for impl methods (Spec 134 Phase 2: Fixed)
         for type_info in visitor.types.values() {
             for method_name in &type_info.methods {
                 if !method_names.contains(method_name) {
                     continue;
                 }
 
-                // For methods in impl blocks, check if they're marked pub
-                // This requires tracking visibility in TypeVisitor for impl methods
-                // For now, count methods as private by default (conservative)
-                breakdown.private += 1;
+                // Look up the tracked visibility for this method
+                if let Some(vis) = visitor.method_visibility.get(method_name) {
+                    match vis {
+                        syn::Visibility::Public(_) => breakdown.public += 1,
+                        syn::Visibility::Restricted(r) => {
+                            if let Some(ident) = r.path.get_ident() {
+                                if ident == "crate" {
+                                    breakdown.pub_crate += 1;
+                                } else if ident == "super" {
+                                    breakdown.pub_super += 1;
+                                } else {
+                                    breakdown.private += 1;
+                                }
+                            } else {
+                                breakdown.private += 1;
+                            }
+                        }
+                        syn::Visibility::Inherited => breakdown.private += 1,
+                    }
+                } else {
+                    // Fallback: if visibility not tracked, assume private (conservative)
+                    breakdown.private += 1;
+                }
             }
         }
 
@@ -1115,6 +1134,8 @@ struct TypeVisitor {
     function_complexity: Vec<FunctionComplexityInfo>,
     function_items: Vec<syn::ItemFn>,
     location_extractor: Option<UnifiedLocationExtractor>,
+    /// Tracks visibility of impl methods (Spec 134 Phase 2)
+    method_visibility: HashMap<String, syn::Visibility>,
 }
 
 impl TypeVisitor {
@@ -1125,6 +1146,7 @@ impl TypeVisitor {
             function_complexity: Vec::new(),
             function_items: Vec::new(),
             location_extractor,
+            method_visibility: HashMap::new(),
         }
     }
 
@@ -1229,6 +1251,15 @@ impl TypeVisitor {
 
             if node.trait_.is_some() {
                 type_info.trait_implementations += 1;
+            }
+
+            // Spec 134 Phase 2: Track visibility of impl methods
+            for item in &node.items {
+                if let syn::ImplItem::Fn(method) = item {
+                    let method_name = method.sig.ident.to_string();
+                    self.method_visibility
+                        .insert(method_name, method.vis.clone());
+                }
             }
         }
     }
@@ -2219,5 +2250,93 @@ mod tests {
 
         assert_eq!(classify_struct_domain("AppConfig"), "core_config");
         assert_eq!(classify_struct_domain("UserSettings"), "core_config");
+    }
+
+    // Spec 134 Phase 2: Tests for impl method visibility tracking
+    #[test]
+    fn test_impl_method_visibility_tracking() {
+        let code = r#"
+            pub struct MyStruct {
+                field: u32,
+            }
+            impl MyStruct {
+                pub fn public_method(&self) {}
+                fn private_method(&self) {}
+                pub(crate) fn crate_method(&self) {}
+                pub(super) fn super_method(&self) {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // Should have visibility breakdown
+        assert!(analysis.visibility_breakdown.is_some());
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+
+        // Should correctly count each visibility type
+        assert_eq!(breakdown.public, 1, "Should have 1 public method");
+        assert_eq!(breakdown.pub_crate, 1, "Should have 1 pub(crate) method");
+        assert_eq!(breakdown.pub_super, 1, "Should have 1 pub(super) method");
+        assert_eq!(breakdown.private, 1, "Should have 1 private method");
+        assert_eq!(breakdown.total(), 4, "Total should be 4 methods");
+
+        // Validate consistency
+        assert!(analysis.validate().is_ok());
+    }
+
+    #[test]
+    fn test_mixed_standalone_and_impl_visibility() {
+        let code = r#"
+            pub fn standalone_pub() {}
+            fn standalone_private() {}
+
+            pub struct MyStruct {}
+            impl MyStruct {
+                pub fn impl_pub(&self) {}
+                fn impl_private(&self) {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+
+        // For GodClass detection with a struct present, only impl methods are counted (2 methods)
+        // The standalone functions are not part of the god object analysis
+        assert_eq!(breakdown.public, 1, "impl method");
+        assert_eq!(breakdown.private, 1, "impl method");
+        assert_eq!(breakdown.total(), 2);
+        assert_eq!(analysis.method_count, 2);
+        assert!(analysis.validate().is_ok());
+    }
+
+    #[test]
+    fn test_visibility_breakdown_validates() {
+        let code = r#"
+            pub struct MyStruct {}
+            impl MyStruct {
+                pub fn m1(&self) {}
+                pub fn m2(&self) {}
+                fn m3(&self) {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // method_count should match visibility breakdown total
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+        assert_eq!(analysis.method_count, breakdown.total());
+
+        // Validation should pass
+        assert!(analysis.validate().is_ok());
     }
 }
