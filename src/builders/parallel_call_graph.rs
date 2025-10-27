@@ -11,7 +11,6 @@ use crate::{
     progress::ProgressManager,
 };
 use anyhow::{Context, Result};
-use indicatif::ParallelProgressIterator;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -96,12 +95,21 @@ impl ParallelCallGraphBuilder {
         Ok((final_graph, framework_exclusions, function_pointer_used))
     }
 
-    /// Phase 1: Parse files in parallel
+    /// Phase 1: Read and parse files, returning parsed ASTs
+    ///
+    /// This function reads files in parallel and parses them to syn::File objects.
+    /// Each file is parsed exactly once, eliminating redundant parsing
+    /// across multiple phases.
+    ///
+    /// # Performance
+    ///
+    /// Files are read in parallel, then parsed. The parsed ASTs are stored
+    /// in memory and reused in subsequent phases without re-parsing.
     fn parallel_parse_files(
         &self,
         rust_files: &[PathBuf],
         parallel_graph: &Arc<ParallelCallGraph>,
-    ) -> Result<Vec<(PathBuf, String)>> {
+    ) -> Result<Vec<(PathBuf, syn::File)>> {
         // Create progress bar using global progress manager
         let progress = ProgressManager::global().map(|pm| {
             let pb = pm.create_bar(
@@ -112,21 +120,27 @@ impl ParallelCallGraphBuilder {
             pb
         });
 
-        // Parse files in parallel with progress tracking
-        let parsed_files: Vec<_> = rust_files
+        // Step 1: Read file contents in parallel (I/O bound)
+        let file_contents: Vec<_> = rust_files
             .par_iter()
-            .progress_with(
-                progress
-                    .clone()
-                    .unwrap_or_else(indicatif::ProgressBar::hidden),
-            )
             .filter_map(|file_path| {
                 let content = io::read_file(file_path).ok()?;
+                Some((file_path.clone(), content))
+            })
+            .collect();
 
-                // Update stats
+        // Step 2: Parse files to AST (cannot be parallelized due to syn::File not being Send)
+        let parsed_files: Vec<_> = file_contents
+            .iter()
+            .filter_map(|(file_path, content)| {
+                let parsed = syn::parse_file(content).ok()?;
                 parallel_graph.stats().increment_files();
 
-                Some((file_path.clone(), content))
+                if let Some(ref pb) = progress {
+                    pb.inc(1);
+                }
+
+                Some((file_path.clone(), parsed))
             })
             .collect();
 
@@ -138,10 +152,13 @@ impl ParallelCallGraphBuilder {
         Ok(parsed_files)
     }
 
-    /// Phase 2: Extract multi-file call graph in parallel
+    /// Phase 2: Extract multi-file call graph from pre-parsed ASTs
+    ///
+    /// Uses pre-parsed ASTs to avoid redundant parsing operations.
+    /// Processes files sequentially due to syn::File not being Send+Sync.
     fn parallel_multi_file_extraction(
         &self,
-        parsed_files: &[(PathBuf, String)],
+        parsed_files: &[(PathBuf, syn::File)],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<()> {
         // Create progress bar for multi-file extraction
@@ -152,46 +169,41 @@ impl ParallelCallGraphBuilder {
         // Group files into chunks for better parallelization
         let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
 
-        // Process chunks in parallel
-        parsed_files.par_chunks(chunk_size).for_each(|chunk| {
-            // Parse syn files within each chunk
-            let parsed_chunk: Vec<_> = chunk
-                .iter()
-                .filter_map(|(path, content)| {
-                    syn::parse_file(content)
-                        .ok()
-                        .map(|parsed| (parsed, path.clone()))
-                })
-                .collect();
+        // Process files in chunks (sequentially due to syn::File limitations)
+        for chunk in parsed_files.chunks(chunk_size) {
+            if !chunk.is_empty() {
+                // Convert to format expected by extract_call_graph_multi_file
+                // No re-parsing needed!
+                let chunk_for_extraction: Vec<_> = chunk
+                    .iter()
+                    .map(|(path, parsed)| (parsed.clone(), path.clone()))
+                    .collect();
 
-            if !parsed_chunk.is_empty() {
                 // Extract call graph for this chunk
-                let chunk_graph = extract_call_graph_multi_file(&parsed_chunk);
+                let chunk_graph = extract_call_graph_multi_file(&chunk_for_extraction);
 
                 // Merge into main graph
                 parallel_graph.merge_concurrent(chunk_graph);
             }
-        });
+        }
 
         progress.finish_with_message("Cross-file analysis complete");
 
         Ok(())
     }
 
-    /// Phase 3: Enhanced analysis in parallel
+    /// Phase 3: Enhanced analysis using pre-parsed ASTs
+    ///
+    /// Uses pre-parsed ASTs to avoid redundant parsing operations.
     fn parallel_enhanced_analysis(
         &self,
-        parsed_files: &[(PathBuf, String)],
+        parsed_files: &[(PathBuf, syn::File)],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-        // Parse all files first (sequential but fast)
+        // Use already-parsed files directly - no re-parsing needed!
         let workspace_files: Vec<(PathBuf, syn::File)> = parsed_files
             .iter()
-            .filter_map(|(path, content)| {
-                syn::parse_file(content)
-                    .ok()
-                    .map(|parsed| (path.clone(), parsed))
-            })
+            .map(|(path, parsed)| (path.clone(), parsed.clone()))
             .collect();
 
         // Create thread-safe enhanced builder
