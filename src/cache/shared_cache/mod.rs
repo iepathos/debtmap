@@ -418,6 +418,11 @@ impl SharedCache {
             return PruningStrategyType::NoAutoPruner;
         }
 
+        // If auto-pruning is disabled, don't perform any automatic pruning
+        if !config.auto_prune_enabled {
+            return PruningStrategyType::NoAutoPruner;
+        }
+
         if config.use_sync_pruning {
             return PruningStrategyType::SyncPruning;
         }
@@ -437,7 +442,15 @@ impl SharedCache {
         data_len: usize,
     ) -> Result<()> {
         match strategy {
-            PruningStrategyType::NoAutoPruner => self.maybe_cleanup(),
+            PruningStrategyType::NoAutoPruner => {
+                // Only run cleanup if there's no auto_pruner configured
+                // If auto_pruner exists but is disabled, we respect that and don't cleanup
+                if self.auto_pruner.is_none() {
+                    self.maybe_cleanup()
+                } else {
+                    Ok(())
+                }
+            }
             PruningStrategyType::SyncPruning => self.execute_sync_pruning(key, data_len),
             PruningStrategyType::BackgroundPruning => {
                 if let Some(bg_pruner) = &self.background_pruner {

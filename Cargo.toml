@@ -66,6 +66,7 @@ im = { version = "15.1", features = ["serde"] }
 
 # Coverage parsing
 lcov = "0.8"
+rustc-demangle = "0.1"
 
 # Parallel processing
 rayon = "1.10"
