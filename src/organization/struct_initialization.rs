@@ -347,7 +347,7 @@ impl ReturnStructVisitor {
     }
 }
 
-/// Check if type is Result<T>
+/// Check if type is `Result<T>`
 fn is_result_type(ty: &Type) -> bool {
     if let Type::Path(type_path) = ty {
         type_path
