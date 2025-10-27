@@ -60,6 +60,7 @@ jobs:
 
     - name: Generate coverage data
       run: |
+        mkdir -p target/coverage
         cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
         echo "Disk space after coverage generation:"
         df -h
