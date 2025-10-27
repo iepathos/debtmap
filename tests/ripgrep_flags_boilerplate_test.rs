@@ -281,8 +281,10 @@ fn test_ripgrep_flags_pattern_detection() {
 
     // Use detector with slightly lower threshold for this test
     // (25 impls gets 67.5% confidence, just under the default 70% threshold)
-    let mut detector = BoilerplateDetector::default();
-    detector.confidence_threshold = 0.65;
+    let detector = BoilerplateDetector {
+        confidence_threshold: 0.65,
+        ..Default::default()
+    };
 
     // Analyze the file
     let result = detector.detect(Path::new("flags_defs.rs"), &syntax);
