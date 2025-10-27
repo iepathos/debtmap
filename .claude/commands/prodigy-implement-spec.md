@@ -134,6 +134,152 @@ Final steps:
    - Create integration tests where applicable
    - Ensure existing tests still pass
 
+## CRITICAL: Autonomous Implementation Requirements
+
+**YOU MUST WORK AUTONOMOUSLY - NO USER QUESTIONS ALLOWED**
+
+This command runs in automation workflows that require commits. You MUST:
+
+### 1. Make All Implementation Decisions Autonomously
+
+- **NEVER ask the user for implementation direction, approach, or preferences**
+- Use your technical judgment based on:
+  - Spec's explicit requirements and acceptance criteria
+  - Project architecture and conventions from .prodigy files
+  - Priority level (critical > high > medium > low)
+  - Incremental progress principle: working code > perfect code
+- If multiple valid approaches exist, choose the one that:
+  - Best satisfies the acceptance criteria
+  - Follows existing project patterns
+  - Minimizes risk and breaking changes
+  - Can be completed and committed in this session
+
+### 2. Handle Complex Specs with Phased Implementation
+
+When a spec requires significant architectural changes:
+
+**DO THIS** (Autonomous phased approach):
+1. Break the spec into logical phases automatically
+2. Implement Phase 1 completely (the most critical part)
+3. Commit Phase 1 with substantive progress
+4. Document remaining phases in the spec's "Implementation Notes" section
+5. Update spec status from "draft" to "in-progress" or "partial"
+
+**NEVER DO THIS**:
+- Ask user "which phase should I implement?"
+- Stop without committing because "it's too complex"
+- Request clarification on what to prioritize
+- Provide multiple options and ask user to choose
+
+### 3. Determine Phase 1 Priority Automatically
+
+Use this decision framework for complex specs:
+
+1. **Critical bugs/contradictions**: Fix the most severe user-facing issue first
+2. **Validation/testing**: Add validation that prevents future issues
+3. **Foundation work**: Create data structures and types needed for full implementation
+4. **Non-breaking changes**: Implement parts that don't affect existing functionality
+5. **Documentation**: Document findings and remaining work
+
+Example for Spec 134 (metric contradictions):
+- Phase 1: Add validation layer to detect contradictions (non-breaking, immediate value)
+- Phase 2: Fix visibility counting bug (critical user-facing issue)
+- Phase 3: Unify function counting systems (architectural change)
+
+### 4. Minimum Commit Requirements
+
+Every execution MUST produce at least one commit with substantive changes:
+
+**Acceptable commits include**:
+- Implemented functionality (even if partial)
+- New test cases that expose the problem
+- Validation code that detects issues
+- Refactored code that improves structure
+- Fixed bugs identified during investigation
+- Documentation of investigation findings in code comments
+
+**NOT acceptable**:
+- Only reading files
+- Only analysis without code changes
+- Only asking questions
+- Only documenting "what could be done"
+
+### 5. When Genuinely Blocked
+
+If you discover a blocker (missing dependency, conflicting requirement, unclear spec):
+
+**DO THIS**:
+1. Implement what you CAN implement around the blocker
+2. Add TODO comments documenting the specific blocker
+3. Update spec with "Blockers" section explaining the issue
+4. Commit your partial progress
+5. The commit message should indicate partial implementation
+
+**Example**:
+```
+feat: implement spec 134 phase 1 - add metric validation layer
+
+- Add validation functions to detect metric contradictions
+- Create test cases for known inconsistencies
+- Document findings in god_object_metrics.rs
+
+Note: Full unification of counting systems requires architectural
+changes documented in spec. This phase provides immediate value by
+detecting contradictions.
+
+Relates to spec 134.
+```
+
+### 6. Time Management
+
+- Aim to complete Phase 1 within reasonable time (30-60 minutes)
+- If Phase 1 is taking longer, reduce scope further and commit what works
+- **Never spend >90 minutes without committing something**
+- Progress > Perfection
+
+### 7. Decision-Making Examples
+
+**Scenario**: "The spec says to fix visibility counting, but I found three different places it's counted"
+
+**Wrong Response**: "There are three places to fix. Which should I prioritize?"
+
+**Correct Response**:
+1. Fix the most critical one (the one used in user-facing output)
+2. Add TODO comments for the other two
+3. Commit the fix with notes about remaining work
+
+**Scenario**: "The spec requires changes to core architecture across 5 modules"
+
+**Wrong Response**: "This is too complex. Should I create a plan document instead?"
+
+**Correct Response**:
+1. Identify the smallest valuable subset (e.g., validation layer)
+2. Implement that subset completely
+3. Commit with clear message indicating Phase 1 of larger work
+4. Update spec with implementation plan for remaining phases
+
+**Scenario**: "I'm not sure if we should use approach A or B"
+
+**Wrong Response**: "Which approach do you prefer?"
+
+**Correct Response**:
+1. Evaluate both against acceptance criteria
+2. Choose the one that best fits project patterns
+3. Implement it
+4. Document the decision in code comments or DECISIONS.md
+5. Commit
+
+### 8. Quality Standards Still Apply
+
+Autonomous doesn't mean sloppy:
+- Code must compile
+- Tests must pass
+- Follow project conventions
+- Use proper error handling
+- Add appropriate documentation
+
+But remember: **Working incremental progress beats perfect unshipped code**
+
 ## Automation Mode Behavior
 
 **Automation Detection**: The command detects automation mode when:
