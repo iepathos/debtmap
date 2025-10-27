@@ -7,10 +7,12 @@
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use debtmap::organization::BoilerplateDetector;
 /// use syn::parse_str;
+/// use std::path::Path;
 ///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let detector = BoilerplateDetector::default();
 /// let content = std::fs::read_to_string("src/file.rs")?;
 /// let ast = parse_str(&content)?;
@@ -20,6 +22,8 @@
 ///     println!("Confidence: {:.0}%", analysis.confidence * 100.0);
 ///     println!("{}", analysis.recommendation);
 /// }
+/// # Ok(())
+/// # }
 /// ```
 use super::trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 use serde::{Deserialize, Serialize};
@@ -29,6 +33,8 @@ use syn;
 /// Core boilerplate detection configuration and logic
 #[derive(Debug, Clone)]
 pub struct BoilerplateDetector {
+    /// Whether detection is enabled
+    pub enabled: bool,
     /// Minimum number of impl blocks to consider
     pub min_impl_blocks: usize,
     /// Minimum percentage of shared methods across implementations (0.0-1.0)
@@ -42,6 +48,7 @@ pub struct BoilerplateDetector {
 impl Default for BoilerplateDetector {
     fn default() -> Self {
         Self {
+            enabled: true,
             min_impl_blocks: 20,
             method_uniformity_threshold: 0.7,
             max_avg_complexity: 2.0,
@@ -54,6 +61,7 @@ impl BoilerplateDetector {
     /// Create detector from configuration
     pub fn from_config(config: &BoilerplateDetectionConfig) -> Self {
         Self {
+            enabled: config.enabled,
             min_impl_blocks: config.min_impl_blocks,
             method_uniformity_threshold: config.method_uniformity_threshold,
             max_avg_complexity: config.max_avg_complexity,
@@ -65,6 +73,17 @@ impl BoilerplateDetector {
     ///
     /// Returns analysis with confidence score and pattern type if detected.
     pub fn detect(&self, path: &Path, ast: &syn::File) -> BoilerplateAnalysis {
+        // Early return if detection is disabled
+        if !self.enabled {
+            return BoilerplateAnalysis {
+                is_boilerplate: false,
+                confidence: 0.0,
+                pattern_type: None,
+                signals: vec![],
+                recommendation: String::new(),
+            };
+        }
+
         // Analyze trait patterns
         let trait_metrics = TraitPatternAnalyzer::analyze_file(ast);
 
