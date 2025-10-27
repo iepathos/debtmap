@@ -215,12 +215,14 @@ fn benchmark_flat_vs_nested(c: &mut Criterion) {
         b.iter(|| {
             // 70% exact matches
             for (file, func_name) in &exact_queries {
-                let result = flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
+                let result =
+                    flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
                 black_box(result);
             }
             // 30% requiring path strategies (this is where O(n) scan hurts)
             for (file, func_name) in &path_strategy_queries {
-                let result = flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
+                let result =
+                    flat_index.get_function_coverage_old(black_box(file), black_box(func_name));
                 black_box(result);
             }
         })
@@ -231,12 +233,14 @@ fn benchmark_flat_vs_nested(c: &mut Criterion) {
         b.iter(|| {
             // 70% exact matches
             for (file, func_name) in &exact_queries {
-                let result = nested_index.get_function_coverage(black_box(file), black_box(func_name));
+                let result =
+                    nested_index.get_function_coverage(black_box(file), black_box(func_name));
                 black_box(result);
             }
             // 30% requiring path strategies (now O(files) instead of O(functions))
             for (file, func_name) in &path_strategy_queries {
-                let result = nested_index.get_function_coverage(black_box(file), black_box(func_name));
+                let result =
+                    nested_index.get_function_coverage(black_box(file), black_box(func_name));
                 black_box(result);
             }
         })
