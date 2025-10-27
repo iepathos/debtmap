@@ -109,7 +109,7 @@ coverage:
     echo "Cleaning previous coverage data..."
     cargo llvm-cov clean
     echo "Generating code coverage report with cargo-llvm-cov..."
-    cargo llvm-cov --all-features --html --lcov --json --output-dir target/coverage
+    cargo llvm-cov --all-features --html --output-dir target/coverage
     echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
