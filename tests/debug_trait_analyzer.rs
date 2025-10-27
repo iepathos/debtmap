@@ -1,6 +1,6 @@
+use debtmap::organization::boilerplate_detector::BoilerplateDetector;
 /// Debug test to understand what the trait pattern analyzer sees
 use debtmap::organization::trait_pattern_analyzer::TraitPatternAnalyzer;
-use debtmap::organization::boilerplate_detector::BoilerplateDetector;
 use std::path::Path;
 
 #[test]
@@ -35,7 +35,10 @@ fn debug_trait_pattern_detection() {
     println!("Most common trait: {:?}", metrics.most_common_trait);
     println!("Method uniformity: {:.2}", metrics.method_uniformity);
     println!("Shared methods: {:?}", metrics.shared_methods);
-    println!("Avg method complexity: {:.2}", metrics.avg_method_complexity);
+    println!(
+        "Avg method complexity: {:.2}",
+        metrics.avg_method_complexity
+    );
     println!("Complexity variance: {:.2}", metrics.complexity_variance);
     println!("Avg method lines: {:.2}", metrics.avg_method_lines);
     println!("========================================\n");
@@ -61,8 +64,14 @@ fn debug_25_flag_structs() {
     println!("Unique traits: {:?}", metrics.unique_traits);
     println!("Most common trait: {:?}", metrics.most_common_trait);
     println!("Method uniformity: {:.2}", metrics.method_uniformity);
-    println!("Shared methods (first 10): {:?}", &metrics.shared_methods[..metrics.shared_methods.len().min(10)]);
-    println!("Avg method complexity: {:.2}", metrics.avg_method_complexity);
+    println!(
+        "Shared methods (first 10): {:?}",
+        &metrics.shared_methods[..metrics.shared_methods.len().min(10)]
+    );
+    println!(
+        "Avg method complexity: {:.2}",
+        metrics.avg_method_complexity
+    );
     println!("Complexity variance: {:.2}", metrics.complexity_variance);
     println!("Avg method lines: {:.2}", metrics.avg_method_lines);
     println!("=============================================\n");
@@ -80,7 +89,10 @@ fn debug_25_flag_structs() {
     // Debug: what are the thresholds?
     println!("=== DETECTOR CONFIG ===");
     println!("Min impl blocks: {}", detector.min_impl_blocks);
-    println!("Method uniformity threshold: {:.2}", detector.method_uniformity_threshold);
+    println!(
+        "Method uniformity threshold: {:.2}",
+        detector.method_uniformity_threshold
+    );
     println!("Max avg complexity: {:.2}", detector.max_avg_complexity);
     println!("Confidence threshold: {:.2}", detector.confidence_threshold);
     println!("=======================\n");
@@ -89,10 +101,15 @@ fn debug_25_flag_structs() {
     assert_eq!(metrics.impl_block_count, 25, "Should detect 25 impl blocks");
 
     // Should detect Flag trait
-    assert!(metrics.unique_traits.contains("Flag"), "Should detect Flag trait");
+    assert!(
+        metrics.unique_traits.contains("Flag"),
+        "Should detect Flag trait"
+    );
 
     // Should have high method uniformity (all impl the same 5 methods)
-    assert!(metrics.method_uniformity >= 0.9,
-            "Method uniformity should be >= 0.9, got {:.2}",
-            metrics.method_uniformity);
+    assert!(
+        metrics.method_uniformity >= 0.9,
+        "Method uniformity should be >= 0.9, got {:.2}",
+        metrics.method_uniformity
+    );
 }

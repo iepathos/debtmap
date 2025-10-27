@@ -349,18 +349,20 @@ fn test_actual_ripgrep_file_if_available() {
     let ripgrep_path = Path::new("../ripgrep/crates/core/flags/defs.rs");
 
     if !ripgrep_path.exists() {
-        println!("Skipping test - ripgrep source not found at {:?}", ripgrep_path);
+        println!(
+            "Skipping test - ripgrep source not found at {:?}",
+            ripgrep_path
+        );
         return;
     }
 
     println!("\n=== ANALYZING ACTUAL RIPGREP FLAGS/DEFS.RS ===");
 
     // Read and parse the actual file
-    let content = std::fs::read_to_string(ripgrep_path)
-        .expect("Failed to read ripgrep flags/defs.rs");
+    let content =
+        std::fs::read_to_string(ripgrep_path).expect("Failed to read ripgrep flags/defs.rs");
 
-    let syntax = syn::parse_file(&content)
-        .expect("Failed to parse ripgrep flags/defs.rs");
+    let syntax = syn::parse_file(&content).expect("Failed to parse ripgrep flags/defs.rs");
 
     // Use default detector
     let detector = BoilerplateDetector::default();

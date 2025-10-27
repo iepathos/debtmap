@@ -27,6 +27,7 @@ fn test_file_level_scoring_integration() {
             module_structure: None,
         },
         function_scores: vec![],
+        god_object_type: None,
     };
 
     // Add various function scores
@@ -86,6 +87,7 @@ fn test_file_scoring_with_god_object_detection() {
             recommended_splits: Vec::new(),
             module_structure: None,
         },
+        god_object_type: None,
         function_scores: vec![8.0; 80], // High scores for all functions
     };
 
@@ -121,6 +123,7 @@ fn test_file_scoring_priorities() {
             total_complexity: 6,
             coverage_percent: 0.9,
             function_scores: vec![1.0, 1.5, 2.0],
+            god_object_type: None,
             ..Default::default()
         },
         FileDebtMetrics {
@@ -131,6 +134,7 @@ fn test_file_scoring_priorities() {
             total_complexity: 160,
             coverage_percent: 0.6,
             function_scores: vec![5.0; 20],
+            god_object_type: None,
             ..Default::default()
         },
         FileDebtMetrics {
@@ -148,6 +152,7 @@ fn test_file_scoring_priorities() {
                 ..Default::default()
             },
             function_scores: vec![7.0; 60],
+            god_object_type: None,
             ..Default::default()
         },
     ];
@@ -190,6 +195,7 @@ fn test_file_debt_item_creation() {
         uncovered_lines: 360,
         god_object_indicators: GodObjectIndicators::default(),
         function_scores: vec![6.0; 35],
+        god_object_type: None,
     };
 
     let score = metrics.calculate_score();
@@ -234,6 +240,7 @@ fn test_file_scoring_edge_cases() {
         coverage_percent: 0.0,
         uncovered_lines: 100,
         function_scores: vec![1.0; 5],
+        god_object_type: None,
         ..Default::default()
     };
     let coverage_score = coverage_only.calculate_score();
@@ -252,6 +259,7 @@ fn test_file_scoring_edge_cases() {
         coverage_percent: 1.0,
         uncovered_lines: 0,
         function_scores: vec![0.5; 5],
+        god_object_type: None,
         ..Default::default()
     };
     let perfect_score = perfect_file.calculate_score();
@@ -349,6 +357,7 @@ fn test_file_scoring_with_real_world_scenarios() {
             module_structure: None,
         },
         function_scores: vec![9.0; 70],
+        god_object_type: None,
     };
 
     let legacy_score = legacy_file.calculate_score();
@@ -370,6 +379,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         uncovered_lines: 10,
         god_object_indicators: GodObjectIndicators::default(),
         function_scores: vec![2.0; 15],
+        god_object_type: None,
     };
 
     let util_score = util_file.calculate_score();
@@ -391,6 +401,7 @@ fn test_file_scoring_with_real_world_scenarios() {
         uncovered_lines: 175,
         god_object_indicators: GodObjectIndicators::default(),
         function_scores: vec![5.5; 30],
+        god_object_type: None,
     };
 
     let business_score = business_logic.calculate_score();

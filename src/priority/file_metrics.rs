@@ -14,6 +14,9 @@ pub struct FileDebtMetrics {
     pub uncovered_lines: usize,
     pub god_object_indicators: GodObjectIndicators,
     pub function_scores: Vec<f64>,
+    /// The specific type of god object detected (if any)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub god_object_type: Option<crate::organization::GodObjectType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -144,6 +147,14 @@ impl FileDebtMetrics {
     }
 
     pub fn generate_recommendation(&self) -> String {
+        // First check for boilerplate pattern - highest priority
+        if let Some(crate::organization::GodObjectType::BoilerplatePattern {
+            recommendation, ..
+        }) = &self.god_object_type
+        {
+            return recommendation.clone();
+        }
+
         if self.god_object_indicators.is_god_object {
             // Analyze the file path to provide context-specific recommendations
             let file_name = self
@@ -209,6 +220,7 @@ impl Default for FileDebtMetrics {
             uncovered_lines: 0,
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: Vec::new(),
+            god_object_type: None,
         }
     }
 }
@@ -268,6 +280,7 @@ mod tests {
             uncovered_lines: 20,
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![1.0, 2.0, 3.0],
+            god_object_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -298,6 +311,7 @@ mod tests {
                 module_structure: None,
             },
             function_scores: vec![5.0; 60],
+            god_object_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -318,6 +332,7 @@ mod tests {
             uncovered_lines: 180,
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![1.0; 10],
+            god_object_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -345,6 +360,7 @@ mod tests {
             uncovered_lines: 90,
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![3.0; 15],
+            god_object_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -365,6 +381,7 @@ mod tests {
             uncovered_lines: 200,
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![2.0; 75],
+            god_object_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -483,6 +500,7 @@ mod tests {
             total_complexity: 6,
             coverage_percent: 0.5,
             function_scores: vec![10.0, 20.0, 30.0],
+            god_object_type: None,
             ..Default::default()
         };
 
@@ -497,6 +515,7 @@ mod tests {
             total_complexity: 6,
             coverage_percent: 0.5,
             function_scores: vec![],
+            god_object_type: None,
             ..Default::default()
         };
 
@@ -505,5 +524,125 @@ mod tests {
             score > score_no_functions,
             "Function scores should increase total score"
         );
+    }
+
+    #[test]
+    fn test_boilerplate_recommendation_used() {
+        use crate::organization::boilerplate_detector::BoilerplatePattern;
+        use crate::organization::GodObjectType;
+
+        let boilerplate_type = GodObjectType::BoilerplatePattern {
+            pattern: BoilerplatePattern::TraitImplementation {
+                trait_name: "Flag".to_string(),
+                impl_count: 104,
+                shared_methods: vec!["name_long".to_string()],
+                method_uniformity: 1.0,
+            },
+            confidence: 0.878,
+            recommendation: "BOILERPLATE DETECTED: Create declarative macro to generate Flag implementations. This is NOT a god object requiring module splitting.".to_string(),
+        };
+
+        let metrics = FileDebtMetrics {
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                methods_count: 888,
+                fields_count: 0,
+                responsibilities: 1,
+                god_object_score: 0.878,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+            },
+            god_object_type: Some(boilerplate_type),
+            total_lines: 7775,
+            function_count: 888,
+            ..Default::default()
+        };
+
+        let recommendation = metrics.generate_recommendation();
+
+        assert!(recommendation.contains("BOILERPLATE DETECTED"));
+        assert!(recommendation.contains("declarative macro"));
+        assert!(recommendation.contains("NOT a god object requiring module splitting"));
+    }
+
+    #[test]
+    fn test_regular_god_object_still_gets_splitting_advice() {
+        use crate::organization::GodObjectType;
+
+        let god_file_type = GodObjectType::GodModule {
+            total_structs: 20,
+            total_methods: 100,
+            largest_struct: crate::organization::StructMetrics {
+                name: "Config".to_string(),
+                method_count: 50,
+                field_count: 30,
+                responsibilities: vec!["Data Access".to_string()],
+                line_span: (0, 1000),
+            },
+            suggested_splits: vec![],
+        };
+
+        let metrics = FileDebtMetrics {
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                methods_count: 100,
+                fields_count: 30,
+                responsibilities: 5,
+                god_object_score: 0.8,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+            },
+            god_object_type: Some(god_file_type),
+            total_lines: 2000,
+            function_count: 100,
+            ..Default::default()
+        };
+
+        let recommendation = metrics.generate_recommendation();
+
+        assert!(recommendation.contains("Split") || recommendation.contains("URGENT"));
+        assert!(!recommendation.contains("BOILERPLATE"));
+        assert!(!recommendation.contains("macro"));
+    }
+
+    #[test]
+    fn test_boilerplate_takes_precedence_over_god_object() {
+        use crate::organization::boilerplate_detector::BoilerplatePattern;
+        use crate::organization::GodObjectType;
+
+        let boilerplate_type = GodObjectType::BoilerplatePattern {
+            pattern: BoilerplatePattern::TestBoilerplate {
+                test_count: 50,
+                shared_structure: "similar test structure".to_string(),
+            },
+            confidence: 0.92,
+            recommendation: "Use a macro to generate these test functions".to_string(),
+        };
+
+        let metrics = FileDebtMetrics {
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                methods_count: 200,
+                fields_count: 100,
+                responsibilities: 10,
+                god_object_score: 0.95,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+            },
+            god_object_type: Some(boilerplate_type),
+            total_lines: 5000,
+            function_count: 200,
+            ..Default::default()
+        };
+
+        let recommendation = metrics.generate_recommendation();
+
+        // Should use boilerplate recommendation, not god object recommendation
+        assert!(recommendation.contains("macro"));
+        assert!(!recommendation.contains("Split"));
+        assert!(!recommendation.contains("URGENT"));
     }
 }

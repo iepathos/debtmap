@@ -80,6 +80,7 @@ mod tests {
                     module_structure: None,
                 },
                 function_scores: vec![],
+                god_object_type: None,
             },
             score,
             priority_rank: 1,

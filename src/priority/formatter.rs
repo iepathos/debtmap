@@ -699,7 +699,13 @@ fn determine_file_type_label(
     is_god_object: bool,
     fields_count: usize,
     total_lines: usize,
+    god_object_type: Option<&crate::organization::GodObjectType>,
 ) -> &'static str {
+    // Check for boilerplate pattern first
+    if let Some(crate::organization::GodObjectType::BoilerplatePattern { .. }) = god_object_type {
+        return "FILE - BOILERPLATE PATTERN";
+    }
+
     if is_god_object {
         // Distinguish between god objects (classes) and god modules (procedural files)
         if fields_count > 5 {
@@ -722,7 +728,46 @@ fn generate_why_message(
     responsibilities: usize,
     function_count: usize,
     total_lines: usize,
+    god_object_type: Option<&crate::organization::GodObjectType>,
 ) -> String {
+    // Check for boilerplate pattern first
+    if let Some(crate::organization::GodObjectType::BoilerplatePattern {
+        pattern,
+        confidence,
+        ..
+    }) = god_object_type
+    {
+        let pattern_description = match pattern {
+            crate::organization::boilerplate_detector::BoilerplatePattern::TraitImplementation {
+                trait_name,
+                impl_count,
+                ..
+            } => {
+                format!(
+                    "{} implementations of {} trait",
+                    impl_count, trait_name
+                )
+            }
+            crate::organization::boilerplate_detector::BoilerplatePattern::BuilderPattern {
+                builder_count,
+            } => {
+                format!("{} builder pattern instances", builder_count)
+            }
+            crate::organization::boilerplate_detector::BoilerplatePattern::TestBoilerplate {
+                test_count,
+                ..
+            } => {
+                format!("{} repetitive test functions", test_count)
+            }
+        };
+
+        return format!(
+            "BOILERPLATE DETECTED: {} ({:.0}% confidence). This file contains repetitive patterns that should be macro-ified or code-generated, not split into modules.",
+            pattern_description,
+            confidence * 100.0
+        );
+    }
+
     if is_god_object {
         // Distinguish between god class (single struct with many methods) vs god module (many functions/types)
         if fields_count > 5 && methods_count > 20 {
@@ -1192,6 +1237,7 @@ fn format_file_priority_item(
         item.metrics.god_object_indicators.is_god_object,
         item.metrics.god_object_indicators.fields_count,
         item.metrics.total_lines,
+        item.metrics.god_object_type.as_ref(),
     );
 
     writeln!(
@@ -1222,6 +1268,7 @@ fn format_file_priority_item(
         item.metrics.god_object_indicators.responsibilities,
         item.metrics.function_count,
         item.metrics.total_lines,
+        item.metrics.god_object_type.as_ref(),
     );
 
     writeln!(
@@ -2639,6 +2686,7 @@ mod tests {
                     module_structure: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
+                god_object_type: None,
             },
             score: 75.5,
             priority_rank: 1,
