@@ -72,9 +72,10 @@ test_workspaces_*/
 criterion/
 
 # Coverage reports
-tarpaulin-report.html
 lcov.info
 coverage/
+*.profraw
+*.profdata
 
 # Rust-specific
 **/*.rs.bk

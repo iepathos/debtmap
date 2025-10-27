@@ -96,22 +96,26 @@ test-pattern PATTERN:
 test-watch:
     cargo watch -x 'nextest run'
 
-# Run tests with coverage using optimized tarpaulin with LLVM engine and nextest
+# Run tests with coverage using cargo-llvm-cov
 coverage:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
-    echo "Generating code coverage report with tarpaulin (LLVM engine + nextest)..."
-    cargo tarpaulin --config .tarpaulin.toml
-    echo "Coverage report generated at target/coverage/tarpaulin-report.html"
+    echo "Cleaning previous coverage data..."
+    cargo llvm-cov clean
+    echo "Generating code coverage report with cargo-llvm-cov..."
+    cargo llvm-cov --all-features --html --lcov --json --output-dir target/coverage
+    echo "Coverage report generated at target/coverage/html/index.html"
 
 # Run tests with coverage (lcov format)
 coverage-lcov:
     #!/usr/bin/env bash
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
-    echo "Generating code coverage report with tarpaulin (lcov format)..."
-    cargo tarpaulin --config .tarpaulin.toml --out Lcov
+    echo "Cleaning previous coverage data..."
+    cargo llvm-cov clean
+    echo "Generating code coverage report with cargo-llvm-cov (lcov format)..."
+    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
     echo "Coverage report generated at target/coverage/lcov.info"
 
 # Run tests with coverage and check threshold
@@ -120,8 +124,9 @@ coverage-check:
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Checking code coverage threshold..."
-    cargo tarpaulin --config .tarpaulin.toml --out Json --quiet
-    COVERAGE=$(cat target/coverage/tarpaulin-report.json | jq -r '.files | to_entries | map(.value.coverage) | add / length')
+    cargo llvm-cov clean
+    cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
+    COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
     echo "Current coverage: ${COVERAGE}%"
     if (( $(echo "$COVERAGE < 80" | bc -l) )); then
         echo "⚠️  Coverage is below 80%: $COVERAGE%"
@@ -132,7 +137,7 @@ coverage-check:
 
 # Open coverage report in browser
 coverage-open: coverage
-    open target/coverage/tarpaulin-report.html
+    open target/coverage/html/index.html
 
 # Analyze the current repository with debtmap using coverage data
 analyze-self:
@@ -140,7 +145,8 @@ analyze-self:
     echo "Building debtmap..."
     cargo build --bin debtmap
     echo "Generating code coverage (lcov format)..."
-    cargo tarpaulin --config .tarpaulin.toml --out Lcov
+    cargo llvm-cov clean
+    cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
     echo "Analyzing current repository with debtmap..."
     ./target/debug/debtmap analyze . --lcov target/coverage/lcov.info -vv
     echo "Analysis complete!"
@@ -320,8 +326,8 @@ full-check: clean build test lint doc audit
 
 # Install development tools
 install-tools:
-    rustup component add rustfmt clippy
-    cargo install cargo-watch cargo-tarpaulin cargo-audit cargo-outdated cargo-nextest
+    rustup component add rustfmt clippy llvm-tools-preview
+    cargo install cargo-watch cargo-llvm-cov cargo-audit cargo-outdated cargo-nextest
 
 # Install additional development tools
 install-extras:

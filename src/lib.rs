@@ -83,7 +83,7 @@
 //! // Parse coverage data (skip if file doesn't exist)
 //! let coverage_path = std::path::Path::new("target/coverage/lcov.info");
 //! if !coverage_path.exists() {
-//!     println!("Generate coverage with: cargo tarpaulin --out lcov");
+//!     println!("Generate coverage with: cargo llvm-cov --lcov --output-path target/coverage/lcov.info");
 //!     return;
 //! }
 //!
@@ -134,7 +134,7 @@
 //! ### Coverage Integration
 //!
 //! Debtmap works with any tool generating LCOV format:
-//! - **Rust**: [`cargo-tarpaulin`](https://github.com/xd009642/tarpaulin), [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)
+//! - **Rust**: [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov) (recommended), [`cargo-tarpaulin`](https://github.com/xd009642/tarpaulin)
 //! - **Python**: `pytest-cov`, `coverage.py`
 //! - **JavaScript**: `jest --coverage`, `nyc`
 //!
@@ -223,7 +223,7 @@
 //! debtmap analyze .
 //!
 //! # With coverage integration
-//! cargo tarpaulin --out lcov --output-dir target/coverage
+//! cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 //! debtmap analyze . --lcov target/coverage/lcov.info
 //!
 //! # Generate JSON report

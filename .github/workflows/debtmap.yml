@@ -25,7 +25,7 @@ jobs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        components: rustfmt, clippy
+        components: rustfmt, clippy, llvm-tools-preview
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -40,19 +40,21 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
 
-    - name: Install cargo-tarpaulin
+    - name: Install cargo-llvm-cov
       run: |
-        if ! command -v cargo-tarpaulin &> /dev/null; then
-          cargo install cargo-tarpaulin
+        if ! command -v cargo-llvm-cov &> /dev/null; then
+          cargo install cargo-llvm-cov
         else
-          echo "cargo-tarpaulin already installed"
+          echo "cargo-llvm-cov already installed"
         fi
 
     - name: Build debtmap
       run: cargo build --release
 
     - name: Generate coverage data
-      run: cargo tarpaulin --config .tarpaulin.toml --out Lcov --timeout 300
+      run: |
+        cargo llvm-cov clean
+        cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
 
     - name: Run debtmap validation with coverage
       run: |
