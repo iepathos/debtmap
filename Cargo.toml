@@ -174,3 +174,7 @@ harness = false
 [[bench]]
 name = "validate_parallel_bench"
 harness = false
+
+[[bench]]
+name = "ast_parsing_optimization_bench"
+harness = false

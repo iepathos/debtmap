@@ -66,6 +66,20 @@ functions.par_iter().map(|f| {
 })
 ```
 
+#### AST Parsing Optimization (Spec 132)
+Eliminates redundant parsing in call graph construction by parsing files once and reusing ASTs.
+
+**Before**: Files parsed twice (once for content, again for analysis) = 2N parse operations
+**After**: Files parsed once, ASTs cloned for subsequent use = N parse operations
+
+**Performance Gains**:
+- Parse + clone: 1.33ms per file (44% faster than re-parsing)
+- Cloning overhead: ~0.15ms vs re-parse cost: ~1.07ms saved
+- Total speedup: **1.8x faster** for call graph construction
+- Memory impact: <100MB for 400-file projects
+
+See `docs/spec-132-benchmark-results.md` for detailed benchmarks.
+
 #### Parallel Configuration
 - **Default**: Uses all available CPU cores
 - **Configurable**: `--jobs N` flag for explicit control

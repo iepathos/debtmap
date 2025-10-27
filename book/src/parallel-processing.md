@@ -190,6 +190,49 @@ This chunking strategy balances parallelism with overhead:
 - Dynamic chunk sizing based on available threads
 - Each chunk produces a local call graph that's merged concurrently
 
+**AST Parsing Optimization (Spec 132)**
+
+Prior to spec 132, files were parsed twice during call graph construction:
+1. Phase 1: Read files and store content as strings
+2. Phase 2: **Re-parse the same content** to extract call graphs
+
+This redundant parsing was eliminated by parsing each file exactly once and reusing the parsed `syn::File` AST:
+
+```rust
+// Optimized: Parse once in Phase 1
+let parsed_files: Vec<(PathBuf, syn::File)> = rust_files
+    .par_iter()
+    .filter_map(|file_path| {
+        let content = io::read_file(file_path).ok()?;
+        let parsed = syn::parse_file(&content).ok()?;  // Parse ONCE
+        Some((file_path.clone(), parsed))
+    })
+    .collect();
+
+// Phase 2: Reuse parsed ASTs (no re-parsing)
+for chunk in parsed_files.chunks(chunk_size) {
+    let chunk_for_extraction: Vec<_> = chunk
+        .iter()
+        .map(|(path, parsed)| (parsed.clone(), path.clone()))  // Clone AST
+        .collect();
+    // Extract call graph...
+}
+```
+
+**Performance Impact:**
+- **Before**: 2N parse operations (404 files × 2 = 808 parses)
+- **After**: N parse operations (404 files × 1 = 404 parses)
+- **Speedup**: Cloning a parsed AST is **44% faster** than re-parsing
+- **Time saved**: ~432ms per analysis run on 400-file projects
+- **Memory overhead**: <100MB for parsed AST storage
+
+**Why Clone Instead of Borrow?**
+- `syn::File` is not `Send + Sync` (cannot be shared across threads)
+- Call graph extraction requires owned AST values
+- Cloning is still significantly faster than re-parsing (1.33ms vs 2.40ms per file)
+
+See `docs/spec-132-benchmark-results.md` for detailed benchmarks validating these improvements.
+
 **Phase 3: Enhanced Analysis**
 
 The third phase analyzes trait dispatch, function pointers, and framework patterns. This phase is currently sequential due to complex shared state requirements, but benefits from the parallel foundation built in phases 1-2.
