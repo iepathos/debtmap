@@ -164,7 +164,7 @@ pub fn format_recommendations(recommendations: &Vector<TestingRecommendation>) -
         return output;
     }
 
-    output.push_str("[TARGET] TOP 5 TESTING RECOMMENDATIONS\n");
+    output.push_str("TOP 5 TESTING RECOMMENDATIONS\n");
     output.push_str("Ordered by Risk Priority (Complexity × Coverage Gap × Dependencies)\n");
     output.push('\n');
 

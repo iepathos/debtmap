@@ -182,7 +182,7 @@ impl<W: Write> EnhancedMarkdownWriter<W> {
         unified_analysis: Option<&UnifiedAnalysis>,
     ) -> Result<()> {
         self.toc_builder.add_entry(1, "Visualizations");
-        writeln!(self.writer, "## [STATS] Visualizations\n")?;
+        writeln!(self.writer, "## Visualizations\n")?;
 
         self.toc_builder.add_entry(2, "Complexity Distribution");
         write_complexity_distribution(&mut self.writer, results)?;

@@ -76,10 +76,10 @@ pub fn write_health_section_header<W: Write>(writer: &mut W, collapsible: bool) 
         writeln!(writer, "<details open>")?;
         writeln!(
             writer,
-            "<summary><strong>[STATS] Health Status</strong></summary>\n"
+            "<summary><strong>Health Status</strong></summary>\n"
         )?;
     } else {
-        writeln!(writer, "### [STATS] Health Status\n")?;
+        writeln!(writer, "### Health Status\n")?;
     }
     Ok(())
 }
@@ -119,7 +119,7 @@ pub fn write_enhanced_health_dashboard<W: Write>(
     writer: &mut W,
     dashboard: &HealthDashboard,
 ) -> Result<()> {
-    writeln!(writer, "### [STATS] Codebase Health Dashboard\n")?;
+    writeln!(writer, "### Codebase Health Dashboard\n")?;
 
     writeln!(writer, "| Metric | Status | Interpretation |")?;
     writeln!(writer, "|--------|--------|----------------|")?;
@@ -157,7 +157,7 @@ pub fn write_enhanced_health_dashboard<W: Write>(
 }
 
 pub fn write_quick_wins_section<W: Write>(writer: &mut W, quick_wins: &QuickWins) -> Result<()> {
-    writeln!(writer, "### [TARGET] Quick Wins (< 1 day effort)\n")?;
+    writeln!(writer, "### Quick Wins (< 1 day effort)\n")?;
 
     writeln!(
         writer,

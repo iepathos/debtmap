@@ -150,7 +150,7 @@ fn format_default_with_config(
     let count = top_items.len().min(limit);
     writeln!(
         output,
-        "[TARGET] {}",
+        "{}",
         format!("TOP {count} RECOMMENDATIONS")
             .bright_yellow()
             .bold()
@@ -173,14 +173,14 @@ fn format_default_with_config(
     // Add summary
     writeln!(
         output,
-        "[STATS] {}",
+        "{}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
     )
     .unwrap();
 
     writeln!(
         output,
-        "[DENSITY] {}",
+        "{}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -194,7 +194,7 @@ fn format_default_with_config(
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "[CHART] {}",
+                "{}",
                 format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
             )
             .unwrap();
@@ -286,7 +286,7 @@ fn format_tiered_terminal(
 
     writeln!(
         output,
-        "[TARGET] {}",
+        "{}",
         "TECHNICAL DEBT ANALYSIS - PRIORITY TIERS"
             .bright_yellow()
             .bold()
@@ -371,7 +371,7 @@ fn format_tiered_terminal(
 
     writeln!(
         output,
-        "[DENSITY] {}",
+        "{}",
         format!(
             "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
             analysis.debt_density, analysis.total_lines_of_code
@@ -620,7 +620,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
     writeln!(output).unwrap();
     writeln!(
         output,
-        "[STATS] {}",
+        "{}",
         format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score)
             .bright_cyan()
             .bold()
@@ -1742,7 +1742,7 @@ pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalys
     writeln!(output).unwrap();
     writeln!(
         output,
-        "[STATS] {}",
+        "{}",
         "TOTAL IMPACT IF ALL FIXED".bright_green().bold()
     )
     .unwrap();

@@ -136,7 +136,7 @@ pub fn format_god_object_display(
         path.display()
     ));
 
-    output.push_str(&format!("\n   [STATS] {} METRICS:\n", label));
+    output.push_str(&format!("\n   {} METRICS:\n", label));
     output.push_str(&format!("   ├─ {}: {} (max: {})\n", metric_label, analysis.method_count, if is_god_class { 20 } else { 50 }));
     if is_god_class {
         output.push_str(&format!("   ├─ Fields: {} (max: 15)\n", analysis.field_count));

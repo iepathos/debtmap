@@ -498,7 +498,7 @@ pub fn format_enhanced_message(message: &EnhancedComplexityMessage) -> String {
 
     // Details section
     if !message.details.is_empty() {
-        writeln!(output, "\n[STATS] COMPLEXITY ISSUES:").unwrap();
+        writeln!(output, "\nCOMPLEXITY ISSUES:").unwrap();
         for (i, detail) in message.details.iter().enumerate() {
             let severity_icon = match detail.severity {
                 Severity::Low => "[INFO]",

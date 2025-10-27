@@ -263,7 +263,7 @@ impl CallGraphDebugger {
         output.push_str("════════════════════════════════════════\n\n");
 
         // Statistics
-        output.push_str("[STATS] RESOLUTION STATISTICS\n");
+        output.push_str("RESOLUTION STATISTICS\n");
         output.push_str(&format!(
             "  Total Attempts:    {}\n",
             self.stats.total_attempts
