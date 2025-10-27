@@ -123,7 +123,20 @@ impl GodObjectDetector {
         file_path: &Path,
         ast: &syn::File,
     ) -> GodObjectType {
-        // First, check for registry pattern before classifying as god object
+        // First, check for boilerplate pattern before other classifications
+        let boilerplate_detector =
+            crate::organization::boilerplate_detector::BoilerplateDetector::default();
+        let boilerplate_analysis = boilerplate_detector.detect(file_path, ast);
+
+        if boilerplate_analysis.is_boilerplate && boilerplate_analysis.confidence > 0.7 {
+            return GodObjectType::BoilerplatePattern {
+                pattern: boilerplate_analysis.pattern_type.unwrap(),
+                confidence: boilerplate_analysis.confidence,
+                recommendation: boilerplate_analysis.recommendation,
+            };
+        }
+
+        // Second, check for registry pattern before classifying as god object
         if let Some(source_content) = &self.source_content {
             let registry_detector = crate::organization::RegistryPatternDetector::default();
             if let Some(pattern) = registry_detector.detect(ast, source_content) {
@@ -408,6 +421,19 @@ impl GodObjectDetector {
                             severity, pattern.setter_count
                         )
                     }
+                )
+            }
+            GodObjectType::BoilerplatePattern {
+                recommendation,
+                confidence,
+                ..
+            } => {
+                format!(
+                    "{}\n\
+                    \n\
+                    Detection confidence: {:.0}%",
+                    recommendation,
+                    confidence * 100.0
                 )
             }
             GodObjectType::NotGodObject => {
