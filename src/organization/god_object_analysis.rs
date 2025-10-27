@@ -443,6 +443,12 @@ pub enum GodObjectType {
         original_score: f64,
         adjusted_score: f64,
     },
+    /// Boilerplate pattern - repetitive low-complexity code that should be macro-ified
+    BoilerplatePattern {
+        pattern: crate::organization::boilerplate_detector::BoilerplatePattern,
+        confidence: f64,
+        recommendation: String,
+    },
     /// No god object detected
     NotGodObject,
 }

@@ -1,6 +1,7 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod boilerplate_detector;
 pub mod builder_pattern;
 pub mod call_graph_cohesion;
 pub mod class_ownership;
@@ -14,12 +15,14 @@ pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod javascript;
 pub mod language;
+pub mod macro_recommendations;
 pub mod parallel_execution_pattern;
 pub mod purity_analyzer;
 pub mod registry_pattern;
 pub mod split_validator;
 pub mod struct_initialization;
 pub mod struct_ownership;
+pub mod trait_pattern_analyzer;
 
 pub use god_object_analysis::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
@@ -61,6 +64,15 @@ pub use struct_initialization::{
 pub use parallel_execution_pattern::{
     adjust_parallel_score, ClosureInfo, ParallelLibrary, ParallelPattern, ParallelPatternDetector,
 };
+
+pub use boilerplate_detector::{
+    BoilerplateAnalysis, BoilerplateDetectionConfig, BoilerplateDetector, BoilerplatePattern,
+    DetectionSignal,
+};
+
+pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
+
+pub use macro_recommendations::MacroRecommendationEngine;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrganizationAntiPattern {

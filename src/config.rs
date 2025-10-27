@@ -1106,6 +1106,11 @@ pub struct DebtmapConfig {
     /// AST-based functional pattern analysis configuration (spec 111)
     #[serde(default)]
     pub functional_analysis: Option<crate::analysis::FunctionalAnalysisConfig>,
+
+    /// Boilerplate detection configuration (spec 131)
+    #[serde(default)]
+    pub boilerplate_detection:
+        Option<crate::organization::boilerplate_detector::BoilerplateDetectionConfig>,
 }
 
 /// Classification configuration
