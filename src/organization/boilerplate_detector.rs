@@ -234,16 +234,57 @@ pub enum DetectionSignal {
 }
 
 /// Configuration for boilerplate detection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BoilerplateDetectionConfig {
+    #[serde(default = "default_enabled")]
     pub enabled: bool,
+    #[serde(default = "default_min_impl_blocks")]
     pub min_impl_blocks: usize,
+    #[serde(default = "default_method_uniformity_threshold")]
     pub method_uniformity_threshold: f64,
+    #[serde(default = "default_max_avg_complexity")]
     pub max_avg_complexity: f64,
+    #[serde(default = "default_confidence_threshold")]
     pub confidence_threshold: f64,
+    #[serde(default = "default_detect_trait_impls")]
     pub detect_trait_impls: bool,
+    #[serde(default = "default_detect_builders")]
     pub detect_builders: bool,
+    #[serde(default = "default_detect_test_boilerplate")]
     pub detect_test_boilerplate: bool,
+}
+
+// Default value functions for serde
+fn default_enabled() -> bool {
+    true
+}
+
+fn default_min_impl_blocks() -> usize {
+    20
+}
+
+fn default_method_uniformity_threshold() -> f64 {
+    0.7
+}
+
+fn default_max_avg_complexity() -> f64 {
+    2.0
+}
+
+fn default_confidence_threshold() -> f64 {
+    0.7
+}
+
+fn default_detect_trait_impls() -> bool {
+    true
+}
+
+fn default_detect_builders() -> bool {
+    true
+}
+
+fn default_detect_test_boilerplate() -> bool {
+    true
 }
 
 impl Default for BoilerplateDetectionConfig {
