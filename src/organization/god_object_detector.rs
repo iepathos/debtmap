@@ -2466,4 +2466,45 @@ mod tests {
         // Validation must pass - no contradictions
         assert!(analysis.validate().is_ok());
     }
+
+    #[test]
+    fn test_godfile_visibility_tracking() {
+        // Test case: file with only standalone functions (no structs)
+        let code = r#"
+            pub fn public_function1() {}
+            pub fn public_function2() {}
+            fn private_function1() {}
+            fn private_function2() {}
+            pub(crate) fn crate_function() {}
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // Should be GodFile (no structs)
+        assert_eq!(analysis.detection_type, crate::organization::DetectionType::GodFile);
+
+        // Should have 5 functions
+        assert_eq!(analysis.method_count, 5);
+
+        // Visibility breakdown should be populated and match
+        assert!(analysis.visibility_breakdown.is_some());
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+
+        assert_eq!(breakdown.public, 2, "Should have 2 public functions");
+        assert_eq!(breakdown.private, 2, "Should have 2 private functions");
+        assert_eq!(breakdown.pub_crate, 1, "Should have 1 pub(crate) function");
+        assert_eq!(breakdown.total(), 5, "Total should be 5");
+
+        // Validation should pass
+        assert!(analysis.validate().is_ok());
+    }
+
+    // Note: The output formatter (src/priority/formatter.rs) currently uses
+    // ModuleStructure.function_counts instead of GodObjectAnalysis.visibility_breakdown.
+    // This means the terminal output may show different visibility counts than
+    // what's in GodObjectAnalysis. Future work should integrate these two systems.
+    // See: TODO in src/priority/formatter.rs for integration plan.
 }
