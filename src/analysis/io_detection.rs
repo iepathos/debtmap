@@ -304,10 +304,7 @@ impl IoPatternSet {
                 ".set_".to_string(),
                 ".update_".to_string(),
             ],
-            global_mutations: vec![
-                "global ".to_string(),
-                "GLOBAL_".to_string(),
-            ],
+            global_mutations: vec!["global ".to_string(), "GLOBAL_".to_string()],
             collection_mutations: vec![
                 ".append(".to_string(),
                 ".pop(".to_string(),
