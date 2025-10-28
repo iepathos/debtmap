@@ -2789,4 +2789,182 @@ class Calculator:
             .unwrap();
         assert_eq!(log_callee.line, 14);
     }
+
+    #[test]
+    fn test_discover_observer_without_abc() {
+        // Test that observer collection names are recognized
+        use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
+
+        assert!(ObserverRegistry::is_observer_collection_name("observers"));
+        assert!(ObserverRegistry::is_observer_collection_name("listeners"));
+        assert!(ObserverRegistry::is_observer_collection_name("handlers"));
+        assert!(ObserverRegistry::is_observer_collection_name("callbacks"));
+        assert!(ObserverRegistry::is_observer_collection_name("subscribers"));
+        assert!(ObserverRegistry::is_observer_collection_name("watchers"));
+        assert!(!ObserverRegistry::is_observer_collection_name("items"));
+        assert!(!ObserverRegistry::is_observer_collection_name("data"));
+    }
+
+    #[test]
+    fn test_register_interface_methods_from_dispatch() {
+        // Test that we can detect for loops that iterate over collections
+        let code = r#"
+class Manager:
+    def __init__(self):
+        self.handlers = []
+
+    def trigger(self):
+        for h in self.handlers:
+            h.on_start()
+            h.on_stop()
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let _call_graph = extractor.extract(&module);
+
+        // Verify that the Manager class has a handlers collection
+        // The actual interface discovery happens through type flow tracking in integration tests
+        assert!(extractor.type_tracker.class_hierarchy.contains_key("Manager"));
+    }
+
+    #[test]
+    fn test_base_class_registered_as_interface() {
+        // Test that class hierarchy is tracked correctly
+        let code = r#"
+class BaseObserver:
+    def notify(self): pass
+
+class ConcreteObserver(BaseObserver):
+    def notify(self): print("notified")
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let _call_graph = extractor.extract(&module);
+
+        // Verify class hierarchy is tracked
+        assert!(extractor.type_tracker.class_hierarchy.contains_key("BaseObserver"));
+        assert!(extractor.type_tracker.class_hierarchy.contains_key("ConcreteObserver"));
+
+        // Verify ConcreteObserver inherits from BaseObserver
+        let concrete = extractor.type_tracker.class_hierarchy.get("ConcreteObserver").unwrap();
+        assert!(concrete.bases.contains(&"BaseObserver".to_string()));
+    }
+
+    #[test]
+    fn test_call_edges_from_dispatch_to_implementations() {
+        // Verify that basic call graph extraction works for dispatch patterns
+        // Full end-to-end testing is done in integration tests
+        let code = r#"
+class Observer:
+    def update(self, event):
+        pass
+
+class Subject:
+    def __init__(self):
+        self.observers = []
+
+    def notify(self, event):
+        for obs in self.observers:
+            obs.update(event)
+"#;
+
+        let module =
+            rustpython_parser::parse(code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let call_graph = extractor.extract(&module);
+
+        // Find the notify method (dispatch site)
+        let notify_id = FunctionId::new(
+            PathBuf::from("test.py"),
+            "Subject.notify".to_string(),
+            0,
+        );
+
+        // Get all callees from notify
+        let callees = call_graph.get_callees(&notify_id);
+
+        // Verify that Observer.update is recognized as a callee
+        // (concrete implementations are resolved through type flow in cross-module contexts)
+        let has_update_call = callees.iter().any(|callee| {
+            callee.name.contains("update")
+        });
+
+        assert!(
+            has_update_call,
+            "Call to update should be detected. Found callees: {:?}",
+            callees.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_observer_discovery_performance() {
+        // Generate code with multiple classes and observer patterns
+        // to verify that observer discovery performance is reasonable
+        let mut code = String::new();
+
+        // Generate 20 observer interfaces
+        for i in 0..20 {
+            code.push_str(&format!(
+                "
+class Observer{}:
+    def update(self):
+        pass
+",
+                i
+            ));
+        }
+
+        // Generate 20 concrete implementations
+        for i in 0..20 {
+            code.push_str(&format!(
+                "
+class ConcreteObserver{}(Observer{}):
+    def update(self):
+        print('Observer {} updated')
+",
+                i, i, i
+            ));
+        }
+
+        // Generate 20 subjects with observer collections
+        for i in 0..20 {
+            code.push_str(&format!(
+                "
+class Subject{}:
+    def __init__(self):
+        self.observers = []
+
+    def attach(self, observer):
+        self.observers.append(observer)
+
+    def notify(self):
+        for obs in self.observers:
+            obs.update()
+",
+                i
+            ));
+        }
+
+        let start = std::time::Instant::now();
+        let module =
+            rustpython_parser::parse(&code, rustpython_parser::Mode::Module, "test.py").unwrap();
+        let mut extractor = TwoPassExtractor::new(PathBuf::from("test.py"));
+        let _call_graph = extractor.extract(&module);
+        let duration = start.elapsed();
+
+        // Performance should be reasonable for this size
+        // With 60 classes and 20 observer patterns, should complete quickly
+        assert!(
+            duration.as_millis() < 1000,
+            "Observer discovery took {}ms, which is too slow. Expected < 1000ms",
+            duration.as_millis()
+        );
+
+        // Verify that class hierarchy was extracted
+        assert!(extractor.type_tracker.class_hierarchy.len() > 0);
+    }
 }

@@ -264,7 +264,7 @@ def process_batch(batch):
 }
 
 #[test]
-#[ignore = "Requires parameter type flow tracking - observer passed as parameter to attach() method. Spec 128 implements collection-level type tracking but not cross-function parameter tracking."]
+#[ignore = "Spec 128 implements collection-level type tracking for observer patterns, but this test requires cross-function parameter flow tracking (tracking types passed as arguments to methods like attach()). This functionality is deferred to a future spec. The current implementation successfully handles simpler observer patterns where types can be inferred from collection usage within a single function."]
 fn test_observer_pattern_cross_module() {
     let temp_dir = TempDir::new().unwrap();
 
