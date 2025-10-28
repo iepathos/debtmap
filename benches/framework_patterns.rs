@@ -4,7 +4,7 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::analysis::framework_patterns_multi::{
-    detector::{Decorator, FileContext, FunctionAst, FunctionCall, Parameter},
+    detector::{FileContext, FunctionAst, Parameter},
     patterns::Language,
     FrameworkDetector,
 };
@@ -30,9 +30,11 @@ fn generate_test_functions(count: usize) -> Vec<FunctionAst> {
         } else if i % 3 == 1 {
             // Test function
             let mut func = FunctionAst::new(format!("test_case_{}", i));
-            func.attributes.push(debtmap::analysis::framework_patterns_multi::detector::Attribute {
-                text: "#[test]".to_string(),
-            });
+            func.attributes.push(
+                debtmap::analysis::framework_patterns_multi::detector::Attribute {
+                    text: "#[test]".to_string(),
+                },
+            );
             functions.push(func);
         } else {
             // Regular function
@@ -127,18 +129,14 @@ fn bench_overhead_comparison(c: &mut Criterion) {
         let functions = generate_test_functions(*size);
         let file_context = generate_file_context(Language::Rust);
 
-        group.bench_with_input(
-            BenchmarkId::new("without_detection", size),
-            size,
-            |b, _| {
-                b.iter(|| {
-                    for func in &functions {
-                        black_box(&func.name);
-                        black_box(func.parameters.len());
-                    }
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("without_detection", size), size, |b, _| {
+            b.iter(|| {
+                for func in &functions {
+                    black_box(&func.name);
+                    black_box(func.parameters.len());
+                }
+            })
+        });
 
         group.bench_with_input(BenchmarkId::new("with_detection", size), size, |b, _| {
             b.iter(|| {
@@ -164,8 +162,8 @@ fn bench_regex_caching(c: &mut Criterion) {
     let detector =
         FrameworkDetector::from_config(config_path).expect("Failed to load framework config");
 
-    let mut func = FunctionAst::new("test_example".to_string());
-    let mut file_context = generate_file_context(Language::Rust);
+    let func = FunctionAst::new("test_example".to_string());
+    let file_context = generate_file_context(Language::Rust);
 
     c.bench_function("regex_cache_warm", |b| {
         b.iter(|| {

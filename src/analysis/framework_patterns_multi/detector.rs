@@ -422,14 +422,8 @@ mod tests {
     fn test_language_parse() {
         assert_eq!(Language::parse("rust").unwrap(), Language::Rust);
         assert_eq!(Language::parse("python").unwrap(), Language::Python);
-        assert_eq!(
-            Language::parse("javascript").unwrap(),
-            Language::JavaScript
-        );
-        assert_eq!(
-            Language::parse("typescript").unwrap(),
-            Language::TypeScript
-        );
+        assert_eq!(Language::parse("javascript").unwrap(), Language::JavaScript);
+        assert_eq!(Language::parse("typescript").unwrap(), Language::TypeScript);
         assert!(Language::parse("unknown").is_err());
     }
 
@@ -450,7 +444,10 @@ patterns = [
         eprintln!("Parsed patterns: {:?}", patterns);
         eprintln!("Keys: {:?}", patterns.keys().collect::<Vec<_>>());
 
-        assert!(patterns.contains_key(&Language::Rust), "Should have Rust patterns");
+        assert!(
+            patterns.contains_key(&Language::Rust),
+            "Should have Rust patterns"
+        );
         let rust_patterns = &patterns[&Language::Rust];
         assert_eq!(rust_patterns.len(), 1);
         assert_eq!(rust_patterns[0].name, "Axum Web Framework");
