@@ -101,8 +101,10 @@ pub struct PythonTypeTracker {
     from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
     /// Framework pattern registry for entry point detection
     pub framework_registry: FrameworkPatternRegistry,
-    /// Type flow tracker for data flow analysis
-    pub type_flow: TypeFlowTracker,
+    /// Type flow tracker for data flow analysis (owned for standalone use)
+    type_flow_owned: Option<TypeFlowTracker>,
+    /// Shared type flow tracker for cross-module analysis
+    type_flow_shared: Option<std::sync::Arc<std::sync::RwLock<TypeFlowTracker>>>,
 }
 
 impl PythonTypeTracker {
@@ -116,7 +118,57 @@ impl PythonTypeTracker {
             imports: HashMap::new(),
             from_imports: HashMap::new(),
             framework_registry: FrameworkPatternRegistry::new(),
-            type_flow: TypeFlowTracker::new(),
+            type_flow_owned: Some(TypeFlowTracker::new()),
+            type_flow_shared: None,
+        }
+    }
+
+    /// Create a new tracker with a shared type flow tracker for cross-module analysis
+    pub fn new_with_shared_flow(
+        file_path: PathBuf,
+        shared_flow: std::sync::Arc<std::sync::RwLock<TypeFlowTracker>>,
+    ) -> Self {
+        Self {
+            local_types: HashMap::new(),
+            class_hierarchy: HashMap::new(),
+            function_signatures: HashMap::new(),
+            current_scope: vec![Scope::new()],
+            file_path,
+            imports: HashMap::new(),
+            from_imports: HashMap::new(),
+            framework_registry: FrameworkPatternRegistry::new(),
+            type_flow_owned: None,
+            type_flow_shared: Some(shared_flow),
+        }
+    }
+
+    /// Get access to the type flow tracker (either owned or shared)
+    fn with_type_flow<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&TypeFlowTracker) -> R,
+    {
+        if let Some(shared) = &self.type_flow_shared {
+            let guard = shared.read().unwrap();
+            f(&*guard)
+        } else if let Some(owned) = &self.type_flow_owned {
+            f(owned)
+        } else {
+            panic!("No type flow tracker available")
+        }
+    }
+
+    /// Get mutable access to the type flow tracker
+    fn with_type_flow_mut<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut TypeFlowTracker) -> R,
+    {
+        if let Some(shared) = &self.type_flow_shared {
+            let mut guard = shared.write().unwrap();
+            f(&mut *guard)
+        } else if let Some(owned) = &mut self.type_flow_owned {
+            f(owned)
+        } else {
+            panic!("No type flow tracker available")
         }
     }
 
@@ -301,7 +353,8 @@ impl PythonTypeTracker {
 
                 // Track type flow for assignments
                 if let Some(type_id) = self.python_type_to_type_id(&inferred_type) {
-                    self.type_flow.record_assignment(name.id.as_ref(), type_id);
+                    let name_ref = name.id.as_ref();
+                    self.with_type_flow_mut(|flow| flow.record_assignment(name_ref, type_id));
                 }
             }
             ast::Expr::Attribute(attr) => {
@@ -314,7 +367,7 @@ impl PythonTypeTracker {
                         // Track type flow for attribute assignments
                         if let Some(type_id) = self.python_type_to_type_id(&inferred_type) {
                             let attr_name = format!("self.{}", attr.attr);
-                            self.type_flow.record_assignment(&attr_name, type_id);
+                            self.with_type_flow_mut(|flow| flow.record_assignment(&attr_name, type_id));
                         }
                     }
                 }
@@ -350,7 +403,7 @@ impl PythonTypeTracker {
         field: &str,
     ) -> Vec<crate::analysis::type_flow_tracker::TypeId> {
         let collection_name = format!("{}.{}", class, field);
-        self.type_flow.get_collection_type_ids(&collection_name)
+        self.with_type_flow(|flow| flow.get_collection_type_ids(&collection_name))
     }
 
     /// Extract class hierarchy from AST
@@ -740,12 +793,16 @@ impl TwoPassExtractor {
     pub fn new_with_context(file_path: PathBuf, source: &str, context: CrossModuleContext) -> Self {
         let source_lines: Vec<String> = source.lines().map(|s| s.to_string()).collect();
 
-        // Get shared observer registry from context
+        // Get shared observer registry and type flow tracker from context
         let observer_registry = context.observer_registry();
+        let shared_type_flow = context.type_flow();
+
+        // Create type tracker with shared type flow
+        let type_tracker = PythonTypeTracker::new_with_shared_flow(file_path.clone(), shared_type_flow);
 
         Self {
             phase_one_calls: Vec::new(),
-            type_tracker: PythonTypeTracker::new(file_path.clone()),
+            type_tracker,
             call_graph: CallGraph::new(),
             known_functions: HashSet::new(),
             function_name_map: HashMap::new(),
@@ -1372,8 +1429,7 @@ impl TwoPassExtractor {
             let collection_path = format!("{}.{}", class_name, field_name);
             let type_ids = self
                 .type_tracker
-                .type_flow
-                .get_collection_type_ids(&collection_path);
+                .with_type_flow(|flow| flow.get_collection_type_ids(&collection_path));
 
             // Step 3: Register these types as observer interfaces
             for type_id in type_ids {
@@ -1384,10 +1440,15 @@ impl TwoPassExtractor {
                     .register_interface(&type_id.name);
 
                 // Also register base classes as interfaces
-                if let Some(type_info) = self
+                let collection_types = self
                     .type_tracker
-                    .type_flow
-                    .get_collection_types(&collection_path)
+                    .with_type_flow(|flow| {
+                        flow.get_collection_types(&collection_path)
+                            .into_iter()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    });
+                if let Some(type_info) = collection_types
                     .into_iter()
                     .find(|ti| ti.type_id == type_id)
                 {
@@ -1447,8 +1508,12 @@ impl TwoPassExtractor {
                     // Get types in the collection from type flow tracker
                     let type_infos = self
                         .type_tracker
-                        .type_flow
-                        .get_collection_types(&collection_path);
+                        .with_type_flow(|flow| {
+                            flow.get_collection_types(&collection_path)
+                                .into_iter()
+                                .cloned()
+                                .collect::<Vec<_>>()
+                        });
 
                     // For each type in the collection, register the methods as interface methods
                     for type_info in type_infos {
@@ -1605,8 +1670,7 @@ impl TwoPassExtractor {
                     if let Some(type_id) = self.infer_and_register_type_from_expr(arg) {
                         // Record the type flowing into the collection
                         self.type_tracker
-                            .type_flow
-                            .record_collection_add(&collection_name, type_id);
+                            .with_type_flow_mut(|flow| flow.record_collection_add(&collection_name, type_id));
                     }
                 }
             }
@@ -1642,11 +1706,13 @@ impl TwoPassExtractor {
                     };
 
                     // Register in type flow tracker
-                    self.type_tracker.type_flow.register_type(TypeInfo {
+                    let file_path = self.type_tracker.file_path.clone();
+                    let type_info = TypeInfo {
                         type_id: type_id.clone(),
-                        source_location: Location::new(self.type_tracker.file_path.clone(), 0),
+                        source_location: Location::new(file_path, 0),
                         base_classes,
-                    });
+                    };
+                    self.type_tracker.with_type_flow_mut(|flow| flow.register_type(type_info));
 
                     Some(type_id)
                 } else {
@@ -1654,10 +1720,11 @@ impl TwoPassExtractor {
                 }
             }
             // Variable reference: observer (look up type)
-            ast::Expr::Name(name) => self
-                .type_tracker
-                .type_flow
-                .get_variable_type(name.id.as_str()),
+            ast::Expr::Name(name) => {
+                let name_str = name.id.as_str();
+                self.type_tracker
+                    .with_type_flow(|flow| flow.get_variable_type(name_str))
+            }
             _ => None,
         }
     }
@@ -1720,9 +1787,23 @@ impl TwoPassExtractor {
         let class_name = &class_def.name;
 
         // Check if any base class is a registered observer interface
+        // Also proactively register base classes as potential interfaces
         for base in &class_def.bases {
             if let ast::Expr::Name(base_name) = base {
                 let interface_name = base_name.id.to_string();
+
+                // Proactively register the base class as an interface if it looks like an observer interface
+                // (ends with Observer, Listener, Handler, etc.)
+                if interface_name.ends_with("Observer")
+                    || interface_name.ends_with("Listener")
+                    || interface_name.ends_with("Handler")
+                    || interface_name.ends_with("Callback")
+                {
+                    self.observer_registry
+                        .write()
+                        .unwrap()
+                        .register_interface(&interface_name);
+                }
 
                 // Check if the base class is a registered observer interface
                 let is_observer_impl = self

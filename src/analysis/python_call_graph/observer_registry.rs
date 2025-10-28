@@ -174,6 +174,17 @@ impl ObserverRegistry {
     pub fn is_interface(&self, class_name: &str) -> bool {
         self.implementations.contains_key(class_name)
     }
+
+    /// Get all registered observer collections across all classes
+    pub fn get_all_observer_collections(&self) -> Vec<(String, String)> {
+        let mut result = Vec::new();
+        for (class_name, fields) in &self.collections {
+            for field_name in fields.keys() {
+                result.push((class_name.clone(), field_name.clone()));
+            }
+        }
+        result
+    }
 }
 
 #[cfg(test)]

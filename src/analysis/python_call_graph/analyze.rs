@@ -3,7 +3,6 @@ use super::import_tracker::ImportTracker;
 use crate::analysis::python_type_tracker::TwoPassExtractor;
 use crate::priority::call_graph::CallGraph;
 use anyhow::{Context, Result};
-use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -13,8 +12,10 @@ pub fn analyze_python_project(files: &[PathBuf]) -> Result<CallGraph> {
     let context = build_cross_module_context(files)?;
 
     // Phase 2: Analyze each file with the context
+    // Note: Using sequential iteration instead of parallel to ensure observer
+    // implementations are fully registered before dispatch resolution happens
     let call_graphs: Vec<CallGraph> = files
-        .par_iter()
+        .iter()
         .map(|file| analyze_file_with_context(file, &context))
         .collect::<Result<Vec<_>>>()?;
 
