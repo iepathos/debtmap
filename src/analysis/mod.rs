@@ -12,6 +12,7 @@
 //! - Diagnostic reporting and insights generation
 //! - I/O and side effect detection for responsibility classification
 //! - Call graph metrics and pattern detection for responsibility analysis
+//! - Purity analysis for function classification and refactoring guidance
 
 pub mod attribution;
 pub mod call_graph;
@@ -25,6 +26,7 @@ pub mod io_detection;
 pub mod module_structure;
 pub mod multi_pass;
 pub mod patterns;
+pub mod purity_analysis;
 pub mod python_call_graph;
 pub mod python_dead_code;
 pub mod python_dead_code_enhanced;
@@ -62,6 +64,10 @@ pub use patterns::{
     callback::CallbackPatternRecognizer, factory::FactoryPatternRecognizer,
     observer::ObserverPatternRecognizer, Implementation, PatternDetector, PatternInstance,
     PatternRecognizer, PatternType, UsageSite,
+};
+pub use purity_analysis::{
+    EffortLevel, PurityAnalysis, PurityAnalyzer, PurityLevel, PurityRefactoringOpportunity,
+    PurityViolation, RefactoringType,
 };
 pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
 pub use python_dead_code_enhanced::{
