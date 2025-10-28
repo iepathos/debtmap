@@ -25,12 +25,13 @@ fn test_file_level_scoring_integration() {
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
-        
+
             domain_count: 0,
             domain_diversity: 0.0,
             struct_ratio: 0.0,
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
-            cross_domain_severity: None,},
+            cross_domain_severity: None,
+        },
         function_scores: vec![],
         god_object_type: None,
     };
@@ -91,12 +92,13 @@ fn test_file_scoring_with_god_object_detection() {
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
-        
+
             domain_count: 0,
             domain_diversity: 0.0,
             struct_ratio: 0.0,
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
-            cross_domain_severity: None,},
+            cross_domain_severity: None,
+        },
         god_object_type: None,
         function_scores: vec![8.0; 80], // High scores for all functions
     };
@@ -365,12 +367,13 @@ fn test_file_scoring_with_real_world_scenarios() {
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
-        
+
             domain_count: 0,
             domain_diversity: 0.0,
             struct_ratio: 0.0,
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
-            cross_domain_severity: None,},
+            cross_domain_severity: None,
+        },
         function_scores: vec![9.0; 70],
         god_object_type: None,
     };

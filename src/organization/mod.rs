@@ -25,13 +25,13 @@ pub mod struct_ownership;
 pub mod trait_pattern_analyzer;
 
 pub use god_object_analysis::{
-    calculate_god_object_score, calculate_god_object_score_weighted,
-    calculate_struct_ratio, count_distinct_domains, determine_confidence,
-    determine_cross_domain_severity, group_methods_by_responsibility, recommend_module_splits,
-    suggest_module_splits_by_domain, suggest_splits_by_struct_grouping, DetectionType,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity,
-    SplitAnalysisMethod, StructMetrics, StructWithMethods,
+    calculate_god_object_score, calculate_god_object_score_weighted, calculate_struct_ratio,
+    count_distinct_domains, determine_confidence, determine_cross_domain_severity,
+    group_methods_by_responsibility, recommend_module_splits, suggest_module_splits_by_domain,
+    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
+    GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
+    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StructMetrics,
+    StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;

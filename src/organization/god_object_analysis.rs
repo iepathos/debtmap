@@ -1422,7 +1422,6 @@ mod tests {
         // Struct-heavy: 8 structs, 10 functions, ratio = 0.8
         let ratio = calculate_struct_ratio(8, 10);
         assert!(ratio > 0.3);
-        assert!(8 >= 5);
 
         // Not struct-heavy: 3 structs, 20 functions, ratio = 0.15
         let ratio = calculate_struct_ratio(3, 20);
@@ -1431,6 +1430,5 @@ mod tests {
         // Edge case: Exactly at threshold
         let ratio = calculate_struct_ratio(5, 15);
         assert_eq!(ratio, 5.0 / 15.0);
-        assert!(5 >= 5);
     }
 }
