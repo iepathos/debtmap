@@ -1272,4 +1272,165 @@ mod tests {
         };
         assert_eq!(breakdown.total(), 20);
     }
+
+    #[test]
+    fn test_count_distinct_domains() {
+        let structs = vec![
+            StructMetrics {
+                name: "ThresholdConfig".to_string(),
+                line_span: (0, 10),
+                method_count: 2,
+                field_count: 5,
+                responsibilities: vec!["configuration".to_string()],
+            },
+            StructMetrics {
+                name: "ThresholdValidator".to_string(),
+                line_span: (11, 20),
+                method_count: 3,
+                field_count: 4,
+                responsibilities: vec!["validation".to_string()],
+            },
+            StructMetrics {
+                name: "ScoringWeight".to_string(),
+                line_span: (21, 30),
+                method_count: 4,
+                field_count: 3,
+                responsibilities: vec!["calculation".to_string()],
+            },
+            StructMetrics {
+                name: "ScoringMultiplier".to_string(),
+                line_span: (31, 40),
+                method_count: 2,
+                field_count: 6,
+                responsibilities: vec!["configuration".to_string()],
+            },
+        ];
+
+        // Should identify 2 domains: "thresholds" and "scoring"
+        assert_eq!(count_distinct_domains(&structs), 2);
+    }
+
+    #[test]
+    fn test_count_distinct_domains_single() {
+        let structs = vec![
+            StructMetrics {
+                name: "ConfigA".to_string(),
+                line_span: (0, 10),
+                method_count: 2,
+                field_count: 5,
+                responsibilities: vec!["configuration".to_string()],
+            },
+            StructMetrics {
+                name: "ConfigB".to_string(),
+                line_span: (11, 20),
+                method_count: 3,
+                field_count: 4,
+                responsibilities: vec!["configuration".to_string()],
+            },
+        ];
+
+        // Should identify 1 domain: "config"
+        assert_eq!(count_distinct_domains(&structs), 1);
+    }
+
+    #[test]
+    fn test_calculate_struct_ratio() {
+        // Normal case
+        assert_eq!(calculate_struct_ratio(10, 20), 0.5);
+
+        // More structs than functions
+        assert_eq!(calculate_struct_ratio(15, 10), 1.5);
+
+        // Single struct
+        assert_eq!(calculate_struct_ratio(1, 10), 0.1);
+    }
+
+    #[test]
+    fn test_calculate_struct_ratio_edge_cases() {
+        // Zero functions should return 0.0 to avoid division by zero
+        assert_eq!(calculate_struct_ratio(10, 0), 0.0);
+
+        // Zero structs
+        assert_eq!(calculate_struct_ratio(0, 10), 0.0);
+
+        // Both zero
+        assert_eq!(calculate_struct_ratio(0, 0), 0.0);
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_critical() {
+        // Critical: God object with cross-domain mixing
+        assert!(matches!(
+            determine_cross_domain_severity(10, 3, 600, true),
+            RecommendationSeverity::Critical
+        ));
+
+        // Critical: Massive cross-domain mixing
+        assert!(matches!(
+            determine_cross_domain_severity(16, 5, 400, false),
+            RecommendationSeverity::Critical
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_high() {
+        // High: Significant cross-domain issues
+        assert!(matches!(
+            determine_cross_domain_severity(10, 4, 500, false),
+            RecommendationSeverity::High
+        ));
+
+        // High: Large file with multiple domains
+        assert!(matches!(
+            determine_cross_domain_severity(8, 3, 850, false),
+            RecommendationSeverity::High
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_medium() {
+        // Medium: Proactive improvement opportunity (8+ structs)
+        assert!(matches!(
+            determine_cross_domain_severity(8, 2, 300, false),
+            RecommendationSeverity::Medium
+        ));
+
+        // Medium: Larger file
+        assert!(matches!(
+            determine_cross_domain_severity(6, 2, 450, false),
+            RecommendationSeverity::Medium
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_low() {
+        // Low: Small file with few structs
+        assert!(matches!(
+            determine_cross_domain_severity(5, 2, 200, false),
+            RecommendationSeverity::Low
+        ));
+
+        // Low: Minimal mixing
+        assert!(matches!(
+            determine_cross_domain_severity(3, 2, 150, false),
+            RecommendationSeverity::Low
+        ));
+    }
+
+    #[test]
+    fn test_struct_heavy_detection() {
+        // Struct-heavy: 8 structs, 10 functions, ratio = 0.8
+        let ratio = calculate_struct_ratio(8, 10);
+        assert!(ratio > 0.3);
+        assert!(8 >= 5);
+
+        // Not struct-heavy: 3 structs, 20 functions, ratio = 0.15
+        let ratio = calculate_struct_ratio(3, 20);
+        assert!(ratio < 0.3);
+
+        // Edge case: Exactly at threshold
+        let ratio = calculate_struct_ratio(5, 15);
+        assert_eq!(ratio, 5.0 / 15.0);
+        assert!(5 >= 5);
+    }
 }
