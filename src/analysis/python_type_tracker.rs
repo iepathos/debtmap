@@ -2826,7 +2826,10 @@ class Manager:
 
         // Verify that the Manager class has a handlers collection
         // The actual interface discovery happens through type flow tracking in integration tests
-        assert!(extractor.type_tracker.class_hierarchy.contains_key("Manager"));
+        assert!(extractor
+            .type_tracker
+            .class_hierarchy
+            .contains_key("Manager"));
     }
 
     #[test]
@@ -2846,11 +2849,21 @@ class ConcreteObserver(BaseObserver):
         let _call_graph = extractor.extract(&module);
 
         // Verify class hierarchy is tracked
-        assert!(extractor.type_tracker.class_hierarchy.contains_key("BaseObserver"));
-        assert!(extractor.type_tracker.class_hierarchy.contains_key("ConcreteObserver"));
+        assert!(extractor
+            .type_tracker
+            .class_hierarchy
+            .contains_key("BaseObserver"));
+        assert!(extractor
+            .type_tracker
+            .class_hierarchy
+            .contains_key("ConcreteObserver"));
 
         // Verify ConcreteObserver inherits from BaseObserver
-        let concrete = extractor.type_tracker.class_hierarchy.get("ConcreteObserver").unwrap();
+        let concrete = extractor
+            .type_tracker
+            .class_hierarchy
+            .get("ConcreteObserver")
+            .unwrap();
         assert!(concrete.bases.contains(&"BaseObserver".to_string()));
     }
 
@@ -2878,20 +2891,14 @@ class Subject:
         let call_graph = extractor.extract(&module);
 
         // Find the notify method (dispatch site)
-        let notify_id = FunctionId::new(
-            PathBuf::from("test.py"),
-            "Subject.notify".to_string(),
-            0,
-        );
+        let notify_id = FunctionId::new(PathBuf::from("test.py"), "Subject.notify".to_string(), 0);
 
         // Get all callees from notify
         let callees = call_graph.get_callees(&notify_id);
 
         // Verify that Observer.update is recognized as a callee
         // (concrete implementations are resolved through type flow in cross-module contexts)
-        let has_update_call = callees.iter().any(|callee| {
-            callee.name.contains("update")
-        });
+        let has_update_call = callees.iter().any(|callee| callee.name.contains("update"));
 
         assert!(
             has_update_call,
