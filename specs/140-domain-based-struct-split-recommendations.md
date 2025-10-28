@@ -1,6 +1,6 @@
 ---
 number: 140
-title: Domain-Based Struct Split Recommendations for God Modules
+title: Domain-Based Organization Analysis for Cross-Domain Struct Mixing
 category: optimization
 priority: high
 status: draft
@@ -8,7 +8,7 @@ dependencies: [133]
 created: 2025-10-27
 ---
 
-# Specification 140: Domain-Based Struct Split Recommendations for God Modules
+# Specification 140: Domain-Based Organization Analysis for Cross-Domain Struct Mixing
 
 **Category**: optimization
 **Priority**: high
@@ -17,76 +17,103 @@ created: 2025-10-27
 
 ## Context
 
-Debtmap currently provides **generic, low-value recommendations** for god modules that are primarily composed of struct definitions rather than methods. This is evident in the analysis of `src/config.rs`:
+Rust projects commonly suffer from **cross-domain struct mixing** - files that contain struct definitions from multiple unrelated semantic domains. This creates maintenance issues, poor discoverability, and architectural drift.
 
-**Current Output:**
+**The Core Problem: Cross-Domain Mixing**
+
+Files that mix structs from different domains violate Single Responsibility Principle at the module level:
+
+```rust
+// config.rs - MIXING 15+ UNRELATED DOMAINS
+pub struct ScoringWeights { ... }           // Scoring domain
+pub struct ThresholdsConfig { ... }         // Thresholds domain
+pub struct GodObjectConfig { ... }          // God object detection domain
+pub struct OrchestratorDetectionConfig {...}// Orchestrator detection domain
+pub struct EntropyConfig { ... }            // Complexity analysis domain
+pub struct LanguagesConfig { ... }          // Language support domain
+pub struct DisplayConfig { ... }            // Output formatting domain
+// ... 23+ more structs across different domains
 ```
-#2 SCORE: 100 [CRITICAL - FILE - GOD OBJECT]
-└─ ./src/config.rs (2732 lines, 217 functions)
-└─ ACTION: Split by data flow: 1) Input/parsing 2) Core logic 3) Output
-  - SUGGESTED SPLIT (generic - no detailed analysis available):
-  -  [1] config_core.rs - Core business logic
-  -  [2] config_io.rs - Input/output operations
-  -  [3] config_utils.rs - Helper functions
-```
 
-**The Problem:**
-1. config.rs contains **30 struct definitions** (configuration schemas) across 15+ feature domains
-2. It has **90 `default_*()` functions** (serde defaults) and ~20 actual functions
-3. The "data flow" split recommendation is **completely wrong** for this file type
-4. The generic "core/io/utils" suggestion provides **zero actionable value**
+**Current State: God Object-Only Analysis**
 
-**What's Available But Not Used:**
-The codebase already has `suggest_module_splits_by_domain()` at `src/organization/god_object_analysis.rs:625` which:
-- Analyzes struct names to classify them into domains (scoring, thresholds, detection, etc.)
+Debtmap currently only analyzes struct organization when a file is flagged as a **god object**. This means:
+- ❌ Files with cross-domain mixing get NO guidance until they're critically large
+- ❌ Generic "core/io/utils" fallback recommendations provide zero value
+- ❌ Domain analysis capability exists but isn't used proactively
+
+**Example of Current Failure:**
+
+A 600-line file with 10 structs across 4 unrelated domains gets no recommendations because it's not yet a "god object", even though it clearly violates SRP and would benefit from domain-based organization.
+
+**What Already Exists:**
+
+The codebase has `suggest_module_splits_by_domain()` at `src/organization/god_object_analysis.rs:625` which:
+- Analyzes struct names to classify semantic domains
 - Groups related structs together
 - Generates domain-specific module recommendations
-- Would produce **excellent recommendations** like:
-  - `config/scoring.rs` - ScoringWeights, RoleMultipliers
-  - `config/thresholds.rs` - ThresholdsConfig, ValidationThresholds
-  - `config/detection.rs` - All detection configs
+- Works independently of god object detection
 
-**Root Cause:**
-The `recommend_module_splits()` function (line 592) only works with **method-based grouping** via `responsibility_groups`. For struct-heavy files with few methods, it returns empty recommendations, triggering the generic fallback.
+**The Gap:**
+
+This domain analysis is only triggered for god objects, and uses method-based grouping as the default. We need to **invert this**: make domain-based analysis the **primary strategy** for struct-heavy files, regardless of god object status.
 
 ## Objective
 
-Implement intelligent split recommendations that detect **struct-heavy god modules** and use domain-based struct grouping instead of generic fallbacks, providing actionable, high-value recommendations for refactoring.
+Implement **domain-based organization analysis** that proactively detects cross-domain struct mixing and provides actionable module split recommendations, regardless of whether the file is flagged as a god object. Shift from reactive (fix god objects) to proactive (prevent architectural drift through domain organization).
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Struct-Heavy File Detection**
-   - Detect when a file is primarily struct definitions (>30% struct ratio)
-   - Calculate struct count, total functions, and struct-to-function ratio
-   - Distinguish between method-heavy vs struct-heavy files
-   - Track domain diversity (number of distinct semantic domains)
-   - Support both god object analysis AND proactive organization analysis
+1. **Cross-Domain Detection (Primary Analysis)**
+   - **Primary goal**: Detect files mixing structs from multiple unrelated domains
+   - Calculate domain diversity (count of distinct semantic domains)
+   - Identify cross-domain mixing regardless of file size or god object status
+   - Track struct count, domain count, and struct-to-function ratio
+   - Flag files with poor domain cohesion
 
-2. **Domain Classification Integration**
-   - Use existing `suggest_module_splits_by_domain()` for struct-heavy files
+2. **Domain Classification**
+   - Use existing `suggest_module_splits_by_domain()` for domain analysis
    - Leverage existing `classify_struct_domain()` logic
-   - Support enhanced domain classifier with 15+ domain patterns
+   - Support 15+ semantic domain patterns (scoring, thresholds, detection, etc.)
+   - Group structs by semantic domain, not by size or complexity
    - Preserve struct ownership information in recommendations
 
 3. **Recommendation Trigger Conditions**
 
-   **Primary Trigger (CRITICAL - God Object):**
-   - File flagged as god object (`is_god_object = true`)
-   - AND struct-heavy characteristics (struct_count > 5, struct_ratio > 0.3)
-   - Shows critical-level recommendations with refactoring guidance
+   **Trigger on Cross-Domain Mixing (Primary Strategy):**
+   ```
+   IF file contains structs AND domain_diversity >= 3 THEN
+       severity = determine_severity(struct_count, domain_count, file_lines, is_god_object)
+       generate_domain_based_recommendations()
+   ```
 
-   **Secondary Trigger (WARNING - Organization):**
-   - NOT flagged as god object yet (`is_god_object = false`)
-   - BUT has organization issues: struct_count > 8, domain_diversity >= 3, file_lines > 400
-   - Shows warning-level suggestions for proactive improvement
+   **Severity Levels:**
+
+   - **CRITICAL** (Red flag - immediate action needed):
+     - is_god_object = true AND domain_diversity >= 3
+     - OR struct_count > 15 AND domain_diversity >= 5
+     - Message: "URGENT: Cross-domain mixing in god module"
+
+   - **HIGH** (Strong recommendation):
+     - struct_count >= 10 AND domain_diversity >= 4
+     - OR file_lines > 800 AND domain_diversity >= 3
+     - Message: "Significant cross-domain mixing detected"
+
+   - **MEDIUM** (Proactive suggestion):
+     - struct_count >= 8 AND domain_diversity >= 3
+     - OR file_lines > 400 AND domain_diversity >= 3
+     - Message: "Consider domain-based organization"
+
+   - **LOW/INFO** (Informational):
+     - struct_count >= 5 AND domain_diversity >= 3
+     - Message: "Multiple domains detected, monitor organization"
 
    **No Recommendation:**
-   - Few structs (< 5 for god objects, < 8 for organization)
-   - Low domain diversity (< 3 distinct domains)
-   - Small files (< 400 lines)
-   - Cohesive single-domain files
+   - domain_diversity < 3 (cohesive, single or dual domain)
+   - struct_count < 5 (too small to warrant splitting)
+   - Single-domain files regardless of size
 
 4. **Recommendation Quality Threshold**
    - Never show generic fallback if domain-based analysis is available
@@ -116,20 +143,35 @@ Implement intelligent split recommendations that detect **struct-heavy god modul
 
 ## Acceptance Criteria
 
-- [ ] Struct-heavy files (>10 structs, struct/method ratio >3:1) trigger domain-based recommendations
-- [ ] config.rs shows domain-specific splits (scoring, thresholds, detection, etc.) instead of generic core/io/utils
+### Primary: Cross-Domain Detection
+- [ ] Files with 3+ semantic domains trigger domain-based analysis regardless of god object status
+- [ ] Domain count and diversity metrics calculated for all struct-heavy files
+- [ ] Severity determined based on cross-domain mixing extent (not just file size)
+- [ ] Cross-domain analysis runs BEFORE god object analysis (primary strategy)
+
+### Recommendation Quality
+- [ ] config.rs (30 structs, 15 domains) shows CRITICAL severity with domain-specific splits
+- [ ] Mid-size file (10 structs, 4 domains, 600 lines, not god object) shows MEDIUM severity recommendations
+- [ ] Single-domain files (8 structs, 1 domain) show NO cross-domain recommendations
 - [ ] Each recommended split includes:
+  - [ ] Severity level (CRITICAL/HIGH/MEDIUM/LOW)
   - [ ] Specific domain name (not generic "core")
-  - [ ] List of structs to move (at least 3 examples shown)
+  - [ ] List of structs to move (at least 3 examples)
+  - [ ] Domain rationale (why structs grouped together)
   - [ ] Estimated line count within 20% accuracy
-  - [ ] Suggested module path (e.g., `config/scoring.rs`)
-- [ ] Generic fallback only shown when:
-  - [ ] File has <5 structs
-  - [ ] Domain analysis finds <2 distinct groups
-  - [ ] No clear domain patterns detected
-- [ ] Method-heavy files continue to use responsibility-based grouping
-- [ ] Output clearly indicates which analysis method was used
+
+### Fallback Behavior
+- [ ] Generic "core/io/utils" fallback NEVER shown when domain analysis possible
+- [ ] Method-based analysis used only for:
+  - [ ] Files with <3 domains (cohesive)
+  - [ ] Method-heavy god objects (struct_count < 5)
+- [ ] Output clearly indicates analysis method (CrossDomain vs MethodBased)
+
+### Performance and Compatibility
+- [ ] Domain diversity calculation adds <50ms per file
 - [ ] No performance regression >5% on existing benchmarks
+- [ ] Backward compatible JSON output (new fields optional)
+- [ ] No breaking changes to existing API
 
 ## Technical Details
 
@@ -151,69 +193,118 @@ let recommended_splits = if is_god_object {
 };
 ```
 
-**New Code:**
+**New Code (Cross-Domain Mixing as Primary Analysis):**
 ```rust
 let recommended_splits = {
     let file_name = path.file_stem()...;
     let struct_count = per_struct_metrics.len();
     let total_functions = all_methods.len();
-    let struct_ratio = if total_functions > 0 {
-        struct_count as f64 / total_functions as f64
-    } else {
-        0.0
-    };
 
-    // Determine if this is a struct-heavy file
-    let is_struct_heavy = struct_count > 5 && struct_ratio > 0.3;
+    // PRIMARY ANALYSIS: Check for cross-domain struct mixing
+    if struct_count >= 5 {
+        let domain_count = count_distinct_domains(&per_struct_metrics);
 
-    // Primary trigger: God object detection
-    if is_god_object {
-        if is_struct_heavy {
-            // Use domain-based struct grouping for struct-heavy god objects
-            crate::organization::suggest_module_splits_by_domain(&per_struct_metrics)
-        } else {
-            // Use method-based responsibility grouping for method-heavy god objects
+        // Cross-domain mixing detected (3+ domains)
+        if domain_count >= 3 {
+            // Generate domain-based recommendations
+            let splits = crate::organization::suggest_module_splits_by_domain(&per_struct_metrics);
+
+            // Determine severity for output formatting
+            let severity = determine_cross_domain_severity(
+                struct_count,
+                domain_count,
+                lines_of_code,
+                is_god_object,
+            );
+
+            // Attach severity metadata to splits
+            attach_severity_to_splits(splits, severity)
+        }
+        // Struct-heavy but single domain - check for method-based splits
+        else if is_god_object {
+            // Fall back to method-based analysis for god objects
             crate::organization::recommend_module_splits(
                 file_name,
                 &all_methods,
                 &responsibility_groups,
             )
-        }
-    }
-    // Secondary trigger: Proactive organization analysis
-    else if struct_count > 8 && lines_of_code > 400 {
-        // Calculate domain diversity
-        let domain_count = count_distinct_domains(&per_struct_metrics);
-
-        if domain_count >= 3 {
-            // File has organization issues - suggest domain-based splits
-            // These will be marked as WARNING level in output
-            crate::organization::suggest_module_splits_by_domain(&per_struct_metrics)
         } else {
             vec![]
         }
+    }
+    // Method-heavy file, use traditional god object analysis
+    else if is_god_object {
+        crate::organization::recommend_module_splits(
+            file_name,
+            &all_methods,
+            &responsibility_groups,
+        )
     } else {
         vec![]
     }
 };
+
+/// Determine severity of cross-domain mixing issue
+fn determine_cross_domain_severity(
+    struct_count: usize,
+    domain_count: usize,
+    lines: usize,
+    is_god_object: bool,
+) -> RecommendationSeverity {
+    // CRITICAL: God object with cross-domain mixing
+    if is_god_object && domain_count >= 3 {
+        return RecommendationSeverity::Critical;
+    }
+
+    // CRITICAL: Massive cross-domain mixing
+    if struct_count > 15 && domain_count >= 5 {
+        return RecommendationSeverity::Critical;
+    }
+
+    // HIGH: Significant cross-domain issues
+    if struct_count >= 10 && domain_count >= 4 {
+        return RecommendationSeverity::High;
+    }
+
+    if lines > 800 && domain_count >= 3 {
+        return RecommendationSeverity::High;
+    }
+
+    // MEDIUM: Proactive improvement opportunity
+    if struct_count >= 8 || lines > 400 {
+        return RecommendationSeverity::Medium;
+    }
+
+    // LOW: Informational only
+    RecommendationSeverity::Low
+}
 ```
 
 ### Architecture Changes
 
-1. **Detection Logic Enhancement**
-   - Add `is_struct_heavy()` helper function
-   - Calculate struct-to-function ratio
-   - Store ratio in `GodObjectIndicators` for visibility
+1. **Cross-Domain Analysis (New Primary Analysis)**
+   - Add `count_distinct_domains()` function
+   - Calculate domain diversity as primary metric
+   - Determine cross-domain mixing severity independently of god object status
+   - Store domain_count and domain_diversity in analysis results
 
-2. **Domain Classifier Improvements**
+2. **Severity-Based Recommendation System**
+   - Add `RecommendationSeverity` enum (Critical, High, Medium, Low)
+   - Implement `determine_cross_domain_severity()` function
+   - Attach severity metadata to all recommendations
+   - Format output based on severity level (color coding, urgency)
+
+3. **Domain Classifier Enhancements**
    - Enhance `classify_struct_domain()` with more patterns
-   - Add support for nested config domains (e.g., `detection/god_objects`)
-   - Improve heuristics for ambiguous names
+   - Add support for nested domains (e.g., `detection/god_objects`)
+   - Improve disambiguation for common prefixes
+   - Track domain classification confidence
 
-3. **Recommendation Formatting**
-   - Update `format_god_object_steps()` to show analysis method used
-   - Display struct grouping rationale
-   - Show example structs per module
+4. **Recommendation Formatting**
+   - Show severity level prominently (CRITICAL, HIGH, MEDIUM, LOW)
+   - Display domain diversity metrics (X structs across Y domains)
+   - Show domain-specific groupings with rationale
+   - Include example structs per recommended module
 
 ### Data Structures
 
@@ -222,6 +313,14 @@ let recommended_splits = {
 pub struct GodObjectIndicators {
     // ... existing fields ...
 
+    /// Number of distinct semantic domains detected
+    #[serde(default)]
+    pub domain_count: usize,
+
+    /// Domain diversity score (0.0 to 1.0)
+    #[serde(default)]
+    pub domain_diversity: f64,
+
     /// Ratio of struct definitions to total functions (0.0 to 1.0)
     #[serde(default)]
     pub struct_ratio: f64,
@@ -229,15 +328,27 @@ pub struct GodObjectIndicators {
     /// Analysis method used for recommendations
     #[serde(default)]
     pub analysis_method: SplitAnalysisMethod,
+
+    /// Severity of cross-domain mixing (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cross_domain_severity: Option<RecommendationSeverity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum SplitAnalysisMethod {
     #[default]
     None,
+    CrossDomain,      // domain mixing analysis (primary)
     MethodBased,      // responsibility_groups analysis
-    StructBased,      // domain classification
     Hybrid,           // combination of both
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RecommendationSeverity {
+    Critical,  // Immediate action required
+    High,      // Strong recommendation
+    Medium,    // Proactive improvement
+    Low,       // Informational
 }
 ```
 
@@ -246,6 +357,9 @@ pub enum SplitAnalysisMethod {
 pub struct ModuleSplit {
     // ... existing fields ...
 
+    /// Semantic domain this split represents
+    pub domain: String,
+
     /// Explanation of why this split was suggested
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
@@ -253,6 +367,10 @@ pub struct ModuleSplit {
     /// Analysis method that generated this split
     #[serde(default)]
     pub method: SplitAnalysisMethod,
+
+    /// Severity of this recommendation
+    #[serde(default)]
+    pub severity: RecommendationSeverity,
 }
 ```
 
