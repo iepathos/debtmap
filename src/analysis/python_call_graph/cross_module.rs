@@ -1,13 +1,15 @@
 use super::import_tracker::{ExportedSymbol, ImportTracker, ImportedSymbol};
 use super::namespace::{build_module_namespace, ImportUsage, ModuleNamespace};
+use super::observer_registry::ObserverRegistry;
 use crate::analysis::python_imports::EnhancedImportResolver;
+use crate::analysis::type_flow_tracker::{TypeFlowTracker, TypeId};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CrossModuleContext {
     pub symbols: HashMap<String, FunctionId>,
     pub dependencies: HashMap<PathBuf, Vec<PathBuf>>,
@@ -22,6 +24,10 @@ pub struct CrossModuleContext {
     pub resolution_cache: RwLock<HashMap<(PathBuf, String), Option<FunctionId>>>,
     /// Enhanced import resolver for advanced import resolution
     pub enhanced_resolver: RwLock<Option<EnhancedImportResolver>>,
+    /// Shared observer registry across all files
+    pub observer_registry: Arc<RwLock<ObserverRegistry>>,
+    /// Shared type flow tracker across all files
+    pub type_flow: Arc<RwLock<TypeFlowTracker>>,
 }
 
 impl Clone for CrossModuleContext {
@@ -36,16 +42,32 @@ impl Clone for CrossModuleContext {
             import_usage: self.import_usage.clone(),
             resolution_cache: RwLock::new(self.resolution_cache.read().unwrap().clone()),
             enhanced_resolver: RwLock::new(self.enhanced_resolver.read().unwrap().clone()),
+            observer_registry: Arc::clone(&self.observer_registry),
+            type_flow: Arc::clone(&self.type_flow),
         }
+    }
+}
+
+impl Default for CrossModuleContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl CrossModuleContext {
     pub fn new() -> Self {
         Self {
+            symbols: HashMap::new(),
+            dependencies: HashMap::new(),
+            imports: HashMap::new(),
+            exports: HashMap::new(),
+            module_trackers: HashMap::new(),
+            namespaces: HashMap::new(),
+            import_usage: HashMap::new(),
             resolution_cache: RwLock::new(HashMap::new()),
             enhanced_resolver: RwLock::new(None),
-            ..Default::default()
+            observer_registry: Arc::new(RwLock::new(ObserverRegistry::new())),
+            type_flow: Arc::new(RwLock::new(TypeFlowTracker::new())),
         }
     }
 
@@ -57,6 +79,43 @@ impl CrossModuleContext {
     /// Check if enhanced resolution is enabled
     pub fn has_enhanced_resolution(&self) -> bool {
         self.enhanced_resolver.read().unwrap().is_some()
+    }
+
+    /// Get shared observer registry for a file analysis
+    pub fn observer_registry(&self) -> Arc<RwLock<ObserverRegistry>> {
+        Arc::clone(&self.observer_registry)
+    }
+
+    /// Get shared type flow tracker
+    pub fn type_flow(&self) -> Arc<RwLock<TypeFlowTracker>> {
+        Arc::clone(&self.type_flow)
+    }
+
+    /// Resolve an imported type to its source module
+    ///
+    /// Returns a TypeId with the module path where the type is defined
+    pub fn resolve_imported_type(&self, import_name: &str, current_file: &Path) -> Option<TypeId> {
+        // Check if this name is imported in the current file
+        let imports = self.imports.get(current_file)?;
+
+        for import in imports {
+            // Check if the import matches
+            if import.name == import_name || import.alias.as_ref() == Some(&import_name.to_string())
+            {
+                // Resolve the module path
+                let source_module = self.resolve_import_path(current_file, &import.module)?;
+
+                return Some(TypeId::new(import_name.to_string(), Some(source_module)));
+            }
+        }
+
+        None
+    }
+
+    /// Record that a type flows into a collection across modules
+    pub fn record_cross_module_type_flow(&self, collection: &str, type_id: TypeId) {
+        let mut flow = self.type_flow.write().unwrap();
+        flow.record_collection_add(collection, type_id);
     }
 
     pub fn add_module(

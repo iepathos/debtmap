@@ -6,7 +6,7 @@
 use super::observer_registry::ObserverRegistry;
 use crate::priority::call_graph::FunctionId;
 use rustpython_parser::ast;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 /// Information about an observer dispatch call site
 #[derive(Debug, Clone)]
@@ -25,12 +25,12 @@ pub struct ObserverDispatch {
 
 /// Detector for observer pattern dispatch in for loops
 pub struct ObserverDispatchDetector {
-    registry: Arc<ObserverRegistry>,
+    registry: Arc<RwLock<ObserverRegistry>>,
 }
 
 impl ObserverDispatchDetector {
     /// Create a new observer dispatch detector
-    pub fn new(registry: Arc<ObserverRegistry>) -> Self {
+    pub fn new(registry: Arc<RwLock<ObserverRegistry>>) -> Self {
         Self { registry }
     }
 
@@ -98,9 +98,9 @@ impl ObserverDispatchDetector {
 
                         // Check if this is a registered observer collection
                         if let Some(class_name) = current_class {
-                            if let Some(interface) = self
-                                .registry
-                                .get_collection_interface(class_name, field_name)
+                            let registry = self.registry.read().unwrap();
+                            if let Some(interface) =
+                                registry.get_collection_interface(class_name, field_name)
                             {
                                 return Some((collection_expr, Some(interface.clone())));
                             }
@@ -231,7 +231,7 @@ for observer in self.observers:
         let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
         if let ast::Mod::Module(m) = &module {
             if let Some(ast::Stmt::For(for_stmt)) = m.body.first() {
-                let registry = Arc::new(ObserverRegistry::new());
+                let registry = Arc::new(RwLock::new(ObserverRegistry::new()));
                 let detector = ObserverDispatchDetector::new(registry);
 
                 let dispatches = detector.detect_in_for_loop(
@@ -261,7 +261,7 @@ for listener in self.listeners:
         let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
         if let ast::Mod::Module(m) = &module {
             if let Some(ast::Stmt::For(for_stmt)) = m.body.first() {
-                let registry = Arc::new(ObserverRegistry::new());
+                let registry = Arc::new(RwLock::new(ObserverRegistry::new()));
                 let detector = ObserverDispatchDetector::new(registry);
 
                 let dispatches = detector.detect_in_for_loop(
@@ -291,7 +291,7 @@ for observer in self.observers:
             if let Some(ast::Stmt::For(for_stmt)) = m.body.first() {
                 let mut registry = ObserverRegistry::new();
                 registry.register_collection("Subject", "observers", "Observer");
-                let registry = Arc::new(registry);
+                let registry = Arc::new(RwLock::new(registry));
                 let detector = ObserverDispatchDetector::new(registry);
 
                 let dispatches = detector.detect_in_for_loop(
@@ -323,7 +323,7 @@ for observer in self.observers:
         let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
         if let ast::Mod::Module(m) = &module {
             if let Some(ast::Stmt::For(for_stmt)) = m.body.first() {
-                let registry = Arc::new(ObserverRegistry::new());
+                let registry = Arc::new(RwLock::new(ObserverRegistry::new()));
                 let detector = ObserverDispatchDetector::new(registry);
 
                 let dispatches = detector.detect_in_for_loop(
@@ -350,7 +350,7 @@ for item in self.items:
         let module = parse(python_code, rustpython_parser::Mode::Module, "<test>").unwrap();
         if let ast::Mod::Module(m) = &module {
             if let Some(ast::Stmt::For(for_stmt)) = m.body.first() {
-                let registry = Arc::new(ObserverRegistry::new());
+                let registry = Arc::new(RwLock::new(ObserverRegistry::new()));
                 let detector = ObserverDispatchDetector::new(registry);
 
                 let dispatches = detector.detect_in_for_loop(
