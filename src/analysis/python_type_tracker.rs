@@ -633,9 +633,10 @@ pub struct TwoPassExtractor {
     cross_module_context: Option<CrossModuleContext>,
     /// Callback tracker for deferred callback resolution
     callback_tracker: crate::analysis::python_call_graph::CallbackTracker,
-    /// Observer registry for tracking observer patterns
-    observer_registry:
-        std::sync::Arc<crate::analysis::python_call_graph::observer_registry::ObserverRegistry>,
+    /// Observer registry for tracking observer patterns (shared across files via RwLock)
+    observer_registry: std::sync::Arc<
+        std::sync::RwLock<crate::analysis::python_call_graph::observer_registry::ObserverRegistry>,
+    >,
     /// Pending for loops that may contain observer dispatches (to be resolved after all classes are processed)
     /// Format: (for_stmt, caller_id, current_class)
     pending_observer_dispatches: Vec<(ast::StmtFor, FunctionId, Option<String>)>,
@@ -707,9 +708,9 @@ impl TwoPassExtractor {
             source_lines: Vec::new(),
             cross_module_context: None,
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
-            observer_registry: std::sync::Arc::new(
+            observer_registry: std::sync::Arc::new(std::sync::RwLock::new(
                 crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
-            ),
+            )),
             pending_observer_dispatches: Vec::new(),
         }
     }
@@ -728,9 +729,9 @@ impl TwoPassExtractor {
             source_lines,
             cross_module_context: None,
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
-            observer_registry: std::sync::Arc::new(
+            observer_registry: std::sync::Arc::new(std::sync::RwLock::new(
                 crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
-            ),
+            )),
             pending_observer_dispatches: Vec::new(),
         }
     }
@@ -738,6 +739,10 @@ impl TwoPassExtractor {
     /// Create a new extractor with cross-module context for better resolution
     pub fn new_with_context(file_path: PathBuf, source: &str, context: CrossModuleContext) -> Self {
         let source_lines: Vec<String> = source.lines().map(|s| s.to_string()).collect();
+
+        // Get shared observer registry from context
+        let observer_registry = context.observer_registry();
+
         Self {
             phase_one_calls: Vec::new(),
             type_tracker: PythonTypeTracker::new(file_path.clone()),
@@ -749,9 +754,7 @@ impl TwoPassExtractor {
             source_lines,
             cross_module_context: Some(context),
             callback_tracker: crate::analysis::python_call_graph::CallbackTracker::new(),
-            observer_registry: std::sync::Arc::new(
-                crate::analysis::python_call_graph::observer_registry::ObserverRegistry::new(),
-            ),
+            observer_registry,
             pending_observer_dispatches: Vec::new(),
         }
     }
@@ -1314,7 +1317,8 @@ impl TwoPassExtractor {
 
         // If this class inherits from ABC, register it as an observer interface
         if has_abc_base {
-            std::sync::Arc::get_mut(&mut self.observer_registry)
+            self.observer_registry
+                .write()
                 .unwrap()
                 .register_interface(class_name);
         }
@@ -1374,7 +1378,8 @@ impl TwoPassExtractor {
             // Step 3: Register these types as observer interfaces
             for type_id in type_ids {
                 // Register the type as an interface
-                std::sync::Arc::get_mut(&mut self.observer_registry)
+                self.observer_registry
+                    .write()
                     .unwrap()
                     .register_interface(&type_id.name);
 
@@ -1387,7 +1392,8 @@ impl TwoPassExtractor {
                     .find(|ti| ti.type_id == type_id)
                 {
                     for base_class in &type_info.base_classes {
-                        std::sync::Arc::get_mut(&mut self.observer_registry)
+                        self.observer_registry
+                            .write()
                             .unwrap()
                             .register_interface(&base_class.name);
                     }
@@ -1451,7 +1457,8 @@ impl TwoPassExtractor {
                         // Register each method called in the dispatch loop
                         for _method_name in &method_calls {
                             // Register the interface if not already registered
-                            std::sync::Arc::get_mut(&mut self.observer_registry)
+                            self.observer_registry
+                                .write()
                                 .unwrap()
                                 .register_interface(interface_name);
                         }
@@ -1687,15 +1694,14 @@ impl TwoPassExtractor {
                                                     .infer_interface_from_field_name(field_name);
 
                                                 // Register the collection
-                                                std::sync::Arc::get_mut(
-                                                    &mut self.observer_registry,
-                                                )
-                                                .unwrap()
-                                                .register_collection(
-                                                    class_name,
-                                                    field_name,
-                                                    &interface_name,
-                                                );
+                                                self.observer_registry
+                                                    .write()
+                                                    .unwrap()
+                                                    .register_collection(
+                                                        class_name,
+                                                        field_name,
+                                                        &interface_name,
+                                                    );
                                             }
                                         }
                                     }
@@ -1719,13 +1725,16 @@ impl TwoPassExtractor {
                 let interface_name = base_name.id.to_string();
 
                 // Check if the base class is a registered observer interface
-                let is_observer_impl = std::sync::Arc::get_mut(&mut self.observer_registry)
+                let is_observer_impl = self
+                    .observer_registry
+                    .read()
                     .unwrap()
                     .is_interface(&interface_name);
 
                 if is_observer_impl {
                     // Register class-to-interface mapping
-                    std::sync::Arc::get_mut(&mut self.observer_registry)
+                    self.observer_registry
+                        .write()
                         .unwrap()
                         .register_class_interface(class_name, &interface_name);
 
@@ -1750,19 +1759,20 @@ impl TwoPassExtractor {
                                     )
                                 };
 
-                                let registry_mut =
-                                    std::sync::Arc::get_mut(&mut self.observer_registry).unwrap();
-                                registry_mut.register_implementation(
-                                    &interface_name,
-                                    &method_def.name,
-                                    func_id.clone(),
-                                );
-                                // Also register under generic "Observer" for heuristic matching
-                                registry_mut.register_implementation(
-                                    "Observer",
-                                    &method_def.name,
-                                    func_id,
-                                );
+                                {
+                                    let mut registry_mut = self.observer_registry.write().unwrap();
+                                    registry_mut.register_implementation(
+                                        &interface_name,
+                                        &method_def.name,
+                                        func_id.clone(),
+                                    );
+                                    // Also register under generic "Observer" for heuristic matching
+                                    registry_mut.register_implementation(
+                                        "Observer",
+                                        &method_def.name,
+                                        func_id,
+                                    );
+                                }
                             }
                         }
                     }
@@ -1800,9 +1810,14 @@ impl TwoPassExtractor {
         for dispatch in dispatches {
             // Look up implementations for this observer method
             if let Some(interface) = &dispatch.observer_interface {
-                let impls = self
-                    .observer_registry
-                    .get_implementations(interface, &dispatch.method_name);
+                let impls: Vec<_> = {
+                    let registry = self.observer_registry.read().unwrap();
+                    registry
+                        .get_implementations(interface, &dispatch.method_name)
+                        .into_iter()
+                        .cloned()
+                        .collect()
+                };
                 for impl_func_id in impls {
                     // Create call edge from dispatcher to implementation
                     self.call_graph.add_call(FunctionCall {

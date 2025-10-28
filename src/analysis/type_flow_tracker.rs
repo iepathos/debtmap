@@ -57,6 +57,17 @@ impl TypeId {
             module: None,
         }
     }
+
+    /// Get qualified name for disambiguation
+    ///
+    /// Format: "module/path:TypeName" or just "TypeName" if no module
+    pub fn qualified_name(&self) -> String {
+        if let Some(module) = &self.module {
+            format!("{}:{}", module.display(), self.name)
+        } else {
+            self.name.clone()
+        }
+    }
 }
 
 /// Type information with metadata
@@ -112,6 +123,7 @@ pub enum CollectionOp {
 ///
 /// All mappings use conservative over-approximation: if a type *might* flow,
 /// it's recorded.
+#[derive(Debug)]
 pub struct TypeFlowTracker {
     /// Variable -> Set of types that have flowed into it
     variable_types: HashMap<String, HashSet<TypeId>>,
