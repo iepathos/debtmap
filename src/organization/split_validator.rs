@@ -93,6 +93,10 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -106,6 +110,10 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         },
     ]
 }
@@ -131,6 +139,10 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -144,6 +156,10 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         },
     ]
 }
@@ -170,6 +186,10 @@ mod tests {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         }
     }
 
@@ -187,6 +207,10 @@ mod tests {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         };
 
         let validated = validate_and_refine_splits(vec![split]);

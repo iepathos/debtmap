@@ -1316,7 +1316,12 @@ mod tests {
                         responsibility_names: vec![],
                         recommended_splits: vec![],
                         module_structure: None,
-                    },
+                    
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+            cross_domain_severity: None,},
                     function_scores: vec![],
                     god_object_type: None,
                 },
@@ -1805,7 +1810,12 @@ mod tests {
                 responsibility_names: vec![],
                 recommended_splits: vec![],
                 module_structure: None,
-            },
+            
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+            cross_domain_severity: None,},
             function_scores: vec![],
             god_object_type: None,
         };
@@ -1971,7 +1981,12 @@ mod tests {
                 responsibility_names: vec![],
                 recommended_splits: vec![],
                 module_structure: None,
-            },
+            
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+            cross_domain_severity: None,},
             function_scores: vec![],
             god_object_type: None,
         };

@@ -136,7 +136,11 @@ impl ValidationLimits {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
-        }];
+        
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,}];
 
         let enhanced =
             enhance_splits_with_cohesion(splits, Path::new("test.rs"), &parsed, &ownership);
@@ -172,7 +176,11 @@ impl ValidationLimits {
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
-            },
+            
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,},
             ModuleSplit {
                 suggested_name: "validation".to_string(),
                 methods_to_move: vec![],
@@ -185,7 +193,11 @@ impl ValidationLimits {
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
-            },
+            
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,},
         ];
 
         let enhanced =
@@ -214,7 +226,11 @@ impl ValidationLimits {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
-        }];
+        
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,}];
 
         let enhanced =
             enhance_splits_with_cohesion(splits, Path::new("test.rs"), &parsed, &ownership);

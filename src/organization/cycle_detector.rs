@@ -96,7 +96,11 @@ mod tests {
             cohesion_score: None,
             dependencies_in: deps_in.iter().map(|s| s.to_string()).collect(),
             dependencies_out: _deps_out.iter().map(|s| s.to_string()).collect(),
-        }
+        
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,}
     }
 
     #[test]

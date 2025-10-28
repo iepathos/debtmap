@@ -254,6 +254,11 @@ mod tests {
             module_structure: None,
             detection_type: crate::organization::DetectionType::GodClass,
             visibility_breakdown: None, // Spec 134: Added for test compatibility
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::organization::SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         }
     }
 

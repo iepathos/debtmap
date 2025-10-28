@@ -6,6 +6,46 @@ use crate::risk::lcov::LcovData;
 use anyhow::Result;
 use std::path::Path;
 
+/// Convert between god_object_analysis and file_metrics SplitAnalysisMethod enums
+fn convert_split_analysis_method(
+    method: crate::organization::SplitAnalysisMethod,
+) -> crate::priority::file_metrics::SplitAnalysisMethod {
+    match method {
+        crate::organization::SplitAnalysisMethod::None => {
+            crate::priority::file_metrics::SplitAnalysisMethod::None
+        }
+        crate::organization::SplitAnalysisMethod::CrossDomain => {
+            crate::priority::file_metrics::SplitAnalysisMethod::CrossDomain
+        }
+        crate::organization::SplitAnalysisMethod::MethodBased => {
+            crate::priority::file_metrics::SplitAnalysisMethod::MethodBased
+        }
+        crate::organization::SplitAnalysisMethod::Hybrid => {
+            crate::priority::file_metrics::SplitAnalysisMethod::Hybrid
+        }
+    }
+}
+
+/// Convert between god_object_analysis and file_metrics RecommendationSeverity enums
+fn convert_recommendation_severity(
+    severity: crate::organization::RecommendationSeverity,
+) -> crate::priority::file_metrics::RecommendationSeverity {
+    match severity {
+        crate::organization::RecommendationSeverity::Critical => {
+            crate::priority::file_metrics::RecommendationSeverity::Critical
+        }
+        crate::organization::RecommendationSeverity::High => {
+            crate::priority::file_metrics::RecommendationSeverity::High
+        }
+        crate::organization::RecommendationSeverity::Medium => {
+            crate::priority::file_metrics::RecommendationSeverity::Medium
+        }
+        crate::organization::RecommendationSeverity::Low => {
+            crate::priority::file_metrics::RecommendationSeverity::Low
+        }
+    }
+}
+
 /// Helper struct for complexity calculation results
 struct ComplexityMetrics {
     total_complexity: u32,
@@ -65,6 +105,10 @@ impl UnifiedFileAnalyzer {
                         method_count: split.method_count,
                         warning: split.warning.clone(),
                         priority: split.priority.into(),
+                        domain: split.domain.clone(),
+                        rationale: split.rationale.clone(),
+                        method: convert_split_analysis_method(split.method),
+                        severity: split.severity.map(convert_recommendation_severity),
                     })
                     .collect();
 
@@ -78,6 +122,16 @@ impl UnifiedFileAnalyzer {
                     responsibility_names: enhanced_analysis.file_metrics.responsibilities.clone(),
                     recommended_splits,
                     module_structure: enhanced_analysis.file_metrics.module_structure.clone(),
+                    domain_count: enhanced_analysis.file_metrics.domain_count,
+                    domain_diversity: enhanced_analysis.file_metrics.domain_diversity,
+                    struct_ratio: enhanced_analysis.file_metrics.struct_ratio,
+                    analysis_method: convert_split_analysis_method(
+                        enhanced_analysis.file_metrics.analysis_method,
+                    ),
+                    cross_domain_severity: enhanced_analysis
+                        .file_metrics
+                        .cross_domain_severity
+                        .map(convert_recommendation_severity),
                 };
 
                 return (indicators, Some(enhanced_analysis.classification));
@@ -109,6 +163,11 @@ impl UnifiedFileAnalyzer {
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
                 module_structure: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
             },
             None,
         )
@@ -235,6 +294,11 @@ impl UnifiedFileAnalyzer {
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         }
     }
 }

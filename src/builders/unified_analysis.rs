@@ -1304,6 +1304,11 @@ fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObj
         responsibility_names: Vec::new(),
         recommended_splits: Vec::new(),
         module_structure: None,
+        domain_count: 0,
+        domain_diversity: 0.0,
+        struct_ratio: 0.0,
+        analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+        cross_domain_severity: None,
     }
 }
 
@@ -1318,6 +1323,46 @@ fn calculate_function_scores(
     // and avoid circular dependency where file scores depend on function scores
     // which haven't been finalized yet
     Vec::new()
+}
+
+/// Convert file_metrics::SplitAnalysisMethod to organization::SplitAnalysisMethod
+fn convert_to_org_split_method(
+    method: crate::priority::file_metrics::SplitAnalysisMethod,
+) -> crate::organization::SplitAnalysisMethod {
+    match method {
+        crate::priority::file_metrics::SplitAnalysisMethod::None => {
+            crate::organization::SplitAnalysisMethod::None
+        }
+        crate::priority::file_metrics::SplitAnalysisMethod::CrossDomain => {
+            crate::organization::SplitAnalysisMethod::CrossDomain
+        }
+        crate::priority::file_metrics::SplitAnalysisMethod::MethodBased => {
+            crate::organization::SplitAnalysisMethod::MethodBased
+        }
+        crate::priority::file_metrics::SplitAnalysisMethod::Hybrid => {
+            crate::organization::SplitAnalysisMethod::Hybrid
+        }
+    }
+}
+
+/// Convert file_metrics::RecommendationSeverity to organization::RecommendationSeverity
+fn convert_to_org_severity(
+    severity: crate::priority::file_metrics::RecommendationSeverity,
+) -> crate::organization::RecommendationSeverity {
+    match severity {
+        crate::priority::file_metrics::RecommendationSeverity::Critical => {
+            crate::organization::RecommendationSeverity::Critical
+        }
+        crate::priority::file_metrics::RecommendationSeverity::High => {
+            crate::organization::RecommendationSeverity::High
+        }
+        crate::priority::file_metrics::RecommendationSeverity::Medium => {
+            crate::organization::RecommendationSeverity::Medium
+        }
+        crate::priority::file_metrics::RecommendationSeverity::Low => {
+            crate::organization::RecommendationSeverity::Low
+        }
+    }
 }
 
 // Pure function to create god object analysis
@@ -1343,6 +1388,16 @@ fn create_god_object_analysis(
         module_structure: file_metrics.god_object_indicators.module_structure.clone(),
         detection_type: crate::organization::DetectionType::GodFile,
         visibility_breakdown: None, // Spec 134: Added for compatibility
+        domain_count: file_metrics.god_object_indicators.domain_count,
+        domain_diversity: file_metrics.god_object_indicators.domain_diversity,
+        struct_ratio: file_metrics.god_object_indicators.struct_ratio,
+        analysis_method: convert_to_org_split_method(
+            file_metrics.god_object_indicators.analysis_method,
+        ),
+        cross_domain_severity: file_metrics
+            .god_object_indicators
+            .cross_domain_severity
+            .map(convert_to_org_severity),
     })
 }
 
