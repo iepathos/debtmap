@@ -817,10 +817,13 @@ impl TwoPassExtractor {
                 }
             }
 
-            // Third pass: Analyze functions and collect calls
+            // Third pass: Analyze functions and collect calls (this also tracks collection operations for type flow)
             for stmt in &module.body {
                 self.analyze_stmt_phase_one(stmt);
             }
+
+            // Phase 3.5: Discover observer interfaces from usage (after type flow tracking)
+            self.discover_observer_interfaces_from_usage(module);
 
             // Fourth pass: Register observer implementations now that all functions are in function_name_map
             for stmt in &module.body {
@@ -1138,6 +1141,9 @@ impl TwoPassExtractor {
     fn analyze_expr_for_calls(&mut self, expr: &ast::Expr) {
         match expr {
             ast::Expr::Call(call) => {
+                // Track type flow for collection operations (e.g., self.observers.append(observer))
+                self.track_collection_operation(call);
+
                 // Collect unresolved call
                 if let Some(caller) = &self.current_function {
                     let unresolved = self.create_unresolved_call(caller.clone(), call);
@@ -1312,6 +1318,346 @@ impl TwoPassExtractor {
                 .unwrap()
                 .register_interface(class_name);
         }
+    }
+
+    /// Discover observer interfaces via usage analysis (after type flow tracking)
+    /// This identifies interfaces by analyzing how types are used in observer collections
+    fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
+        use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
+
+        // Step 1: Find all observer collections
+        let mut observer_collections: Vec<(String, String)> = Vec::new();
+
+        for stmt in &module.body {
+            if let ast::Stmt::ClassDef(class_def) = stmt {
+                let class_name = &class_def.name.to_string();
+
+                // Look for observer collections in __init__
+                for method_stmt in &class_def.body {
+                    if let ast::Stmt::FunctionDef(func_def) = method_stmt {
+                        if func_def.name.as_str() == "__init__" {
+                            for init_stmt in &func_def.body {
+                                if let ast::Stmt::Assign(assign) = init_stmt {
+                                    for target in &assign.targets {
+                                        if let ast::Expr::Attribute(attr) = target {
+                                            if let ast::Expr::Name(name) = &*attr.value {
+                                                if name.id.as_str() == "self" {
+                                                    let field_name = attr.attr.as_str();
+                                                    if ObserverRegistry::is_observer_collection_name(
+                                                        field_name,
+                                                    ) {
+                                                        observer_collections.push((
+                                                            class_name.clone(),
+                                                            field_name.to_string(),
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 2: For each observer collection, get types from type flow tracker
+        for (class_name, field_name) in observer_collections {
+            let collection_path = format!("{}.{}", class_name, field_name);
+            let type_ids = self
+                .type_tracker
+                .type_flow
+                .get_collection_type_ids(&collection_path);
+
+            // Step 3: Register these types as observer interfaces
+            for type_id in type_ids {
+                // Register the type as an interface
+                std::sync::Arc::get_mut(&mut self.observer_registry)
+                    .unwrap()
+                    .register_interface(&type_id.name);
+
+                // Also register base classes as interfaces
+                if let Some(type_info) = self
+                    .type_tracker
+                    .type_flow
+                    .get_collection_types(&collection_path)
+                    .into_iter()
+                    .find(|ti| ti.type_id == type_id)
+                {
+                    for base_class in &type_info.base_classes {
+                        std::sync::Arc::get_mut(&mut self.observer_registry)
+                            .unwrap()
+                            .register_interface(&base_class.name);
+                    }
+                }
+            }
+        }
+
+        // Step 4: Analyze dispatch loops to find interface methods
+        self.analyze_dispatch_loops_for_interface_methods(module);
+    }
+
+    /// Analyze for loops to discover which methods are part of observer interfaces
+    fn analyze_dispatch_loops_for_interface_methods(&mut self, module: &ast::ModModule) {
+        for stmt in &module.body {
+            if let ast::Stmt::ClassDef(class_def) = stmt {
+                for method in &class_def.body {
+                    if let ast::Stmt::FunctionDef(func_def) = method {
+                        self.find_and_register_interface_methods_in_function(
+                            &class_def.name,
+                            func_def,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Find dispatch loops in a function and register the methods being called
+    fn find_and_register_interface_methods_in_function(
+        &mut self,
+        class_name: &ast::Identifier,
+        func_def: &ast::StmtFunctionDef,
+    ) {
+        // Recursively search for for-loops in the function body
+        for stmt in &func_def.body {
+            self.process_stmt_for_dispatch_loops(class_name, stmt);
+        }
+    }
+
+    /// Process a statement looking for dispatch loops
+    fn process_stmt_for_dispatch_loops(&mut self, class_name: &ast::Identifier, stmt: &ast::Stmt) {
+        match stmt {
+            ast::Stmt::For(for_stmt) => {
+                // Check if this is an observer dispatch pattern
+                if let Some((collection_name, method_calls)) =
+                    self.extract_observer_dispatch_info(for_stmt)
+                {
+                    // Get the full collection path
+                    let collection_path = format!("{}.{}", class_name, collection_name);
+
+                    // Get types in the collection from type flow tracker
+                    let type_infos = self
+                        .type_tracker
+                        .type_flow
+                        .get_collection_types(&collection_path);
+
+                    // For each type in the collection, register the methods as interface methods
+                    for type_info in type_infos {
+                        let interface_name = &type_info.type_id.name;
+
+                        // Register each method called in the dispatch loop
+                        for _method_name in &method_calls {
+                            // Register the interface if not already registered
+                            std::sync::Arc::get_mut(&mut self.observer_registry)
+                                .unwrap()
+                                .register_interface(interface_name);
+                        }
+                    }
+                }
+            }
+            ast::Stmt::If(if_stmt) => {
+                // Check branches for dispatch loops
+                for body_stmt in &if_stmt.body {
+                    self.process_stmt_for_dispatch_loops(class_name, body_stmt);
+                }
+                for else_stmt in &if_stmt.orelse {
+                    self.process_stmt_for_dispatch_loops(class_name, else_stmt);
+                }
+            }
+            ast::Stmt::While(while_stmt) => {
+                for body_stmt in &while_stmt.body {
+                    self.process_stmt_for_dispatch_loops(class_name, body_stmt);
+                }
+            }
+            ast::Stmt::With(with_stmt) => {
+                for body_stmt in &with_stmt.body {
+                    self.process_stmt_for_dispatch_loops(class_name, body_stmt);
+                }
+            }
+            ast::Stmt::Try(try_stmt) => {
+                for body_stmt in &try_stmt.body {
+                    self.process_stmt_for_dispatch_loops(class_name, body_stmt);
+                }
+                for handler in &try_stmt.handlers {
+                    let ast::ExceptHandler::ExceptHandler(except_handler) = handler;
+                    for handler_stmt in &except_handler.body {
+                        self.process_stmt_for_dispatch_loops(class_name, handler_stmt);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Extract observer dispatch information from a for loop
+    /// Returns (collection_name, method_names) if this is a dispatch loop
+    fn extract_observer_dispatch_info(
+        &self,
+        for_stmt: &ast::StmtFor,
+    ) -> Option<(String, Vec<String>)> {
+        use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
+
+        // Extract collection name from the iterator
+        let collection_name = match &*for_stmt.iter {
+            ast::Expr::Attribute(attr) => {
+                // Pattern: for x in self.observers
+                if let ast::Expr::Name(name) = &*attr.value {
+                    if name.id.as_str() == "self" {
+                        Some(attr.attr.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }?;
+
+        // Check if it looks like an observer collection
+        if !ObserverRegistry::is_observer_collection_name(&collection_name) {
+            return None;
+        }
+
+        // Extract the loop variable name
+        let loop_var = match &*for_stmt.target {
+            ast::Expr::Name(name) => name.id.as_str(),
+            _ => return None,
+        };
+
+        // Find method calls on the loop variable in the body
+        let mut method_calls = Vec::new();
+        for stmt in &for_stmt.body {
+            self.extract_method_calls_on_var(stmt, loop_var, &mut method_calls);
+        }
+
+        if method_calls.is_empty() {
+            None
+        } else {
+            Some((collection_name, method_calls))
+        }
+    }
+
+    /// Extract method calls on a specific variable from a statement
+    fn extract_method_calls_on_var(
+        &self,
+        stmt: &ast::Stmt,
+        var_name: &str,
+        method_calls: &mut Vec<String>,
+    ) {
+        match stmt {
+            ast::Stmt::Expr(expr_stmt) => {
+                self.extract_method_calls_from_expr(&expr_stmt.value, var_name, method_calls);
+            }
+            ast::Stmt::If(if_stmt) => {
+                for body_stmt in &if_stmt.body {
+                    self.extract_method_calls_on_var(body_stmt, var_name, method_calls);
+                }
+                for else_stmt in &if_stmt.orelse {
+                    self.extract_method_calls_on_var(else_stmt, var_name, method_calls);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Extract method calls from an expression
+    fn extract_method_calls_from_expr(
+        &self,
+        expr: &ast::Expr,
+        var_name: &str,
+        method_calls: &mut Vec<String>,
+    ) {
+        if let ast::Expr::Call(call) = expr {
+            if let ast::Expr::Attribute(attr) = &*call.func {
+                if let ast::Expr::Name(name) = &*attr.value {
+                    if name.id.as_str() == var_name {
+                        method_calls.push(attr.attr.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Track collection operations like append() for type flow analysis
+    fn track_collection_operation(&mut self, call: &ast::ExprCall) {
+        // Check if this is a method call on a collection (e.g., self.observers.append(x))
+        if let ast::Expr::Attribute(attr) = &*call.func {
+            let method_name = attr.attr.as_str();
+
+            // Track append operations
+            if method_name == "append" && !call.args.is_empty() {
+                // Extract the collection being appended to (e.g., "self.observers")
+                let collection_name = self.extract_full_attribute_name(&attr.value);
+
+                // Get the type being appended
+                if let Some(arg) = call.args.first() {
+                    if let Some(type_id) = self.infer_and_register_type_from_expr(arg) {
+                        // Record the type flowing into the collection
+                        self.type_tracker
+                            .type_flow
+                            .record_collection_add(&collection_name, type_id);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Infer and register type from an expression (with mutable access)
+    fn infer_and_register_type_from_expr(
+        &mut self,
+        expr: &ast::Expr,
+    ) -> Option<crate::analysis::type_flow_tracker::TypeId> {
+        use crate::analysis::type_flow_tracker::{Location, TypeId, TypeInfo};
+
+        match expr {
+            // Direct instantiation: ConcreteObserver()
+            ast::Expr::Call(call) => {
+                if let ast::Expr::Name(name) = &*call.func {
+                    let type_name = name.id.to_string();
+                    let type_id =
+                        TypeId::new(type_name.clone(), Some(self.type_tracker.file_path.clone()));
+
+                    // Get base classes if this is a known class
+                    let base_classes = if let Some(class_info) =
+                        self.type_tracker.class_hierarchy.get(&type_name)
+                    {
+                        class_info
+                            .bases
+                            .iter()
+                            .map(|base| TypeId::from_name(base))
+                            .collect()
+                    } else {
+                        vec![]
+                    };
+
+                    // Register in type flow tracker
+                    self.type_tracker.type_flow.register_type(TypeInfo {
+                        type_id: type_id.clone(),
+                        source_location: Location::new(self.type_tracker.file_path.clone(), 0),
+                        base_classes,
+                    });
+
+                    Some(type_id)
+                } else {
+                    None
+                }
+            }
+            // Variable reference: observer (look up type)
+            ast::Expr::Name(name) => self
+                .type_tracker
+                .type_flow
+                .get_variable_type(name.id.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Extract full attribute name (e.g., "self.observers" from attribute expression)
+    fn extract_full_attribute_name(&self, expr: &ast::Expr) -> String {
+        extract_attribute_name_recursive(expr)
     }
 
     /// Populate observer registry from class definition
@@ -1888,6 +2234,18 @@ impl TwoPassExtractor {
             }
         }
         None
+    }
+}
+
+/// Helper function to extract full attribute name recursively
+fn extract_attribute_name_recursive(expr: &ast::Expr) -> String {
+    match expr {
+        ast::Expr::Name(name) => name.id.to_string(),
+        ast::Expr::Attribute(attr) => {
+            let base = extract_attribute_name_recursive(&attr.value);
+            format!("{}.{}", base, attr.attr)
+        }
+        _ => "<unknown>".to_string(),
     }
 }
 

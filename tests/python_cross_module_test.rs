@@ -264,7 +264,7 @@ def process_batch(batch):
 }
 
 #[test]
-#[ignore = "Observer pattern detection with dynamic dispatch in loops requires additional implementation"]
+#[ignore = "Requires parameter type flow tracking - observer passed as parameter to attach() method. Spec 128 implements collection-level type tracking but not cross-function parameter tracking."]
 fn test_observer_pattern_cross_module() {
     let temp_dir = TempDir::new().unwrap();
 
