@@ -1,0 +1,107 @@
+# Multi-Signal Responsibility Classification Configuration
+#
+# This configuration file defines the weights and strategies used for
+# aggregating multiple signals to classify function responsibilities.
+
+[weights]
+# Signal weights must sum to 1.0
+#
+# I/O Detection (35%): Primary signal for identifying I/O operations
+io_detection = 0.35
+
+# Call Graph Analysis (25%): Identifies orchestration and coordination patterns
+call_graph = 0.25
+
+# Type Signatures (15%): Infers responsibility from parameter and return types
+type_signatures = 0.15
+
+# Name Heuristics (15%): Uses function names to infer responsibility
+name_heuristics = 0.15
+
+# Purity Analysis (5%): Identifies pure computation functions
+purity_side_effects = 0.05
+
+# Framework Patterns (5%): Detects framework-specific patterns
+framework_patterns = 0.05
+
+[conflict_resolution]
+# Strategy to use when signals disagree
+# Options: "weighted_voting", "framework_first", "io_first", "highest_confidence"
+strategy = "weighted_voting"
+
+# Minimum confidence threshold for classification (0.0 - 1.0)
+minimum_confidence = 0.30
+
+# Threshold for framework pattern override (0.0 - 1.0)
+# When a framework signal has confidence >= this threshold, it overrides other signals
+framework_override_threshold = 0.70
+
+[accuracy]
+# Target accuracy goal
+target_accuracy = 0.85
+
+# Baseline accuracy (name-based classification alone)
+baseline_accuracy = 0.50
+
+[tuning]
+# Enable automatic weight tuning based on ground truth corpus
+auto_tune = false
+
+# Path to ground truth corpus for validation
+ground_truth_path = "tests/responsibility_ground_truth.json"
+
+# Optimization metric: "accuracy", "precision", "recall", "f1"
+optimization_metric = "accuracy"
+
+[explainability]
+# Include evidence from all signals in classification results
+include_evidence = true
+
+# Show alternative classifications with their scores
+show_alternatives = true
+
+# Maximum number of alternative classifications to show
+max_alternatives = 2
+
+[performance]
+# Enable parallel processing for multi-signal analysis
+enable_parallel = true
+
+# Maximum performance overhead target (as percentage)
+max_overhead_percent = 3.0
+
+[categories]
+# Map of responsibility categories and their descriptions
+# These are used for documentation and output formatting
+
+[categories.io]
+FileIO = "File system I/O operations"
+NetworkIO = "Network communication and HTTP requests"
+DatabaseIO = "Database queries and transactions"
+ConfigurationIO = "Configuration file loading and parsing"
+MixedIO = "Multiple types of I/O operations"
+
+[categories.handlers]
+HttpRequestHandler = "HTTP request handler (web framework)"
+WebSocketHandler = "WebSocket connection handler"
+CliHandler = "Command-line interface handler"
+DatabaseHandler = "Database connection handler"
+
+[categories.computation]
+PureComputation = "Pure mathematical or logical computation"
+Validation = "Input validation and verification"
+Transformation = "Data transformation between formats"
+Parsing = "Parsing text or structured data"
+Formatting = "Formatting data for output"
+
+[categories.coordination]
+Orchestration = "High-level workflow orchestration"
+Coordination = "Coordination between components"
+ErrorHandling = "Error handling and recovery"
+
+[categories.testing]
+TestFunction = "Unit or integration test function"
+
+[categories.other]
+SideEffects = "Functions with side effects"
+Unknown = "Unable to classify responsibility"

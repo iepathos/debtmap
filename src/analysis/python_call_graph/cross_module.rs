@@ -7,7 +7,15 @@ use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId}
 use rustpython_parser::ast;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
+
+/// Pending observer dispatch information for cross-file resolution
+#[derive(Debug, Clone)]
+pub struct PendingObserverDispatch {
+    pub for_stmt: ast::StmtFor,
+    pub caller: FunctionId,
+    pub current_class: Option<String>,
+}
 
 #[derive(Debug)]
 pub struct CrossModuleContext {
@@ -28,6 +36,8 @@ pub struct CrossModuleContext {
     pub observer_registry: Arc<RwLock<ObserverRegistry>>,
     /// Shared type flow tracker across all files
     pub type_flow: Arc<RwLock<TypeFlowTracker>>,
+    /// Pending observer dispatches to resolve after all files are analyzed
+    pub pending_observer_dispatches: Arc<Mutex<Vec<PendingObserverDispatch>>>,
 }
 
 impl Clone for CrossModuleContext {
@@ -44,6 +54,7 @@ impl Clone for CrossModuleContext {
             enhanced_resolver: RwLock::new(self.enhanced_resolver.read().unwrap().clone()),
             observer_registry: Arc::clone(&self.observer_registry),
             type_flow: Arc::clone(&self.type_flow),
+            pending_observer_dispatches: Arc::clone(&self.pending_observer_dispatches),
         }
     }
 }
@@ -68,6 +79,7 @@ impl CrossModuleContext {
             enhanced_resolver: RwLock::new(None),
             observer_registry: Arc::new(RwLock::new(ObserverRegistry::new())),
             type_flow: Arc::new(RwLock::new(TypeFlowTracker::new())),
+            pending_observer_dispatches: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -398,7 +410,51 @@ impl CrossModuleContext {
             }
         }
 
+        // Resolve pending observer dispatches now that all implementations are registered
+        self.resolve_observer_dispatches(&mut merged);
+
         merged
+    }
+
+    /// Resolve all pending observer dispatches and add them to the call graph
+    ///
+    /// This must be called after all files have been analyzed and all observer
+    /// implementations have been registered in the observer registry.
+    fn resolve_observer_dispatches(&self, call_graph: &mut CallGraph) {
+        use super::observer_dispatch::ObserverDispatchDetector;
+
+        let pending = self.pending_observer_dispatches.lock().unwrap();
+        let detector = ObserverDispatchDetector::new(self.observer_registry.clone());
+
+        for pending_dispatch in pending.iter() {
+            let dispatches = detector.detect_in_for_loop(
+                &pending_dispatch.for_stmt,
+                pending_dispatch.current_class.as_deref(),
+                &pending_dispatch.caller,
+            );
+
+            // Add call edges for each detected dispatch
+            for dispatch in dispatches {
+                if let Some(interface) = &dispatch.observer_interface {
+                    let impls: Vec<_> = {
+                        let registry = self.observer_registry.read().unwrap();
+                        registry
+                            .get_implementations(interface, &dispatch.method_name)
+                            .into_iter()
+                            .cloned()
+                            .collect()
+                    };
+
+                    for impl_func_id in impls {
+                        call_graph.add_call(FunctionCall {
+                            caller: dispatch.caller_id.clone(),
+                            callee: impl_func_id.clone(),
+                            call_type: CallType::ObserverDispatch,
+                        });
+                    }
+                }
+            }
+        }
     }
 
     fn find_exported_functions(&self, module_name: &str) -> Option<&Vec<ExportedSymbol>> {

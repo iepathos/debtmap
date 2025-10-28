@@ -895,8 +895,8 @@ impl TwoPassExtractor {
                 }
             }
 
-            // Fifth pass: Resolve observer dispatches now that all implementations are registered
-            self.resolve_pending_observer_dispatches();
+            // Fifth pass: Store pending observer dispatches for cross-module resolution
+            self.store_pending_observer_dispatches();
         }
     }
 
@@ -1863,20 +1863,38 @@ impl TwoPassExtractor {
         }
     }
 
-    /// Resolve all pending observer dispatches after all classes have been registered
-    fn resolve_pending_observer_dispatches(&mut self) {
-        // Clone the pending dispatches to avoid borrowing issues
-        let pending = std::mem::take(&mut self.pending_observer_dispatches);
+    /// Store pending observer dispatches in the shared cross-module context
+    /// for resolution after all files have been analyzed
+    fn store_pending_observer_dispatches(&mut self) {
+        use crate::analysis::python_call_graph::cross_module::PendingObserverDispatch;
 
-        for (for_stmt, caller, current_class) in pending {
-            // Temporarily set current_class for detection
-            let saved_class = self.current_class.clone();
-            self.current_class = current_class;
+        // If we have a cross-module context, store pending dispatches there
+        if let Some(context) = &self.cross_module_context {
+            let pending = std::mem::take(&mut self.pending_observer_dispatches);
+            let mut shared_pending = context.pending_observer_dispatches.lock().unwrap();
 
-            self.detect_observer_dispatch(&for_stmt, &caller);
+            for (for_stmt, caller, current_class) in pending {
+                shared_pending.push(PendingObserverDispatch {
+                    for_stmt,
+                    caller,
+                    current_class,
+                });
+            }
+        } else {
+            // Fallback: resolve immediately if no cross-module context
+            // (for backward compatibility with single-file analysis)
+            let pending = std::mem::take(&mut self.pending_observer_dispatches);
 
-            // Restore previous current_class
-            self.current_class = saved_class;
+            for (for_stmt, caller, current_class) in pending {
+                // Temporarily set current_class for detection
+                let saved_class = self.current_class.clone();
+                self.current_class = current_class;
+
+                self.detect_observer_dispatch(&for_stmt, &caller);
+
+                // Restore previous current_class
+                self.current_class = saved_class;
+            }
         }
     }
 
