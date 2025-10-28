@@ -783,7 +783,7 @@ mod tests {
         assert!(!profile.side_effects.is_empty());
         assert!(!profile.is_pure);
         // Should detect both "static mut" and "unsafe {" patterns
-        assert!(profile.side_effects.len() >= 1);
+        assert!(!profile.side_effects.is_empty());
     }
 
     #[test]
