@@ -112,6 +112,35 @@ impl IoDetector {
             }
         }
 
+        // Detect field mutations
+        for pattern in &pattern_set.field_mutations {
+            if code.contains(pattern) {
+                profile.side_effects.push(SideEffect::FieldMutation {
+                    target: "unknown".to_string(),
+                    field: "unknown".to_string(),
+                });
+            }
+        }
+
+        // Detect global mutations
+        for pattern in &pattern_set.global_mutations {
+            if code.contains(pattern) {
+                profile.side_effects.push(SideEffect::GlobalMutation {
+                    name: "unknown".to_string(),
+                });
+            }
+        }
+
+        // Detect collection mutations
+        for pattern in &pattern_set.collection_mutations {
+            if code.contains(pattern) {
+                let op = Self::classify_collection_op(pattern);
+                profile
+                    .side_effects
+                    .push(SideEffect::CollectionMutation { operation: op });
+            }
+        }
+
         // Update purity status
         profile.is_pure = profile.file_operations.is_empty()
             && profile.network_operations.is_empty()
@@ -121,6 +150,23 @@ impl IoDetector {
             && profile.side_effects.is_empty();
 
         profile
+    }
+
+    /// Classify collection operation from pattern
+    fn classify_collection_op(pattern: &str) -> CollectionOp {
+        if pattern.contains("push") {
+            CollectionOp::Push
+        } else if pattern.contains("pop") {
+            CollectionOp::Pop
+        } else if pattern.contains("insert") {
+            CollectionOp::Insert
+        } else if pattern.contains("remove") {
+            CollectionOp::Remove
+        } else if pattern.contains("clear") {
+            CollectionOp::Clear
+        } else {
+            CollectionOp::Push // Default fallback
+        }
     }
 }
 
@@ -138,6 +184,9 @@ pub struct IoPatternSet {
     pub console_ops: Vec<String>,
     pub db_ops: Vec<String>,
     pub env_ops: Vec<String>,
+    pub field_mutations: Vec<String>,
+    pub global_mutations: Vec<String>,
+    pub collection_mutations: Vec<String>,
 }
 
 impl IoPatternSet {
@@ -189,6 +238,25 @@ impl IoPatternSet {
                 "env::var".to_string(),
                 "env::set_var".to_string(),
             ],
+            field_mutations: vec![
+                "self.".to_string(),
+                ".set_".to_string(),
+                ".update_".to_string(),
+            ],
+            global_mutations: vec![
+                "static mut".to_string(),
+                "GLOBAL_".to_string(),
+                "unsafe {".to_string(),
+            ],
+            collection_mutations: vec![
+                ".push(".to_string(),
+                ".pop(".to_string(),
+                ".insert(".to_string(),
+                ".remove(".to_string(),
+                ".clear(".to_string(),
+                ".append(".to_string(),
+                ".extend(".to_string(),
+            ],
         }
     }
 
@@ -231,6 +299,23 @@ impl IoPatternSet {
                 "os.getenv(".to_string(),
                 "os.putenv(".to_string(),
             ],
+            field_mutations: vec![
+                "self.".to_string(),
+                ".set_".to_string(),
+                ".update_".to_string(),
+            ],
+            global_mutations: vec![
+                "global ".to_string(),
+                "GLOBAL_".to_string(),
+            ],
+            collection_mutations: vec![
+                ".append(".to_string(),
+                ".pop(".to_string(),
+                ".insert(".to_string(),
+                ".remove(".to_string(),
+                ".clear(".to_string(),
+                ".extend(".to_string(),
+            ],
         }
     }
 
@@ -266,6 +351,23 @@ impl IoPatternSet {
                 ".findOne(".to_string(),
             ],
             env_ops: vec!["process.env".to_string(), "process.env.".to_string()],
+            field_mutations: vec![
+                "this.".to_string(),
+                ".set(".to_string(),
+                ".update(".to_string(),
+            ],
+            global_mutations: vec![
+                "window.".to_string(),
+                "global.".to_string(),
+                "GLOBAL_".to_string(),
+            ],
+            collection_mutations: vec![
+                ".push(".to_string(),
+                ".pop(".to_string(),
+                ".splice(".to_string(),
+                ".shift(".to_string(),
+                ".unshift(".to_string(),
+            ],
         }
     }
 
@@ -624,5 +726,215 @@ mod tests {
         assert_eq!(Responsibility::DatabaseIO.as_str(), "Database I/O");
         assert_eq!(Responsibility::MixedIO.as_str(), "Mixed I/O");
         assert_eq!(Responsibility::SideEffects.as_str(), "Side Effects");
+    }
+
+    #[test]
+    fn test_rust_field_mutation_detection() {
+        let code = r#"
+        fn update_counter(&mut self) {
+            self.count += 1;
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Rust);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+        assert!(matches!(
+            profile.side_effects[0],
+            SideEffect::FieldMutation { .. }
+        ));
+    }
+
+    #[test]
+    fn test_rust_collection_mutation_detection() {
+        let code = r#"
+        fn add_item(&mut self, item: i32) {
+            self.items.push(item);
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Rust);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+        // Should contain a collection mutation (may not be first due to field mutation)
+        assert!(profile.side_effects.iter().any(|e| matches!(
+            e,
+            SideEffect::CollectionMutation {
+                operation: CollectionOp::Push
+            }
+        )));
+    }
+
+    #[test]
+    fn test_rust_global_mutation_detection() {
+        let code = r#"
+        static mut GLOBAL_COUNTER: i32 = 0;
+        fn increment_global() {
+            unsafe {
+                GLOBAL_COUNTER += 1;
+            }
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Rust);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+        // Should detect both "static mut" and "unsafe {" patterns
+        assert!(profile.side_effects.len() >= 1);
+    }
+
+    #[test]
+    fn test_python_field_mutation_detection() {
+        let code = r#"
+        def update_counter(self):
+            self.count += 1
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Python);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+    }
+
+    #[test]
+    fn test_python_collection_mutation_detection() {
+        let code = r#"
+        def add_item(self, item):
+            self.items.append(item)
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Python);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+        // Should contain a collection mutation (may not be first due to field mutation)
+        assert!(profile.side_effects.iter().any(|e| matches!(
+            e,
+            SideEffect::CollectionMutation {
+                operation: CollectionOp::Push
+            }
+        )));
+    }
+
+    #[test]
+    fn test_python_global_mutation_detection() {
+        let code = r#"
+        def increment_global():
+            global counter
+            counter += 1
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Python);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+    }
+
+    #[test]
+    fn test_javascript_field_mutation_detection() {
+        let code = r#"
+        function updateCounter() {
+            this.count += 1;
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::JavaScript);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+    }
+
+    #[test]
+    fn test_javascript_collection_mutation_detection() {
+        let code = r#"
+        function addItem(item) {
+            this.items.push(item);
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::JavaScript);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+        // Should contain a collection mutation (may not be first due to field mutation)
+        assert!(profile.side_effects.iter().any(|e| matches!(
+            e,
+            SideEffect::CollectionMutation {
+                operation: CollectionOp::Push
+            }
+        )));
+    }
+
+    #[test]
+    fn test_javascript_global_mutation_detection() {
+        let code = r#"
+        function updateGlobal() {
+            window.globalCounter += 1;
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::JavaScript);
+
+        assert!(!profile.side_effects.is_empty());
+        assert!(!profile.is_pure);
+    }
+
+    #[test]
+    fn test_multiple_collection_operations() {
+        let code = r#"
+        fn manage_items(&mut self) {
+            self.items.push(1);
+            self.items.pop();
+            self.items.insert(0, 2);
+            self.items.remove(1);
+            self.items.clear();
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Rust);
+
+        assert!(profile.side_effects.len() >= 5);
+        assert!(!profile.is_pure);
+    }
+
+    #[test]
+    fn test_pure_function_no_side_effects() {
+        let code = r#"
+        fn calculate_sum(a: i32, b: i32) -> i32 {
+            a + b
+        }
+        "#;
+
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(code, Language::Rust);
+
+        assert!(profile.side_effects.is_empty());
+        assert!(profile.is_pure);
+    }
+
+    #[test]
+    fn test_side_effects_affect_purity() {
+        let code_pure = r#"fn pure(x: i32) -> i32 { x * 2 }"#;
+        let code_impure = r#"fn impure(&mut self) { self.value = 42; }"#;
+
+        let detector = IoDetector::new();
+        let profile_pure = detector.detect_io(code_pure, Language::Rust);
+        let profile_impure = detector.detect_io(code_impure, Language::Rust);
+
+        assert!(profile_pure.is_pure);
+        assert!(!profile_impure.is_pure);
     }
 }
