@@ -149,7 +149,7 @@ impl PythonTypeTracker {
     {
         if let Some(shared) = &self.type_flow_shared {
             let guard = shared.read().unwrap();
-            f(&*guard)
+            f(&guard)
         } else if let Some(owned) = &self.type_flow_owned {
             f(owned)
         } else {
@@ -164,7 +164,7 @@ impl PythonTypeTracker {
     {
         if let Some(shared) = &self.type_flow_shared {
             let mut guard = shared.write().unwrap();
-            f(&mut *guard)
+            f(&mut guard)
         } else if let Some(owned) = &mut self.type_flow_owned {
             f(owned)
         } else {
@@ -367,7 +367,9 @@ impl PythonTypeTracker {
                         // Track type flow for attribute assignments
                         if let Some(type_id) = self.python_type_to_type_id(&inferred_type) {
                             let attr_name = format!("self.{}", attr.attr);
-                            self.with_type_flow_mut(|flow| flow.record_assignment(&attr_name, type_id));
+                            self.with_type_flow_mut(|flow| {
+                                flow.record_assignment(&attr_name, type_id)
+                            });
                         }
                     }
                 }
@@ -798,7 +800,8 @@ impl TwoPassExtractor {
         let shared_type_flow = context.type_flow();
 
         // Create type tracker with shared type flow
-        let type_tracker = PythonTypeTracker::new_with_shared_flow(file_path.clone(), shared_type_flow);
+        let type_tracker =
+            PythonTypeTracker::new_with_shared_flow(file_path.clone(), shared_type_flow);
 
         Self {
             phase_one_calls: Vec::new(),
@@ -1440,14 +1443,12 @@ impl TwoPassExtractor {
                     .register_interface(&type_id.name);
 
                 // Also register base classes as interfaces
-                let collection_types = self
-                    .type_tracker
-                    .with_type_flow(|flow| {
-                        flow.get_collection_types(&collection_path)
-                            .into_iter()
-                            .cloned()
-                            .collect::<Vec<_>>()
-                    });
+                let collection_types = self.type_tracker.with_type_flow(|flow| {
+                    flow.get_collection_types(&collection_path)
+                        .into_iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                });
                 if let Some(type_info) = collection_types
                     .into_iter()
                     .find(|ti| ti.type_id == type_id)
@@ -1506,14 +1507,12 @@ impl TwoPassExtractor {
                     let collection_path = format!("{}.{}", class_name, collection_name);
 
                     // Get types in the collection from type flow tracker
-                    let type_infos = self
-                        .type_tracker
-                        .with_type_flow(|flow| {
-                            flow.get_collection_types(&collection_path)
-                                .into_iter()
-                                .cloned()
-                                .collect::<Vec<_>>()
-                        });
+                    let type_infos = self.type_tracker.with_type_flow(|flow| {
+                        flow.get_collection_types(&collection_path)
+                            .into_iter()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    });
 
                     // For each type in the collection, register the methods as interface methods
                     for type_info in type_infos {
@@ -1669,8 +1668,9 @@ impl TwoPassExtractor {
                 if let Some(arg) = call.args.first() {
                     if let Some(type_id) = self.infer_and_register_type_from_expr(arg) {
                         // Record the type flowing into the collection
-                        self.type_tracker
-                            .with_type_flow_mut(|flow| flow.record_collection_add(&collection_name, type_id));
+                        self.type_tracker.with_type_flow_mut(|flow| {
+                            flow.record_collection_add(&collection_name, type_id)
+                        });
                     }
                 }
             }
@@ -1712,7 +1712,8 @@ impl TwoPassExtractor {
                         source_location: Location::new(file_path, 0),
                         base_classes,
                     };
-                    self.type_tracker.with_type_flow_mut(|flow| flow.register_type(type_info));
+                    self.type_tracker
+                        .with_type_flow_mut(|flow| flow.register_type(type_info));
 
                     Some(type_id)
                 } else {
