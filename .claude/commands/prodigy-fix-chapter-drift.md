@@ -30,8 +30,8 @@ CHAPTER_ID="<value from --chapter-id parameter>"
 **Determine Paths:**
 Based on project name:
 - For Prodigy: `.prodigy/book-analysis/drift-${CHAPTER_ID}.json`
-- For Debtmap: `.debtmap/book-analysis/drift-${CHAPTER_ID}.json`
-- Pattern: `.{project_lowercase}/book-analysis/drift-${CHAPTER_ID}.json`
+- For Debtmap: `.prodigy/book-analysis/drift-${CHAPTER_ID}.json`
+- Pattern: `.prodigy/book-analysis/drift-${CHAPTER_ID}.json`
 
 **Load Drift Report:**
 Read the drift report JSON file to get:

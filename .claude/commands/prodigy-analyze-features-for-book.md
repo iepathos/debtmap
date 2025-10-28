@@ -62,7 +62,7 @@ Based on the project configuration:
 - Extract `book_dir` from config (defaults to "book")
 - Create analysis directory adjacent to book: `.{project_lowercase}/book-analysis/`
 - For Prodigy: `.prodigy/book-analysis/features.json`
-- For Debtmap: `.debtmap/book-analysis/features.json`
+- For Debtmap: `.prodigy/book-analysis/features.json`
 
 **Action Required:**
 Use the Write tool to create a JSON file at the determined path with this structure:

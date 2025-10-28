@@ -158,8 +158,8 @@ Overall chapter assessment:
 **Determine Output Path:**
 Based on the project name from `--project` parameter:
 - For Prodigy: `.prodigy/book-analysis/drift-$CHAPTER_ID.json`
-- For Debtmap: `.debtmap/book-analysis/drift-$CHAPTER_ID.json`
-- Pattern: `.{project_lowercase}/book-analysis/drift-$CHAPTER_ID.json`
+- For Debtmap: `.prodigy/book-analysis/drift-$CHAPTER_ID.json`
+- Pattern: `.prodigy/book-analysis/drift-$CHAPTER_ID.json`
 
 Create drift report at the determined path:
 

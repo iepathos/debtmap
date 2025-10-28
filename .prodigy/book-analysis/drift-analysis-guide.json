@@ -103,7 +103,7 @@
   ],
   "metadata": {
     "analyzed_at": "2025-10-20",
-    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Complexity metrics (cyclomatic, cognitive, entropy, nesting, length)",
       "Debt patterns (24 types in 4 categories: Testing, Architecture, Performance, Code Quality)",
