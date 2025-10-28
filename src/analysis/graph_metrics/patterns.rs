@@ -37,6 +37,9 @@ pub struct ResponsibilityClassification {
     pub evidence: Vec<String>,
     /// Detected patterns
     pub patterns: Vec<CallGraphPattern>,
+    /// Framework context (if detected)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub framework_context: Option<String>,
 }
 
 /// Pattern detector for call graphs
@@ -146,6 +149,32 @@ impl PatternDetector {
         })
     }
 
+    /// Classify responsibility with framework context
+    ///
+    /// This method checks for framework patterns first, then falls back to
+    /// standard classification based on call graph patterns and I/O profile.
+    pub fn classify_with_framework(
+        &self,
+        patterns: &[CallGraphPattern],
+        metrics: &GraphMetrics,
+        io_profile: Option<&IoProfile>,
+        framework_matches: &[crate::analysis::FrameworkMatch],
+    ) -> ResponsibilityClassification {
+        // Check for framework patterns first (highest priority)
+        if let Some(framework_match) = framework_matches.first() {
+            return ResponsibilityClassification {
+                primary: framework_match.category.clone(),
+                confidence: framework_match.confidence,
+                evidence: framework_match.evidence.clone(),
+                patterns: patterns.to_vec(),
+                framework_context: Some(framework_match.framework.clone()),
+            };
+        }
+
+        // Fall back to standard classification
+        self.classify_responsibility(patterns, metrics, io_profile)
+    }
+
     /// Classify responsibility based on detected patterns and I/O profile
     pub fn classify_responsibility(
         &self,
@@ -238,6 +267,7 @@ impl PatternDetector {
             confidence,
             evidence,
             patterns: patterns.to_vec(),
+            framework_context: None,
         }
     }
 }
