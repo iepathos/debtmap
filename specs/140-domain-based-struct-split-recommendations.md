@@ -58,10 +58,11 @@ Implement intelligent split recommendations that detect **struct-heavy god modul
 ### Functional Requirements
 
 1. **Struct-Heavy File Detection**
-   - Detect when a file is primarily struct definitions (>60% of content)
-   - Identify when struct count > method count / 3
-   - Distinguish between method-heavy vs struct-heavy god modules
-   - Track ratio of structs to total functions
+   - Detect when a file is primarily struct definitions (>30% struct ratio)
+   - Calculate struct count, total functions, and struct-to-function ratio
+   - Distinguish between method-heavy vs struct-heavy files
+   - Track domain diversity (number of distinct semantic domains)
+   - Support both god object analysis AND proactive organization analysis
 
 2. **Domain Classification Integration**
    - Use existing `suggest_module_splits_by_domain()` for struct-heavy files
@@ -69,19 +70,38 @@ Implement intelligent split recommendations that detect **struct-heavy god modul
    - Support enhanced domain classifier with 15+ domain patterns
    - Preserve struct ownership information in recommendations
 
-3. **Recommendation Quality Threshold**
+3. **Recommendation Trigger Conditions**
+
+   **Primary Trigger (CRITICAL - God Object):**
+   - File flagged as god object (`is_god_object = true`)
+   - AND struct-heavy characteristics (struct_count > 5, struct_ratio > 0.3)
+   - Shows critical-level recommendations with refactoring guidance
+
+   **Secondary Trigger (WARNING - Organization):**
+   - NOT flagged as god object yet (`is_god_object = false`)
+   - BUT has organization issues: struct_count > 8, domain_diversity >= 3, file_lines > 400
+   - Shows warning-level suggestions for proactive improvement
+
+   **No Recommendation:**
+   - Few structs (< 5 for god objects, < 8 for organization)
+   - Low domain diversity (< 3 distinct domains)
+   - Small files (< 400 lines)
+   - Cohesive single-domain files
+
+4. **Recommendation Quality Threshold**
    - Never show generic fallback if domain-based analysis is available
    - Require minimum 2 domain groups for split recommendations
    - Filter out single-struct domains unless >200 lines
    - Prioritize splits with >5 structs or >400 estimated lines
 
-4. **Recommendation Content**
+5. **Recommendation Content**
    - Show specific struct names to move (first 3-5 per module)
    - Include estimated line counts per module
    - Suggest appropriate module paths (e.g., `config/detection/`)
    - Provide rationale for grouping (domain explanation)
+   - Include severity level (CRITICAL for god objects, WARNING for organization issues)
 
-5. **Hybrid File Handling**
+6. **Hybrid File Handling**
    - For files with both structs and methods:
      - If struct-heavy (>60% structs): Use domain-based grouping
      - If method-heavy (>60% methods): Use responsibility-based grouping
@@ -133,28 +153,48 @@ let recommended_splits = if is_god_object {
 
 **New Code:**
 ```rust
-let recommended_splits = if is_god_object {
+let recommended_splits = {
     let file_name = path.file_stem()...;
-
-    // Detect if this is a struct-heavy file
     let struct_count = per_struct_metrics.len();
     let total_functions = all_methods.len();
-    let is_struct_heavy = struct_count > 5 &&
-                          (struct_count as f64 / total_functions as f64) > 0.3;
-
-    if is_struct_heavy {
-        // Use domain-based struct grouping
-        crate::organization::suggest_module_splits_by_domain(&per_struct_metrics)
+    let struct_ratio = if total_functions > 0 {
+        struct_count as f64 / total_functions as f64
     } else {
-        // Use method-based responsibility grouping
-        crate::organization::recommend_module_splits(
-            file_name,
-            &all_methods,
-            &responsibility_groups,
-        )
+        0.0
+    };
+
+    // Determine if this is a struct-heavy file
+    let is_struct_heavy = struct_count > 5 && struct_ratio > 0.3;
+
+    // Primary trigger: God object detection
+    if is_god_object {
+        if is_struct_heavy {
+            // Use domain-based struct grouping for struct-heavy god objects
+            crate::organization::suggest_module_splits_by_domain(&per_struct_metrics)
+        } else {
+            // Use method-based responsibility grouping for method-heavy god objects
+            crate::organization::recommend_module_splits(
+                file_name,
+                &all_methods,
+                &responsibility_groups,
+            )
+        }
     }
-} else {
-    vec![]
+    // Secondary trigger: Proactive organization analysis
+    else if struct_count > 8 && lines_of_code > 400 {
+        // Calculate domain diversity
+        let domain_count = count_distinct_domains(&per_struct_metrics);
+
+        if domain_count >= 3 {
+            // File has organization issues - suggest domain-based splits
+            // These will be marked as WARNING level in output
+            crate::organization::suggest_module_splits_by_domain(&per_struct_metrics)
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    }
 };
 ```
 
@@ -241,6 +281,26 @@ fn calculate_struct_ratio(
         return 0.0;
     }
     (struct_count as f64) / (total_functions as f64)
+}
+
+/// Count distinct semantic domains in struct list
+fn count_distinct_domains(structs: &[StructMetrics]) -> usize {
+    let domains: HashSet<String> = structs
+        .iter()
+        .map(|s| classify_struct_domain(&s.name))
+        .collect();
+    domains.len()
+}
+
+/// Check if file has organization issues (even if not god object)
+fn has_organization_issues(
+    struct_count: usize,
+    domain_count: usize,
+    lines_of_code: usize,
+) -> bool {
+    struct_count > 8 &&
+    domain_count >= 3 &&
+    lines_of_code > 400
 }
 ```
 
