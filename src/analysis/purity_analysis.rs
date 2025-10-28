@@ -249,7 +249,12 @@ impl PurityAnalyzer {
     }
 
     /// Analyze I/O operations from the I/O profile
-    fn analyze_io_operations(&self, profile: &IoProfile, _code: &str, _language: Language) -> Vec<PurityViolation> {
+    fn analyze_io_operations(
+        &self,
+        profile: &IoProfile,
+        _code: &str,
+        _language: Language,
+    ) -> Vec<PurityViolation> {
         let mut violations = Vec::new();
 
         // File operations
@@ -369,7 +374,13 @@ impl PurityAnalyzer {
     }
 
     /// Classify the purity level based on violations
-    fn classify_purity(&self, violations: &[PurityViolation], profile: &IoProfile, code: &str, language: Language) -> PurityLevel {
+    fn classify_purity(
+        &self,
+        violations: &[PurityViolation],
+        profile: &IoProfile,
+        code: &str,
+        language: Language,
+    ) -> PurityLevel {
         if violations.is_empty() {
             return PurityLevel::StrictlyPure;
         }
@@ -399,7 +410,12 @@ impl PurityAnalyzer {
     }
 
     /// Check if the I/O profile only contains read operations
-    fn only_has_read_operations(&self, profile: &IoProfile, code: &str, language: Language) -> bool {
+    fn only_has_read_operations(
+        &self,
+        profile: &IoProfile,
+        code: &str,
+        language: Language,
+    ) -> bool {
         // Check if we have file reads but no other I/O
         let has_file_ops = !profile.file_operations.is_empty();
         let has_network = !profile.network_operations.is_empty();
