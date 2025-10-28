@@ -5,6 +5,7 @@
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
+use crate::analysis::type_flow_tracker::TypeFlowTracker;
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
@@ -100,6 +101,8 @@ pub struct PythonTypeTracker {
     from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
     /// Framework pattern registry for entry point detection
     pub framework_registry: FrameworkPatternRegistry,
+    /// Type flow tracker for data flow analysis
+    pub type_flow: TypeFlowTracker,
 }
 
 impl PythonTypeTracker {
@@ -113,6 +116,7 @@ impl PythonTypeTracker {
             imports: HashMap::new(),
             from_imports: HashMap::new(),
             framework_registry: FrameworkPatternRegistry::new(),
+            type_flow: TypeFlowTracker::new(),
         }
     }
 
@@ -293,7 +297,12 @@ impl PythonTypeTracker {
         match target {
             ast::Expr::Name(name) => {
                 self.current_scope_mut()
-                    .insert(name.id.to_string(), inferred_type);
+                    .insert(name.id.to_string(), inferred_type.clone());
+
+                // Track type flow for assignments
+                if let Some(type_id) = self.python_type_to_type_id(&inferred_type) {
+                    self.type_flow.record_assignment(name.id.as_ref(), type_id);
+                }
             }
             ast::Expr::Attribute(attr) => {
                 // Track attribute assignments for class members
@@ -301,11 +310,47 @@ impl PythonTypeTracker {
                     if name.id.as_str() == "self" {
                         // This is a self.attr assignment in a method
                         // We'd need to track the current class context
+
+                        // Track type flow for attribute assignments
+                        if let Some(type_id) = self.python_type_to_type_id(&inferred_type) {
+                            let attr_name = format!("self.{}", attr.attr);
+                            self.type_flow.record_assignment(&attr_name, type_id);
+                        }
                     }
                 }
             }
             _ => {}
         }
+    }
+
+    /// Convert PythonType to TypeId for type flow tracking
+    fn python_type_to_type_id(
+        &self,
+        py_type: &PythonType,
+    ) -> Option<crate::analysis::type_flow_tracker::TypeId> {
+        match py_type {
+            PythonType::Class(name) | PythonType::Instance(name) => {
+                Some(crate::analysis::type_flow_tracker::TypeId::new(
+                    name.clone(),
+                    Some(self.file_path.clone()),
+                ))
+            }
+            PythonType::BuiltIn(name) => Some(crate::analysis::type_flow_tracker::TypeId::new(
+                name.clone(),
+                None,
+            )),
+            _ => None,
+        }
+    }
+
+    /// Get all types stored in a collection field (for observer pattern detection)
+    pub fn get_collection_member_types(
+        &self,
+        class: &str,
+        field: &str,
+    ) -> Vec<crate::analysis::type_flow_tracker::TypeId> {
+        let collection_name = format!("{}.{}", class, field);
+        self.type_flow.get_collection_type_ids(&collection_name)
     }
 
     /// Extract class hierarchy from AST

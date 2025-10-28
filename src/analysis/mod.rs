@@ -27,6 +27,7 @@ pub mod python_dead_code_enhanced;
 pub mod python_imports;
 pub mod python_static_errors;
 pub mod python_type_tracker;
+pub mod type_flow_tracker;
 
 pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
@@ -64,3 +65,4 @@ pub use python_static_errors::{
 pub use python_type_tracker::{
     ClassInfo, FunctionSignature, PythonType, PythonTypeTracker, TwoPassExtractor,
 };
+pub use type_flow_tracker::{CollectionOp, Location, TypeFlowTracker, TypeId, TypeInfo};
