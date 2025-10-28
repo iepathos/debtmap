@@ -90,6 +90,10 @@ impl GodObjectDetector {
     }
 
     /// Build metrics for each struct in the file
+    ///
+    /// Spec 134 Phase 3: This returns ALL methods (including tests) per struct.
+    /// This is intentional for per-struct breakdown. For file-level god object
+    /// detection, use the filtered counts from analyze_comprehensive.
     fn build_per_struct_metrics(&self, visitor: &TypeVisitor) -> Vec<StructMetrics> {
         visitor
             .types
@@ -98,7 +102,7 @@ impl GodObjectDetector {
                 let responsibilities = group_methods_by_responsibility(&type_analysis.methods);
                 StructMetrics {
                     name: type_analysis.name.clone(),
-                    method_count: type_analysis.method_count,
+                    method_count: type_analysis.method_count, // All methods (including tests)
                     field_count: type_analysis.field_count,
                     responsibilities: responsibilities.keys().cloned().collect(),
                     line_span: (
@@ -552,9 +556,10 @@ impl GodObjectDetector {
 
         // Count actual lines more accurately by looking at span information
         // For now, use a better heuristic based on item count and complexity
-        let lines_of_code = if let Some(type_info) = primary_type {
-            // Estimate based on only the struct's methods and fields (not standalone functions)
-            type_info.method_count * 15 + type_info.field_count * 2 + 50
+        // Spec 134 Phase 3: Use filtered total_methods for consistency
+        let lines_of_code = if primary_type.is_some() {
+            // Estimate based on filtered method count (production methods only)
+            total_methods * 15 + total_fields * 2 + 50
         } else {
             // If no types, estimate based on standalone functions
             standalone_count * 10 + 20
@@ -2337,6 +2342,128 @@ mod tests {
         assert_eq!(analysis.method_count, breakdown.total());
 
         // Validation should pass
+        assert!(analysis.validate().is_ok());
+    }
+
+    // Spec 134 Phase 3: Tests for function counting consistency
+    #[test]
+    fn test_function_count_excludes_tests_for_god_class() {
+        let code = r#"
+            pub struct MyStruct {}
+            impl MyStruct {
+                pub fn production1(&self) {}
+                pub fn production2(&self) {}
+
+                #[test]
+                fn test_method1() {}
+
+                #[test]
+                fn test_method2() {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // Should only count production methods (2), not tests (2)
+        assert_eq!(
+            analysis.method_count, 2,
+            "Should count only production methods"
+        );
+        assert_eq!(
+            analysis.detection_type,
+            crate::organization::DetectionType::GodClass
+        );
+
+        // Visibility breakdown should match method_count
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+        assert_eq!(
+            breakdown.total(),
+            2,
+            "Visibility breakdown should match method_count"
+        );
+
+        // Validation must pass
+        assert!(analysis.validate().is_ok());
+    }
+
+    #[test]
+    fn test_function_count_consistency_across_metrics() {
+        let code = r#"
+            pub struct MyStruct {}
+            impl MyStruct {
+                pub fn m1(&self) {}
+                pub fn m2(&self) {}
+                pub fn m3(&self) {}
+
+                #[test]
+                fn test1() {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // Verify consistency: method_count, visibility breakdown, and responsibilities
+        assert_eq!(analysis.method_count, 3, "Should have 3 production methods");
+
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+        assert_eq!(breakdown.total(), 3, "Visibility should match method_count");
+        assert_eq!(breakdown.public, 3);
+
+        // Validate all metrics are consistent
+        assert!(analysis.validate().is_ok());
+
+        // Lines of code should be calculated from filtered method_count
+        // Formula: method_count * 15 + field_count * 2 + 50
+        let expected_loc = 3 * 15 + 50; // 0 fields, so no field contribution
+        assert_eq!(analysis.lines_of_code, expected_loc);
+    }
+
+    #[test]
+    fn test_no_contradictions_in_metrics() {
+        let code = r#"
+            pub struct GodClass {
+                f1: u32, f2: u32, f3: u32, f4: u32, f5: u32,
+            }
+            impl GodClass {
+                pub fn method1(&self) {}
+                pub fn method2(&self) {}
+                fn method3(&self) {}
+                pub(crate) fn method4(&self) {}
+
+                #[test]
+                fn test_method() {}
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("test.rs");
+        let analysis = detector.analyze_comprehensive(path, &ast);
+
+        // All metrics must be consistent
+        let breakdown = analysis.visibility_breakdown.as_ref().unwrap();
+
+        // Should have 4 production methods (excluding test)
+        assert_eq!(analysis.method_count, 4);
+        assert_eq!(breakdown.total(), 4);
+        assert_eq!(breakdown.public, 2);
+        assert_eq!(breakdown.pub_crate, 1);
+        assert_eq!(breakdown.private, 1);
+
+        // Responsibilities must match method count
+        assert!(!analysis.responsibilities.is_empty());
+        assert_eq!(
+            analysis.responsibility_count,
+            analysis.responsibilities.len()
+        );
+
+        // Validation must pass - no contradictions
         assert!(analysis.validate().is_ok());
     }
 }

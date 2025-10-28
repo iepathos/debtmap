@@ -15,8 +15,18 @@ pub enum DetectionType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GodObjectAnalysis {
     pub is_god_object: bool,
-    /// For GodClass: production methods only (tests excluded)
-    /// For GodFile: all functions including tests
+    /// **Function count for god object scoring** (Spec 134 Phase 3)
+    ///
+    /// - **GodClass**: Production methods only (tests excluded)
+    /// - **GodFile**: All functions including tests
+    ///
+    /// This count is used consistently for:
+    /// - God object score calculation
+    /// - Lines of code estimation
+    /// - Visibility breakdown validation
+    ///
+    /// Note: `EnhancedGodObjectAnalysis.per_struct_metrics` may show different
+    /// counts as they include all methods for per-struct breakdown.
     pub method_count: usize,
     pub field_count: usize,
     pub responsibility_count: usize,
