@@ -467,11 +467,81 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
     groups
 }
 
+/// Infer responsibility using both I/O detection and name-based heuristics.
+///
+/// This provides more accurate classification than name-based heuristics alone
+/// by analyzing actual I/O operations in the function body.
+///
+/// # Arguments
+///
+/// * `method_name` - Name of the method/function
+/// * `method_body` - Optional source code of the method body
+/// * `language` - Programming language for I/O pattern detection
+///
+/// # Returns
+///
+/// Responsibility category string
+///
+/// # Strategy
+///
+/// 1. If method body is provided, use I/O detection (primary signal)
+/// 2. Fall back to name-based heuristics if no I/O detected or body not available
+/// 3. For conflicting signals, I/O detection takes precedence
+pub fn infer_responsibility_with_io_detection(
+    method_name: &str,
+    method_body: Option<&str>,
+    language: crate::analysis::io_detection::Language,
+) -> String {
+    use crate::analysis::io_detection::{IoDetector, Responsibility};
+
+    // If we have the method body, use I/O detection as primary signal
+    if let Some(body) = method_body {
+        let detector = IoDetector::new();
+        let profile = detector.detect_io(body, language);
+
+        // If I/O operations detected, use I/O-based classification
+        if !profile.is_pure {
+            let io_responsibility = profile.primary_responsibility();
+            return match io_responsibility {
+                Responsibility::FileIO => "File I/O".to_string(),
+                Responsibility::NetworkIO => "Network I/O".to_string(),
+                Responsibility::ConsoleIO => "Console I/O".to_string(),
+                Responsibility::DatabaseIO => "Database I/O".to_string(),
+                Responsibility::MixedIO => "Mixed I/O".to_string(),
+                Responsibility::SideEffects => "Side Effects".to_string(),
+                Responsibility::PureComputation => {
+                    // For pure functions, name heuristics might be more informative
+                    infer_responsibility_from_method(method_name)
+                }
+            };
+        }
+    }
+
+    // Fall back to name-based heuristics
+    infer_responsibility_from_method(method_name)
+}
+
+/// Map I/O-based responsibility to traditional responsibility categories.
+///
+/// This helps maintain backward compatibility with existing classification while
+/// leveraging the improved accuracy of I/O detection.
+pub fn map_io_to_traditional_responsibility(io_resp: &str) -> String {
+    match io_resp {
+        "File I/O" | "Network I/O" | "Database I/O" => "Persistence".to_string(),
+        "Console I/O" => "Formatting & Output".to_string(),
+        "Mixed I/O" => "Processing".to_string(),
+        _ => io_resp.to_string(),
+    }
+}
+
 /// Infer responsibility category from function/method name.
 ///
 /// This function uses common naming patterns to categorize functions into
 /// responsibility groups. It recognizes standard Rust function prefixes like
 /// `format_*`, `parse_*`, `filter_*`, etc.
+///
+/// For more accurate classification, use `infer_responsibility_with_io_detection`
+/// which analyzes actual I/O operations in the function body.
 ///
 /// # Pattern Recognition
 ///
@@ -1430,5 +1500,155 @@ mod tests {
         // Edge case: Exactly at threshold
         let ratio = calculate_struct_ratio(5, 15);
         assert_eq!(ratio, 5.0 / 15.0);
+    }
+
+    // Tests for I/O-based responsibility detection (Spec 141)
+    #[test]
+    fn test_io_detection_file_io() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "load_config";
+        let method_body = r#"
+            fn load_config() -> String {
+                std::fs::read_to_string("config.toml").unwrap()
+            }
+        "#;
+
+        let responsibility =
+            infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
+
+        assert_eq!(responsibility, "File I/O");
+    }
+
+    #[test]
+    fn test_io_detection_network_io() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "fetch_data";
+        let method_body = r#"
+            fn fetch_data() {
+                let client = reqwest::blocking::Client::new();
+                let response = client.get("https://api.example.com").send();
+            }
+        "#;
+
+        let responsibility =
+            infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
+
+        assert_eq!(responsibility, "Network I/O");
+    }
+
+    #[test]
+    fn test_io_detection_console_io() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "display_results";
+        let method_body = r#"
+            fn display_results(data: &str) {
+                println!("Results: {}", data);
+            }
+        "#;
+
+        let responsibility =
+            infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
+
+        assert_eq!(responsibility, "Console I/O");
+    }
+
+    #[test]
+    fn test_io_detection_pure_computation() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "calculate_sum";
+        let method_body = r#"
+            fn calculate_sum(a: i32, b: i32) -> i32 {
+                a + b
+            }
+        "#;
+
+        let responsibility =
+            infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
+
+        // Pure functions fall back to name-based heuristics
+        assert_eq!(responsibility, "Computation");
+    }
+
+    #[test]
+    fn test_io_detection_fallback_to_name() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "format_output";
+        let method_body = None; // No body provided
+
+        let responsibility =
+            infer_responsibility_with_io_detection(method_name, method_body, Language::Rust);
+
+        // Without body, falls back to name-based detection
+        assert_eq!(responsibility, "Formatting & Output");
+    }
+
+    #[test]
+    fn test_io_detection_python_file_io() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "read_data";
+        let method_body = r#"
+            def read_data():
+                with open('data.json') as f:
+                    return f.read()
+        "#;
+
+        let responsibility = infer_responsibility_with_io_detection(
+            method_name,
+            Some(method_body),
+            Language::Python,
+        );
+
+        assert_eq!(responsibility, "File I/O");
+    }
+
+    #[test]
+    fn test_io_detection_javascript_network() {
+        use crate::analysis::io_detection::Language;
+
+        let method_name = "getData";
+        let method_body = r#"
+            async function getData() {
+                const response = await fetch('https://api.example.com');
+                return await response.json();
+            }
+        "#;
+
+        let responsibility = infer_responsibility_with_io_detection(
+            method_name,
+            Some(method_body),
+            Language::JavaScript,
+        );
+
+        assert_eq!(responsibility, "Network I/O");
+    }
+
+    #[test]
+    fn test_map_io_to_traditional_responsibility() {
+        assert_eq!(
+            map_io_to_traditional_responsibility("File I/O"),
+            "Persistence"
+        );
+        assert_eq!(
+            map_io_to_traditional_responsibility("Network I/O"),
+            "Persistence"
+        );
+        assert_eq!(
+            map_io_to_traditional_responsibility("Database I/O"),
+            "Persistence"
+        );
+        assert_eq!(
+            map_io_to_traditional_responsibility("Console I/O"),
+            "Formatting & Output"
+        );
+        assert_eq!(
+            map_io_to_traditional_responsibility("Mixed I/O"),
+            "Processing"
+        );
     }
 }
