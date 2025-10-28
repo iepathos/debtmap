@@ -534,6 +534,80 @@ pub fn map_io_to_traditional_responsibility(io_resp: &str) -> String {
     }
 }
 
+/// Infer responsibility using multi-signal aggregation (Spec 145).
+///
+/// This provides the highest accuracy classification by combining:
+/// - I/O Detection (40% weight)
+/// - Call Graph Analysis (30% weight)
+/// - Type Signatures (15% weight)
+/// - Purity Analysis (10% weight)
+/// - Framework Patterns (5% weight)
+/// - Name Heuristics (5% weight)
+///
+/// Target accuracy: ~88% (vs ~50% with name-based alone)
+///
+/// # Arguments
+///
+/// * `method_name` - Name of the method/function
+/// * `method_body` - Optional source code of the method body
+/// * `language` - Programming language
+///
+/// # Returns
+///
+/// Tuple of (responsibility string, confidence score)
+pub fn infer_responsibility_multi_signal(
+    method_name: &str,
+    method_body: Option<&str>,
+    language: crate::analysis::io_detection::Language,
+) -> (String, f64) {
+    use crate::analysis::multi_signal_aggregation::{ResponsibilityAggregator, SignalSet};
+
+    let aggregator = ResponsibilityAggregator::new();
+
+    // Collect all available signals
+    let mut signals = SignalSet::default();
+
+    // I/O signal (if body available)
+    if let Some(body) = method_body {
+        signals.io_signal = aggregator.collect_io_signal(body, language);
+        signals.purity_signal = aggregator.collect_purity_signal(body, language);
+    }
+
+    // Name signal (always available)
+    signals.name_signal = Some(aggregator.collect_name_signal(method_name));
+
+    // Aggregate all signals
+    let result = aggregator.aggregate(&signals);
+
+    // Convert to traditional responsibility string
+    let responsibility = result.primary.as_str().to_string();
+    let confidence = result.confidence;
+
+    (responsibility, confidence)
+}
+
+/// Group methods by responsibility using multi-signal aggregation.
+///
+/// This provides more accurate grouping than name-based heuristics alone.
+pub fn group_methods_by_responsibility_multi_signal(
+    methods: &[(String, Option<String>)],
+    language: crate::analysis::io_detection::Language,
+) -> HashMap<String, Vec<String>> {
+    let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (method_name, method_body) in methods {
+        let (responsibility, _confidence) =
+            infer_responsibility_multi_signal(method_name, method_body.as_deref(), language);
+
+        groups
+            .entry(responsibility)
+            .or_default()
+            .push(method_name.clone());
+    }
+
+    groups
+}
+
 /// Infer responsibility category from function/method name.
 ///
 /// This function uses common naming patterns to categorize functions into

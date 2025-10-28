@@ -13,6 +13,7 @@
 //! - I/O and side effect detection for responsibility classification
 //! - Call graph metrics and pattern detection for responsibility analysis
 //! - Purity analysis for function classification and refactoring guidance
+//! - Multi-signal aggregation for high-accuracy responsibility classification
 
 pub mod attribution;
 pub mod call_graph;
@@ -26,6 +27,7 @@ pub mod graph_metrics;
 pub mod io_detection;
 pub mod module_structure;
 pub mod multi_pass;
+pub mod multi_signal_aggregation;
 pub mod patterns;
 pub mod purity_analysis;
 pub mod python_call_graph;
@@ -64,6 +66,11 @@ pub use io_detection::{
 pub use module_structure::{
     ComponentCouplingAnalysis, ComponentDependencyGraph, Difficulty, FunctionCounts, FunctionGroup,
     ModuleComponent, ModuleStructure, ModuleStructureAnalyzer, SplitRecommendation,
+};
+pub use multi_signal_aggregation::{
+    AggregatedClassification, AggregationConfig, ConflictResolutionStrategy,
+    ResponsibilityAggregator, ResponsibilityCategory, SignalEvidence, SignalSet, SignalType,
+    SignalWeights,
 };
 pub use patterns::{
     callback::CallbackPatternRecognizer, factory::FactoryPatternRecognizer,
