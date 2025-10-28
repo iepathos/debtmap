@@ -48,6 +48,21 @@ pub struct GodObjectIndicators {
     /// Detailed module structure analysis (for enhanced reporting)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub module_structure: Option<crate::analysis::ModuleStructure>,
+    /// Number of distinct semantic domains detected
+    #[serde(default)]
+    pub domain_count: usize,
+    /// Domain diversity score (0.0 to 1.0)
+    #[serde(default)]
+    pub domain_diversity: f64,
+    /// Ratio of struct definitions to total functions (0.0 to 1.0)
+    #[serde(default)]
+    pub struct_ratio: f64,
+    /// Analysis method used for recommendations
+    #[serde(default)]
+    pub analysis_method: SplitAnalysisMethod,
+    /// Severity of cross-domain mixing (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cross_domain_severity: Option<RecommendationSeverity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,12 +79,41 @@ pub struct ModuleSplit {
     pub warning: Option<String>,
     #[serde(default)]
     pub priority: Priority,
+    /// Semantic domain this split represents
+    #[serde(default)]
+    pub domain: String,
+    /// Explanation of why this split was suggested
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+    /// Analysis method that generated this split
+    #[serde(default)]
+    pub method: SplitAnalysisMethod,
+    /// Severity of this recommendation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<RecommendationSeverity>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum Priority {
     High,
     #[default]
+    Medium,
+    Low,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum SplitAnalysisMethod {
+    #[default]
+    None,
+    CrossDomain,
+    MethodBased,
+    Hybrid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RecommendationSeverity {
+    Critical,
+    High,
     Medium,
     Low,
 }
@@ -280,6 +324,11 @@ impl Default for GodObjectIndicators {
             responsibility_names: Vec::new(),
             recommended_splits: Vec::new(),
             module_structure: None,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         }
     }
 }
@@ -353,6 +402,12 @@ mod tests {
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
                 module_structure: None,
+
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
             },
             function_scores: vec![5.0; 60],
             god_object_type: None,
@@ -596,6 +651,12 @@ mod tests {
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
                 module_structure: None,
+
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
@@ -637,6 +698,12 @@ mod tests {
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
                 module_structure: None,
+
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
             },
             god_object_type: Some(god_file_type),
             total_lines: 2000,
@@ -675,6 +742,12 @@ mod tests {
                 responsibility_names: Vec::new(),
                 recommended_splits: Vec::new(),
                 module_structure: None,
+
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                cross_domain_severity: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,

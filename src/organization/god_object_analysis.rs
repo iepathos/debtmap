@@ -45,6 +45,21 @@ pub struct GodObjectAnalysis {
     /// Function visibility breakdown (added for spec 134)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visibility_breakdown: Option<FunctionVisibilityBreakdown>,
+    /// Number of distinct semantic domains detected (spec 140)
+    #[serde(default)]
+    pub domain_count: usize,
+    /// Domain diversity score (0.0 to 1.0) (spec 140)
+    #[serde(default)]
+    pub domain_diversity: f64,
+    /// Ratio of struct definitions to total functions (0.0 to 1.0) (spec 140)
+    #[serde(default)]
+    pub struct_ratio: f64,
+    /// Analysis method used for recommendations (spec 140)
+    #[serde(default)]
+    pub analysis_method: SplitAnalysisMethod,
+    /// Severity of cross-domain mixing (if applicable) (spec 140)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cross_domain_severity: Option<RecommendationSeverity>,
 }
 
 impl GodObjectAnalysis {
@@ -201,12 +216,41 @@ pub struct ModuleSplit {
     /// External modules/structs that depend on this module
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies_out: Vec<String>,
+    /// Semantic domain this split represents
+    #[serde(default)]
+    pub domain: String,
+    /// Explanation of why this split was suggested
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+    /// Analysis method that generated this split
+    #[serde(default)]
+    pub method: SplitAnalysisMethod,
+    /// Severity of this recommendation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<RecommendationSeverity>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum Priority {
     High,
     #[default]
+    Medium,
+    Low,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum SplitAnalysisMethod {
+    #[default]
+    None,
+    CrossDomain,
+    MethodBased,
+    Hybrid,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RecommendationSeverity {
+    Critical,
+    High,
     Medium,
     Low,
 }
@@ -614,11 +658,71 @@ pub fn recommend_module_splits(
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
+                domain: String::new(),
+                rationale: Some(format!(
+                    "Methods grouped by '{}' responsibility pattern",
+                    responsibility
+                )),
+                method: SplitAnalysisMethod::MethodBased,
+                severity: None,
             });
         }
     }
 
     recommendations
+}
+
+/// Count distinct semantic domains in struct list
+pub fn count_distinct_domains(structs: &[StructMetrics]) -> usize {
+    use std::collections::HashSet;
+    let domains: HashSet<String> = structs
+        .iter()
+        .map(|s| classify_struct_domain(&s.name))
+        .collect();
+    domains.len()
+}
+
+/// Calculate struct-to-function ratio
+pub fn calculate_struct_ratio(struct_count: usize, total_functions: usize) -> f64 {
+    if total_functions == 0 {
+        return 0.0;
+    }
+    (struct_count as f64) / (total_functions as f64)
+}
+
+/// Determine severity of cross-domain mixing issue
+pub fn determine_cross_domain_severity(
+    struct_count: usize,
+    domain_count: usize,
+    lines: usize,
+    is_god_object: bool,
+) -> RecommendationSeverity {
+    // CRITICAL: God object with cross-domain mixing
+    if is_god_object && domain_count >= 3 {
+        return RecommendationSeverity::Critical;
+    }
+
+    // CRITICAL: Massive cross-domain mixing
+    if struct_count > 15 && domain_count >= 5 {
+        return RecommendationSeverity::Critical;
+    }
+
+    // HIGH: Significant cross-domain issues
+    if struct_count >= 10 && domain_count >= 4 {
+        return RecommendationSeverity::High;
+    }
+
+    if lines > 800 && domain_count >= 3 {
+        return RecommendationSeverity::High;
+    }
+
+    // MEDIUM: Proactive improvement opportunity
+    if struct_count >= 8 || lines > 400 {
+        return RecommendationSeverity::Medium;
+    }
+
+    // LOW: Informational only
+    RecommendationSeverity::Low
 }
 
 /// Suggest module splits based on struct name patterns (domain-based grouping)
@@ -656,6 +760,13 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
+                domain: domain.clone(),
+                rationale: Some(format!(
+                    "Structs grouped by '{}' domain to improve organization",
+                    domain
+                )),
+                method: SplitAnalysisMethod::CrossDomain,
+                severity: None, // Will be set by caller based on overall analysis
             }
         })
         .collect()
@@ -760,7 +871,7 @@ pub fn suggest_splits_by_struct_grouping(
                 suggested_name: format!("{}_{}", "module", domain),
                 methods_to_move: vec![],
                 structs_to_move: struct_names,
-                responsibility: domain,
+                responsibility: domain.clone(),
                 estimated_lines: estimated_lines.max(total_methods * 15), // Estimate if line_span not available
                 method_count: total_methods,
                 warning: None,
@@ -768,6 +879,13 @@ pub fn suggest_splits_by_struct_grouping(
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
+                domain: domain.clone(),
+                rationale: Some(format!(
+                    "Structs grouped by '{}' domain using struct ownership analysis",
+                    domain
+                )),
+                method: SplitAnalysisMethod::CrossDomain,
+                severity: None,
             }
         })
         .collect();
@@ -1023,6 +1141,11 @@ mod tests {
                 pub_super: 0,
                 private: 1,
             }),
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         };
 
         assert!(analysis.validate().is_ok());
@@ -1050,6 +1173,11 @@ mod tests {
                 pub_super: 0,
                 private: 1,
             }),
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         };
 
         let result = analysis.validate();
@@ -1082,6 +1210,11 @@ mod tests {
                 pub_super: 0,
                 private: 1,
             }),
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         };
 
         let result = analysis.validate();
@@ -1114,6 +1247,11 @@ mod tests {
                 pub_super: 0,
                 private: 2,
             }),
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: SplitAnalysisMethod::None,
+            cross_domain_severity: None,
         };
 
         let result = analysis.validate();
@@ -1133,5 +1271,164 @@ mod tests {
             private: 10,
         };
         assert_eq!(breakdown.total(), 20);
+    }
+
+    #[test]
+    fn test_count_distinct_domains() {
+        let structs = vec![
+            StructMetrics {
+                name: "ThresholdConfig".to_string(),
+                line_span: (0, 10),
+                method_count: 2,
+                field_count: 5,
+                responsibilities: vec!["configuration".to_string()],
+            },
+            StructMetrics {
+                name: "ThresholdValidator".to_string(),
+                line_span: (11, 20),
+                method_count: 3,
+                field_count: 4,
+                responsibilities: vec!["validation".to_string()],
+            },
+            StructMetrics {
+                name: "ScoringWeight".to_string(),
+                line_span: (21, 30),
+                method_count: 4,
+                field_count: 3,
+                responsibilities: vec!["calculation".to_string()],
+            },
+            StructMetrics {
+                name: "ScoringMultiplier".to_string(),
+                line_span: (31, 40),
+                method_count: 2,
+                field_count: 6,
+                responsibilities: vec!["configuration".to_string()],
+            },
+        ];
+
+        // Should identify 2 domains: "thresholds" and "scoring"
+        assert_eq!(count_distinct_domains(&structs), 2);
+    }
+
+    #[test]
+    fn test_count_distinct_domains_single() {
+        let structs = vec![
+            StructMetrics {
+                name: "ConfigA".to_string(),
+                line_span: (0, 10),
+                method_count: 2,
+                field_count: 5,
+                responsibilities: vec!["configuration".to_string()],
+            },
+            StructMetrics {
+                name: "ConfigB".to_string(),
+                line_span: (11, 20),
+                method_count: 3,
+                field_count: 4,
+                responsibilities: vec!["configuration".to_string()],
+            },
+        ];
+
+        // Should identify 1 domain: "config"
+        assert_eq!(count_distinct_domains(&structs), 1);
+    }
+
+    #[test]
+    fn test_calculate_struct_ratio() {
+        // Normal case
+        assert_eq!(calculate_struct_ratio(10, 20), 0.5);
+
+        // More structs than functions
+        assert_eq!(calculate_struct_ratio(15, 10), 1.5);
+
+        // Single struct
+        assert_eq!(calculate_struct_ratio(1, 10), 0.1);
+    }
+
+    #[test]
+    fn test_calculate_struct_ratio_edge_cases() {
+        // Zero functions should return 0.0 to avoid division by zero
+        assert_eq!(calculate_struct_ratio(10, 0), 0.0);
+
+        // Zero structs
+        assert_eq!(calculate_struct_ratio(0, 10), 0.0);
+
+        // Both zero
+        assert_eq!(calculate_struct_ratio(0, 0), 0.0);
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_critical() {
+        // Critical: God object with cross-domain mixing
+        assert!(matches!(
+            determine_cross_domain_severity(10, 3, 600, true),
+            RecommendationSeverity::Critical
+        ));
+
+        // Critical: Massive cross-domain mixing
+        assert!(matches!(
+            determine_cross_domain_severity(16, 5, 400, false),
+            RecommendationSeverity::Critical
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_high() {
+        // High: Significant cross-domain issues
+        assert!(matches!(
+            determine_cross_domain_severity(10, 4, 500, false),
+            RecommendationSeverity::High
+        ));
+
+        // High: Large file with multiple domains
+        assert!(matches!(
+            determine_cross_domain_severity(8, 3, 850, false),
+            RecommendationSeverity::High
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_medium() {
+        // Medium: Proactive improvement opportunity (8+ structs)
+        assert!(matches!(
+            determine_cross_domain_severity(8, 2, 300, false),
+            RecommendationSeverity::Medium
+        ));
+
+        // Medium: Larger file
+        assert!(matches!(
+            determine_cross_domain_severity(6, 2, 450, false),
+            RecommendationSeverity::Medium
+        ));
+    }
+
+    #[test]
+    fn test_determine_cross_domain_severity_low() {
+        // Low: Small file with few structs
+        assert!(matches!(
+            determine_cross_domain_severity(5, 2, 200, false),
+            RecommendationSeverity::Low
+        ));
+
+        // Low: Minimal mixing
+        assert!(matches!(
+            determine_cross_domain_severity(3, 2, 150, false),
+            RecommendationSeverity::Low
+        ));
+    }
+
+    #[test]
+    fn test_struct_heavy_detection() {
+        // Struct-heavy: 8 structs, 10 functions, ratio = 0.8
+        let ratio = calculate_struct_ratio(8, 10);
+        assert!(ratio > 0.3);
+
+        // Not struct-heavy: 3 structs, 20 functions, ratio = 0.15
+        let ratio = calculate_struct_ratio(3, 20);
+        assert!(ratio < 0.3);
+
+        // Edge case: Exactly at threshold
+        let ratio = calculate_struct_ratio(5, 15);
+        assert_eq!(ratio, 5.0 / 15.0);
     }
 }

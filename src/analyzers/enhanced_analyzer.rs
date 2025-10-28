@@ -61,6 +61,11 @@ fn create_god_object_analysis(
         module_structure: None,
         detection_type: crate::organization::DetectionType::GodFile,
         visibility_breakdown: None, // Spec 134: Added for compatibility
+        domain_count: 0,
+        domain_diversity: 0.0,
+        struct_ratio: 0.0,
+        analysis_method: crate::organization::SplitAnalysisMethod::None,
+        cross_domain_severity: None,
     }
 }
 

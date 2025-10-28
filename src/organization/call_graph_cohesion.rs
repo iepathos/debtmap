@@ -136,6 +136,11 @@ impl ValidationLimits {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         }];
 
         let enhanced =
@@ -172,6 +177,11 @@ impl ValidationLimits {
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
+
+                domain: String::new(),
+                rationale: None,
+                method: crate::organization::SplitAnalysisMethod::None,
+                severity: None,
             },
             ModuleSplit {
                 suggested_name: "validation".to_string(),
@@ -185,6 +195,11 @@ impl ValidationLimits {
                 cohesion_score: None,
                 dependencies_in: vec![],
                 dependencies_out: vec![],
+
+                domain: String::new(),
+                rationale: None,
+                method: crate::organization::SplitAnalysisMethod::None,
+                severity: None,
             },
         ];
 
@@ -214,6 +229,11 @@ impl ValidationLimits {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         }];
 
         let enhanced =

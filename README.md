@@ -167,6 +167,50 @@ The key indicators:
 - See "GOD MODULE"? Split the file's functions into multiple focused modules
 - Both can appear in the same codebase for different files
 
+#### Smart Refactoring Recommendations
+
+Debtmap provides tailored recommendations based on your file's characteristics:
+
+**Struct-Heavy Modules** (many type definitions):
+- **Detection criteria**: 5+ structs with 3+ semantic domains, struct-to-function ratio > 0.3
+- **Recommendation style**: Domain-based organization
+- **Example**: A `config.rs` file with `ScoreConfig`, `ThresholdConfig`, `DetectionConfig` will be recommended to split into:
+  - `config/scoring.rs` - Score-related structures
+  - `config/thresholds.rs` - Threshold-related structures
+  - `config/detection.rs` - Detection-related structures
+- **Why**: Groups related types together for better semantic cohesion
+
+**Method-Heavy Modules** (many functions):
+- **Detection criteria**: Does not meet struct-heavy criteria
+- **Recommendation style**: Responsibility-based organization
+- **Example**: A utility file with diverse functions will be recommended to split by responsibility:
+  - `parsing.rs` - Input parsing functions
+  - `formatting.rs` - Output formatting functions
+  - `validation.rs` - Validation functions
+- **Why**: Separates different functional concerns for clarity
+
+**Severity Levels**:
+- **Critical**: God object with cross-domain mixing (immediate action recommended)
+- **High**: Significant complexity or size issues (priority refactoring)
+- **Medium**: Proactive improvement opportunity (approaching thresholds)
+- **Low**: Informational suggestions (minor improvements)
+
+**Example recommendation output**:
+```
+GOD OBJECT DETECTED: src/config.rs (10 structs across 3 domains)
+  Recommendation: Split by semantic domain
+  Severity: High
+
+  Suggested splits:
+    1. config/scoring.rs
+       Structs: ScoreConfig, ScoreCalculator, ScoreValidator
+       Estimated lines: ~150
+
+    2. config/thresholds.rs
+       Structs: ThresholdConfig, ThresholdValidator, ThresholdManager, ThresholdFactory
+       Estimated lines: ~200
+```
+
 ### Pattern Detection
 Automatically detects common design patterns (Observer, Factory, Singleton, Strategy, etc.) with configurable confidence thresholds.
 

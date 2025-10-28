@@ -2014,6 +2014,160 @@ Generate Report
 - Pure function weight < Impure function weight (always)
 - Total weighted complexity >= raw complexity count
 
+### God Object Detection - Recommendation Strategy
+
+When a god object or god module is detected, DebtMap provides actionable refactoring recommendations. The recommendation strategy adapts to the file's characteristics to provide the most relevant split suggestions.
+
+#### Analysis Method Selection
+
+DebtMap uses different analysis strategies based on the file's composition:
+
+**Domain-Based Analysis** (for struct-heavy files):
+- **Trigger conditions**:
+  - Struct count ≥ 5
+  - Distinct semantic domains ≥ 3
+  - Struct-to-function ratio > 0.3
+- **Analysis approach**: Groups structs by semantic domain (e.g., `ScoreConfig`, `ScoreCalculator` → "score" domain)
+- **Recommendations**: Suggests domain-specific module splits (e.g., `config/scoring.rs`, `config/thresholds.rs`)
+- **Rationale**: Struct-heavy files benefit from semantic grouping rather than responsibility-based splitting
+
+**Responsibility-Based Analysis** (for method-heavy files):
+- **Trigger conditions**: Does not meet domain-based criteria (few structs or low ratio)
+- **Analysis approach**: Groups functions by inferred responsibility patterns (e.g., parsing, formatting, validation)
+- **Recommendations**: Suggests responsibility-based splits (e.g., `parsing.rs`, `formatting.rs`, `validation.rs`)
+- **Rationale**: Method-heavy files benefit from separating different functional responsibilities
+
+#### Selection Priority
+
+The recommendation engine applies these strategies in order:
+
+1. **Domain-Based (Primary)**: If struct-heavy conditions are met, use domain analysis
+2. **Responsibility-Based (Fallback)**: Otherwise, use responsibility pattern analysis
+3. **Hybrid (Optional)**: For files with both characteristics, may provide both types of recommendations
+
+#### Severity Determination
+
+Recommendations are assigned severity levels based on multiple factors:
+
+```rust
+fn determine_cross_domain_severity(
+    struct_count: usize,
+    domain_count: usize,
+    lines: usize,
+    is_god_object: bool,
+) -> RecommendationSeverity {
+    // CRITICAL: God object with cross-domain mixing
+    if is_god_object && domain_count >= 3 {
+        return Critical;
+    }
+
+    // CRITICAL: Massive cross-domain mixing
+    if struct_count > 15 && domain_count >= 5 {
+        return Critical;
+    }
+
+    // HIGH: Significant cross-domain issues
+    if struct_count >= 10 && domain_count >= 4 {
+        return High;
+    }
+
+    if lines > 800 && domain_count >= 3 {
+        return High;
+    }
+
+    // MEDIUM: Proactive improvement opportunity
+    if struct_count >= 8 || lines > 400 {
+        return Medium;
+    }
+
+    // LOW: Informational only
+    Low
+}
+```
+
+**Severity Levels**:
+- **Critical**: Immediate action recommended (god object + cross-domain issues)
+- **High**: High priority refactoring (significant complexity or size)
+- **Medium**: Proactive improvement opportunity (approaching problematic thresholds)
+- **Low**: Informational suggestion (minor organizational improvements)
+
+#### Domain Classification
+
+The domain classifier examines struct names to identify semantic domains:
+
+**Common Patterns**:
+- Prefixes: `CacheConfig`, `CacheManager` → "cache" domain
+- Suffixes: `ScoreCalculator`, `ScoreValidator` → "score" domain
+- Base words: `ThresholdConfig`, `ThresholdFactory` → "threshold" domain
+
+**Algorithm**:
+```rust
+fn classify_struct_domain(name: &str) -> String {
+    // Extract domain from camelCase or snake_case names
+    // Examples:
+    //   "ScoreConfig" → "score"
+    //   "ThresholdValidator" → "threshold"
+    //   "DetectionEngine" → "detection"
+}
+```
+
+#### Recommendation Output
+
+Each recommendation includes:
+
+**ModuleSplit Structure**:
+- `suggested_name`: Target module path (e.g., `config/scoring.rs`)
+- `structs_to_move`: List of structs to relocate to this module
+- `methods_to_move`: List of functions to relocate (for responsibility-based)
+- `responsibility`: Description of the module's purpose
+- `domain`: Semantic domain name (for domain-based splits)
+- `rationale`: Explanation of why this split is recommended
+- `method`: Analysis method used (`CrossDomain` or `ResponsibilityBased`)
+- `severity`: Priority level for this recommendation
+- `estimated_lines`: Approximate size of the new module
+
+**Example Output**:
+```
+GOD OBJECT DETECTED: src/config.rs
+  Recommendation: Split by semantic domain (10 structs across 3 domains)
+  Severity: High
+
+  Suggested splits:
+    1. config/scoring.rs (3 structs: ScoreConfig, ScoreCalculator, ScoreValidator)
+       Domain: scoring
+       Estimated lines: ~150
+
+    2. config/thresholds.rs (4 structs: ThresholdConfig, ThresholdValidator, ThresholdManager, ThresholdFactory)
+       Domain: threshold
+       Estimated lines: ~200
+
+    3. config/detection.rs (3 structs: DetectionConfig, DetectionEngine, DetectionResult)
+       Domain: detection
+       Estimated lines: ~120
+```
+
+#### Implementation Details
+
+**Location**: `src/organization/god_object_analysis.rs`
+
+**Key Functions**:
+- `count_distinct_domains(structs: &[StructMetrics]) -> usize`: Count unique semantic domains
+- `calculate_struct_ratio(struct_count: usize, total_functions: usize) -> f64`: Calculate struct-to-function ratio
+- `determine_cross_domain_severity(...)`: Assign severity to recommendations
+- `suggest_module_splits_by_domain(structs: &[StructMetrics])`: Generate domain-based split suggestions
+- `classify_struct_domain(name: &str) -> String`: Extract semantic domain from struct name
+
+**Integration**:
+The recommendation strategy is integrated into `analyze_god_object_with_recommendations()` which:
+1. Analyzes file structure (struct count, function count, domains)
+2. Selects appropriate analysis method (domain-based vs responsibility-based)
+3. Generates recommendations with severity levels
+4. Populates `structs_to_move` or `methods_to_move` fields based on strategy
+
+**Testing**:
+- Unit tests: `tests::test_count_distinct_domains()`, `test_calculate_struct_ratio()`, `test_determine_cross_domain_severity()`
+- Integration tests: `tests/god_object_struct_recommendations.rs`
+
 ## Observer Pattern Detection
 
 ### Overview

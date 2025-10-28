@@ -96,6 +96,11 @@ mod tests {
             cohesion_score: None,
             dependencies_in: vec![],
             dependencies_out: vec![],
+
+            domain: String::new(),
+            rationale: None,
+            method: crate::organization::SplitAnalysisMethod::None,
+            severity: None,
         }
     }
 
