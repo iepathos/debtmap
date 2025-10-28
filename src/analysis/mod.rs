@@ -5,7 +5,7 @@
 //! - Python-specific call graph analysis with instance method tracking
 //! - Python type tracking and inference for improved method resolution
 //! - Python-aware dead code detection with magic methods and framework patterns
-//! - Framework pattern detection
+//! - Framework pattern detection (Python-specific and multi-language)
 //! - Design pattern recognition (Observer, Factory, Callback)
 //! - Cross-module dependency tracking
 //! - Multi-pass complexity analysis with attribution
@@ -19,6 +19,7 @@ pub mod call_graph;
 pub mod context_detection;
 pub mod diagnostics;
 pub mod framework_patterns;
+pub mod framework_patterns_multi;
 pub mod function_visitor;
 pub mod functional_composition;
 pub mod graph_metrics;
@@ -42,6 +43,10 @@ pub use call_graph::{
 pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
+};
+pub use framework_patterns_multi::{
+    FrameworkDetector as MultiLangFrameworkDetector, FrameworkMatch, Language as FrameworkLanguage,
+    PatternMatcher as MultiLangPatternMatcher,
 };
 pub use functional_composition::{
     analyze_composition, analyze_purity, detect_pipelines, score_composition, CompositionMetrics,

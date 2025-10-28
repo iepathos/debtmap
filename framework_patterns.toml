@@ -1,0 +1,256 @@
+# Framework Pattern Detection Configuration
+#
+# This file defines patterns for detecting framework-specific code across
+# multiple programming languages. Patterns are used to identify functions
+# based on decorators, attributes, naming conventions, imports, and more.
+
+[rust.web.axum]
+name = "Axum Web Framework"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "import", pattern = "axum" },
+    { type = "parameter", pattern = "axum::extract::" },
+    { type = "parameter", pattern = "Path<" },
+    { type = "parameter", pattern = "Query<" },
+    { type = "parameter", pattern = "Json<" },
+    { type = "return_type", pattern = "axum::response::" },
+    { type = "return_type", pattern = "Response" },
+]
+
+[rust.web.actix]
+name = "Actix Web Framework"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "import", pattern = "actix_web" },
+    { type = "parameter", pattern = "HttpRequest" },
+    { type = "parameter", pattern = "HttpResponse" },
+    { type = "parameter", pattern = "web::" },
+    { type = "return_type", pattern = "Result<HttpResponse" },
+]
+
+[rust.testing.builtin]
+name = "Rust Built-in Testing"
+category = "Test Function"
+patterns = [
+    { type = "attribute", pattern = "#\\[test\\]" },
+    { type = "attribute", pattern = "#\\[cfg\\(test\\)\\]" },
+    { type = "attribute", pattern = "#\\[tokio::test\\]" },
+    { type = "name", pattern = "^test_.*" },
+]
+
+[rust.cli.clap]
+name = "Clap CLI Parser"
+category = "CLI Argument Parsing"
+patterns = [
+    { type = "derive", pattern = "Parser" },
+    { type = "derive", pattern = "Args" },
+    { type = "derive", pattern = "Subcommand" },
+    { type = "import", pattern = "clap::" },
+]
+
+[rust.database.diesel]
+name = "Diesel ORM"
+category = "Database Query"
+patterns = [
+    { type = "import", pattern = "diesel::" },
+    { type = "call", pattern = "\\.execute\\(" },
+    { type = "call", pattern = "\\.load\\(" },
+    { type = "call", pattern = "\\.get_results?\\(" },
+    { type = "derive", pattern = "Queryable" },
+    { type = "derive", pattern = "Insertable" },
+]
+
+[rust.async.tokio]
+name = "Tokio Async Runtime"
+category = "Async Task Management"
+patterns = [
+    { type = "attribute", pattern = "#\\[tokio::main\\]" },
+    { type = "import", pattern = "tokio::" },
+    { type = "call", pattern = "tokio::spawn" },
+]
+
+[python.web.fastapi]
+name = "FastAPI"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "decorator", pattern = "@app\\.(get|post|put|delete|patch|head|options)" },
+    { type = "decorator", pattern = "@router\\.(get|post|put|delete|patch)" },
+    { type = "import", pattern = "from fastapi import" },
+    { type = "import", pattern = "import fastapi" },
+    { type = "parameter", pattern = ": Request" },
+    { type = "parameter", pattern = ": Response" },
+]
+
+[python.web.flask]
+name = "Flask"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "decorator", pattern = "@app\\.route" },
+    { type = "decorator", pattern = "@blueprint\\.route" },
+    { type = "decorator", pattern = "@app\\.before_request" },
+    { type = "decorator", pattern = "@app\\.after_request" },
+    { type = "decorator", pattern = "@app\\.errorhandler" },
+    { type = "import", pattern = "from flask import" },
+    { type = "import", pattern = "import flask" },
+]
+
+[python.web.django]
+name = "Django"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "import", pattern = "from django" },
+    { type = "import", pattern = "import django" },
+    { type = "name", pattern = "^(get|post|put|patch|delete|head|options)$" },
+    { type = "decorator", pattern = "@login_required" },
+    { type = "decorator", pattern = "@permission_required" },
+    { type = "decorator", pattern = "@require_http_methods" },
+]
+
+[python.testing.pytest]
+name = "Pytest"
+category = "Test Function"
+patterns = [
+    { type = "decorator", pattern = "@pytest\\.fixture" },
+    { type = "decorator", pattern = "@pytest\\.mark\\." },
+    { type = "decorator", pattern = "@fixture" },
+    { type = "name", pattern = "^test_.*" },
+    { type = "name", pattern = ".*_test$" },
+    { type = "file_path", pattern = ".*/tests?/.*" },
+    { type = "file_path", pattern = ".*test_.*\\.py$" },
+]
+
+[python.testing.unittest]
+name = "unittest"
+category = "Test Function"
+patterns = [
+    { type = "import", pattern = "import unittest" },
+    { type = "import", pattern = "from unittest import" },
+    { type = "name", pattern = "^test.*" },
+    { type = "name", pattern = "^setUp$" },
+    { type = "name", pattern = "^tearDown$" },
+]
+
+[python.cli.click]
+name = "Click CLI Framework"
+category = "CLI Command Handler"
+patterns = [
+    { type = "decorator", pattern = "@click\\.command" },
+    { type = "decorator", pattern = "@click\\.group" },
+    { type = "decorator", pattern = "@click\\.option" },
+    { type = "decorator", pattern = "@click\\.argument" },
+    { type = "import", pattern = "import click" },
+]
+
+[python.database.sqlalchemy]
+name = "SQLAlchemy ORM"
+category = "Database Model"
+patterns = [
+    { type = "import", pattern = "from sqlalchemy import" },
+    { type = "import", pattern = "import sqlalchemy" },
+    { type = "decorator", pattern = "@validates" },
+    { type = "decorator", pattern = "@hybrid_property" },
+    { type = "decorator", pattern = "@event\\.listens_for" },
+]
+
+[python.async.asyncio]
+name = "asyncio"
+category = "Async Task"
+patterns = [
+    { type = "import", pattern = "import asyncio" },
+    { type = "name", pattern = "^async_.*" },
+    { type = "call", pattern = "asyncio\\." },
+]
+
+[python.celery]
+name = "Celery Task Queue"
+category = "Background Task"
+patterns = [
+    { type = "decorator", pattern = "@app\\.task" },
+    { type = "decorator", pattern = "@celery\\.task" },
+    { type = "import", pattern = "from celery import" },
+    { type = "import", pattern = "import celery" },
+]
+
+[javascript.web.express]
+name = "Express.js"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "call", pattern = "app\\.(get|post|put|delete|patch|head|options)" },
+    { type = "call", pattern = "router\\.(get|post|put|delete|patch)" },
+    { type = "import", pattern = "require\\(['\"]express['\"]\\)" },
+    { type = "import", pattern = "from ['\"]express['\"]" },
+]
+
+[javascript.web.fastify]
+name = "Fastify"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "call", pattern = "fastify\\.(get|post|put|delete|patch)" },
+    { type = "import", pattern = "require\\(['\"]fastify['\"]\\)" },
+    { type = "import", pattern = "from ['\"]fastify['\"]" },
+]
+
+[javascript.testing.jest]
+name = "Jest"
+category = "Test Function"
+patterns = [
+    { type = "call", pattern = "^(test|it)\\(" },
+    { type = "call", pattern = "^describe\\(" },
+    { type = "call", pattern = "^beforeEach\\(" },
+    { type = "call", pattern = "^afterEach\\(" },
+    { type = "call", pattern = "^beforeAll\\(" },
+    { type = "call", pattern = "^afterAll\\(" },
+    { type = "file_path", pattern = ".*\\.(test|spec)\\.(js|ts|jsx|tsx)$" },
+]
+
+[javascript.testing.mocha]
+name = "Mocha"
+category = "Test Function"
+patterns = [
+    { type = "call", pattern = "^(it|describe)\\(" },
+    { type = "call", pattern = "^before\\(" },
+    { type = "call", pattern = "^after\\(" },
+    { type = "call", pattern = "^beforeEach\\(" },
+    { type = "call", pattern = "^afterEach\\(" },
+]
+
+[javascript.react]
+name = "React"
+category = "UI Component"
+patterns = [
+    { type = "import", pattern = "from ['\"]react['\"]" },
+    { type = "import", pattern = "require\\(['\"]react['\"]\\)" },
+    { type = "return_type", pattern = "JSX\\.Element" },
+    { type = "return_type", pattern = "ReactElement" },
+    { type = "call", pattern = "React\\.createElement" },
+]
+
+[javascript.database.prisma]
+name = "Prisma ORM"
+category = "Database Query"
+patterns = [
+    { type = "import", pattern = "from ['\"]@prisma/client['\"]" },
+    { type = "call", pattern = "prisma\\." },
+]
+
+[typescript.web.nestjs]
+name = "NestJS"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "decorator", pattern = "@Controller\\(" },
+    { type = "decorator", pattern = "@Get\\(" },
+    { type = "decorator", pattern = "@Post\\(" },
+    { type = "decorator", pattern = "@Put\\(" },
+    { type = "decorator", pattern = "@Delete\\(" },
+    { type = "decorator", pattern = "@Patch\\(" },
+    { type = "import", pattern = "from ['\"]@nestjs/" },
+]
+
+[typescript.testing.jest]
+name = "Jest (TypeScript)"
+category = "Test Function"
+patterns = [
+    { type = "call", pattern = "^(test|it)\\(" },
+    { type = "call", pattern = "^describe\\(" },
+    { type = "file_path", pattern = ".*\\.(test|spec)\\.tsx?$" },
+]

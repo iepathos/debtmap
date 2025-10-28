@@ -211,6 +211,79 @@ GOD OBJECT DETECTED: src/config.rs (10 structs across 3 domains)
        Estimated lines: ~200
 ```
 
+### Framework Pattern Detection
+Debtmap identifies framework-specific code patterns across Rust, Python, JavaScript, and TypeScript, improving the accuracy of responsibility classification and helping distinguish framework boilerplate from application logic.
+
+**Supported Frameworks:**
+
+- **Rust**: Axum, Actix-Web, Tokio, Diesel, Clap
+- **Python**: FastAPI, Flask, Django, Pytest, SQLAlchemy, Click, Celery
+- **JavaScript/TypeScript**: Express.js, Fastify, React, Jest, Mocha, NestJS, Prisma
+
+**How It Works:**
+
+Framework patterns are detected using a combination of:
+- Import/require statements
+- Decorators and attributes
+- Function signatures and parameters
+- Return types and naming conventions
+- File path patterns
+
+**Example Detection:**
+
+```rust
+// Axum Web Handler - Detected as "HTTP Request Handler"
+async fn get_user(Path(user_id): Path<u32>) -> Json<User> {
+    // ...
+}
+```
+
+```python
+# FastAPI Route - Detected as "HTTP Request Handler"
+@app.get("/users/{user_id}")
+async def get_user(user_id: int) -> User:
+    # ...
+```
+
+```javascript
+// React Component - Detected as "UI Component"
+function UserProfile({ userId }) {
+    return <div>Profile for {userId}</div>;
+}
+```
+
+**Custom Pattern Configuration:**
+
+You can add custom framework patterns by creating a `framework_patterns.toml` file in your project root:
+
+```toml
+[rust.web.your_framework]
+name = "Your Framework"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "import", pattern = "your_framework::" },
+    { type = "parameter", pattern = "Request<" },
+    { type = "return_type", pattern = "Response" },
+]
+```
+
+Pattern types available:
+- `import` - Match import/use statements
+- `decorator` - Match Python/TypeScript decorators
+- `attribute` - Match Rust attributes (#[...])
+- `derive` - Match Rust derive macros
+- `parameter` - Match function parameter types
+- `return_type` - Match function return types
+- `name` - Match function names (regex supported)
+- `call` - Match function calls in body
+- `file_path` - Match file paths (regex supported)
+
+**Benefits:**
+
+- **Better Responsibility Classification**: Framework handlers are correctly categorized instead of being flagged as generic "I/O" operations
+- **Reduced False Positives**: Test functions and framework boilerplate are properly identified
+- **Context-Aware Analysis**: Understanding framework patterns helps debtmap provide more accurate complexity assessments
+
 ### Pattern Detection
 Automatically detects common design patterns (Observer, Factory, Singleton, Strategy, etc.) with configurable confidence thresholds.
 
