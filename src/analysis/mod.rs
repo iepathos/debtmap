@@ -11,6 +11,7 @@
 //! - Multi-pass complexity analysis with attribution
 //! - Diagnostic reporting and insights generation
 //! - I/O and side effect detection for responsibility classification
+//! - Call graph metrics and pattern detection for responsibility analysis
 
 pub mod attribution;
 pub mod call_graph;
@@ -19,6 +20,7 @@ pub mod diagnostics;
 pub mod framework_patterns;
 pub mod function_visitor;
 pub mod functional_composition;
+pub mod graph_metrics;
 pub mod io_detection;
 pub mod module_structure;
 pub mod multi_pass;
@@ -42,6 +44,11 @@ pub use framework_patterns::{
 pub use functional_composition::{
     analyze_composition, analyze_purity, detect_pipelines, score_composition, CompositionMetrics,
     FunctionalAnalysisConfig, Pipeline, PipelineStage, PurityMetrics, SideEffectKind, TerminalOp,
+};
+pub use graph_metrics::{
+    compute_betweenness_centrality, compute_clustering_coefficient,
+    compute_depth_from_entry_points, CallGraphPattern, GraphMetrics,
+    PatternDetector as CallGraphPatternDetector, ResponsibilityClassification,
 };
 pub use io_detection::{
     CollectionOp as IoCollectionOp, IoDetector, IoOperation, IoPatternSet, IoProfile, Language,
