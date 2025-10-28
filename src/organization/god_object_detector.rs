@@ -684,26 +684,38 @@ impl GodObjectDetector {
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
-        // Optionally generate detailed module structure analysis for Rust files
-        let module_structure =
-            if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                if let Some(source_content) = &self.source_content {
-                    use crate::analysis::ModuleStructureAnalyzer;
-                    let analyzer = ModuleStructureAnalyzer::new_rust();
-                    Some(analyzer.analyze_rust_file(source_content, path))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
         // Calculate visibility breakdown for Rust files (Spec 134)
         let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
             Some(Self::calculate_visibility_breakdown(&visitor, &all_methods))
         } else {
             None
         };
+
+        // Optionally generate detailed module structure analysis for Rust files
+        // Spec 140: Integrate visibility breakdown with module structure
+        let module_structure =
+            if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                if let Some(source_content) = &self.source_content {
+                    use crate::analysis::ModuleStructureAnalyzer;
+                    let analyzer = ModuleStructureAnalyzer::new_rust();
+                    let mut structure = analyzer.analyze_rust_file(source_content, path);
+
+                    // Integrate visibility breakdown into function counts
+                    if let Some(ref breakdown) = visibility_breakdown {
+                        structure.function_counts = Self::integrate_visibility_into_counts(
+                            &structure.function_counts,
+                            breakdown,
+                            total_methods,
+                        );
+                    }
+
+                    Some(structure)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
 
         GodObjectAnalysis {
             is_god_object,
@@ -792,6 +804,35 @@ impl GodObjectDetector {
         }
 
         breakdown
+    }
+
+    /// Integrate visibility breakdown into FunctionCounts (Spec 140)
+    ///
+    /// This bridges the new visibility tracking system (Spec 134) with the existing
+    /// ModuleStructure.function_counts field used by output formatters.
+    ///
+    /// Maps visibility levels to public/private counts:
+    /// - public_functions = breakdown.public
+    /// - private_functions = breakdown.private + pub_crate + pub_super
+    /// - total = breakdown.total()
+    ///
+    /// Falls back to original counts if visibility_breakdown is unavailable.
+    fn integrate_visibility_into_counts(
+        original_counts: &crate::analysis::FunctionCounts,
+        breakdown: &crate::organization::god_object_analysis::FunctionVisibilityBreakdown,
+        _total_methods: usize,
+    ) -> crate::analysis::FunctionCounts {
+        use crate::analysis::FunctionCounts;
+
+        FunctionCounts {
+            module_level_functions: original_counts.module_level_functions,
+            impl_methods: original_counts.impl_methods,
+            trait_methods: original_counts.trait_methods,
+            nested_module_functions: original_counts.nested_module_functions,
+            // Use visibility breakdown for public/private counts
+            public_functions: breakdown.public,
+            private_functions: breakdown.private + breakdown.pub_crate + breakdown.pub_super,
+        }
     }
 
     /// Calculate purity-weighted function contributions
@@ -2484,7 +2525,10 @@ mod tests {
         let analysis = detector.analyze_comprehensive(path, &ast);
 
         // Should be GodFile (no structs)
-        assert_eq!(analysis.detection_type, crate::organization::DetectionType::GodFile);
+        assert_eq!(
+            analysis.detection_type,
+            crate::organization::DetectionType::GodFile
+        );
 
         // Should have 5 functions
         assert_eq!(analysis.method_count, 5);
@@ -2502,9 +2546,96 @@ mod tests {
         assert!(analysis.validate().is_ok());
     }
 
-    // Note: The output formatter (src/priority/formatter.rs) currently uses
-    // ModuleStructure.function_counts instead of GodObjectAnalysis.visibility_breakdown.
-    // This means the terminal output may show different visibility counts than
-    // what's in GodObjectAnalysis. Future work should integrate these two systems.
-    // See: TODO in src/priority/formatter.rs for integration plan.
+    // Spec 140: Tests for visibility breakdown integration
+    #[test]
+    fn test_integrate_visibility_into_counts() {
+        use crate::analysis::FunctionCounts;
+        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+
+        let original_counts = FunctionCounts {
+            module_level_functions: 5,
+            impl_methods: 15,
+            trait_methods: 2,
+            nested_module_functions: 0,
+            public_functions: 0, // Old system didn't track these
+            private_functions: 0,
+        };
+
+        let breakdown = FunctionVisibilityBreakdown {
+            public: 10,
+            pub_crate: 3,
+            pub_super: 2,
+            private: 12,
+        };
+
+        let integrated =
+            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 27);
+
+        // Original counts preserved
+        assert_eq!(integrated.module_level_functions, 5);
+        assert_eq!(integrated.impl_methods, 15);
+        assert_eq!(integrated.trait_methods, 2);
+        assert_eq!(integrated.nested_module_functions, 0);
+
+        // Visibility counts from breakdown
+        assert_eq!(integrated.public_functions, 10);
+        assert_eq!(integrated.private_functions, 17); // 12 + 3 + 2
+        assert_eq!(integrated.total(), 22); // module_level + impl + trait
+    }
+
+    #[test]
+    fn test_integrate_visibility_all_public() {
+        use crate::analysis::FunctionCounts;
+        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+
+        let original_counts = FunctionCounts {
+            module_level_functions: 20,
+            impl_methods: 0,
+            trait_methods: 0,
+            nested_module_functions: 0,
+            public_functions: 0,
+            private_functions: 0,
+        };
+
+        let breakdown = FunctionVisibilityBreakdown {
+            public: 20,
+            pub_crate: 0,
+            pub_super: 0,
+            private: 0,
+        };
+
+        let integrated =
+            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 20);
+
+        assert_eq!(integrated.public_functions, 20);
+        assert_eq!(integrated.private_functions, 0);
+    }
+
+    #[test]
+    fn test_integrate_visibility_all_private() {
+        use crate::analysis::FunctionCounts;
+        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+
+        let original_counts = FunctionCounts {
+            module_level_functions: 0,
+            impl_methods: 15,
+            trait_methods: 0,
+            nested_module_functions: 0,
+            public_functions: 0,
+            private_functions: 0,
+        };
+
+        let breakdown = FunctionVisibilityBreakdown {
+            public: 0,
+            pub_crate: 0,
+            pub_super: 0,
+            private: 15,
+        };
+
+        let integrated =
+            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 15);
+
+        assert_eq!(integrated.public_functions, 0);
+        assert_eq!(integrated.private_functions, 15);
+    }
 }
