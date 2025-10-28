@@ -33,6 +33,39 @@ pub fn is_express_handler(function: &FunctionAst, file_context: &FileContext) ->
     has_express_import && has_req_res_params
 }
 
+/// Detect React component (JavaScript/TypeScript)
+pub fn is_react_component(function: &FunctionAst, file_context: &FileContext) -> bool {
+    let has_react_import = file_context
+        .imports
+        .iter()
+        .any(|i| i.contains("react") || i.contains("React"));
+
+    let returns_jsx = function
+        .return_type
+        .as_ref()
+        .map(|rt| rt.contains("JSX.Element") || rt.contains("ReactElement"))
+        .unwrap_or(false)
+        || function.body_contains_jsx;
+
+    let has_react_create_element = function
+        .calls
+        .iter()
+        .any(|call| call.name.contains("React.createElement"));
+
+    // React components typically:
+    // - Have React imports
+    // - Return JSX elements or use createElement
+    // - Have PascalCase names (starts with uppercase letter)
+    let is_pascal_case = function
+        .name
+        .chars()
+        .next()
+        .map(|c| c.is_uppercase())
+        .unwrap_or(false);
+
+    has_react_import && (returns_jsx || has_react_create_element || is_pascal_case)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::detector::{FileContext, FunctionAst, Parameter};
@@ -71,5 +104,47 @@ mod tests {
         file_context.add_import("const express = require('express');".to_string());
 
         assert!(is_express_handler(&function, &file_context));
+    }
+
+    #[test]
+    fn test_react_component_detection_with_jsx_return() {
+        let mut function = FunctionAst::new("UserProfile".to_string());
+        function.return_type = Some("JSX.Element".to_string());
+
+        let mut file_context = FileContext::new(Language::JavaScript, "components.jsx".into());
+        file_context.add_import("import React from 'react';".to_string());
+
+        assert!(is_react_component(&function, &file_context));
+    }
+
+    #[test]
+    fn test_react_component_detection_with_body_jsx() {
+        let mut function = FunctionAst::new("Header".to_string());
+        function.body_contains_jsx = true;
+
+        let mut file_context = FileContext::new(Language::TypeScript, "Header.tsx".into());
+        file_context.add_import("import React from 'react';".to_string());
+
+        assert!(is_react_component(&function, &file_context));
+    }
+
+    #[test]
+    fn test_react_component_detection_with_pascal_case() {
+        let function = FunctionAst::new("MyComponent".to_string());
+
+        let mut file_context = FileContext::new(Language::JavaScript, "MyComponent.js".into());
+        file_context.add_import("import React from 'react';".to_string());
+
+        assert!(is_react_component(&function, &file_context));
+    }
+
+    #[test]
+    fn test_not_react_component_without_import() {
+        let mut function = FunctionAst::new("Component".to_string());
+        function.body_contains_jsx = true;
+
+        let file_context = FileContext::new(Language::JavaScript, "component.js".into());
+
+        assert!(!is_react_component(&function, &file_context));
     }
 }

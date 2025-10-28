@@ -310,22 +310,38 @@ fn parse_config_into_patterns(
     let mut patterns: HashMap<Language, Vec<FrameworkPattern>> = HashMap::new();
 
     if let Some(table) = config.as_table() {
-        for (lang_key, frameworks) in table {
+        for (lang_key, lang_value) in table {
             let language = Language::parse(lang_key)?;
 
-            if let Some(frameworks_table) = frameworks.as_table() {
-                for (_, framework_value) in frameworks_table {
-                    // Parse nested framework categories
-                    if let Some(nested) = framework_value.as_table() {
-                        for (_, pattern_value) in nested {
-                            if let Ok(framework_pattern) =
-                                toml::from_str::<FrameworkPattern>(&toml::to_string(pattern_value)?)
-                            {
+            // Navigate through nested tables (e.g., rust.web.axum)
+            if let Some(category_table) = lang_value.as_table() {
+                for (_category_key, framework_table) in category_table {
+                    if let Some(framework_items) = framework_table.as_table() {
+                        for (_framework_key, pattern_value) in framework_items {
+                            // Deserialize directly from toml::Value instead of string roundtrip
+                            match pattern_value.clone().try_into::<FrameworkPattern>() {
+                                Ok(framework_pattern) => {
+                                    patterns
+                                        .entry(language)
+                                        .or_default()
+                                        .push(framework_pattern);
+                                }
+                                Err(_) => {
+                                    // Might be a direct framework definition, try parsing this level
+                                    continue;
+                                }
+                            }
+                        }
+                    } else {
+                        // Try parsing at this level (rust.testing case)
+                        match framework_table.clone().try_into::<FrameworkPattern>() {
+                            Ok(framework_pattern) => {
                                 patterns
                                     .entry(language)
                                     .or_default()
                                     .push(framework_pattern);
                             }
+                            Err(_) => continue,
                         }
                     }
                 }
@@ -415,5 +431,30 @@ mod tests {
             Language::TypeScript
         );
         assert!(Language::parse("unknown").is_err());
+    }
+
+    #[test]
+    fn test_toml_parsing() {
+        let toml_str = r#"
+[rust.web.axum]
+name = "Axum Web Framework"
+category = "HTTP Request Handler"
+patterns = [
+    { type = "import", pattern = "axum" },
+    { type = "parameter", pattern = "Path<" },
+]
+"#;
+        let config: toml::Value = toml::from_str(toml_str).unwrap();
+        let patterns = parse_config_into_patterns(&config).unwrap();
+
+        eprintln!("Parsed patterns: {:?}", patterns);
+        eprintln!("Keys: {:?}", patterns.keys().collect::<Vec<_>>());
+
+        assert!(patterns.contains_key(&Language::Rust), "Should have Rust patterns");
+        let rust_patterns = &patterns[&Language::Rust];
+        assert_eq!(rust_patterns.len(), 1);
+        assert_eq!(rust_patterns[0].name, "Axum Web Framework");
+        assert_eq!(rust_patterns[0].category, "HTTP Request Handler");
+        assert_eq!(rust_patterns[0].patterns.len(), 2);
     }
 }
