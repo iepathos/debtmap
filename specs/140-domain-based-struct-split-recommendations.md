@@ -193,14 +193,19 @@ let recommended_splits = if is_god_object {
 };
 ```
 
-**New Code (Cross-Domain Mixing as Primary Analysis):**
+**New Code (Cross-Domain Mixing with Boilerplate Detection):**
 ```rust
 let recommended_splits = {
     let file_name = path.file_stem()...;
     let struct_count = per_struct_metrics.len();
     let total_functions = all_methods.len();
 
-    // PRIMARY ANALYSIS: Check for cross-domain struct mixing
+    // PRIORITY 1: Check for boilerplate patterns (existing logic)
+    // Note: Boilerplate detection happens earlier in god_object_detector.rs
+    // and returns GodObjectType::BoilerplatePattern if detected
+    // This code path only runs if NOT boilerplate
+
+    // PRIORITY 2: Cross-domain struct mixing analysis
     if struct_count >= 5 {
         let domain_count = count_distinct_domains(&per_struct_metrics);
 
@@ -232,7 +237,7 @@ let recommended_splits = {
             vec![]
         }
     }
-    // Method-heavy file, use traditional god object analysis
+    // PRIORITY 3: Method-heavy file, use traditional god object analysis
     else if is_god_object {
         crate::organization::recommend_module_splits(
             file_name,
@@ -449,10 +454,109 @@ pub fn classify_struct_domain_with_path(
 }
 ```
 
+## Relationship with Existing Boilerplate Detection
+
+### Boilerplate Detection (Already Implemented)
+
+Debtmap **already has** macro recommendation logic via `BoilerplateDetector` in `src/organization/boilerplate_detector.rs`.
+
+**When macro recommendations are given:**
+```
+CONDITIONS:
+  20+ impl blocks for same trait
+  AND method_uniformity >= 70% (similar method signatures)
+  AND avg_complexity <= 2.0 (simple boilerplate code)
+  AND confidence >= 70%
+
+RESULT: GodObjectType::BoilerplatePattern
+OUTPUT: Macro generation recommendations
+```
+
+**Example:**
+```rust
+// flags.rs - 50 trait implementations with identical structure
+impl Flag for VerboseFlag {
+    fn name_long(&self) -> &str { "verbose" }
+    fn is_switch(&self) -> bool { true }
+    // ... 70 more boilerplate lines
+}
+// ... 49 more identical implementations
+
+// Recommendation: Use declarative macro
+// BEFORE: 3500 lines (50 × 70 lines)
+// AFTER: 450 lines (50 × 9 lines with macro)
+// 87% reduction
+```
+
+### Cross-Domain Detection (This Spec - Spec 140)
+
+This spec adds **domain-based organization** analysis for struct definitions.
+
+**When domain recommendations are given:**
+```
+CONDITIONS:
+  domain_diversity >= 3 (structs from 3+ different domains)
+  AND struct_count >= 5
+  AND NOT already flagged as boilerplate
+
+RESULT: Domain-based split recommendations
+OUTPUT: Module organization by semantic domain
+```
+
+**Example:**
+```rust
+// config.rs - 30 config structs across 15 domains
+pub struct ScoringWeights { ... }      // Domain: scoring
+pub struct ThresholdsConfig { ... }    // Domain: thresholds
+pub struct GodObjectConfig { ... }     // Domain: detection
+
+// Recommendation: Split by domain
+// Create: config/scoring.rs, config/thresholds.rs, config/detection.rs
+```
+
+### Priority Order (Detection Pipeline)
+
+```
+1. Boilerplate Detection (Existing - runs first)
+   ├─ IF 20+ trait impls with 70%+ uniformity
+   └─ THEN recommend macros, STOP
+
+2. Cross-Domain Analysis (Spec 140 - runs second)
+   ├─ IF 3+ domains AND 5+ structs
+   └─ THEN recommend domain splits, STOP
+
+3. Method-Based Analysis (Existing - fallback)
+   ├─ IF god object detected
+   └─ THEN recommend method-based splits
+```
+
+### Why This Order?
+
+1. **Boilerplate first**: Macro-ifiable code should NOT be split into modules
+   - Splitting 50 similar trait impls into modules makes maintenance WORSE
+   - Macros reduce 3500 lines to 450 lines - better than any module split
+
+2. **Cross-domain second**: Organize by semantic domain
+   - After ruling out boilerplate, check for cross-domain mixing
+   - Domain organization prevents architectural drift
+
+3. **Method-based last**: Traditional god object refactoring
+   - Only when file isn't boilerplate AND has cohesive domain
+   - Split by method responsibility patterns
+
+### Examples by Detection Path
+
+| File | Detection | Recommendation |
+|------|-----------|----------------|
+| flags.rs (50 trait impls) | Boilerplate | Macro generation (87% reduction) |
+| config.rs (30 structs, 15 domains) | Cross-domain | Domain splits (11 modules) |
+| analyzer.rs (1 struct, 50 methods) | Method-based | Responsibility splits |
+
 ## Dependencies
 
 ### Prerequisites
 - **Spec 133**: God Object vs God Module detection must be implemented
+- **Existing boilerplate detection**: Must remain functional and run first
 - Existing `suggest_module_splits_by_domain()` function must be available
 - `classify_struct_domain()` must be functional
 
