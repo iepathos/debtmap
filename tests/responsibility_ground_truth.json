@@ -1,0 +1,139 @@
+{
+  "test_cases": [
+    {
+      "id": "file_io_read_config",
+      "function_name": "read_config_file",
+      "language": "rust",
+      "code": "fn read_config_file(path: &Path) -> Result<Config> {\n    let contents = fs::read_to_string(path)?;\n    toml::from_str(&contents)\n}",
+      "expected_category": "FileIO",
+      "minimum_confidence": 0.70,
+      "rationale": "Direct file system operations with Path parameter"
+    },
+    {
+      "id": "pure_calculation",
+      "function_name": "calculate_total",
+      "language": "rust",
+      "code": "fn calculate_total(items: &[Item]) -> f64 {\n    items.iter().map(|i| i.price * i.quantity).sum()\n}",
+      "expected_category": "PureComputation",
+      "minimum_confidence": 0.75,
+      "rationale": "Pure mathematical computation with no side effects"
+    },
+    {
+      "id": "http_handler_axum",
+      "function_name": "handle_get_user",
+      "language": "rust",
+      "code": "async fn handle_get_user(\n    Path(user_id): Path<u64>,\n    State(db): State<Database>,\n) -> Result<Json<User>, StatusCode> {\n    let user = db.get_user(user_id).await?;\n    Ok(Json(user))\n}",
+      "expected_category": "HttpRequestHandler",
+      "minimum_confidence": 0.85,
+      "rationale": "Axum web handler with Path extractor and async"
+    },
+    {
+      "id": "database_query",
+      "function_name": "find_user_by_email",
+      "language": "rust",
+      "code": "async fn find_user_by_email(email: &str, pool: &PgPool) -> Result<User> {\n    sqlx::query_as!(User, \"SELECT * FROM users WHERE email = $1\", email)\n        .fetch_one(pool)\n        .await\n}",
+      "expected_category": "DatabaseIO",
+      "minimum_confidence": 0.80,
+      "rationale": "SQL query with database connection pool"
+    },
+    {
+      "id": "validation_function",
+      "function_name": "validate_email",
+      "language": "rust",
+      "code": "fn validate_email(email: &str) -> bool {\n    let re = Regex::new(r\"^[^@]+@[^@]+\\.[^@]+$\").unwrap();\n    re.is_match(email)\n}",
+      "expected_category": "Validation",
+      "minimum_confidence": 0.70,
+      "rationale": "Validates input using regex pattern matching"
+    },
+    {
+      "id": "transformation_map",
+      "function_name": "transform_user_dto",
+      "language": "rust",
+      "code": "fn transform_user_dto(user: User) -> UserDTO {\n    UserDTO {\n        id: user.id,\n        name: format!(\"{} {}\", user.first_name, user.last_name),\n        email: user.email,\n    }\n}",
+      "expected_category": "Transformation",
+      "minimum_confidence": 0.75,
+      "rationale": "Transforms data from one structure to another"
+    },
+    {
+      "id": "parsing_json",
+      "function_name": "parse_request_body",
+      "language": "rust",
+      "code": "fn parse_request_body(body: &str) -> Result<Request> {\n    serde_json::from_str(body)\n        .context(\"Failed to parse request body\")\n}",
+      "expected_category": "Parsing",
+      "minimum_confidence": 0.80,
+      "rationale": "Parses JSON string into structured data"
+    },
+    {
+      "id": "formatting_output",
+      "function_name": "format_report",
+      "language": "rust",
+      "code": "fn format_report(data: &ReportData) -> String {\n    format!(\n        \"Report for {}:\\n  Total: {}\\n  Status: {}\",\n        data.name, data.total, data.status\n    )\n}",
+      "expected_category": "Formatting",
+      "minimum_confidence": 0.75,
+      "rationale": "Formats data into human-readable string"
+    },
+    {
+      "id": "orchestration_workflow",
+      "function_name": "process_order",
+      "language": "rust",
+      "code": "async fn process_order(order: Order) -> Result<()> {\n    validate_order(&order)?;\n    let payment = charge_payment(&order).await?;\n    update_inventory(&order).await?;\n    send_confirmation(&order).await?;\n    notify_warehouse(&order).await?;\n    Ok(())\n}",
+      "expected_category": "Orchestration",
+      "minimum_confidence": 0.80,
+      "rationale": "Orchestrates multiple operations in sequence"
+    },
+    {
+      "id": "network_io_http_request",
+      "function_name": "fetch_user_data",
+      "language": "rust",
+      "code": "async fn fetch_user_data(user_id: u64) -> Result<UserData> {\n    let url = format!(\"https://api.example.com/users/{}\", user_id);\n    let response = reqwest::get(&url).await?;\n    response.json::<UserData>().await\n}",
+      "expected_category": "NetworkIO",
+      "minimum_confidence": 0.85,
+      "rationale": "HTTP request to external API"
+    },
+    {
+      "id": "test_function",
+      "function_name": "test_user_creation",
+      "language": "rust",
+      "code": "#[test]\nfn test_user_creation() {\n    let user = User::new(\"test@example.com\");\n    assert_eq!(user.email, \"test@example.com\");\n    assert!(user.id > 0);\n}",
+      "expected_category": "TestFunction",
+      "minimum_confidence": 0.95,
+      "rationale": "Test function with #[test] attribute"
+    },
+    {
+      "id": "error_handling",
+      "function_name": "handle_request_error",
+      "language": "rust",
+      "code": "fn handle_request_error(error: RequestError) -> AppError {\n    match error {\n        RequestError::InvalidInput(msg) => AppError::BadRequest(msg),\n        RequestError::Unauthorized => AppError::Unauthorized,\n        _ => AppError::Unknown,\n    }\n}",
+      "expected_category": "ErrorHandling",
+      "minimum_confidence": 0.75,
+      "rationale": "Converts request errors to application errors"
+    },
+    {
+      "id": "cli_handler",
+      "function_name": "handle_cli_command",
+      "language": "rust",
+      "code": "fn handle_cli_command(args: InitArgs) -> Result<()> {\n    println!(\"Initializing project in: {}\", args.path);\n    create_directory_structure(&args.path)?;\n    write_default_config(&args.path)?;\n    println!(\"Project initialized successfully!\");\n    Ok(())\n}",
+      "expected_category": "CliHandler",
+      "minimum_confidence": 0.80,
+      "rationale": "Handles CLI command with console output"
+    },
+    {
+      "id": "configuration_io",
+      "function_name": "load_config",
+      "language": "rust",
+      "code": "fn load_config() -> Result<AppConfig> {\n    let config_path = env::var(\"APP_CONFIG\").unwrap_or_else(|_| \"config.toml\".to_string());\n    let contents = fs::read_to_string(&config_path)?;\n    toml::from_str(&contents)\n}",
+      "expected_category": "ConfigurationIO",
+      "minimum_confidence": 0.75,
+      "rationale": "Loads configuration from file and environment"
+    },
+    {
+      "id": "coordination_delegator",
+      "function_name": "delegate_task",
+      "language": "rust",
+      "code": "async fn delegate_task(task: Task, workers: &WorkerPool) -> Result<()> {\n    let worker = workers.find_available().await?;\n    worker.assign(task).await?;\n    monitor_progress(&task).await\n}",
+      "expected_category": "Coordination",
+      "minimum_confidence": 0.70,
+      "rationale": "Coordinates task delegation between components"
+    }
+  ]
+}
