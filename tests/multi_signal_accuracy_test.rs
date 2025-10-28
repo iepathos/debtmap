@@ -77,12 +77,13 @@ fn classify_test_case(
     let language = test_case.parse_language();
 
     // Collect available signals
-    let mut signals = SignalSet::default();
-
     // Always collect I/O and purity signals
-    signals.io_signal = aggregator.collect_io_signal(&test_case.code, language);
-    signals.purity_signal = aggregator.collect_purity_signal(&test_case.code, language);
-    signals.name_signal = Some(aggregator.collect_name_signal(&test_case.function_name));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(&test_case.code, language),
+        purity_signal: aggregator.collect_purity_signal(&test_case.code, language),
+        name_signal: Some(aggregator.collect_name_signal(&test_case.function_name)),
+        ..Default::default()
+    };
 
     // Aggregate signals
     let result = aggregator.aggregate(&signals);
@@ -206,11 +207,12 @@ fn test_confidence_levels() {
 
     for test_case in &corpus.test_cases {
         let language = test_case.parse_language();
-        let mut signals = SignalSet::default();
-
-        signals.io_signal = aggregator.collect_io_signal(&test_case.code, language);
-        signals.purity_signal = aggregator.collect_purity_signal(&test_case.code, language);
-        signals.name_signal = Some(aggregator.collect_name_signal(&test_case.function_name));
+        let signals = SignalSet {
+            io_signal: aggregator.collect_io_signal(&test_case.code, language),
+            purity_signal: aggregator.collect_purity_signal(&test_case.code, language),
+            name_signal: Some(aggregator.collect_name_signal(&test_case.function_name)),
+            ..Default::default()
+        };
 
         let result = aggregator.aggregate(&signals);
 

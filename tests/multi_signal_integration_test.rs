@@ -18,10 +18,12 @@ fn read_user_profile(user_id: &str) -> Result<Profile> {
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.io_signal = aggregator.collect_io_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("read_user_profile"));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("read_user_profile")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -48,10 +50,12 @@ fn calculate_fibonacci(n: u64) -> u64 {
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.purity_signal = aggregator.collect_purity_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("calculate_fibonacci"));
+    let signals = SignalSet {
+        purity_signal: aggregator.collect_purity_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("calculate_fibonacci")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -78,10 +82,12 @@ async fn handle_create_user(
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.io_signal = aggregator.collect_io_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("handle_create_user"));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("handle_create_user")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -109,12 +115,14 @@ fn process_transactions(file_path: &Path) -> Result<Summary> {
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
     // Both I/O and purity signals present
-    signals.io_signal = aggregator.collect_io_signal(code, Language::Rust);
-    signals.purity_signal = aggregator.collect_purity_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("process_transactions"));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(code, Language::Rust),
+        purity_signal: aggregator.collect_purity_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("process_transactions")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -135,10 +143,12 @@ fn validate_email_format(email: &str) -> bool {
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.purity_signal = aggregator.collect_purity_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("validate_email_format"));
+    let signals = SignalSet {
+        purity_signal: aggregator.collect_purity_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("validate_email_format")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -178,10 +188,12 @@ fn transform_user_data(user: User) -> UserDTO {
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.purity_signal = aggregator.collect_purity_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("transform_user_data"));
+    let signals = SignalSet {
+        purity_signal: aggregator.collect_purity_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("transform_user_data")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -209,10 +221,12 @@ fn calculate_discount(price: f64, rate: f64) -> f64 {
     config.weights.framework_patterns = 0.05;
 
     let aggregator = ResponsibilityAggregator::with_config(config);
-    let mut signals = SignalSet::default();
 
-    signals.purity_signal = aggregator.collect_purity_signal(code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("calculate_discount"));
+    let signals = SignalSet {
+        purity_signal: aggregator.collect_purity_signal(code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("calculate_discount")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -229,10 +243,12 @@ def fetch_user_data(user_id):
 "#;
 
     let aggregator = ResponsibilityAggregator::new();
-    let mut signals = SignalSet::default();
 
-    signals.io_signal = aggregator.collect_io_signal(python_code, Language::Python);
-    signals.name_signal = Some(aggregator.collect_name_signal("fetch_user_data"));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(python_code, Language::Python),
+        name_signal: Some(aggregator.collect_name_signal("fetch_user_data")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
@@ -246,9 +262,11 @@ fn fetch_user_data(user_id: u64) -> Result<UserData> {
 }
 "#;
 
-    let mut signals = SignalSet::default();
-    signals.io_signal = aggregator.collect_io_signal(rust_code, Language::Rust);
-    signals.name_signal = Some(aggregator.collect_name_signal("fetch_user_data"));
+    let signals = SignalSet {
+        io_signal: aggregator.collect_io_signal(rust_code, Language::Rust),
+        name_signal: Some(aggregator.collect_name_signal("fetch_user_data")),
+        ..Default::default()
+    };
 
     let result = aggregator.aggregate(&signals);
 
