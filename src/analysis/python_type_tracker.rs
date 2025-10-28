@@ -2972,6 +2972,6 @@ class Subject{}:
         );
 
         // Verify that class hierarchy was extracted
-        assert!(extractor.type_tracker.class_hierarchy.len() > 0);
+        assert!(!extractor.type_tracker.class_hierarchy.is_empty());
     }
 }
