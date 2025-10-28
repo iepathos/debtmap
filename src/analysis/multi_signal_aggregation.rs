@@ -369,10 +369,7 @@ impl ResponsibilityAggregator {
     }
 
     /// Collect call graph signal from function analysis
-    pub fn collect_call_graph_signal(
-        &self,
-        func_name: &str,
-    ) -> Option<CallGraphClassification> {
+    pub fn collect_call_graph_signal(&self, func_name: &str) -> Option<CallGraphClassification> {
         let call_graph = self.call_graph.as_ref()?;
 
         // Analyze function based on call patterns
@@ -389,7 +386,8 @@ impl ResponsibilityAggregator {
         let is_orchestration = callees.len() > 5;
 
         // Check for handler patterns (many callers, entry point)
-        let is_handler = callers.is_empty() && call_graph.base_graph.is_entry_point(&matching_function);
+        let is_handler =
+            callers.is_empty() && call_graph.base_graph.is_entry_point(&matching_function);
 
         let category = if is_handler {
             ResponsibilityCategory::HttpRequestHandler
@@ -409,11 +407,7 @@ impl ResponsibilityAggregator {
             0.60
         };
 
-        let evidence = format!(
-            "{} callers, {} callees",
-            callers.len(),
-            callees.len()
-        );
+        let evidence = format!("{} callers, {} callees", callers.len(), callees.len());
 
         Some(CallGraphClassification {
             category,
@@ -487,13 +481,16 @@ impl ResponsibilityAggregator {
         });
 
         // Prefer parameter evidence over return type
-        let (category, confidence) = param_io
-            .or(return_io)?;
+        let (category, confidence) = param_io.or(return_io)?;
 
         let evidence = format!(
             "Type signature indicates {} (from {})",
             category.as_str(),
-            if param_io.is_some() { "parameters" } else { "return type" }
+            if param_io.is_some() {
+                "parameters"
+            } else {
+                "return type"
+            }
         );
 
         Some(TypeSignatureClassification {
@@ -717,20 +714,32 @@ fn classify_from_name(name: &str) -> ResponsibilityCategory {
     }
 
     // Parsing (check before HTTP patterns that might contain "request")
-    if lower.starts_with("parse") || lower.contains("_parse") || lower.ends_with("_body") && lower.contains("parse") {
+    if lower.starts_with("parse")
+        || lower.contains("_parse")
+        || lower.ends_with("_body") && lower.contains("parse")
+    {
         return ResponsibilityCategory::Parsing;
     }
 
     // Error handling (check before other handlers to avoid conflicts)
-    if (lower.starts_with("handle") && lower.contains("error")) || (lower.contains("error") && lower.contains("handle")) {
+    if (lower.starts_with("handle") && lower.contains("error"))
+        || (lower.contains("error") && lower.contains("handle"))
+    {
         return ResponsibilityCategory::ErrorHandling;
     }
 
     // Framework handlers (check before I/O patterns)
-    if lower.contains("handle") && (lower.contains("command") || lower.contains("cli") || lower.contains("init")) {
+    if lower.contains("handle")
+        && (lower.contains("command") || lower.contains("cli") || lower.contains("init"))
+    {
         return ResponsibilityCategory::CliHandler;
     }
-    if lower.contains("handle") && (lower.contains("http") || lower.contains("request") || lower.contains("get_") || lower.contains("post_")) {
+    if lower.contains("handle")
+        && (lower.contains("http")
+            || lower.contains("request")
+            || lower.contains("get_")
+            || lower.contains("post_"))
+    {
         return ResponsibilityCategory::HttpRequestHandler;
     }
     if lower.contains("handler") && !lower.contains("error") {
@@ -738,7 +747,9 @@ fn classify_from_name(name: &str) -> ResponsibilityCategory {
     }
 
     // I/O patterns (check config first before generic file operations)
-    if (lower.contains("config") && lower.contains("load")) || (lower.contains("app") && lower.contains("config")) {
+    if (lower.contains("config") && lower.contains("load"))
+        || (lower.contains("app") && lower.contains("config"))
+    {
         return ResponsibilityCategory::ConfigurationIO;
     }
     if lower.contains("read") || lower.contains("write") || lower.contains("file") {
@@ -747,15 +758,23 @@ fn classify_from_name(name: &str) -> ResponsibilityCategory {
     if lower.contains("http") || lower.contains("fetch") {
         return ResponsibilityCategory::NetworkIO;
     }
-    if lower.contains("database") || lower.contains("query") || lower.contains("sql") || (lower.contains("find") && lower.contains("by")) {
+    if lower.contains("database")
+        || lower.contains("query")
+        || lower.contains("sql")
+        || (lower.contains("find") && lower.contains("by"))
+    {
         return ResponsibilityCategory::DatabaseIO;
     }
 
     // Orchestration and coordination
-    if lower.starts_with("process_") || lower.starts_with("execute_") || lower.contains("workflow") {
+    if lower.starts_with("process_") || lower.starts_with("execute_") || lower.contains("workflow")
+    {
         return ResponsibilityCategory::Orchestration;
     }
-    if lower.starts_with("delegate") || lower.starts_with("coordinate") || lower.contains("dispatch") {
+    if lower.starts_with("delegate")
+        || lower.starts_with("coordinate")
+        || lower.contains("dispatch")
+    {
         return ResponsibilityCategory::Coordination;
     }
 

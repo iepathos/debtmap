@@ -65,10 +65,8 @@ impl TestCase {
 /// Load ground truth corpus from JSON file
 fn load_ground_truth() -> GroundTruthCorpus {
     let corpus_path = Path::new("tests/responsibility_ground_truth.json");
-    let contents = fs::read_to_string(corpus_path)
-        .expect("Failed to read ground truth corpus");
-    serde_json::from_str(&contents)
-        .expect("Failed to parse ground truth corpus")
+    let contents = fs::read_to_string(corpus_path).expect("Failed to read ground truth corpus");
+    serde_json::from_str(&contents).expect("Failed to parse ground truth corpus")
 }
 
 /// Classify a test case using multi-signal aggregation
@@ -127,7 +125,12 @@ fn test_multi_signal_accuracy() {
     if !failed_cases.is_empty() {
         println!("\nFailed cases:");
         for (id, expected, actual) in failed_cases {
-            println!("  - {}: expected {}, got {}", id, expected.as_str(), actual.as_str());
+            println!(
+                "  - {}: expected {}, got {}",
+                id,
+                expected.as_str(),
+                actual.as_str()
+            );
         }
     }
 
@@ -148,24 +151,34 @@ fn test_individual_signal_strengths() {
     // Test I/O detection signal only
     let mut io_correct = 0;
     for test_case in &corpus.test_cases {
-        if let Some(io_signal) = aggregator.collect_io_signal(&test_case.code, test_case.parse_language()) {
+        if let Some(io_signal) =
+            aggregator.collect_io_signal(&test_case.code, test_case.parse_language())
+        {
             if io_signal.category == test_case.parse_expected_category() {
                 io_correct += 1;
             }
         }
     }
-    println!("I/O Detection alone: {:.2}%", (io_correct as f64 / corpus.test_cases.len() as f64) * 100.0);
+    println!(
+        "I/O Detection alone: {:.2}%",
+        (io_correct as f64 / corpus.test_cases.len() as f64) * 100.0
+    );
 
     // Test purity analysis signal only
     let mut purity_correct = 0;
     for test_case in &corpus.test_cases {
-        if let Some(purity_signal) = aggregator.collect_purity_signal(&test_case.code, test_case.parse_language()) {
+        if let Some(purity_signal) =
+            aggregator.collect_purity_signal(&test_case.code, test_case.parse_language())
+        {
             if purity_signal.category == test_case.parse_expected_category() {
                 purity_correct += 1;
             }
         }
     }
-    println!("Purity Analysis alone: {:.2}%", (purity_correct as f64 / corpus.test_cases.len() as f64) * 100.0);
+    println!(
+        "Purity Analysis alone: {:.2}%",
+        (purity_correct as f64 / corpus.test_cases.len() as f64) * 100.0
+    );
 
     // Test name-based signal only
     let mut name_correct = 0;
@@ -175,7 +188,10 @@ fn test_individual_signal_strengths() {
             name_correct += 1;
         }
     }
-    println!("Name-based alone: {:.2}%", (name_correct as f64 / corpus.test_cases.len() as f64) * 100.0);
+    println!(
+        "Name-based alone: {:.2}%",
+        (name_correct as f64 / corpus.test_cases.len() as f64) * 100.0
+    );
 }
 
 #[test]
@@ -207,9 +223,17 @@ fn test_confidence_levels() {
     }
 
     if high_confidence_total > 0 {
-        let high_conf_accuracy = (high_confidence_correct as f64 / high_confidence_total as f64) * 100.0;
-        println!("High confidence (>=0.70) accuracy: {:.2}%", high_conf_accuracy);
-        println!("High confidence cases: {}/{}", high_confidence_total, corpus.test_cases.len());
+        let high_conf_accuracy =
+            (high_confidence_correct as f64 / high_confidence_total as f64) * 100.0;
+        println!(
+            "High confidence (>=0.70) accuracy: {:.2}%",
+            high_conf_accuracy
+        );
+        println!(
+            "High confidence cases: {}/{}",
+            high_confidence_total,
+            corpus.test_cases.len()
+        );
     }
 }
 
@@ -236,6 +260,12 @@ fn test_category_specific_accuracy() {
 
     for (category, (total, correct)) in category_stats {
         let accuracy = (correct as f64 / total as f64) * 100.0;
-        println!("{}: {}/{} ({:.2}%)", category.as_str(), correct, total, accuracy);
+        println!(
+            "{}: {}/{} ({:.2}%)",
+            category.as_str(),
+            correct,
+            total,
+            accuracy
+        );
     }
 }

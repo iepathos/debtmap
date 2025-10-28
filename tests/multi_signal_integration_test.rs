@@ -27,7 +27,11 @@ fn read_user_profile(user_id: &str) -> Result<Profile> {
 
     assert_eq!(result.primary, ResponsibilityCategory::FileIO);
     // With only I/O (35%) and name (10%) signals, max realistic confidence is ~0.45
-    assert!(result.confidence > 0.30, "Expected confidence > 0.30, got {}", result.confidence);
+    assert!(
+        result.confidence > 0.30,
+        "Expected confidence > 0.30, got {}",
+        result.confidence
+    );
     assert!(!result.evidence.is_empty());
 }
 
@@ -54,7 +58,11 @@ fn calculate_fibonacci(n: u64) -> u64 {
     // Should detect as pure computation due to "calculate" prefix
     assert_eq!(result.primary, ResponsibilityCategory::PureComputation);
     // With only purity (5%) and name (10%) signals, expect low confidence
-    assert!(result.confidence > 0.10, "Expected confidence > 0.10, got {}", result.confidence);
+    assert!(
+        result.confidence > 0.10,
+        "Expected confidence > 0.10, got {}",
+        result.confidence
+    );
 }
 
 #[test]
@@ -139,7 +147,8 @@ fn validate_email_format(email: &str) -> bool {
     assert!(
         result.primary == ResponsibilityCategory::Validation
             || result.primary == ResponsibilityCategory::Formatting,
-        "Expected Validation or Formatting, got {:?}", result.primary
+        "Expected Validation or Formatting, got {:?}",
+        result.primary
     );
 
     // Check that evidence is collected
@@ -150,7 +159,11 @@ fn validate_email_format(email: &str) -> bool {
         .evidence
         .iter()
         .any(|e| e.description.contains("Name pattern"));
-    assert!(has_name_evidence, "Expected name-based evidence in {:?}", result.evidence);
+    assert!(
+        has_name_evidence,
+        "Expected name-based evidence in {:?}",
+        result.evidence
+    );
 }
 
 #[test]
