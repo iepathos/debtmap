@@ -94,6 +94,50 @@ Debtmap shows you exactly what to fix first with actionable recommendations:
 └─ WHY: Complex logic (cyclomatic=6) with 0% test coverage
 ```
 
+### Concise Actionable Recommendations
+
+Debtmap provides step-by-step recommendations with clear impact estimates and difficulty levels. Each recommendation includes:
+
+- **Maximum 5 high-level steps** - Focused, actionable tasks
+- **Impact estimates** - Quantified improvements for each step
+- **Difficulty indicators** - Easy/Medium/Hard classifications
+- **Executable commands** - Concrete commands to run
+- **Estimated effort** - Time estimates in hours
+
+**Before (Legacy format):**
+```
+ACTION: Add tests and refactor
+WHY: High complexity with low coverage
+STEPS: Write tests, reduce complexity, verify improvements
+```
+
+**After (Concise format):**
+```
+PRIMARY ACTION: Add 8 tests for untested branches
+ESTIMATED EFFORT: 2.5 hours
+
+STEPS:
+1. Add 8 tests for 70% coverage gap [Easy]
+   Impact: +8 tests, reduce risk
+   Commands: cargo test parse_complex_input::
+            # Write focused tests covering critical paths
+
+2. Extract complex branches into focused functions [Medium]
+   Impact: -15 complexity
+   Commands: cargo clippy -- -W clippy::cognitive_complexity
+
+3. Verify tests pass and coverage improved [Easy]
+   Impact: Confirmed +70% coverage
+   Commands: cargo test --all
+            # Run coverage tool to verify improvement
+```
+
+The new format helps you:
+- **Prioritize** which step to do first (ordered by impact)
+- **Estimate** how long the work will take
+- **Execute** with specific commands to run
+- **Verify** improvements with measurable impact
+
 📖 See the [Getting Started Guide](https://iepathos.github.io/debtmap/getting-started.html) for detailed installation, examples, and next steps.
 
 ## Key Features
