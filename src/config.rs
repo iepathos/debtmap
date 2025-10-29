@@ -1111,6 +1111,71 @@ pub struct DebtmapConfig {
     #[serde(default)]
     pub boilerplate_detection:
         Option<crate::organization::boilerplate_detector::BoilerplateDetectionConfig>,
+
+    /// Rebalanced scoring configuration (spec 136)
+    #[serde(default, rename = "scoring_rebalanced")]
+    pub scoring_rebalanced: Option<RebalancedScoringConfig>,
+}
+
+/// Rebalanced scoring configuration (spec 136)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RebalancedScoringConfig {
+    /// Preset name (balanced, quality-focused, size-focused, test-coverage)
+    #[serde(default)]
+    pub preset: Option<String>,
+
+    /// Custom complexity weight (overrides preset if specified)
+    #[serde(default)]
+    pub complexity_weight: Option<f64>,
+
+    /// Custom coverage weight (overrides preset if specified)
+    #[serde(default)]
+    pub coverage_weight: Option<f64>,
+
+    /// Custom structural weight (overrides preset if specified)
+    #[serde(default)]
+    pub structural_weight: Option<f64>,
+
+    /// Custom size weight (overrides preset if specified)
+    #[serde(default)]
+    pub size_weight: Option<f64>,
+
+    /// Custom smell weight (overrides preset if specified)
+    #[serde(default)]
+    pub smell_weight: Option<f64>,
+}
+
+impl RebalancedScoringConfig {
+    /// Convert to ScoreWeights
+    pub fn to_weights(&self) -> crate::priority::scoring::ScoreWeights {
+        use crate::priority::scoring::ScoreWeights;
+
+        // Start with preset if specified, otherwise default
+        let mut weights = self
+            .preset
+            .as_ref()
+            .and_then(|p| ScoreWeights::from_preset(p))
+            .unwrap_or_default();
+
+        // Override with custom values if specified
+        if let Some(w) = self.complexity_weight {
+            weights.complexity_weight = w;
+        }
+        if let Some(w) = self.coverage_weight {
+            weights.coverage_weight = w;
+        }
+        if let Some(w) = self.structural_weight {
+            weights.structural_weight = w;
+        }
+        if let Some(w) = self.size_weight {
+            weights.size_weight = w;
+        }
+        if let Some(w) = self.smell_weight {
+            weights.smell_weight = w;
+        }
+
+        weights
+    }
 }
 
 /// Classification configuration

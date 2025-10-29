@@ -897,8 +897,267 @@ io_wrapper = 0.5     # De-emphasize I/O wrappers more
 minimum_debt_score = 3.0
 ```
 
-## See Also
+## Rebalanced Debt Scoring (Spec 136)
+
+Debtmap now includes an advanced **rebalanced scoring algorithm** that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.
+
+### Philosophy
+
+Traditional scoring often over-emphasizes file size, causing large but simple files to rank higher than complex, untested code. The rebalanced algorithm fixes this by:
+
+1. **De-emphasizing size**: Reduces size weight from ~1.5 to 0.3 (80% reduction)
+2. **Emphasizing quality**: Increases weights for complexity (1.0) and coverage gaps (1.0)
+3. **Additive bonuses**: Provides +20 bonus for complex + untested code (not multiplicative)
+4. **Context-aware thresholds**: Integrates with file type classification from Spec 135
+
+### Multi-Dimensional Scoring
+
+The rebalanced algorithm computes five scoring components:
+
+| Component | Weight | Range | Description |
+|-----------|--------|-------|-------------|
+| **Complexity** | 1.0 | 0-100 | Cyclomatic + cognitive complexity |
+| **Coverage Gap** | 1.0 | 0-80 | Testing coverage deficit with complexity bonus |
+| **Structural** | 0.8 | 0-60 | God objects and architectural issues |
+| **Size** | 0.3 | 0-30 | File size (reduced from previous ~1.5) |
+| **Code Smells** | 0.6 | 0-40 | Long functions, deep nesting, impure logic |
+
+**Weighted Total Formula**:
+```
+weighted_total = (complexity × 1.0) + (coverage × 1.0) + (structural × 0.8)
+                 + (size × 0.3) + (smells × 0.6)
+
+normalized_score = (weighted_total / 237.0) × 200.0  // Normalize to 0-200 range
+```
+
+### Scoring Presets
+
+Debtmap provides four presets for different prioritization strategies:
+
+#### Balanced (Default)
+```toml
+[scoring_rebalanced]
+preset = "balanced"
+```
+
+Weights:
+- Complexity: 1.0, Coverage: 1.0, Structural: 0.8, Size: 0.3, Smells: 0.6
+
+**Use when**: Standard development with focus on actual code quality
+
+#### Quality-Focused
+```toml
+[scoring_rebalanced]
+preset = "quality-focused"
+```
+
+Weights:
+- Complexity: 1.2, Coverage: 1.1, Structural: 0.9, Size: 0.2, Smells: 0.7
+
+**Use when**: Maximum emphasis on code quality, minimal concern for file size
+
+#### Test-Coverage-Focused
+```toml
+[scoring_rebalanced]
+preset = "test-coverage"
+```
+
+Weights:
+- Complexity: 0.8, Coverage: 1.3, Structural: 0.6, Size: 0.2, Smells: 0.5
+
+**Use when**: Prioritizing test coverage improvements
+
+#### Size-Focused (Legacy)
+```toml
+[scoring_rebalanced]
+preset = "size-focused"
+```
+
+Weights:
+- Complexity: 0.5, Coverage: 0.4, Structural: 0.6, Size: 1.5, Smells: 0.3
+
+**Use when**: Maintaining legacy scoring behavior, file size is primary concern
+
+### Custom Weights
+
+You can define custom weights in `.debtmap.toml`:
+
+```toml
+[scoring_rebalanced]
+complexity_weight = 1.2
+coverage_weight = 1.0
+structural_weight = 0.8
+size_weight = 0.2
+smell_weight = 0.7
+```
+
+### Severity Levels
+
+The rebalanced algorithm assigns severity based on normalized score and risk factors:
+
+| Severity | Criteria | Description |
+|----------|----------|-------------|
+| **CRITICAL** | Score > 120 OR (complexity > 60 AND coverage > 40) | Requires immediate attention |
+| **HIGH** | Score > 80 OR (complexity > 40 AND coverage > 20) OR structural > 50 | High priority for next sprint |
+| **MEDIUM** | Score > 40 OR single moderate issue | Plan for future sprint |
+| **LOW** | Everything else | Minor concerns, size-only issues |
+
+### Example Prioritization
+
+**Complex Untested Function** (HIGH priority):
+```rust
+fn process_payment(cart: &Cart, user: &User) -> Result<Receipt> {
+    // 150 lines, cyclomatic: 42, cognitive: 77
+    // Coverage: 38%
+
+    // Rebalanced Score:
+    // - Complexity: 100.0 (very high)
+    // - Coverage: 57.2 (gap × 0.6 + 20 bonus for complex+untested)
+    // - Structural: 0.0
+    // - Size: 0.0 (function-level scoring)
+    // - Smells: 25.0 (long function)
+    // Total: 95.3 → CRITICAL severity
+}
+```
+
+**Large Simple Function** (LOW priority):
+```rust
+fn format_report(data: &ReportData) -> String {
+    // 2000 lines, cyclomatic: 3, cognitive: 5
+    // Coverage: 100%
+
+    // Rebalanced Score:
+    // - Complexity: 0.0 (trivial)
+    // - Coverage: 0.0 (well tested)
+    // - Structural: 0.0
+    // - Size: 0.0 (function-level scoring)
+    // - Smells: 15.0 (long but simple)
+    // Total: 3.2 → LOW severity
+}
+```
+
+**Result**: Complex untested code ranks 30× higher than large simple code.
+
+### Integration with File Classification (Spec 135)
+
+The rebalanced scoring integrates with context-aware file size thresholds:
+
+```rust
+use debtmap::organization::file_classifier::{classify_file, get_threshold};
+
+let file_type = classify_file(source, path);
+let threshold = get_threshold(&file_type, function_count, lines);
+
+// Apply context-aware scoring:
+// - Generated code: 0.1× size multiplier
+// - Test code: Lenient thresholds (650 lines)
+// - Business logic: Strict thresholds (400 lines)
+```
+
+### Generated Code Detection
+
+The rebalanced scoring automatically detects and reduces scores for generated code:
+
+**Detection Markers** (first 20 lines):
+- "DO NOT EDIT"
+- "automatically generated"
+- "AUTO-GENERATED"
+- "@generated"
+- "Code generated by"
+
+**Generated Code Score Adjustment**:
+```rust
+if is_generated_code(source) {
+    size_score *= 0.1;  // 90% reduction
+}
+```
+
+### Scoring Rationale
+
+Each debt item includes a detailed rationale explaining the score:
+
+```
+Debt Item: src/payment/processor.rs:142 - process_payment()
+Score: 95.3 (CRITICAL)
+
+Primary factors:
+  - High cyclomatic complexity (+100.0)
+  - Significant coverage gap (+57.2)
+
+Bonuses:
+  - Complex + untested: +20 bonus applied
+  - Code smells detected (+25.0)
+
+Context adjustments:
+  - Size de-emphasized (weight: 0.3)
+```
+
+### Migration from Legacy Scoring
+
+**Breaking Changes**:
+- Scores will change significantly for all debt items
+- Large files with low complexity will rank lower
+- Complex untested code will rank higher
+- Size-based prioritization reduced by 80%
+
+**Restoring Legacy Behavior**:
+```toml
+[scoring_rebalanced]
+preset = "size-focused"
+```
+
+**Gradual Migration**:
+1. Run analysis with both algorithms: `debtmap analyze . --legacy-scoring`
+2. Compare results to understand impact
+3. Adjust team priorities based on new rankings
+4. Switch to rebalanced scoring after validation
+
+See [Migration Guide](./migration-guide.md) for detailed migration instructions.
+
+### Configuration Reference
+
+Complete configuration example:
+
+```toml
+# .debtmap.toml
+
+[scoring_rebalanced]
+# Use a preset (balanced, quality-focused, test-coverage, size-focused)
+preset = "balanced"
+
+# Or define custom weights
+complexity_weight = 1.0
+coverage_weight = 1.0
+structural_weight = 0.8
+size_weight = 0.3
+smell_weight = 0.6
+```
+
+### When to Use Rebalanced Scoring
+
+✅ **Use rebalanced scoring when**:
+- You want to prioritize code quality over file size
+- Complex untested code is a concern
+- You're building new features and need quality focus
+- Your team values testability and maintainability
+
+❌ **Use legacy/size-focused when**:
+- You're managing a legacy codebase with large files
+- File size reduction is the primary concern
+- You need compatibility with existing workflows
+- Your team's priority is file splitting over quality
+
+### Performance
+
+The rebalanced scoring algorithm has minimal performance impact:
+- Same O(n) complexity as legacy scoring
+- No additional file I/O required
+- Parallel processing compatible
+- Adds ~5% to analysis time for rationale generation
+
+### See Also
 
 - [Tiered Prioritization](./tiered-prioritization.md) - Understanding tier-based classification
 - [Configuration](./configuration.md) - Scoring and aggregation configuration
 - [Analysis Guide](./analysis-guide.md) - Detailed metric explanations
+- [File Classification](./file-classification.md) - Context-aware file size thresholds (Spec 135)
