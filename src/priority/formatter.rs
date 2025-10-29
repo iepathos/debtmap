@@ -695,6 +695,8 @@ fn format_mixed_priority_item(
 }
 
 // Pure function to determine file type label based on characteristics
+// Note: Kept for potential future use, but not used in current spec 139 format
+#[allow(dead_code)]
 fn determine_file_type_label(
     is_god_object: bool,
     fields_count: usize,
@@ -1255,21 +1257,14 @@ fn format_file_priority_item(
     let severity = get_severity_label(item.score);
     let severity_color = get_severity_color(item.score);
 
-    let type_label = determine_file_type_label(
-        item.metrics.god_object_indicators.is_god_object,
-        item.metrics.god_object_indicators.fields_count,
-        item.metrics.total_lines,
-        item.metrics.god_object_type.as_ref(),
-    );
-
+    // Spec 139: Separate severity from issue type
+    // Type label is now shown in location context, not in header
     writeln!(
         output,
         "#{} {} [{}]",
         rank,
         format!("SCORE: {}", score_formatter::format_score(item.score)).bright_yellow(),
-        format!("{} - {}", severity, type_label)
-            .color(severity_color)
-            .bold()
+        severity.color(severity_color).bold()
     )
     .unwrap();
 
@@ -1504,6 +1499,7 @@ struct FormattedSections {
     location: String,
     action: String,
     impact: String,
+    evidence: Option<String>, // New: combines complexity + metrics
     complexity: Option<String>,
     dependencies: Option<String>,
     debt_specific: Option<String>,
@@ -1517,6 +1513,7 @@ fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
         location: format_location_section(context),
         action: format_action_section(context),
         impact: format_impact_section(context),
+        evidence: format_evidence_section(context), // New
         complexity: format_complexity_section(context),
         dependencies: format_dependencies_section(context),
         debt_specific: format_debt_specific_section(context),
@@ -1553,7 +1550,7 @@ fn format_location_section(context: &FormatContext) -> String {
 fn format_action_section(context: &FormatContext) -> String {
     format!(
         "{} {}",
-        "├─ ACTION:".bright_blue(),
+        "├─ RECOMMENDED ACTION:".bright_blue(),
         context.action.bright_green().bold()
     )
 }
@@ -1581,6 +1578,50 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
         format!("{}", context.complexity_info.cognitive).yellow(),
         format!("{}", context.complexity_info.nesting).yellow()
     ))
+}
+
+// Pure function to format evidence section (metrics only, no rationale)
+fn format_evidence_section(context: &FormatContext) -> Option<String> {
+    if !context.complexity_info.has_complexity {
+        return None;
+    }
+
+    let mut section = format!("{}", "├─ EVIDENCE:".bright_blue());
+
+    // Show complexity metrics in priority order
+    if context.complexity_info.cyclomatic > 0 {
+        section.push_str(&format!(
+            "\n│  {} Cyclomatic Complexity: {}",
+            "├─",
+            format!("{}", context.complexity_info.cyclomatic).yellow()
+        ));
+    }
+
+    if context.complexity_info.cognitive > 0 {
+        section.push_str(&format!(
+            "\n│  {} Cognitive Complexity: {}",
+            "├─",
+            format!("{}", context.complexity_info.cognitive).yellow()
+        ));
+    }
+
+    if context.complexity_info.branch_count > 0 {
+        section.push_str(&format!(
+            "\n│  {} Estimated Branches: {}",
+            "├─",
+            format!("{}", context.complexity_info.branch_count).yellow()
+        ));
+    }
+
+    if context.complexity_info.nesting > 0 {
+        section.push_str(&format!(
+            "\n│  {} Nesting Depth: {}",
+            "└─",
+            format!("{}", context.complexity_info.nesting).yellow()
+        ));
+    }
+
+    Some(section)
 }
 
 // Pure function to format dependencies section with enhanced caller/callee display
@@ -1697,18 +1738,35 @@ fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
 }
 
 // Pure function to format rationale section
+// This explains WHY the evidence matters (implications, not repeating metrics)
 fn format_rationale_section(context: &FormatContext) -> String {
     let _formatter = ColoredFormatter::new(FormattingConfig::default());
-    format!("{} {}", "- WHY:".bright_blue(), context.rationale)
+    format!(
+        "{} {}",
+        "├─ WHY THIS MATTERS:".bright_blue(),
+        context.rationale
+    )
 }
 
 // I/O function to apply formatted sections to output
+// Following spec 139: Header → Location → Impact → Evidence → WHY → Action
 fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
     writeln!(output, "{}", sections.header).unwrap();
     writeln!(output, "{}", sections.location).unwrap();
-    writeln!(output, "{}", sections.action).unwrap();
     writeln!(output, "{}", sections.impact).unwrap();
 
+    // Evidence section (new) - metrics only
+    if let Some(evidence) = sections.evidence {
+        writeln!(output, "{}", evidence).unwrap();
+    }
+
+    // WHY section - rationale explaining why evidence matters
+    writeln!(output, "{}", sections.rationale).unwrap();
+
+    // Action comes after WHY (spec 139 ordering)
+    writeln!(output, "{}", sections.action).unwrap();
+
+    // Keep legacy complexity for backward compatibility
     if let Some(complexity) = sections.complexity {
         writeln!(output, "{}", complexity).unwrap();
     }
@@ -1720,8 +1778,6 @@ fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
     if let Some(debt_specific) = sections.debt_specific {
         writeln!(output, "{}", debt_specific).unwrap();
     }
-
-    writeln!(output, "{}", sections.rationale).unwrap();
 }
 
 #[allow(dead_code)]
@@ -2745,10 +2801,8 @@ mod tests {
         // Check header elements
         assert!(clean_output.contains("#1"));
         assert!(clean_output.contains("SCORE: 75.5"));
-        assert!(
-            clean_output.contains("[CRITICAL - FILE - GOD OBJECT]")
-                || clean_output.contains("[HIGH - FILE - GOD OBJECT]")
-        );
+        // Spec 139: Severity should be separate from issue type
+        assert!(clean_output.contains("[CRITICAL]") || clean_output.contains("[HIGH]"));
 
         // Check file path
         assert!(clean_output.contains("src/test_file.rs"));
@@ -2784,7 +2838,9 @@ mod tests {
         format_file_priority_item(&mut output, 2, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        assert!(clean_output.contains("FILE - GOD MODULE"));
+        // Spec 139: Header shows only severity, not file type
+        assert!(clean_output.contains("[HIGH]") || clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("#2"));
     }
 
     #[test]
@@ -2800,7 +2856,13 @@ mod tests {
         format_file_priority_item(&mut output, 3, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        assert!(clean_output.contains("FILE - HIGH COMPLEXITY"));
+        // Spec 139: Header shows only severity, not file type
+        assert!(
+            clean_output.contains("[HIGH]")
+                || clean_output.contains("[CRITICAL]")
+                || clean_output.contains("[MEDIUM]")
+        );
+        assert!(clean_output.contains("#3"));
     }
 
     #[test]
@@ -2817,9 +2879,11 @@ mod tests {
         format_file_priority_item(&mut output, 4, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        // For regular files with lower scores
-        assert!(clean_output.contains("FILE"));
-        assert!(!clean_output.contains("GOD"));
+        // Spec 139: Header shows only severity based on score
+        // Score of 35.0 is >= 8.0, so it's CRITICAL severity
+        assert!(clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("#4"));
+        assert!(clean_output.contains("SCORE: 35.0"));
     }
 
     #[test]

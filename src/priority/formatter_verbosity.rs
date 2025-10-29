@@ -623,10 +623,10 @@ fn format_item_body(
     verbosity: u8,
     tree_pipe: &str,
 ) {
-    // Location section
+    // Location section (spec 139: tree formatting)
     writeln!(
         output,
-        "- {} {}:{} {}()",
+        "├─ {} {}:{} {}()",
         "LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
@@ -634,15 +634,27 @@ fn format_item_body(
     )
     .unwrap();
 
-    // WHY section (the rationale)
-    let why_label = "- WHY:".bright_blue();
-    writeln!(output, "{} {}", why_label, item.recommendation.rationale).unwrap();
-
-    // ACTION section
+    // IMPACT section (before EVIDENCE per spec 139 ordering)
     writeln!(
         output,
-        "- {} {}",
-        "ACTION:".bright_blue(),
+        "├─ {} {}",
+        "IMPACT:".bright_blue(),
+        crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
+    )
+    .unwrap();
+
+    // COMPLEXITY section (acts as EVIDENCE - metrics only)
+    format_complexity_summary(output, item, _formatter);
+
+    // WHY THIS MATTERS section (spec 139: explains why evidence matters)
+    let why_label = "├─ WHY THIS MATTERS:".bright_blue();
+    writeln!(output, "{} {}", why_label, item.recommendation.rationale).unwrap();
+
+    // ACTION section (moved after WHY per spec 139)
+    writeln!(
+        output,
+        "├─ {} {}",
+        "RECOMMENDED ACTION:".bright_blue(),
         item.recommendation.primary_action.bright_green().bold()
     )
     .unwrap();
@@ -653,18 +665,6 @@ fn format_item_body(
         &item.recommendation.implementation_steps,
         _formatter,
     );
-
-    // IMPACT section
-    writeln!(
-        output,
-        "- {} {}",
-        "IMPACT:".bright_blue(),
-        crate::priority::formatter::format_impact(&item.expected_impact).bright_cyan()
-    )
-    .unwrap();
-
-    // COMPLEXITY section
-    format_complexity_summary(output, item, _formatter);
 
     // DEPENDENCIES section
     format_dependencies_summary(output, item, _formatter, tree_pipe);
@@ -718,7 +718,7 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "- {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "├─ {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
@@ -731,7 +731,7 @@ fn format_complexity_summary(
         } else {
             writeln!(
                 output,
-                "- {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
+                "├─ {} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 branch_count.to_string().yellow(),

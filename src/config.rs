@@ -1619,6 +1619,9 @@ pub struct IgnoreConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputConfig {
     pub default_format: Option<String>,
+    /// Enable colored output (default: auto-detect based on TTY)
+    #[serde(default)]
+    pub use_color: Option<bool>,
 }
 
 /// Cache the configuration
