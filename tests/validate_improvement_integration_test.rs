@@ -136,7 +136,11 @@ fn test_validate_improvement_subcommand_end_to_end() {
 
     // Verify status is "complete"
     let status = validation["status"].as_str().unwrap();
-    assert_eq!(status, "complete", "Expected status 'complete', got '{}'", status);
+    assert_eq!(
+        status, "complete",
+        "Expected status 'complete', got '{}'",
+        status
+    );
 }
 
 /// Integration test for validate-improvement with regressions

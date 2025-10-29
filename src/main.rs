@@ -442,7 +442,9 @@ fn main() -> Result<()> {
         // Parse space-separated arguments from environment variable
         let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
         // Prepend program name (required by clap)
-        let mut full_args = vec![std::env::args().next().unwrap_or_else(|| "debtmap".to_string())];
+        let mut full_args = vec![std::env::args()
+            .next()
+            .unwrap_or_else(|| "debtmap".to_string())];
         full_args.extend(args);
         Cli::parse_from(full_args)
     } else {
