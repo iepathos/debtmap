@@ -206,24 +206,33 @@ Implement context-aware file size heuristics that adjust thresholds based on fil
 
 2. **Declarative Config Detection**
    ```rust
-   fn is_declarative_config(source: &str) -> bool {
-       // High density of similar patterns
-       let pattern_indicators = [
-           // Flag/option definitions
-           r"(?m)^\s*pub\s+\w+:\s+\w+,\s*$",
-           // Schema definitions
-           r"(?m)^\s*#\[derive\(",
-           // Builder patterns
-           r"(?m)^\s*pub\s+fn\s+\w+\(mut\s+self",
-       ];
+   use once_cell::sync::Lazy;
+   use regex::Regex;
 
-       let matches: usize = pattern_indicators.iter()
-           .map(|pat| Regex::new(pat).unwrap().find_iter(source).count())
-           .sum();
+   // Compile regexes once at startup using once_cell
+   static FIELD_PATTERN: Lazy<Regex> = Lazy::new(|| {
+       Regex::new(r"(?m)^\s*pub\s+\w+:\s+\w+,\s*$").unwrap()
+   });
+
+   static DERIVE_PATTERN: Lazy<Regex> = Lazy::new(|| {
+       Regex::new(r"(?m)^\s*#\[derive\(").unwrap()
+   });
+
+   static BUILDER_METHOD_PATTERN: Lazy<Regex> = Lazy::new(|| {
+       Regex::new(r"(?m)^\s*pub\s+fn\s+\w+\(mut\s+self").unwrap()
+   });
+
+   fn is_declarative_config(source: &str) -> bool {
+       // High density of similar patterns using pre-compiled regexes
+       let field_matches = FIELD_PATTERN.find_iter(source).count();
+       let derive_matches = DERIVE_PATTERN.find_iter(source).count();
+       let builder_matches = BUILDER_METHOD_PATTERN.find_iter(source).count();
+
+       let total_matches = field_matches + derive_matches + builder_matches;
+       let total_lines = source.lines().count();
 
        // If >70% of lines match declarative patterns
-       let total_lines = source.lines().count();
-       matches as f32 / total_lines as f32 > 0.7
+       (total_matches as f32 / total_lines as f32) > 0.7
    }
    ```
 
@@ -291,16 +300,237 @@ pub enum RecommendationLevel {
 }
 ```
 
+## Integration Points
+
+This feature integrates with multiple components of the debtmap architecture:
+
+### 1. Classification Module (New)
+- **Location**: `src/organization/file_classifier.rs`
+- **Rationale**: Classification logic belongs with organizational analysis (GodObjectType, BuilderPattern, BoilerplatePattern)
+- **Exports**: `FileType`, `FileSizeThresholds`, `classify_file()`, `get_threshold()`, `calculate_reduction_target()`
+
+### 2. File Metrics Collection
+- **Location**: `src/priority/file_metrics.rs`
+- **Integration**: Add `file_type: FileType` field to `FileDebtMetrics` struct
+- **Call Site**: Invoke `classify_file()` during metrics collection in `FileDebtMetrics::new()`
+
+### 3. Output Formatters (3 locations)
+- **Terminal Output**: `src/priority/formatter.rs:1177`
+  - Replace `classify_file_size()` with context-aware `get_threshold()`
+  - Update recommendation text to include file type rationale
+- **Markdown Output**: `src/priority/formatter_markdown.rs:531,571`
+  - Apply same threshold logic as terminal output
+  - Add file type classification to markdown headers
+- **JSON Output**: `src/io/output.rs`
+  - Add `file_type` and `threshold_rationale` fields to JSON schema
+  - Mark new fields with `#[serde(default, skip_serializing_if = "Option::is_none")]`
+
+### 4. Debt Scoring
+- **Location**: `src/priority/debt_aggregator.rs`
+- **Integration**: Use context-aware thresholds when calculating file size penalties
+- **Impact**: Debt scores will change; document in migration guide
+
+### 5. Configuration System
+- **Location**: `src/config.rs`
+- **Integration**: Load threshold overrides from `.debtmap.toml`
+- **Precedence**: CLI flags > project `.debtmap.toml` > `~/.config/debtmap/config.toml` > defaults
+
+## Configuration
+
+### Configuration File Location and Loading
+
+#### File Locations (in precedence order)
+1. **CLI flags**: `--threshold-business-logic=500`
+2. **Project config**: `./.debtmap.toml` (in project root)
+3. **User config**: `~/.config/debtmap/config.toml` (global defaults)
+4. **Built-in defaults**: Hard-coded in `file_classifier.rs`
+
+#### Configuration Schema
+
+```toml
+# .debtmap.toml
+[thresholds]
+business_logic = 400
+test_code = 650
+declarative_config = 1200
+generated_code = 5000
+proc_macro = 500
+build_script = 300
+
+# Minimum lines per function (safety threshold)
+min_lines_per_function = 3.0
+
+[thresholds.overrides]
+# File-specific overrides using glob patterns
+"src/flags/defs.rs" = 2000
+"tests/integration/*.rs" = 1000
+"**/generated/**/*.rs" = 10000
+```
+
+#### CLI Flag Interface
+
+```bash
+# Override specific thresholds
+debtmap analyze --threshold-business-logic=500 --threshold-test=800
+
+# Restore legacy behavior
+debtmap analyze --legacy-thresholds
+
+# Preview threshold changes without applying
+debtmap analyze --preview-thresholds
+```
+
+#### Configuration Loading Implementation
+
+```rust
+// src/config.rs
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use anyhow::{Context, Result};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThresholdConfig {
+    #[serde(default)]
+    pub thresholds: ThresholdLimits,
+    #[serde(default)]
+    pub overrides: std::collections::HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThresholdLimits {
+    #[serde(default = "default_business_logic")]
+    pub business_logic: usize,
+    #[serde(default = "default_test_code")]
+    pub test_code: usize,
+    #[serde(default = "default_declarative_config")]
+    pub declarative_config: usize,
+    #[serde(default = "default_generated_code")]
+    pub generated_code: usize,
+    #[serde(default = "default_proc_macro")]
+    pub proc_macro: usize,
+    #[serde(default = "default_build_script")]
+    pub build_script: usize,
+    #[serde(default = "default_min_lines_per_function")]
+    pub min_lines_per_function: f32,
+}
+
+fn default_business_logic() -> usize { 400 }
+fn default_test_code() -> usize { 650 }
+fn default_declarative_config() -> usize { 1200 }
+fn default_generated_code() -> usize { 5000 }
+fn default_proc_macro() -> usize { 500 }
+fn default_build_script() -> usize { 300 }
+fn default_min_lines_per_function() -> f32 { 3.0 }
+
+impl Default for ThresholdLimits {
+    fn default() -> Self {
+        Self {
+            business_logic: default_business_logic(),
+            test_code: default_test_code(),
+            declarative_config: default_declarative_config(),
+            generated_code: default_generated_code(),
+            proc_macro: default_proc_macro(),
+            build_script: default_build_script(),
+            min_lines_per_function: default_min_lines_per_function(),
+        }
+    }
+}
+
+impl ThresholdConfig {
+    /// Load configuration with precedence: CLI > project > user > defaults
+    pub fn load(
+        project_root: Option<&Path>,
+        cli_overrides: Option<ThresholdLimits>,
+    ) -> Result<Self> {
+        let mut config = ThresholdConfig::default();
+
+        // 1. Load user config
+        if let Some(user_config) = Self::load_user_config()? {
+            config = config.merge(user_config);
+        }
+
+        // 2. Load project config
+        if let Some(root) = project_root {
+            if let Some(project_config) = Self::load_project_config(root)? {
+                config = config.merge(project_config);
+            }
+        }
+
+        // 3. Apply CLI overrides
+        if let Some(cli) = cli_overrides {
+            config.thresholds = cli;
+        }
+
+        Ok(config)
+    }
+
+    fn load_user_config() -> Result<Option<Self>> {
+        let config_path = dirs::config_dir()
+            .map(|p| p.join("debtmap/config.toml"));
+
+        if let Some(path) = config_path {
+            if path.exists() {
+                let content = std::fs::read_to_string(&path)
+                    .context("Failed to read user config")?;
+                let config: ThresholdConfig = toml::from_str(&content)
+                    .context("Failed to parse user config")?;
+                return Ok(Some(config));
+            }
+        }
+        Ok(None)
+    }
+
+    fn load_project_config(root: &Path) -> Result<Option<Self>> {
+        let config_path = root.join(".debtmap.toml");
+        if config_path.exists() {
+            let content = std::fs::read_to_string(&config_path)
+                .context("Failed to read project config")?;
+            let config: ThresholdConfig = toml::from_str(&content)
+                .context("Failed to parse project config")?;
+            return Ok(Some(config));
+        }
+        Ok(None)
+    }
+
+    fn merge(mut self, other: Self) -> Self {
+        // Later configs override earlier ones
+        self.thresholds.business_logic = other.thresholds.business_logic;
+        self.thresholds.test_code = other.thresholds.test_code;
+        self.thresholds.declarative_config = other.thresholds.declarative_config;
+        self.thresholds.generated_code = other.thresholds.generated_code;
+        self.thresholds.proc_macro = other.thresholds.proc_macro;
+        self.thresholds.build_script = other.thresholds.build_script;
+        self.thresholds.min_lines_per_function = other.thresholds.min_lines_per_function;
+        self.overrides.extend(other.overrides);
+        self
+    }
+}
+
+impl Default for ThresholdConfig {
+    fn default() -> Self {
+        Self {
+            thresholds: ThresholdLimits::default(),
+            overrides: std::collections::HashMap::new(),
+        }
+    }
+}
+```
+
 ## Dependencies
 
 - **Prerequisites**: None
 - **Affected Components**:
-  - `src/debt/file_metrics.rs` - File-level analysis
-  - `src/io/output.rs` - Recommendation formatting
-  - `src/analysis/file_classifier.rs` - New module for classification
+  - `src/priority/file_metrics.rs` - File-level analysis (add file_type field)
+  - `src/priority/formatter.rs` - Terminal output (update classify_file_size)
+  - `src/priority/formatter_markdown.rs` - Markdown output (update thresholds)
+  - `src/priority/debt_aggregator.rs` - Scoring (use context-aware thresholds)
+  - `src/io/output.rs` - JSON output (add new fields)
+  - `src/config.rs` - Configuration loading (add ThresholdConfig)
+  - `src/organization/file_classifier.rs` - New module for classification
 - **External Dependencies**:
   - `regex` (already in use)
-  - May need `lazy_static` for regex compilation
+  - `once_cell` (already in Cargo.toml) - for regex compilation
+  - `dirs` - for user config directory location (~/.config)
 
 ## Testing Strategy
 
@@ -383,6 +613,92 @@ fn test_business_logic_strict_threshold() {
     // Business logic should get strict threshold
     assert!(matches!(analysis.file_type, FileType::BusinessLogic));
     assert!(analysis.threshold.base_threshold <= 500);
+}
+```
+
+### Performance Benchmarks
+
+Performance is critical for maintaining debtmap's fast analysis times. Classification should add minimal overhead.
+
+```rust
+// benches/file_classification_bench.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use debtmap::organization::file_classifier::{classify_file, FileType};
+use std::path::Path;
+
+fn classification_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("file_classification");
+
+    // Test files of varying sizes
+    let test_cases = vec![
+        ("small", include_str!("../tests/fixtures/small_business_logic.rs"), 150),
+        ("medium", include_str!("../tests/fixtures/medium_test_file.rs"), 500),
+        ("large", include_str!("../tests/fixtures/large_declarative_config.rs"), 2000),
+        ("huge", include_str!("../tests/fixtures/huge_generated_code.rs"), 10000),
+    ];
+
+    for (name, content, lines) in test_cases {
+        group.bench_with_input(
+            BenchmarkId::new("classify_file", format!("{name}_{lines}lines")),
+            &content,
+            |b, content| {
+                b.iter(|| {
+                    classify_file(black_box(content), black_box(Path::new("test.rs")))
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, classification_benchmark);
+criterion_main!(benches);
+```
+
+#### Performance Targets
+
+**Acceptable Overhead**: Classification should add <5% to total analysis time
+
+| File Size | Classification Time (Target) | Total Analysis Time | Overhead % |
+|-----------|------------------------------|---------------------|------------|
+| 150 lines | <0.1ms | ~2ms | <5% |
+| 500 lines | <0.3ms | ~6ms | <5% |
+| 2000 lines | <1ms | ~25ms | <4% |
+| 10000 lines | <5ms | ~150ms | <3.3% |
+
+**Baseline Measurement**: Run benchmarks on debtmap's own codebase (80+ files) to establish baseline before implementation.
+
+**Optimization Strategy**:
+- Use `once_cell::sync::Lazy` for compiled regexes (avoid re-compilation)
+- Early-exit detection (check generated code markers first, most deterministic)
+- Cache classification results in file metrics (no re-classification needed)
+- Parallel classification via `rayon::par_iter()` during file analysis phase
+
+#### Performance Validation Test
+
+```rust
+#[test]
+fn classification_performance_regression() {
+    use std::time::Instant;
+
+    let large_file = include_str!("../tests/fixtures/large_declarative_config.rs");
+    let iterations = 1000;
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let _ = classify_file(large_file, Path::new("test.rs"));
+    }
+    let duration = start.elapsed();
+
+    let avg_time = duration.as_micros() / iterations;
+
+    // Should classify 2000-line file in <1ms (1000μs)
+    assert!(
+        avg_time < 1000,
+        "Classification too slow: {}μs (expected <1000μs)",
+        avg_time
+    );
 }
 ```
 
