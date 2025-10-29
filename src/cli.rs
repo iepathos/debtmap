@@ -421,6 +421,38 @@ pub enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+
+    /// Validate technical debt improvement from comparison results
+    ValidateImprovement {
+        /// Path to comparison JSON file from 'debtmap compare'
+        #[arg(long, value_name = "FILE")]
+        comparison: PathBuf,
+
+        /// Output file path for validation results
+        #[arg(
+            long,
+            short = 'o',
+            value_name = "FILE",
+            default_value = ".prodigy/debtmap-validation.json"
+        )]
+        output: PathBuf,
+
+        /// Path to previous validation for progress tracking
+        #[arg(long, value_name = "FILE")]
+        previous_validation: Option<PathBuf>,
+
+        /// Improvement threshold percentage (0-100)
+        #[arg(long, default_value = "75.0")]
+        threshold: f64,
+
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "json")]
+        format: OutputFormat,
+
+        /// Suppress progress output (automation mode)
+        #[arg(long, short = 'q')]
+        quiet: bool,
+    },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
