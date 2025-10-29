@@ -66,6 +66,10 @@ pub struct ValidationResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_summary: Option<TargetSummary>,
     pub project_summary: ProjectSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trend_analysis: Option<TrendAnalysis>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attempt_number: Option<u32>,
 }
 
 /// Gap detail structure
@@ -101,6 +105,15 @@ pub struct ProjectSummary {
     pub improvement_percent: f64,
     pub items_resolved: usize,
     pub items_new: usize,
+}
+
+/// Trend analysis structure for tracking progress across attempts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrendAnalysis {
+    pub direction: String,
+    pub previous_completion: Option<f64>,
+    pub change: Option<f64>,
+    pub recommendation: String,
 }
 
 /// Main entry point for validation
@@ -148,7 +161,7 @@ fn load_previous_validation(path: &Path) -> Result<ValidationResult> {
 /// Pure validation logic
 fn validate_improvement_internal(
     comparison: &ComparisonResult,
-    _previous: Option<&ValidationResult>,
+    previous: Option<&ValidationResult>,
 ) -> Result<ValidationResult> {
     let mut improvements = Vec::new();
     let mut remaining_issues = Vec::new();
@@ -173,6 +186,10 @@ fn validate_improvement_internal(
     let target_summary = build_target_summary(&comparison.target_item);
     let project_summary = build_project_summary(comparison);
 
+    // Calculate trend analysis if previous validation is provided
+    let trend_analysis = previous.map(|prev| calculate_trend_analysis(prev, improvement_score));
+    let attempt_number = previous.map(|prev| prev.attempt_number.unwrap_or(1) + 1);
+
     Ok(ValidationResult {
         completion_percentage: improvement_score,
         status,
@@ -181,6 +198,8 @@ fn validate_improvement_internal(
         gaps,
         target_summary,
         project_summary,
+        trend_analysis,
+        attempt_number,
     })
 }
 
@@ -437,6 +456,38 @@ fn print_validation_summary(result: &ValidationResult) {
         result.completion_percentage
     );
     println!("Status: {}", result.status);
+}
+
+/// Pure function to calculate trend analysis based on previous validation
+fn calculate_trend_analysis(previous: &ValidationResult, current_score: f64) -> TrendAnalysis {
+    let previous_completion = previous.completion_percentage;
+    let change = current_score - previous_completion;
+
+    let (direction, recommendation) = if change < -5.0 {
+        (
+            "regression".to_string(),
+            "CRITICAL: Stop refactoring. Return to original plan and complete remaining items."
+                .to_string(),
+        )
+    } else if change > 5.0 {
+        (
+            "progress".to_string(),
+            "Continue completing remaining plan items.".to_string(),
+        )
+    } else {
+        (
+            "stable".to_string(),
+            "Progress stalled. Focus on completing specific plan items rather than refactoring."
+                .to_string(),
+        )
+    };
+
+    TrendAnalysis {
+        direction,
+        previous_completion: Some(previous_completion),
+        change: Some(change),
+        recommendation,
+    }
 }
 
 #[cfg(test)]

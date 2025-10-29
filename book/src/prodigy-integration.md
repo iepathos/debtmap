@@ -475,13 +475,23 @@ Executes the implementation plan.
 
 Validates that the implementation successfully addressed the debt item.
 
+> **Note**: This slash command now wraps the `debtmap validate-improvement` subcommand. You can use either approach:
+> - Claude slash command: `/prodigy-validate-debtmap-improvement` (recommended for Prodigy workflows)
+> - Direct subcommand: `debtmap validate-improvement` (recommended for shell scripts)
+
 ```yaml
+# Using Claude slash command (recommended for workflows)
 - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+
+# Or using shell command directly
+- shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
 ```
 
 **Parameters:**
 - `--comparison`: Debtmap comparison results (before vs after)
 - `--output`: Validation results JSON (with score 0-100)
+- `--previous-validation`: (Optional) Previous validation result for trend tracking
+- `--threshold`: (Optional) Improvement threshold percentage (default: 75.0)
 
 #### `/prodigy-complete-debtmap-fix`
 
