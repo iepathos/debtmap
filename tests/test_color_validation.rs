@@ -59,7 +59,8 @@ fn verify_formatter_uses_correct_colors() {
     let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
 
     // Updated for spec 139: "WHY THIS MATTERS" label format in both files
-    let verbosity_why_label_blue = formatter_verbosity_content.contains("WHY THIS MATTERS:\".bright_blue()");
+    let verbosity_why_label_blue =
+        formatter_verbosity_content.contains("WHY THIS MATTERS:\".bright_blue()");
     let verbosity_has_dimmed = formatter_verbosity_content.contains("rationale.dimmed()");
     let verbosity_has_bright_white =
         formatter_verbosity_content.contains("rationale.bright_white()");

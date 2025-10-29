@@ -2802,10 +2802,7 @@ mod tests {
         assert!(clean_output.contains("#1"));
         assert!(clean_output.contains("SCORE: 75.5"));
         // Spec 139: Severity should be separate from issue type
-        assert!(
-            clean_output.contains("[CRITICAL]")
-                || clean_output.contains("[HIGH]")
-        );
+        assert!(clean_output.contains("[CRITICAL]") || clean_output.contains("[HIGH]"));
 
         // Check file path
         assert!(clean_output.contains("src/test_file.rs"));
@@ -2860,7 +2857,11 @@ mod tests {
 
         let clean_output = strip_ansi_codes(&output);
         // Spec 139: Header shows only severity, not file type
-        assert!(clean_output.contains("[HIGH]") || clean_output.contains("[CRITICAL]") || clean_output.contains("[MEDIUM]"));
+        assert!(
+            clean_output.contains("[HIGH]")
+                || clean_output.contains("[CRITICAL]")
+                || clean_output.contains("[MEDIUM]")
+        );
         assert!(clean_output.contains("#3"));
     }
 
