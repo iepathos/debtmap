@@ -97,6 +97,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -114,6 +115,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         },
     ]
 }
@@ -143,6 +145,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -160,6 +163,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         },
     ]
 }
@@ -190,6 +194,7 @@ mod tests {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         }
     }
 
@@ -211,6 +216,7 @@ mod tests {
             rationale: None,
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
+            interface_estimate: None,
         };
 
         let validated = validate_and_refine_splits(vec![split]);
