@@ -53,11 +53,13 @@ fn verify_formatter_uses_correct_colors() {
         .expect("Could not read formatter_verbosity.rs");
 
     // Check that WHY label uses bright_blue and rationale uses no color (plain text)
-    let formatter_why_label_blue = formatter_content.contains("\"- WHY:\".bright_blue()");
+    // Updated for spec 139: "WHY THIS MATTERS" label format
+    let formatter_why_label_blue = formatter_content.contains("WHY THIS MATTERS:\".bright_blue()");
     let formatter_has_dimmed = formatter_content.contains("rationale.dimmed()");
     let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
 
-    let verbosity_why_label_blue = formatter_verbosity_content.contains("\"- WHY:\".bright_blue()");
+    // Updated for spec 139: "WHY THIS MATTERS" label format in both files
+    let verbosity_why_label_blue = formatter_verbosity_content.contains("WHY THIS MATTERS:\".bright_blue()");
     let verbosity_has_dimmed = formatter_verbosity_content.contains("rationale.dimmed()");
     let verbosity_has_bright_white =
         formatter_verbosity_content.contains("rationale.bright_white()");

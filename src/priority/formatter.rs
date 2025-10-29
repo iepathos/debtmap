@@ -1504,6 +1504,7 @@ struct FormattedSections {
     location: String,
     action: String,
     impact: String,
+    evidence: Option<String>, // New: combines complexity + metrics
     complexity: Option<String>,
     dependencies: Option<String>,
     debt_specific: Option<String>,
@@ -1517,6 +1518,7 @@ fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
         location: format_location_section(context),
         action: format_action_section(context),
         impact: format_impact_section(context),
+        evidence: format_evidence_section(context), // New
         complexity: format_complexity_section(context),
         dependencies: format_dependencies_section(context),
         debt_specific: format_debt_specific_section(context),
@@ -1553,7 +1555,7 @@ fn format_location_section(context: &FormatContext) -> String {
 fn format_action_section(context: &FormatContext) -> String {
     format!(
         "{} {}",
-        "├─ ACTION:".bright_blue(),
+        "├─ RECOMMENDED ACTION:".bright_blue(),
         context.action.bright_green().bold()
     )
 }
@@ -1581,6 +1583,50 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
         format!("{}", context.complexity_info.cognitive).yellow(),
         format!("{}", context.complexity_info.nesting).yellow()
     ))
+}
+
+// Pure function to format evidence section (metrics only, no rationale)
+fn format_evidence_section(context: &FormatContext) -> Option<String> {
+    if !context.complexity_info.has_complexity {
+        return None;
+    }
+
+    let mut section = format!("{}", "├─ EVIDENCE:".bright_blue());
+
+    // Show complexity metrics in priority order
+    if context.complexity_info.cyclomatic > 0 {
+        section.push_str(&format!(
+            "\n│  {} Cyclomatic Complexity: {}",
+            "├─",
+            format!("{}", context.complexity_info.cyclomatic).yellow()
+        ));
+    }
+
+    if context.complexity_info.cognitive > 0 {
+        section.push_str(&format!(
+            "\n│  {} Cognitive Complexity: {}",
+            "├─",
+            format!("{}", context.complexity_info.cognitive).yellow()
+        ));
+    }
+
+    if context.complexity_info.branch_count > 0 {
+        section.push_str(&format!(
+            "\n│  {} Estimated Branches: {}",
+            "├─",
+            format!("{}", context.complexity_info.branch_count).yellow()
+        ));
+    }
+
+    if context.complexity_info.nesting > 0 {
+        section.push_str(&format!(
+            "\n│  {} Nesting Depth: {}",
+            "└─",
+            format!("{}", context.complexity_info.nesting).yellow()
+        ));
+    }
+
+    Some(section)
 }
 
 // Pure function to format dependencies section with enhanced caller/callee display
@@ -1697,18 +1743,35 @@ fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
 }
 
 // Pure function to format rationale section
+// This explains WHY the evidence matters (implications, not repeating metrics)
 fn format_rationale_section(context: &FormatContext) -> String {
     let _formatter = ColoredFormatter::new(FormattingConfig::default());
-    format!("{} {}", "- WHY:".bright_blue(), context.rationale)
+    format!(
+        "{} {}",
+        "├─ WHY THIS MATTERS:".bright_blue(),
+        context.rationale
+    )
 }
 
 // I/O function to apply formatted sections to output
+// Following spec 139: Header → Location → Impact → Evidence → WHY → Action
 fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
     writeln!(output, "{}", sections.header).unwrap();
     writeln!(output, "{}", sections.location).unwrap();
-    writeln!(output, "{}", sections.action).unwrap();
     writeln!(output, "{}", sections.impact).unwrap();
 
+    // Evidence section (new) - metrics only
+    if let Some(evidence) = sections.evidence {
+        writeln!(output, "{}", evidence).unwrap();
+    }
+
+    // WHY section - rationale explaining why evidence matters
+    writeln!(output, "{}", sections.rationale).unwrap();
+
+    // Action comes after WHY (spec 139 ordering)
+    writeln!(output, "{}", sections.action).unwrap();
+
+    // Keep legacy complexity for backward compatibility
     if let Some(complexity) = sections.complexity {
         writeln!(output, "{}", complexity).unwrap();
     }
@@ -1720,8 +1783,6 @@ fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
     if let Some(debt_specific) = sections.debt_specific {
         writeln!(output, "{}", debt_specific).unwrap();
     }
-
-    writeln!(output, "{}", sections.rationale).unwrap();
 }
 
 #[allow(dead_code)]
