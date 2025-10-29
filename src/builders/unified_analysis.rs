@@ -1014,6 +1014,8 @@ fn convert_error_swallowing_to_unified(
                         "Consider propagating errors to caller with ?".to_string(),
                     ],
                     related_items: vec![],
+                    steps: None,
+                    estimated_effort_hours: None,
                 },
                 expected_impact: ImpactMetrics {
                     coverage_improvement: 0.0,

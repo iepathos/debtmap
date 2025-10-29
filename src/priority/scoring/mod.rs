@@ -3,6 +3,7 @@
 pub mod calculation;
 pub mod classification;
 pub mod computation;
+pub mod concise_recommendation; // Spec 138a: Concise actionable recommendations
 pub mod construction;
 pub mod context_aware;
 pub mod coverage_expectations;
@@ -36,6 +37,8 @@ pub use recommendation::{
     generate_dead_code_recommendation, generate_error_swallowing_recommendation,
     generate_test_debt_recommendation, generate_testing_gap_recommendation,
 };
+
+pub use concise_recommendation::generate_concise_recommendation;
 
 pub use test_calculation::{
     calculate_tests_needed, validate_recommendation_consistency, ComplexityTier, TestRecommendation,
