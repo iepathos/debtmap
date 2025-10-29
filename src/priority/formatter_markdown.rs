@@ -528,10 +528,29 @@ fn format_file_debt_item(output: &mut String, item: &FileDebtItem, verbosity: u8
             item.metrics.god_object_indicators.responsibilities
         )
         .unwrap();
-    } else if item.metrics.total_lines > 500 {
-        writeln!(output, "**Type:** LARGE FILE").unwrap();
     } else {
-        writeln!(output, "**Type:** COMPLEX FILE").unwrap();
+        // Use context-aware threshold if available (spec 135)
+        let type_str = if let Some(ref file_type) = item.metrics.file_type {
+            use crate::organization::get_threshold;
+            let threshold = get_threshold(
+                file_type,
+                item.metrics.function_count,
+                item.metrics.total_lines,
+            );
+            if item.metrics.total_lines > threshold.base_threshold {
+                format!("**Type:** LARGE FILE ({:?})", file_type)
+            } else {
+                format!("**Type:** COMPLEX FILE ({:?})", file_type)
+            }
+        } else {
+            // Legacy behavior if no file type
+            if item.metrics.total_lines > 500 {
+                "**Type:** LARGE FILE".to_string()
+            } else {
+                "**Type:** COMPLEX FILE".to_string()
+            }
+        };
+        writeln!(output, "{}", type_str).unwrap();
     }
 
     writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
@@ -565,13 +584,28 @@ fn format_file_priority_item_markdown(
 ) {
     let severity = get_severity_label(item.score);
 
-    // Determine file type
+    // Determine file type using context-aware thresholds (spec 135)
     let type_label = if item.metrics.god_object_indicators.is_god_object {
         "FILE - GOD OBJECT"
-    } else if item.metrics.total_lines > 500 {
-        "FILE - HIGH COMPLEXITY"
+    } else if let Some(ref file_type) = item.metrics.file_type {
+        use crate::organization::get_threshold;
+        let threshold = get_threshold(
+            file_type,
+            item.metrics.function_count,
+            item.metrics.total_lines,
+        );
+        if item.metrics.total_lines > threshold.base_threshold {
+            "FILE - HIGH COMPLEXITY"
+        } else {
+            "FILE"
+        }
     } else {
-        "FILE"
+        // Legacy behavior if no file type
+        if item.metrics.total_lines > 500 {
+            "FILE - HIGH COMPLEXITY"
+        } else {
+            "FILE"
+        }
     };
 
     // File items (god objects) are always T1 Critical Architecture
@@ -1568,6 +1602,7 @@ mod tests {
                 },
                 function_scores: vec![10.0, 8.0, 6.0],
                 god_object_type: None,
+            file_type: None,
             },
             score: 45.2,
             priority_rank: 1,
@@ -1624,6 +1659,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 125.8,
             priority_rank: 1,
@@ -1682,6 +1718,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 85.3,
             priority_rank: 2,
@@ -1736,6 +1773,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 55.7,
             priority_rank: 3,
@@ -1792,6 +1830,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 5.0,
             priority_rank: 10,
@@ -1844,6 +1883,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 150.0,
             priority_rank: 1,
@@ -1896,6 +1936,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 18.5,
             priority_rank: 15,
@@ -2222,6 +2263,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
+            file_type: None,
             },
             score: 72.4,
             priority_rank: 4,

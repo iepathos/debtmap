@@ -11,6 +11,7 @@ pub mod complexity_weighting;
 pub mod cycle_detector;
 pub mod dependency_analyzer;
 pub mod domain_classifier;
+pub mod file_classifier;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod javascript;
@@ -75,6 +76,11 @@ pub use boilerplate_detector::{
 pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 
 pub use macro_recommendations::MacroRecommendationEngine;
+
+pub use file_classifier::{
+    calculate_reduction_target, classify_file, get_threshold, recommendation_level, ConfigType,
+    FileSizeAnalysis, FileSizeThresholds, FileType, RecommendationLevel, ReductionTarget, TestType,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrganizationAntiPattern {
