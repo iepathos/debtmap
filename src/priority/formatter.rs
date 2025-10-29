@@ -2716,7 +2716,7 @@ mod tests {
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,
-            file_type: None,
+                file_type: None,
             },
             score: 75.5,
             priority_rank: 1,

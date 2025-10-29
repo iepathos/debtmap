@@ -1154,7 +1154,7 @@ mod tests {
                 },
                 function_scores: vec![],
                 god_object_type: None,
-            file_type: None,
+                file_type: None,
             },
             score: 50.0,
             priority_rank: 1,
