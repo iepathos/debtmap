@@ -228,6 +228,20 @@ pub struct ModuleSplit {
     /// Severity of this recommendation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<RecommendationSeverity>,
+    /// Estimated interface size between modules
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface_estimate: Option<InterfaceEstimate>,
+}
+
+/// Estimated interface size between proposed modules
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct InterfaceEstimate {
+    /// Number of public functions that cross module boundaries
+    pub public_functions_needed: usize,
+    /// Number of shared types between modules
+    pub shared_types: usize,
+    /// Estimated lines of code for interface definitions
+    pub estimated_loc: usize,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -534,6 +548,86 @@ pub fn map_io_to_traditional_responsibility(io_resp: &str) -> String {
     }
 }
 
+/// Infer responsibility from call patterns.
+///
+/// Analyzes what functions a method calls and who calls it to infer responsibility.
+/// This complements name-based and I/O-based detection by looking at actual usage patterns.
+///
+/// # Arguments
+///
+/// * `function_name` - Name of the function
+/// * `callees` - Functions that this function calls
+/// * `callers` - Functions that call this function
+///
+/// # Returns
+///
+/// Optional responsibility string based on call patterns
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // Function mostly called by formatting functions
+/// let callees = vec![];
+/// let callers = vec!["format_output", "render_table"];
+/// let resp = infer_responsibility_from_call_patterns("escape_html", &callees, &callers);
+/// assert_eq!(resp, Some("Formatting Support"));
+/// ```
+pub fn infer_responsibility_from_call_patterns(
+    function_name: &str,
+    callees: &[String],
+    callers: &[String],
+) -> Option<String> {
+    // Special case: if function name suggests it's a helper and has many callers
+    if (function_name.contains("helper") || function_name.contains("util")) && callers.len() >= 3 {
+        return Some("Utilities".to_string());
+    }
+
+    // Analyze caller patterns - who uses this function?
+    let caller_categories = categorize_functions(callers);
+
+    // Analyze callee patterns - what does this function use?
+    let callee_categories = categorize_functions(callees);
+
+    // If majority of callers are in one category, this is likely support for that category
+    // Skip if the category is "Utilities" (catch-all)
+    if let Some((category, count)) = find_dominant_category(&caller_categories) {
+        if count >= 2 && category != "Utilities" {
+            return Some(format!("{} Support", category));
+        }
+    }
+
+    // If majority of callees are in one category, this is likely orchestration for that category
+    if let Some((category, count)) = find_dominant_category(&callee_categories) {
+        if count >= 3 {
+            return Some(format!("{} Orchestration", category));
+        }
+    }
+
+    None
+}
+
+/// Categorize functions by their name patterns
+fn categorize_functions(functions: &[String]) -> std::collections::HashMap<String, usize> {
+    let mut categories = std::collections::HashMap::new();
+
+    for func in functions {
+        let category = infer_responsibility_from_method(func);
+        *categories.entry(category).or_insert(0) += 1;
+    }
+
+    categories
+}
+
+/// Find the dominant category in a set of categorized functions
+fn find_dominant_category(
+    categories: &std::collections::HashMap<String, usize>,
+) -> Option<(String, usize)> {
+    categories
+        .iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(category, count)| (category.clone(), *count))
+}
+
 /// Infer responsibility using multi-signal aggregation (Spec 145).
 ///
 /// This provides the highest accuracy classification by combining:
@@ -809,6 +903,7 @@ pub fn recommend_module_splits(
                 )),
                 method: SplitAnalysisMethod::MethodBased,
                 severity: None,
+                interface_estimate: None,
             });
         }
     }
@@ -911,6 +1006,7 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 )),
                 method: SplitAnalysisMethod::CrossDomain,
                 severity: None, // Will be set by caller based on overall analysis
+                interface_estimate: None,
             }
         })
         .collect()
@@ -1030,6 +1126,7 @@ pub fn suggest_splits_by_struct_grouping(
                 )),
                 method: SplitAnalysisMethod::CrossDomain,
                 severity: None,
+                interface_estimate: None,
             }
         })
         .collect();
@@ -1724,5 +1821,81 @@ mod tests {
             map_io_to_traditional_responsibility("Mixed I/O"),
             "Processing"
         );
+    }
+
+    // Tests for call pattern-based responsibility detection (Spec 137)
+    #[test]
+    fn test_call_pattern_support_detection() {
+        let function_name = "escape_html";
+        let callees = vec![];
+        let callers = vec!["format_output".to_string(), "render_table".to_string()];
+
+        let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
+        assert_eq!(resp, Some("Formatting & Output Support".to_string()));
+    }
+
+    #[test]
+    fn test_call_pattern_orchestration_detection() {
+        let function_name = "process_data";
+        let callees = vec![
+            "validate_input".to_string(),
+            "check_bounds".to_string(),
+            "verify_format".to_string(),
+        ];
+        let callers = vec![];
+
+        let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
+        assert_eq!(resp, Some("Validation Orchestration".to_string()));
+    }
+
+    #[test]
+    fn test_call_pattern_utility_detection() {
+        let function_name = "helper_function";
+        let callees = vec![];
+        let callers = vec![
+            "func1".to_string(),
+            "func2".to_string(),
+            "func3".to_string(),
+            "func4".to_string(),
+        ];
+
+        let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
+        assert_eq!(resp, Some("Utilities".to_string()));
+    }
+
+    #[test]
+    fn test_call_pattern_no_clear_pattern() {
+        let function_name = "mixed_function";
+        let callees = vec!["func1".to_string()];
+        let callers = vec!["func2".to_string()];
+
+        let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
+        assert_eq!(resp, None);
+    }
+
+    #[test]
+    fn test_categorize_functions() {
+        let functions = vec![
+            "format_output".to_string(),
+            "format_json".to_string(),
+            "parse_input".to_string(),
+            "validate_data".to_string(),
+        ];
+
+        let categories = categorize_functions(&functions);
+        assert_eq!(categories.get("Formatting & Output"), Some(&2));
+        assert_eq!(categories.get("Parsing & Input"), Some(&1));
+        assert_eq!(categories.get("Validation"), Some(&1));
+    }
+
+    #[test]
+    fn test_find_dominant_category() {
+        let mut categories = std::collections::HashMap::new();
+        categories.insert("Formatting & Output".to_string(), 5);
+        categories.insert("Parsing & Input".to_string(), 2);
+        categories.insert("Validation".to_string(), 1);
+
+        let dominant = find_dominant_category(&categories);
+        assert_eq!(dominant, Some(("Formatting & Output".to_string(), 5)));
     }
 }
