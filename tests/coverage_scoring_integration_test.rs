@@ -59,8 +59,8 @@ fn create_debt_item(
             rationale: "Testing gap".to_string(),
             implementation_steps: vec![],
             related_items: vec![],
-                steps: None,
-                estimated_effort_hours: None,
+            steps: None,
+            estimated_effort_hours: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,

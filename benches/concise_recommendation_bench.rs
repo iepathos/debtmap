@@ -75,11 +75,7 @@ fn bench_testing_gap_recommendation(c: &mut Criterion) {
 fn bench_complexity_hotspot_recommendation(c: &mut Criterion) {
     let mut group = c.benchmark_group("complexity_hotspot_recommendation");
 
-    let scenarios = [
-        ("moderate", 16, 22),
-        ("high", 25, 35),
-        ("extreme", 40, 55),
-    ];
+    let scenarios = [("moderate", 16, 22), ("high", 25, 35), ("extreme", 40, 55)];
 
     for (name, cyclomatic, cognitive) in scenarios.iter() {
         group.bench_with_input(
@@ -178,8 +174,11 @@ fn bench_batch_recommendation_generation(c: &mut Criterion) {
 
                 b.iter(|| {
                     for (i, debt) in debt_items.iter().enumerate() {
-                        let metrics =
-                            create_test_metrics(&format!("func_{}", i), 15 + i as u32, 20 + i as u32);
+                        let metrics = create_test_metrics(
+                            &format!("func_{}", i),
+                            15 + i as u32,
+                            20 + i as u32,
+                        );
                         black_box(generate_concise_recommendation(
                             debt,
                             &metrics,
