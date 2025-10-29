@@ -7,6 +7,7 @@ use crate::core::FunctionMetrics;
 use crate::priority::DebtType;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::Path;
 
 /// Severity levels for debt items based on score and risk factors
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -234,13 +235,19 @@ pub struct DebtScore {
 impl DebtScore {
     /// Calculate debt score for a function with the given debt type
     pub fn calculate(func: &FunctionMetrics, debt_type: &DebtType, weights: &ScoreWeights) -> Self {
-        let components = ScoreComponents {
+        let mut components = ScoreComponents {
             complexity_score: score_complexity(func, debt_type, weights),
             coverage_score: score_coverage_gap(func, debt_type, weights),
             structural_score: score_structural_issues(debt_type, weights),
             size_score: score_file_size(func, weights),
             smell_score: score_code_smells(func, weights),
         };
+
+        // Apply generated code detection and scoring reduction
+        if is_generated_file(&func.file) {
+            // Reduce size score by 90% for generated code
+            components.size_score *= 0.1;
+        }
 
         let total = components.weighted_total(weights);
         let severity = determine_severity(&components, func, debt_type);
@@ -358,12 +365,29 @@ fn score_structural_issues(debt_type: &DebtType, _weights: &ScoreWeights) -> f64
     }
 }
 
-/// Score file size component (typically done at file-level, returns 0 for functions)
-fn score_file_size(_func: &FunctionMetrics, _weights: &ScoreWeights) -> f64 {
-    // File size scoring is typically done at file-level analysis
-    // For function-level debt items, this returns 0
-    // This would be implemented in a separate file-level scoring module
-    0.0
+/// Score file size component using context-aware thresholds from spec 135
+fn score_file_size(func: &FunctionMetrics, _weights: &ScoreWeights) -> f64 {
+    // Function-level scoring: Score based on function length
+    // Use simplified thresholds since we don't have full file context here
+
+    let length = func.length;
+
+    // Simplified function-level thresholds (would use file context in full impl)
+    // These are conservative estimates for function-level analysis
+    let threshold: usize = 100; // Reasonable function length threshold
+    let max_threshold: usize = 200; // Max before critical
+
+    if length <= threshold {
+        0.0
+    } else if length <= max_threshold {
+        // Linear scaling from threshold to max_threshold
+        let ratio = (length - threshold) as f64 / (max_threshold - threshold) as f64;
+        ratio * 15.0 // Max 15 points for moderate size
+    } else {
+        // Beyond max threshold, cap at 30
+        let excess = (length - max_threshold) as f64;
+        (15.0 + (excess / 100.0).min(15.0)).min(30.0)
+    }
 }
 
 /// Score code smells like long functions, deep nesting, etc.
@@ -421,6 +445,25 @@ fn determine_severity(
 
     // LOW: Everything else (minor issues, pure size concerns)
     Severity::Low
+}
+
+/// Detect if a file is generated code based on common patterns
+fn is_generated_file(path: &Path) -> bool {
+    let path_str = path.to_string_lossy();
+
+    // Common generated file patterns
+    let generated_patterns = [
+        ".generated.rs",
+        ".pb.rs", // Protocol buffers
+        ".g.rs",  // Grammar generated files
+        "_pb.rs", // Alternative protobuf naming
+        "generated/",
+        "/gen/",
+    ];
+
+    generated_patterns
+        .iter()
+        .any(|pattern| path_str.contains(pattern))
 }
 
 #[cfg(test)]
@@ -669,6 +712,62 @@ mod tests {
         assert!(
             !rationale_str.is_empty(),
             "Rationale should produce non-empty output"
+        );
+    }
+
+    #[test]
+    fn test_generated_code_detection() {
+        // Test generated file patterns
+        assert!(is_generated_file(Path::new("src/proto/api.pb.rs")));
+        assert!(is_generated_file(Path::new("src/generated/schema.rs")));
+        assert!(is_generated_file(Path::new("src/parser.g.rs")));
+        assert!(is_generated_file(Path::new("src/models_pb.rs")));
+
+        // Test normal files
+        assert!(!is_generated_file(Path::new("src/main.rs")));
+        assert!(!is_generated_file(Path::new("src/lib.rs")));
+        assert!(!is_generated_file(Path::new("src/utils/helpers.rs")));
+    }
+
+    #[test]
+    fn test_generated_code_scoring_reduction() {
+        // Create a function in a generated file
+        let mut generated_func = create_test_function("generated_fn", 10, 15, 500);
+        generated_func.file = PathBuf::from("src/proto/api.pb.rs");
+
+        let score = DebtScore::calculate(
+            &generated_func,
+            &DebtType::Risk {
+                risk_score: 0.5,
+                factors: vec!["Long function".to_string()],
+            },
+            &ScoreWeights::default(),
+        );
+
+        // Size score should be reduced by 90%
+        assert!(
+            score.components.size_score < 3.0,
+            "Generated code size score should be reduced to ~10%, got {:.1}",
+            score.components.size_score
+        );
+
+        // Create the same function in a normal file
+        let mut normal_func = create_test_function("normal_fn", 10, 15, 500);
+        normal_func.file = PathBuf::from("src/processor.rs");
+
+        let normal_score = DebtScore::calculate(
+            &normal_func,
+            &DebtType::Risk {
+                risk_score: 0.5,
+                factors: vec!["Long function".to_string()],
+            },
+            &ScoreWeights::default(),
+        );
+
+        // Normal file should have full size score
+        assert!(
+            normal_score.components.size_score > score.components.size_score * 5.0,
+            "Normal file should have much higher size score than generated file"
         );
     }
 }
