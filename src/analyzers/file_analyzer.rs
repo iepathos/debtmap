@@ -310,6 +310,9 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
         let coverage_percent = self.get_file_coverage(path);
         let uncovered_lines = ((1.0 - coverage_percent) * total_lines as f64) as usize;
 
+        // Classify file type for context-aware thresholds (spec 135)
+        let file_type = Some(crate::organization::classify_file(content, path));
+
         Ok(FileDebtMetrics {
             path: path.to_path_buf(),
             total_lines,
@@ -323,6 +326,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             god_object_indicators,
             function_scores: Vec::new(),
             god_object_type,
+            file_type,
         })
     }
 
@@ -358,6 +362,13 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
         // Calculate individual function scores based on complexity
         let function_scores = Self::calculate_function_scores(functions);
 
+        // Classify file type for context-aware thresholds (spec 135)
+        let file_type = if let Ok(content) = std::fs::read_to_string(&path) {
+            Some(crate::organization::classify_file(&content, &path))
+        } else {
+            None
+        };
+
         FileDebtMetrics {
             path,
             total_lines: line_metrics.total_lines,
@@ -371,6 +382,7 @@ impl FileAnalyzer for UnifiedFileAnalyzer {
             god_object_indicators,
             function_scores,
             god_object_type,
+            file_type,
         }
     }
 }

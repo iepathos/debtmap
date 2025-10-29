@@ -1173,14 +1173,35 @@ fn format_detailed_metrics(
     }
 }
 
-// Pure functions to determine file size and function count classifications
-fn classify_file_size(total_lines: usize) -> &'static str {
-    if total_lines > 1000 {
-        "CRITICAL"
-    } else if total_lines > 500 {
-        "HIGH"
+// Context-aware file size classification (spec 135)
+fn classify_file_size(
+    total_lines: usize,
+    function_count: usize,
+    file_type: Option<&crate::organization::FileType>,
+) -> &'static str {
+    use crate::organization::{get_threshold, recommendation_level, RecommendationLevel};
+
+    // Use context-aware thresholds if file type is available
+    if let Some(ft) = file_type {
+        let threshold = get_threshold(ft, function_count, total_lines);
+        let level = recommendation_level(ft, total_lines, &threshold);
+
+        match level {
+            RecommendationLevel::Critical => "CRITICAL",
+            RecommendationLevel::High => "HIGH",
+            RecommendationLevel::Medium => "MEDIUM",
+            RecommendationLevel::Low => "LOW",
+            RecommendationLevel::Suppressed => "OK",
+        }
     } else {
-        "MEDIUM"
+        // Fallback to legacy behavior if no file type info
+        if total_lines > 1000 {
+            "CRITICAL"
+        } else if total_lines > 500 {
+            "HIGH"
+        } else {
+            "MEDIUM"
+        }
     }
 }
 
@@ -1200,13 +1221,14 @@ fn format_scoring_and_dependencies(
     _formatter: &ColoredFormatter,
     total_lines: usize,
     function_count: usize,
+    file_type: Option<&crate::organization::FileType>,
 ) {
     // Add SCORING breakdown
     writeln!(
         output,
         "{} File size: {} | Functions: {} | Complexity: HIGH",
         "└─ SCORING:".bright_blue(),
-        classify_file_size(total_lines),
+        classify_file_size(total_lines, function_count, file_type),
         classify_function_count(function_count)
     )
     .unwrap();
@@ -1318,6 +1340,7 @@ fn format_file_priority_item(
         &formatter,
         item.metrics.total_lines,
         item.metrics.function_count,
+        item.metrics.file_type.as_ref(),
     );
 }
 
@@ -2693,6 +2716,7 @@ mod tests {
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,
+                file_type: None,
             },
             score: 75.5,
             priority_rank: 1,

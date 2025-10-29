@@ -1175,6 +1175,10 @@ pub struct ThresholdsConfig {
     /// Validation thresholds - used by `debtmap validate` command
     #[serde(default)]
     pub validation: Option<ValidationThresholds>,
+
+    /// Context-aware file size thresholds (spec 135)
+    #[serde(default)]
+    pub file_size: Option<FileSizeThresholds>,
 }
 
 /// Validation thresholds for the validate command
@@ -1290,6 +1294,90 @@ fn default_max_debt_density() -> f64 {
 }
 fn default_max_total_debt_score_high() -> u32 {
     10000 // High ceiling - 5x typical project, acts as safety net for extreme cases
+}
+
+/// Context-aware file size thresholds (spec 135)
+///
+/// Provides different size limits based on file type and purpose.
+/// This prevents unrealistic recommendations for generated code,
+/// declarative configurations, and other special file types.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileSizeThresholds {
+    /// Business logic files (strict)
+    #[serde(default = "default_business_logic_threshold")]
+    pub business_logic: usize,
+
+    /// Test code files (moderate)
+    #[serde(default = "default_test_code_threshold")]
+    pub test_code: usize,
+
+    /// Declarative configuration files (lenient)
+    #[serde(default = "default_declarative_config_threshold")]
+    pub declarative_config: usize,
+
+    /// Generated code files (very lenient/suppressed)
+    #[serde(default = "default_generated_code_threshold")]
+    pub generated_code: usize,
+
+    /// Procedural macro files (moderate-strict)
+    #[serde(default = "default_proc_macro_threshold")]
+    pub proc_macro: usize,
+
+    /// Build scripts (strict)
+    #[serde(default = "default_build_script_threshold")]
+    pub build_script: usize,
+
+    /// Minimum lines per function (safety threshold)
+    #[serde(default = "default_min_lines_per_function")]
+    pub min_lines_per_function: f32,
+
+    /// File-specific overrides using glob patterns
+    #[serde(default)]
+    pub overrides: std::collections::HashMap<String, usize>,
+}
+
+impl Default for FileSizeThresholds {
+    fn default() -> Self {
+        Self {
+            business_logic: default_business_logic_threshold(),
+            test_code: default_test_code_threshold(),
+            declarative_config: default_declarative_config_threshold(),
+            generated_code: default_generated_code_threshold(),
+            proc_macro: default_proc_macro_threshold(),
+            build_script: default_build_script_threshold(),
+            min_lines_per_function: default_min_lines_per_function(),
+            overrides: std::collections::HashMap::new(),
+        }
+    }
+}
+
+// Default file size threshold values
+fn default_business_logic_threshold() -> usize {
+    400
+}
+
+fn default_test_code_threshold() -> usize {
+    650
+}
+
+fn default_declarative_config_threshold() -> usize {
+    1200
+}
+
+fn default_generated_code_threshold() -> usize {
+    5000
+}
+
+fn default_proc_macro_threshold() -> usize {
+    500
+}
+
+fn default_build_script_threshold() -> usize {
+    300
+}
+
+fn default_min_lines_per_function() -> f32 {
+    3.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

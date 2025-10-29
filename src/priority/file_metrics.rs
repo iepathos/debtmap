@@ -30,6 +30,10 @@ pub struct FileDebtMetrics {
     /// 5. None → use general refactoring recommendations based on size/complexity
     #[serde(skip_serializing_if = "Option::is_none")]
     pub god_object_type: Option<crate::organization::GodObjectType>,
+
+    /// File type classification for context-aware thresholds (spec 135)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_type: Option<crate::organization::FileType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -309,6 +313,7 @@ impl Default for FileDebtMetrics {
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: Vec::new(),
             god_object_type: None,
+            file_type: None,
         }
     }
 }
@@ -374,6 +379,7 @@ mod tests {
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![1.0, 2.0, 3.0],
             god_object_type: None,
+            file_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -411,6 +417,7 @@ mod tests {
             },
             function_scores: vec![5.0; 60],
             god_object_type: None,
+            file_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -432,6 +439,7 @@ mod tests {
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![1.0; 10],
             god_object_type: None,
+            file_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -460,6 +468,7 @@ mod tests {
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![3.0; 15],
             god_object_type: None,
+            file_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -481,6 +490,7 @@ mod tests {
             god_object_indicators: GodObjectIndicators::default(),
             function_scores: vec![2.0; 75],
             god_object_type: None,
+            file_type: None,
         };
 
         let score = metrics.calculate_score();
@@ -600,6 +610,7 @@ mod tests {
             coverage_percent: 0.5,
             function_scores: vec![10.0, 20.0, 30.0],
             god_object_type: None,
+            file_type: None,
             ..Default::default()
         };
 
@@ -615,6 +626,7 @@ mod tests {
             coverage_percent: 0.5,
             function_scores: vec![],
             god_object_type: None,
+            file_type: None,
             ..Default::default()
         };
 
