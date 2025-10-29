@@ -6,6 +6,7 @@ priority: medium
 status: draft
 dependencies: [141, 142]
 created: 2025-10-27
+updated: 2025-10-29
 ---
 
 # Specification 146: Rust-Specific Responsibility Patterns
@@ -34,6 +35,56 @@ While Spec 144 (Framework Patterns) handles framework-specific idioms, this spec
 
 Detect Rust-specific language patterns to enhance responsibility classification for Rust code. Recognize trait implementations, async patterns, error handling, and memory management to provide more accurate and Rust-idiomatic classifications.
 
+## Prerequisites and Architecture Alignment
+
+### AST Audit Findings (2025-10-29)
+
+The following capabilities are **verified to exist** in the current codebase:
+
+✅ **Async Detection**: Available via `syn::ItemFn::sig.asyncness` field
+- Location: `src/analyzers/signature_extractor.rs:53,91`
+- Usage: `item_fn.sig.asyncness.is_some()`
+
+✅ **Call Graph Extraction**: Fully implemented module
+- Location: `src/analyzers/rust_call_graph.rs` + `src/analyzers/call_graph/`
+- API: `extract_call_graph(file: &syn::File, path: &Path) -> CallGraph`
+- Features: Multi-file support, trait resolution, import-aware resolution
+
+✅ **Function Body Access**: Via `quote::ToTokens`
+- Location: `src/analyzers/rust.rs:567,985`
+- Usage: `quote::quote!(#block).to_string()`
+
+✅ **Impl Block Tracking**: Context maintained during AST traversal
+- Location: `src/analyzers/rust.rs:824-851`
+- Fields: `current_impl_type`, `current_impl_is_trait`, tracked via `syn::visit::Visit`
+
+⚠️ **Trait Implementation Tracker**: Exists but needs integration
+- Location: `src/analyzers/trait_implementation_tracker.rs`
+- Status: Module present, needs hook into pattern detection
+
+### Data Structures
+
+**Primary Analysis Context** (to be created):
+```rust
+pub struct RustFunctionContext<'a> {
+    pub item_fn: &'a syn::ItemFn,              // Parsed function AST
+    pub metrics: Option<&'a FunctionMetrics>,  // Computed metrics (if available)
+    pub impl_context: Option<ImplContext>,     // Parent impl block info
+    pub file_path: &'a Path,                   // For error reporting
+}
+
+pub struct ImplContext {
+    pub impl_type: String,           // Type being implemented (e.g., "MyStruct")
+    pub is_trait_impl: bool,         // Whether this is a trait impl
+    pub trait_name: Option<String>,  // Trait name if trait impl (e.g., "Display")
+}
+```
+
+**Existing Structure** (do not modify):
+- `FunctionMetrics` at `src/core/mod.rs:42-64` stores computed metrics
+- `syn::ItemFn` provides full AST access
+- `CallGraph` at `src/priority/call_graph/types.rs` provides call relationships
+
 ## Requirements
 
 ### Functional Requirements
@@ -42,65 +93,152 @@ Detect Rust-specific language patterns to enhance responsibility classification 
 - Detect standard trait implementations (Display, Debug, From, Into, Default, etc.)
 - Classify functions by trait purpose (formatting, conversion, construction)
 - Track custom trait implementations
-- Identify orphan trait implementations (trait + type from different crates)
+- Integrate with existing `TraitImplementationTracker` module
 
 **Async/Concurrency Pattern Detection**:
-- Detect `async fn` and async blocks
-- Identify tokio patterns (spawn, channels, select!, join!)
-- Detect mutex/rwlock usage patterns
-- Track thread spawning and synchronization
+- Detect `async fn` via `sig.asyncness.is_some()`
+- Identify tokio patterns (spawn, channels, select!, join!) via AST traversal
+- Detect mutex/rwlock usage via AST path analysis (not string matching)
+- Track thread spawning and synchronization primitives
 
 **Error Handling Pattern Detection**:
-- Identify error propagation with `?` operator
-- Detect custom error type definitions
+- Count `?` operator usage via AST traversal (not string counting)
+- Detect custom error type definitions via type analysis
 - Track error conversion patterns (`From<E>` for error types)
-- Identify panic/unwrap usage (anti-patterns)
+- Identify panic/unwrap usage via AST expression matching
 
 **Memory Management Pattern Detection**:
-- Detect unsafe blocks and raw pointer usage
-- Identify custom `Drop` implementations
-- Track reference counting patterns (Rc, Arc)
-- Detect memory leaks (`Box::leak`, `mem::forget`)
+- Detect unsafe blocks via `syn::Block` analysis
+- Identify custom `Drop` implementations via trait tracker
+- Track reference counting patterns (Rc, Arc) via type path analysis
+- Detect memory leaks (`Box::leak`, `mem::forget`) via function call detection
 
 **Builder Pattern Detection**:
 - Identify builder structs (methods returning `Self`)
 - Detect constructor patterns (`new`, `with_*`, `from_*`)
 - Track builder finalization methods (`build`, `finalize`)
+- Use existing signature extraction infrastructure
 
 **Type Conversion Detection**:
 - Detect `From`/`Into` trait implementations
-- Identify `as` cast patterns
+- Identify `as` cast expressions via AST
 - Track `TryFrom`/`TryInto` for fallible conversions
 - Detect newtype wrappers
 
 ### Non-Functional Requirements
 
 - **Accuracy**: Correctly identify >90% of Rust-specific patterns
-- **Performance**: Pattern detection adds <5% overhead
+- **Performance**: Pattern detection adds <5% overhead (to be validated via benchmarks)
 - **Rust Version Support**: Support stable Rust patterns (no nightly-only)
 - **Idiomatic**: Classifications align with Rust community terminology
+- **AST-Based**: Use `syn::visit::Visit` patterns, not string matching
 
 ## Acceptance Criteria
 
 - [ ] Standard trait implementations are correctly classified (Display, From, Into, etc.)
-- [ ] Async functions and tokio patterns are identified
-- [ ] Error handling patterns are detected (`?` operator, custom errors)
-- [ ] Unsafe blocks and memory management patterns are flagged
-- [ ] Builder patterns are identified (chainable methods)
-- [ ] Type conversion implementations are detected
-- [ ] Custom Drop implementations are classified as "Resource Cleanup"
-- [ ] Iterator implementations are classified as "Iteration Logic"
-- [ ] Performance overhead <5% on Rust codebases
+- [ ] Async functions detected via `sig.asyncness.is_some()`
+- [ ] Error handling patterns detected via AST traversal (not string matching)
+- [ ] Unsafe blocks and memory management patterns flagged via AST analysis
+- [ ] Builder patterns identified via signature analysis
+- [ ] Type conversion implementations detected via trait tracker integration
+- [ ] Custom Drop implementations classified as "Resource Cleanup"
+- [ ] Iterator implementations classified as "Iteration Logic"
+- [ ] Performance overhead validated with criterion benchmarks
 - [ ] Test suite includes debtmap's own Rust code examples
+- [ ] No false positives from comments or string literals (AST-based detection)
 
 ## Technical Details
 
 ### Implementation Approach
 
-**Phase 1: Trait Implementation Detection**
+**Phase 1: Foundation and Context**
+
+Create analysis context structure that unifies existing data:
 
 ```rust
-use syn::{ImplItem, ImplItemMethod, ItemImpl, Path};
+// File: src/analysis/rust_patterns/context.rs
+
+use std::path::Path;
+use syn::ItemFn;
+use crate::core::FunctionMetrics;
+
+/// Context for Rust pattern detection combining AST and metadata
+pub struct RustFunctionContext<'a> {
+    /// Parsed function AST from syn
+    pub item_fn: &'a ItemFn,
+
+    /// Computed metrics (may be None during initial analysis)
+    pub metrics: Option<&'a FunctionMetrics>,
+
+    /// Parent impl block context if this is a method
+    pub impl_context: Option<ImplContext>,
+
+    /// File path for error reporting
+    pub file_path: &'a Path,
+}
+
+#[derive(Clone, Debug)]
+pub struct ImplContext {
+    pub impl_type: String,
+    pub is_trait_impl: bool,
+    pub trait_name: Option<String>,
+}
+
+impl<'a> RustFunctionContext<'a> {
+    pub fn from_item_fn(item_fn: &'a ItemFn, file_path: &'a Path) -> Self {
+        Self {
+            item_fn,
+            metrics: None,
+            impl_context: None,
+            file_path,
+        }
+    }
+
+    pub fn with_impl_context(mut self, ctx: ImplContext) -> Self {
+        self.impl_context = Some(ctx);
+        self
+    }
+
+    /// Check if function is async (leverages existing capability)
+    pub fn is_async(&self) -> bool {
+        self.item_fn.sig.asyncness.is_some()
+    }
+
+    /// Get function body for AST traversal
+    pub fn body(&self) -> &syn::Block {
+        &self.item_fn.block
+    }
+
+    /// Get function body as string for reporting (NOT for pattern matching)
+    pub fn body_text(&self) -> String {
+        use quote::ToTokens;
+        quote::quote!(#(self.item_fn.block)).to_string()
+    }
+
+    /// Check if this is a trait method implementation
+    pub fn is_trait_impl(&self) -> bool {
+        self.impl_context.as_ref()
+            .map(|ctx| ctx.is_trait_impl)
+            .unwrap_or(false)
+    }
+
+    /// Get trait name if this is a trait implementation
+    pub fn trait_name(&self) -> Option<&str> {
+        self.impl_context.as_ref()
+            .and_then(|ctx| ctx.trait_name.as_deref())
+    }
+}
+```
+
+**Phase 2: Trait Implementation Detection (AST-Based)**
+
+Leverage existing `TraitImplementationTracker` module:
+
+```rust
+// File: src/analysis/rust_patterns/trait_detector.rs
+
+use syn::{ItemImpl, Path};
+use crate::analyzers::trait_implementation_tracker::TraitImplementationTracker;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StandardTrait {
@@ -143,11 +281,20 @@ pub enum StandardTrait {
     Deserialize,
 }
 
-pub struct RustPatternDetector {
+#[derive(Debug, Clone)]
+pub struct TraitImplClassification {
+    pub trait_name: String,
+    pub standard_trait: Option<StandardTrait>,
+    pub category: ResponsibilityCategory,
+    pub confidence: f64,
+    pub evidence: String,
+}
+
+pub struct RustTraitDetector {
     trait_patterns: HashMap<StandardTrait, ResponsibilityCategory>,
 }
 
-impl RustPatternDetector {
+impl RustTraitDetector {
     pub fn new() -> Self {
         let mut trait_patterns = HashMap::new();
 
@@ -168,20 +315,28 @@ impl RustPatternDetector {
         trait_patterns.insert(StandardTrait::IntoIterator, ResponsibilityCategory::Iteration);
 
         // Operators are "Computation"
-        for op_trait in [StandardTrait::Add, StandardTrait::Sub, StandardTrait::Mul, StandardTrait::Div] {
+        for op_trait in [StandardTrait::Add, StandardTrait::Sub,
+                         StandardTrait::Mul, StandardTrait::Div] {
             trait_patterns.insert(op_trait, ResponsibilityCategory::Computation);
         }
 
-        RustPatternDetector { trait_patterns }
+        RustTraitDetector { trait_patterns }
     }
 
-    pub fn detect_trait_impl(&self, impl_block: &ItemImpl) -> Option<TraitImplClassification> {
-        // Check if this is a trait implementation
-        let trait_path = impl_block.trait_.as_ref()?.1.clone();
-        let trait_name = extract_trait_name(&trait_path)?;
+    /// Detect trait implementation from context
+    pub fn detect_trait_impl(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Option<TraitImplClassification> {
+        // Check if this function is a trait method
+        if !context.is_trait_impl() {
+            return None;
+        }
+
+        let trait_name = context.trait_name()?;
 
         // Match against standard traits
-        let standard_trait = self.match_standard_trait(&trait_name)?;
+        let standard_trait = self.match_standard_trait(trait_name)?;
         let category = self.trait_patterns.get(&standard_trait)?;
 
         Some(TraitImplClassification {
@@ -193,8 +348,13 @@ impl RustPatternDetector {
         })
     }
 
+    /// Match trait name to standard trait enum
+    /// Handles both simple names and qualified paths
     fn match_standard_trait(&self, trait_name: &str) -> Option<StandardTrait> {
-        match trait_name {
+        // Extract final segment for matching
+        let simple_name = trait_name.split("::").last()?;
+
+        match simple_name {
             "Display" => Some(StandardTrait::Display),
             "Debug" => Some(StandardTrait::Debug),
             "From" => Some(StandardTrait::From),
@@ -206,7 +366,7 @@ impl RustPatternDetector {
             "Drop" => Some(StandardTrait::Drop),
             "Iterator" => Some(StandardTrait::Iterator),
             "IntoIterator" => Some(StandardTrait::IntoIterator),
-            "Add" | "Sub" | "Mul" | "Div" => Some(StandardTrait::Add),  // Simplification
+            "Add" | "Sub" | "Mul" | "Div" => Some(StandardTrait::Add),
             "Serialize" => Some(StandardTrait::Serialize),
             "Deserialize" => Some(StandardTrait::Deserialize),
             _ => None,
@@ -215,9 +375,15 @@ impl RustPatternDetector {
 }
 ```
 
-**Phase 2: Async/Concurrency Pattern Detection**
+**Phase 3: Async/Concurrency Pattern Detection (AST-Based)**
+
+Use `syn::visit::Visit` for accurate detection:
 
 ```rust
+// File: src/analysis/rust_patterns/async_detector.rs
+
+use syn::{visit::Visit, Expr, ExprAwait, ExprCall, ExprPath, Path};
+
 #[derive(Debug, Clone)]
 pub struct AsyncPattern {
     pub pattern_type: AsyncPatternType,
@@ -235,12 +401,99 @@ pub enum AsyncPatternType {
     JoinMacro,
 }
 
-impl RustPatternDetector {
-    pub fn detect_async_patterns(&self, function: &FunctionAst) -> Vec<AsyncPattern> {
+/// AST visitor for detecting concurrency patterns
+pub struct ConcurrencyPatternVisitor {
+    pub has_mutex: bool,
+    pub has_rwlock: bool,
+    pub has_channel_send: bool,
+    pub has_channel_recv: bool,
+    pub spawn_calls: Vec<String>,
+    pub await_points: usize,
+}
+
+impl ConcurrencyPatternVisitor {
+    pub fn new() -> Self {
+        Self {
+            has_mutex: false,
+            has_rwlock: false,
+            has_channel_send: false,
+            has_channel_recv: false,
+            spawn_calls: Vec::new(),
+            await_points: 0,
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for ConcurrencyPatternVisitor {
+    fn visit_expr_await(&mut self, await_expr: &'ast ExprAwait) {
+        self.await_points += 1;
+        syn::visit::visit_expr_await(self, await_expr);
+    }
+
+    fn visit_path(&mut self, path: &'ast Path) {
+        // Build path string for analysis
+        let path_segments: Vec<_> = path.segments.iter()
+            .map(|s| s.ident.to_string())
+            .collect();
+        let path_str = path_segments.join("::");
+
+        // Detect synchronization primitives
+        if path_segments.iter().any(|s| s == "Mutex") {
+            self.has_mutex = true;
+        }
+        if path_segments.iter().any(|s| s == "RwLock") {
+            self.has_rwlock = true;
+        }
+
+        syn::visit::visit_path(self, path);
+    }
+
+    fn visit_expr_call(&mut self, call: &'ast ExprCall) {
+        // Detect spawn calls (tokio::spawn, async_std::spawn, etc.)
+        if let Expr::Path(ExprPath { path, .. }) = &*call.func {
+            let path_str = path.segments.iter()
+                .map(|s| s.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::");
+
+            if path_str.contains("spawn") {
+                self.spawn_calls.push(path_str);
+            }
+        }
+
+        syn::visit::visit_expr_call(self, call);
+    }
+
+    fn visit_expr_method_call(&mut self, method: &'ast syn::ExprMethodCall) {
+        let method_name = method.method.to_string();
+
+        // Detect channel operations
+        if method_name == "send" || method_name == "try_send" {
+            self.has_channel_send = true;
+        }
+        if method_name == "recv" || method_name == "try_recv" {
+            self.has_channel_recv = true;
+        }
+
+        syn::visit::visit_expr_method_call(self, method);
+    }
+}
+
+pub struct RustAsyncDetector;
+
+impl RustAsyncDetector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn detect_async_patterns(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Vec<AsyncPattern> {
         let mut patterns = Vec::new();
 
-        // Async function
-        if function.is_async {
+        // Check if function is async (using verified capability)
+        if context.is_async() {
             patterns.push(AsyncPattern {
                 pattern_type: AsyncPatternType::AsyncFunction,
                 confidence: 1.0,
@@ -248,47 +501,47 @@ impl RustPatternDetector {
             });
         }
 
-        // Task spawning (tokio::spawn, async_std::task::spawn)
-        for call in &function.calls {
-            if call.name.contains("spawn") &&
-               (call.name.contains("tokio") || call.name.contains("async_std")) {
-                patterns.push(AsyncPattern {
-                    pattern_type: AsyncPatternType::TaskSpawning,
-                    confidence: 0.9,
-                    evidence: format!("Spawns async task: {}", call.name),
-                });
-            }
+        // Traverse AST to find concurrency patterns
+        let mut visitor = ConcurrencyPatternVisitor::new();
+        visitor.visit_block(context.body());
+
+        // Task spawning detected
+        if !visitor.spawn_calls.is_empty() {
+            patterns.push(AsyncPattern {
+                pattern_type: AsyncPatternType::TaskSpawning,
+                confidence: 0.9,
+                evidence: format!("Spawns async tasks: {}", visitor.spawn_calls.join(", ")),
+            });
         }
 
-        // Channel usage (tokio::sync::mpsc, crossbeam::channel)
-        for call in &function.calls {
-            if call.name.contains("channel") ||
-               call.name.contains("send") ||
-               call.name.contains("recv") {
-                patterns.push(AsyncPattern {
-                    pattern_type: AsyncPatternType::ChannelCommunication,
-                    confidence: 0.8,
-                    evidence: "Uses channel communication".into(),
-                });
-                break;
-            }
+        // Channel communication
+        if visitor.has_channel_send || visitor.has_channel_recv {
+            patterns.push(AsyncPattern {
+                pattern_type: AsyncPatternType::ChannelCommunication,
+                confidence: 0.85,
+                evidence: "Uses channel communication".into(),
+            });
         }
 
-        // Mutex/RwLock usage
-        if function.body_text.contains("Mutex::new") ||
-           function.body_text.contains(".lock()") ||
-           function.body_text.contains("RwLock") {
+        // Mutex usage
+        if visitor.has_mutex || visitor.has_rwlock {
             patterns.push(AsyncPattern {
                 pattern_type: AsyncPatternType::MutexUsage,
                 confidence: 0.85,
-                evidence: "Uses mutex/rwlock for synchronization".into(),
+                evidence: format!(
+                    "Uses synchronization: Mutex={}, RwLock={}",
+                    visitor.has_mutex, visitor.has_rwlock
+                ),
             });
         }
 
         patterns
     }
 
-    pub fn classify_from_async_patterns(&self, patterns: &[AsyncPattern]) -> Option<ResponsibilityCategory> {
+    pub fn classify_from_async_patterns(
+        &self,
+        patterns: &[AsyncPattern],
+    ) -> Option<ResponsibilityCategory> {
         if patterns.is_empty() {
             return None;
         }
@@ -313,57 +566,143 @@ impl RustPatternDetector {
 }
 ```
 
-**Phase 3: Error Handling Pattern Detection**
+**Phase 4: Error Handling Pattern Detection (AST-Based)**
+
+Count `?` operator and detect error types via AST:
 
 ```rust
+// File: src/analysis/rust_patterns/error_detector.rs
+
+use syn::{visit::Visit, Expr, ExprTry, ReturnType, Type};
+
 #[derive(Debug, Clone)]
 pub struct ErrorPattern {
     pub pattern_type: ErrorPatternType,
     pub count: usize,
-    pub locations: Vec<SourceLocation>,
+    pub evidence: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorPatternType {
-    QuestionMarkOperator,      // Uses ? for error propagation
-    CustomErrorType,            // Defines custom error type
-    ErrorConversion,            // Implements From for error conversion
-    UnwrapUsage,                // Anti-pattern: unwrap()
-    PanicUsage,                 // Anti-pattern: panic!()
-    ExpectUsage,                // Better than unwrap: expect()
+    QuestionMarkOperator,
+    CustomErrorType,
+    ErrorConversion,
+    UnwrapUsage,
+    PanicUsage,
+    ExpectUsage,
 }
 
-impl RustPatternDetector {
-    pub fn detect_error_patterns(&self, function: &FunctionAst) -> Vec<ErrorPattern> {
+/// AST visitor for error handling patterns
+pub struct ErrorPatternVisitor {
+    pub question_mark_count: usize,
+    pub unwrap_count: usize,
+    pub expect_count: usize,
+    pub panic_count: usize,
+}
+
+impl ErrorPatternVisitor {
+    pub fn new() -> Self {
+        Self {
+            question_mark_count: 0,
+            unwrap_count: 0,
+            expect_count: 0,
+            panic_count: 0,
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for ErrorPatternVisitor {
+    fn visit_expr_try(&mut self, try_expr: &'ast ExprTry) {
+        // The `?` operator
+        self.question_mark_count += 1;
+        syn::visit::visit_expr_try(self, try_expr);
+    }
+
+    fn visit_expr_method_call(&mut self, method: &'ast syn::ExprMethodCall) {
+        let method_name = method.method.to_string();
+
+        match method_name.as_str() {
+            "unwrap" => self.unwrap_count += 1,
+            "expect" => self.expect_count += 1,
+            _ => {}
+        }
+
+        syn::visit::visit_expr_method_call(self, method);
+    }
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        let macro_name = mac.path.segments.last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+
+        if macro_name == "panic" {
+            self.panic_count += 1;
+        }
+
+        syn::visit::visit_macro(self, mac);
+    }
+}
+
+pub struct RustErrorDetector;
+
+impl RustErrorDetector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn detect_error_patterns(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Vec<ErrorPattern> {
         let mut patterns = Vec::new();
 
-        // Count ? operator usage
-        let question_mark_count = function.body_text.matches('?').count();
-        if question_mark_count > 0 {
+        // Traverse AST for error handling
+        let mut visitor = ErrorPatternVisitor::new();
+        visitor.visit_block(context.body());
+
+        // Question mark operator usage
+        if visitor.question_mark_count > 0 {
             patterns.push(ErrorPattern {
                 pattern_type: ErrorPatternType::QuestionMarkOperator,
-                count: question_mark_count,
-                locations: vec![],  // Would need AST parsing for exact locations
+                count: visitor.question_mark_count,
+                evidence: format!("Uses ? operator {} times", visitor.question_mark_count),
             });
         }
 
-        // Detect unwrap() usage (anti-pattern)
-        let unwrap_count = function.body_text.matches(".unwrap()").count();
-        if unwrap_count > 0 {
+        // Unwrap usage (anti-pattern)
+        if visitor.unwrap_count > 0 {
             patterns.push(ErrorPattern {
                 pattern_type: ErrorPatternType::UnwrapUsage,
-                count: unwrap_count,
-                locations: vec![],
+                count: visitor.unwrap_count,
+                evidence: format!("Uses unwrap() {} times (anti-pattern)", visitor.unwrap_count),
+            });
+        }
+
+        // Expect usage (better than unwrap)
+        if visitor.expect_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::ExpectUsage,
+                count: visitor.expect_count,
+                evidence: format!("Uses expect() {} times", visitor.expect_count),
+            });
+        }
+
+        // Panic usage (anti-pattern)
+        if visitor.panic_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::PanicUsage,
+                count: visitor.panic_count,
+                evidence: format!("Uses panic!() {} times (anti-pattern)", visitor.panic_count),
             });
         }
 
         // Check return type for Result
-        if let Some(ref return_type) = function.return_type {
-            if return_type.contains("Result<") {
+        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output {
+            if Self::is_result_type(ty) {
                 patterns.push(ErrorPattern {
                     pattern_type: ErrorPatternType::QuestionMarkOperator,
-                    count: 1,  // Return type indicates error handling
-                    locations: vec![],
+                    count: 1,
+                    evidence: "Returns Result type".into(),
                 });
             }
         }
@@ -371,7 +710,19 @@ impl RustPatternDetector {
         patterns
     }
 
-    pub fn classify_from_error_patterns(&self, patterns: &[ErrorPattern]) -> Option<ResponsibilityCategory> {
+    fn is_result_type(ty: &Type) -> bool {
+        if let Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                return segment.ident == "Result";
+            }
+        }
+        false
+    }
+
+    pub fn classify_from_error_patterns(
+        &self,
+        patterns: &[ErrorPattern],
+    ) -> Option<ResponsibilityCategory> {
         // High ? usage = Error Propagation & Handling
         let question_mark_count: usize = patterns.iter()
             .filter(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator)
@@ -392,183 +743,299 @@ impl RustPatternDetector {
 }
 ```
 
-**Phase 4: Builder Pattern Detection**
+**Phase 5: Main Pattern Detector and Integration**
 
 ```rust
-#[derive(Debug, Clone)]
-pub struct BuilderPattern {
-    pub is_builder: bool,
-    pub chainable_methods: Vec<String>,
-    pub finalizer_method: Option<String>,
-    pub confidence: f64,
+// File: src/analysis/rust_patterns/detector.rs
+
+pub struct RustPatternDetector {
+    trait_detector: RustTraitDetector,
+    async_detector: RustAsyncDetector,
+    error_detector: RustErrorDetector,
 }
 
 impl RustPatternDetector {
-    pub fn detect_builder_pattern(&self, struct_methods: &[FunctionAst]) -> BuilderPattern {
-        let mut chainable_methods = Vec::new();
-        let mut finalizer_method = None;
-
-        for method in struct_methods {
-            // Chainable: returns Self
-            if let Some(ref return_type) = method.return_type {
-                if return_type == "Self" || return_type.ends_with("Self") {
-                    chainable_methods.push(method.name.clone());
-                }
-                // Finalizer: build() or finalize()
-                else if method.name == "build" || method.name == "finalize" {
-                    finalizer_method = Some(method.name.clone());
-                }
-            }
-        }
-
-        let is_builder = chainable_methods.len() >= 2 || finalizer_method.is_some();
-        let confidence = if chainable_methods.len() >= 3 && finalizer_method.is_some() {
-            0.95
-        } else if chainable_methods.len() >= 2 {
-            0.80
-        } else {
-            0.50
-        };
-
-        BuilderPattern {
-            is_builder,
-            chainable_methods,
-            finalizer_method,
-            confidence,
+    pub fn new() -> Self {
+        Self {
+            trait_detector: RustTraitDetector::new(),
+            async_detector: RustAsyncDetector::new(),
+            error_detector: RustErrorDetector::new(),
         }
     }
+
+    /// Detect all Rust-specific patterns for a function
+    pub fn detect_all_patterns(
+        &self,
+        context: &RustFunctionContext,
+    ) -> RustPatternResult {
+        RustPatternResult {
+            trait_impl: self.trait_detector.detect_trait_impl(context),
+            async_patterns: self.async_detector.detect_async_patterns(context),
+            error_patterns: self.error_detector.detect_error_patterns(context),
+        }
+    }
+
+    /// Classify function based on detected patterns
+    /// Priority order: Trait impls > Async > Error handling
+    pub fn classify_function(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Option<RustSpecificClassification> {
+        // 1. Trait implementations (highest confidence)
+        if let Some(trait_impl) = self.trait_detector.detect_trait_impl(context) {
+            return Some(RustSpecificClassification {
+                category: trait_impl.category,
+                confidence: trait_impl.confidence,
+                evidence: trait_impl.evidence,
+                rust_pattern: RustPattern::TraitImplementation(trait_impl),
+            });
+        }
+
+        // 2. Async/concurrency patterns
+        let async_patterns = self.async_detector.detect_async_patterns(context);
+        if let Some(category) = self.async_detector.classify_from_async_patterns(&async_patterns) {
+            return Some(RustSpecificClassification {
+                category,
+                confidence: 0.85,
+                evidence: format!("Async patterns: {:?}", async_patterns),
+                rust_pattern: RustPattern::AsyncConcurrency(async_patterns),
+            });
+        }
+
+        // 3. Error handling patterns
+        let error_patterns = self.error_detector.detect_error_patterns(context);
+        if let Some(category) = self.error_detector.classify_from_error_patterns(&error_patterns) {
+            return Some(RustSpecificClassification {
+                category,
+                confidence: 0.75,
+                evidence: format!("Error handling: {:?}", error_patterns),
+                rust_pattern: RustPattern::ErrorHandling(error_patterns),
+            });
+        }
+
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RustPatternResult {
+    pub trait_impl: Option<TraitImplClassification>,
+    pub async_patterns: Vec<AsyncPattern>,
+    pub error_patterns: Vec<ErrorPattern>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RustSpecificClassification {
+    pub category: ResponsibilityCategory,
+    pub confidence: f64,
+    pub evidence: String,
+    pub rust_pattern: RustPattern,
+}
+
+#[derive(Debug, Clone)]
+pub enum RustPattern {
+    TraitImplementation(TraitImplClassification),
+    AsyncConcurrency(Vec<AsyncPattern>),
+    ErrorHandling(Vec<ErrorPattern>),
 }
 ```
 
-**Phase 5: Integration with Multi-Signal**
+**Phase 6: Integration into RustAnalyzer**
 
 ```rust
-pub fn classify_rust_function(
-    function: &FunctionAst,
-    rust_detector: &RustPatternDetector,
-) -> Option<RustSpecificClassification> {
-    // Priority order: Most specific patterns first
+// File: src/analyzers/rust.rs (modifications)
 
-    // 1. Trait implementations (highest confidence)
-    if let Some(trait_impl) = rust_detector.detect_trait_impl(function.parent_impl?) {
-        return Some(RustSpecificClassification {
-            category: trait_impl.category,
-            confidence: trait_impl.confidence,
-            evidence: trait_impl.evidence,
-            rust_pattern: RustPattern::TraitImplementation(trait_impl),
-        });
+use crate::analysis::rust_patterns::{
+    RustPatternDetector, RustFunctionContext, ImplContext,
+};
+
+struct FunctionVisitor {
+    // ... existing fields ...
+    rust_pattern_detector: RustPatternDetector,
+    current_impl_type: Option<String>,
+    current_impl_is_trait: bool,
+    current_trait_name: Option<String>,  // NEW: track trait name
+}
+
+impl FunctionVisitor {
+    fn new(path: PathBuf, /* ... */) -> Self {
+        Self {
+            // ... existing initialization ...
+            rust_pattern_detector: RustPatternDetector::new(),
+            current_impl_type: None,
+            current_impl_is_trait: false,
+            current_trait_name: None,
+        }
     }
 
-    // 2. Async/concurrency patterns
-    let async_patterns = rust_detector.detect_async_patterns(function);
-    if let Some(category) = rust_detector.classify_from_async_patterns(&async_patterns) {
-        return Some(RustSpecificClassification {
-            category,
-            confidence: 0.85,
-            evidence: format!("Async patterns: {:?}", async_patterns),
-            rust_pattern: RustPattern::AsyncConcurrency(async_patterns),
-        });
-    }
+    fn analyze_function(
+        &mut self,
+        name: String,
+        item_fn: &syn::ItemFn,
+        line: usize,
+        is_trait_method: bool,
+    ) {
+        // ... existing analysis ...
 
-    // 3. Error handling patterns
-    let error_patterns = rust_detector.detect_error_patterns(function);
-    if let Some(category) = rust_detector.classify_from_error_patterns(&error_patterns) {
-        return Some(RustSpecificClassification {
-            category,
-            confidence: 0.75,
-            evidence: format!("Error handling: {:?}", error_patterns),
-            rust_pattern: RustPattern::ErrorHandling(error_patterns),
+        // NEW: Add Rust-specific pattern detection
+        let impl_context = self.current_impl_type.as_ref().map(|impl_type| {
+            ImplContext {
+                impl_type: impl_type.clone(),
+                is_trait_impl: self.current_impl_is_trait,
+                trait_name: self.current_trait_name.clone(),
+            }
         });
-    }
 
-    None
+        let mut context = RustFunctionContext::from_item_fn(item_fn, &self.path);
+        if let Some(ctx) = impl_context {
+            context = context.with_impl_context(ctx);
+        }
+
+        let rust_patterns = self.rust_pattern_detector.detect_all_patterns(&context);
+
+        // Store patterns in metrics (extend FunctionMetrics with optional field)
+        let mut metrics = FunctionMetrics::new(name.clone(), self.path.clone(), line);
+        // ... set other metrics ...
+        metrics.rust_pattern_result = Some(rust_patterns);  // NEW optional field
+
+        self.functions.push(metrics);
+    }
+}
+
+impl<'ast> Visit<'ast> for FunctionVisitor {
+    fn visit_item_impl(&mut self, item_impl: &'ast syn::ItemImpl) {
+        // ... existing impl type extraction ...
+
+        // NEW: Extract trait name if this is a trait impl
+        let trait_name = item_impl.trait_.as_ref()
+            .map(|(_, path, _)| {
+                path.segments.last()
+                    .map(|s| s.ident.to_string())
+                    .unwrap_or_default()
+            });
+
+        self.current_trait_name = trait_name;
+
+        // ... continue visiting ...
+    }
 }
 ```
 
 ### Architecture Changes
 
 **New Module**: `src/analysis/rust_patterns/`
-- `detector.rs` - Main Rust pattern detection
-- `traits.rs` - Standard trait detection
-- `async_patterns.rs` - Async/concurrency patterns
-- `error_patterns.rs` - Error handling patterns
-- `builders.rs` - Builder pattern detection
-- `conversions.rs` - Type conversion patterns
+- `mod.rs` - Module exports and public API
+- `context.rs` - `RustFunctionContext` and `ImplContext`
+- `detector.rs` - Main `RustPatternDetector`
+- `trait_detector.rs` - Trait implementation detection
+- `async_detector.rs` - Async/concurrency patterns
+- `error_detector.rs` - Error handling patterns
+- `builder_detector.rs` - Builder pattern detection (future)
+- `conversion_detector.rs` - Type conversion patterns (future)
 
-**Integration Point**: `src/analysis/multi_signal_aggregation.rs`
-- Add Rust-specific signal to SignalSet
-- Weight: 5-10% for Rust code (0% for other languages)
-- Override generic classifications with Rust-specific when high confidence
+**Modified Files**:
+- `src/analyzers/rust.rs` - Integration point for pattern detection
+- `src/core/mod.rs` - Add optional `rust_pattern_result` field to `FunctionMetrics`
+
+**No Integration with Spec 145**: This module operates standalone. If multi-signal aggregation is implemented later, it can consume `RustPatternResult` as one signal.
 
 ## Dependencies
 
-- **Prerequisites**: Spec 141 (I/O Detection), Spec 142 (Call Graph)
-- **Optional Integration**: Spec 145 (Multi-Signal Aggregation)
+- **Prerequisites**:
+  - ✅ Spec 141 (I/O Detection) - Independent
+  - ✅ Spec 142 (Call Graph) - Already implemented at `src/analyzers/rust_call_graph.rs`
+- **Optional Integration**: Spec 145 (Multi-Signal Aggregation) - Not required
 - **Affected Components**:
-  - `src/analysis/` - new rust_patterns module
-  - `src/analyzers/rust_analyzer.rs` - integration point
+  - `src/analysis/` - new rust_patterns module (new)
+  - `src/analyzers/rust.rs` - integration point (modified)
+  - `src/core/mod.rs` - extend FunctionMetrics (modified)
 - **External Dependencies**:
-  - `syn` (already in use for Rust parsing)
+  - `syn` (already in use)
+  - `quote` (already in use)
 
 ## Testing Strategy
 
 ### Unit Tests
 
+All pattern detectors have unit tests using AST-based verification:
+
 ```rust
 #[cfg(test)]
 mod tests {
     use super::*;
+    use syn::parse_quote;
 
     #[test]
-    fn detect_display_trait() {
-        let code = r#"
-        impl Display for MyType {
+    fn detect_display_trait_via_context() {
+        let item_fn: syn::ItemFn = parse_quote! {
             fn fmt(&self, f: &mut Formatter) -> fmt::Result {
                 write!(f, "MyType")
             }
-        }
-        "#;
+        };
 
-        let impl_block = parse_impl_block(code);
-        let detector = RustPatternDetector::new();
+        let mut context = RustFunctionContext::from_item_fn(
+            &item_fn,
+            Path::new("test.rs"),
+        );
+        context = context.with_impl_context(ImplContext {
+            impl_type: "MyType".into(),
+            is_trait_impl: true,
+            trait_name: Some("Display".into()),
+        });
 
-        let classification = detector.detect_trait_impl(&impl_block).unwrap();
+        let detector = RustTraitDetector::new();
+        let classification = detector.detect_trait_impl(&context).unwrap();
+
         assert_eq!(classification.category, ResponsibilityCategory::Formatting);
         assert_eq!(classification.standard_trait, Some(StandardTrait::Display));
+        assert!(classification.confidence > 0.9);
     }
 
     #[test]
-    fn detect_async_spawn() {
-        let code = r#"
-        async fn process_tasks() {
-            tokio::spawn(async {
-                // Task logic
-            });
-        }
-        "#;
+    fn detect_async_spawn_via_ast() {
+        let item_fn: syn::ItemFn = parse_quote! {
+            async fn process_tasks() {
+                tokio::spawn(async {
+                    // Task logic
+                });
+            }
+        };
 
-        let ast = parse_rust(code);
-        let detector = RustPatternDetector::new();
+        let context = RustFunctionContext::from_item_fn(
+            &item_fn,
+            Path::new("test.rs"),
+        );
 
-        let patterns = detector.detect_async_patterns(&ast.functions[0]);
-        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::TaskSpawning));
+        let detector = RustAsyncDetector::new();
+        let patterns = detector.detect_async_patterns(&context);
+
+        assert!(patterns.iter().any(|p|
+            p.pattern_type == AsyncPatternType::AsyncFunction
+        ));
+        assert!(patterns.iter().any(|p|
+            p.pattern_type == AsyncPatternType::TaskSpawning
+        ));
     }
 
     #[test]
-    fn detect_error_propagation() {
-        let code = r#"
-        fn read_config() -> Result<Config, Error> {
-            let file = File::open("config.toml")?;
-            let content = read_to_string(file)?;
-            let config = parse_toml(&content)?;
-            Ok(config)
-        }
-        "#;
+    fn detect_error_propagation_via_ast() {
+        let item_fn: syn::ItemFn = parse_quote! {
+            fn read_config() -> Result<Config, Error> {
+                let file = File::open("config.toml")?;
+                let content = read_to_string(file)?;
+                let config = parse_toml(&content)?;
+                Ok(config)
+            }
+        };
 
-        let ast = parse_rust(code);
-        let detector = RustPatternDetector::new();
+        let context = RustFunctionContext::from_item_fn(
+            &item_fn,
+            Path::new("test.rs"),
+        );
 
-        let patterns = detector.detect_error_patterns(&ast.functions[0]);
+        let detector = RustErrorDetector::new();
+        let patterns = detector.detect_error_patterns(&context);
+
         let question_marks: usize = patterns.iter()
             .filter(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator)
             .map(|p| p.count)
@@ -578,58 +1045,103 @@ mod tests {
     }
 
     #[test]
-    fn detect_builder_pattern() {
-        let code = r#"
-        struct Builder { /* fields */ }
+    fn no_false_positives_from_comments() {
+        let item_fn: syn::ItemFn = parse_quote! {
+            fn example() {
+                // This comment mentions Mutex but shouldn't trigger detection
+                let x = 42;
+            }
+        };
 
-        impl Builder {
-            fn new() -> Self { Builder {} }
-            fn with_name(mut self, name: String) -> Self { self }
-            fn with_age(mut self, age: u32) -> Self { self }
-            fn build(self) -> Config { Config {} }
-        }
-        "#;
+        let context = RustFunctionContext::from_item_fn(
+            &item_fn,
+            Path::new("test.rs"),
+        );
 
-        let ast = parse_rust(code);
-        let detector = RustPatternDetector::new();
+        let detector = RustAsyncDetector::new();
+        let patterns = detector.detect_async_patterns(&context);
 
-        let pattern = detector.detect_builder_pattern(&ast.impl_blocks[0].methods);
-        assert!(pattern.is_builder);
-        assert_eq!(pattern.finalizer_method, Some("build".to_string()));
-        assert!(pattern.confidence > 0.9);
+        // Should NOT detect mutex usage from comment
+        assert!(!patterns.iter().any(|p|
+            p.pattern_type == AsyncPatternType::MutexUsage
+        ));
     }
 }
 ```
 
 ### Integration Tests
 
+Test on debtmap's own codebase:
+
 ```rust
 #[test]
 fn rust_patterns_on_debtmap_code() {
     let files = vec![
-        "src/analyzers/rust_analyzer.rs",
-        "src/config.rs",
-        "src/io/reader.rs",
+        "src/analyzers/rust.rs",
+        "src/core/mod.rs",
+        "src/analysis/call_graph/graph_builder.rs",
     ];
 
     let detector = RustPatternDetector::new();
 
     for file_path in files {
-        let ast = parse_file(file_path);
+        let content = std::fs::read_to_string(file_path).unwrap();
+        let file: syn::File = syn::parse_file(&content).unwrap();
 
-        for function in ast.functions() {
-            let rust_classification = classify_rust_function(function, &detector);
-
-            if let Some(classification) = rust_classification {
-                println!("{}: {} ({:.2})",
-                    function.name,
-                    classification.category,
-                    classification.confidence
+        for item in &file.items {
+            if let syn::Item::Fn(item_fn) = item {
+                let context = RustFunctionContext::from_item_fn(
+                    item_fn,
+                    Path::new(file_path),
                 );
+
+                if let Some(classification) = detector.classify_function(&context) {
+                    println!(
+                        "{}: {} ({:.2}) - {}",
+                        item_fn.sig.ident,
+                        classification.category,
+                        classification.confidence,
+                        classification.evidence
+                    );
+                }
             }
         }
     }
 }
+```
+
+### Performance Benchmarks
+
+Use `criterion` to validate <5% overhead claim:
+
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn benchmark_pattern_detection(c: &mut Criterion) {
+    let item_fn: syn::ItemFn = parse_quote! {
+        async fn complex_function() -> Result<(), Error> {
+            let mutex = Mutex::new(0);
+            tokio::spawn(async move {
+                let _ = mutex.lock()?;
+            });
+            Ok(())
+        }
+    };
+
+    let context = RustFunctionContext::from_item_fn(
+        &item_fn,
+        Path::new("bench.rs"),
+    );
+
+    let detector = RustPatternDetector::new();
+
+    c.bench_function("detect_all_patterns", |b| {
+        b.iter(|| detector.detect_all_patterns(black_box(&context)))
+    });
+}
+
+criterion_group!(benches, benchmark_pattern_detection);
+criterion_main!(benches);
 ```
 
 ## Documentation Requirements
@@ -637,6 +1149,7 @@ fn rust_patterns_on_debtmap_code() {
 ### User Documentation
 
 Update README.md:
+
 ```markdown
 ## Rust-Specific Pattern Detection
 
@@ -662,73 +1175,68 @@ For Rust code, debtmap recognizes language-specific patterns:
 **Builder Patterns**:
 - Chainable methods → Configuration Builder
 - build() method → Finalization
+
+All pattern detection uses AST traversal for accuracy - no false positives from comments or strings.
 ```
+
+### Developer Documentation
+
+Create `docs/rust-patterns.md` explaining:
+- How to add new pattern detectors
+- AST visitor patterns used
+- Integration with existing analyzers
+- Performance considerations
 
 ## Implementation Notes
 
-### Syn Integration
+### AST-Based Detection Principles
 
-Use `syn` crate for accurate Rust AST parsing:
+1. **Always use `syn::visit::Visit`** for traversing function bodies
+2. **Never use string matching** on function body text (only for reporting)
+3. **Leverage existing infrastructure**:
+   - `sig.asyncness` for async detection
+   - `TraitImplementationTracker` for trait analysis
+   - `CallGraph` for call relationships
+4. **Test for false positives** from comments/strings
 
-```rust
-use syn::{parse_file, Item, ItemImpl, ImplItem};
+### Performance Optimization
 
-pub fn extract_trait_implementations(code: &str) -> Vec<ItemImpl> {
-    let syntax_tree = parse_file(code).unwrap();
-
-    syntax_tree.items
-        .into_iter()
-        .filter_map(|item| {
-            if let Item::Impl(impl_block) = item {
-                if impl_block.trait_.is_some() {
-                    return Some(impl_block);
-                }
-            }
-            None
-        })
-        .collect()
-}
-```
+- Pattern detection runs during single-pass AST traversal
+- Visitors are lightweight (no heap allocations in hot paths)
+- Results cached in `FunctionMetrics` (computed once)
+- Parallel analysis of files maintains performance
 
 ## Migration and Compatibility
 
-### Language-Specific Signals
+### Backward Compatibility
 
-Rust patterns only apply to Rust code:
+- New optional field in `FunctionMetrics`: `rust_pattern_result: Option<RustPatternResult>`
+- No breaking changes to existing APIs
+- Pattern detection opt-in via configuration flag
 
-```rust
-impl SignalSet {
-    pub fn collect_for_function(...) -> Self {
-        let rust_signal = if context.language == Language::Rust {
-            Some(classify_rust_function(function, &context.rust_detector))
-        } else {
-            None
-        };
+### Rollout Strategy
 
-        SignalSet {
-            // ... other signals
-            rust_specific_signal: rust_signal,
-        }
-    }
-}
-```
+1. **Phase 1**: Implement standalone module with tests
+2. **Phase 2**: Integrate into `RustAnalyzer` behind feature flag
+3. **Phase 3**: Enable by default after validation
+4. **Phase 4**: Use patterns for debt prioritization
 
 ## Expected Impact
 
 ### Accuracy Improvement for Rust
 
-- **Generic multi-signal**: ~85% accuracy on Rust code
-- **+ Rust patterns**: ~90% accuracy on Rust code
-- **Improvement**: +5 percentage points for Rust
+- **Generic analysis**: ~85% accuracy on Rust code
+- **+ Rust patterns**: ~92% accuracy on Rust code
+- **Improvement**: +7 percentage points for Rust
 
 ### Better Rust-Specific Classifications
 
 ```rust
-// Before (generic)
+// Before (generic analysis)
 impl Display for User {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result { ... }
 }
-// Classification: "General Logic"
+// Classification: "General Logic" (low confidence)
 
 // After (Rust-specific)
 impl Display for User {
@@ -737,8 +1245,297 @@ impl Display for User {
 // Classification: "Formatting (Display trait)" (0.95 confidence)
 ```
 
-### Foundation for Language-Specific Analysis
+### Foundation for Future Enhancements
 
-This pattern can be extended to Python and JavaScript:
-- Python: Decorators, magic methods, context managers
-- JavaScript: Prototypes, promises, async/await patterns
+This pattern establishes:
+- AST-based pattern detection architecture
+- Language-specific plugin system
+- Path for Python/JavaScript pattern detectors
+
+## Integration with Spec 145 (Multi-Signal Aggregation)
+
+### Overview
+
+Spec 145 is **implemented** at `src/analysis/multi_signal_aggregation.rs`. Rust-specific patterns should integrate as a new signal type alongside existing signals.
+
+### Current Signal Types (Spec 145)
+
+```rust
+pub enum SignalType {
+    IoDetection,
+    CallGraph,
+    Purity,
+    Framework,
+    TypeSignatures,
+    Name,
+    // Add: RustPatterns (Spec 146)
+}
+
+pub struct SignalSet {
+    pub io_signal: Option<IoClassification>,
+    pub call_graph_signal: Option<CallGraphClassification>,
+    pub purity_signal: Option<PurityClassification>,
+    pub framework_signal: Option<FrameworkClassification>,
+    pub type_signal: Option<TypeSignatureClassification>,
+    pub name_signal: Option<NameBasedClassification>,
+    // Add: rust_pattern_signal (Spec 146)
+}
+```
+
+### Integration Changes Required
+
+**1. Extend `SignalType` enum**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+pub enum SignalType {
+    IoDetection,
+    CallGraph,
+    Purity,
+    Framework,
+    TypeSignatures,
+    Name,
+    RustPatterns,  // NEW
+}
+```
+
+**2. Add Rust pattern classification type**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+/// Classification from Rust-specific pattern detection (Spec 146)
+#[derive(Debug, Clone)]
+pub struct RustPatternClassification {
+    pub category: ResponsibilityCategory,
+    pub confidence: f64,
+    pub evidence: String,
+    pub pattern_type: String,  // e.g., "Display trait", "Async spawn", "Error handling"
+}
+```
+
+**3. Extend `SignalSet` structure**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+#[derive(Debug, Clone, Default)]
+pub struct SignalSet {
+    pub io_signal: Option<IoClassification>,
+    pub call_graph_signal: Option<CallGraphClassification>,
+    pub purity_signal: Option<PurityClassification>,
+    pub framework_signal: Option<FrameworkClassification>,
+    pub type_signal: Option<TypeSignatureClassification>,
+    pub name_signal: Option<NameBasedClassification>,
+    pub rust_pattern_signal: Option<RustPatternClassification>,  // NEW
+}
+```
+
+**4. Update `SignalWeights` configuration**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignalWeights {
+    pub io_detection: f64,
+    pub call_graph: f64,
+    pub type_signatures: f64,
+    pub purity_side_effects: f64,
+    pub framework_patterns: f64,
+    pub rust_patterns: f64,      // NEW
+    pub name_heuristics: f64,
+}
+
+impl Default for SignalWeights {
+    fn default() -> Self {
+        SignalWeights {
+            io_detection: 0.30,      // Reduced from 0.35
+            call_graph: 0.25,
+            type_signatures: 0.15,
+            purity_side_effects: 0.05,
+            framework_patterns: 0.05,
+            rust_patterns: 0.05,     // NEW weight for Rust patterns
+            name_heuristics: 0.15,
+            // Total: 1.00
+        }
+    }
+}
+```
+
+**5. Add to ResponsibilityCategory enum** (expand existing categories):
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResponsibilityCategory {
+    // Existing categories...
+    FileIO,
+    NetworkIO,
+    DatabaseIO,
+    // ... etc ...
+
+    // NEW: Rust-specific categories
+    TypeConversion,           // From/Into traits
+    Construction,             // Default/Clone/new()
+    ResourceCleanup,          // Drop trait
+    Iteration,                // Iterator trait
+    ConcurrencyManagement,    // tokio::spawn, threads
+    CommunicationOrchestration, // Channels
+    AsynchronousOperation,    // async fn
+
+    // Existing...
+    Unknown,
+}
+```
+
+**6. Extend ResponsibilityAggregator**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+use crate::analysis::rust_patterns::RustPatternDetector;
+
+pub struct ResponsibilityAggregator {
+    config: AggregationConfig,
+    io_detector: IoDetector,
+    purity_analyzer: PurityAnalyzer,
+    framework_detector: Option<FrameworkDetector>,
+    call_graph: Option<RustCallGraph>,
+    type_tracker: Option<TypeFlowTracker>,
+    rust_pattern_detector: Option<RustPatternDetector>,  // NEW
+}
+
+impl ResponsibilityAggregator {
+    /// Set Rust pattern detector (only active for Rust code)
+    pub fn with_rust_pattern_detector(mut self, detector: RustPatternDetector) -> Self {
+        self.rust_pattern_detector = Some(detector);
+        self
+    }
+
+    /// Collect Rust pattern signal from function context
+    pub fn collect_rust_pattern_signal(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Option<RustPatternClassification> {
+        let detector = self.rust_pattern_detector.as_ref()?;
+        let classification = detector.classify_function(context)?;
+
+        Some(RustPatternClassification {
+            category: classification.category,
+            confidence: classification.confidence,
+            evidence: classification.evidence,
+            pattern_type: format!("{:?}", classification.rust_pattern),
+        })
+    }
+}
+```
+
+**7. Update aggregation logic**:
+
+```rust
+// File: src/analysis/multi_signal_aggregation.rs
+
+impl ResponsibilityAggregator {
+    pub fn aggregate(&self, signals: SignalSet) -> AggregatedClassification {
+        let mut scores: HashMap<ResponsibilityCategory, f64> = HashMap::new();
+        let mut evidence: Vec<SignalEvidence> = Vec::new();
+
+        // ... existing signal processing ...
+
+        // NEW: Process Rust pattern signal
+        if let Some(rust_signal) = signals.rust_pattern_signal {
+            let weight = self.config.weights.rust_patterns;
+            let contribution = rust_signal.confidence * weight;
+
+            *scores.entry(rust_signal.category).or_insert(0.0) += contribution;
+
+            evidence.push(SignalEvidence {
+                signal_type: SignalType::RustPatterns,
+                category: rust_signal.category,
+                confidence: rust_signal.confidence,
+                weight,
+                contribution,
+                description: rust_signal.evidence,
+            });
+        }
+
+        // ... rest of aggregation logic ...
+    }
+}
+```
+
+### Integration Priority
+
+Rust patterns have **high confidence** (0.85-0.95) for specific cases:
+- Trait implementations: 0.95 confidence → Should influence final classification strongly
+- Async patterns: 0.85 confidence
+- Error handling: 0.75 confidence
+
+**Override Strategy**: When Rust patterns detect a trait implementation with >0.9 confidence, it should override weaker signals unless `framework_patterns` has higher confidence.
+
+### Language-Specific Activation
+
+Rust patterns should only activate for Rust code:
+
+```rust
+// In RustAnalyzer integration
+fn analyze_function(&mut self, item_fn: &syn::ItemFn, ...) {
+    // ... existing analysis ...
+
+    // Only collect Rust pattern signal for Rust files
+    if self.language == Language::Rust {
+        let rust_signal = self.aggregator.collect_rust_pattern_signal(&context);
+        signal_set.rust_pattern_signal = rust_signal;
+    }
+
+    let classification = self.aggregator.aggregate(signal_set);
+}
+```
+
+### Weight Rationale
+
+**5% weight** for Rust patterns is conservative but appropriate because:
+- High precision (>90%) but limited scope (Rust only)
+- Complements rather than replaces other signals
+- Most valuable for trait impls and async patterns
+- Framework patterns (5%) handle similar concerns for other languages
+
+### Expected Accuracy Impact
+
+With Rust patterns integrated:
+- **Rust code**: ~92% accuracy (up from ~85%)
+- **Other languages**: No change (signal inactive)
+- **Overall project**: Depends on Rust percentage
+
+## Open Questions
+
+1. ✅ **Multi-Signal Integration**: **RESOLVED** - Spec 145 is implemented, integrate as new signal type
+
+2. **Builder Pattern Detection**: Include in initial implementation?
+   - **Recommendation**: Defer to Phase 2, focus on traits/async/errors first
+
+3. **Configuration**: Should pattern detection be always-on or opt-in?
+   - **Recommendation**: Always-on for Rust files (minimal overhead, high value)
+
+4. **Signal Weight**: Is 5% appropriate or should it be higher?
+   - **Recommendation**: Start with 5%, monitor accuracy metrics, adjust if needed
+
+## Revision History
+
+- 2025-10-27: Initial draft
+- 2025-10-29: Major revision based on AST audit
+  - Corrected data structures (FunctionAst → RustFunctionContext)
+  - Changed from string matching to AST-based detection
+  - Added verified capability references
+  - Defined standalone integration strategy
+  - Added performance benchmarking requirements
+- 2025-10-29: Integration with Spec 145
+  - Added multi-signal aggregation integration section
+  - Defined RustPatternClassification structure
+  - Specified SignalSet and SignalWeights modifications
+  - Defined ResponsibilityCategory extensions
+  - Clarified language-specific activation strategy
+  - Set 5% weight for rust_patterns signal
