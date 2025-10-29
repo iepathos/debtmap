@@ -2,18 +2,20 @@
 number: 139
 title: Improve Output Clarity and Consistency
 category: optimization
-priority: low
+priority: medium
 status: draft
-dependencies: [134, 135, 136, 138]
+dependencies: [138a]
 created: 2025-10-27
+updated: 2025-10-29
 ---
 
 # Specification 139: Improve Output Clarity and Consistency
 
 **Category**: optimization
-**Priority**: low
+**Priority**: medium
 **Status**: draft
-**Dependencies**: Specs 134, 135, 136, 138
+**Dependencies**: Spec 138a (Concise Actionable Recommendations)
+**Implementation**: Two-phase approach
 
 ## Context
 
@@ -58,6 +60,12 @@ The current debtmap output has clarity and consistency issues:
 ## Objective
 
 Redesign debtmap output format for clarity, consistency, and scannability while maintaining information density and actionability.
+
+**Note**: This spec takes a two-phase approach:
+- **Phase 1**: Refactor existing `src/priority/formatter.rs` (currently 2919 lines, 116 functions) into focused modules
+- **Phase 2**: Apply clarity improvements to the refactored codebase
+
+This ensures we build on a clean foundation rather than adding complexity to an already complex module.
 
 ## Requirements
 
@@ -218,7 +226,7 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
    fn format_location(loc: &Location, indent: usize) -> String {
        let prefix = " ".repeat(indent * 2);
 
-       let mut output = format!("{}📍 LOCATION\n", prefix);
+       let mut output = format!("{}LOCATION\n", prefix);
 
        output.push_str(&format!("{}├─ File: {}\n",
                                prefix,
@@ -243,7 +251,7 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
    fn format_evidence(evidence: &Evidence, indent: usize, verbosity: Verbosity) -> String {
        let prefix = " ".repeat(indent * 2);
 
-       let mut output = format!("{}📊 EVIDENCE\n", prefix);
+       let mut output = format!("{}EVIDENCE\n", prefix);
 
        // Sort metrics by importance
        let sorted_metrics = sort_metrics_by_importance(&evidence.metrics);
@@ -277,7 +285,7 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
    fn format_rationale(rationale: &Rationale, indent: usize, verbosity: Verbosity) -> String {
        let prefix = " ".repeat(indent * 2);
 
-       let mut output = format!("{}💡 WHY THIS MATTERS\n", prefix);
+       let mut output = format!("{}WHY THIS MATTERS\n", prefix);
 
        output.push_str(&format!("{}├─ {}\n", prefix, rationale.primary_reason));
 
@@ -300,22 +308,24 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
 
 3. **Severity Formatting**
    ```rust
+   // Simple, clean bracket format (default)
    fn format_severity(severity: Severity) -> String {
-       match severity {
-           Severity::Critical => "🔴 CRITICAL".to_string(),
-           Severity::High => "🟠 HIGH".to_string(),
-           Severity::Medium => "🟡 MEDIUM".to_string(),
-           Severity::Low => "🟢 LOW".to_string(),
-       }
-   }
-
-   // For terminals without emoji support
-   fn format_severity_simple(severity: Severity) -> String {
        match severity {
            Severity::Critical => "[CRITICAL]".to_string(),
            Severity::High => "[HIGH]    ".to_string(),
            Severity::Medium => "[MEDIUM]  ".to_string(),
            Severity::Low => "[LOW]     ".to_string(),
+       }
+   }
+
+   // Optional colored output (when use_color = true)
+   fn format_severity_colored(severity: Severity) -> ColoredString {
+       use colored::*;
+       match severity {
+           Severity::Critical => "[CRITICAL]".red().bold(),
+           Severity::High => "[HIGH]    ".yellow().bold(),
+           Severity::Medium => "[MEDIUM]  ".blue(),
+           Severity::Low => "[LOW]     ".green(),
        }
    }
    ```
@@ -332,27 +342,26 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
    pub struct FormatOptions {
        verbosity: Verbosity,
        use_color: bool,
-       use_emoji: bool,
        max_issues: Option<usize>,
    }
    ```
 
-5. **Example Output**
+5. **Example Output (Default - No Colors)**
    ```
-   #3 🔴 CRITICAL | Complex Function | Score: 15.8
+   #3 [CRITICAL] | Complex Function | Score: 15.8
 
-   📍 LOCATION
+   LOCATION
    ├─ File: ./crates/core/flags/hiargs.rs
    ├─ Function: HiArgs::from_low_args()
    ├─ Lines: 113-200
    └─ Size: 87 lines
 
-   ⚠️  IMPACT
+   IMPACT
    ├─ Risk Level: High - untested complex logic
    ├─ Affected: Command-line argument parsing (critical path)
    └─ User Impact: Bugs affect all users, hard to diagnose
 
-   📊 EVIDENCE
+   EVIDENCE
    ├─ Cyclomatic Complexity: 42 (threshold: 10)
    ├─ Coverage: 38.7% (gap: 61.3%)
    ├─ Cognitive Complexity: 77
@@ -360,26 +369,26 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
    ├─ Uncovered Branches: 26 of 42
    └─ Estimated Test Gap: 26 tests needed
 
-   💡 WHY THIS MATTERS
+   WHY THIS MATTERS
    ├─ High complexity + low coverage = high defect risk
    ├─ Critical path code should have >80% coverage
    ├─ Cyclomatic complexity >20 is very hard to maintain
    └─ Impact: Each bug affects CLI usability for all users
 
-   ✅ RECOMMENDED ACTION
-   1. 🟢 Add 7 tests for critical uncovered branches
+   RECOMMENDED ACTION
+   1. [HIGH PRIORITY] Add 7 tests for critical uncovered branches
       Impact: +7 tests, reduce risk by 50%
       Run: cargo test test_from_low_args
 
-   2. 🟡 Extract nested conditionals into 4-5 focused functions
+   2. [MEDIUM] Extract nested conditionals into 4-5 focused functions
       Impact: -20 complexity, improve testability
       Pattern: Nested conditionals → Guard clauses + predicates
 
-   3. 🟢 Verify complexity reduction
+   3. [LOW] Verify complexity reduction
       Impact: Confirmed <10 complexity per function
       Run: cargo test && debtmap analyze src/
 
-   📖 CODE EXAMPLE: Extract Guard Clauses
+   CODE EXAMPLE: Extract Guard Clauses
 
    Before:
        fn from_low_args(...) {
@@ -410,30 +419,69 @@ Redesign debtmap output format for clarity, consistency, and scannability while 
 # .debtmap.toml
 [output]
 verbosity = "normal"  # compact, normal, verbose
-use_color = true
-use_emoji = true
+use_color = true      # Use colored output (default: true in TTY, false otherwise)
 max_issues = 10       # Top N issues to show
-
-[output.sections]
-show_evidence = true
-show_code_examples = true
-show_detailed_steps = false  # Only in verbose mode
 ```
 
-## Dependencies
+**Note**: Configuration is kept minimal. Section-level configuration (show_evidence, show_code_examples) can be added in future iterations based on user feedback.
 
-- **Prerequisites**:
-  - Spec 134: Consistent metrics for evidence section
-  - Spec 135: Context-aware thresholds for rationale
-  - Spec 136: Rebalanced scoring for severity
-  - Spec 138: Concise actions for action section
-- **Affected Components**:
-  - `src/io/output.rs` - Complete refactor of formatting
-  - `src/io/formatters/` - New module structure for formatters
-  - `src/config.rs` - Add output configuration
-- **External Dependencies**:
-  - `termcolor` (optional) - For color support
-  - `console` (optional) - For better terminal detection
+## Implementation Phases
+
+### Phase 1: Refactor Existing Formatter Module
+
+**Goal**: Break down `src/priority/formatter.rs` (2919 lines, 116 functions) into focused modules.
+
+**Affected Components**:
+- `src/priority/formatter.rs` - Split into focused modules
+- `src/priority/formatter_verbosity.rs` - Already exists, may need updates
+- `src/priority/formatter_markdown.rs` - Already exists, may need updates
+
+**New Module Structure**:
+```
+src/priority/
+├── formatter/
+│   ├── mod.rs              # Public API, orchestrates formatting
+│   ├── header.rs           # Format issue headers
+│   ├── location.rs         # Format location information
+│   ├── evidence.rs         # Format metrics and measurements
+│   ├── rationale.rs        # Format WHY sections
+│   ├── action.rs           # Format recommended actions
+│   ├── tree_utils.rs       # Tree character utilities
+│   └── severity.rs         # Severity formatting
+├── formatter_verbosity.rs  # Existing verbosity handling
+└── formatter_markdown.rs   # Existing markdown formatting
+```
+
+**Success Criteria**:
+- [ ] All functions under 20 lines
+- [ ] Each module has single responsibility
+- [ ] All existing tests pass
+- [ ] No behavior changes (refactor only)
+- [ ] Cyclomatic complexity <5 per function
+
+### Phase 2: Apply Clarity Improvements
+
+**Goal**: Implement structured output with consistent formatting.
+
+**Prerequisites**:
+- Spec 138a: Concise Actionable Recommendations (for ACTION section format)
+- Phase 1 completed
+
+**Changes**:
+- Standardize tree formatting across all sections
+- Separate EVIDENCE from WHY sections
+- Implement verbosity levels (already partially exists)
+- Add consistent section ordering
+- Improve metric prioritization
+
+**Affected Components**:
+- All modules in `src/priority/formatter/`
+- `src/config.rs` - Add minimal output configuration
+- Tests in `tests/output_format_tests.rs`
+
+**External Dependencies**:
+- `colored` (already in use) - For optional color support
+- No new dependencies needed
 
 ## Testing Strategy
 
@@ -446,12 +494,14 @@ fn test_consistent_tree_formatting() {
     let output = format_issue(&issue, &FormatOptions::default());
 
     // Verify tree structure
-    assert!(output.contains("📍 LOCATION"));
+    assert!(output.contains("LOCATION"));
     assert!(output.contains("├─ File:"));
     assert!(output.contains("└─ Size:"));
 
     // Verify no mixing of formats
-    assert!(!output.contains("└─") && output.contains("  - "));
+    let has_tree = output.contains("└─") || output.contains("├─");
+    let has_bullets = output.contains("  - ");
+    assert!(!(has_tree && has_bullets), "Should not mix tree and bullet formats");
 }
 
 #[test]
@@ -521,9 +571,9 @@ fn test_ripgrep_output_clarity() {
     assert!(critical_issues[0].contains("Score:"));
 
     // Sections should be clearly separated
-    assert!(output.contains("📍 LOCATION"));
-    assert!(output.contains("📊 EVIDENCE"));
-    assert!(output.contains("💡 WHY THIS MATTERS"));
+    assert!(output.contains("LOCATION"));
+    assert!(output.contains("EVIDENCE"));
+    assert!(output.contains("WHY THIS MATTERS"));
 }
 ```
 
@@ -544,10 +594,10 @@ fn test_output_scannability() {
     println!("{}", output);
 
     // Automated checks for structure
-    assert!(output.contains("📍 LOCATION"));
-    assert!(output.contains("📊 EVIDENCE"));
-    assert!(output.contains("💡 WHY THIS MATTERS"));
-    assert!(output.contains("✅ RECOMMENDED ACTION"));
+    assert!(output.contains("LOCATION"));
+    assert!(output.contains("EVIDENCE"));
+    assert!(output.contains("WHY THIS MATTERS"));
+    assert!(output.contains("RECOMMENDED ACTION"));
 }
 ```
 
@@ -576,11 +626,12 @@ Update ARCHITECTURE.md:
 
 ## Implementation Notes
 
-### Emoji and Color Support
+### Color Support
 
-- **Emoji**: Make optional, provide text fallbacks
-- **Color**: Detect terminal support, fall back to plain text
-- **Configuration**: Allow users to disable both
+- **Default**: Use `colored` crate (already a dependency) for terminal color
+- **Detection**: Automatically detect TTY vs pipe/file output
+- **Configuration**: Users can disable with `use_color = false` or `NO_COLOR` env var
+- **Fallback**: Gracefully degrade to plain text when colors disabled
 
 ### Consistent Tree Characters
 
@@ -626,6 +677,32 @@ fn sort_metrics_by_importance(metrics: &HashMap<String, MetricValue>) -> Vec<(St
     );
 
     sorted
+}
+```
+
+### Adapting Existing Data Structures
+
+**Current**: The codebase uses `UnifiedDebtItem` with its own structure.
+
+**Approach**: Rather than creating entirely new types (`IssueOutput`, `IssueHeader`, etc.), adapt the formatting functions to work with existing `UnifiedDebtItem` structure. The new data structures shown in this spec are for illustration - the actual implementation should:
+
+1. Work with existing `UnifiedDebtItem` type
+2. Extract formatting logic into pure functions
+3. Add helper functions to transform existing data into display-friendly format
+4. Maintain backward compatibility with JSON/YAML output
+
+Example:
+```rust
+// Work with existing type
+fn format_unified_debt_item(item: &UnifiedDebtItem, options: &FormatOptions) -> String {
+    let mut output = String::new();
+
+    // Extract data and format
+    output.push_str(&format_header_from_item(item));
+    output.push_str(&format_location_from_item(item));
+    // ... etc
+
+    output
 }
 ```
 
