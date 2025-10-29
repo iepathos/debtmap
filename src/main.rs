@@ -437,7 +437,19 @@ fn print_metrics_explanation() {
 
 // Main orchestrator function
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    // Support ARGUMENTS environment variable for backward compatibility
+    let cli = if let Ok(args_str) = std::env::var("ARGUMENTS") {
+        // Parse space-separated arguments from environment variable
+        let args: Vec<String> = args_str.split_whitespace().map(String::from).collect();
+        // Prepend program name (required by clap)
+        let mut full_args = vec![std::env::args()
+            .next()
+            .unwrap_or_else(|| "debtmap".to_string())];
+        full_args.extend(args);
+        Cli::parse_from(full_args)
+    } else {
+        Cli::parse()
+    };
 
     // Create the dependency injection container once at startup
     let _container = Arc::new(create_app_container()?);
@@ -505,7 +517,45 @@ fn main() -> Result<()> {
             )?;
             Ok(())
         }
+        Commands::ValidateImprovement {
+            comparison,
+            output,
+            previous_validation,
+            threshold,
+            format,
+            quiet,
+        } => {
+            let config = debtmap::commands::validate_improvement::ValidateImprovementConfig {
+                comparison_path: comparison,
+                output_path: output,
+                previous_validation,
+                threshold,
+                format: match format {
+                    debtmap::cli::OutputFormat::Json => {
+                        debtmap::commands::validate_improvement::OutputFormat::Json
+                    }
+                    debtmap::cli::OutputFormat::Markdown => {
+                        debtmap::commands::validate_improvement::OutputFormat::Markdown
+                    }
+                    debtmap::cli::OutputFormat::Terminal => {
+                        debtmap::commands::validate_improvement::OutputFormat::Terminal
+                    }
+                },
+                quiet: quiet || is_automation_mode(),
+            };
+            debtmap::commands::validate_improvement::validate_improvement(config)?;
+            Ok(())
+        }
     }
+}
+
+fn is_automation_mode() -> bool {
+    std::env::var("PRODIGY_AUTOMATION")
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("true")
+        || std::env::var("PRODIGY_VALIDATION")
+            .unwrap_or_default()
+            .eq_ignore_ascii_case("true")
 }
 
 // Pure function to handle analyze command with all its complexity

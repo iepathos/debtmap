@@ -24,7 +24,7 @@ debtmap validate . --config debtmap.toml
 
 ## Commands
 
-Debtmap provides four main commands:
+Debtmap provides five main commands:
 
 ### `analyze`
 
@@ -149,6 +149,46 @@ Use one or the other to specify the target location.
 
 **Description:**
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.
+
+### `validate-improvement`
+
+Validate that technical debt improvements meet quality thresholds.
+
+**Usage:**
+```bash
+debtmap validate-improvement --comparison <FILE> [OPTIONS]
+```
+
+**Required Options:**
+- `--comparison <FILE>` - Path to comparison JSON file (from `debtmap compare`)
+
+**Optional Options:**
+- `-o, --output <FILE>` - Output file path for validation results (default: `.prodigy/debtmap-validation.json`)
+- `--previous-validation <FILE>` - Path to previous validation result for trend tracking
+- `--threshold <N>` - Improvement threshold percentage (default: 75.0)
+- `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: json)
+- `--quiet` - Suppress console output (useful for automation)
+
+**Description:**
+Validates improvement quality by analyzing comparison output from `debtmap compare`. Calculates a composite improvement score based on:
+- Target item improvement (50% weight)
+- Overall project health (30% weight)
+- Absence of regressions (20% weight)
+
+When `--previous-validation` is provided, tracks progress trends across multiple attempts and provides recommendations for continuing or adjusting the improvement approach.
+
+**Example:**
+```bash
+# Basic validation
+debtmap validate-improvement --comparison comparison.json
+
+# With trend tracking and custom threshold
+debtmap validate-improvement \
+  --comparison .prodigy/comparison.json \
+  --previous-validation .prodigy/validation.json \
+  --output .prodigy/validation.json \
+  --threshold 80.0
+```
 
 ## Options
 
