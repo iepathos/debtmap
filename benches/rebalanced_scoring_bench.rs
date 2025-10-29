@@ -3,10 +3,11 @@
 //! Validates that the rebalanced scoring has minimal performance impact
 //! compared to legacy scoring.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::scoring::rebalanced::{DebtScore, ScoreWeights};
 use debtmap::priority::DebtType;
+use std::hint::black_box;
 use std::path::PathBuf;
 
 fn create_test_function(
