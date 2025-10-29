@@ -13,8 +13,8 @@ updated: 2025-10-28
 
 **Category**: optimization
 **Priority**: medium
-**Status**: draft
-**Dependencies**: Spec 134 (metric consistency)
+**Status**: in_progress (67% complete)
+**Dependencies**: Spec 134 (metric consistency - implemented)
 
 ## Context
 
@@ -56,22 +56,27 @@ SUGGESTED SPLIT (generic - no detailed analysis available):
 - Multi-signal aggregation (`infer_responsibility_multi_signal()`)
 
 **Remaining Gaps** 🔨:
-1. **LCOM (Lack of Cohesion of Methods)**: Spec describes LCOM but implementation uses simpler internal/external call ratio
-   - Current: `cohesion = internal_calls / (internal_calls + external_calls)`
-   - Needed: LCOM-style pair-wise method coupling analysis
-   - Decision: Keep current approach as it's simpler and achieves same goal
-
-2. **Call pattern-based responsibility naming**: Current naming uses function name heuristics and I/O detection
+1. **Call pattern-based responsibility naming**: Current naming uses function name heuristics and I/O detection
    - Already uses multi-signal aggregation (Spec 145)
    - Extend with call graph patterns (who calls whom)
 
-3. **IntraModuleCallGraph structure**: Spec describes dedicated structure for module analysis
-   - Current implementation uses project-wide `CallGraph`
-   - Can filter by file path, but no dedicated structure
-   - Decision: Add helper functions instead of new structure
-
-4. **Interface size estimation**: Dependencies tracked but interface size not explicitly calculated
+2. **Interface size estimation**: Dependencies tracked but interface size not explicitly calculated
    - Add count of public functions that cross module boundaries
+
+3. **Validation test**: Need integration test on real-world code (ripgrep standard.rs)
+
+**Rejected/Not Needed** ❌:
+- **LCOM (Lack of Cohesion of Methods)**: Originally specified but doesn't make sense for Rust
+  - LCOM designed for OOP languages with fat classes full of fields
+  - Rust uses small structs (5-10 fields) with behavior in impl blocks
+  - Rust god objects = too many methods, not too many fields
+  - Current call-based cohesion is more appropriate for Rust
+  - Decision: Keep current `internal_calls / total_calls` approach
+
+- **IntraModuleCallGraph structure**: Dedicated structure not needed
+  - Current implementation uses project-wide `CallGraph` filtered by file
+  - Adding new structure would be unnecessary abstraction
+  - Decision: Use existing `CallGraph` with helper functions
 
 ## Objective
 
@@ -96,11 +101,13 @@ Enhance god object analysis with call graph analysis and cohesion metrics to pro
    - Detect common patterns (builders, visitors, state machines)
 
 3. **Cohesion Metrics**
-   - Calculate LCOM (Lack of Cohesion of Methods) for each cluster
+   - Calculate cohesion for each cluster using call-based analysis
    - Measure coupling between potential modules
    - Identify shared dependencies
    - Detect tight coupling (high fan-in/fan-out within cluster)
    - Measure interface size between proposed modules
+
+   **Note**: LCOM (Lack of Cohesion of Methods) not applicable for Rust - see Implementation Status section
 
 4. **Actionable Split Recommendations**
    - Suggest specific function groups for each new module
@@ -123,7 +130,7 @@ Enhance god object analysis with call graph analysis and cohesion metrics to pro
 - [x] ✅ Functions are grouped into cohesive clusters using call patterns
 - [x] ✅ Responsibility names are derived from actual function names and purposes
 - [x] ✅ Each suggested module split includes specific function names
-- [ ] 🔨 Cohesion metrics enhanced with LCOM-style analysis (current: simple ratio)
+- [x] ✅ Cohesion metrics calculated (call-based, appropriate for Rust)
 - [x] ✅ Coupling between proposed modules is measured and reported
 - [x] ✅ Generic split suggestions eliminated (domain-based grouping)
 - [ ] ⚠️ ripgrep standard.rs gets specific recommendations (needs validation test)
@@ -132,35 +139,11 @@ Enhance god object analysis with call graph analysis and cohesion metrics to pro
 - [ ] 🔨 Interface size between modules is explicitly calculated
 - [x] ✅ Unit tests verify clustering on known code patterns
 
-**Status**: 8/12 complete, 2/12 in progress, 2/12 need validation
+**Status**: 9/12 complete, 1/12 in progress, 2/12 need validation (LCOM criterion replaced with Rust-appropriate call-based cohesion)
 
 ## Implementation Tasks
 
-### Task 1: Add LCOM Alternative Cohesion Metric
-**Status**: Optional (current metric sufficient)
-**Files**: `src/organization/cohesion_calculator.rs`
-
-The spec describes LCOM but current implementation uses `internal_calls / total_calls` which:
-- Is simpler to calculate
-- Provides same signal (high cohesion = good split)
-- Works well with call graph data we have
-
-**Decision**: Keep current approach unless analysis shows LCOM provides significantly better results.
-
-If LCOM is needed:
-```rust
-// Add to cohesion_calculator.rs
-pub fn calculate_lcom_cohesion(
-    split: &ModuleSplit,
-    call_graph: &CallGraph,
-    ownership: &StructOwnershipAnalyzer,
-) -> f64 {
-    // Count pairs of methods that share no calls
-    // LCOM = (non_cohesive_pairs - cohesive_pairs) / total_pairs
-}
-```
-
-### Task 2: Add Call Pattern-Based Responsibility Naming
+### Task 1: Add Call Pattern-Based Responsibility Naming
 **Status**: TODO
 **Files**: `src/organization/god_object_analysis.rs`
 
@@ -180,7 +163,7 @@ pub fn infer_responsibility_from_call_patterns(
 }
 ```
 
-### Task 3: Add Interface Size Estimation
+### Task 2: Add Interface Size Estimation
 **Status**: TODO
 **Files**: `src/organization/dependency_analyzer.rs`, `src/organization/god_object_analysis.rs`
 
@@ -201,7 +184,7 @@ pub fn estimate_interface_size(
 }
 ```
 
-### Task 4: Add Integration Test for ripgrep standard.rs
+### Task 3: Add Integration Test for ripgrep standard.rs
 **Status**: TODO
 **Files**: `tests/god_object_ripgrep_standard_test.rs` (new)
 
@@ -783,11 +766,11 @@ None - this is additive functionality
 
 ## Implementation Summary
 
-**Spec Status**: 67% Complete (8/12 criteria met)
+**Spec Status**: 75% Complete (9/12 criteria met)
 
 **What's Already Built**:
 - Full call graph extraction and analysis infrastructure
-- Cohesion calculation based on internal/external call ratio
+- Cohesion calculation based on internal/external call ratio (Rust-appropriate)
 - Dependency tracking and circular dependency detection
 - Priority assignment based on cohesion and coupling
 - Integration with god object detection
@@ -798,14 +781,15 @@ None - this is additive functionality
 2. **Interface size estimation** - Add explicit calculation of API surface
 3. **Validation test** - Verify recommendations on real code (ripgrep standard.rs)
 
-**Optional Enhancement**:
-- LCOM-style cohesion metric (current metric is simpler but sufficient)
+**Rejected Enhancements**:
+- LCOM-style cohesion metric (not applicable for Rust - see analysis above)
+- IntraModuleCallGraph structure (existing CallGraph sufficient)
 
 **Estimated Effort**: 2-3 days for remaining tasks
 
 **Next Steps**:
-1. Implement Task 2 (call pattern naming) in `src/organization/god_object_analysis.rs`
-2. Implement Task 3 (interface size) in `src/organization/dependency_analyzer.rs`
-3. Implement Task 4 (validation test) in `tests/`
+1. Implement Task 1 (call pattern naming) in `src/organization/god_object_analysis.rs`
+2. Implement Task 2 (interface size) in `src/organization/dependency_analyzer.rs`
+3. Implement Task 3 (validation test) in `tests/`
 4. Run full test suite
 5. Update spec status to `complete`
