@@ -10,6 +10,7 @@ pub mod coverage_scoring;
 pub mod debt_item;
 pub mod formatting;
 pub mod orchestration_adjustment;
+pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
 pub mod recommendation;
 pub mod recommendation_extended;
 pub mod recommendation_helpers;
@@ -52,5 +53,7 @@ pub use coverage_scoring::calculate_coverage_score;
 pub use context_aware::{
     ContextRecommendationEngine, ContextualRecommendation, Severity as ContextSeverity,
 };
+
+pub use rebalanced::{DebtScore, ScoreComponents, ScoreWeights, ScoringRationale, Severity};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility
