@@ -528,10 +528,7 @@ mod tests {
             complex_score.total
         );
         assert!(
-            matches!(
-                complex_score.severity,
-                Severity::Critical | Severity::High
-            ),
+            matches!(complex_score.severity, Severity::Critical | Severity::High),
             "Complex untested function should be CRITICAL or HIGH, got {:?}",
             complex_score.severity
         );
@@ -573,7 +570,7 @@ mod tests {
         let bonus_diff =
             complex_score.components.coverage_score - simple_score.components.coverage_score;
         assert!(
-            bonus_diff >= 10.0 && bonus_diff <= 20.0,
+            (10.0..=20.0).contains(&bonus_diff),
             "Bonus should be additive (10-20 points), got {:.1}",
             bonus_diff
         );

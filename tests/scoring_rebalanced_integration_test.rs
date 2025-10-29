@@ -118,8 +118,11 @@ fn test_preset_weights_behavior() {
     let quality_score =
         DebtScore::calculate(&complex_func, &debt_type, &ScoreWeights::quality_focused());
     let size_score = DebtScore::calculate(&complex_func, &debt_type, &ScoreWeights::size_focused());
-    let testing_score =
-        DebtScore::calculate(&complex_func, &debt_type, &ScoreWeights::test_coverage_focused());
+    let testing_score = DebtScore::calculate(
+        &complex_func,
+        &debt_type,
+        &ScoreWeights::test_coverage_focused(),
+    );
 
     // Quality-focused should score higher than balanced for coverage gaps
     assert!(
@@ -185,7 +188,7 @@ fn test_additive_bonus_for_complex_untested() {
         complex_score.components.coverage_score - simple_score.components.coverage_score;
 
     assert!(
-        coverage_diff >= 10.0 && coverage_diff <= 20.0,
+        (10.0..=20.0).contains(&coverage_diff),
         "Bonus for complex untested should be additive (10-20 points), got {:.1}",
         coverage_diff
     );
@@ -248,19 +251,37 @@ fn test_score_normalization_range() {
     // Test various scenarios to ensure scores stay in 0-200 range
 
     let scenarios = vec![
-        ("max_complexity", 50, 100, 300, DebtType::ComplexityHotspot {
-            cyclomatic: 50,
-            cognitive: 100,
-        }),
-        ("max_coverage_gap", 30, 50, 200, DebtType::TestingGap {
-            coverage: 0.0,
-            cyclomatic: 30,
-            cognitive: 50,
-        }),
-        ("minimal", 2, 3, 20, DebtType::Risk {
-            risk_score: 0.1,
-            factors: vec!["Minor issue".to_string()],
-        }),
+        (
+            "max_complexity",
+            50,
+            100,
+            300,
+            DebtType::ComplexityHotspot {
+                cyclomatic: 50,
+                cognitive: 100,
+            },
+        ),
+        (
+            "max_coverage_gap",
+            30,
+            50,
+            200,
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 30,
+                cognitive: 50,
+            },
+        ),
+        (
+            "minimal",
+            2,
+            3,
+            20,
+            DebtType::Risk {
+                risk_score: 0.1,
+                factors: vec!["Minor issue".to_string()],
+            },
+        ),
     ];
 
     for (name, cyclomatic, cognitive, length, debt_type) in scenarios {

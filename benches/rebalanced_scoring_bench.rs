@@ -50,11 +50,7 @@ fn bench_single_score_calculation(c: &mut Criterion) {
 
     c.bench_function("rebalanced_single_score", |b| {
         b.iter(|| {
-            DebtScore::calculate(
-                black_box(&func),
-                black_box(&debt_type),
-                black_box(&weights),
-            )
+            DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights))
         })
     });
 }
@@ -104,11 +100,7 @@ fn bench_batch_score_calculation(c: &mut Criterion) {
                 .iter()
                 .zip(debt_types.iter())
                 .map(|(func, debt_type)| {
-                    DebtScore::calculate(
-                        black_box(func),
-                        black_box(debt_type),
-                        black_box(&weights),
-                    )
+                    DebtScore::calculate(black_box(func), black_box(debt_type), black_box(&weights))
                 })
                 .collect::<Vec<_>>()
         })
@@ -127,22 +119,30 @@ fn bench_preset_weights(c: &mut Criterion) {
 
     group.bench_function("balanced", |b| {
         let weights = ScoreWeights::balanced();
-        b.iter(|| DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights)))
+        b.iter(|| {
+            DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights))
+        })
     });
 
     group.bench_function("quality_focused", |b| {
         let weights = ScoreWeights::quality_focused();
-        b.iter(|| DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights)))
+        b.iter(|| {
+            DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights))
+        })
     });
 
     group.bench_function("test_coverage_focused", |b| {
         let weights = ScoreWeights::test_coverage_focused();
-        b.iter(|| DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights)))
+        b.iter(|| {
+            DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights))
+        })
     });
 
     group.bench_function("size_focused", |b| {
         let weights = ScoreWeights::size_focused();
-        b.iter(|| DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights)))
+        b.iter(|| {
+            DebtScore::calculate(black_box(&func), black_box(&debt_type), black_box(&weights))
+        })
     });
 
     group.finish();
