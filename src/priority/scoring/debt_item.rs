@@ -264,7 +264,22 @@ pub(super) fn generate_recommendation_with_coverage_and_data_flow(
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
 ) -> ActionableRecommendation {
-    // Determine if we have actual coverage data (not just a None value)
+    // Try to use new concise recommendation format (spec 138a) for supported debt types
+    use super::concise_recommendation::generate_concise_recommendation;
+
+    match debt_type {
+        DebtType::TestingGap { .. }
+        | DebtType::ComplexityHotspot { .. }
+        | DebtType::DeadCode { .. } => {
+            // Use new concise recommendation format
+            return generate_concise_recommendation(debt_type, func, role, coverage);
+        }
+        _ => {
+            // Fall back to legacy format for other debt types
+        }
+    }
+
+    // Legacy path: Determine if we have actual coverage data (not just a None value)
     let has_coverage_data = coverage.is_some();
 
     // Create recommendation context using pure functions
@@ -389,6 +404,8 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
             rationale: String::new(),
             implementation_steps: vec![],
             related_items: vec![],
+            steps: None,
+            estimated_effort_hours: None,
         },
         expected_impact: ImpactMetrics {
             risk_reduction: 0.0,

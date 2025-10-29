@@ -2062,6 +2062,8 @@ mod tests {
                 rationale: "Low coverage critical function".to_string(),
                 implementation_steps: vec!["Write tests".to_string()],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 coverage_improvement: 50.0,

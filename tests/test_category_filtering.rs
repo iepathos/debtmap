@@ -32,6 +32,8 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             rationale: "Low test coverage".to_string(),
             implementation_steps: vec![],
             related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 25.0,

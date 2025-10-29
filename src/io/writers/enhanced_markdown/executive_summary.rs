@@ -719,6 +719,8 @@ mod tests {
                 rationale: "Test rationale".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 risk_reduction: 0.5,

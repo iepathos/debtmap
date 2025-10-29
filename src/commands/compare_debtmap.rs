@@ -705,6 +705,8 @@ mod tests {
                 rationale: String::new(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 coverage_improvement: 0.0,
@@ -765,6 +767,8 @@ mod tests {
                 rationale: "test".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
@@ -824,6 +828,8 @@ mod tests {
                 rationale: "Test".into(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 risk_reduction: 0.0,

@@ -74,12 +74,74 @@ pub struct ImpactMetrics {
     pub risk_reduction: f64,
 }
 
+/// Concise recommendation with clear action steps (spec 138a)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionableRecommendation {
+    /// One-line primary action
     pub primary_action: String,
+    /// Why this matters
     pub rationale: String,
+    /// Legacy steps (for backward compatibility)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implementation_steps: Vec<String>,
+    /// Related items
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub related_items: Vec<String>,
+    /// New structured steps with impact and difficulty (spec 138a)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steps: Option<Vec<ActionStep>>,
+    /// Estimated total effort in hours (spec 138a)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub estimated_effort_hours: Option<f32>,
+}
+
+/// Single actionable step with clear impact (spec 138a)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionStep {
+    /// What to do (concise, <80 chars)
+    pub description: String,
+    /// Expected impact (e.g., "-10 complexity", "+5 tests")
+    pub impact: String,
+    /// Difficulty level
+    pub difficulty: Difficulty,
+    /// Commands to execute this step
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<String>,
+}
+
+/// Difficulty classification for actionable steps (spec 138a)
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Difficulty {
+    /// <30 min, straightforward
+    Easy,
+    /// 30min-2hr, requires some design
+    Medium,
+    /// >2hr, requires significant refactoring
+    Hard,
+}
+
+impl Difficulty {
+    /// Determine difficulty based on testing requirements
+    pub fn for_testing(tests_needed: u32, cyclomatic: u32) -> Self {
+        if tests_needed <= 3 && cyclomatic <= 10 {
+            Difficulty::Easy
+        } else if tests_needed <= 7 || cyclomatic <= 20 {
+            Difficulty::Medium
+        } else {
+            Difficulty::Hard
+        }
+    }
+
+    /// Determine difficulty for refactoring tasks
+    pub fn for_refactoring(cyclomatic: u32, cognitive: u32) -> Self {
+        if cyclomatic <= 15 && cognitive <= 20 {
+            Difficulty::Easy
+        } else if cyclomatic <= 25 || cognitive <= 35 {
+            Difficulty::Medium
+        } else {
+            Difficulty::Hard
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1344,6 +1406,8 @@ mod tests {
                 rationale: "Test".into(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 risk_reduction: 0.0,

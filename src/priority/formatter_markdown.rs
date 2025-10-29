@@ -1394,6 +1394,8 @@ mod tests {
                     "Add unit tests".to_string(),
                 ],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 5.0,
@@ -1991,6 +1993,8 @@ mod tests {
                 rationale: "God object detected".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 50.0,
@@ -2042,6 +2046,8 @@ mod tests {
                 rationale: "High complexity".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 20.0,
@@ -2094,6 +2100,8 @@ mod tests {
                 rationale: "No test coverage".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
@@ -2147,6 +2155,8 @@ mod tests {
                 rationale: "Function is not used".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 5.0,

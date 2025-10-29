@@ -59,6 +59,8 @@ fn create_debt_item(
             rationale: "Testing gap".to_string(),
             implementation_steps: vec![],
             related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 0.0,
@@ -152,6 +154,8 @@ fn test_coverage_scoring_invariant_total_analysis() {
                 rationale: "High complexity".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 coverage_improvement: 0.0,

@@ -38,6 +38,8 @@ fn create_untested_item() -> UnifiedDebtItem {
             rationale: "Function is untested".to_string(),
             implementation_steps: vec![],
             related_items: vec![],
+            steps: None,
+            estimated_effort_hours: None,
         },
         expected_impact: ImpactMetrics {
             coverage_improvement: 100.0,

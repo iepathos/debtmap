@@ -324,7 +324,7 @@ pub(super) fn generate_test_debt_recommendation(
     }
 }
 
-/// Pure function to build final actionable recommendation
+/// Pure function to build final actionable recommendation (legacy format)
 pub(super) fn build_actionable_recommendation(
     primary_action: String,
     rationale: String,
@@ -335,6 +335,8 @@ pub(super) fn build_actionable_recommendation(
         rationale,
         implementation_steps: steps,
         related_items: vec![],
+        steps: None,                  // New field (spec 138a)
+        estimated_effort_hours: None, // New field (spec 138a)
     }
 }
 

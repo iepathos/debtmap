@@ -267,6 +267,8 @@ mod tests {
                 rationale: "Test recommendation".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: ImpactMetrics {
                 complexity_reduction: 5.0,

@@ -1502,6 +1502,8 @@ mod tests {
                 rationale: "Test rationale".to_string(),
                 implementation_steps: vec![],
                 related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
             },
             expected_impact: crate::priority::ImpactMetrics {
                 coverage_improvement: 0.5,
