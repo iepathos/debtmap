@@ -384,7 +384,7 @@ mod tests {
     fn test_estimate_effort() {
         // Simple case: few tests, low complexity
         let effort1 = estimate_effort(10, 3);
-        assert!(effort1 >= 0.5 && effort1 <= 2.0);
+        assert!((0.5..=2.0).contains(&effort1));
 
         // Complex case: many tests, high complexity
         let effort2 = estimate_effort(30, 10);
