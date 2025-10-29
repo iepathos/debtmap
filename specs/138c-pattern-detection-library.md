@@ -2,29 +2,33 @@
 number: 138c
 title: Advanced Pattern Detection Library (Optional Enhancement)
 category: optimization
-priority: low
+priority: medium
 status: draft
-dependencies: [138a, 138b]
+dependencies: [138a]
 created: 2025-10-29
 replaces: 138 (split into 138a/b/c)
+note: 138b (code examples) deferred, 138c provides more value through specific detection
 ---
 
 # Specification 138c: Advanced Pattern Detection Library
 
 **Category**: optimization
-**Priority**: low (optional enhancement)
+**Priority**: medium (optional enhancement, validate after 138a)
 **Status**: draft
-**Dependencies**: Spec 138a (Concise Recommendations), Spec 138b (Template-Based Examples)
+**Dependencies**: Spec 138a (Concise Recommendations)
 **Supersedes**: Spec 138 (split into three focused specs)
+**Note**: Spec 138b (code examples) deferred - 138c provides more value
 
 ## Context
 
-After implementing concise recommendations (138a) and template-based examples (138b), there's an opportunity to **improve pattern detection accuracy** using more sophisticated analysis. However, this is **optional** and should only be pursued if user feedback shows value.
+After implementing concise recommendations (138a), there's an opportunity to **improve pattern detection accuracy** using more sophisticated analysis. This provides more value than code examples (138b, now deferred) because it gives specific, targeted recommendations rather than generic patterns.
 
-**Current State** (after 138a/b):
+This is **optional** and should only be pursued if user feedback shows that recommendations from 138a are too generic.
+
+**Current State** (after 138a):
 - Pattern detection uses simple heuristics (nesting depth, complexity, length)
 - Works well for common cases
-- Some edge cases not well-handled
+- Some edge cases not well-handled (e.g., appropriate vs inappropriate nesting)
 
 **Potential Improvements**:
 1. Detect parameter list length (not just function length)

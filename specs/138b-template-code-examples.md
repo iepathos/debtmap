@@ -2,11 +2,12 @@
 number: 138b
 title: Template-Based Code Examples for Recommendations
 category: optimization
-priority: medium
-status: draft
+priority: low
+status: deferred
 dependencies: [138a]
 created: 2025-10-29
 replaces: 138 (split into 138a/b/c)
+deferred_reason: Code examples may add output bloat without clear value. Specific pattern detection (138c) provides more actionable guidance. May revisit if user feedback shows demand for visual examples.
 ---
 
 # Specification 138b: Template-Based Code Examples for Recommendations
