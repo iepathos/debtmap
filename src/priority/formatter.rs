@@ -695,6 +695,8 @@ fn format_mixed_priority_item(
 }
 
 // Pure function to determine file type label based on characteristics
+// Note: Kept for potential future use, but not used in current spec 139 format
+#[allow(dead_code)]
 fn determine_file_type_label(
     is_god_object: bool,
     fields_count: usize,
@@ -1255,21 +1257,14 @@ fn format_file_priority_item(
     let severity = get_severity_label(item.score);
     let severity_color = get_severity_color(item.score);
 
-    let type_label = determine_file_type_label(
-        item.metrics.god_object_indicators.is_god_object,
-        item.metrics.god_object_indicators.fields_count,
-        item.metrics.total_lines,
-        item.metrics.god_object_type.as_ref(),
-    );
-
+    // Spec 139: Separate severity from issue type
+    // Type label is now shown in location context, not in header
     writeln!(
         output,
         "#{} {} [{}]",
         rank,
         format!("SCORE: {}", score_formatter::format_score(item.score)).bright_yellow(),
-        format!("{} - {}", severity, type_label)
-            .color(severity_color)
-            .bold()
+        severity.color(severity_color).bold()
     )
     .unwrap();
 
@@ -2806,9 +2801,10 @@ mod tests {
         // Check header elements
         assert!(clean_output.contains("#1"));
         assert!(clean_output.contains("SCORE: 75.5"));
+        // Spec 139: Severity should be separate from issue type
         assert!(
-            clean_output.contains("[CRITICAL - FILE - GOD OBJECT]")
-                || clean_output.contains("[HIGH - FILE - GOD OBJECT]")
+            clean_output.contains("[CRITICAL]")
+                || clean_output.contains("[HIGH]")
         );
 
         // Check file path
@@ -2845,7 +2841,9 @@ mod tests {
         format_file_priority_item(&mut output, 2, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        assert!(clean_output.contains("FILE - GOD MODULE"));
+        // Spec 139: Header shows only severity, not file type
+        assert!(clean_output.contains("[HIGH]") || clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("#2"));
     }
 
     #[test]
@@ -2861,7 +2859,9 @@ mod tests {
         format_file_priority_item(&mut output, 3, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        assert!(clean_output.contains("FILE - HIGH COMPLEXITY"));
+        // Spec 139: Header shows only severity, not file type
+        assert!(clean_output.contains("[HIGH]") || clean_output.contains("[CRITICAL]") || clean_output.contains("[MEDIUM]"));
+        assert!(clean_output.contains("#3"));
     }
 
     #[test]
@@ -2878,9 +2878,11 @@ mod tests {
         format_file_priority_item(&mut output, 4, &item, config);
 
         let clean_output = strip_ansi_codes(&output);
-        // For regular files with lower scores
-        assert!(clean_output.contains("FILE"));
-        assert!(!clean_output.contains("GOD"));
+        // Spec 139: Header shows only severity based on score
+        // Score of 35.0 is >= 8.0, so it's CRITICAL severity
+        assert!(clean_output.contains("[CRITICAL]"));
+        assert!(clean_output.contains("#4"));
+        assert!(clean_output.contains("SCORE: 35.0"));
     }
 
     #[test]

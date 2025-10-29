@@ -117,6 +117,10 @@ pub enum Commands {
         #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
         verbosity: u8,
 
+        /// Use compact output format (minimal details, top metrics only)
+        #[arg(short = 'c', long = "compact", conflicts_with = "verbosity")]
+        compact: bool,
+
         /// Show verbose macro parsing warnings
         #[arg(long = "verbose-macro-warnings")]
         verbose_macro_warnings: bool,

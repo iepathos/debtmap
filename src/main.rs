@@ -578,6 +578,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         semantic_off,
         explain_score: _,
         verbosity,
+        compact,
         verbose_macro_warnings,
         show_macro_stats,
         group_by_category,
@@ -669,6 +670,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             summary,
             semantic_off,
             verbosity,
+            compact,
             verbose_macro_warnings,
             show_macro_stats,
             group_by_category,
@@ -891,6 +893,7 @@ fn build_analyze_config(
     summary: bool,
     semantic_off: bool,
     verbosity: u8,
+    compact: bool,
     verbose_macro_warnings: bool,
     show_macro_stats: bool,
     group_by_category: bool,
@@ -936,6 +939,13 @@ fn build_analyze_config(
     ast_functional_analysis: bool,
     functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
+    // Compute effective verbosity: compact mode sets verbosity to a special low value
+    let effective_verbosity = if compact {
+        0 // Compact mode uses minimum verbosity
+    } else {
+        verbosity
+    };
+
     debtmap::commands::analyze::AnalyzeConfig {
         path,
         format: convert_output_format(format),
@@ -952,7 +962,7 @@ fn build_analyze_config(
         tail,
         summary,
         semantic_off,
-        verbosity,
+        verbosity: effective_verbosity,
         verbose_macro_warnings,
         show_macro_stats,
         group_by_category,
