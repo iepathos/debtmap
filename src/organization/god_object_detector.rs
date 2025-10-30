@@ -478,6 +478,72 @@ impl GodObjectDetector {
 
     /// Analyzes a file for god object patterns.
     ///
+    /// Determines whether the file contains a God Class or God File
+    ///
+    /// # Arguments
+    /// * `primary_type` - The largest type in the file (if any)
+    /// * `visitor` - Type visitor containing parsed type information
+    /// * `standalone_count` - Number of standalone functions in the file
+    ///
+    /// # Returns
+    /// Tuple of (total_methods, total_fields, all_methods, total_complexity, detection_type)
+    fn determine_god_object_type(
+        primary_type: Option<&TypeAnalysis>,
+        visitor: &TypeVisitor,
+        standalone_count: usize,
+    ) -> (usize, usize, Vec<String>, u32, DetectionType) {
+
+        // Spec 118 & 130: Distinguish between God Class and God File
+        // - God Class: Struct with excessive methods (tests excluded)
+        // - God File: File with excessive functions/lines (tests included)
+        if let Some(type_info) = primary_type {
+            // God Class analysis: struct with impl methods
+            // Spec 130: Filter out test functions for god class detection
+            let struct_method_names: std::collections::HashSet<_> =
+                type_info.methods.iter().collect();
+
+            // Production methods only (exclude tests)
+            let production_complexity: Vec<_> = visitor
+                .function_complexity
+                .iter()
+                .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
+                .cloned()
+                .collect();
+
+            let production_methods: Vec<String> = production_complexity
+                .iter()
+                .map(|fc| fc.name.clone())
+                .collect();
+
+            let total_methods = production_methods.len();
+            let total_complexity: u32 = production_complexity
+                .iter()
+                .map(|fc| fc.cyclomatic_complexity)
+                .sum();
+
+            (
+                total_methods,
+                type_info.field_count,
+                production_methods,
+                total_complexity,
+                DetectionType::GodClass,
+            )
+        } else {
+            // No struct/impl blocks found - God File analysis
+            // Spec 130: Include ALL functions (production + tests) for file size concerns
+            let all_methods = visitor.standalone_functions.clone();
+            let total_complexity = (standalone_count * 5) as u32;
+
+            (
+                standalone_count,
+                0,
+                all_methods,
+                total_complexity,
+                DetectionType::GodFile,
+            )
+        }
+    }
+
     /// # God Class vs God Module
     ///
     /// This function distinguishes between:
@@ -506,56 +572,9 @@ impl GodObjectDetector {
         // Count standalone functions in addition to methods from types
         let standalone_count = visitor.standalone_functions.len();
 
-        // Spec 118 & 130: Distinguish between God Class and God File
-        // - God Class: Struct with excessive methods (tests excluded)
-        // - God File: File with excessive functions/lines (tests included)
+        // Determine whether this is a God Class or God File
         let (total_methods, total_fields, all_methods, total_complexity, detection_type) =
-            if let Some(type_info) = primary_type {
-                // God Class analysis: struct with impl methods
-                // Spec 130: Filter out test functions for god class detection
-                let struct_method_names: std::collections::HashSet<_> =
-                    type_info.methods.iter().collect();
-
-                // Production methods only (exclude tests)
-                let production_complexity: Vec<_> = visitor
-                    .function_complexity
-                    .iter()
-                    .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
-                    .cloned()
-                    .collect();
-
-                let production_methods: Vec<String> = production_complexity
-                    .iter()
-                    .map(|fc| fc.name.clone())
-                    .collect();
-
-                let total_methods = production_methods.len();
-                let total_complexity: u32 = production_complexity
-                    .iter()
-                    .map(|fc| fc.cyclomatic_complexity)
-                    .sum();
-
-                (
-                    total_methods,
-                    type_info.field_count,
-                    production_methods,
-                    total_complexity,
-                    DetectionType::GodClass,
-                )
-            } else {
-                // No struct/impl blocks found - God File analysis
-                // Spec 130: Include ALL functions (production + tests) for file size concerns
-                let all_methods = visitor.standalone_functions.clone();
-                let total_complexity = (standalone_count * 5) as u32;
-
-                (
-                    standalone_count,
-                    0,
-                    all_methods,
-                    total_complexity,
-                    DetectionType::GodFile,
-                )
-            };
+            Self::determine_god_object_type(primary_type, &visitor, standalone_count);
 
         // Count actual lines more accurately by looking at span information
         // For now, use a better heuristic based on item count and complexity
