@@ -702,14 +702,128 @@ pub fn group_methods_by_responsibility_multi_signal(
     groups
 }
 
-/// Infer responsibility category from function/method name.
+/// Responsibility category definition for method name classification.
 ///
-/// This function uses common naming patterns to categorize functions into
-/// responsibility groups. It recognizes standard Rust function prefixes like
-/// `format_*`, `parse_*`, `filter_*`, etc.
+/// This struct defines a single category with its name and the method name
+/// prefixes that indicate membership in that category.
 ///
-/// For more accurate classification, use `infer_responsibility_with_io_detection`
-/// which analyzes actual I/O operations in the function body.
+/// # Examples
+///
+/// ```
+/// let category = ResponsibilityCategory {
+///     name: "Data Access",
+///     prefixes: &["get", "set"],
+/// };
+/// assert!(category.matches("get_value"));
+/// assert!(category.matches("set_config"));
+/// assert!(!category.matches("calculate_sum"));
+/// ```
+struct ResponsibilityCategory {
+    name: &'static str,
+    prefixes: &'static [&'static str],
+}
+
+impl ResponsibilityCategory {
+    /// Check if a method name matches any of this category's prefixes.
+    ///
+    /// # Arguments
+    ///
+    /// * `method_name` - The lowercased method name to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the method name starts with any of this category's prefixes
+    fn matches(&self, method_name: &str) -> bool {
+        self.prefixes
+            .iter()
+            .any(|prefix| method_name.starts_with(prefix))
+    }
+}
+
+/// Static responsibility categories ordered by specificity.
+///
+/// Categories are checked in order, so more specific categories should appear first.
+/// The "Utilities" category has no prefixes and serves as a fallback for unmatched methods.
+///
+/// # Adding New Categories
+///
+/// To add a new category:
+/// 1. Insert a new `ResponsibilityCategory` entry in the appropriate position
+/// 2. Provide a descriptive name and list of prefixes
+/// 3. Add unit tests covering the new prefixes
+/// 4. Update the function documentation below
+///
+/// # Example
+///
+/// ```
+/// ResponsibilityCategory {
+///     name: "Authentication",
+///     prefixes: &["auth", "login", "logout"],
+/// },
+/// ```
+const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
+    ResponsibilityCategory {
+        name: "Formatting & Output",
+        prefixes: &["format", "render", "write", "print"],
+    },
+    ResponsibilityCategory {
+        name: "Parsing & Input",
+        prefixes: &["parse", "read", "extract"],
+    },
+    ResponsibilityCategory {
+        name: "Filtering & Selection",
+        prefixes: &["filter", "select", "find"],
+    },
+    ResponsibilityCategory {
+        name: "Transformation",
+        prefixes: &["transform", "convert", "map", "apply"],
+    },
+    ResponsibilityCategory {
+        name: "Data Access",
+        prefixes: &["get", "set"],
+    },
+    ResponsibilityCategory {
+        name: "Validation",
+        prefixes: &["validate", "check", "verify", "is"],
+    },
+    ResponsibilityCategory {
+        name: "Computation",
+        prefixes: &["calculate", "compute"],
+    },
+    ResponsibilityCategory {
+        name: "Construction",
+        prefixes: &["create", "build", "new"],
+    },
+    ResponsibilityCategory {
+        name: "Persistence",
+        prefixes: &["save", "load", "store"],
+    },
+    ResponsibilityCategory {
+        name: "Processing",
+        prefixes: &["process", "handle"],
+    },
+    ResponsibilityCategory {
+        name: "Communication",
+        prefixes: &["send", "receive"],
+    },
+    ResponsibilityCategory {
+        name: "Utilities",
+        prefixes: &[],
+    },
+];
+
+/// Infer responsibility category from function/method name using pattern matching.
+///
+/// This function uses a data-driven approach to categorize functions by matching
+/// method name prefixes against predefined categories. It searches through
+/// `RESPONSIBILITY_CATEGORIES` in order and returns the first matching category.
+///
+/// # Implementation
+///
+/// The function:
+/// 1. Converts the method name to lowercase for case-insensitive matching
+/// 2. Iterates through categories until finding one with a matching prefix
+/// 3. Returns the category name, or "Utilities" if no match is found
 ///
 /// # Pattern Recognition
 ///
@@ -726,89 +840,39 @@ pub fn group_methods_by_responsibility_multi_signal(
 /// - `send_*`, `receive_*` → "Communication"
 /// - Everything else → "Utilities"
 ///
+/// # Examples
+///
+/// ```
+/// assert_eq!(infer_responsibility_from_method("format_output"), "Formatting & Output");
+/// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing & Input");
+/// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
+/// assert_eq!(infer_responsibility_from_method("helper_function"), "Utilities");
+/// ```
+///
+/// # Performance
+///
+/// This is a pure function with O(n*m) complexity where n is the number of categories
+/// (currently 12) and m is the average number of prefixes per category (~3).
+/// In practice, most matches occur in the first few categories.
+///
 /// # Extending Patterns
 ///
-/// To add new patterns:
-/// 1. Add a new `else if` clause with the prefix check
-/// 2. Choose a descriptive category name
-/// 3. Add a unit test for the new pattern
-/// 4. Update this documentation
+/// To add new patterns, modify `RESPONSIBILITY_CATEGORIES` rather than this function.
+/// See the documentation on `RESPONSIBILITY_CATEGORIES` for details.
 ///
-/// # Note on Catch-all
+/// # Alternative
 ///
-/// The catch-all category is "Utilities" rather than "Core Operations" because
-/// it more accurately describes miscellaneous helper functions that don't fit
-/// standard naming conventions.
+/// For more accurate classification, consider `infer_responsibility_with_io_detection`
+/// which analyzes actual I/O operations in the function body rather than just names.
 fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
-    // Formatting & Output
-    if lower.starts_with("format")
-        || lower.starts_with("render")
-        || lower.starts_with("write")
-        || lower.starts_with("print")
-    {
-        "Formatting & Output".to_string()
-    }
-    // Parsing & Input
-    else if lower.starts_with("parse")
-        || lower.starts_with("read")
-        || lower.starts_with("extract")
-    {
-        "Parsing & Input".to_string()
-    }
-    // Filtering & Selection
-    else if lower.starts_with("filter")
-        || lower.starts_with("select")
-        || lower.starts_with("find")
-    {
-        "Filtering & Selection".to_string()
-    }
-    // Transformation
-    else if lower.starts_with("transform")
-        || lower.starts_with("convert")
-        || lower.starts_with("map")
-        || lower.starts_with("apply")
-    {
-        "Transformation".to_string()
-    }
-    // Data Access (existing)
-    else if lower.starts_with("get") || lower.starts_with("set") {
-        "Data Access".to_string()
-    }
-    // Validation (existing, enhanced with 'is_' prefix)
-    else if lower.starts_with("validate")
-        || lower.starts_with("check")
-        || lower.starts_with("verify")
-        || lower.starts_with("is")
-    {
-        "Validation".to_string()
-    }
-    // Computation (existing)
-    else if lower.starts_with("calculate") || lower.starts_with("compute") {
-        "Computation".to_string()
-    }
-    // Construction (existing)
-    else if lower.starts_with("create") || lower.starts_with("build") || lower.starts_with("new")
-    {
-        "Construction".to_string()
-    }
-    // Persistence (existing)
-    else if lower.starts_with("save") || lower.starts_with("load") || lower.starts_with("store") {
-        "Persistence".to_string()
-    }
-    // Processing (existing)
-    else if lower.starts_with("process") || lower.starts_with("handle") {
-        "Processing".to_string()
-    }
-    // Communication (existing)
-    else if lower.starts_with("send") || lower.starts_with("receive") {
-        "Communication".to_string()
-    }
-    // Utilities (renamed from "Core Operations")
-    else {
-        "Utilities".to_string()
-    }
+    RESPONSIBILITY_CATEGORIES
+        .iter()
+        .find(|cat| cat.matches(&lower))
+        .map(|cat| cat.name)
+        .unwrap_or("Utilities")
+        .to_string()
 }
 
 /// Metrics for an individual struct within a file
@@ -1357,6 +1421,130 @@ mod tests {
             "Parsing & Input"
         );
         assert_eq!(infer_responsibility_from_method("IS_VALID"), "Validation");
+    }
+
+    #[test]
+    fn test_calculate_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("calculate_total"),
+            "Computation"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("calculate_sum"),
+            "Computation"
+        );
+    }
+
+    #[test]
+    fn test_compute_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("compute_result"),
+            "Computation"
+        );
+    }
+
+    #[test]
+    fn test_create_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("create_instance"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_build_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("build_object"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_new_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("new_connection"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_save_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("save_to_disk"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_load_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("load_from_file"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_store_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("store_data"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_process_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("process_request"),
+            "Processing"
+        );
+    }
+
+    #[test]
+    fn test_handle_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("handle_event"),
+            "Processing"
+        );
+    }
+
+    #[test]
+    fn test_send_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("send_message"),
+            "Communication"
+        );
+    }
+
+    #[test]
+    fn test_receive_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("receive_data"),
+            "Communication"
+        );
+    }
+
+    #[test]
+    fn test_empty_string_returns_utilities() {
+        assert_eq!(infer_responsibility_from_method(""), "Utilities");
+    }
+
+    #[test]
+    fn test_underscore_only_returns_utilities() {
+        assert_eq!(infer_responsibility_from_method("_"), "Utilities");
+        assert_eq!(infer_responsibility_from_method("__"), "Utilities");
+    }
+
+    #[test]
+    fn test_special_chars_return_utilities() {
+        assert_eq!(infer_responsibility_from_method("@#$%"), "Utilities");
+    }
+
+    #[test]
+    fn test_function_is_deterministic() {
+        let input = "calculate_average";
+        let result1 = infer_responsibility_from_method(input);
+        let result2 = infer_responsibility_from_method(input);
+        assert_eq!(result1, result2);
     }
 
     // Spec 134: Tests for metric validation
