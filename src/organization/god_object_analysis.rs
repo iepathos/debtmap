@@ -710,6 +710,7 @@ pub fn group_methods_by_responsibility_multi_signal(
 /// # Examples
 ///
 /// ```
+/// # use debtmap::organization::god_object_analysis::ResponsibilityCategory;
 /// let category = ResponsibilityCategory {
 ///     name: "Data Access",
 ///     prefixes: &["get", "set"],
@@ -718,9 +719,9 @@ pub fn group_methods_by_responsibility_multi_signal(
 /// assert!(category.matches("set_config"));
 /// assert!(!category.matches("calculate_sum"));
 /// ```
-struct ResponsibilityCategory {
-    name: &'static str,
-    prefixes: &'static [&'static str],
+pub struct ResponsibilityCategory {
+    pub name: &'static str,
+    pub prefixes: &'static [&'static str],
 }
 
 impl ResponsibilityCategory {
@@ -733,7 +734,7 @@ impl ResponsibilityCategory {
     /// # Returns
     ///
     /// `true` if the method name starts with any of this category's prefixes
-    fn matches(&self, method_name: &str) -> bool {
+    pub fn matches(&self, method_name: &str) -> bool {
         self.prefixes
             .iter()
             .any(|prefix| method_name.starts_with(prefix))
@@ -756,10 +757,12 @@ impl ResponsibilityCategory {
 /// # Example
 ///
 /// ```
-/// ResponsibilityCategory {
+/// # use debtmap::organization::god_object_analysis::ResponsibilityCategory;
+/// let category = ResponsibilityCategory {
 ///     name: "Authentication",
 ///     prefixes: &["auth", "login", "logout"],
-/// },
+/// };
+/// # assert!(category.matches("auth_user"));
 /// ```
 const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
     ResponsibilityCategory {
@@ -843,6 +846,7 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 /// # Examples
 ///
 /// ```
+/// # use debtmap::organization::god_object_analysis::infer_responsibility_from_method;
 /// assert_eq!(infer_responsibility_from_method("format_output"), "Formatting & Output");
 /// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing & Input");
 /// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
@@ -864,7 +868,7 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 ///
 /// For more accurate classification, consider `infer_responsibility_with_io_detection`
 /// which analyzes actual I/O operations in the function body rather than just names.
-fn infer_responsibility_from_method(method_name: &str) -> String {
+pub fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
     RESPONSIBILITY_CATEGORIES

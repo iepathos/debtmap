@@ -20,6 +20,7 @@
 //! # Example
 //!
 //! ```no_run
+//! use debtmap::analyzers::javascript::detectors::testing::detect_testing_patterns;
 //! use tree_sitter::Parser;
 //! use std::path::PathBuf;
 //!

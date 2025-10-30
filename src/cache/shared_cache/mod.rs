@@ -24,8 +24,7 @@ pub use writer::CacheWriter;
 // Re-export for testing
 #[cfg(test)]
 pub(crate) use file_ops::{
-    build_dest_path, classify_entry, copy_dir_entry, copy_file_entry, select_keys_for_removal,
-    EntryType,
+    build_dest_path, classify_entry, copy_dir_entry, copy_file_entry, EntryType,
 };
 
 /// Thread-safe shared cache implementation
