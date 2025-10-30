@@ -710,7 +710,8 @@ fn detect_transformation_lost(
             confidence: 0.9,
             function_name: func_name.to_string(),
             exception_type: Some(transform.raised_type.name()),
-            explanation: "Exception transformation loses context (use 'raise ... from ...')".to_string(),
+            explanation: "Exception transformation loses context (use 'raise ... from ...')"
+                .to_string(),
             suggestion: format!(
                 "Use 'raise {}(...) from e' to preserve exception context",
                 transform.raised_type.name()
