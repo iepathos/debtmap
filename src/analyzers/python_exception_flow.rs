@@ -421,29 +421,19 @@ impl ExceptionFlowAnalyzer {
 
     /// Detect exception flow patterns
     fn detect_patterns(&self) -> Vec<ExceptionFlowPattern> {
-        let mut patterns = Vec::new();
-
-        for (func_name, flow) in &self.exception_flows {
-            // Pattern: Undocumented exceptions
-            patterns.extend(detect_undocumented_exceptions(func_name, flow));
-
-            // Pattern: Documented but not raised
-            patterns.extend(detect_documented_not_raised(func_name, flow));
-
-            // Patterns: Exception handler issues (BareExcept, OverlyBroadHandler, ExceptionSwallowing)
-            patterns.extend(detect_handler_patterns(func_name, &flow.caught_exceptions));
-
-            // Pattern: Log and ignore
-            patterns.extend(detect_log_and_ignore(func_name, &flow.caught_exceptions));
-
-            // Pattern: Lost context in transformation
-            patterns.extend(detect_transformation_lost(
-                func_name,
-                &flow.transformed_exceptions,
-            ));
-        }
-
-        patterns
+        self.exception_flows
+            .iter()
+            .flat_map(|(func_name, flow)| {
+                [
+                    detect_undocumented_exceptions(func_name, flow),
+                    detect_documented_not_raised(func_name, flow),
+                    detect_handler_patterns(func_name, &flow.caught_exceptions),
+                    detect_log_and_ignore(func_name, &flow.caught_exceptions),
+                    detect_transformation_lost(func_name, &flow.transformed_exceptions),
+                ]
+            })
+            .flatten()
+            .collect()
     }
 
     /// Build exception propagation graph integrated with call graph
