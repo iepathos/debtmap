@@ -175,6 +175,60 @@ impl PatternDetector {
         self.classify_responsibility(patterns, metrics, io_profile)
     }
 
+    /// Classify Orchestrator pattern
+    fn classify_orchestrator(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
+        let primary = "Orchestration & Coordination".to_string();
+        let confidence = 0.85;
+        let evidence = vec![format!(
+            "Calls {} functions, orchestrating complex workflow",
+            metrics.outdegree
+        )];
+        (primary, confidence, evidence)
+    }
+
+    /// Classify IoGateway pattern
+    fn classify_io_gateway(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
+        let primary = "I/O & External Communication".to_string();
+        let confidence = 0.80;
+        let mut evidence = vec!["Acts as gateway to I/O operations".to_string()];
+
+        if let Some(profile) = io_profile {
+            if profile.has_file_io() {
+                evidence.push("Performs file I/O operations".to_string());
+            }
+            if profile.has_network_io() {
+                evidence.push("Performs network I/O operations".to_string());
+            }
+            if profile.has_database_io() {
+                evidence.push("Performs database operations".to_string());
+            }
+        }
+
+        (primary, confidence, evidence)
+    }
+
+    /// Classify Hub pattern
+    fn classify_hub(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
+        let primary = "Core Business Logic".to_string();
+        let confidence = 0.75;
+        let evidence = vec![format!(
+            "Called by {} functions, central to module",
+            metrics.indegree
+        )];
+        (primary, confidence, evidence)
+    }
+
+    /// Classify Bridge pattern
+    fn classify_bridge(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
+        let primary = "Module Integration".to_string();
+        let confidence = 0.70;
+        let evidence = vec![format!(
+            "High betweenness centrality ({:.2}), connects modules",
+            metrics.betweenness
+        )];
+        (primary, confidence, evidence)
+    }
+
     /// Classify responsibility based on detected patterns and I/O profile
     pub fn classify_responsibility(
         &self,
@@ -182,85 +236,58 @@ impl PatternDetector {
         metrics: &GraphMetrics,
         io_profile: Option<&IoProfile>,
     ) -> ResponsibilityClassification {
-        let mut evidence = Vec::new();
-        let primary: String;
-        let confidence: f64;
-
-        // Priority order: Most specific patterns first
-        if patterns.contains(&CallGraphPattern::Orchestrator) {
-            primary = "Orchestration & Coordination".to_string();
-            confidence = 0.85;
-            evidence.push(format!(
-                "Calls {} functions, orchestrating complex workflow",
-                metrics.outdegree
-            ));
+        let (primary, confidence, evidence) = if patterns.contains(&CallGraphPattern::Orchestrator)
+        {
+            Self::classify_orchestrator(metrics)
         } else if patterns.contains(&CallGraphPattern::IoGateway) {
-            primary = "I/O & External Communication".to_string();
-            confidence = 0.80;
-            evidence.push("Acts as gateway to I/O operations".to_string());
-
-            if let Some(profile) = io_profile {
-                if profile.has_file_io() {
-                    evidence.push("Performs file I/O operations".to_string());
-                }
-                if profile.has_network_io() {
-                    evidence.push("Performs network I/O operations".to_string());
-                }
-                if profile.has_database_io() {
-                    evidence.push("Performs database operations".to_string());
-                }
-            }
+            Self::classify_io_gateway(io_profile)
         } else if patterns.contains(&CallGraphPattern::Hub) {
-            primary = "Core Business Logic".to_string();
-            confidence = 0.75;
-            evidence.push(format!(
-                "Called by {} functions, central to module",
-                metrics.indegree
-            ));
+            Self::classify_hub(metrics)
         } else if patterns.contains(&CallGraphPattern::Bridge) {
-            primary = "Module Integration".to_string();
-            confidence = 0.70;
-            evidence.push(format!(
-                "High betweenness centrality ({:.2}), connects modules",
-                metrics.betweenness
-            ));
+            Self::classify_bridge(metrics)
         } else if patterns.contains(&CallGraphPattern::LeafNode) {
             // Check I/O profile to distinguish between pure computation and utilities
             if let Some(profile) = io_profile {
                 if profile.is_pure {
-                    primary = "Pure Computation".to_string();
-                    confidence = 0.75;
-                    evidence.push("Pure function with no side effects or I/O".to_string());
+                    let primary = "Pure Computation".to_string();
+                    let confidence = 0.75;
+                    let evidence = vec!["Pure function with no side effects or I/O".to_string()];
+                    (primary, confidence, evidence)
                 } else {
-                    primary = "Utility & Helper Functions".to_string();
-                    confidence = 0.70;
-                    evidence.push("Leaf function with side effects".to_string());
+                    let primary = "Utility & Helper Functions".to_string();
+                    let confidence = 0.70;
+                    let evidence = vec!["Leaf function with side effects".to_string()];
+                    (primary, confidence, evidence)
                 }
             } else {
-                primary = "Utility & Helper Functions".to_string();
-                confidence = 0.70;
-                evidence.push("Pure function with no external calls".to_string());
+                let primary = "Utility & Helper Functions".to_string();
+                let confidence = 0.70;
+                let evidence = vec!["Pure function with no external calls".to_string()];
+                (primary, confidence, evidence)
             }
         } else if patterns.contains(&CallGraphPattern::UtilityCluster) {
-            primary = "Domain-Specific Utilities".to_string();
-            confidence = 0.65;
-            evidence.push(format!(
+            let primary = "Domain-Specific Utilities".to_string();
+            let confidence = 0.65;
+            let evidence = vec![format!(
                 "Part of tightly-connected functional group (clustering: {:.2})",
                 metrics.clustering
-            ));
+            )];
+            (primary, confidence, evidence)
         } else {
             // Default fallback based on I/O profile
             if let Some(profile) = io_profile {
                 let responsibility = profile.primary_responsibility();
-                primary = responsibility.as_str().to_string();
-                confidence = 0.50;
-                evidence.push("Classified based on I/O behavior".to_string());
+                let primary = responsibility.as_str().to_string();
+                let confidence = 0.50;
+                let evidence = vec!["Classified based on I/O behavior".to_string()];
+                (primary, confidence, evidence)
             } else {
-                primary = "General Logic".to_string();
-                confidence = 0.40;
-                evidence.push("No strong call graph pattern detected".to_string());
+                let primary = "General Logic".to_string();
+                let confidence = 0.40;
+                let evidence = vec!["No strong call graph pattern detected".to_string()];
+                (primary, confidence, evidence)
             }
-        }
+        };
 
         ResponsibilityClassification {
             primary,
