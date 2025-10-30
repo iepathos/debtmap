@@ -1,235 +1,225 @@
-# Implementation Plan: Refactor classify_responsibility to Reduce Complexity
+# Implementation Plan: Split Large Test File into Focused Modules
 
 ## Problem Summary
 
-**Location**: ./src/analysis/graph_metrics/patterns.rs:PatternDetector::classify_responsibility:179
-**Priority Score**: 17.68
-**Debt Type**: ComplexityHotspot (Cognitive: 58, Cyclomatic: 23)
+**Location**: ./src/priority/semantic_classifier.rs:file:0
+**Priority Score**: 58.53
+**Debt Type**: File-level complexity (God Object - Large Test File)
 **Current Metrics**:
-- Lines of Code: 95
-- Cyclomatic Complexity: 23
-- Cognitive Complexity: 58
-- Nesting Depth: 7
+- Lines of Code: 2021
+- Functions: 86 (27 implementation + 59 test functions)
+- Cyclomatic Complexity: 187 total, 2.17 avg, 13 max
+- Coverage: 0% (this is test code itself)
 
-**Issue**: High complexity 23/58 makes function hard to test and maintain. The function has deeply nested conditional logic with 7 levels of nesting, making it difficult to reason about and extend.
+**Issue**: This test file has grown too large with 2021 lines and 86 functions. It contains production code (classification logic and helper functions) mixed with extensive test coverage. The file should be split into focused modules for better maintainability.
 
 ## Target State
 
-**Expected Impact** (from debtmap):
-- Complexity Reduction: 11.5 (from 23 to ~11)
-- Coverage Improvement: 0.0 (already well-tested)
-- Risk Reduction: 6.19
+**Expected Impact**:
+- Complexity Reduction: 37.4
+- Maintainability Improvement: 5.85
+- Test Effort: 202.1
 
 **Success Criteria**:
-- [ ] Cyclomatic complexity reduced from 23 to ≤12
-- [ ] Cognitive complexity reduced from 58 to ≤30
-- [ ] Nesting depth reduced from 7 to ≤3
-- [ ] All existing tests continue to pass (100% pass rate)
+- [ ] Production code separated from test code
+- [ ] Test file reduced to <500 lines with clear organization
+- [ ] Each module has <30 functions
+- [ ] All existing tests continue to pass
 - [ ] No clippy warnings
-- [ ] Proper formatting (rustfmt)
-- [ ] No regression in functionality
+- [ ] Proper formatting with `cargo fmt`
 
 ## Implementation Phases
 
-### Phase 1: Extract Pattern-Specific Classification Functions
+### Phase 1: Extract Pattern Matching Helpers
 
-**Goal**: Extract each pattern branch into its own pure classification function, reducing the main function's complexity by ~8 points.
+**Goal**: Extract pattern matching helper functions (debug, accessor, constructor name matching) into a dedicated module.
 
 **Changes**:
-- Extract `classify_orchestrator()` - handles Orchestrator pattern
-- Extract `classify_io_gateway()` - handles IoGateway pattern with io_profile checks
-- Extract `classify_hub()` - handles Hub pattern
-- Extract `classify_bridge()` - handles Bridge pattern
-- Each function returns `(String, f64, Vec<String>)` for (primary, confidence, evidence)
+- Create `src/priority/semantic_classifier/pattern_matchers.rs`
+- Move pattern matching functions:
+  - `matches_debug_pattern`
+  - `matches_output_io_pattern`
+  - `matches_accessor_name`
+  - `is_entry_point_by_name`
+  - `is_orchestrator_by_name`
+- Update imports in `semantic_classifier.rs`
 
 **Testing**:
-- Run `cargo test patterns::tests` to verify existing tests pass
+- Run `cargo test --lib semantic_classifier` to verify tests pass
 - Run `cargo clippy` to check for warnings
-- Manually verify each extracted function handles its specific pattern
 
 **Success Criteria**:
-- [ ] 4 new pure functions extracted
-- [ ] Main function complexity reduced to ~15
-- [ ] All 9 existing tests pass
-- [ ] No clippy warnings
-- [ ] Ready to commit
-
-### Phase 2: Extract Leaf Node Classification Logic
-
-**Goal**: Extract the complex LeafNode classification branch that has nested I/O profile checks, reducing complexity by ~4 points.
-
-**Changes**:
-- Extract `classify_leaf_node()` - handles LeafNode pattern with io_profile distinction
-- Function takes `Option<&IoProfile>` and returns classification tuple
-- Reduces nesting in main function from 7 to 4 levels
-
-**Testing**:
-- Run `cargo test patterns::tests::test_pure_leaf_responsibility_classification`
-- Run `cargo test patterns::tests::test_leaf_node_pattern_detection`
-- Verify both pure and non-pure leaf node cases work correctly
-
-**Success Criteria**:
-- [ ] LeafNode classification extracted to pure function
-- [ ] Main function complexity reduced to ~11
-- [ ] Nesting depth reduced to 4 levels
+- [ ] Pattern matchers extracted to separate module
 - [ ] All tests pass
+- [ ] Main file reduced by ~150 lines
 - [ ] Ready to commit
 
-### Phase 3: Extract Utility Cluster and Fallback Classification
+### Phase 2: Extract Classification Rules
 
-**Goal**: Extract remaining classification branches and create a clean classification strategy pattern, reducing complexity to target of ≤12.
+**Goal**: Extract the core classification rule functions into a focused module.
 
 **Changes**:
-- Extract `classify_utility_cluster()` - handles UtilityCluster pattern
-- Extract `classify_fallback()` - handles the default case with io_profile checks
-- Create a `ClassificationStrategy` struct/trait if beneficial for future extension
+- Create `src/priority/semantic_classifier/classifiers.rs`
+- Move classification functions:
+  - `is_debug_function`
+  - `has_diagnostic_characteristics`
+  - `is_simple_constructor`
+  - `is_constructor_enhanced`
+  - `is_enum_converter_enhanced`
+  - `is_accessor_method`
+  - `is_pattern_matching_function`
+  - `is_orchestrator`
+  - `is_io_wrapper`
+  - `is_io_orchestration`
+  - `calculate_delegation_ratio`
+  - `delegates_to_tested_functions`
+  - `contains_io_patterns`
+- Update imports in `semantic_classifier.rs`
 
 **Testing**:
-- Run `cargo test patterns::tests::test_utility_cluster_pattern_detection`
-- Run `cargo test --lib` to verify all pattern tests
-- Run `cargo clippy` for final warning check
+- Run `cargo test --lib semantic_classifier` to verify tests pass
+- Run `cargo clippy` to check for warnings
 
 **Success Criteria**:
-- [ ] All classification branches extracted
-- [ ] Main function is now a clean dispatch to extracted functions
-- [ ] Cyclomatic complexity ≤12
-- [ ] Cognitive complexity ≤30
+- [ ] Classification rules extracted to separate module
 - [ ] All tests pass
+- [ ] Main file reduced by ~400 lines
 - [ ] Ready to commit
 
-### Phase 4: Add Unit Tests for New Functions
+### Phase 3: Extract AST Analysis Helpers
 
-**Goal**: Ensure new extracted functions have direct unit tests (not just through main function), improving maintainability.
+**Goal**: Extract AST-specific analysis functions into a dedicated module.
 
 **Changes**:
-- Add `test_classify_orchestrator()` - tests the extracted function directly
-- Add `test_classify_io_gateway()` - tests with various io_profile scenarios
-- Add `test_classify_leaf_node_pure()` and `test_classify_leaf_node_impure()`
-- Add `test_classify_fallback()` - tests default classification logic
+- Create `src/priority/semantic_classifier/ast_analysis.rs`
+- Move AST analysis functions:
+  - `is_simple_accessor_body`
+  - `is_simple_accessor_expr`
+  - `is_simple_accessor_method`
+  - `has_immutable_self_receiver`
+  - `is_simple_binding_pattern`
+- Update imports in `classifiers.rs` and `semantic_classifier.rs`
 
 **Testing**:
-- Run `cargo test patterns::tests` to verify all tests pass
-- Verify coverage hasn't decreased with `cargo tarpaulin --lib`
+- Run `cargo test --lib semantic_classifier` to verify tests pass
+- Run `cargo clippy` to check for warnings
 
 **Success Criteria**:
-- [ ] 6+ new unit tests added
-- [ ] All new functions have direct test coverage
-- [ ] Test coverage maintained or improved
+- [ ] AST analysis helpers extracted to separate module
 - [ ] All tests pass
+- [ ] Main file reduced by ~150 lines
 - [ ] Ready to commit
 
-### Phase 5: Final Refactoring and Documentation
+### Phase 4: Reorganize Tests by Feature
 
-**Goal**: Polish the refactored code, update documentation, and verify all quality gates pass.
+**Goal**: Split the test module into focused test files by feature area.
 
 **Changes**:
-- Update function documentation to reflect new structure
-- Add inline comments explaining the classification strategy
-- Ensure all extracted functions have proper doc comments with examples
-- Run final quality checks
+- Create test submodules within `src/priority/semantic_classifier/`:
+  - `tests/entry_point_tests.rs` - Entry point classification tests
+  - `tests/orchestrator_tests.rs` - Orchestrator classification tests
+  - `tests/io_wrapper_tests.rs` - I/O wrapper classification tests
+  - `tests/constructor_tests.rs` - Constructor detection tests
+  - `tests/enum_converter_tests.rs` - Enum converter detection tests
+  - `tests/accessor_tests.rs` - Accessor method detection tests
+  - `tests/debug_tests.rs` - Debug function detection tests
+  - `tests/integration_tests.rs` - Integration and helper function tests
+- Move test helper function `create_test_metrics` to shared test utilities
+- Update module structure to support test submodules
 
 **Testing**:
-- Run `cargo test --all` - All tests pass
-- Run `cargo clippy --all-targets --all-features -- -D warnings` - No warnings
-- Run `cargo fmt --all -- --check` - Code is formatted
-- Run `cargo doc --no-deps` - Documentation builds
-- Optional: Run `debtmap analyze` to verify improvement in complexity score
+- Run `cargo test --lib semantic_classifier` to verify all tests pass
+- Run `cargo clippy` to check for warnings
 
 **Success Criteria**:
-- [ ] All documentation updated
-- [ ] All quality gates pass
-- [ ] Cyclomatic complexity ≤12 verified
-- [ ] Cognitive complexity ≤30 verified
-- [ ] Nesting depth ≤3 verified
-- [ ] Ready for final commit
+- [ ] Tests split into 8 focused files, each <200 lines
+- [ ] All 59 tests pass
+- [ ] Main test file removed
+- [ ] Test organization follows feature areas
+- [ ] Ready to commit
+
+### Phase 5: Convert to Module Directory Structure
+
+**Goal**: Finalize the module structure and ensure clean public API.
+
+**Changes**:
+- Convert `semantic_classifier.rs` to `semantic_classifier/mod.rs`
+- Keep only public API in `mod.rs`:
+  - `FunctionRole` enum
+  - `classify_function_role` function
+  - `get_role_multiplier` function
+  - `classify_by_rules` (if needed publicly)
+- Use `mod` declarations to organize submodules
+- Ensure proper visibility modifiers (`pub(crate)` vs `pub`)
+- Add module-level documentation
+
+**Testing**:
+- Run `cargo test --lib semantic_classifier` to verify tests pass
+- Run `just ci` for full CI checks
+- Run `cargo doc` to verify documentation builds
+
+**Success Criteria**:
+- [ ] Module converted to directory structure
+- [ ] Clean public API with only 3-4 public items
+- [ ] All tests pass
+- [ ] Documentation builds without warnings
+- [ ] Ready to commit
 
 ## Testing Strategy
 
 **For each phase**:
-1. Run `cargo test patterns::tests` to verify pattern detection tests pass
+1. Run `cargo test --lib semantic_classifier` to verify existing tests pass
 2. Run `cargo clippy` to check for warnings
-3. Verify the specific functionality changed in that phase works correctly
+3. Run `cargo fmt` to ensure proper formatting
+4. Verify imports are correct and no unused imports remain
 
 **Final verification**:
-1. `cargo test --all` - All tests pass
-2. `cargo clippy --all-targets --all-features -- -D warnings` - No warnings
-3. `cargo fmt --all -- --check` - Properly formatted
-4. `cargo doc --no-deps` - Documentation builds
-5. Optional: `debtmap analyze` - Verify complexity reduction achieved
+1. `just ci` - Full CI checks including all tests
+2. `cargo doc --no-deps` - Verify documentation builds
+3. Run full test suite: `cargo test --all-features`
+4. Verify no regressions in functionality
 
 ## Rollback Plan
 
 If a phase fails:
 1. Revert the phase with `git reset --hard HEAD~1`
-2. Review the failure - examine test output and error messages
-3. Adjust the approach:
-   - If tests fail: Analyze what behavior changed unintentionally
-   - If complexity didn't reduce: Extract larger logical blocks
-   - If clippy warnings: Address the specific warning pattern
-4. Retry the phase with adjustments
+2. Review the failure:
+   - Check for missing imports
+   - Verify function visibility modifiers
+   - Check for circular dependencies
+3. Adjust the plan based on the issue
+4. Retry with corrections
 
-## Implementation Notes
-
-### Functional Programming Approach
-
-The refactoring will follow these principles:
-- Each extracted function is pure (same inputs → same outputs)
-- No side effects in classification logic
-- Main function becomes a simple dispatch/orchestrator
-- Use tuple returns `(String, f64, Vec<String>)` for simplicity
-
-### Key Complexity Sources
-
-The main complexity comes from:
-1. Deep nesting of if/else-if chains (7 levels)
-2. Pattern matching combined with optional io_profile checks
-3. Multiple evidence.push() calls within each branch
-
-### Extraction Strategy
-
-Each pattern branch will be extracted to:
-```rust
-fn classify_<pattern>(metrics: &GraphMetrics, io_profile: Option<&IoProfile>)
-    -> (String, f64, Vec<String>)
-{
-    // Pure classification logic
-    // Returns (primary, confidence, evidence)
-}
-```
-
-The main function will become:
-```rust
-pub fn classify_responsibility(...) -> ResponsibilityClassification {
-    let (primary, confidence, evidence) = if patterns.contains(&Orchestrator) {
-        classify_orchestrator(metrics, io_profile)
-    } else if patterns.contains(&IoGateway) {
-        classify_io_gateway(metrics, io_profile)
-    }
-    // ... simplified dispatch
-
-    ResponsibilityClassification {
-        primary,
-        confidence,
-        evidence,
-        patterns: patterns.to_vec(),
-        framework_context: None,
-    }
-}
-```
-
-### Preserving Behavior
-
-Critical behaviors to preserve:
-- Priority order of pattern matching (Orchestrator → IoGateway → Hub → Bridge → LeafNode → UtilityCluster → Fallback)
-- Confidence scores for each classification type
-- Evidence message formatting
-- Distinction between pure and impure LeafNode functions
-- Fallback to io_profile when no patterns match
+Common issues to watch for:
+- **Circular dependencies**: Ensure dependency graph flows in one direction (patterns → ast_analysis → classifiers → mod)
+- **Visibility**: Helper functions should be `pub(crate)`, only API functions `pub`
+- **Test organization**: Each test file should be independent and not depend on other test files
 
 ## Notes
 
-- The function is already well-tested with 9 test cases covering different patterns
-- No test changes should be needed in phases 1-3, only additions in phase 4
-- The refactoring is purely structural - no functional changes
-- Each phase should take ~30-45 minutes of focused work
-- Total estimated effort: 3.45 hours (matches debtmap recommendation)
+**Module Dependency Order**:
+```
+semantic_classifier/mod.rs (public API)
+  ├── pattern_matchers.rs (pure pattern matching, no dependencies)
+  ├── ast_analysis.rs (depends on syn only)
+  └── classifiers.rs (depends on pattern_matchers, ast_analysis)
+```
+
+**Functional Programming Approach**:
+- All extracted functions are already pure (take inputs, return outputs)
+- No mutable state to worry about
+- Can be tested independently
+- Composition through function calls
+
+**Why This Split**:
+- **Pattern matchers**: Pure string/name-based pattern matching (simplest, no dependencies)
+- **AST analysis**: Pure AST inspection functions (depends only on syn)
+- **Classifiers**: Business logic combining patterns and AST (depends on both)
+- **Tests**: Organized by feature for easier maintenance
+
+**Line Count Reduction**:
+- Phase 1: ~150 lines (pattern matchers)
+- Phase 2: ~400 lines (classifiers)
+- Phase 3: ~150 lines (AST analysis)
+- Phase 4: ~1100 lines (tests moved to separate files)
+- Final main file: ~200 lines (public API only)
