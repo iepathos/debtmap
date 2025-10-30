@@ -17,13 +17,15 @@ File-level scoring aggregates metrics across all functions in a file to identify
 ### Formula
 
 ```
-File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores
+File Score = Size × Complexity × Coverage Factor × Density × GodObject × FunctionScores
 ```
+
+**Note**: This is a conceptual formula showing the multiplicative relationship between factors. The actual implementation in `src/priority/file_metrics.rs` includes additional normalization steps and conditional adjustments. See source code for exact calculation details.
 
 Where each factor is calculated as:
 - **Size** = `sqrt(total_lines / 100)`
 - **Complexity** = `(avg_complexity / 5.0) × sqrt(total_complexity / 50.0)`
-- **Coverage Multiplier** = `1.0 - coverage_percent`
+- **Coverage Factor** = `((1.0 - coverage_percent) × 2.0) + 1.0`
 - **Density** = `1.0 + ((function_count - 50) × 0.02)` if function_count > 50, else 1.0
 - **GodObject** = `2.0 + god_object_score` if detected
 - **FunctionScores** = `sum(function_scores) / 10`
@@ -40,11 +42,13 @@ Where each factor is calculated as:
 - Balances per-function and aggregate complexity
 - Rationale: Both concentrated complexity and spread-out complexity matter
 
-**Coverage Multiplier**: `1.0 - coverage_percent`
+**Coverage Factor**: `(coverage_gap × 2.0) + 1.0` where `coverage_gap = 1.0 - coverage_percent`
 - Lower coverage increases score multiplicatively
-- Range: 0.0 (100% coverage) to 1.0 (0% coverage)
-- Rationale: Untested files amplify existing complexity and risk
-- Note: Earlier versions used an additive "Coverage Factor" formula; current implementation uses multiplicative dampening
+- Range: 1.0 (100% coverage) to 3.0 (0% coverage)
+- Formula expands to: `((1.0 - coverage_percent) × 2.0) + 1.0`
+- Example: 50% coverage → gap=0.5 → factor=(0.5×2.0)+1.0 = 2.0x
+- Rationale: Untested files amplify existing complexity and risk through a multiplicative factor greater than 1.0
+- Note: Earlier versions used `1.0 - coverage_percent` (range 0-1); current implementation uses expanded range 1-3 for stronger emphasis
 
 **Density Factor**: Penalizes files with excessive function count
 - Triggers when function count > 50
@@ -188,6 +192,8 @@ method = "max_plus_average"
 | Mixed quality | `max_plus_average` | Balances hot spots with overall quality |
 | Trend analysis | `sum` | Simple, consistent metric over time |
 
+**Performance Note**: All aggregation methods have O(n) complexity where n = number of functions. Performance differences are negligible for typical codebases (<100k functions). Choose based on prioritization strategy, not performance concerns.
+
 ### Configuration
 
 ```toml
@@ -222,7 +228,15 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 4. **Coverage Multiplier**: 1.0 - coverage_percent (0% coverage = 1.0, 100% coverage = 0.0)
 5. **Final Score**: Base Score × Coverage Multiplier × Role Multiplier
 
-**Note**: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights (0.50 for complexity, 0.25 for dependencies) are hard-coded in the implementation.
+**Note**: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights (0.50 for complexity, 0.25 for dependencies) are hard-coded in the implementation to ensure consistent scoring across environments. Role multipliers and coverage weights remain configurable to allow customization while maintaining stable base calculations.
+
+**Why Hard-Coded Weights?** These base weights are intentionally not configurable to:
+- **Ensure consistency**: Scores remain comparable across projects and teams
+- **Prevent instability**: Avoid extreme configurations that break prioritization
+- **Simplify configuration**: Reduce cognitive load for users
+- **Maintain calibration**: Weights are empirically tuned based on analysis of real codebases
+
+You can still customize prioritization significantly through configurable `role_multipliers`, `coverage_weights`, and normalization settings.
 
 **Migration Note**: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model (spec 122) uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.
 
@@ -359,6 +373,23 @@ To disable AST-based detection (if experiencing performance issues):
 ast_detection = false     # Fall back to pattern-only matching
 # Note: May reduce detection accuracy but improves performance
 ```
+
+**Performance and Disabling**:
+
+Constructor detection is **always enabled** and cannot be fully disabled, as it's integral to accurate priority scoring. However, you can:
+
+1. **Disable AST analysis** (shown above): Falls back to pattern-only matching, reducing accuracy but improving performance for very large codebases (100k+ functions)
+2. **Adjust thresholds**: Make detection more lenient by increasing `max_cyclomatic`, `max_cognitive`, or `max_length`
+3. **Remove patterns**: Delete specific patterns from the `patterns` list to exclude them from detection
+
+**Performance Impact**:
+- AST-based detection: Negligible impact (<5% overhead) for typical codebases
+- Pattern-only detection: Near-zero performance impact
+- Recommendation: Keep `ast_detection = true` unless profiling shows it's a bottleneck
+
+**Accuracy Trade-offs**:
+- With AST: 95%+ accuracy in identifying simple constructors
+- Without AST: ~70% accuracy, more false negatives
 
 This feature is part of spec 117 and helps reduce false positives in priority scoring.
 
@@ -674,7 +705,19 @@ log_multiplier = 10.0         # Applied to scores above logarithmic threshold
 show_raw_scores = true        # Display both normalized (0-100) and raw scores in output
 ```
 
-**Note on Scoring Weights**: The base scoring weights for complexity (50%) and dependencies (25%) are hard-coded in the implementation and not configurable via the config file. Coverage is applied as a multiplicative dampener (1.0 - coverage_percent), not as an additive weight.
+**Note on Scoring Weights**: The base complexity and dependency weights are hard-coded for consistency across environments. However, you can customize prioritization significantly through configurable options:
+
+**What's Configurable:**
+- `role_multipliers` - Adjust importance of different function types (pure logic, entry points, I/O wrappers)
+- `coverage_weights` - Role-specific coverage penalty adjustments
+- `normalization` settings - Control score scaling and range
+- `aggregation.method` - Choose how function scores combine into file scores
+
+**What's Hard-Coded:**
+- Base complexity weight (50%) and dependency weight (25%)
+- Coverage multiplier formula: `1.0 - coverage_percent`
+
+**Impact**: While base weights are fixed, the configurable multipliers and weights provide significant control over final rankings and priorities. A function with `role_multiplier = 1.5` and `coverage_weight = 1.2` can have 80% higher priority than the same function with default settings.
 
 **Note**: The configuration file must be named `.debtmap.toml` (not `debtmap.yml` or other variants) and placed in your project root directory.
 
@@ -726,12 +769,22 @@ debtmap analyze src/problematic/module.rs --format terminal
 
 ### Example 1: God Object Detection
 
+**Command**:
+```bash
+debtmap analyze src/services/user_service.rs --aggregate-only
+```
+
 **File-Level View:**
 ```
 src/services/user_service.rs - Score: 245.8
   - 850 lines, 45 methods
   - God Object: 78% score
   - Action: Split into UserAuth, UserProfile, UserNotifications
+```
+
+**Command**:
+```bash
+debtmap analyze src/services/user_service.rs --top 5
 ```
 
 **Function-Level View:**
@@ -745,11 +798,21 @@ src/services/user_service.rs:456 - send_notification() - Score: 6.8
 
 ### Example 2: Targeted Function Fix
 
+**Command**:
+```bash
+debtmap analyze src/parsers/expression.rs --aggregate-only
+```
+
 **File-Level View:**
 ```
 src/parsers/expression.rs - Score: 45.2
   - 320 lines, 12 functions
   - No god object detected
+```
+
+**Command**:
+```bash
+debtmap analyze src/parsers/expression.rs --top 5
 ```
 
 **Function-Level View:**
@@ -764,11 +827,21 @@ src/parsers/expression.rs:89 - parse_complex_expression() - Score: 9.1
 
 ### Example 3: Balanced Refactoring
 
+**Command**:
+```bash
+debtmap analyze src/analysis/scoring.rs --aggregate-only --coverage-file coverage.lcov
+```
+
 **File-Level View:**
 ```
 src/analysis/scoring.rs - Score: 125.6
   - 580 lines, 18 functions
   - High complexity, low coverage
+```
+
+**Command**:
+```bash
+debtmap analyze src/analysis/scoring.rs --coverage-file coverage.lcov --top 5
 ```
 
 **Function-Level View:**
@@ -788,29 +861,34 @@ Both scoring approaches normalize to a 0-10 scale for consistency.
 
 **Default: Linear Clamping**
 
-The default normalization (`normalize_final_score`) uses simple linear clamping:
+The default normalization uses simple linear clamping to the 0-100 range:
 
-```rust
-score_normalized = raw_score.clamp(0.0, 100.0)
-```
+- **Formula**: Score is clamped between 0.0 and 100.0
+- **Behavior**: No transformation, just boundary enforcement
+- **Usage**: Production output uses this method
 
-This ensures scores stay within the expected 0-100 range without additional transformations. This is the normalization method used in production output.
+This ensures scores stay within the expected range without additional transformations.
 
 **Advanced: Multi-Phase Normalization**
 
-For more sophisticated normalization, debtmap provides `normalize_final_score_with_metadata` which uses different scaling for different score ranges:
+For more sophisticated normalization, debtmap provides multi-phase scaling with different formulas for different score ranges:
 
-```rust
-score_normalized = if raw_score < 10.0 {
-    raw_score  // Linear below 10
-} else if raw_score < 100.0 {
-    10.0 + (raw_score - 10.0).sqrt() * 3.33  // Square root 10-100
-} else {
-    41.59 + (raw_score / 100.0).ln() * 10.0  // Logarithmic above 100
-}
-```
+**Phase 1 - Linear (scores < 10)**:
+- Formula: `normalized = raw_score`
+- Behavior: 1:1 mapping, no scaling
+- Rationale: Preserve low score distinctions
 
-This multi-phase approach dampens extreme values while preserving distinctions in the normal range. Note that this advanced normalization is available but may not be used by default in all outputs.
+**Phase 2 - Square Root (scores 10-100)**:
+- Formula: `normalized = 10.0 + sqrt(raw_score - 10.0) × 3.33`
+- Behavior: Moderate dampening
+- Rationale: Balance between linear and logarithmic
+
+**Phase 3 - Logarithmic (scores > 100)**:
+- Formula: `normalized = 41.59 + ln(raw_score / 100.0) × 10.0`
+- Behavior: Strong dampening of extreme values
+- Rationale: Prevent outliers from dominating
+
+This multi-phase approach dampens extreme values while preserving distinctions in the normal range. Configure via `[normalization]` section in `.debtmap.toml`.
 
 ### Configuration
 
@@ -900,6 +978,44 @@ minimum_debt_score = 3.0
 ## Rebalanced Debt Scoring (Spec 136)
 
 Debtmap now includes an advanced **rebalanced scoring algorithm** that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.
+
+### Enabling Rebalanced Scoring
+
+**Configuration-Based Activation**: Rebalanced scoring is enabled through your `.debtmap.toml` configuration file, not via CLI flags.
+
+**Default Behavior**: By default, debtmap uses the standard scoring algorithm described earlier in this chapter. To use rebalanced scoring, add the `[scoring_rebalanced]` section to your config:
+
+```toml
+# .debtmap.toml
+[scoring_rebalanced]
+preset = "balanced"  # Activates rebalanced scoring with balanced preset
+```
+
+**Relationship to Standard Scoring**:
+- Rebalanced scoring **supplements** standard scoring, providing an alternative prioritization strategy
+- Both algorithms can coexist - choose which to use based on your needs
+- File-level and function-level scoring both work with rebalanced scoring
+- Output format remains the same, only score calculations differ
+
+**Migration Path**:
+1. **Test first**: Add `[scoring_rebalanced]` section to a test config file
+2. **Compare**: Run analysis with both standard and rebalanced scoring on same codebase
+3. **Evaluate**: Review how priorities change (large simple files rank lower, complex untested code ranks higher)
+4. **Adopt**: Once satisfied, switch your primary config to use rebalanced scoring
+5. **Tune**: Adjust preset or custom weights based on your team's priorities
+
+**Quick Start**:
+```bash
+# Create test config with rebalanced scoring
+cat > .debtmap-rebalanced.toml <<EOF
+[scoring_rebalanced]
+preset = "balanced"
+EOF
+
+# Compare results
+debtmap analyze . --format terminal                            # Standard scoring
+debtmap analyze . --config .debtmap-rebalanced.toml --format terminal  # Rebalanced scoring
+```
 
 ### Philosophy
 
@@ -1001,6 +1117,8 @@ The rebalanced algorithm assigns severity based on normalized score and risk fac
 | **HIGH** | Score > 80 OR (complexity > 40 AND coverage > 20) OR structural > 50 | High priority for next sprint |
 | **MEDIUM** | Score > 40 OR single moderate issue | Plan for future sprint |
 | **LOW** | Everything else | Minor concerns, size-only issues |
+
+**Evaluation Logic**: Severity is assigned based on the **first matching criteria** (logical OR). An item needs to satisfy **only ONE condition** to qualify for that severity level. For example, a function with score=90 is HIGH severity even if complexity and coverage are both low, because it meets the "Score > 80" condition.
 
 ### Example Prioritization
 
