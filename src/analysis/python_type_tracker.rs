@@ -5,7 +5,7 @@
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
-use crate::analysis::type_flow_tracker::TypeFlowTracker;
+use crate::analysis::type_flow_tracker::{TypeFlowTracker, TypeId};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
@@ -1384,66 +1384,141 @@ impl TwoPassExtractor {
         }
     }
 
-    /// Discover observer interfaces via usage analysis (after type flow tracking)
-    /// This identifies interfaces by analyzing how types are used in observer collections
-    fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
+    /// Find observer collections in module by analyzing class `__init__` methods.
+    ///
+    /// This function traverses the AST to find assignments to `self.*` attributes
+    /// in class constructors, filtering for observer collection names.
+    ///
+    /// # Returns
+    /// A vector of `(class_name, field_name)` tuples representing observer collections.
+    ///
+    /// # Example
+    /// For code like:
+    /// ```python
+    /// class Subject:
+    ///     def __init__(self):
+    ///         self.observers = []  # This will be found
+    /// ```
+    /// Returns: `[("Subject", "observers")]`
+    fn find_observer_collections(module: &ast::ModModule) -> Vec<(String, String)> {
         use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
 
-        // Step 1: Find all observer collections
-        let mut observer_collections: Vec<(String, String)> = Vec::new();
-
-        for stmt in &module.body {
-            if let ast::Stmt::ClassDef(class_def) = stmt {
-                let class_name = &class_def.name.to_string();
-
-                // Look for observer collections in __init__
-                for method_stmt in &class_def.body {
-                    if let ast::Stmt::FunctionDef(func_def) = method_stmt {
-                        if func_def.name.as_str() == "__init__" {
-                            for init_stmt in &func_def.body {
+        module
+            .body
+            .iter()
+            .filter_map(|stmt| {
+                if let ast::Stmt::ClassDef(class_def) = stmt {
+                    Some((class_def.name.to_string(), &class_def.body))
+                } else {
+                    None
+                }
+            })
+            .flat_map(|(class_name, body)| {
+                body.iter()
+                    .filter_map(move |method_stmt| {
+                        if let ast::Stmt::FunctionDef(func_def) = method_stmt {
+                            if func_def.name.as_str() == "__init__" {
+                                Some((class_name.clone(), &func_def.body))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .flat_map(|(class_name, init_body)| {
+                        init_body
+                            .iter()
+                            .filter_map(move |init_stmt| {
                                 if let ast::Stmt::Assign(assign) = init_stmt {
-                                    for target in &assign.targets {
-                                        if let ast::Expr::Attribute(attr) = target {
-                                            if let ast::Expr::Name(name) = &*attr.value {
-                                                if name.id.as_str() == "self" {
-                                                    let field_name = attr.attr.as_str();
-                                                    if ObserverRegistry::is_observer_collection_name(
-                                                        field_name,
-                                                    ) {
-                                                        observer_collections.push((
-                                                            class_name.clone(),
-                                                            field_name.to_string(),
-                                                        ));
-                                                    }
+                                    Some((class_name.clone(), &assign.targets))
+                                } else {
+                                    None
+                                }
+                            })
+                            .flat_map(|(class_name, targets)| {
+                                targets.iter().filter_map(move |target| {
+                                    if let ast::Expr::Attribute(attr) = target {
+                                        if let ast::Expr::Name(name) = &*attr.value {
+                                            if name.id.as_str() == "self" {
+                                                let field_name = attr.attr.as_str();
+                                                if ObserverRegistry::is_observer_collection_name(
+                                                    field_name,
+                                                ) {
+                                                    return Some((
+                                                        class_name.clone(),
+                                                        field_name.to_string(),
+                                                    ));
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                                    None
+                                })
+                            })
+                    })
+            })
+            .collect()
+    }
 
-        // Step 2: For each observer collection, get types from type flow tracker
-        for (class_name, field_name) in observer_collections {
-            let collection_path = format!("{}.{}", class_name, field_name);
-            let type_ids = self
-                .type_tracker
-                .with_type_flow(|flow| flow.get_collection_type_ids(&collection_path));
+    /// Collect type IDs for observer collections from the type flow tracker.
+    ///
+    /// For each observer collection, queries the type flow tracker to determine
+    /// which types are stored in that collection.
+    ///
+    /// # Arguments
+    /// * `type_tracker` - The type flow tracker to query for type information
+    /// * `observer_collections` - List of (class_name, field_name) tuples
+    ///
+    /// # Returns
+    /// A vector of `(collection_path, type_ids)` tuples where collection_path
+    /// is in the format "ClassName.field_name".
+    fn collect_type_ids_for_observers(
+        type_tracker: &PythonTypeTracker,
+        observer_collections: &[(String, String)],
+    ) -> Vec<(String, Vec<TypeId>)> {
+        observer_collections
+            .iter()
+            .map(|(class_name, field_name)| {
+                let collection_path = format!("{}.{}", class_name, field_name);
+                let type_ids = type_tracker
+                    .with_type_flow(|flow| flow.get_collection_type_ids(&collection_path));
+                (collection_path, type_ids)
+            })
+            .collect()
+    }
 
-            // Step 3: Register these types as observer interfaces
+    /// Register observer interfaces discovered from usage analysis.
+    ///
+    /// This function registers each discovered type as an observer interface,
+    /// along with any base classes it inherits from.
+    ///
+    /// # Arguments
+    /// * `observer_registry` - The registry to register interfaces in
+    /// * `type_tracker` - The type flow tracker for querying base class information
+    /// * `type_ids_by_collection` - Map of collection paths to their type IDs
+    ///
+    /// # Side Effects
+    /// Mutates the observer registry by registering interfaces.
+    fn register_observer_interfaces_from_usage(
+        observer_registry: &std::sync::Arc<
+            std::sync::RwLock<
+                crate::analysis::python_call_graph::observer_registry::ObserverRegistry,
+            >,
+        >,
+        type_tracker: &PythonTypeTracker,
+        type_ids_by_collection: Vec<(String, Vec<TypeId>)>,
+    ) {
+        for (collection_path, type_ids) in type_ids_by_collection {
             for type_id in type_ids {
                 // Register the type as an interface
-                self.observer_registry
+                observer_registry
                     .write()
                     .unwrap()
                     .register_interface(&type_id.name);
 
                 // Also register base classes as interfaces
-                let collection_types = self.type_tracker.with_type_flow(|flow| {
+                let collection_types = type_tracker.with_type_flow(|flow| {
                     flow.get_collection_types(&collection_path)
                         .into_iter()
                         .cloned()
@@ -1454,7 +1529,7 @@ impl TwoPassExtractor {
                     .find(|ti| ti.type_id == type_id)
                 {
                     for base_class in &type_info.base_classes {
-                        self.observer_registry
+                        observer_registry
                             .write()
                             .unwrap()
                             .register_interface(&base_class.name);
@@ -1462,6 +1537,35 @@ impl TwoPassExtractor {
                 }
             }
         }
+    }
+
+    /// Discover observer interfaces via usage analysis (after type flow tracking).
+    ///
+    /// This identifies observer interfaces by analyzing how types are used in observer
+    /// collections, without requiring explicit ABC inheritance or decorators.
+    ///
+    /// # Algorithm
+    /// 1. Find all observer collections (e.g., `self.observers = []`)
+    /// 2. Query type flow tracker for types stored in those collections
+    /// 3. Register those types (and their base classes) as observer interfaces
+    /// 4. Analyze dispatch loops to identify interface methods
+    ///
+    /// # Arguments
+    /// * `module` - The Python module AST to analyze
+    fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
+        // Step 1: Find all observer collections
+        let observer_collections = Self::find_observer_collections(module);
+
+        // Step 2: For each observer collection, get types from type flow tracker
+        let type_ids_by_collection =
+            Self::collect_type_ids_for_observers(&self.type_tracker, &observer_collections);
+
+        // Step 3: Register these types as observer interfaces
+        Self::register_observer_interfaces_from_usage(
+            &self.observer_registry,
+            &self.type_tracker,
+            type_ids_by_collection,
+        );
 
         // Step 4: Analyze dispatch loops to find interface methods
         self.analyze_dispatch_loops_for_interface_methods(module);
