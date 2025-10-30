@@ -5,7 +5,7 @@
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
-use crate::analysis::type_flow_tracker::TypeFlowTracker;
+use crate::analysis::type_flow_tracker::{TypeFlowTracker, TypeId};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
@@ -1447,6 +1447,22 @@ impl TwoPassExtractor {
             .collect()
     }
 
+    /// Collect type IDs for observer collections from the type flow tracker
+    fn collect_type_ids_for_observers(
+        type_tracker: &PythonTypeTracker,
+        observer_collections: &[(String, String)],
+    ) -> Vec<(String, Vec<TypeId>)> {
+        observer_collections
+            .iter()
+            .map(|(class_name, field_name)| {
+                let collection_path = format!("{}.{}", class_name, field_name);
+                let type_ids = type_tracker
+                    .with_type_flow(|flow| flow.get_collection_type_ids(&collection_path));
+                (collection_path, type_ids)
+            })
+            .collect()
+    }
+
     /// Discover observer interfaces via usage analysis (after type flow tracking)
     /// This identifies interfaces by analyzing how types are used in observer collections
     fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
@@ -1454,13 +1470,11 @@ impl TwoPassExtractor {
         let observer_collections = Self::find_observer_collections(module);
 
         // Step 2: For each observer collection, get types from type flow tracker
-        for (class_name, field_name) in observer_collections {
-            let collection_path = format!("{}.{}", class_name, field_name);
-            let type_ids = self
-                .type_tracker
-                .with_type_flow(|flow| flow.get_collection_type_ids(&collection_path));
+        let type_ids_by_collection =
+            Self::collect_type_ids_for_observers(&self.type_tracker, &observer_collections);
 
-            // Step 3: Register these types as observer interfaces
+        // Step 3: Register these types as observer interfaces
+        for (collection_path, type_ids) in type_ids_by_collection {
             for type_id in type_ids {
                 // Register the type as an interface
                 self.observer_registry
