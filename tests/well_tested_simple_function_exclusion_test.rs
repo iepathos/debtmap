@@ -7,6 +7,7 @@ use debtmap::builders::parallel_unified_analysis::{
 };
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::CallGraph;
+use debtmap::priority::UnifiedAnalysisQueries;
 use debtmap::risk::lcov::{FunctionCoverage, LcovData};
 use std::path::PathBuf;
 

@@ -1,6 +1,7 @@
 use crate::priority::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
-    DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedDebtItem,
+    DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedAnalysisQueries,
+    UnifiedDebtItem,
 };
 use std::fmt::Write;
 
@@ -1120,7 +1121,7 @@ mod tests {
     use super::*;
     use crate::priority::{
         ActionableRecommendation, FunctionRole, FunctionVisibility, ImpactMetrics, Location,
-        TransitiveCoverage, UnifiedDebtItem, UnifiedScore,
+        TransitiveCoverage, UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
     };
 
     #[test]

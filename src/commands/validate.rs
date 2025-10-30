@@ -3,6 +3,7 @@ use super::super::commands::analyze;
 use super::super::output;
 use super::super::utils::{risk_analyzer, validation_printer};
 use crate::formatting::FormattingConfig;
+use crate::priority::UnifiedAnalysisUtils;
 use crate::{cli, config, core::*, risk};
 use anyhow::Result;
 use std::path::PathBuf;
