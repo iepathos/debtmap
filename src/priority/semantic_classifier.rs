@@ -1,3 +1,5 @@
+mod pattern_matchers;
+
 use crate::analyzers::rust_constructor_detector::{
     analyze_function_body, extract_return_type, ConstructorReturnType,
 };
@@ -5,6 +7,10 @@ use crate::analyzers::rust_data_flow_analyzer::analyze_data_flow;
 use crate::analyzers::rust_enum_converter_detector::is_enum_converter;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
+use pattern_matchers::{
+    is_entry_point_by_name, is_orchestrator_by_name, matches_accessor_name, matches_debug_pattern,
+    matches_output_io_pattern,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -145,22 +151,6 @@ fn is_debug_function(func: &FunctionMetrics) -> bool {
     has_debug_characteristics
 }
 
-/// Check if function name matches debug patterns
-fn matches_debug_pattern(name: &str) -> bool {
-    let name_lower = name.to_lowercase();
-
-    // Specific debug prefixes
-    let prefixes = ["debug_", "print_", "dump_", "trace_"];
-    // Specific debug suffixes
-    let suffixes = ["_diagnostics", "_debug", "_stats"];
-    // Specific debug contains patterns
-    let contains = ["diagnostics"];
-
-    prefixes.iter().any(|p| name_lower.starts_with(p))
-        || suffixes.iter().any(|s| name_lower.ends_with(s))
-        || contains.iter().any(|c| name_lower.contains(c))
-}
-
 /// Check if function has diagnostic behavioral characteristics
 fn has_diagnostic_characteristics(func: &FunctionMetrics) -> bool {
     // Diagnostic functions typically have:
@@ -171,14 +161,6 @@ fn has_diagnostic_characteristics(func: &FunctionMetrics) -> bool {
     let has_output_io_name = matches_output_io_pattern(&func.name);
 
     is_very_simple && has_output_io_name
-}
-
-/// Check if name matches output-focused I/O patterns (not read/write operations)
-fn matches_output_io_pattern(name: &str) -> bool {
-    let name_lower = name.to_lowercase();
-    let output_patterns = ["print", "display", "show", "log", "trace", "dump"];
-
-    output_patterns.iter().any(|p| name_lower.contains(p))
 }
 
 /// Detect simple constructor functions to prevent false positive classifications.
@@ -380,27 +362,6 @@ fn is_accessor_method(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) ->
     }
 
     true
-}
-
-/// Check if name matches accessor patterns
-fn matches_accessor_name(name: &str, config: &crate::config::AccessorDetectionConfig) -> bool {
-    let name_lower = name.to_lowercase();
-
-    // Single-word accessors
-    if config.single_word_patterns.contains(&name_lower) {
-        return true;
-    }
-
-    // Prefix patterns
-    if config
-        .prefix_patterns
-        .iter()
-        .any(|p| name_lower.starts_with(p))
-    {
-        return true;
-    }
-
-    false
 }
 
 /// Check if function body is simple accessor pattern (AST analysis)
@@ -628,108 +589,6 @@ fn is_io_wrapper(func: &FunctionMetrics) -> bool {
 
     // Longer functions can still be I/O wrappers if they match I/O orchestration patterns
     func.length <= 50 && is_io_orchestration(func)
-}
-
-fn is_entry_point_by_name(name: &str) -> bool {
-    let entry_patterns = [
-        "main", "run", "start", "init", "handle", "process", "execute", "serve", "listen",
-    ];
-
-    let name_lower = name.to_lowercase();
-    entry_patterns
-        .iter()
-        .any(|pattern| name_lower.starts_with(pattern) || name_lower.ends_with(pattern))
-}
-
-fn is_orchestrator_by_name(name: &str) -> bool {
-    let name_lower = name.to_lowercase();
-
-    // Exclude common non-orchestration patterns first
-    let exclude_patterns = [
-        "print",
-        "format",
-        "create",
-        "build",
-        "extract",
-        "parse",
-        "new",
-        "from",
-        "to",
-        "into",
-        "write",
-        "read",
-        "display",
-        "render",
-        "emit",
-        // Exclude adapter/wrapper patterns
-        "adapt",
-        "wrap",
-        "convert",
-        "transform",
-        "translate",
-        // Exclude functional patterns
-        "map",
-        "filter",
-        "reduce",
-        "fold",
-        "collect",
-        "apply",
-        // Exclude single-purpose functions
-        "get",
-        "set",
-        "find",
-        "search",
-        "check",
-        "validate",
-    ];
-
-    for pattern in &exclude_patterns {
-        if name_lower.starts_with(pattern) || name_lower.ends_with(pattern) {
-            return false;
-        }
-    }
-
-    // Check common orchestration patterns that override excludes
-    // (These would have been in include_patterns config)
-    let include_patterns = [
-        "workflow_",
-        "pipeline_",
-        "process_",
-        "orchestrate_",
-        "coordinate_",
-        "execute_flow_",
-    ];
-    for pattern in &include_patterns {
-        if name_lower.starts_with(pattern) {
-            return true;
-        }
-    }
-
-    // Then check for true orchestration patterns
-    let orchestrator_patterns = [
-        "orchestrate",
-        "coordinate",
-        "manage",
-        "dispatch",
-        "route",
-        "if_requested",
-        "if_needed",
-        "if_enabled",
-        "maybe",
-        "try_",
-        "attempt_",
-        "delegate",
-        "forward",
-    ];
-
-    // Check for conditional patterns like generate_report_if_requested
-    if name_lower.contains("_if_") || name_lower.contains("_when_") {
-        return true;
-    }
-
-    orchestrator_patterns
-        .iter()
-        .any(|pattern| name_lower.contains(pattern))
 }
 
 fn delegates_to_tested_functions(
