@@ -702,14 +702,37 @@ pub fn group_methods_by_responsibility_multi_signal(
     groups
 }
 
-/// Responsibility category definition for method name classification
+/// Responsibility category definition for method name classification.
+///
+/// This struct defines a single category with its name and the method name
+/// prefixes that indicate membership in that category.
+///
+/// # Examples
+///
+/// ```
+/// let category = ResponsibilityCategory {
+///     name: "Data Access",
+///     prefixes: &["get", "set"],
+/// };
+/// assert!(category.matches("get_value"));
+/// assert!(category.matches("set_config"));
+/// assert!(!category.matches("calculate_sum"));
+/// ```
 struct ResponsibilityCategory {
     name: &'static str,
     prefixes: &'static [&'static str],
 }
 
 impl ResponsibilityCategory {
-    /// Check if a method name matches any of this category's prefixes
+    /// Check if a method name matches any of this category's prefixes.
+    ///
+    /// # Arguments
+    ///
+    /// * `method_name` - The lowercased method name to check
+    ///
+    /// # Returns
+    ///
+    /// `true` if the method name starts with any of this category's prefixes
     fn matches(&self, method_name: &str) -> bool {
         self.prefixes
             .iter()
@@ -717,7 +740,27 @@ impl ResponsibilityCategory {
     }
 }
 
-/// Static responsibility categories ordered by specificity (more specific first)
+/// Static responsibility categories ordered by specificity.
+///
+/// Categories are checked in order, so more specific categories should appear first.
+/// The "Utilities" category has no prefixes and serves as a fallback for unmatched methods.
+///
+/// # Adding New Categories
+///
+/// To add a new category:
+/// 1. Insert a new `ResponsibilityCategory` entry in the appropriate position
+/// 2. Provide a descriptive name and list of prefixes
+/// 3. Add unit tests covering the new prefixes
+/// 4. Update the function documentation below
+///
+/// # Example
+///
+/// ```
+/// ResponsibilityCategory {
+///     name: "Authentication",
+///     prefixes: &["auth", "login", "logout"],
+/// },
+/// ```
 const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
     ResponsibilityCategory {
         name: "Formatting & Output",
@@ -769,14 +812,18 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
     },
 ];
 
-/// Infer responsibility category from function/method name.
+/// Infer responsibility category from function/method name using pattern matching.
 ///
-/// This function uses common naming patterns to categorize functions into
-/// responsibility groups. It recognizes standard Rust function prefixes like
-/// `format_*`, `parse_*`, `filter_*`, etc.
+/// This function uses a data-driven approach to categorize functions by matching
+/// method name prefixes against predefined categories. It searches through
+/// `RESPONSIBILITY_CATEGORIES` in order and returns the first matching category.
 ///
-/// For more accurate classification, use `infer_responsibility_with_io_detection`
-/// which analyzes actual I/O operations in the function body.
+/// # Implementation
+///
+/// The function:
+/// 1. Converts the method name to lowercase for case-insensitive matching
+/// 2. Iterates through categories until finding one with a matching prefix
+/// 3. Returns the category name, or "Utilities" if no match is found
 ///
 /// # Pattern Recognition
 ///
@@ -793,19 +840,30 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 /// - `send_*`, `receive_*` → "Communication"
 /// - Everything else → "Utilities"
 ///
+/// # Examples
+///
+/// ```
+/// assert_eq!(infer_responsibility_from_method("format_output"), "Formatting & Output");
+/// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing & Input");
+/// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
+/// assert_eq!(infer_responsibility_from_method("helper_function"), "Utilities");
+/// ```
+///
+/// # Performance
+///
+/// This is a pure function with O(n*m) complexity where n is the number of categories
+/// (currently 12) and m is the average number of prefixes per category (~3).
+/// In practice, most matches occur in the first few categories.
+///
 /// # Extending Patterns
 ///
-/// To add new patterns:
-/// 1. Add a new `else if` clause with the prefix check
-/// 2. Choose a descriptive category name
-/// 3. Add a unit test for the new pattern
-/// 4. Update this documentation
+/// To add new patterns, modify `RESPONSIBILITY_CATEGORIES` rather than this function.
+/// See the documentation on `RESPONSIBILITY_CATEGORIES` for details.
 ///
-/// # Note on Catch-all
+/// # Alternative
 ///
-/// The catch-all category is "Utilities" rather than "Core Operations" because
-/// it more accurately describes miscellaneous helper functions that don't fit
-/// standard naming conventions.
+/// For more accurate classification, consider `infer_responsibility_with_io_detection`
+/// which analyzes actual I/O operations in the function body rather than just names.
 fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
