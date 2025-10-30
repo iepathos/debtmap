@@ -1,7 +1,7 @@
 use debtmap::priority::{
     unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
     CallGraph, DebtCategory, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics,
-    UnifiedAnalysis,
+    UnifiedAnalysis, UnifiedAnalysisUtils,
 };
 use std::path::PathBuf;
 

@@ -1,8 +1,8 @@
 use crate::analyzers::purity_detector::PurityDetector;
+use crate::analyzers::rust_complexity_calculation;
 use crate::analyzers::Analyzer;
 use crate::complexity::{
-    cognitive::calculate_cognitive_with_patterns,
-    cyclomatic::{calculate_cyclomatic, calculate_cyclomatic_adjusted},
+    cyclomatic::calculate_cyclomatic,
     if_else_analyzer::{IfElseChain, IfElseChainAnalyzer},
     message_generator::{generate_enhanced_message, EnhancedComplexityMessage},
     pure_mapping_patterns::{
@@ -641,8 +641,8 @@ impl FunctionVisitor {
             line: context.line,
             cyclomatic: complexity.cyclomatic,
             cognitive: complexity.cognitive,
-            nesting: calculate_nesting(block),
-            length: count_function_lines(item_fn),
+            nesting: rust_complexity_calculation::calculate_nesting(block),
+            length: rust_complexity_calculation::count_function_lines(item_fn),
             is_test: metadata.is_test,
             visibility: metadata.visibility,
             is_trait_method: context.is_trait_method,
@@ -796,27 +796,19 @@ impl FunctionVisitor {
     }
 
     fn calculate_cyclomatic_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
-        self.try_detect_visitor_pattern(func)
-            .map(|pattern_info| pattern_info.adjusted_complexity)
-            .unwrap_or_else(|| calculate_cyclomatic_adjusted(block))
+        rust_complexity_calculation::calculate_cyclomatic_with_visitor(
+            block,
+            func,
+            self.file_ast.as_ref(),
+        )
     }
 
     fn calculate_cognitive_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
-        self.try_detect_visitor_pattern(func)
-            .map(|pattern_info| apply_cognitive_pattern_scaling(block, &pattern_info))
-            .unwrap_or_else(|| calculate_cognitive_syn(block))
-    }
-
-    /// Pure helper to try detecting visitor patterns
-    fn try_detect_visitor_pattern(
-        &self,
-        func: &syn::ItemFn,
-    ) -> Option<crate::complexity::visitor_detector::PatternInfo> {
-        use crate::complexity::visitor_detector::detect_visitor_pattern;
-
-        self.file_ast
-            .as_ref()
-            .and_then(|file_ast| detect_visitor_pattern(file_ast, func))
+        rust_complexity_calculation::calculate_cognitive_with_visitor(
+            block,
+            func,
+            self.file_ast.as_ref(),
+        )
     }
 }
 
@@ -959,9 +951,9 @@ impl FunctionVisitor {
     fn calculate_closure_complexity(&self, block: &syn::Block) -> ClosureComplexityMetrics {
         ClosureComplexityMetrics {
             cyclomatic: calculate_cyclomatic(block),
-            cognitive: calculate_cognitive_syn(block),
-            nesting: calculate_nesting(block),
-            length: count_lines(block),
+            cognitive: rust_complexity_calculation::calculate_cognitive_syn(block),
+            nesting: rust_complexity_calculation::calculate_nesting(block),
+            length: rust_complexity_calculation::count_lines(block),
         }
     }
 
@@ -1059,143 +1051,6 @@ impl FunctionVisitor {
 }
 
 /// Pure function to apply cognitive complexity scaling based on pattern type
-fn apply_cognitive_pattern_scaling(
-    block: &syn::Block,
-    pattern_info: &crate::complexity::visitor_detector::PatternInfo,
-) -> u32 {
-    use crate::complexity::visitor_detector::PatternType;
-
-    let base_cognitive = calculate_cognitive_syn(block);
-
-    match pattern_info.pattern_type {
-        PatternType::Visitor => ((base_cognitive as f32).log2().ceil()).max(1.0) as u32,
-        PatternType::ExhaustiveMatch => ((base_cognitive as f32).sqrt().ceil()).max(2.0) as u32,
-        PatternType::SimpleMapping => ((base_cognitive as f32) * 0.2).max(1.0) as u32,
-        _ => base_cognitive,
-    }
-}
-
-fn calculate_cognitive_syn(block: &syn::Block) -> u32 {
-    // Use the enhanced version that includes pattern detection
-    let (total, _patterns) = calculate_cognitive_with_patterns(block);
-    total
-}
-
-fn calculate_nesting(block: &syn::Block) -> u32 {
-    struct NestingVisitor {
-        current_depth: u32,
-        max_depth: u32,
-    }
-
-    impl NestingVisitor {
-        // Helper function to visit nested content
-        fn visit_nested<F>(&mut self, f: F)
-        where
-            F: FnOnce(&mut Self),
-        {
-            self.current_depth += 1;
-            self.max_depth = self.max_depth.max(self.current_depth);
-            f(self);
-            self.current_depth -= 1;
-        }
-    }
-
-    impl<'ast> Visit<'ast> for NestingVisitor {
-        fn visit_expr_if(&mut self, i: &'ast syn::ExprIf) {
-            self.visit_nested(|v| syn::visit::visit_expr_if(v, i));
-        }
-
-        fn visit_expr_while(&mut self, i: &'ast syn::ExprWhile) {
-            self.visit_nested(|v| syn::visit::visit_expr_while(v, i));
-        }
-
-        fn visit_expr_for_loop(&mut self, i: &'ast syn::ExprForLoop) {
-            self.visit_nested(|v| syn::visit::visit_expr_for_loop(v, i));
-        }
-
-        fn visit_expr_loop(&mut self, i: &'ast syn::ExprLoop) {
-            self.visit_nested(|v| syn::visit::visit_expr_loop(v, i));
-        }
-
-        fn visit_expr_match(&mut self, i: &'ast syn::ExprMatch) {
-            // Match itself increases nesting
-            self.current_depth += 1;
-            self.max_depth = self.max_depth.max(self.current_depth);
-
-            // Visit the expression being matched
-            self.visit_expr(&i.expr);
-
-            // Visit each arm (arms will handle their own nesting)
-            for arm in &i.arms {
-                self.visit_arm(arm);
-            }
-
-            self.current_depth -= 1;
-        }
-
-        fn visit_arm(&mut self, i: &'ast syn::Arm) {
-            // Don't increase nesting for match arms themselves
-            // The match already increased nesting
-            // Just visit the patterns and body
-            for attr in &i.attrs {
-                self.visit_attribute(attr);
-            }
-            self.visit_pat(&i.pat);
-            if let Some((_, guard)) = &i.guard {
-                self.visit_expr(guard);
-            }
-            self.visit_expr(&i.body);
-        }
-
-        // Don't count blocks themselves as they're part of control structures
-        // Only count control flow structures
-        fn visit_block(&mut self, block: &'ast syn::Block) {
-            // Just visit the statements, don't increase depth for blocks
-            syn::visit::visit_block(self, block);
-        }
-    }
-
-    let mut visitor = NestingVisitor {
-        current_depth: 0,
-        max_depth: 0,
-    };
-
-    // Visit the block's statements directly
-    for stmt in &block.stmts {
-        visitor.visit_stmt(stmt);
-    }
-
-    visitor.max_depth
-}
-
-fn count_lines(block: &syn::Block) -> usize {
-    // Get the span of the entire block to calculate actual source lines
-    let span = block.span();
-    let start_line = span.start().line;
-    let end_line = span.end().line;
-
-    // Calculate the number of lines the function spans
-    if end_line >= start_line {
-        end_line - start_line + 1
-    } else {
-        1 // Fallback for edge cases
-    }
-}
-
-fn count_function_lines(item_fn: &syn::ItemFn) -> usize {
-    // Get the span of the entire function (from signature to end of body)
-    let span = item_fn.span();
-    let start_line = span.start().line;
-    let end_line = span.end().line;
-
-    // Calculate the number of lines the function spans
-    if end_line >= start_line {
-        end_line - start_line + 1
-    } else {
-        1 // Fallback for edge cases
-    }
-}
-
 fn extract_debt_items_with_enhanced(
     _file: &syn::File,
     _path: &Path,

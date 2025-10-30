@@ -1,4 +1,7 @@
 // Module declarations
+pub mod builder;
+mod file_ops;
+mod pruning;
 pub mod reader;
 pub mod writer;
 
@@ -6,7 +9,7 @@ use crate::cache::auto_pruner::{AutoPruner, BackgroundPruner, PruneStats, PruneS
 use crate::cache::cache_location::{CacheLocation, CacheStrategy};
 use crate::cache::index_manager::{CacheMetadata, IndexManager};
 use crate::cache::pruning::{InternalCacheStats, PruningConfig, PruningStrategyType};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -14,56 +17,27 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 // Re-export for backward compatibility
+pub use builder::SharedCacheBuilder;
 pub use reader::CacheReader;
 pub use writer::CacheWriter;
 
-/// Type of directory entry for classification
-#[derive(Debug, PartialEq)]
-pub(crate) enum EntryType {
-    File,
-    Directory,
-    Other,
-}
-
-/// Classify a path as file, directory, or other
-pub(crate) fn classify_entry(path: &Path) -> EntryType {
-    if path.is_file() {
-        EntryType::File
-    } else if path.is_dir() {
-        EntryType::Directory
-    } else {
-        EntryType::Other
-    }
-}
-
-/// Build destination path from base and entry name
-pub(crate) fn build_dest_path(dest: &Path, entry_name: &std::ffi::OsStr) -> PathBuf {
-    dest.join(entry_name)
-}
-
-/// Copy a single file with error context
-pub(crate) fn copy_file_entry(src: &Path, dest: &Path) -> Result<()> {
-    fs::copy(src, dest)
-        .with_context(|| format!("Failed to copy file from {:?} to {:?}", src, dest))?;
-    Ok(())
-}
-
-/// Create a directory with error context
-pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
-    fs::create_dir_all(dest).with_context(|| format!("Failed to create directory {:?}", dest))?;
-    Ok(())
-}
+// Re-export for testing
+#[cfg(test)]
+pub(crate) use file_ops::{
+    build_dest_path, classify_entry, copy_dir_entry, copy_file_entry, select_keys_for_removal,
+    EntryType,
+};
 
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
-    reader: CacheReader,
-    writer: CacheWriter,
-    index_manager: Arc<IndexManager>,
-    max_cache_size: u64,
-    cleanup_threshold: f64,
-    auto_pruner: Option<AutoPruner>,
-    background_pruner: Option<BackgroundPruner>,
+    pub(super) reader: CacheReader,
+    pub(super) writer: CacheWriter,
+    pub(super) index_manager: Arc<IndexManager>,
+    pub(super) max_cache_size: u64,
+    pub(super) cleanup_threshold: f64,
+    pub(super) auto_pruner: Option<AutoPruner>,
+    pub(super) background_pruner: Option<BackgroundPruner>,
 }
 
 impl std::fmt::Debug for SharedCache {
@@ -81,63 +55,24 @@ impl std::fmt::Debug for SharedCache {
 impl SharedCache {
     /// Create a new shared cache instance
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
-        let location = CacheLocation::resolve(repo_path)?;
-        let cache = Self::new_with_location(location)?;
+        let mut builder = SharedCacheBuilder::new();
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        let cache = builder.build()?;
         cache.validate_version()?;
         Ok(cache)
     }
 
     /// Create a new shared cache instance with explicit cache directory (for testing)
     pub fn new_with_cache_dir(repo_path: Option<&Path>, cache_dir: PathBuf) -> Result<Self> {
-        let strategy = CacheStrategy::Custom(cache_dir);
-        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
-        let cache = Self::new_with_location(location)?;
+        let mut builder = SharedCacheBuilder::new().cache_dir(cache_dir);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        let cache = builder.build()?;
         cache.validate_version()?;
         Ok(cache)
-    }
-
-    /// Create a new shared cache instance with explicit location
-    fn new_with_location(location: CacheLocation) -> Result<Self> {
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        // Create auto-pruner from environment or defaults
-        let auto_pruner = if std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
-            .unwrap_or_else(|_| "true".to_string())
-            .to_lowercase()
-            == "true"
-        {
-            Some(AutoPruner::from_env())
-        } else {
-            None
-        };
-
-        let background_pruner = auto_pruner
-            .as_ref()
-            .map(|p| BackgroundPruner::new(p.clone()));
-
-        // Use auto-pruner's max size if configured
-        let max_cache_size = auto_pruner
-            .as_ref()
-            .map(|p| p.max_size_bytes as u64)
-            .unwrap_or(1024 * 1024 * 1024); // 1GB default
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size,
-            cleanup_threshold: 0.9, // Cleanup when 90% full
-            auto_pruner,
-            background_pruner,
-        })
     }
 
     /// Save the current index to disk with comprehensive error handling
@@ -150,23 +85,11 @@ impl SharedCache {
         self.reader.get(key, component)
     }
 
-    // Pure functions for configuration and decision making
+    // Delegate to pruning module
 
     /// Determine pruning configuration based on environment and test conditions
     fn determine_pruning_config() -> PruningConfig {
-        let auto_prune_enabled =
-            std::env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or_default() == "true";
-        let sync_prune_requested =
-            std::env::var("DEBTMAP_CACHE_SYNC_PRUNE").unwrap_or_default() == "true";
-        let is_test_environment = cfg!(test);
-
-        let use_sync_pruning = auto_prune_enabled && (is_test_environment || sync_prune_requested);
-
-        PruningConfig {
-            auto_prune_enabled,
-            use_sync_pruning,
-            is_test_environment,
-        }
+        pruning::determine_pruning_config()
     }
 
     /// Determine if an entry already exists in the index
@@ -176,9 +99,7 @@ impl SharedCache {
 
     /// Determine if pruning is needed after insertion
     fn should_prune_after_insertion(pruner: &AutoPruner, stats: &InternalCacheStats) -> bool {
-        let size_exceeded = stats.total_size > pruner.max_size_bytes as u64;
-        let count_exceeded = stats.entry_count > pruner.max_entries;
-        size_exceeded || count_exceeded
+        pruning::should_prune_after_insertion(pruner, stats)
     }
 
     /// Check if key represents a new entry
@@ -202,24 +123,7 @@ impl SharedCache {
         has_auto_pruner: bool,
         has_background_pruner: bool,
     ) -> PruningStrategyType {
-        if !has_auto_pruner {
-            return PruningStrategyType::NoAutoPruner;
-        }
-
-        // If auto-pruning is disabled, don't perform any automatic pruning
-        if !config.auto_prune_enabled {
-            return PruningStrategyType::NoAutoPruner;
-        }
-
-        if config.use_sync_pruning {
-            return PruningStrategyType::SyncPruning;
-        }
-
-        if has_background_pruner {
-            PruningStrategyType::BackgroundPruning
-        } else {
-            PruningStrategyType::SyncPruning
-        }
+        pruning::determine_pruning_strategy(config, has_auto_pruner, has_background_pruner)
     }
 
     /// Execute the determined pruning strategy
@@ -271,18 +175,12 @@ impl SharedCache {
         config: &PruningConfig,
         has_auto_pruner: bool,
     ) -> bool {
-        has_auto_pruner && config.use_sync_pruning
+        pruning::should_perform_post_insertion_pruning(config, has_auto_pruner)
     }
 
     /// Log debug information for post-insertion pruning in test mode
     fn log_post_insertion_debug(stats: &CacheStats, pruner: &AutoPruner) {
-        if cfg!(test) {
-            println!(
-                "Post-insertion check: size={}/{}, count={}/{}",
-                stats.total_size, pruner.max_size_bytes, stats.entry_count, pruner.max_entries
-            );
-            println!("Triggering post-insertion pruning due to limit exceeded");
-        }
+        pruning::log_post_insertion_debug(stats, pruner)
     }
 
     /// Execute post-insertion pruning check and action
@@ -312,14 +210,7 @@ impl SharedCache {
 
     /// Log configuration details for debugging in test environment - pure function
     fn log_config_if_test_environment(config: &PruningConfig) {
-        if config.is_test_environment {
-            log::debug!(
-                "use_sync_pruning={}, auto_prune={}, cfg_test={}",
-                config.use_sync_pruning,
-                config.auto_prune_enabled,
-                config.is_test_environment
-            );
-        }
+        pruning::log_config_if_test_environment(config)
     }
 
     /// Execute the core cache storage operation - coordinates all steps
@@ -374,12 +265,7 @@ impl SharedCache {
 
     /// Get the file path for a cache entry
     fn get_cache_file_path(&self, key: &str, component: &str) -> PathBuf {
-        let component_path = self.location.get_component_path(component);
-
-        // Use first 2 chars of key for directory sharding
-        let shard = if key.len() >= 2 { &key[..2] } else { "00" };
-
-        component_path.join(shard).join(format!("{}.cache", key))
+        file_ops::get_cache_file_path(&self.location, key, component)
     }
 
     /// Perform cleanup if cache is too large
@@ -396,135 +282,32 @@ impl SharedCache {
 
     /// Clean up old cache entries
     pub fn cleanup(&self) -> Result<()> {
-        let removed_keys = self.determine_keys_to_remove()?;
-        self.delete_cache_files(&removed_keys)?;
+        let removed_keys =
+            file_ops::determine_keys_to_remove(&self.index_manager, self.max_cache_size)?;
+        file_ops::delete_cache_files(&self.location, &removed_keys)?;
         self.save_index()?;
         Ok(())
     }
 
-    /// Determine which cache keys should be removed based on size and age
-    fn determine_keys_to_remove(&self) -> Result<Vec<String>> {
-        let (sorted_entries, total_size) = self.index_manager.get_sorted_entries_and_stats();
-        let target_size = self.max_cache_size / 2;
-        let keys_to_remove = Self::select_keys_for_removal(sorted_entries, target_size, total_size);
-
-        self.index_manager.remove_entries(&keys_to_remove)?;
-        Ok(keys_to_remove)
+    /// Migrate cache from local to shared location
+    pub fn migrate_from_local(&self, local_cache_path: &Path) -> Result<()> {
+        file_ops::migrate_from_local(&self.location, local_cache_path)
     }
 
-    /// Select keys for removal until target size is reached
-    fn select_keys_for_removal(
+    /// Recursively copy directory contents (used in tests)
+    #[cfg(test)]
+    pub(crate) fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
+        file_ops::copy_dir_recursive(src, dest)
+    }
+
+    /// Select keys for removal (used in tests)
+    #[cfg(test)]
+    pub(crate) fn select_keys_for_removal(
         entries: Vec<(String, CacheMetadata)>,
         target_size: u64,
         current_size: u64,
     ) -> Vec<String> {
-        let mut removed_keys = Vec::new();
-        let mut remaining_size = current_size;
-
-        for (key, metadata) in entries {
-            if remaining_size <= target_size {
-                break;
-            }
-            removed_keys.push(key);
-            remaining_size -= metadata.size_bytes;
-        }
-        removed_keys
-    }
-
-    /// Delete cache files for the given keys
-    fn delete_cache_files(&self, removed_keys: &[String]) -> Result<()> {
-        const CACHE_COMPONENTS: &[&str] = &[
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for key in removed_keys {
-            for component in CACHE_COMPONENTS {
-                self.delete_component_file(key, component);
-            }
-        }
-        Ok(())
-    }
-
-    /// Delete a single cache component file with error handling
-    fn delete_component_file(&self, key: &str, component: &str) {
-        let cache_path = self.get_cache_file_path(key, component);
-        if cache_path.exists() {
-            if let Err(e) = fs::remove_file(&cache_path) {
-                log::debug!(
-                    "Failed to delete cache file {:?}: {}. This may be due to concurrent access.",
-                    cache_path,
-                    e
-                );
-            }
-        }
-    }
-
-    /// Migrate cache from local to shared location
-    pub fn migrate_from_local(&self, local_cache_path: &Path) -> Result<()> {
-        if !local_cache_path.exists() {
-            return Ok(()); // Nothing to migrate
-        }
-
-        log::info!(
-            "Migrating cache from {:?} to {:?}",
-            local_cache_path,
-            self.location.get_cache_path()
-        );
-
-        // Copy all cache files
-        for entry in fs::read_dir(local_cache_path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() {
-                if let Some(file_name) = path.file_name() {
-                    let dest = self.location.get_cache_path().join(file_name);
-                    fs::copy(&path, &dest).with_context(|| {
-                        format!("Failed to copy cache file from {:?} to {:?}", path, dest)
-                    })?;
-                }
-            } else if path.is_dir() {
-                // Recursively copy subdirectories
-                if let Some(dir_name) = path.file_name() {
-                    let dest_dir = self.location.get_cache_path().join(dir_name);
-                    fs::create_dir_all(&dest_dir)?;
-                    self.copy_dir_recursive(&path, &dest_dir)?;
-                }
-            }
-        }
-
-        log::info!("Cache migration completed successfully");
-        Ok(())
-    }
-
-    /// Recursively copy directory contents
-    fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
-        #[allow(clippy::only_used_in_recursion)]
-        let _ = self; // Silence clippy warning
-        for entry in
-            fs::read_dir(src).with_context(|| format!("Failed to read directory {:?}", src))?
-        {
-            let entry = entry?;
-            let path = entry.path();
-            let dest_path = build_dest_path(dest, &entry.file_name());
-
-            match classify_entry(&path) {
-                EntryType::File => copy_file_entry(&path, &dest_path)?,
-                EntryType::Directory => {
-                    copy_dir_entry(&dest_path)?;
-                    self.copy_dir_recursive(&path, &dest_path)?;
-                }
-                EntryType::Other => {
-                    // Skip other entry types (symlinks, etc.)
-                }
-            }
-        }
-        Ok(())
+        file_ops::select_keys_for_removal(entries, target_size, current_size)
     }
 
     /// Get cache statistics
@@ -597,34 +380,7 @@ impl SharedCache {
 
     /// Clear all files in a component directory
     fn clear_component_files(&self, component: &str) -> Result<()> {
-        let component_path = self.location.get_component_path(component);
-        if !component_path.exists() {
-            return Ok(());
-        }
-
-        for entry in fs::read_dir(&component_path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() {
-                fs::remove_file(&path)?;
-                continue;
-            }
-
-            if path.is_dir() {
-                // Remove files in sharded subdirectories
-                for subentry in fs::read_dir(&path)? {
-                    let subentry = subentry?;
-                    if subentry.path().is_file() {
-                        fs::remove_file(subentry.path())?;
-                    }
-                }
-                // Try to remove the now-empty shard directory
-                let _ = fs::remove_dir(&path);
-            }
-        }
-
-        Ok(())
+        file_ops::clear_component_files(&self.location, component)
     }
 
     pub fn get_stats(&self) -> CacheStats {
@@ -650,28 +406,11 @@ impl SharedCache {
 
     /// Create a new shared cache with auto-pruning enabled
     pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self> {
-        let location = CacheLocation::resolve(repo_path)?;
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        let background_pruner = BackgroundPruner::new(pruner.clone());
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size: pruner.max_size_bytes as u64,
-            cleanup_threshold: 0.9,
-            auto_pruner: Some(pruner),
-            background_pruner: Some(background_pruner),
-        })
+        let mut builder = SharedCacheBuilder::new().auto_pruner(pruner);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        builder.build()
     }
 
     /// Create a new shared cache with auto-pruning enabled and explicit cache directory (for testing)
@@ -680,53 +419,16 @@ impl SharedCache {
         cache_dir: PathBuf,
         pruner: AutoPruner,
     ) -> Result<Self> {
-        let strategy = CacheStrategy::Custom(cache_dir);
-        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        let background_pruner = BackgroundPruner::new(pruner.clone());
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size: pruner.max_size_bytes as u64,
-            cleanup_threshold: 0.9,
-            auto_pruner: Some(pruner),
-            background_pruner: Some(background_pruner),
-        })
+        let mut builder = SharedCacheBuilder::new()
+            .cache_dir(cache_dir)
+            .auto_pruner(pruner);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        builder.build()
     }
 
-    // Pure function to calculate projected cache state after adding a new entry
-    fn calculate_cache_projections(
-        current_size: u64,
-        current_count: usize,
-        new_entry_size: usize,
-    ) -> (u64, usize) {
-        let projected_size = current_size + new_entry_size as u64;
-        let projected_count = current_count + if new_entry_size > 0 { 1 } else { 0 };
-        (projected_size, projected_count)
-    }
-
-    // Pure function to determine if pruning is needed based on projections
-    fn should_prune_based_on_projections(
-        projected_size: u64,
-        projected_count: usize,
-        max_size_bytes: usize,
-        max_entries: usize,
-    ) -> bool {
-        projected_size > max_size_bytes as u64 || projected_count > max_entries
-    }
-
-    // Pure function to determine pruning decision given all inputs
+    // Delegate to pruning module
     fn calculate_pruning_decision(
         current_size: u64,
         current_count: usize,
@@ -735,89 +437,46 @@ impl SharedCache {
         max_entries: usize,
         additional_check: bool,
     ) -> bool {
-        let (projected_size, projected_count) =
-            Self::calculate_cache_projections(current_size, current_count, new_entry_size);
-
-        Self::should_prune_based_on_projections(
-            projected_size,
-            projected_count,
+        pruning::calculate_pruning_decision(
+            current_size,
+            current_count,
+            new_entry_size,
             max_size_bytes,
             max_entries,
-        ) || additional_check
+            additional_check,
+        )
     }
 
-    // Pure function to create empty prune stats with current cache state
     fn create_no_prune_stats(entry_count: usize, total_size: u64) -> PruneStats {
-        PruneStats {
-            entries_removed: 0,
-            bytes_freed: 0,
-            entries_remaining: entry_count,
-            bytes_remaining: total_size,
-            duration_ms: 0,
-            files_deleted: 0,
-            files_not_found: 0,
-        }
+        pruning::create_no_prune_stats(entry_count, total_size)
     }
 
-    // Pure functions for age-based cleanup
-
-    /// Calculate the maximum age duration from days
     fn calculate_max_age_duration(max_age_days: i64) -> Duration {
-        Duration::from_secs(max_age_days as u64 * 86400)
+        pruning::calculate_max_age_duration(max_age_days)
     }
 
-    /// Determine if an entry should be removed based on age
+    #[allow(dead_code)] // Used in tests
     fn should_remove_entry_by_age(
         now: SystemTime,
         last_accessed: SystemTime,
         max_age: Duration,
     ) -> bool {
-        now.duration_since(last_accessed)
-            .map(|age| age >= max_age) // Use >= to handle zero-age case
-            .unwrap_or(false) // If time calculation fails, don't remove
+        pruning::should_remove_entry_by_age(now, last_accessed, max_age)
     }
 
-    /// Filter entries to find those that should be removed based on age
     fn filter_entries_by_age(
         entries: &HashMap<String, CacheMetadata>,
         now: SystemTime,
         max_age: Duration,
     ) -> Vec<String> {
-        entries
-            .iter()
-            .filter_map(|(key, metadata)| {
-                if Self::should_remove_entry_by_age(now, metadata.last_accessed, max_age) {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        pruning::filter_entries_by_age(entries, now, max_age)
     }
 
-    /// Delete cache files for the given keys and components
     fn delete_cache_files_for_keys(
         cache: &SharedCache,
         keys: &[String],
     ) -> std::result::Result<(), ()> {
-        let components = [
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for key in keys {
-            for component in &components {
-                let cache_path = cache.get_cache_file_path(key, component);
-                if cache_path.exists() {
-                    let _ = fs::remove_file(&cache_path); // Ignore errors
-                }
-            }
-        }
-        Ok(())
+        pruning::delete_cache_files_for_keys(|k, c| cache.get_cache_file_path(k, c), keys)
     }
 
     /// Trigger pruning if needed based on auto-pruner configuration
@@ -924,16 +583,12 @@ impl SharedCache {
         })
     }
 
-    /// Calculate which entries should be pruned - pure function
+    /// Calculate which entries should be pruned
     fn calculate_entries_to_prune(
         &self,
         pruner: &AutoPruner,
     ) -> Result<Vec<(String, CacheMetadata)>> {
-        let index_arc = self.index_manager.get_index_arc();
-        let index = index_arc
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-        Ok(pruner.calculate_entries_to_remove(&index))
+        pruning::calculate_entries_to_prune(&self.index_manager, pruner)
     }
 
     /// Remove entries from index and return bytes freed
@@ -941,30 +596,13 @@ impl SharedCache {
         &self,
         entries_to_remove: &[(String, CacheMetadata)],
     ) -> Result<u64> {
-        let keys: Vec<String> = entries_to_remove.iter().map(|(k, _)| k.clone()).collect();
-
-        let bytes_freed: u64 = entries_to_remove
-            .iter()
-            .map(|(_, metadata)| metadata.size_bytes)
-            .sum();
-
-        self.index_manager.remove_entries(&keys)?;
-
-        Ok(bytes_freed)
+        pruning::remove_entries_from_index(&self.index_manager, entries_to_remove)
     }
 
     /// Create empty stats when no pruning is needed
     fn create_empty_prune_stats(&self) -> PruneStats {
         let stats = self.get_stats();
-        PruneStats {
-            entries_removed: 0,
-            bytes_freed: 0,
-            entries_remaining: stats.entry_count,
-            bytes_remaining: stats.total_size,
-            duration_ms: 0,
-            files_deleted: 0,
-            files_not_found: 0,
-        }
+        pruning::create_no_prune_stats(stats.entry_count, stats.total_size)
     }
 
     /// Create prune stats from operation results
@@ -976,57 +614,21 @@ impl SharedCache {
         files_deleted: usize,
         files_not_found: usize,
     ) -> Result<PruneStats> {
-        let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
-        let final_stats = self.get_stats();
-
-        Ok(PruneStats {
+        let stats = self.get_stats();
+        pruning::create_prune_stats(
+            start,
             entries_removed,
             bytes_freed,
-            entries_remaining: final_stats.entry_count,
-            bytes_remaining: final_stats.total_size,
-            duration_ms: duration,
             files_deleted,
             files_not_found,
-        })
+            stats.entry_count,
+            stats.total_size,
+        )
     }
 
     /// Delete files for pruned entries and return counts
     fn delete_pruned_files(&self, entries_to_remove: &[(String, CacheMetadata)]) -> (usize, usize) {
-        let mut files_deleted = 0usize;
-        let mut files_not_found = 0usize;
-        let components = [
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for (key, _) in entries_to_remove {
-            let mut any_file_found = false;
-
-            for component in &components {
-                let cache_path = self.get_cache_file_path(key, component);
-                if !cache_path.exists() {
-                    continue;
-                }
-
-                any_file_found = true;
-                if fs::remove_file(&cache_path).is_ok() {
-                    files_deleted += 1;
-                } else {
-                    log::warn!("Failed to delete cache file: {:?}", cache_path);
-                }
-            }
-
-            if !any_file_found {
-                files_not_found += 1;
-                log::debug!("No files found for cache entry: {}", key);
-            }
-        }
-
-        (files_deleted, files_not_found)
+        pruning::delete_pruned_files(|k, c| self.get_cache_file_path(k, c), entries_to_remove)
     }
 
     /// Prune entries with a specific strategy

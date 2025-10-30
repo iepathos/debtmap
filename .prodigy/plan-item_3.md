@@ -1,268 +1,314 @@
-# Implementation Plan: Reduce Complexity in infer_responsibility_from_method
+# Implementation Plan: Split formatter.rs into Focused Sub-Modules
 
 ## Problem Summary
 
-**Location**: ./src/organization/god_object_analysis.rs:infer_responsibility_from_method:742
-**Priority Score**: 19.955
-**Debt Type**: ComplexityHotspot (Cyclomatic: 23, Cognitive: 107)
-
+**Location**: ./src/priority/formatter.rs:file:0
+**Priority Score**: 105.37
+**Debt Type**: File-level God Object (God Module)
 **Current Metrics**:
-- Function Length: 108 lines
-- Cyclomatic Complexity: 23
-- Cognitive Complexity: 107
-- Nesting Depth: 11
-- Function Role: PureLogic (95% purity confidence)
+- Lines of Code: 2,985
+- Functions: 117
+- Total Cyclomatic Complexity: 243
+- Max Function Complexity: 13
+- Coverage: 0.0%
 
-**Issue**: High complexity (23 cyclomatic, 107 cognitive) makes function hard to test and maintain. The function uses a large if-else chain to categorize method names into responsibility categories based on string prefix matching.
+**Issue**: The `formatter.rs` module has grown too large with 117 functions across 2,985 lines, making it difficult to navigate, test, and maintain. The module handles multiple distinct responsibilities including dependency filtering, output formatting (default/tail/detailed), terminal display, section formatting, and utility functions for metrics, labels, and extraction. This violates the single responsibility principle and creates a maintenance burden.
+
+**Recommendation**: Split into: 1) Core formatter 2) Section writers (one per major section) 3) Style/theme handling. Max 20 functions per writer module.
 
 ## Target State
 
 **Expected Impact** (from debtmap):
-- Complexity Reduction: 11.5 (from 23 to ~10)
-- Coverage Improvement: 0.0 (already pure logic)
-- Risk Reduction: 6.98425
+- Complexity Reduction: 48.6 points
+- Maintainability Improvement: 10.54 points
+- Test Effort Reduction: 298.5 points (easier to test smaller modules)
 
 **Success Criteria**:
-- [ ] Cyclomatic complexity reduced from 23 to ≤10
-- [ ] Cognitive complexity reduced from 107 to <50
-- [ ] Nesting depth reduced from 11 to ≤3
+- [ ] Module broken into 5-7 focused sub-modules with clear responsibilities
+- [ ] Each sub-module has < 400 lines and < 20 functions
 - [ ] All existing tests continue to pass
 - [ ] No clippy warnings
 - [ ] Proper formatting with `cargo fmt`
-- [ ] Function remains pure (no side effects)
+- [ ] Public API remains unchanged (backward compatibility)
 
 ## Implementation Phases
 
-### Phase 1: Add Test Coverage for Safety Net
+### Phase 1: Extract Dependency Filtering Module
 
-**Goal**: Establish comprehensive tests before refactoring to ensure behavior preservation.
+**Goal**: Extract dependency filtering and caller/callee logic into a dedicated module
 
 **Changes**:
-- Add unit tests in `#[cfg(test)]` module at end of file
-- Test all 11 responsibility categories:
-  - Formatting & Output (format, render, write, print)
-  - Parsing & Input (parse, read, extract)
-  - Filtering & Selection (filter, select, find)
-  - Transformation (transform, convert, map, apply)
-  - Data Access (get, set)
-  - Validation (validate, check, verify, is)
-  - Computation (calculate, compute)
-  - Construction (create, build, new)
-  - Persistence (save, load, store)
-  - Processing (process, handle)
-  - Communication (send, receive)
-  - Utilities (default case)
-- Test edge cases: empty strings, mixed case, underscores
-- Test that function is deterministic and pure
+- Create new module `src/priority/formatter/dependencies.rs`
+- Move functions:
+  - `should_include_in_output`
+  - `is_standard_library_call`
+  - `is_external_crate_call`
+  - `filter_dependencies`
+  - `format_function_reference`
+- Export public functions as needed
+- Update imports in `formatter.rs`
 
 **Testing**:
-```bash
-cargo test infer_responsibility_from_method
-```
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy` to check for warnings
+- Verify compilation with `cargo check`
 
 **Success Criteria**:
-- [ ] At least 20 test cases covering all categories
-- [ ] Edge cases tested (empty, mixed case, special chars)
+- [ ] New `dependencies.rs` module created with 5 functions
 - [ ] All tests pass
-- [ ] Test coverage for function >90%
-- [ ] Ready to commit
-
-### Phase 2: Extract Responsibility Category Data Structure
-
-**Goal**: Replace if-else chain with data-driven lookup using a static category configuration.
-
-**Changes**:
-- Create `ResponsibilityCategory` struct with:
-  - `name: &'static str` - category name
-  - `prefixes: &'static [&'static str]` - matching prefixes
-- Define `RESPONSIBILITY_CATEGORIES` as a static slice of categories in logical order
-- Categories in priority order (more specific first):
-  1. Formatting & Output
-  2. Parsing & Input
-  3. Filtering & Selection
-  4. Transformation
-  5. Data Access
-  6. Validation
-  7. Computation
-  8. Construction
-  9. Persistence
-  10. Processing
-  11. Communication
-  12. Utilities (no prefixes, default fallback)
-
-**Testing**:
-```bash
-cargo test infer_responsibility_from_method
-cargo clippy
-```
-
-**Success Criteria**:
-- [ ] Data structure compiles and is usable
-- [ ] All existing tests still pass
 - [ ] No clippy warnings
 - [ ] Ready to commit
 
-### Phase 3: Refactor to Use Category Lookup
+### Phase 2: Extract Section Formatting Module
 
-**Goal**: Replace the if-else chain with a functional iterator-based lookup.
+**Goal**: Extract detailed item section formatting into a dedicated module
 
 **Changes**:
-- Refactor `infer_responsibility_from_method` to:
-  ```rust
-  fn infer_responsibility_from_method(method_name: &str) -> String {
-      let lower = method_name.to_lowercase();
-
-      RESPONSIBILITY_CATEGORIES
-          .iter()
-          .find(|cat| cat.matches(&lower))
-          .map(|cat| cat.name)
-          .unwrap_or("Utilities")
-          .to_string()
-  }
-  ```
-- Implement `matches(&self, method_name: &str) -> bool` on `ResponsibilityCategory`:
-  ```rust
-  fn matches(&self, method_name: &str) -> bool {
-      self.prefixes.iter().any(|prefix| method_name.starts_with(prefix))
-  }
-  ```
-- This reduces cyclomatic complexity from 23 to ~3:
-  - 1 for the function entry
-  - 1 for the `.find()` iterator
-  - 1 for the `.unwrap_or()` fallback
-- Nesting depth reduced from 11 to 2 (iterator chain)
+- Create new module `src/priority/formatter/sections.rs`
+- Move structs and functions related to section formatting:
+  - `FormatContext` struct
+  - `SeverityInfo`, `LocationInfo`, `ComplexityInfo`, `DependencyInfo` structs
+  - `DebtSpecificInfo` enum
+  - `FormattedSections` struct
+  - All `format_*_section` functions (header, location, action, impact, complexity, evidence, dependencies, debt_specific, rationale)
+  - `generate_formatted_sections`
+  - `apply_formatted_sections`
+  - `create_format_context`
+- Export public types and functions
+- Update imports in `formatter.rs`
 
 **Testing**:
-```bash
-cargo test infer_responsibility_from_method
-cargo test --all
-cargo clippy
-```
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy` to check for warnings
+- Verify compilation with `cargo check`
 
 **Success Criteria**:
-- [ ] All tests pass (exact same behavior)
-- [ ] Cyclomatic complexity ≤3
-- [ ] Nesting depth ≤2
+- [ ] New `sections.rs` module created with ~20 functions and types
+- [ ] All tests pass
 - [ ] No clippy warnings
-- [ ] Code is more readable and maintainable
 - [ ] Ready to commit
 
-### Phase 4: Add Documentation and Examples
+### Phase 3: Extract Utility Functions Module
 
-**Goal**: Document the refactored function and category system for maintainability.
+**Goal**: Extract utility and helper functions into a dedicated module
 
 **Changes**:
-- Add doc comments to `ResponsibilityCategory`:
-  - Explain purpose
-  - Show example of adding new categories
-- Add doc comments to `infer_responsibility_from_method`:
-  - Explain categorization logic
-  - Show examples of categorized method names
-  - Document the fallback to "Utilities"
-- Add inline comments to `RESPONSIBILITY_CATEGORIES` explaining ordering
+- Create new module `src/priority/formatter/utils.rs`
+- Move utility functions:
+  - `format_role`
+  - `format_visibility`
+  - `get_severity_label`
+  - `get_severity_color`
+  - `get_file_extension`
+  - `get_language_name`
+  - `classify_file_size`
+  - `classify_function_count`
+  - `determine_file_type_label`
+  - `extract_complexity_info`
+  - `extract_dependency_info`
+  - `format_truncated_list`
+- Export public functions
+- Update imports in `formatter.rs`
 
 **Testing**:
-```bash
-cargo doc --no-deps
-cargo test --doc
-```
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy` to check for warnings
+- Verify compilation with `cargo check`
 
 **Success Criteria**:
-- [ ] Documentation builds without warnings
-- [ ] Doc examples compile and run
-- [ ] Public API clearly documented
+- [ ] New `utils.rs` module created with ~12 utility functions
+- [ ] All tests pass
+- [ ] No clippy warnings
 - [ ] Ready to commit
 
-### Phase 5: Final Validation and Metrics
+### Phase 4: Extract Terminal Display Module
 
-**Goal**: Verify the refactoring achieved the expected impact and quality standards.
+**Goal**: Extract terminal-specific display formatting into a dedicated module
 
 **Changes**:
-- Run full CI suite
-- Regenerate coverage report
-- Run debtmap to verify complexity reduction
-- Compare before/after metrics
+- Create new module `src/priority/formatter/terminal.rs`
+- Move terminal display functions:
+  - `format_summary_terminal`
+  - `format_tiered_terminal`
+  - `format_tier_terminal`
+  - `format_display_group_terminal`
+  - `format_compact_item`
+  - `format_item_location`
+- Export public functions
+- Update imports in `formatter.rs`
 
 **Testing**:
-```bash
-just ci
-cargo tarpaulin --out Lcov
-debtmap analyze --output .prodigy/debt-after-refactor.json
-```
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy` to check for warnings
+- Verify compilation with `cargo check`
 
 **Success Criteria**:
-- [ ] All CI checks pass
-- [ ] Coverage maintained or improved
-- [ ] Cyclomatic complexity reduced from 23 to ≤10 (target: ~3)
-- [ ] Cognitive complexity reduced from 107 to <50 (target: ~15)
-- [ ] No new clippy warnings
-- [ ] Debtmap confirms improvement
-- [ ] Ready for final commit
+- [ ] New `terminal.rs` module created with ~6 display functions
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Ready to commit
+
+### Phase 5: Extract Detailed Item Formatting Module
+
+**Goal**: Extract detailed item formatting logic into a dedicated module
+
+**Changes**:
+- Create new module `src/priority/formatter/detailed.rs`
+- Move detailed formatting functions:
+  - `format_detailed`
+  - `format_detailed_item`
+  - `format_priority_item`
+  - `format_mixed_priority_item`
+  - `format_file_priority_item`
+  - `format_detailed_metrics`
+  - `format_scoring_and_dependencies`
+  - `generate_why_message`
+  - `calculate_impact_message`
+  - `format_god_object_steps`
+  - `format_module_structure_analysis`
+  - `format_language_specific_advice`
+  - `format_generic_god_object_steps`
+- Export public functions (especially `format_priority_item` and `format_detailed`)
+- Update imports in `formatter.rs`
+
+**Testing**:
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy` to check for warnings
+- Verify compilation with `cargo check`
+
+**Success Criteria**:
+- [ ] New `detailed.rs` module created with ~13 formatting functions
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Ready to commit
+
+### Phase 6: Reorganize Core Formatter and Create Module Structure
+
+**Goal**: Finalize the module structure and create a clean public API
+
+**Changes**:
+- Convert `formatter.rs` to `formatter/mod.rs`
+- Keep only core orchestration functions in `mod.rs`:
+  - `OutputFormat` enum
+  - `format_priorities` and variants
+  - `format_default` and variants
+  - `format_tail` and variants
+  - `format_impact`
+  - `format_debt_type`
+- Re-export public APIs from sub-modules
+- Ensure all internal functions are properly scoped
+- Verify module structure:
+  ```
+  src/priority/formatter/
+  ├── mod.rs              (~200 lines, core API)
+  ├── dependencies.rs     (~80 lines, 5 functions)
+  ├── sections.rs         (~400 lines, 20 functions)
+  ├── utils.rs            (~200 lines, 12 functions)
+  ├── terminal.rs         (~300 lines, 6 functions)
+  ├── detailed.rs         (~800 lines, 13 functions)
+  └── formatter_verbosity.rs (existing, already modularized)
+  ```
+
+**Testing**:
+- Run `cargo test --lib` to verify existing tests pass
+- Run `cargo clippy --all-targets --all-features -- -D warnings` for strict linting
+- Run `cargo fmt --all -- --check` to verify formatting
+- Run full CI with `just ci` if available
+
+**Success Criteria**:
+- [ ] Module structure reorganized with clear separation
+- [ ] Public API unchanged (backward compatible)
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Code properly formatted
+- [ ] Ready to commit
 
 ## Testing Strategy
 
 **For each phase**:
 1. Run `cargo test --lib` to verify existing tests pass
-2. Run `cargo clippy --all-targets --all-features -- -D warnings` to check for warnings
-3. Run `cargo fmt --all -- --check` to ensure formatting
-4. Run phase-specific tests as noted above
+2. Run `cargo clippy` to check for warnings
+3. Run `cargo check` to verify compilation
+4. Manually verify that moved functions are properly imported
+
+**Between phases**:
+- Commit after each successful phase
+- Use descriptive commit messages explaining what was extracted
 
 **Final verification**:
-1. `just ci` - Full CI checks (test, clippy, fmt, deny)
-2. `cargo tarpaulin --out Lcov` - Regenerate coverage
-3. `debtmap analyze` - Verify complexity reduction
+1. `just ci` - Full CI checks (or `cargo test --all-features`)
+2. Verify public API is unchanged by checking exports
+3. Check that all 6 sub-modules are properly integrated
+4. Ensure no duplicate code exists
 
 ## Rollback Plan
 
 If a phase fails:
-1. Review the specific test failures or clippy warnings
-2. If the issue is fixable within 15 minutes, fix it
-3. Otherwise, revert the phase with `git reset --hard HEAD~1`
-4. Analyze what went wrong
-5. Adjust the approach for that phase
-6. Retry with the updated approach
+1. Revert the phase with `git reset --hard HEAD~1`
+2. Review the failure:
+   - Check for missing imports
+   - Verify function visibility (pub vs private)
+   - Check for circular dependencies
+3. Adjust the approach:
+   - May need to extract in different order
+   - May need to adjust function visibility
+   - May need to add intermediate re-exports
+4. Retry the phase with corrections
 
 ## Notes
 
-### Why This Approach Works
+- **Backward Compatibility**: The public API must remain unchanged. All public functions currently exported from `formatter.rs` must still be accessible after the refactoring.
+- **Import Strategy**: Use `pub use` to re-export public functions from sub-modules in `mod.rs` to maintain the existing API.
+- **Verbosity Module**: The existing `formatter_verbosity.rs` module is already separated and should not be moved.
+- **Function Visibility**: Pay careful attention to which functions are currently public vs private. Only public functions need to be re-exported.
+- **Testing**: Since there's 0% coverage currently, we won't add new tests in this refactoring. The focus is purely on structural improvement.
+- **Incremental Progress**: Each phase should compile and pass tests independently. Don't try to do multiple extractions in one commit.
+- **Module Size Guidelines**: Target 200-400 lines per module, maximum 20 functions. The `detailed.rs` module may be slightly larger (~800 lines) due to the complexity of formatting functions, but this is still better than 2,985 lines.
 
-**Complexity Reduction**:
-- **Before**: 23 branches (11 if-else-if + 2 conditions per branch on average)
-- **After**: ~3 branches (iterator find + unwrap_or)
-- **Savings**: 20 cyclomatic complexity points
+## Expected Final Structure
 
-**Maintainability Improvements**:
-- **Data-driven**: Adding new categories is trivial (add to array)
-- **No deep nesting**: Iterator chain is linear, not nested
-- **Testable**: Can test category matching independently
-- **Functional style**: Pure function with clear data flow
-- **Self-documenting**: Category array shows all supported patterns
+```
+src/priority/formatter/
+├── mod.rs                     # Core API orchestration (~200 lines)
+│   ├── OutputFormat enum
+│   ├── format_priorities family
+│   ├── format_default family
+│   ├── format_tail family
+│   ├── format_impact
+│   └── format_debt_type
+│
+├── dependencies.rs            # Dependency filtering (~80 lines)
+│   ├── should_include_in_output
+│   ├── is_standard_library_call
+│   ├── is_external_crate_call
+│   ├── filter_dependencies
+│   └── format_function_reference
+│
+├── sections.rs                # Section formatting (~400 lines)
+│   ├── FormatContext and related structs
+│   ├── generate_formatted_sections
+│   ├── All format_*_section functions
+│   └── apply_formatted_sections
+│
+├── utils.rs                   # Utility functions (~200 lines)
+│   ├── Label and classification functions
+│   ├── Extraction functions
+│   └── Formatting helpers
+│
+├── terminal.rs                # Terminal display (~300 lines)
+│   ├── format_summary_terminal
+│   ├── format_tiered_terminal
+│   ├── Terminal rendering functions
+│   └── Compact item formatting
+│
+├── detailed.rs                # Detailed item formatting (~800 lines)
+│   ├── format_detailed
+│   ├── format_detailed_item
+│   ├── format_priority_item
+│   ├── God object formatting
+│   └── Language-specific advice
+│
+└── formatter_verbosity.rs     # Existing verbosity config
+```
 
-### Functional Programming Principles Applied
-
-1. **Pure Function**: No side effects, deterministic output
-2. **Immutable Data**: Static category definitions
-3. **Function Composition**: Iterator chain (.iter().find().map().unwrap_or())
-4. **Data-First Design**: Categories as data, not control flow
-5. **Declarative**: "Find the category that matches" vs "if this then that"
-
-### Potential Gotchas
-
-- **Ordering matters**: Categories are checked in order, so more specific patterns must come first
-- **Case sensitivity**: Already handled with `to_lowercase()`, maintained in refactor
-- **Performance**: Iterator lookup is O(n) where n=12 categories, acceptable for this use case
-- **Default case**: "Utilities" fallback must remain for unknown patterns
-
-### Expected Metrics After Refactor
-
-- Cyclomatic Complexity: 23 → 3 (87% reduction)
-- Cognitive Complexity: 107 → ~15 (86% reduction)
-- Nesting Depth: 11 → 2 (82% reduction)
-- Function Length: 108 → ~15 lines (86% reduction)
-- Maintainability: Significantly improved
-
-This refactoring exemplifies the functional programming principles in CLAUDE.md:
-- Pure core logic separated from data
-- Function composition with iterators
-- Data transformation over imperative control flow
-- Single responsibility (category matching moved to data structure)
+This structure provides clear separation of concerns, easier testing boundaries, and better maintainability.

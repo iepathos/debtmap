@@ -2,6 +2,17 @@
 //!
 //! Provides type inference and tracking for Python code to improve call graph accuracy.
 //! Uses two-pass resolution for better method resolution and reduced false positives.
+//!
+//! This module is organized into focused sub-modules:
+//! - `types`: Core type definitions (PythonType, ClassInfo, FunctionSignature, Scope)
+//! - `utils`: Utility functions for AST extraction and manipulation
+//! - (More modules will be added as refactoring progresses)
+
+mod types;
+mod utils;
+
+// Re-export public types for backward compatibility
+pub use types::{ClassInfo, FunctionSignature, PythonType, Scope};
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
@@ -10,78 +21,6 @@ use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId}
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-
-/// Python type representation for tracking
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PythonType {
-    /// Class type (e.g., `MyClass`)
-    Class(String),
-    /// Instance of a class (e.g., `MyClass()`)
-    Instance(String),
-    /// Function or method
-    Function(FunctionSignature),
-    /// Module
-    Module(String),
-    /// Union of multiple possible types
-    Union(Vec<PythonType>),
-    /// Built-in type
-    BuiltIn(String),
-    /// Unknown type
-    Unknown,
-}
-
-/// Function signature information
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FunctionSignature {
-    pub name: String,
-    pub params: Vec<String>,
-    pub return_type: Option<Box<PythonType>>,
-}
-
-/// Class information including hierarchy and members
-#[derive(Debug, Clone)]
-pub struct ClassInfo {
-    pub name: String,
-    pub bases: Vec<String>,
-    pub methods: HashMap<String, FunctionId>,
-    pub attributes: HashMap<String, PythonType>,
-    pub static_methods: HashSet<String>,
-    pub class_methods: HashSet<String>,
-    pub properties: HashSet<String>,
-}
-
-/// Scope information for tracking variables
-#[derive(Debug, Clone)]
-pub struct Scope {
-    pub variables: HashMap<String, PythonType>,
-    pub parent: Option<Box<Scope>>,
-}
-
-impl Scope {
-    fn new() -> Self {
-        Self {
-            variables: HashMap::new(),
-            parent: None,
-        }
-    }
-
-    fn with_parent(parent: Scope) -> Self {
-        Self {
-            variables: HashMap::new(),
-            parent: Some(Box::new(parent)),
-        }
-    }
-
-    fn lookup(&self, name: &str) -> Option<&PythonType> {
-        self.variables
-            .get(name)
-            .or_else(|| self.parent.as_ref().and_then(|p| p.lookup(name)))
-    }
-
-    fn insert(&mut self, name: String, ty: PythonType) {
-        self.variables.insert(name, ty);
-    }
-}
 
 /// Python type tracker for improved call resolution
 pub struct PythonTypeTracker {
@@ -695,34 +634,6 @@ pub struct TwoPassExtractor {
     /// Pending for loops that may contain observer dispatches (to be resolved after all classes are processed)
     /// Format: (for_stmt, caller_id, current_class)
     pending_observer_dispatches: Vec<(ast::StmtFor, FunctionId, Option<String>)>,
-}
-
-/// Helper function to extract callback expression as a string
-fn extract_callback_expr_impl(expr: &ast::Expr) -> String {
-    match expr {
-        ast::Expr::Name(name) => name.id.to_string(),
-        ast::Expr::Attribute(attr) => {
-            if let ast::Expr::Name(obj) = &*attr.value {
-                format!("{}.{}", obj.id, attr.attr)
-            } else {
-                attr.attr.to_string()
-            }
-        }
-        ast::Expr::Call(call) => {
-            // For functools.partial(func, ...) extract func
-            if let ast::Expr::Attribute(attr) = &*call.func {
-                if attr.attr.as_str() == "partial" {
-                    if let Some(first_arg) = call.args.first() {
-                        let func_name = extract_callback_expr_impl(first_arg);
-                        return format!("partial({})", func_name);
-                    }
-                }
-            }
-            "<lambda>".to_string()
-        }
-        ast::Expr::Lambda(_) => "<lambda>".to_string(),
-        _ => "<unknown>".to_string(),
-    }
 }
 
 impl TwoPassExtractor {
@@ -1836,7 +1747,7 @@ impl TwoPassExtractor {
 
     /// Extract full attribute name (e.g., "self.observers" from attribute expression)
     fn extract_full_attribute_name(&self, expr: &ast::Expr) -> String {
-        extract_attribute_name_recursive(expr)
+        utils::extract_attribute_name_recursive(expr)
     }
 
     /// Populate observer registry from class definition
@@ -2119,7 +2030,7 @@ impl TwoPassExtractor {
 
     /// Extract callback expression as a string for tracking
     fn extract_callback_expr(&self, expr: &ast::Expr) -> String {
-        extract_callback_expr_impl(expr)
+        utils::extract_callback_expr_impl(expr)
     }
 
     /// Check for event binding patterns like obj.Bind(event, self.method)
@@ -2453,18 +2364,6 @@ impl TwoPassExtractor {
             }
         }
         None
-    }
-}
-
-/// Helper function to extract full attribute name recursively
-fn extract_attribute_name_recursive(expr: &ast::Expr) -> String {
-    match expr {
-        ast::Expr::Name(name) => name.id.to_string(),
-        ast::Expr::Attribute(attr) => {
-            let base = extract_attribute_name_recursive(&attr.value);
-            format!("{}.{}", base, attr.attr)
-        }
-        _ => "<unknown>".to_string(),
     }
 }
 

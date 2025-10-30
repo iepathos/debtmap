@@ -6,7 +6,7 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::{DebtAggregator, FunctionId as AggregatorFunctionId},
         file_metrics::FileDebtItem,
-        UnifiedAnalysis, UnifiedDebtItem,
+        UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
     progress::{ProgressManager, TEMPLATE_FILE_ANALYSIS},
     risk::lcov::LcovData,

@@ -7,7 +7,7 @@
 use debtmap::priority::formatter::format_priorities_with_verbosity;
 use debtmap::priority::{
     CallGraph, DebtType, FunctionRole, ImpactMetrics, Location, OutputFormat, UnifiedAnalysis,
-    UnifiedDebtItem, UnifiedScore,
+    UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
 };
 use std::path::PathBuf;
 
