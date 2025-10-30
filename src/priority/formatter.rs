@@ -1,4 +1,3 @@
-use crate::config::CallerCalleeConfig;
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, FunctionVisibility, Tier,
@@ -10,77 +9,9 @@ use std::fmt::Write;
 #[path = "formatter_verbosity.rs"]
 mod verbosity;
 
-// ============================================================================
-// Caller/Callee Filtering and Formatting Functions
-// ============================================================================
+mod dependencies;
 
-/// Pure function to determine if a function reference should be included in output
-fn should_include_in_output(function_name: &str, config: &CallerCalleeConfig) -> bool {
-    // Check for standard library patterns
-    if !config.show_std_lib && is_standard_library_call(function_name) {
-        return false;
-    }
-
-    // Check for external crate patterns (functions with :: that aren't std)
-    if !config.show_external && is_external_crate_call(function_name) {
-        return false;
-    }
-
-    true
-}
-
-/// Pure function to check if a call is to the standard library
-fn is_standard_library_call(function_name: &str) -> bool {
-    function_name.starts_with("std::")
-        || function_name.starts_with("core::")
-        || function_name.starts_with("alloc::")
-        || function_name == "println"
-        || function_name == "print"
-        || function_name == "eprintln"
-        || function_name == "eprint"
-        || function_name == "write"
-        || function_name == "writeln"
-        || function_name == "format"
-        || function_name == "panic"
-        || function_name == "assert"
-        || function_name == "debug_assert"
-}
-
-/// Pure function to check if a call is to an external crate
-fn is_external_crate_call(function_name: &str) -> bool {
-    // Has :: but not std/core/alloc
-    function_name.contains("::")
-        && !function_name.starts_with("std::")
-        && !function_name.starts_with("core::")
-        && !function_name.starts_with("alloc::")
-        && !function_name.starts_with("crate::")
-}
-
-/// Pure function to filter a list of dependencies based on configuration
-fn filter_dependencies(names: &[String], config: &CallerCalleeConfig) -> Vec<String> {
-    names
-        .iter()
-        .filter(|name| should_include_in_output(name, config))
-        .cloned()
-        .collect()
-}
-
-/// Pure function to format a function reference for display
-fn format_function_reference(function_name: &str) -> String {
-    // Simplify long paths - show just the last component with file hint
-    if function_name.contains("::") {
-        let parts: Vec<&str> = function_name.split("::").collect();
-        if parts.len() > 2 {
-            format!("{}::{}", parts[parts.len() - 2], parts[parts.len() - 1])
-        } else {
-            function_name.to_string()
-        }
-    } else {
-        function_name.to_string()
-    }
-}
-
-// ============================================================================
+use dependencies::{filter_dependencies, format_function_reference};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
@@ -2046,6 +1977,7 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::CallerCalleeConfig;
     use crate::formatting::ColorMode;
     use crate::priority::call_graph::CallGraph;
     use crate::priority::file_metrics::{
@@ -2543,102 +2475,6 @@ mod tests {
     // ============================================================================
     // Caller/Callee Tests
     // ============================================================================
-
-    #[test]
-    fn test_is_standard_library_call() {
-        assert!(is_standard_library_call("std::vec::Vec"));
-        assert!(is_standard_library_call("core::fmt::Display"));
-        assert!(is_standard_library_call("alloc::string::String"));
-        assert!(is_standard_library_call("println"));
-        assert!(is_standard_library_call("write"));
-        assert!(is_standard_library_call("writeln"));
-
-        assert!(!is_standard_library_call("my_function"));
-        assert!(!is_standard_library_call("crate::utils::helper"));
-    }
-
-    #[test]
-    fn test_is_external_crate_call() {
-        assert!(is_external_crate_call("serde::Serialize"));
-        assert!(is_external_crate_call("tokio::runtime::Runtime"));
-
-        assert!(!is_external_crate_call("std::vec::Vec"));
-        assert!(!is_external_crate_call("core::fmt::Display"));
-        assert!(!is_external_crate_call("crate::utils::helper"));
-        assert!(!is_external_crate_call("my_function"));
-    }
-
-    #[test]
-    fn test_should_include_in_output_default_config() {
-        let config = CallerCalleeConfig::default();
-
-        // Should exclude std lib by default
-        assert!(!should_include_in_output("std::vec::Vec", &config));
-        assert!(!should_include_in_output("println", &config));
-
-        // Should exclude external crates by default
-        assert!(!should_include_in_output("serde::Serialize", &config));
-
-        // Should include local functions
-        assert!(should_include_in_output("my_function", &config));
-        assert!(should_include_in_output("crate::utils::helper", &config));
-    }
-
-    #[test]
-    fn test_should_include_in_output_show_all() {
-        let config = CallerCalleeConfig {
-            max_callers: 5,
-            max_callees: 5,
-            show_external: true,
-            show_std_lib: true,
-        };
-
-        // Should include everything when configured
-        assert!(should_include_in_output("std::vec::Vec", &config));
-        assert!(should_include_in_output("serde::Serialize", &config));
-        assert!(should_include_in_output("my_function", &config));
-    }
-
-    #[test]
-    fn test_filter_dependencies() {
-        let config = CallerCalleeConfig::default();
-
-        let names = vec![
-            "std::vec::Vec".to_string(),
-            "my_function".to_string(),
-            "serde::Serialize".to_string(),
-            "crate::helper".to_string(),
-            "writeln".to_string(),
-        ];
-
-        let filtered = filter_dependencies(&names, &config);
-
-        // Should only include local functions
-        assert_eq!(filtered.len(), 2);
-        assert!(filtered.contains(&"my_function".to_string()));
-        assert!(filtered.contains(&"crate::helper".to_string()));
-    }
-
-    #[test]
-    fn test_format_function_reference() {
-        // Simple function name
-        assert_eq!(format_function_reference("my_function"), "my_function");
-
-        // Short path
-        assert_eq!(format_function_reference("crate::helper"), "crate::helper");
-
-        // Long path - should simplify
-        assert_eq!(
-            format_function_reference("crate::utils::io::helper::read_file"),
-            "helper::read_file"
-        );
-
-        // Module path
-        assert_eq!(
-            format_function_reference("std::collections::HashMap"),
-            "collections::HashMap"
-        );
-    }
 
     #[test]
     fn test_format_dependencies_section_with_callers() {
