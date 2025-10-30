@@ -15,7 +15,7 @@ Debtmap analyzes your codebase to identify complexity hotspots, technical debt p
 **What Makes Debtmap Different:**
 - **Coverage-Risk Correlation**: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
 - **Multi-Factor Analysis**: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
-- **Reduced False Positives**: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
+- **Reduced False Positives**: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.
 - **Actionable Guidance**: Provides specific recommendations like "extract nested conditions" or "split this 80-line function" with quantified impact metrics
 - **Performance**: Significantly faster than Java/Python-based competitors (written in Rust with parallel processing)
 
@@ -37,7 +37,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Reduced false positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)
 - **Token classification system** - Advanced token categorization with weighted entropy for accurate complexity assessment
 - **Threshold presets** - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards
-- **Comprehensive debt detection** - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)
+- **Comprehensive debt detection** - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)
 - **Security vulnerability detection** - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns
 - **Resource management analysis** - Identifies inefficient allocations, nested loops, and blocking I/O patterns
 - **Code organization analysis** - Detects god objects, feature envy, primitive obsession, and magic values
@@ -49,7 +49,7 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Coverage-based risk analysis** - Correlates complexity with test coverage to identify truly risky code
 - **Risk-driven testing recommendations** - Prioritizes testing efforts based on complexity-coverage correlation and dependency impact
 - **Call graph analysis** - Tracks upstream callers and downstream callees to understand dependency impact
-- **Tiered prioritization** - Surfaces critical architectural issues above simple testing gaps
+- **Tiered prioritization** - Multi-stage pipeline (zero coverage, complexity-risk, critical path, dependency impact, effort optimization) surfaces critical architectural issues above simple testing gaps
 - **Quantified impact** - Shows concrete metrics like "refactoring this will reduce complexity by 60%"
 
 ### Performance & Output
@@ -57,12 +57,12 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Multiple output formats** - JSON (legacy and unified structures), Markdown, and human-readable terminal formats for different tool integration needs
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
 - **Incremental analysis** - Smart caching system for analyzing only changed files
-- **Intelligent caching** - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), location options (local/shared), and environment-based configuration for fast repeated analysis
+- **Intelligent caching** - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), location options (local/shared/custom path), and environment-based configuration for fast repeated analysis
 - **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
 
 ### Configuration & Customization
 - **Flexible suppression** - Inline comment-based suppression for specific code sections
-- **Configuration file** - `.debtmap.toml`, `.debtmap.yml`, or `.debtmap.json` for project-specific settings
+- **Configuration file** - `.debtmap.toml` or `debtmap.toml` for project-specific settings
 - **Test-friendly** - Easily exclude test fixtures and example code from debt analysis
 - **Macro expansion support** - Handles Rust macro expansions with configurable warnings
 
@@ -87,3 +87,5 @@ Ready to analyze your codebase? Check out:
 - [Getting Started](./getting-started.md) - Installation and first analysis
 - [Analysis Guide](./analysis-guide.md) - Understanding the metrics and output
 - [Output Formats](./output-formats.md) - JSON, Markdown, and terminal formats
+
+**Tip:** Start with `debtmap analyze . --summary` for a quick overview of your codebase health before diving into detailed analysis.
