@@ -1,0 +1,138 @@
+{
+  "chapter_id": "threshold-configuration",
+  "chapter_title": "Threshold Configuration",
+  "chapter_file": "book/src/threshold-configuration.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "The chapter is generally accurate and comprehensive, but contains a critical factual error about how thresholds are evaluated (AND vs. exceeding ALL). Some implementation details need minor corrections, particularly around test function multipliers and the actual flagging logic.",
+  "issues": [
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "Understanding Complexity Thresholds",
+      "description": "Chapter states 'A function must exceed ALL thresholds to be flagged' but the actual implementation shows this is incorrect. The implementation checks individual thresholds with AND logic, not requiring ALL to be exceeded.",
+      "current_content": "Important: Functions are only flagged when they exceed ALL applicable thresholds, not just one.",
+      "should_be": "Functions are flagged when they exceed the cyclomatic complexity threshold AND cognitive complexity threshold AND meet the minimum function length requirement AND exceed the total complexity threshold. The thresholds are adjusted by role-based multipliers before comparison.",
+      "fix_suggestion": "Clarify the flagging logic: cyclomatic >= adjusted_cyclomatic AND cognitive >= adjusted_cognitive AND length >= minimum_function_length AND (cyclomatic + cognitive) >= adjusted_total. This is a conjunction of individual checks, not a requirement to exceed all possible thresholds.",
+      "source_reference": "src/complexity/threshold_manager.rs:151-166"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Role-Based Multipliers - Test Functions",
+      "description": "Chapter shows test function multiplier discrepancies between different presets and the table",
+      "current_content": "Test Functions | 2.0x - 3.0x | Most lenient | Unit tests, integration tests",
+      "should_be": "Test function multipliers vary by preset: Strict=3.0x, Balanced=2.0x, Lenient=3.0x (from preset() method)",
+      "fix_suggestion": "Update the table to show: 'Test Functions | 2.0x-3.0x (preset-specific) | Most lenient | Unit tests, integration tests' and add a note that strict and lenient use 3.0x while balanced uses 2.0x",
+      "source_reference": "src/complexity/threshold_manager.rs:132,232,245"
+    },
+    {
+      "type": "inconsistent_information",
+      "severity": "medium",
+      "section": "Preset Comparison Table",
+      "description": "Test function multiplier shows different values in from_preset() method (line 132, 232, 245) versus what the table describes",
+      "current_content": "Table doesn't specify preset-specific test multipliers",
+      "should_be": "Strict: test_function_multiplier=3.0, Balanced: test_function_multiplier=2.0, Lenient: test_function_multiplier=3.0",
+      "fix_suggestion": "Add a note in the preset comparison table or in the role-based multipliers section clarifying that test function multipliers vary by preset",
+      "source_reference": "src/complexity/threshold_manager.rs:122-147"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Role-Based Multipliers",
+      "description": "Chapter doesn't mention that Unknown role defaults to core_logic_multiplier (1.0x)",
+      "should_add": "Add a row or note: 'Unknown Functions | 1.0x (defaults to core logic) | Standard | Functions that don't match any role pattern'",
+      "fix_suggestion": "Add explanation of Unknown role behavior in the role multipliers section",
+      "source_reference": "src/complexity/threshold_manager.rs:186"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Understanding Complexity Thresholds",
+      "description": "Chapter doesn't explain that thresholds are validated and must be positive (non-zero)",
+      "should_add": "Document that threshold configuration includes validation to ensure all complexity thresholds and multipliers are positive values",
+      "fix_suggestion": "Add a subsection on threshold validation explaining the validation rules (minimum_total_complexity > 0, minimum_cyclomatic_complexity > 0, etc.)",
+      "source_reference": "src/complexity/threshold_manager.rs:191-217"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Preset Comparison Table",
+      "description": "Missing information about preset-specific utility multipliers which vary across presets",
+      "should_add": "Strict: utility_multiplier=0.6, Balanced: utility_multiplier=0.8, Lenient: utility_multiplier=1.0",
+      "fix_suggestion": "Add a column or footnote showing role multiplier variations across presets, not just the threshold values",
+      "source_reference": "src/complexity/threshold_manager.rs:131,144"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Role-Based Multipliers - How multipliers work",
+      "description": "The examples only show simple calculations but don't fully explain the flagging logic",
+      "current_content": "Shows examples like 'Entry point: flagged at complexity 8 (5 × 1.5)'",
+      "should_be": "Should clarify that BOTH cyclomatic and cognitive thresholds are adjusted independently, and the function must exceed all adjusted thresholds",
+      "fix_suggestion": "Expand the example to show: 'Entry point with balanced preset: cyclomatic_threshold=7.5 (5×1.5), cognitive_threshold=15 (10×1.5), total_threshold=12 (8×1.5). Function is flagged if cyclomatic>=7.5 AND cognitive>=15 AND length>=20 AND total>=12'",
+      "source_reference": "src/complexity/threshold_manager.rs:151-166"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "CLI Threshold Flags",
+      "description": "Chapter shows --threshold-complexity and --threshold-duplication flags but the actual CLI uses --threshold-preset with value_enum",
+      "current_content": "Shows --threshold-complexity 15 and --threshold-duplication 30",
+      "should_be": "The actual CLI has --threshold-preset with values: strict, balanced, lenient (enum)",
+      "fix_suggestion": "Verify the actual CLI flags in analyze command. If --threshold-complexity is deprecated or not implemented, update the documentation to match the actual implementation which uses --threshold-preset",
+      "source_reference": "src/cli.rs:148-150"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration File - complexity_thresholds section",
+      "description": "Chapter doesn't show the full ComplexityThresholds configuration structure available in .debtmap.toml",
+      "should_add": "Document that [complexity_thresholds] section supports: minimum_total_complexity, minimum_cyclomatic_complexity, minimum_cognitive_complexity, minimum_match_arms, minimum_if_else_chain, minimum_function_length, plus role multipliers (entry_point_multiplier, core_logic_multiplier, utility_multiplier, test_function_multiplier)",
+      "fix_suggestion": "Add a complete example showing the full [complexity_thresholds] configuration section with all available fields",
+      "source_reference": "src/complexity/threshold_manager.rs:16-58 and src/config.rs:652"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all threshold presets (strict, balanced, lenient)",
+    "Excellent explanation of different complexity metrics (cyclomatic, cognitive, total)",
+    "Good real-world examples and use cases for each preset",
+    "Clear explanation of god object thresholds with language-specific values that match implementation",
+    "Validation thresholds section accurately reflects the implementation (max_average_complexity, max_debt_density, max_codebase_risk_score)",
+    "Detailed tuning guidelines and troubleshooting tips",
+    "Role-based multipliers concept is well explained",
+    "Decision tree for choosing presets is user-friendly",
+    "Examples are practical and demonstrate real usage patterns"
+  ],
+  "improvement_suggestions": [
+    "Add a technical note explaining the precise flagging logic with pseudocode or a formula",
+    "Include a diagram showing how role multipliers interact with thresholds",
+    "Provide a complete .debtmap.toml example showing the [complexity_thresholds] section",
+    "Add troubleshooting section for when thresholds seem inconsistent (e.g., understanding the AND logic)",
+    "Consider adding a comparison table showing how the same function would be evaluated under different presets",
+    "Add examples of functions that are borderline (just above/below thresholds) to illustrate the flagging behavior",
+    "Link to the actual CLI --threshold-preset flag documentation or verify --threshold-complexity exists"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-30",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Threshold presets (strict, balanced, lenient)",
+      "Custom threshold configuration",
+      "Language-specific thresholds",
+      "Cyclomatic complexity thresholds",
+      "God object thresholds",
+      "Tuning guidelines",
+      "Role-based multipliers",
+      "Validation thresholds"
+    ],
+    "validation_focus": "Check that all threshold presets and configuration options are documented",
+    "code_references": [
+      "src/complexity/threshold_manager.rs:1-398 (ComplexityThresholds, ThresholdPreset, FunctionRole)",
+      "src/config.rs:446-554 (GodObjectConfig, GodObjectThresholds)",
+      "src/config.rs:755-898 (ValidationThresholds)",
+      "src/config.rs:652 (complexity_thresholds config field)",
+      "src/cli.rs:148-150 (threshold-preset CLI flag)"
+    ]
+  }
+}
