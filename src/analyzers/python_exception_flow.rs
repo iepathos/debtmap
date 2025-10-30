@@ -428,26 +428,7 @@ impl ExceptionFlowAnalyzer {
             patterns.extend(detect_undocumented_exceptions(func_name, flow));
 
             // Pattern: Documented but not raised
-            for doc_exc in &flow.documented_exceptions {
-                if !flow.raised_exceptions.iter().any(|exc| {
-                    exc.exception_type.name() == doc_exc.exception_type
-                        || exc.exception_type.is_subclass_of(&doc_exc.exception_type)
-                }) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::ExceptionNotRaised,
-                        severity: Severity::Low,
-                        confidence: 0.7,
-                        function_name: func_name.clone(),
-                        exception_type: Some(doc_exc.exception_type.clone()),
-                        explanation: format!(
-                            "Function '{}' documents {} but doesn't raise it",
-                            func_name, doc_exc.exception_type
-                        ),
-                        suggestion: "Remove from documentation or add the raise statement"
-                            .to_string(),
-                    });
-                }
-            }
+            patterns.extend(detect_documented_not_raised(func_name, flow));
 
             // Pattern: Bare except
             for caught in &flow.caught_exceptions {
@@ -679,6 +660,37 @@ fn detect_undocumented_exceptions(
                 "Add '{}' to the Raises section of the docstring",
                 exc_info.exception_type.name()
             ),
+        })
+        .collect()
+}
+
+/// Detect documented exceptions that are not raised
+///
+/// Pure function that identifies exceptions documented in a function's docstring
+/// that are not actually raised in the function body.
+fn detect_documented_not_raised(
+    func_name: &str,
+    flow: &ExceptionFlow,
+) -> Vec<ExceptionFlowPattern> {
+    flow.documented_exceptions
+        .iter()
+        .filter(|doc_exc| {
+            !flow.raised_exceptions.iter().any(|exc| {
+                exc.exception_type.name() == doc_exc.exception_type
+                    || exc.exception_type.is_subclass_of(&doc_exc.exception_type)
+            })
+        })
+        .map(|doc_exc| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::ExceptionNotRaised,
+            severity: Severity::Low,
+            confidence: 0.7,
+            function_name: func_name.to_string(),
+            exception_type: Some(doc_exc.exception_type.clone()),
+            explanation: format!(
+                "Function '{}' documents {} but doesn't raise it",
+                func_name, doc_exc.exception_type
+            ),
+            suggestion: "Remove from documentation or add the raise statement".to_string(),
         })
         .collect()
 }
