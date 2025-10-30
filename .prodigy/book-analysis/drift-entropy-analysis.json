@@ -1,0 +1,113 @@
+{
+  "chapter_id": "entropy-analysis",
+  "chapter_title": "Entropy Analysis",
+  "chapter_file": "book/src/entropy-analysis.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter has incorrect dampening threshold and misleading configuration examples. The fundamental algorithm (Spec 68) is explained correctly, but configuration documentation conflicts with actual implementation behavior.",
+  "issues": [
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "Configuration - entropy_threshold",
+      "description": "Chapter shows entropy_threshold default as 0.4, but Spec 68 implementation uses 0.2 as the actual threshold for dampening",
+      "current_content": "# Entropy level below which dampening is applied (default: 0.4)\nentropy_threshold = 0.4",
+      "should_be": "# Entropy level below which dampening is applied (default: 0.2)\nentropy_threshold = 0.2",
+      "fix_suggestion": "Update the configuration example and all references to show the correct default threshold of 0.2, which is the actual implementation value per Spec 68",
+      "source_reference": "tests/apply_entropy_dampening_tests.rs:74 shows entropy < 0.2 triggers dampening; src/complexity/entropy.rs:192 uses 0.4 threshold but for different graduated dampening calculation"
+    },
+    {
+      "type": "misleading_content",
+      "severity": "high",
+      "section": "Effective Complexity Adjustment - When Dampening Applies",
+      "description": "Chapter correctly states Spec 68 uses entropy < 0.2, but configuration section shows entropy_threshold = 0.4, creating confusion about which threshold is actually used",
+      "current_content": "**Threshold**: Entropy < 0.2 (very low entropy only)\n\nBut later:\n\n# Entropy level below which dampening is applied (default: 0.4)\nentropy_threshold = 0.4",
+      "should_be": "Consistently use 0.2 throughout as the dampening threshold, clarify that entropy_threshold in config is for a different purpose or remove it if unused",
+      "fix_suggestion": "Reconcile the Spec 68 explanation (0.2 threshold) with the configuration documentation. Verify actual config usage in code and update accordingly.",
+      "source_reference": "tests/apply_entropy_dampening_tests.rs:55-67, :91-103, :107-119 all verify that only entropy < 0.2 triggers dampening per Spec 68"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Token Classification",
+      "description": "Chapter states classification is enabled by default, but code shows it defaults to false for backward compatibility",
+      "current_content": "**When enabled (default)**, tokens are weighted by importance",
+      "should_be": "**When enabled** (disabled by default for backward compatibility), tokens are weighted by importance",
+      "fix_suggestion": "Update to reflect that use_classification defaults to false (None which becomes false) per src/config.rs comments",
+      "source_reference": "src/config.rs:48-49: 'Whether to use smarter token classification (false by default for backward compatibility)'"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Configuration Options",
+      "description": "Configuration section shows many parameters that may not align with actual implementation or are not the primary dampening mechanism",
+      "current_content": "entropy_threshold = 0.4\nbranch_threshold = 0.8\nmax_repetition_reduction = 0.20\nmax_entropy_reduction = 0.15\nmax_branch_reduction = 0.25\nmax_combined_reduction = 0.30",
+      "should_be": "Verify these config values are actually used as documented. Tests show graduated dampening uses hardcoded thresholds (0.2 for entropy, 0.8 for branch, 0.7 for pattern)",
+      "fix_suggestion": "Audit which config parameters actually affect dampening behavior. Update examples to match implementation or clarify which are user-configurable vs internal constants",
+      "source_reference": "src/complexity/entropy.rs:185-193 shows hardcoded thresholds: entropy uses 0.4 threshold with 0.4 range and 0.15 max reduction; branch uses 0.8 threshold"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Effective Complexity Adjustment",
+      "description": "Chapter explains Spec 68 dampening formula clearly but doesn't explain how it interacts with other graduated dampening factors (repetition, branch similarity)",
+      "current_content": "Only shows individual dampening formula for entropy < 0.2",
+      "should_add": "Explain that graduated_dampening is applied to three factors (repetition, entropy, branch) and combined multiplicatively with a 0.7 minimum cap",
+      "fix_suggestion": "Add section explaining the multi-factor dampening: (repetition_factor × entropy_factor × branch_factor).max(0.7)",
+      "source_reference": "src/complexity/entropy.rs:185-195 shows three graduated_dampening calls combined multiplicatively"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Configuration - weight parameter",
+      "description": "Chapter shows 'weight' parameter but doesn't clearly explain what it weights or how it differs from the dampening factors",
+      "current_content": "# Weight of entropy in complexity adjustment (0.0-1.0, default: 1.0)\nweight = 1.0",
+      "should_be": "Clarify how 'weight' parameter affects the dampening calculation or if it's used at all in Spec 68 implementation",
+      "fix_suggestion": "Add explanation of weight parameter's role in the overall complexity calculation, or remove if it doesn't affect entropy dampening directly",
+      "source_reference": "src/config.rs EntropyConfig struct shows weight field but not clear how it's used in dampening calculation"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Algorithm Explanation",
+      "description": "Chapter doesn't explain the UniversalEntropyCalculator or language-agnostic entropy calculation approach",
+      "current_content": "Examples show Rust code only",
+      "should_add": "Mention that entropy analysis works across Rust, Python, JavaScript, and TypeScript using universal token classification",
+      "fix_suggestion": "Add brief mention that entropy analysis is language-agnostic and works across all supported languages",
+      "source_reference": "src/complexity/entropy_core.rs:30-38 shows UniversalEntropyCalculator for language-agnostic analysis"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent explanation of Spec 68: Graduated Entropy Dampening with clear formula and examples",
+    "Clear distinction between repetitive patterns (validation) vs diverse logic (state machines)",
+    "Good real-world examples showing validation function vs state machine",
+    "Shannon entropy formula is correctly presented with clear interpretation",
+    "Token classification importance levels are accurately documented",
+    "Pattern repetition and branch similarity concepts are well explained",
+    "Comparison table with other approaches is helpful and accurate"
+  ],
+  "improvement_suggestions": [
+    "Reconcile Spec 68 threshold (0.2) with config documentation (0.4) - verify which is actually used",
+    "Clarify that token classification defaults to OFF for backward compatibility",
+    "Add explanation of how multiple graduated dampening factors combine (multiplicative with 0.7 min)",
+    "Verify all configuration parameters and update examples to match actual defaults",
+    "Add brief mention of language-agnostic entropy calculation",
+    "Consider adding a troubleshooting section for when entropy dampening seems too aggressive or too lenient",
+    "Add examples showing how to tune entropy configuration for different project needs",
+    "Clarify the relationship between 'weight' parameter and the actual dampening calculation"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-30",
+    "feature_inventory": "Analyzed directly from source code (src/complexity/entropy*.rs, src/config.rs, tests/apply_entropy_dampening_tests.rs)",
+    "topics_covered": [
+      "Shannon entropy calculation",
+      "Pattern repetition detection",
+      "Branch similarity analysis",
+      "Token classification",
+      "Graduated entropy dampening (Spec 68)",
+      "Configuration options",
+      "False positive reduction"
+    ],
+    "validation_focus": "Check that entropy analysis algorithm, components, and configuration are documented with examples"
+  }
+}
