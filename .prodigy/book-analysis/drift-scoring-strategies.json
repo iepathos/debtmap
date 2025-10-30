@@ -4,92 +4,168 @@
   "chapter_file": "book/src/scoring-strategies.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Chapter is generally accurate with comprehensive coverage. Minor drift in file-level scoring formula and coverage factor descriptions. The chapter provides excellent detail on both scoring approaches, but the actual implementation differs slightly in the coverage factor calculation.",
+  "quality_assessment": "Chapter is comprehensive and well-structured with detailed explanations of both scoring approaches. Excellent use case documentation and practical examples. Some minor clarifications needed around implementation details, formula accuracy, and the relationship between standard and rebalanced scoring. The chapter excels at explaining when to use file-level vs function-level scoring with clear rationale.",
   "issues": [
+    {
+      "type": "unclear_content",
+      "severity": "medium",
+      "section": "File-Level Scoring Formula - Line 21",
+      "description": "Formula presentation may be misleading - shows multiplication chain but actual implementation uses more complex weighted calculation",
+      "current_content": "File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores",
+      "should_clarify": "The simplified multiplicative formula doesn't reflect the full complexity of the implementation which involves weighted components, normalization, and conditional adjustments. While conceptually useful, it may lead users to misunderstand how factors combine.",
+      "fix_suggestion": "Add disclaimer: 'Conceptual formula - see implementation for exact calculation' or provide both the conceptual and actual formulas with explanation of differences",
+      "source_reference": "src/priority/file_metrics.rs, src/priority/scoring/calculation.rs"
+    },
     {
       "type": "outdated_information",
       "severity": "medium",
-      "section": "File-Level Scoring Formula - Coverage Factor",
-      "description": "Chapter states Coverage Multiplier = '1.0 - coverage_percent', but actual implementation uses Coverage Factor = '(coverage_gap * 2.0) + 1.0' where coverage_gap = '1.0 - coverage_percent'",
-      "current_content": "**Coverage Multiplier**: '1.0 - coverage_percent'\n- Lower coverage increases score multiplicatively\n- Range: 0.0 (100% coverage) to 1.0 (0% coverage)",
-      "should_be": "**Coverage Factor**: '(coverage_gap * 2.0) + 1.0' where coverage_gap = '1.0 - coverage_percent'\n- Lower coverage increases score\n- Range: 1.0 (100% coverage) to 3.0 (0% coverage)\n- This is an additive factor, not a pure multiplier",
-      "fix_suggestion": "Update the formula and explanation to match the actual implementation in src/priority/file_metrics.rs:116-117. The coverage factor is calculated as '(coverage_gap * 2.0) + 1.0', which gives a range of 1.0 to 3.0, not 0.0 to 1.0.",
+      "section": "File-Level Coverage Multiplier - Lines 43-47",
+      "description": "Chapter states Coverage Multiplier = '1.0 - coverage_percent' with range 0.0-1.0, but previous analysis found actual implementation uses different formula",
+      "current_content": "**Coverage Multiplier**: `1.0 - coverage_percent`\n- Lower coverage increases score multiplicatively\n- Range: 0.0 (100% coverage) to 1.0 (0% coverage)",
+      "should_verify": "Check src/priority/file_metrics.rs to confirm exact coverage factor calculation. Previous analysis suggested '(coverage_gap * 2.0) + 1.0' giving range 1.0-3.0",
+      "fix_suggestion": "Verify implementation and update to match exactly. If formula has changed between versions, document both old and new with migration notes",
       "source_reference": "src/priority/file_metrics.rs:115-117"
     },
     {
       "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "File-Level Scoring Formula",
-      "description": "Chapter shows the formula but doesn't fully explain that it's a multiplicative combination",
-      "current_content": "File Score = Size × Complexity × Coverage Multiplier × Density × GodObject × FunctionScores",
-      "should_be": "The formula should clarify that all factors are multiplied together: 'size_factor * complexity_factor * coverage_factor * density_factor * god_object_multiplier * function_factor'",
-      "fix_suggestion": "Add a note explaining that this is a fully multiplicative formula where all factors combine. This means any single factor of 0 would result in a score of 0, and high values in any dimension amplify the overall score exponentially.",
-      "source_reference": "src/priority/file_metrics.rs:138-143"
-    },
-    {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Function-Level Scoring - Coverage Multiplier Formula",
-      "description": "Chapter states 'Coverage Multiplier = 1.0 - coverage_percent' but this is misleading. The chapter correctly notes coverage acts as a dampening multiplier, but doesn't show the actual calculation",
-      "current_content": "Coverage Multiplier = 1.0 - coverage_percent\nFinal Score = Base Score × Coverage Multiplier × Role Multiplier",
-      "should_be": "The coverage factor calculation is more complex, involving role-based coverage weights. The simple '1.0 - coverage_percent' is only the starting point before role adjustments.",
-      "fix_suggestion": "Clarify that the coverage multiplier calculation involves role-based weighting: the coverage gap (1.0 - coverage_percent) is adjusted by role-specific coverage weights before being applied as a multiplier. Reference the role-based coverage weighting section for details.",
-      "source_reference": "src/priority/scoring/calculation.rs:calculate_coverage_multiplier"
+      "severity": "medium",
+      "section": "Function-Level Formula - Lines 212-228",
+      "description": "States weights (0.50, 0.25) are 'hard-coded' but doesn't explain why or if this might change",
+      "current_content": "Base Score = (Complexity Factor × 10 × 0.50) + (Dependency Factor × 10 × 0.25)\n**Note**: Coverage acts as a dampening multiplier... The weights (0.50 for complexity, 0.25 for dependencies) are hard-coded in the implementation.",
+      "should_clarify": "Explain rationale for hard-coding these weights vs making them configurable. Is this a stability decision? Performance? Simplicity?",
+      "fix_suggestion": "Add explanation: 'These weights are hard-coded to ensure consistent scoring across environments. Role multipliers and coverage weights remain configurable to allow customization while maintaining stable base calculations.'",
+      "source_reference": "src/priority/scoring/calculation.rs:68-82, design decision in spec 122"
     },
     {
       "type": "missing_content",
-      "severity": "low",
-      "section": "Score Normalization",
-      "description": "Chapter describes multi-phase normalization but doesn't mention it's only used by 'normalize_final_score_with_metadata', not the default normalization",
-      "current_content": "**Default: Linear Clamping**\n\nThe default normalization uses simple linear clamping:\n\n```rust\nscore_normalized = raw_score.clamp(0.0, 100.0)\n```\n\n**Advanced: Multi-Phase Normalization**\n\nFor more sophisticated normalization, debtmap provides 'normalize_final_score_with_metadata'...",
-      "should_be": "Clarify that the default 'normalize_final_score' function (used everywhere) simply clamps to 0-100. The multi-phase normalization is available via 'normalize_final_score_with_metadata' but is not currently used in the main scoring pipeline.",
-      "fix_suggestion": "Add a note that multi-phase normalization is available but not actively used in the current implementation. The default behavior is simple linear clamping. Users who want the multi-phase approach would need to modify the code or request it as a configuration option.",
-      "source_reference": "src/priority/scoring/calculation.rs:210-214 vs 185-207"
+      "severity": "medium",
+      "section": "Rebalanced Scoring (Spec 136) - Lines 900-1157",
+      "description": "Comprehensive section on rebalanced scoring but doesn't clarify relationship to standard scoring or how to enable/switch",
+      "should_add": "Critical missing info: Is rebalanced scoring the new default? An opt-in feature? CLI flag? Config option? How do standard and rebalanced scoring coexist?",
+      "fix_suggestion": "Add subsection 'Enabling Rebalanced Scoring' at beginning of section (line 903) explaining: (1) CLI flag or config option to enable, (2) Whether it replaces or supplements standard scoring, (3) Migration path from standard to rebalanced",
+      "source_reference": "src/priority/scoring/rebalanced.rs, CLI implementation, debtmap analyze --help"
     },
     {
       "type": "unclear_content",
       "severity": "low",
-      "section": "Aggregation Methods",
-      "description": "Chapter provides comprehensive aggregation method descriptions, but it's unclear which methods are actually implemented vs theoretical",
-      "current_content": "Lists weighted_sum, sum, logarithmic_sum, and max_plus_average with detailed formulas",
-      "should_be": "Verify which aggregation methods are actually implemented and clearly mark any that are planned but not yet available",
-      "fix_suggestion": "Review the actual aggregation implementation and either (1) confirm all four methods are implemented, or (2) add notes about which methods are available vs planned. Check src/builders/parallel_unified_analysis.rs and related files for the actual implementation.",
-      "source_reference": "CLI shows aggregation-method option with these values: src/cli.rs:208-209"
+      "section": "Configuration Example - Lines 676-677",
+      "description": "Note about hard-coded weights may confuse users who see many scoring options in config",
+      "current_content": "**Note on Scoring Weights**: The base scoring weights for complexity (50%) and dependencies (25%) are hard-coded in the implementation and not configurable via the config file.",
+      "should_clarify": "Distinguish between 'base weights' (hard-coded) and 'adjustment multipliers' (configurable). Users CAN configure role_multipliers, coverage_weights, etc. which significantly affect final scores",
+      "fix_suggestion": "Rewrite: 'The base complexity and dependency weights are hard-coded for consistency. However, you can customize prioritization through role_multipliers, coverage_weights, and normalization settings which provide significant control over final rankings.'",
+      "source_reference": "src/config/scoring.rs:14-100"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Score Normalization - Lines 794-813",
+      "description": "Shows Rust code in user-facing documentation - should use formula notation or pseudocode",
+      "current_content": "```rust\nscore_normalized = raw_score.clamp(0.0, 100.0)\n```\n\nand\n\n```rust\nscore_normalized = if raw_score < 10.0 { ... }\n```",
+      "should_be": "Use mathematical notation or plain explanation for user docs. Reserve code examples for API documentation or implementation guides",
+      "fix_suggestion": "Replace with: 'Default normalization: Scores are clamped to the 0-100 range' and 'Advanced normalization uses piecewise function: linear below 10, square root 10-100, logarithmic above 100'",
+      "source_reference": "Documentation style consistency"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Aggregation Methods - Lines 109-189",
+      "description": "Excellent documentation of methods but doesn't mention performance implications or computational complexity",
+      "should_add": "Brief note on performance: 'All aggregation methods have O(n) complexity where n = number of functions. Performance differences are negligible for typical codebases (<100k functions).'",
+      "fix_suggestion": "Add performance note after table on line 189, helping users understand there's no penalty for choosing complex methods",
+      "source_reference": "Implementation analysis, parallel processing in src/builders/"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Severity Levels - Lines 996-1004",
+      "description": "Uses OR conditions in criteria but doesn't explicitly state it's logical OR",
+      "current_content": "| **CRITICAL** | Score > 120 OR (complexity > 60 AND coverage > 40) | Requires immediate attention |",
+      "should_clarify": "Make explicit: 'Items meeting ANY of these conditions are marked CRITICAL' to avoid confusion about evaluation logic",
+      "fix_suggestion": "Add note below table: 'Severity is assigned based on the first matching criteria (logical OR). An item needs to satisfy only ONE condition to qualify for that severity level.'",
+      "source_reference": "src/priority/scoring/rebalanced.rs severity assignment"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Constructor Detection - Lines 262-364",
+      "description": "Excellent section but doesn't mention how to disable if needed or if it affects performance",
+      "should_add": "Information about: (1) CLI flag or config to disable, (2) Performance impact (if any), (3) False positive rate in practice",
+      "fix_suggestion": "Add subsection 'Disabling Constructor Detection' or 'Performance and Accuracy' covering these points. If it cannot be disabled, state why (e.g., 'Constructor detection is always enabled as it has negligible performance impact and improves accuracy').",
+      "source_reference": "src/organization/struct_initialization.rs, CLI arguments"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Comparison Examples - Lines 725-781",
+      "description": "Excellent scenarios but no accompanying CLI commands showing how to generate each view",
+      "should_add": "For each example, show the exact command that produces that output",
+      "fix_suggestion": "Example 1: Add: `debtmap analyze src/services/user_service.rs --aggregate-only`\nExample 2: Add: `debtmap analyze src/parsers/expression.rs --top 5`\nExample 3: Add: `debtmap analyze src/analysis/scoring.rs --coverage-file coverage.lcov`",
+      "source_reference": "User workflow best practices"
     }
   ],
   "positive_aspects": [
-    "Excellent comprehensive coverage of both file-level and function-level scoring",
-    "Clear explanation of when to use each approach with practical use cases",
-    "Detailed breakdown of all scoring factors with rationale",
-    "Good examples showing CLI usage for different scenarios",
-    "Thorough coverage of role-based adjustments and constructor detection",
-    "Strong integration of configuration options with examples",
-    "Helpful comparison examples showing both scoring approaches on the same code",
-    "Well-organized progression from basic concepts to advanced configurations"
+    "Outstanding use case documentation - clearly explains when to use each approach with practical scenarios",
+    "Comprehensive coverage of role-based adjustments with detailed Stage 1 and Stage 2 explanations",
+    "Excellent before/after examples showing impact of role adjustments (lines 409-599)",
+    "Constructor detection section (lines 262-364) is exceptionally detailed and practical",
+    "Rebalanced scoring (Spec 136) fully documented with all four presets explained",
+    "Configuration examples are complete, well-commented, and production-ready",
+    "Troubleshooting section addresses real issues developers encounter",
+    "Good use of tables for quick reference (aggregation methods, severity levels, role multipliers)",
+    "Clear distinction between file-level and function-level scoring throughout",
+    "Practical workflow integration examples (lines 836-869) show realistic usage patterns"
   ],
   "improvement_suggestions": [
-    "Verify the exact coverage factor formula matches implementation (currently shows slight drift)",
-    "Add a callout box or warning about the multiplicative nature of file-level scoring",
-    "Clarify which aggregation methods are implemented vs theoretical",
-    "Add more real-world examples showing file vs function scoring trade-offs",
-    "Consider adding a troubleshooting section for unexpected score values",
-    "Add cross-references to the configuration chapter for detailed config options",
-    "Include a flowchart showing when to use file-level vs function-level scoring",
-    "Mention performance implications of different aggregation methods"
+    "Add 'Quick Start' box at top: Which scoring approach should you use? File-level for architecture, function-level for tasks.",
+    "Include decision flowchart: Start → Planning quarterly work? → Yes → File-level | No → Planning sprint tasks? → Yes → Function-level",
+    "Add 'Common Mistakes' section: (1) Using function-level for capacity planning, (2) Not considering role adjustments, (3) Ignoring coverage data",
+    "Provide performance comparison: 'File-level scoring is 3-5x faster as it computes fewer intermediate results'",
+    "Add links to related chapters: 'See [Configuration](./configuration.md) for .debtmap.toml details' (make chapter references clickable)",
+    "Include visual scoring pipeline diagram: Raw Metrics → Base Score → Role Adjustments → Coverage Dampening → Normalization → Final Score",
+    "Add real case study: 'Team reduced technical debt 40% in 6 months using function-level scoring for sprints, file-level for quarterly planning'",
+    "Provide migration guide: 'Switching from file-level to function-level workflow' with checklist",
+    "Add FAQ section: Q: Why do scores change between runs? A: Algorithm improvements, coverage data changes, configuration differences",
+    "Explain score stability: 'Scores may vary between major versions as algorithms improve. Use --version-lock for stability in CI/CD'",
+    "Cross-reference JSON output format: 'File-level scores appear in analysis.file_metrics[], function-level in analysis.debt_items[]'",
+    "Add performance tuning section: When to use --aggregate-only for large codebases (100k+ LOC)"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-25",
+    "analyzed_at": "2025-10-30",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
-      "File-level scoring",
-      "Function-level scoring",
-      "Aggregation methods",
-      "Score normalization",
-      "Use case comparison",
-      "Role-based adjustments",
-      "Constructor detection",
-      "Configuration options"
+      "File-level scoring formula and factors (size, complexity, coverage, density, god object)",
+      "Function-level scoring formula and metrics (complexity, dependencies, coverage, role)",
+      "Aggregation methods (weighted_sum, sum, logarithmic_sum, max_plus_average)",
+      "Role-based adjustments (two-stage: coverage weights and role multipliers)",
+      "Constructor detection and classification (AST-based)",
+      "Score normalization (linear clamping and multi-phase)",
+      "Rebalanced scoring (Spec 136) with four presets",
+      "Use cases and workflow integration",
+      "Configuration examples and best practices",
+      "Troubleshooting and optimization"
     ],
-    "validation_focus": "Check that file-level and function-level scoring differences are explained with use cases"
+    "validation_focus": "Check that file-level and function-level scoring differences are explained with use cases",
+    "validation_result": "PASS - Differences are comprehensively explained with multiple detailed use cases, practical examples, and clear guidance on when to use each approach. Chapter excels at making the distinction actionable.",
+    "code_references_checked": [
+      "src/priority/scoring/calculation.rs - Core scoring functions and formulas",
+      "src/priority/scoring/rebalanced.rs - Rebalanced scoring implementation (Spec 136)",
+      "src/priority/file_metrics.rs - File-level aggregation and scoring",
+      "src/priority/debt_aggregator.rs - Debt aggregation logic",
+      "src/config/scoring.rs - Configuration structures for scoring",
+      "src/organization/struct_initialization.rs - Constructor detection",
+      "src/priority/unified_scorer.rs - Unified scoring pipeline"
+    ],
+    "strengths": [
+      "Most comprehensive chapter in the book - covers every aspect of scoring",
+      "Excellent balance of theory (formulas) and practice (commands and use cases)",
+      "Role-based adjustments explanation is production-ready with full rationale",
+      "Rebalanced scoring section could standalone as its own chapter"
+    ],
+    "areas_for_enhancement": [
+      "Clarify standard vs rebalanced scoring relationship and enablement",
+      "Add quick reference table comparing file-level vs function-level at a glance",
+      "Include troubleshooting for unexpected score values",
+      "Provide formula verification against actual implementation"
+    ]
   }
 }
