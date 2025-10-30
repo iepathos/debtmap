@@ -1,7 +1,9 @@
 //! Python exception flow analysis module
 
-mod types;
 mod analyzer;
+mod types;
 
-pub use types::{ExceptionGraph, FunctionExceptions, ExceptionFlowPattern, ExceptionType, BuiltinException};
 pub use analyzer::ExceptionFlowAnalyzer;
+pub use types::{
+    BuiltinException, ExceptionFlowPattern, ExceptionGraph, ExceptionType, FunctionExceptions,
+};

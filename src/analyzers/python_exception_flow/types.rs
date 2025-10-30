@@ -24,7 +24,10 @@ pub enum ExceptionType {
 }
 
 impl ExceptionType {
-    pub(super) fn from_name(name: &str, custom_exceptions: &HashMap<String, ExceptionClass>) -> Self {
+    pub(super) fn from_name(
+        name: &str,
+        custom_exceptions: &HashMap<String, ExceptionClass>,
+    ) -> Self {
         if let Ok(builtin) = name.parse::<BuiltinException>() {
             ExceptionType::Builtin(builtin)
         } else if custom_exceptions.contains_key(name) {

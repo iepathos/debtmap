@@ -13,10 +13,9 @@ use std::path::PathBuf;
 
 // Import types from the sibling types module
 use super::types::{
-    CaughtException, DocumentedException, ExceptionClass, ExceptionFlow,
-    ExceptionFlowPattern, ExceptionGraph, ExceptionInfo, ExceptionPatternType, ExceptionType,
-    ExceptionTransformation, FunctionExceptions, HandlerAction, HandlerType, Severity,
-    BUILTIN_EXCEPTIONS,
+    CaughtException, DocumentedException, ExceptionClass, ExceptionFlow, ExceptionFlowPattern,
+    ExceptionGraph, ExceptionInfo, ExceptionPatternType, ExceptionTransformation, ExceptionType,
+    FunctionExceptions, HandlerAction, HandlerType, Severity, BUILTIN_EXCEPTIONS,
 };
 
 /// Tracks exception flows through Python code
@@ -727,7 +726,6 @@ fn detect_transformation_lost(
         })
         .collect()
 }
-
 
 /// Extract docstring from a statement list
 fn extract_docstring(body: &[ast::Stmt]) -> Option<String> {
