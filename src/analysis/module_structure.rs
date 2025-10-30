@@ -5,10 +5,20 @@
 //! - Component detection (structs, enums, impl blocks)
 //! - Responsibility identification
 //! - Coupling analysis for refactoring recommendations
+//!
+//! ## Line Range Extraction
+//!
+//! Line ranges are extracted from `syn::Span` information using the `Spanned` trait.
+//! All line numbers are 1-based, consistent with syn's conventions and typical editor
+//! line numbering.
+//!
+//! The `extract_line_range()` helper function provides a generic way to extract
+//! line ranges from any AST node, ensuring consistency across all component types.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use syn::spanned::Spanned;
 
 /// Categorized function counts within a module
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -356,7 +366,7 @@ impl ModuleStructureAnalyzer {
             fields,
             methods: 0, // Will be counted from impl blocks
             public,
-            line_range: (0, 0), // Simplified - would need span info
+            line_range: extract_line_range(s),
         }
     }
 
@@ -370,7 +380,7 @@ impl ModuleStructureAnalyzer {
             variants,
             methods: 0,
             public,
-            line_range: (0, 0),
+            line_range: extract_line_range(e),
         }
     }
 
@@ -398,7 +408,7 @@ impl ModuleStructureAnalyzer {
             target,
             methods,
             trait_impl,
-            line_range: (0, 0),
+            line_range: extract_line_range(i),
         })
     }
 
@@ -664,6 +674,28 @@ impl ModuleStructureAnalyzer {
     }
 }
 
+/// Extract line range from any syn AST node that implements Spanned.
+///
+/// Returns a tuple of (start_line, end_line) using 1-based line numbering
+/// consistent with syn's conventions.
+///
+/// # Examples
+///
+/// ```no_run
+/// use syn::spanned::Spanned;
+///
+/// let code = "pub struct Foo { x: u32 }";
+/// let ast: syn::ItemStruct = syn::parse_str(code).unwrap();
+/// // extract_line_range is a private helper function
+/// // that extracts (start_line, end_line) from the span
+/// ```
+fn extract_line_range<T: Spanned>(node: &T) -> (usize, usize) {
+    let span = node.span();
+    let start = span.start().line;
+    let end = span.end().line;
+    (start, end)
+}
+
 fn extract_type_name(ty: &syn::Type) -> Option<String> {
     match ty {
         syn::Type::Path(type_path) => type_path.path.segments.last().map(|s| s.ident.to_string()),
@@ -754,5 +786,144 @@ mod tests {
         assert_eq!(structure.function_counts.impl_methods, 1);
         assert_eq!(structure.function_counts.module_level_functions, 1);
         assert!(structure.responsibility_count >= 1);
+    }
+
+    #[test]
+    fn test_extract_struct_line_range() {
+        let code = r#"
+pub struct Foo {
+    field1: u32,
+    field2: String,
+    field3: bool,
+}
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let analyzer = ModuleStructureAnalyzer::new_rust();
+        let structure = analyzer.analyze_rust_ast(&ast);
+
+        let struct_comp = structure
+            .components
+            .iter()
+            .find(|c| matches!(c, ModuleComponent::Struct { name, .. } if name == "Foo"))
+            .expect("Foo struct should exist");
+
+        let line_count = struct_comp.line_count();
+        assert!(
+            line_count >= 4,
+            "Struct should span 4+ lines, got {}",
+            line_count
+        );
+        assert!(
+            line_count <= 6,
+            "Struct should span at most 6 lines, got {}",
+            line_count
+        );
+    }
+
+    #[test]
+    fn test_extract_enum_line_range() {
+        let code = r#"
+pub enum Status {
+    Active,
+    Inactive,
+    Pending,
+}
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let analyzer = ModuleStructureAnalyzer::new_rust();
+        let structure = analyzer.analyze_rust_ast(&ast);
+
+        let enum_comp = structure
+            .components
+            .iter()
+            .find(|c| matches!(c, ModuleComponent::Enum { name, .. } if name == "Status"))
+            .expect("Status enum should exist");
+
+        let line_count = enum_comp.line_count();
+        assert!(
+            line_count >= 4,
+            "Enum should span 4+ lines, got {}",
+            line_count
+        );
+    }
+
+    #[test]
+    fn test_extract_impl_line_range() {
+        let code = r#"
+impl Foo {
+    pub fn new() -> Self {
+        Self { field1: 0, field2: String::new(), field3: false }
+    }
+
+    pub fn process(&self) -> u32 {
+        self.field1 * 2
+    }
+
+    fn helper(&self) -> String {
+        self.field2.clone()
+    }
+}
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let analyzer = ModuleStructureAnalyzer::new_rust();
+        let structure = analyzer.analyze_rust_ast(&ast);
+
+        let impl_comp = structure
+            .components
+            .iter()
+            .find(|c| matches!(c, ModuleComponent::ImplBlock { target, .. } if target == "Foo"))
+            .expect("Foo impl should exist");
+
+        let line_count = impl_comp.line_count();
+        assert!(
+            line_count >= 12,
+            "Impl block should span 12+ lines, got {}",
+            line_count
+        );
+    }
+
+    #[test]
+    fn test_component_sorting_by_line_count() {
+        let code = r#"
+pub struct Small { x: u32 }
+
+pub struct Large {
+    field1: u32,
+    field2: String,
+    field3: bool,
+    field4: Vec<u8>,
+    field5: Option<usize>,
+}
+
+impl Large {
+    pub fn new() -> Self {
+        Self {
+            field1: 0,
+            field2: String::new(),
+            field3: false,
+            field4: Vec::new(),
+            field5: None,
+        }
+    }
+}
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let analyzer = ModuleStructureAnalyzer::new_rust();
+        let structure = analyzer.analyze_rust_ast(&ast);
+
+        let mut sorted = structure.components.clone();
+        sorted.sort_by_key(|c| std::cmp::Reverse(c.line_count()));
+
+        // Verify Large impl is first (longest)
+        if let ModuleComponent::ImplBlock { target, .. } = &sorted[0] {
+            assert_eq!(target, "Large", "Largest component should be Large impl");
+            assert!(sorted[0].line_count() > sorted[1].line_count());
+        } else {
+            panic!("First component should be impl block");
+        }
     }
 }
