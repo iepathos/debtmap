@@ -1,5 +1,44 @@
 // debtmap:ignore-start -- This file contains test pattern detection and may trigger false security positives
-// Testing pattern detection for JavaScript/TypeScript
+//! Testing pattern detection for JavaScript/TypeScript
+//!
+//! This module analyzes JavaScript and TypeScript test code to detect anti-patterns
+//! and quality issues. It identifies problems such as:
+//! - Missing assertions in tests
+//! - Overly complex test logic
+//! - Timing-dependent tests
+//! - Missing cleanup in React tests
+//! - Async test issues
+//! - Snapshot test overuse
+//!
+//! # Structure
+//!
+//! The module is organized into focused sub-modules:
+//! - `queries`: Tree-sitter query building and node extraction
+//! - `validators`: Pure validation and helper functions
+//! - `detectors`: Individual pattern detection implementations
+//!
+//! # Example
+//!
+//! ```no_run
+//! use tree_sitter::Parser;
+//! use std::path::PathBuf;
+//!
+//! let mut parser = Parser::new();
+//! let language = tree_sitter_javascript::LANGUAGE.into();
+//! parser.set_language(&language).unwrap();
+//!
+//! let source = "test('example', () => { /* no assertion */ });";
+//! let tree = parser.parse(source, None).unwrap();
+//!
+//! let mut issues = Vec::new();
+//! detect_testing_patterns(
+//!     tree.root_node(),
+//!     source,
+//!     &language,
+//!     PathBuf::from("test.js"),
+//!     &mut issues
+//! );
+//! ```
 
 use super::{get_node_text, SourceLocation};
 use crate::core::{DebtItem, DebtType, Priority};
@@ -150,7 +189,7 @@ pub fn detect_testing_patterns(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tree_sitter::Parser;
+    use tree_sitter::{Parser, StreamingIterator};
 
     #[test]
     fn test_is_snapshot_method_match_snapshot() {

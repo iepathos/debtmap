@@ -1,12 +1,27 @@
-// Pattern detection implementations for JavaScript/TypeScript testing anti-patterns
+//! Pattern detection implementations for JavaScript/TypeScript testing anti-patterns
+//!
+//! This module contains the core detection logic for identifying test quality issues.
+//! Each detector function focuses on a specific anti-pattern and operates independently.
+//!
+//! # Detectors
+//!
+//! - `detect_missing_assertions`: Finds tests without expect/assert calls
+//! - `detect_complex_tests`: Identifies overly complex test logic
+//! - `detect_timing_dependent_tests`: Finds tests depending on setTimeout, Date, etc.
+//! - `detect_react_test_issues`: Detects missing cleanup in React component tests
+//! - `detect_async_test_issues`: Finds async operations without proper await or done()
+//! - `detect_snapshot_overuse`: Identifies excessive use of snapshot testing
+//!
+//! All detectors follow a consistent pattern: they analyze the AST, use validator
+//! functions to check for issues, and push detected anti-patterns to the issues vector.
 
-use super::{get_node_text, SourceLocation, TestingAntiPattern};
 use super::{
-    build_async_test_query, contains_async_operations, count_snapshot_methods,
-    calculate_test_complexity, detect_timing_dependency, extract_test_body,
+    build_async_test_query, calculate_test_complexity, contains_async_operations,
+    count_snapshot_methods, detect_timing_dependency, extract_test_body,
     extract_test_function_name, extract_test_name, has_assertions, is_test_function,
     parse_test_name,
 };
+use super::{get_node_text, SourceLocation, TestingAntiPattern};
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
 /// Detects tests that are missing assertions
@@ -229,7 +244,7 @@ pub(super) fn detect_react_test_issues(
 }
 
 /// Creates an async test issue pattern
-fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
+pub(super) fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
     TestingAntiPattern::AsyncTestIssue {
         location: SourceLocation::from_node(body_node),
         test_name,

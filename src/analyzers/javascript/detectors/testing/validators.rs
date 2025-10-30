@@ -1,4 +1,15 @@
-// Validation and helper functions for testing pattern detection
+//! Validation and helper functions for testing pattern detection
+//!
+//! This module contains pure validation predicates and helper functions used
+//! by the pattern detectors. All functions are stateless and have no side effects,
+//! making them easy to test and compose.
+//!
+//! Functions are organized by purpose:
+//! - File and function identification
+//! - Assertion detection
+//! - Timing dependency analysis
+//! - Async operation detection
+//! - Complexity calculation
 
 use crate::analyzers::javascript::detectors::get_node_text;
 use std::path::Path;

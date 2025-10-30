@@ -1,4 +1,11 @@
-// Query building and node extraction utilities for testing pattern detection
+//! Query building and node extraction utilities for testing pattern detection
+//!
+//! This module provides pure functions for building tree-sitter queries and
+//! extracting relevant nodes from query matches. These utilities support the
+//! AST analysis performed by the detectors module.
+//!
+//! All functions in this module are pure and stateless, making them easy to
+//! test and reason about.
 
 use crate::analyzers::javascript::detectors::get_node_text;
 use tree_sitter::{Node, Query, QueryError};
@@ -7,7 +14,9 @@ use tree_sitter::{Node, Query, QueryError};
 ///
 /// This query identifies test function calls (e.g., `it()`, `test()`) that
 /// contain arrow functions with async bodies.
-pub(super) fn build_async_test_query(language: &tree_sitter::Language) -> Result<Query, QueryError> {
+pub(super) fn build_async_test_query(
+    language: &tree_sitter::Language,
+) -> Result<Query, QueryError> {
     let query_string = r#"
     (call_expression
       function: (identifier) @func
@@ -38,7 +47,9 @@ pub(super) fn extract_test_function_name<'a>(
 /// Extracts the test name string node from a query match
 ///
 /// The test name is captured at index 1 in the query.
-pub(super) fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+pub(super) fn extract_test_name<'a>(
+    match_: &tree_sitter::QueryMatch<'a, '_>,
+) -> Option<&'a Node<'a>> {
     match_
         .captures
         .iter()
@@ -49,7 +60,9 @@ pub(super) fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) ->
 /// Extracts the test body node from a query match
 ///
 /// The test body is captured at index 2 in the query.
-pub(super) fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
+pub(super) fn extract_test_body<'a>(
+    match_: &tree_sitter::QueryMatch<'a, '_>,
+) -> Option<&'a Node<'a>> {
     match_
         .captures
         .iter()
@@ -83,7 +96,9 @@ mod tests {
     #[test]
     fn test_parse_test_name_double_quotes() {
         let mut parser = Parser::new();
-        parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+        parser
+            .set_language(&tree_sitter_javascript::LANGUAGE.into())
+            .unwrap();
         let source = r#""my test""#;
         let tree = parser.parse(source, None).unwrap();
         let root = tree.root_node();
@@ -94,7 +109,9 @@ mod tests {
     #[test]
     fn test_parse_test_name_single_quotes() {
         let mut parser = Parser::new();
-        parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+        parser
+            .set_language(&tree_sitter_javascript::LANGUAGE.into())
+            .unwrap();
         let source = r#"'my test'"#;
         let tree = parser.parse(source, None).unwrap();
         let root = tree.root_node();
@@ -105,7 +122,9 @@ mod tests {
     #[test]
     fn test_parse_test_name_backticks() {
         let mut parser = Parser::new();
-        parser.set_language(&tree_sitter_javascript::LANGUAGE.into()).unwrap();
+        parser
+            .set_language(&tree_sitter_javascript::LANGUAGE.into())
+            .unwrap();
         let source = r#"`my test`"#;
         let tree = parser.parse(source, None).unwrap();
         let root = tree.root_node();
