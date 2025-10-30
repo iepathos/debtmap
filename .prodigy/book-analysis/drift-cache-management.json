@@ -2,133 +2,130 @@
   "chapter_id": "cache-management",
   "chapter_title": "Cache Management",
   "chapter_file": "book/src/cache-management.md",
-  "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter is completely missing despite extensive cache functionality in codebase. Users have no documentation for critical performance and disk space management features.",
+  "drift_detected": false,
+  "severity": "low",
+  "quality_assessment": "Chapter is comprehensive and accurately documents the cache management system. All major features are covered with clear examples and explanations. Minor improvements could enhance clarity around edge cases.",
   "issues": [
     {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "Entire Chapter",
-      "description": "Chapter file does not exist, but codebase has comprehensive cache management system",
-      "should_add": "Create complete chapter documenting cache location, configuration, pruning strategies, environment variables, and troubleshooting",
-      "fix_suggestion": "Create book/src/cache-management.md with sections covering all cache features documented in features.json",
-      "source_reference": "src/cache/cache_location.rs, src/cache/auto_pruner.rs, src/cache/pruning/decision.rs"
+      "type": "minor_clarity",
+      "severity": "low",
+      "section": "Cache Strategy",
+      "description": "Chapter mentions 'Shared (default)' and 'Custom' strategies but doesn't explicitly link to CacheStrategy enum",
+      "current_content": "Debtmap supports two cache storage strategies:\n- **Shared (default)**: Stores cache in XDG-compliant shared directory\n- **Custom**: Stores cache in user-specified location via `DEBTMAP_CACHE_DIR`",
+      "improvement_suggestion": "This is accurate and well-explained. No changes needed, but could add a note that these map to CacheStrategy::Shared and CacheStrategy::Custom in the code for developers",
+      "source_reference": "src/cache/cache_location.rs:7-12"
     },
     {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Cache Location Configuration",
-      "description": "No documentation for cache location priority order and platform-specific defaults",
-      "should_add": "Document cache location resolution: DEBTMAP_CACHE_DIR → XDG_CACHE_HOME/debtmap → ~/Library/Caches/debtmap (macOS) → ~/.cache/debtmap (Linux) → %LOCALAPPDATA%/debtmap (Windows)",
-      "fix_suggestion": "Add section 'Cache Location and Configuration' explaining location priority, CacheStrategy enum (Shared vs Custom), and project identification via git remote URL or path hash",
-      "source_reference": "src/cache/cache_location.rs:24-89"
+      "type": "minor_clarity",
+      "severity": "low",
+      "section": "Cache Scope",
+      "description": "DEBTMAP_CACHE_SCOPE is documented in the environment variables table and with an example, but the feature's purpose could be clearer",
+      "current_content": "| `DEBTMAP_CACHE_SCOPE` | Branch-specific cache scope | None | `feature-branch` |\n\n# Branch-specific caching\nexport DEBTMAP_CACHE_SCOPE=\"$(git branch --show-current)\"",
+      "improvement_suggestion": "Add a sentence explaining that this creates isolated cache namespaces for different branches, useful when switching between branches with different code states",
+      "source_reference": "src/cache/cache_location.rs:172-174"
     },
     {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Environment Variables",
-      "description": "No documentation for cache-related environment variables",
-      "should_add": "Document all DEBTMAP_CACHE_* environment variables: DEBTMAP_CACHE_DIR, DEBTMAP_CACHE_AUTO_PRUNE, DEBTMAP_CACHE_MAX_SIZE, DEBTMAP_CACHE_MAX_AGE_DAYS, DEBTMAP_CACHE_MAX_ENTRIES, DEBTMAP_CACHE_PRUNE_PERCENTAGE, DEBTMAP_CACHE_STRATEGY, DEBTMAP_CACHE_SYNC_PRUNE, DEBTMAP_CACHE_SCOPE",
-      "fix_suggestion": "Add section 'Environment Variables' with table showing variable name, description, default value, and example usage for each cache configuration option",
-      "source_reference": "src/cache/auto_pruner.rs:26-213, src/cache/cache_location.rs:26"
+      "type": "technical_accuracy",
+      "severity": "low",
+      "section": "Pruning Strategies - Age Strategy",
+      "description": "Documentation states age-based strategy 'Does not prune based on size or entry count limits' which could be misinterpreted",
+      "current_content": "### Age-Based Only\n\nOnly removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits.",
+      "improvement_suggestion": "Clarify that age-based pruning ONLY removes old entries and ignores size/count thresholds entirely. This means cache can grow unbounded if all entries are recent.",
+      "source_reference": "src/cache/auto_pruner.rs:294-308"
     },
     {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Pruning Strategies",
-      "description": "No documentation for the four cache pruning strategies",
-      "should_add": "Document pruning strategies: LRU (removes least recently accessed), LFU (removes least frequently used), FIFO (removes oldest by creation time), AgeBasedOnly (removes only entries older than max age)",
-      "fix_suggestion": "Add section 'Automatic Pruning Strategies' explaining each strategy, when to use each, and how to configure via DEBTMAP_CACHE_STRATEGY environment variable",
-      "source_reference": "src/cache/auto_pruner.rs:9-20, 251-308"
+      "type": "completeness",
+      "severity": "low",
+      "section": "CLI Examples - cache-location flag",
+      "description": "Chapter shows --cache-location CLI flag usage but doesn't mention it sets DEBTMAP_CACHE_DIR for that run",
+      "current_content": "# Use custom cache location for this run\ndebtmap --cache-location /tmp/temp-cache",
+      "improvement_suggestion": "Add note: '(sets DEBTMAP_CACHE_DIR)' to clarify the relationship between the flag and environment variable",
+      "source_reference": "src/cli.rs:189-190"
     },
     {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Cache CLI Options",
-      "description": "No documentation for cache-related CLI flags",
-      "should_add": "Document CLI options: --no-cache (disable caching), --clear-cache (clear before run), --force-cache-rebuild (rebuild cache), --cache-stats (show statistics), --migrate-cache (migrate to shared location), --cache-location (specify custom location)",
-      "fix_suggestion": "Add section 'Command Line Options' documenting each cache CLI flag with examples of usage",
-      "source_reference": "src/cli.rs:146-168"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Default Configuration",
-      "description": "No documentation for default cache settings",
-      "should_add": "Document defaults: max_size_bytes = 1GB, max_age_days = 30, max_entries = 10000, prune_percentage = 0.25 (25%), strategy = LRU, auto_prune_enabled = true",
-      "fix_suggestion": "Add section 'Default Configuration' showing all default values and explaining when auto-pruning triggers",
-      "source_reference": "src/cache/auto_pruner.rs:93-103"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Cache Structure",
-      "description": "No documentation for cache directory structure and subdirectories",
-      "should_add": "Document cache subdirectories created: call_graphs/, analysis/, metadata/, temp/, file_metrics/",
-      "fix_suggestion": "Add section 'Cache Directory Structure' explaining the purpose of each subdirectory and what data is stored where",
-      "source_reference": "src/cache/cache_location.rs:176-196"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Performance Impact",
-      "description": "No documentation explaining cache performance benefits",
-      "should_add": "Explain that caching speeds up repeated analyses by storing parsed ASTs, call graphs, and analysis results; particularly beneficial for large codebases and CI/CD pipelines",
-      "fix_suggestion": "Add section 'Performance Optimization' explaining cache benefits, when cache hits occur, and best practices for CI environments",
-      "source_reference": ".prodigy/book-analysis/features.json:602-629"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Troubleshooting",
-      "description": "No troubleshooting guidance for cache issues",
-      "should_add": "Document common issues: cache taking too much space (configure DEBTMAP_CACHE_MAX_SIZE or use --clear-cache), stale cache causing incorrect results (use --force-cache-rebuild), permission errors (check DEBTMAP_CACHE_DIR permissions)",
-      "fix_suggestion": "Add section 'Troubleshooting Cache Issues' with common problems and solutions, including how to inspect cache with --cache-stats",
-      "source_reference": ".prodigy/book-analysis/features.json:718-742"
-    },
-    {
-      "type": "missing_content",
+      "type": "edge_case",
       "severity": "low",
       "section": "Project Identification",
-      "description": "No documentation explaining how debtmap identifies projects for cache isolation",
-      "should_add": "Explain that projects are identified by git remote URL hash (first choice) or absolute path hash (fallback), ensuring cache isolation between different projects",
-      "fix_suggestion": "Add technical note explaining project ID generation using SHA256 hash (first 16 chars) for cache key uniqueness",
-      "source_reference": "src/cache/cache_location.rs:91-143"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Background vs Synchronous Pruning",
-      "description": "No documentation for pruning execution modes",
-      "should_add": "Explain that pruning can be synchronous (blocks during cleanup, used in tests) or background (non-blocking, default in production), controlled by DEBTMAP_CACHE_SYNC_PRUNE",
-      "fix_suggestion": "Add technical note explaining BackgroundPruner spawns threads for non-blocking cleanup, useful for CI pipelines where analysis shouldn't wait for pruning",
-      "source_reference": "src/cache/auto_pruner.rs:516-617"
+      "description": "Documentation doesn't mention the 'local:' prefix used when falling back to git repository root",
+      "current_content": "1. **Git remote URL hash** (preferred): SHA256 hash (first 16 characters) of the git remote origin URL\n2. **Absolute path hash** (fallback): SHA256 hash (first 16 characters) of the project's absolute path",
+      "improvement_suggestion": "Technically accurate. The 'local:' prefix is an implementation detail that doesn't affect user understanding. No change needed.",
+      "source_reference": "src/cache/cache_location.rs:138"
     }
   ],
-  "positive_aspects": [],
+  "positive_aspects": [
+    "Comprehensive coverage of all cache environment variables with clear table format",
+    "All four pruning strategies (LRU, LFU, FIFO, Age) are documented with use cases and examples",
+    "CLI options are thoroughly documented with practical examples",
+    "Excellent troubleshooting section covering common issues like disk space, stale cache, and permissions",
+    "Default configuration values are clearly documented (1GB, 30 days, 10000 entries, 25% prune, LRU)",
+    "Cache directory structure is explained with subdirectory purposes",
+    "Performance optimization section explains cache benefits and CI best practices",
+    "Platform-specific cache locations are accurately documented for macOS, Linux, and Windows",
+    "Project identification mechanism using git remote URL or path hash is explained",
+    "Cache migration feature is documented with clear command example",
+    "Background vs synchronous pruning is explained with DEBTMAP_CACHE_SYNC_PRUNE configuration",
+    "Pruning triggers are clearly documented (size, count, age-based)",
+    "Cache scope for branch-specific caching is documented",
+    "All documented environment variables match the actual implementation",
+    "Examples are practical and ready to copy-paste"
+  ],
   "improvement_suggestions": [
-    "Create chapter with clear structure: Introduction → Location Configuration → Environment Variables → Pruning Strategies → CLI Options → Performance Tips → Troubleshooting",
-    "Include practical examples for each environment variable configuration",
-    "Add decision tree for choosing pruning strategy based on use case",
-    "Include examples of cache statistics output from --cache-stats",
-    "Add warnings about disk space and age limits for CI environments",
-    "Link to Performance Tuning section if it exists in the book",
-    "Include examples of cache migration from local to shared location"
+    "Add a note about cache scope creating isolated namespaces for different branches",
+    "Clarify that age-based-only strategy can allow unbounded cache growth if entries are recent",
+    "Consider adding a decision flowchart for choosing the right pruning strategy",
+    "Add example output from --cache-stats command to show users what to expect",
+    "Consider adding a 'Quick Start' section at the beginning with common configurations",
+    "Add note that --cache-location CLI flag sets DEBTMAP_CACHE_DIR for that specific run"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-20",
+    "analyzed_at": "2025-10-30",
     "feature_inventory": ".prodigy/book-analysis/features.json",
-    "topics_covered": [],
+    "topics_covered": [
+      "Cache location and configuration",
+      "Cache strategies (LRU, LFU, FIFO, age-based)",
+      "Automatic pruning",
+      "Environment variables",
+      "CLI options",
+      "Performance optimization",
+      "Troubleshooting cache issues",
+      "Cache directory structure",
+      "Project identification",
+      "Default configuration",
+      "Cache migration"
+    ],
     "validation_focus": "Check that cache configuration options, pruning strategies, and environment variables are documented",
-    "chapter_exists": false,
-    "implementation_files": [
+    "chapter_exists": true,
+    "implementation_files_verified": [
       "src/cache/cache_location.rs",
       "src/cache/auto_pruner.rs",
       "src/cache/pruning/decision.rs",
-      "src/cache/shared_cache/mod.rs",
-      "src/cache/index_manager.rs",
-      "src/cli.rs (lines 142-168)"
+      "src/cache/shared_cache/builder.rs",
+      "src/cli.rs"
+    ],
+    "environment_variables_verified": [
+      "DEBTMAP_CACHE_DIR",
+      "DEBTMAP_CACHE_AUTO_PRUNE",
+      "DEBTMAP_CACHE_MAX_SIZE",
+      "DEBTMAP_CACHE_MAX_AGE_DAYS",
+      "DEBTMAP_CACHE_MAX_ENTRIES",
+      "DEBTMAP_CACHE_PRUNE_PERCENTAGE",
+      "DEBTMAP_CACHE_STRATEGY",
+      "DEBTMAP_CACHE_SYNC_PRUNE",
+      "DEBTMAP_CACHE_SCOPE"
+    ],
+    "cli_flags_verified": [
+      "--no-cache",
+      "--clear-cache",
+      "--force-cache-rebuild",
+      "--cache-stats",
+      "--migrate-cache",
+      "--cache-location"
+    ],
+    "pruning_strategies_verified": [
+      "lru",
+      "lfu",
+      "fifo",
+      "age (with age_based alias)"
     ]
   }
 }
