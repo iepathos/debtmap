@@ -13,6 +13,8 @@ Entropy analysis uses information theory to distinguish between these cases.
 
 ## How It Works
 
+Debtmap's entropy analysis is **language-agnostic**, working across Rust, Python, JavaScript, and TypeScript codebases using a universal token classification approach. This ensures consistent complexity assessment regardless of the programming language used.
+
 ### Shannon Entropy
 
 Shannon entropy measures the variety and unpredictability of code patterns:
@@ -30,7 +32,7 @@ Where:
 
 Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the `use_classification` configuration option.
 
-**When enabled (default)**, tokens are weighted by importance:
+**When enabled** (disabled by default for backward compatibility), tokens are weighted by importance:
 
 **High importance (weight: 1.0):**
 - Control flow keywords (`if`, `match`, `for`, `while`)
@@ -93,56 +95,99 @@ if needs_auth {
 
 ### Effective Complexity Adjustment
 
-Debtmap applies complexity dampening based on **Spec 68: Graduated Entropy Dampening** only when code exhibits very low entropy (< 0.2), indicating highly repetitive patterns.
+Debtmap uses a multi-factor dampening approach that analyzes three dimensions of code repetitiveness:
 
-#### When Dampening Applies
+1. **Pattern Repetition** - Detects repetitive AST structures
+2. **Token Entropy** - Measures variety in token usage
+3. **Branch Similarity** - Compares similarity between conditional branches
 
-**Threshold**: Entropy < 0.2 (very low entropy only)
-
-- **Entropy >= 0.2**: No dampening applied (preserves 100% of complexity)
-- **Entropy < 0.2**: Graduated dampening applied (preserves 50-100% of complexity)
-
-#### Dampening Formula (Spec 68)
-
-For very low entropy cases (< 0.2):
+These factors are combined multiplicatively with a minimum floor of 0.7 (preserving at least 70% of original complexity):
 
 ```
-dampening_factor = 0.5 + 0.5 × (entropy / 0.2)
+dampening_factor = (repetition_factor × entropy_factor × branch_factor).max(0.7)
 effective_complexity = raw_complexity × dampening_factor
 ```
 
-This ensures:
-- **Maximum reduction**: 50% (when entropy = 0.0)
-- **Minimum reduction**: 0% (when entropy = 0.2)
-- **Graduated scaling**: Linear interpolation between these extremes
+#### Historical Note: Spec 68
 
-#### Example: Very Low Entropy (Dampening Applies)
+**Spec 68: Graduated Entropy Dampening** was the original simple algorithm that only considered entropy < 0.2:
+
+```
+dampening_factor = 0.5 + 0.5 × (entropy / 0.2)  [when entropy < 0.2]
+```
+
+The current implementation uses a more sophisticated **graduated dampening** approach that considers all three factors (repetition, entropy, branch similarity) with separate thresholds and ranges for each. The test suite references Spec 68 to verify backward compatibility with the original behavior.
+
+#### When Dampening Applies
+
+Dampening is applied based on multiple thresholds:
+
+- **Pattern Repetition**: Values approaching 1.0 trigger dampening (high repetition detected)
+- **Token Entropy**: Values below 0.4 trigger graduated dampening (low variety)
+- **Branch Similarity**: Values above 0.8 trigger dampening (similar branches)
+
+#### Graduated Dampening Formula
+
+Each factor is dampened individually using a graduated calculation:
+
+```rust
+// Simplified version - actual implementation in src/complexity/entropy.rs:185-195
+fn calculate_dampening_factor(
+    repetition: f64,     // 0.0-1.0
+    entropy: f64,        // 0.0-1.0
+    branch_similarity: f64  // 0.0-1.0
+) -> f64 {
+    let repetition_factor = graduated_dampening(repetition, threshold=1.0, max_reduction=0.20);
+    let entropy_factor = graduated_dampening(entropy, threshold=0.4, max_reduction=0.15);
+    let branch_factor = graduated_dampening(branch_similarity, threshold=0.8, max_reduction=0.25);
+
+    (repetition_factor * entropy_factor * branch_factor).max(0.7)  // Never reduce below 70%
+}
+```
+
+**Key Parameters** (hardcoded in implementation):
+- **Repetition**: Threshold 1.0, max 20% reduction
+- **Entropy**: Threshold 0.4, max 15% reduction
+- **Branch Similarity**: Threshold 0.8, max 25% reduction
+- **Combined Floor**: Minimum 70% of original complexity preserved
+
+#### Example: Repetitive Validation Function
 
 ```
 Raw Complexity: 20
-Token Entropy: 0.1 (very low - highly repetitive)
+Pattern Repetition: 0.95 (very high)
+Token Entropy: 0.3 (low variety)
+Branch Similarity: 0.9 (very similar branches)
 
-dampening_factor = 0.5 + 0.5 × (0.1 / 0.2)
-                 = 0.5 + 0.5 × 0.5
-                 = 0.5 + 0.25
-                 = 0.75
+repetition_factor ≈ 0.85 (15% reduction)
+entropy_factor ≈ 0.90 (10% reduction)
+branch_factor ≈ 0.80 (20% reduction)
 
-Effective Complexity = 20 × 0.75 = 15
+dampening_factor = (0.85 × 0.90 × 0.80) = 0.612
+dampening_factor = max(0.612, 0.7) = 0.7  // Floor applied
 
-Result: 25% reduction (preserves 75% of original complexity)
+Effective Complexity = 20 × 0.7 = 14
+
+Result: 30% reduction (maximum allowed)
 ```
 
-#### Example: Normal Entropy (No Dampening)
+#### Example: Diverse State Machine
 
 ```
 Raw Complexity: 20
-Token Entropy: 0.5 (normal variety)
+Pattern Repetition: 0.2 (low - not repetitive)
+Token Entropy: 0.8 (high variety)
+Branch Similarity: 0.3 (diverse branches)
 
-dampening_factor = 1.0 (no dampening for entropy >= 0.2)
+repetition_factor ≈ 1.0 (no reduction)
+entropy_factor ≈ 1.0 (no reduction)
+branch_factor ≈ 1.0 (no reduction)
+
+dampening_factor = (1.0 × 1.0 × 1.0) = 1.0
 
 Effective Complexity = 20 × 1.0 = 20
 
-Result: 0% reduction (preserves 100% of original complexity)
+Result: 0% reduction (complexity preserved)
 ```
 
 ## Real-World Examples
@@ -224,56 +269,72 @@ Configure entropy analysis in `.debtmap.toml`:
 # Enable entropy analysis (default: true)
 enabled = true
 
-# Weight of entropy in complexity adjustment (0.0-1.0, default: 1.0)
+# Weight of entropy in overall complexity scoring (0.0-1.0, default: 1.0)
+# Note: This affects scoring, not dampening thresholds
 weight = 1.0
 
 # Minimum tokens required for entropy calculation (default: 20)
 min_tokens = 20
 
-# Pattern similarity threshold for detection (0.0-1.0, default: 0.7)
+# Pattern similarity threshold for repetition detection (0.0-1.0, default: 0.7)
 pattern_threshold = 0.7
 
-# Enable advanced token classification (default: true)
-use_classification = true
+# Enable advanced token classification (default: false for backward compatibility)
+# When true, weights tokens by semantic importance (control flow > operators > identifiers)
+use_classification = false
 
-# Entropy level below which dampening is applied (default: 0.4)
-entropy_threshold = 0.4
-
-# Branch similarity above which dampening is applied (default: 0.8)
+# Branch similarity threshold (0.0-1.0, default: 0.8)
+# Branches with similarity above this threshold contribute to dampening
 branch_threshold = 0.8
 
-# Maximum reduction from repetition patterns (default: 0.20 = 20%)
-max_repetition_reduction = 0.20
-
-# Maximum reduction from entropy analysis (default: 0.15 = 15%)
-max_entropy_reduction = 0.15
-
-# Maximum reduction from branch similarity (default: 0.25 = 25%)
-max_branch_reduction = 0.25
-
-# Maximum combined complexity reduction percentage (default: 0.30 = 30%)
-max_combined_reduction = 0.30
+# Maximum reduction limits (these are configurable)
+max_repetition_reduction = 0.20  # Max 20% reduction from pattern repetition
+max_entropy_reduction = 0.15     # Max 15% reduction from low token entropy
+max_branch_reduction = 0.25      # Max 25% reduction from branch similarity
+max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% preserved)
 ```
+
+**Important Notes:**
+
+1. **Graduated dampening thresholds are hardcoded** in the implementation (`src/complexity/entropy.rs:185-195`):
+   - Entropy threshold: 0.4 (not configurable via `entropy_threshold`)
+   - Branch threshold: 0.8 (configured via `branch_threshold`)
+   - Repetition threshold: 1.0 (via `pattern_threshold`)
+
+2. **The `weight` parameter** affects how entropy scores contribute to overall complexity scoring, but does not change the dampening thresholds or reductions.
+
+3. **Token classification** defaults to `false` (disabled) for backward compatibility, even though it provides more accurate entropy analysis when enabled.
 
 ### Tuning for Your Project
 
-**Strict mode (fewer false positive reductions):**
+**Enable token classification for better accuracy:**
 ```toml
 [entropy]
 enabled = true
-weight = 0.3
-max_combined_reduction = 0.5
+use_classification = true  # Weight control flow keywords more heavily
 ```
 
-**Lenient mode (more aggressive false positive reduction):**
+**Strict mode (fewer reductions, flag more code):**
 ```toml
 [entropy]
 enabled = true
-weight = 0.7
-max_combined_reduction = 0.9
+max_repetition_reduction = 0.10  # Reduce from default 0.20
+max_entropy_reduction = 0.08     # Reduce from default 0.15
+max_branch_reduction = 0.12      # Reduce from default 0.25
+max_combined_reduction = 0.20    # Reduce from default 0.30 (preserve 80%)
 ```
 
-**Disable entropy analysis:**
+**Lenient mode (more aggressive reduction):**
+```toml
+[entropy]
+enabled = true
+max_repetition_reduction = 0.30  # Increase from default 0.20
+max_entropy_reduction = 0.25     # Increase from default 0.15
+max_branch_reduction = 0.35      # Increase from default 0.25
+max_combined_reduction = 0.50    # Increase from default 0.30 (preserve 50%)
+```
+
+**Disable entropy dampening entirely:**
 ```toml
 [entropy]
 enabled = false
@@ -320,8 +381,10 @@ If entropy analysis incorrectly reduces flags on genuinely complex code, adjust 
 
 ```toml
 [entropy]
-weight = 0.3  # Reduce impact
-max_combined_reduction = 0.5  # Limit maximum reduction
+max_combined_reduction = 0.20  # Reduce from default 0.30 (preserve 80%)
+max_repetition_reduction = 0.10  # Reduce individual factors
+max_entropy_reduction = 0.08
+max_branch_reduction = 0.12
 ```
 
 ## Best Practices
