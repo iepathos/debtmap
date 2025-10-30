@@ -783,6 +783,65 @@ impl GodObjectDetector {
         )
     }
 
+    /// Analyzes module structure and visibility breakdown for Rust files
+    ///
+    /// # Arguments
+    /// * `path` - File path to check if it's a Rust file
+    /// * `is_god_object` - Whether this is classified as a god object
+    /// * `visitor` - Type visitor containing function information
+    /// * `all_methods` - All method names
+    /// * `total_methods` - Total number of methods
+    /// * `source_content` - Optional source content for detailed analysis
+    ///
+    /// # Returns
+    /// Tuple of (visibility_breakdown, module_structure)
+    fn analyze_module_structure_and_visibility(
+        path: &Path,
+        is_god_object: bool,
+        visitor: &TypeVisitor,
+        all_methods: &[String],
+        total_methods: usize,
+        source_content: &Option<String>,
+    ) -> (
+        Option<crate::organization::god_object_analysis::FunctionVisibilityBreakdown>,
+        Option<crate::analysis::ModuleStructure>,
+    ) {
+        // Calculate visibility breakdown for Rust files (Spec 134)
+        let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            Some(Self::calculate_visibility_breakdown(visitor, all_methods))
+        } else {
+            None
+        };
+
+        // Optionally generate detailed module structure analysis for Rust files
+        // Spec 140: Integrate visibility breakdown with module structure
+        let module_structure =
+            if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                if let Some(source_content) = source_content {
+                    use crate::analysis::ModuleStructureAnalyzer;
+                    let analyzer = ModuleStructureAnalyzer::new_rust();
+                    let mut structure = analyzer.analyze_rust_file(source_content, path);
+
+                    // Integrate visibility breakdown into function counts
+                    if let Some(ref breakdown) = visibility_breakdown {
+                        structure.function_counts = Self::integrate_visibility_into_counts(
+                            &structure.function_counts,
+                            breakdown,
+                            total_methods,
+                        );
+                    }
+
+                    Some(structure)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+        (visibility_breakdown, module_structure)
+    }
+
     /// # God Class vs God Module
     ///
     /// This function distinguishes between:
@@ -883,38 +942,16 @@ impl GodObjectDetector {
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
-        // Calculate visibility breakdown for Rust files (Spec 134)
-        let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
-            Some(Self::calculate_visibility_breakdown(&visitor, &all_methods))
-        } else {
-            None
-        };
-
-        // Optionally generate detailed module structure analysis for Rust files
-        // Spec 140: Integrate visibility breakdown with module structure
-        let module_structure =
-            if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                if let Some(source_content) = &self.source_content {
-                    use crate::analysis::ModuleStructureAnalyzer;
-                    let analyzer = ModuleStructureAnalyzer::new_rust();
-                    let mut structure = analyzer.analyze_rust_file(source_content, path);
-
-                    // Integrate visibility breakdown into function counts
-                    if let Some(ref breakdown) = visibility_breakdown {
-                        structure.function_counts = Self::integrate_visibility_into_counts(
-                            &structure.function_counts,
-                            breakdown,
-                            total_methods,
-                        );
-                    }
-
-                    Some(structure)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+        // Analyze module structure and visibility for Rust files
+        let (visibility_breakdown, module_structure) =
+            Self::analyze_module_structure_and_visibility(
+                path,
+                is_god_object,
+                &visitor,
+                &all_methods,
+                total_methods,
+                &self.source_content,
+            );
 
         GodObjectAnalysis {
             is_god_object,
