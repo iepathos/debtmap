@@ -4,117 +4,81 @@
   "chapter_file": "book/src/parallel-processing.md",
   "drift_detected": true,
   "severity": "medium",
-  "quality_assessment": "Chapter is highly accurate with comprehensive coverage. Minor issues include a duplicated section, one outdated code comment, and a missing edge case in error handling documentation. Overall quality is excellent.",
+  "quality_assessment": "Chapter is comprehensive and accurate but contains a minor inaccuracy about environment variables. Overall documentation quality is excellent with detailed explanations, code examples, and performance benchmarks.",
   "issues": [
     {
-      "type": "outdated_information",
-      "severity": "low",
-      "section": "Thread Pool Configuration (line 96)",
-      "description": "Code example shows line numbers 46-52 but actual implementation is at lines 49-54 in current code",
-      "current_content": "// From src/builders/parallel_call_graph.rs:46-52",
-      "should_be": "// From src/builders/parallel_call_graph.rs:49-54",
-      "fix_suggestion": "Update line number reference to reflect current code location",
-      "source_reference": "src/builders/parallel_call_graph.rs:49-54"
-    },
-    {
-      "type": "duplicate_content",
+      "type": "incorrect_information",
       "severity": "medium",
-      "section": "Parallel Architecture (lines 197-211)",
-      "description": "Section 'Parallel Architecture' (lines 197-211) duplicates information already covered in detail in 'Phase 1: Parallel File Parsing' section. This simplified version adds no new information and may confuse readers.",
-      "current_content": "### Parallel Architecture\n\nDebtmap processes files in parallel using Rayon's parallel iterators:\n\n```rust\nfiles.par_iter()\n    .map(|file| analyze_file(file))\n    .collect()\n```\n\nEach file is:\n1. Parsed independently\n2. Analyzed for complexity\n3. Scored and prioritized",
-      "should_be": "Remove this redundant section",
-      "fix_suggestion": "Delete lines 197-211 as this information is already covered in depth in the 'Phase 1: Parallel File Parsing' section (lines 133-158) with actual implementation code",
-      "source_reference": "book/src/parallel-processing.md:197-211"
-    },
-    {
-      "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "Worker Thread Selection (lines 107-131)",
-      "description": "Documentation mentions 'Falls back to 4 threads if detection fails (rare)' but doesn't explain when this might happen or how to detect it",
-      "current_content": "Falls back to 4 threads if detection fails (rare)",
-      "should_add": "Explain when this fallback occurs (e.g., very old systems, unusual OS configurations) and how to detect it in logs or verify the actual thread count being used",
-      "fix_suggestion": "Add a note explaining: 'This fallback occurs on systems where std::thread::available_parallelism() fails (extremely rare - typically only on very old OS versions or unusual containerization setups). Use -vv flag to see the actual thread count in logs.'",
-      "source_reference": "src/main.rs:750-757"
+      "section": "Environment Variable",
+      "description": "Chapter mentions RAYON_NUM_THREADS as an environment variable option, but the codebase only implements DEBTMAP_JOBS",
+      "current_content": "You can also set the default via the `RAYON_NUM_THREADS` or `DEBTMAP_JOBS` environment variable:\n\n```bash\nexport RAYON_NUM_THREADS=4\ndebtmap analyze  # Uses 4 threads\n```",
+      "should_be": "You can also set the default via the `DEBTMAP_JOBS` environment variable:\n\n```bash\nexport DEBTMAP_JOBS=4\ndebtmap analyze  # Uses 4 threads\n```",
+      "fix_suggestion": "Remove mention of RAYON_NUM_THREADS. The codebase only checks for DEBTMAP_JOBS environment variable in src/cli.rs:396, src/commands/validate.rs:71, and src/builders/unified_analysis.rs:664",
+      "source_reference": "src/cli.rs:396, src/commands/validate.rs:71, src/builders/unified_analysis.rs:664"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "CLI Flags for Parallelization",
-      "description": "Chapter doesn't mention DEBTMAP_JOBS environment variable until line 55, but it's a primary way to configure parallelism",
-      "should_add": "Earlier mention of DEBTMAP_JOBS in the main CLI flags section (around line 31) before diving into specific flag details",
-      "fix_suggestion": "Add a brief mention in the initial CLI Flags section that both --jobs flag and DEBTMAP_JOBS environment variable can control thread count, with cross-reference to the detailed explanation later",
-      "source_reference": "src/cli.rs:392"
-    },
-    {
-      "type": "unclear_content",
-      "severity": "low",
-      "section": "Performance Characteristics (lines 17-26)",
-      "description": "Chapter claims '10-100x faster' than competitors but this range is very wide and may not reflect typical performance differences",
-      "current_content": "Comparison with other tools (medium-sized Rust project, ~50k LOC):\n- SonarQube: 3-4 minutes\n- CodeClimate: 2-3 minutes\n- Debtmap: 5-8 seconds",
-      "should_be": "Add context: these are best-case comparisons for Rust projects where debtmap excels. For other languages, the advantage may be smaller (10-30x).",
-      "fix_suggestion": "Add a note clarifying: 'Performance comparison is for Rust projects where debtmap has native parser support. For other languages using tree-sitter, expect 10-30x speedup.' Also clarify if these competitor timings include their full analysis suite or just complexity analysis.",
-      "source_reference": "book/src/parallel-processing.md:22-25"
-    },
-    {
-      "type": "missing_best_practice",
-      "severity": "low",
-      "section": "Tuning Guidelines",
-      "description": "Missing guidance on how to determine if your analysis is CPU-bound vs I/O-bound",
-      "should_add": "Practical guidance: 'Run with different --jobs values and monitor CPU usage. If CPU usage is near 100% across all cores, you're CPU-bound (good). If CPU usage is low but I/O wait is high, you're I/O-bound (reduce threads or use SSD).'",
-      "fix_suggestion": "Add a 'Determining Bottlenecks' subsection under Performance Tuning with practical monitoring commands and interpretation guidance",
-      "source_reference": "book/src/parallel-processing.md:567-586"
+      "section": "Environment Variables",
+      "description": "Chapter doesn't document DEBTMAP_PARALLEL environment variable",
+      "should_add": "Document DEBTMAP_PARALLEL environment variable (accepts 'true' or '1') for enabling parallel processing programmatically",
+      "fix_suggestion": "Add subsection documenting DEBTMAP_PARALLEL alongside DEBTMAP_JOBS. This is used in src/builders/unified_analysis.rs:660 and src/commands/validate.rs:363",
+      "source_reference": "src/builders/unified_analysis.rs:660, src/commands/validate.rs:363"
     }
   ],
   "positive_aspects": [
-    "Excellent code-to-documentation accuracy - all code snippets match actual implementation",
-    "Comprehensive coverage of parallel processing features with real implementation examples",
-    "Clear progression from CLI flags → implementation → tuning → troubleshooting",
-    "Practical examples with real use cases and environment-specific guidance",
-    "Good cross-references to related chapters (CLI Reference, Cache Management, Troubleshooting)",
-    "Detailed explanation of DashMap benefits and trade-offs",
-    "Accurate description of three-phase parallel processing pipeline",
-    "Helpful troubleshooting section with concrete solutions",
-    "Performance benchmarks provide useful context for users",
-    "Good coverage of Rayon parallel iterators and thread pool configuration"
+    "Excellent detailed explanation of three-phase parallel architecture",
+    "Accurate code examples from actual implementation files with correct line numbers",
+    "Comprehensive coverage of Rayon parallel iterators and thread pool configuration",
+    "Accurate documentation of DashMap usage for lock-free concurrency",
+    "Detailed performance characteristics with real benchmark numbers",
+    "Excellent coverage of AST parsing optimization (Spec 132) with accurate numbers",
+    "Accurate documentation of cross-file call resolution parallel implementation",
+    "Comprehensive coverage of ParallelStats and atomic counter usage",
+    "Accurate documentation of concurrent merging with merge_concurrent()",
+    "Excellent documentation of CoverageIndex nested HashMap optimization",
+    "Helpful troubleshooting section with practical solutions",
+    "Good scaling strategy guidance for different project sizes",
+    "Accurate CLI flags documentation (--jobs, --no-parallel)",
+    "Code examples match actual implementation in src/builders/parallel_call_graph.rs",
+    "Performance numbers align with spec-132-benchmark-results.md"
   ],
   "improvement_suggestions": [
-    "Remove duplicate 'Parallel Architecture' section (lines 197-211)",
-    "Update line number reference in Thread Pool Configuration section",
-    "Add 'Determining Bottlenecks' subsection to help users diagnose CPU vs I/O bound issues",
-    "Clarify performance comparison context (Rust-specific vs other languages)",
-    "Add earlier mention of DEBTMAP_JOBS environment variable in CLI flags overview",
-    "Explain when thread count fallback occurs and how to detect it",
-    "Consider adding a diagram showing the three-phase parallel pipeline",
-    "Add examples of typical log output showing thread count detection",
-    "Include a quick reference table summarizing all parallelization options"
+    "Fix RAYON_NUM_THREADS reference to only mention DEBTMAP_JOBS",
+    "Add documentation for DEBTMAP_PARALLEL environment variable",
+    "Consider adding a quick reference table of all environment variables in one place",
+    "Minor: Consider adding references to benchmark files (benches/parallel_performance.rs, benches/coverage_performance.rs)"
   ],
   "metadata": {
-    "analyzed_at": "2025-01-13",
-    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "analyzed_at": "2025-10-30",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
     "topics_covered": [
       "Rayon parallel iterators",
       "Thread pool configuration",
       "Worker thread tuning",
       "Lock-free concurrent access with DashMap",
       "Performance benchmarks",
-      "Scaling strategies"
+      "Scaling strategies",
+      "AST parsing optimization (Spec 132)",
+      "Cross-file call resolution",
+      "Coverage index optimization",
+      "ParallelCallGraph implementation",
+      "CLI flags --jobs and --no-parallel"
     ],
     "validation_focus": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
     "code_references_verified": [
-      "src/builders/parallel_call_graph.rs:49-54 (Thread pool configuration)",
-      "src/builders/parallel_call_graph.rs:98-139 (Parallel file parsing)",
-      "src/builders/parallel_call_graph.rs:141-172 (Multi-file extraction)",
+      "src/builders/parallel_call_graph.rs:46-52 (ThreadPoolBuilder)",
+      "src/main.rs:802-810 (get_worker_count function)",
       "src/priority/parallel_call_graph.rs:7-47 (ParallelStats)",
       "src/priority/parallel_call_graph.rs:49-56 (ParallelCallGraph structure)",
-      "src/priority/parallel_call_graph.rs:78-96 (add_function)",
-      "src/priority/parallel_call_graph.rs:98-117 (add_call)",
-      "src/priority/parallel_call_graph.rs:119-138 (merge_concurrent)",
-      "src/priority/parallel_call_graph.rs:140-162 (to_call_graph)",
-      "src/main.rs:750-757 (get_worker_count)",
-      "src/cli.rs:386-394 (CLI flags)"
+      "src/priority/call_graph/cross_file.rs:243-312 (resolve_cross_file_calls)",
+      "src/risk/coverage_index.rs:43-57 (CoverageIndex structure)",
+      "src/cli.rs:157-162 (CLI flags)",
+      "docs/spec-132-benchmark-results.md (benchmark validation)"
     ],
-    "accuracy_score": "95%",
-    "completeness_score": "92%",
-    "clarity_score": "93%"
+    "dependencies_verified": {
+      "rayon": "1.10",
+      "dashmap": "6.1"
+    }
   }
 }
