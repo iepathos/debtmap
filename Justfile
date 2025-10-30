@@ -112,15 +112,23 @@ coverage:
 # Run tests with coverage (lcov format)
 coverage-lcov:
     #!/usr/bin/env bash
+    set -euo pipefail  # Exit on error, undefined variables, and pipe failures
     # Ensure rustup's cargo is in PATH (needed for llvm-tools-preview)
     export PATH="$HOME/.cargo/bin:$PATH"
     echo "Building debtmap binary for integration tests..."
     cargo build --bin debtmap
     echo "Cleaning previous coverage data..."
     cargo llvm-cov clean
+    # Ensure target/coverage directory exists
+    mkdir -p target/coverage
     echo "Generating code coverage report with cargo-llvm-cov (lcov format)..."
     cargo llvm-cov --all-features --lcov --output-path target/coverage/lcov.info
     echo "Coverage report generated at target/coverage/lcov.info"
+    # Verify the file was actually created
+    if [ ! -f target/coverage/lcov.info ]; then
+        echo "ERROR: Coverage file was not generated at target/coverage/lcov.info"
+        exit 1
+    fi
 
 # Run tests with coverage and check threshold
 coverage-check:
