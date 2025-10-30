@@ -1463,6 +1463,46 @@ impl TwoPassExtractor {
             .collect()
     }
 
+    /// Register observer interfaces discovered from usage analysis
+    fn register_observer_interfaces_from_usage(
+        observer_registry: &std::sync::Arc<
+            std::sync::RwLock<
+                crate::analysis::python_call_graph::observer_registry::ObserverRegistry,
+            >,
+        >,
+        type_tracker: &PythonTypeTracker,
+        type_ids_by_collection: Vec<(String, Vec<TypeId>)>,
+    ) {
+        for (collection_path, type_ids) in type_ids_by_collection {
+            for type_id in type_ids {
+                // Register the type as an interface
+                observer_registry
+                    .write()
+                    .unwrap()
+                    .register_interface(&type_id.name);
+
+                // Also register base classes as interfaces
+                let collection_types = type_tracker.with_type_flow(|flow| {
+                    flow.get_collection_types(&collection_path)
+                        .into_iter()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                });
+                if let Some(type_info) = collection_types
+                    .into_iter()
+                    .find(|ti| ti.type_id == type_id)
+                {
+                    for base_class in &type_info.base_classes {
+                        observer_registry
+                            .write()
+                            .unwrap()
+                            .register_interface(&base_class.name);
+                    }
+                }
+            }
+        }
+    }
+
     /// Discover observer interfaces via usage analysis (after type flow tracking)
     /// This identifies interfaces by analyzing how types are used in observer collections
     fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
@@ -1474,34 +1514,11 @@ impl TwoPassExtractor {
             Self::collect_type_ids_for_observers(&self.type_tracker, &observer_collections);
 
         // Step 3: Register these types as observer interfaces
-        for (collection_path, type_ids) in type_ids_by_collection {
-            for type_id in type_ids {
-                // Register the type as an interface
-                self.observer_registry
-                    .write()
-                    .unwrap()
-                    .register_interface(&type_id.name);
-
-                // Also register base classes as interfaces
-                let collection_types = self.type_tracker.with_type_flow(|flow| {
-                    flow.get_collection_types(&collection_path)
-                        .into_iter()
-                        .cloned()
-                        .collect::<Vec<_>>()
-                });
-                if let Some(type_info) = collection_types
-                    .into_iter()
-                    .find(|ti| ti.type_id == type_id)
-                {
-                    for base_class in &type_info.base_classes {
-                        self.observer_registry
-                            .write()
-                            .unwrap()
-                            .register_interface(&base_class.name);
-                    }
-                }
-            }
-        }
+        Self::register_observer_interfaces_from_usage(
+            &self.observer_registry,
+            &self.type_tracker,
+            type_ids_by_collection,
+        );
 
         // Step 4: Analyze dispatch loops to find interface methods
         self.analyze_dispatch_loops_for_interface_methods(module);
