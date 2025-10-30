@@ -3,8 +3,9 @@ use super::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
     EnhancedGodObjectAnalysis, FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds,
-    GodObjectType, MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector,
-    PurityAnalyzer, PurityDistribution, PurityLevel, ResponsibilityGroup, StructMetrics,
+    GodObjectType, MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern,
+    OrganizationDetector, PurityAnalyzer, PurityDistribution, PurityLevel, RecommendationSeverity,
+    ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
@@ -478,106 +479,83 @@ impl GodObjectDetector {
 
     /// Analyzes a file for god object patterns.
     ///
-    /// # God Class vs God Module
+    /// Determines whether the file contains a God Class or God File
     ///
-    /// This function distinguishes between:
-    /// - **God Class**: Single struct with excessive methods (>20), fields (>15)
-    /// - **God Module**: File with excessive standalone functions (>50)
+    /// # Arguments
+    /// * `primary_type` - The largest type in the file (if any)
+    /// * `visitor` - Type visitor containing parsed type information
+    /// * `standalone_count` - Number of standalone functions in the file
     ///
-    /// Previously, this incorrectly combined standalone functions with struct
-    /// methods, causing false positives for functional/procedural modules.
-    /// Now it analyzes struct methods separately from standalone functions.
-    pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
-        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
-        visitor.visit_file(ast);
-
-        // Build per-struct metrics for domain analysis (Spec 140)
-        let per_struct_metrics = self.build_per_struct_metrics(&visitor);
-
-        // Get thresholds based on file extension
-        let thresholds = Self::get_thresholds_for_path(path);
-
-        // Find the largest type (struct with most methods) as primary god object candidate
-        let primary_type = visitor
-            .types
-            .values()
-            .max_by_key(|t| t.method_count + t.field_count * 2);
-
-        // Count standalone functions in addition to methods from types
-        let standalone_count = visitor.standalone_functions.len();
-
+    /// # Returns
+    /// Tuple of (total_methods, total_fields, all_methods, total_complexity, detection_type)
+    fn determine_god_object_type(
+        primary_type: Option<&TypeAnalysis>,
+        visitor: &TypeVisitor,
+        standalone_count: usize,
+    ) -> (usize, usize, Vec<String>, u32, DetectionType) {
         // Spec 118 & 130: Distinguish between God Class and God File
         // - God Class: Struct with excessive methods (tests excluded)
         // - God File: File with excessive functions/lines (tests included)
-        let (total_methods, total_fields, all_methods, total_complexity, detection_type) =
-            if let Some(type_info) = primary_type {
-                // God Class analysis: struct with impl methods
-                // Spec 130: Filter out test functions for god class detection
-                let struct_method_names: std::collections::HashSet<_> =
-                    type_info.methods.iter().collect();
+        if let Some(type_info) = primary_type {
+            // God Class analysis: struct with impl methods
+            // Spec 130: Filter out test functions for god class detection
+            let struct_method_names: std::collections::HashSet<_> =
+                type_info.methods.iter().collect();
 
-                // Production methods only (exclude tests)
-                let production_complexity: Vec<_> = visitor
-                    .function_complexity
-                    .iter()
-                    .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
-                    .cloned()
-                    .collect();
+            // Production methods only (exclude tests)
+            let production_complexity: Vec<_> = visitor
+                .function_complexity
+                .iter()
+                .filter(|fc| struct_method_names.contains(&fc.name) && !fc.is_test)
+                .cloned()
+                .collect();
 
-                let production_methods: Vec<String> = production_complexity
-                    .iter()
-                    .map(|fc| fc.name.clone())
-                    .collect();
+            let production_methods: Vec<String> = production_complexity
+                .iter()
+                .map(|fc| fc.name.clone())
+                .collect();
 
-                let total_methods = production_methods.len();
-                let total_complexity: u32 = production_complexity
-                    .iter()
-                    .map(|fc| fc.cyclomatic_complexity)
-                    .sum();
+            let total_methods = production_methods.len();
+            let total_complexity: u32 = production_complexity
+                .iter()
+                .map(|fc| fc.cyclomatic_complexity)
+                .sum();
 
-                (
-                    total_methods,
-                    type_info.field_count,
-                    production_methods,
-                    total_complexity,
-                    DetectionType::GodClass,
-                )
-            } else {
-                // No struct/impl blocks found - God File analysis
-                // Spec 130: Include ALL functions (production + tests) for file size concerns
-                let all_methods = visitor.standalone_functions.clone();
-                let total_complexity = (standalone_count * 5) as u32;
-
-                (
-                    standalone_count,
-                    0,
-                    all_methods,
-                    total_complexity,
-                    DetectionType::GodFile,
-                )
-            };
-
-        // Count actual lines more accurately by looking at span information
-        // For now, use a better heuristic based on item count and complexity
-        // Spec 134 Phase 3: Use filtered total_methods for consistency
-        let lines_of_code = if primary_type.is_some() {
-            // Estimate based on filtered method count (production methods only)
-            total_methods * 15 + total_fields * 2 + 50
+            (
+                total_methods,
+                type_info.field_count,
+                production_methods,
+                total_complexity,
+                DetectionType::GodClass,
+            )
         } else {
-            // If no types, estimate based on standalone functions
-            standalone_count * 10 + 20
-        };
+            // No struct/impl blocks found - God File analysis
+            // Spec 130: Include ALL functions (production + tests) for file size concerns
+            let all_methods = visitor.standalone_functions.clone();
+            let total_complexity = (standalone_count * 5) as u32;
 
-        let responsibility_groups = group_methods_by_responsibility(&all_methods);
+            (
+                standalone_count,
+                0,
+                all_methods,
+                total_complexity,
+                DetectionType::GodFile,
+            )
+        }
+    }
 
-        // Defensive check: Ensure we never report 0 responsibilities when functions exist
-        // If grouping failed or returned empty, default to 1 (all functions share one responsibility)
-        let responsibility_count = if responsibility_groups.is_empty() && !all_methods.is_empty() {
-            1
-        } else {
-            responsibility_groups.len()
-        };
-
+    /// Calculates complexity-weighted metrics for the god object analysis
+    ///
+    /// # Arguments
+    /// * `visitor` - Type visitor containing function information
+    /// * `detection_type` - Whether analyzing a God Class or God File
+    ///
+    /// # Returns
+    /// Tuple of (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution)
+    fn calculate_weighted_metrics(
+        visitor: &TypeVisitor,
+        detection_type: &DetectionType,
+    ) -> (f64, f64, f64, Option<PurityDistribution>) {
         // Calculate complexity-weighted metrics
         // Spec 130: For God Class, use production functions only; for God File, use all
         let relevant_complexity: Vec<_> = match detection_type {
@@ -629,6 +607,43 @@ impl GodObjectDetector {
             (weighted_method_count, None)
         };
 
+        (
+            weighted_method_count,
+            avg_complexity,
+            purity_weighted_count,
+            purity_distribution,
+        )
+    }
+
+    /// Calculates the final god object score using the best available metrics
+    ///
+    /// # Arguments
+    /// * `purity_weighted_count` - Purity-based weighted count
+    /// * `weighted_method_count` - Complexity-weighted method count
+    /// * `total_methods` - Raw method count
+    /// * `total_fields` - Number of fields
+    /// * `responsibility_count` - Number of responsibilities
+    /// * `lines_of_code` - Estimated lines of code
+    /// * `avg_complexity` - Average complexity
+    /// * `purity_distribution` - Optional purity distribution
+    /// * `has_complexity_data` - Whether complexity data is available
+    /// * `thresholds` - God object thresholds
+    ///
+    /// # Returns
+    /// Tuple of (god_object_score, is_god_object)
+    #[allow(clippy::too_many_arguments)]
+    fn calculate_final_god_object_score(
+        purity_weighted_count: f64,
+        weighted_method_count: f64,
+        total_methods: usize,
+        total_fields: usize,
+        responsibility_count: usize,
+        lines_of_code: usize,
+        avg_complexity: f64,
+        purity_distribution: &Option<PurityDistribution>,
+        has_complexity_data: bool,
+        thresholds: &GodObjectThresholds,
+    ) -> (f64, bool) {
         // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
         let god_object_score = if purity_distribution.is_some() {
             calculate_god_object_score_weighted(
@@ -637,16 +652,16 @@ impl GodObjectDetector {
                 responsibility_count,
                 lines_of_code,
                 avg_complexity,
-                &thresholds,
+                thresholds,
             )
-        } else if !visitor.function_complexity.is_empty() {
+        } else if has_complexity_data {
             calculate_god_object_score_weighted(
                 weighted_method_count,
                 total_fields,
                 responsibility_count,
                 lines_of_code,
                 avg_complexity,
-                &thresholds,
+                thresholds,
             )
         } else {
             calculate_god_object_score(
@@ -654,27 +669,51 @@ impl GodObjectDetector {
                 total_fields,
                 responsibility_count,
                 lines_of_code,
-                &thresholds,
+                thresholds,
             )
         };
-
-        let confidence = determine_confidence(
-            total_methods,
-            total_fields,
-            responsibility_count,
-            lines_of_code,
-            total_complexity,
-            &thresholds,
-        );
 
         // With complexity weighting, use the god_object_score to determine if it's a god object
         // rather than just the confidence level (which still uses raw counts)
         let is_god_object = god_object_score >= 70.0;
 
+        (god_object_score, is_god_object)
+    }
+
+    /// Analyzes cross-domain struct mixing and generates module split recommendations
+    ///
+    /// # Arguments
+    /// * `per_struct_metrics` - Metrics for each struct in the file
+    /// * `total_methods` - Total number of methods
+    /// * `lines_of_code` - Estimated lines of code
+    /// * `is_god_object` - Whether this is classified as a god object
+    /// * `path` - File path for generating split names
+    /// * `all_methods` - All method names
+    /// * `responsibility_groups` - Methods grouped by responsibility
+    ///
+    /// # Returns
+    /// Tuple of (recommended_splits, analysis_method, cross_domain_severity, domain_count, domain_diversity, struct_ratio)
+    #[allow(clippy::type_complexity)]
+    fn analyze_domains_and_recommend_splits(
+        per_struct_metrics: &[StructMetrics],
+        total_methods: usize,
+        lines_of_code: usize,
+        is_god_object: bool,
+        path: &Path,
+        all_methods: &[String],
+        responsibility_groups: &HashMap<String, Vec<String>>,
+    ) -> (
+        Vec<ModuleSplit>,
+        crate::organization::SplitAnalysisMethod,
+        Option<RecommendationSeverity>,
+        usize,
+        f64,
+        f64,
+    ) {
         // Cross-domain struct mixing analysis (Spec 140)
         let struct_count = per_struct_metrics.len();
         let domain_count = if struct_count >= 5 {
-            crate::organization::count_distinct_domains(&per_struct_metrics)
+            crate::organization::count_distinct_domains(per_struct_metrics)
         } else {
             0
         };
@@ -703,7 +742,7 @@ impl GodObjectDetector {
         let (recommended_splits, analysis_method) = if struct_count >= 5 && domain_count >= 3 {
             // PRIORITY 1: Cross-domain mixing analysis (primary strategy)
             let mut splits =
-                crate::organization::suggest_module_splits_by_domain(&per_struct_metrics);
+                crate::organization::suggest_module_splits_by_domain(per_struct_metrics);
 
             // Attach severity to all splits
             if let Some(severity) = cross_domain_severity {
@@ -725,8 +764,8 @@ impl GodObjectDetector {
             (
                 crate::organization::recommend_module_splits(
                     file_name,
-                    &all_methods,
-                    &responsibility_groups,
+                    all_methods,
+                    responsibility_groups,
                 ),
                 crate::organization::SplitAnalysisMethod::MethodBased,
             )
@@ -734,11 +773,42 @@ impl GodObjectDetector {
             (Vec::new(), crate::organization::SplitAnalysisMethod::None)
         };
 
-        let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+        (
+            recommended_splits,
+            analysis_method,
+            cross_domain_severity,
+            domain_count,
+            domain_diversity,
+            struct_ratio,
+        )
+    }
 
+    /// Analyzes module structure and visibility breakdown for Rust files
+    ///
+    /// # Arguments
+    /// * `path` - File path to check if it's a Rust file
+    /// * `is_god_object` - Whether this is classified as a god object
+    /// * `visitor` - Type visitor containing function information
+    /// * `all_methods` - All method names
+    /// * `total_methods` - Total number of methods
+    /// * `source_content` - Optional source content for detailed analysis
+    ///
+    /// # Returns
+    /// Tuple of (visibility_breakdown, module_structure)
+    fn analyze_module_structure_and_visibility(
+        path: &Path,
+        is_god_object: bool,
+        visitor: &TypeVisitor,
+        all_methods: &[String],
+        total_methods: usize,
+        source_content: &Option<String>,
+    ) -> (
+        Option<crate::organization::god_object_analysis::FunctionVisibilityBreakdown>,
+        Option<crate::analysis::ModuleStructure>,
+    ) {
         // Calculate visibility breakdown for Rust files (Spec 134)
         let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
-            Some(Self::calculate_visibility_breakdown(&visitor, &all_methods))
+            Some(Self::calculate_visibility_breakdown(visitor, all_methods))
         } else {
             None
         };
@@ -747,7 +817,7 @@ impl GodObjectDetector {
         // Spec 140: Integrate visibility breakdown with module structure
         let module_structure =
             if is_god_object && path.extension().and_then(|s| s.to_str()) == Some("rs") {
-                if let Some(source_content) = &self.source_content {
+                if let Some(source_content) = source_content {
                     use crate::analysis::ModuleStructureAnalyzer;
                     let analyzer = ModuleStructureAnalyzer::new_rust();
                     let mut structure = analyzer.analyze_rust_file(source_content, path);
@@ -768,6 +838,120 @@ impl GodObjectDetector {
             } else {
                 None
             };
+
+        (visibility_breakdown, module_structure)
+    }
+
+    /// # God Class vs God Module
+    ///
+    /// This function distinguishes between:
+    /// - **God Class**: Single struct with excessive methods (>20), fields (>15)
+    /// - **God Module**: File with excessive standalone functions (>50)
+    ///
+    /// Previously, this incorrectly combined standalone functions with struct
+    /// methods, causing false positives for functional/procedural modules.
+    /// Now it analyzes struct methods separately from standalone functions.
+    pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+        visitor.visit_file(ast);
+
+        // Build per-struct metrics for domain analysis (Spec 140)
+        let per_struct_metrics = self.build_per_struct_metrics(&visitor);
+
+        // Get thresholds based on file extension
+        let thresholds = Self::get_thresholds_for_path(path);
+
+        // Find the largest type (struct with most methods) as primary god object candidate
+        let primary_type = visitor
+            .types
+            .values()
+            .max_by_key(|t| t.method_count + t.field_count * 2);
+
+        // Count standalone functions in addition to methods from types
+        let standalone_count = visitor.standalone_functions.len();
+
+        // Determine whether this is a God Class or God File
+        let (total_methods, total_fields, all_methods, total_complexity, detection_type) =
+            Self::determine_god_object_type(primary_type, &visitor, standalone_count);
+
+        // Count actual lines more accurately by looking at span information
+        // For now, use a better heuristic based on item count and complexity
+        // Spec 134 Phase 3: Use filtered total_methods for consistency
+        let lines_of_code = if primary_type.is_some() {
+            // Estimate based on filtered method count (production methods only)
+            total_methods * 15 + total_fields * 2 + 50
+        } else {
+            // If no types, estimate based on standalone functions
+            standalone_count * 10 + 20
+        };
+
+        let responsibility_groups = group_methods_by_responsibility(&all_methods);
+
+        // Defensive check: Ensure we never report 0 responsibilities when functions exist
+        // If grouping failed or returned empty, default to 1 (all functions share one responsibility)
+        let responsibility_count = if responsibility_groups.is_empty() && !all_methods.is_empty() {
+            1
+        } else {
+            responsibility_groups.len()
+        };
+
+        // Calculate complexity-weighted and purity-weighted metrics
+        let (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution) =
+            Self::calculate_weighted_metrics(&visitor, &detection_type);
+
+        // Calculate the final god object score and determination
+        let (god_object_score, is_god_object) = Self::calculate_final_god_object_score(
+            purity_weighted_count,
+            weighted_method_count,
+            total_methods,
+            total_fields,
+            responsibility_count,
+            lines_of_code,
+            avg_complexity,
+            &purity_distribution,
+            !visitor.function_complexity.is_empty(),
+            &thresholds,
+        );
+
+        let confidence = determine_confidence(
+            total_methods,
+            total_fields,
+            responsibility_count,
+            lines_of_code,
+            total_complexity,
+            &thresholds,
+        );
+
+        // Analyze cross-domain mixing and generate split recommendations
+        let (
+            recommended_splits,
+            analysis_method,
+            cross_domain_severity,
+            domain_count,
+            domain_diversity,
+            struct_ratio,
+        ) = Self::analyze_domains_and_recommend_splits(
+            &per_struct_metrics,
+            total_methods,
+            lines_of_code,
+            is_god_object,
+            path,
+            &all_methods,
+            &responsibility_groups,
+        );
+
+        let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+
+        // Analyze module structure and visibility for Rust files
+        let (visibility_breakdown, module_structure) =
+            Self::analyze_module_structure_and_visibility(
+                path,
+                is_god_object,
+                &visitor,
+                &all_methods,
+                total_methods,
+                &self.source_content,
+            );
 
         GodObjectAnalysis {
             is_god_object,
