@@ -3,95 +3,110 @@
   "chapter_title": "Tiered Prioritization",
   "chapter_file": "book/src/tiered-prioritization.md",
   "drift_detected": true,
-  "severity": "high",
-  "quality_assessment": "Chapter has accurate high-level content but contains incorrect TOML configuration syntax that won't work. The nested [tiers.tier_weights] format shown in examples doesn't match actual implementation which uses flat fields.",
+  "severity": "critical",
+  "quality_assessment": "Chapter documents a RecommendationTier system (T1-T4) that exists in code but is NOT used in actual output. The display system uses a different score-based Tier enum (Critical/High/Moderate/Low). This is a fundamental disconnect between documented and actual behavior.",
   "issues": [
     {
-      "type": "incorrect_example",
+      "type": "missing_implementation",
+      "severity": "critical",
+      "section": "Terminal Output",
+      "description": "Chapter shows tiered output with T1/T2/T3/T4 classification, but actual terminal output uses score-based tiers (Critical/High/Moderate/Low)",
+      "current_content": "Terminal output example shows:\n🔴 TIER 1: CRITICAL ARCHITECTURE (3 items)\n🟠 TIER 2: COMPLEX UNTESTED (12 items)\n🟡 TIER 3: TESTING GAPS (45 items)\n⚪ TIER 4: MAINTENANCE (120 items)",
+      "should_be": "Terminal output actually displays:\nTECHNICAL DEBT ANALYSIS - PRIORITY TIERS\nCritical (score >= 90)\nHigh (score 70-89.9)\nModerate (score 50-69.9)\nLow (score < 50)",
+      "fix_suggestion": "Either implement RecommendationTier-based display or update chapter to document the actual score-based tier system. The RecommendationTier classification exists but is not connected to the output layer.",
+      "source_reference": "src/priority/mod.rs:430 (Tier enum) vs src/priority/tiers.rs:10 (RecommendationTier enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "JSON Output",
+      "description": "Chapter documents tier_distribution in JSON output, but this field does not exist in UnifiedOutput or UnifiedJsonOutput",
+      "current_content": "Chapter shows:\n{\n  \"tier_distribution\": {\n    \"t1_count\": 3,\n    \"t2_count\": 12,\n    \"t3_count\": 45,\n    \"t4_count\": 120\n  }\n}",
+      "should_be": "JSON output does not include any tier_distribution field",
+      "fix_suggestion": "Either add tier_distribution to UnifiedOutput/DebtSummary or remove this example from the chapter. If adding, need to classify items by RecommendationTier and include counts in summary.",
+      "source_reference": "src/output/unified.rs:35 (DebtSummary struct)"
+    },
+    {
+      "type": "missing_content",
       "severity": "high",
-      "section": "Configuration - Tier Weight Customization",
-      "description": "Chapter shows nested [tiers.tier_weights] TOML table, but implementation expects flat fields directly in [tiers]",
-      "current_content": "[tiers.tier_weights]\nt1 = 1.5\nt2 = 1.0\nt3 = 0.7\nt4 = 0.3",
-      "should_be": "[tiers]\nt1_weight = 1.5\nt2_weight = 1.0\nt3_weight = 0.7\nt4_weight = 0.3",
-      "fix_suggestion": "Update all TOML examples to use flat field names (t1_weight, t2_weight, t3_weight, t4_weight) directly in [tiers] section, not nested [tiers.tier_weights]",
-      "source_reference": "src/priority/tiers.rs:62-86 TierConfig struct with flat fields"
-    },
-    {
-      "type": "incorrect_example",
-      "severity": "high",
-      "section": "Configuration - Default Tier Thresholds",
-      "description": "Example shows nested tier_weights section which won't parse correctly",
-      "current_content": "# Tier weights\n[tiers.tier_weights]\nt1 = 1.5    # Critical architecture\nt2 = 1.0    # Complex untested\nt3 = 0.7    # Testing gaps\nt4 = 0.3    # Maintenance",
-      "should_be": "[tiers]\n# Tier weights\nt1_weight = 1.5    # Critical architecture\nt2_weight = 1.0    # Complex untested\nt3_weight = 0.7    # Testing gaps\nt4_weight = 0.3    # Maintenance",
-      "fix_suggestion": "Flatten the tier_weights into the main [tiers] section using correct field names with _weight suffix",
-      "source_reference": "src/priority/tiers.rs:75-85 shows t1_weight, t2_weight, t3_weight, t4_weight fields"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Configuration",
-      "description": "Chapter doesn't show complete working example with all threshold and weight fields together",
-      "should_add": "Add a complete [tiers] section example showing all available fields: t2_complexity_threshold, t2_dependency_threshold, t3_complexity_threshold, show_t4_in_main_report, t1_weight, t2_weight, t3_weight, t4_weight",
-      "fix_suggestion": "Add a 'Complete Configuration Example' subsection showing all [tiers] fields in one place with explanatory comments",
-      "source_reference": "src/priority/tiers.rs:62-86 TierConfig struct definition"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Configuration",
-      "description": "Chapter doesn't document the preset configurations available",
-      "should_add": "Document that TierConfig has strict(), balanced(), and lenient() preset configurations available programmatically",
-      "fix_suggestion": "Add note that these are the default values and mention that presets exist in the codebase",
-      "source_reference": "src/priority/tiers.rs:104-128 shows strict(), balanced(), lenient() methods"
-    },
-    {
-      "type": "missing_content",
-      "severity": "low",
-      "section": "Tier 1: Critical Architecture",
-      "description": "Chapter mentions god objects and complexity but doesn't explain the exact criteria for Tier 1 classification",
-      "should_add": "Clarify that Tier 1 includes: GodObject debt type, GodModule debt type, and ComplexityHotspot with cyclomatic > 50",
-      "fix_suggestion": "Add a 'Tier 1 Classification Criteria' subsection explaining the exact conditions from is_architectural_issue()",
-      "source_reference": "src/priority/tiers.rs:151-159 is_architectural_issue() function"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Tier 2: Complex Untested",
-      "description": "Chapter doesn't fully explain all criteria for Tier 2 classification",
-      "should_add": "Document that Tier 2 includes TestingGap items meeting ANY of: cyclomatic >= t2_complexity_threshold (15), total_dependencies >= t2_dependency_threshold (10), OR is an EntryPoint function",
-      "fix_suggestion": "Expand 'Tier 2: Complex Untested' section with complete classification logic including the OR conditions",
-      "source_reference": "src/priority/tiers.rs:161-183 is_complex_untested() function shows OR logic"
+      "section": "JSON Output",
+      "description": "Chapter shows 'tier' field on individual items with values like 'T1CriticalArchitecture', but this field is not included in JSON output",
+      "current_content": "Chapter shows:\n{\n  \"tier\": \"T1CriticalArchitecture\",\n  \"priority_weight\": 1.5,\n  \"base_score\": 8.5,\n  \"final_score\": 12.75\n}",
+      "should_be": "UnifiedDebtItemOutput does not include a tier field",
+      "fix_suggestion": "Either add tier field to FunctionDebtItemOutput/FileDebtItemOutput or remove from chapter examples. Note: UnifiedDebtItem has optional tier field, but it's not included in output serialization.",
+      "source_reference": "src/output/unified.rs:64-70 (UnifiedDebtItemOutput), src/priority/mod.rs:249 (UnifiedDebtItem.tier)"
     },
     {
       "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Chapter shows [tiers] section in TOML but doesn't explain relationship to overall Config structure",
+      "current_content": "[tiers]\nt2_complexity_threshold = 15",
+      "should_be": "Should note that tiers config is optional and integrated into main Config via 'pub tiers: Option<TierConfig>'",
+      "fix_suggestion": "Add note that tier configuration is optional and accessed via config.tiers field. Include full path example like debtmap analyze . --config .debtmap.toml",
+      "source_reference": "src/config.rs:668 (Config.tiers field)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Tier Weights",
+      "description": "Chapter explains tier weights are applied during prioritization, but doesn't show WHERE or HOW they affect scoring",
+      "current_content": "Tier weights are multipliers applied to base debt scores during prioritization",
+      "should_be": "Should explain that tier weights are retrieved via tier.weight(&config) but the actual application to scores is not visible in the provided implementation",
+      "fix_suggestion": "Add section showing how tier weights integrate with UnifiedScore calculation or scoring pipeline. Show code example or formula.",
+      "source_reference": "src/priority/tiers.rs:30-37 (weight method)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Default Values",
+      "description": "Chapter documents default tier thresholds and weights but doesn't mention preset methods (strict, balanced, lenient)",
+      "current_content": "Shows only default values in isolation",
+      "should_be": "TierConfig has preset methods: strict(), balanced(), and lenient() with different threshold combinations",
+      "fix_suggestion": "Add section on tier presets showing the three built-in configurations and their use cases",
+      "source_reference": "src/priority/tiers.rs:104-128 (TierConfig preset methods)"
+    },
+    {
+      "type": "unclear_content",
       "severity": "low",
-      "section": "Use Cases - Sprint Planning",
-      "description": "Example commands use --filter Architecture but this isn't fully explained in context of tiers",
-      "current_content": "debtmap analyze . --filter Architecture --top 5",
-      "fix_suggestion": "Add note that --filter operates independently of tier classification - tiers are about prioritization within results, filters are about selecting debt categories",
-      "source_reference": "Tiers are applied after filtering in the output pipeline"
+      "section": "Tier 1 Example",
+      "description": "Chapter lists 'Functions with cyclomatic complexity > 50' as Tier 1 example, which is technically correct but incomplete",
+      "current_content": "Examples include 'Functions with cyclomatic complexity > 50 (extreme complexity hotspots requiring architectural redesign)'",
+      "should_be": "Code checks: DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 50",
+      "fix_suggestion": "Clarify that this refers to ComplexityHotspot debt type with cyclomatic > 50, not just any function with that complexity",
+      "source_reference": "src/priority/tiers.rs:156 (is_architectural_issue function)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Tier Configuration",
+      "description": "Chapter doesn't mention that show_t4_in_main_report affects display filtering",
+      "current_content": "Shows show_t4_in_main_report = false with note about hiding Tier 4",
+      "should_be": "Should explain how this config value actually affects output filtering in practice",
+      "fix_suggestion": "Add implementation note about how show_t4_in_main_report is used in filtering logic or note if it's not yet implemented",
+      "source_reference": "src/priority/tiers.rs:73 (TierConfig.show_t4_in_main_report field)"
     }
   ],
   "positive_aspects": [
-    "Clear explanation of the four-tier strategy and rationale",
-    "Good descriptions of when to address each tier",
-    "Helpful concrete examples for each tier",
-    "Well-structured use cases section",
-    "Good best practices guidance",
-    "Terminal output example is clear and illustrative",
-    "Troubleshooting section addresses common issues"
+    "Clear explanation of the four-tier strategy and their purposes",
+    "Good examples of what belongs in each tier",
+    "Comprehensive TOML configuration examples",
+    "Helpful use cases for sprint planning and refactoring",
+    "Default threshold values match implementation exactly",
+    "Tier classification logic (T1-T4) is accurately described and matches code"
   ],
   "improvement_suggestions": [
-    "Fix all TOML configuration examples to use correct flat field syntax",
-    "Add a 'Complete Configuration Example' showing all fields in correct format",
-    "Add subsection explaining exact classification criteria for each tier",
-    "Clarify relationship between tiers and other filtering/scoring mechanisms",
-    "Add note that tier classification happens automatically - not user-controlled",
-    "Consider adding example showing before/after of tier configuration changes",
-    "Link to configuration.md chapter for more details on [tiers] section"
+    "CRITICAL: Resolve the disconnect between RecommendationTier (T1-T4) and display Tier (Critical/High/Moderate/Low). Either implement RecommendationTier-based output or rewrite chapter to document the actual score-based system.",
+    "Add section explaining that two tier systems exist: RecommendationTier for classification and score-based Tier for display",
+    "Remove or implement tier_distribution and per-item tier fields in JSON output",
+    "Add examples showing actual terminal output format (score-based tiers)",
+    "Document the relationship between tier weights and final scoring calculation",
+    "Add tier preset configurations (strict, balanced, lenient)",
+    "Include integration examples showing tier config in full .debtmap.toml context",
+    "Add troubleshooting for when RecommendationTier classifications don't match user expectations"
   ],
   "metadata": {
-    "analyzed_at": "2025-01-13",
+    "analyzed_at": "2025-10-30",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Tier 1: Critical Architecture",
