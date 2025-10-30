@@ -4,8 +4,8 @@ use super::{
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
     EnhancedGodObjectAnalysis, FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds,
     GodObjectType, MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern,
-    OrganizationDetector, PurityAnalyzer, PurityDistribution, PurityLevel,
-    RecommendationSeverity, ResponsibilityGroup, StructMetrics,
+    OrganizationDetector, PurityAnalyzer, PurityDistribution, PurityLevel, RecommendationSeverity,
+    ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
@@ -493,7 +493,6 @@ impl GodObjectDetector {
         visitor: &TypeVisitor,
         standalone_count: usize,
     ) -> (usize, usize, Vec<String>, u32, DetectionType) {
-
         // Spec 118 & 130: Distinguish between God Class and God File
         // - God Class: Struct with excessive methods (tests excluded)
         // - God File: File with excessive functions/lines (tests included)
@@ -632,6 +631,7 @@ impl GodObjectDetector {
     ///
     /// # Returns
     /// Tuple of (god_object_score, is_god_object)
+    #[allow(clippy::too_many_arguments)]
     fn calculate_final_god_object_score(
         purity_weighted_count: f64,
         weighted_method_count: f64,
