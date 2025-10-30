@@ -75,8 +75,9 @@ map:
   # Note: Items are wrapped in either File or Function enums
   # File items: item.File.score
   # Function items: item.Function.unified_score.final_score
+  # NULLS LAST ensures Files (with non-null File.score) sort before Functions (with null File.score)
   filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
-  sort_by: "File.score DESC, Function.unified_score.final_score DESC"  # Process highest score items first
+  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"  # Process highest score items first
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
