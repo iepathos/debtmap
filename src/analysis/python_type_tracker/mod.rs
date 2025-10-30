@@ -636,7 +636,6 @@ pub struct TwoPassExtractor {
     pending_observer_dispatches: Vec<(ast::StmtFor, FunctionId, Option<String>)>,
 }
 
-
 impl TwoPassExtractor {
     /// Check if a function name is a framework entry point using the framework registry
     fn is_framework_entry_point(&self, func_name: &str, decorators: &[&str]) -> bool {
