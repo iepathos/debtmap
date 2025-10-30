@@ -702,6 +702,73 @@ pub fn group_methods_by_responsibility_multi_signal(
     groups
 }
 
+/// Responsibility category definition for method name classification
+struct ResponsibilityCategory {
+    name: &'static str,
+    prefixes: &'static [&'static str],
+}
+
+impl ResponsibilityCategory {
+    /// Check if a method name matches any of this category's prefixes
+    fn matches(&self, method_name: &str) -> bool {
+        self.prefixes
+            .iter()
+            .any(|prefix| method_name.starts_with(prefix))
+    }
+}
+
+/// Static responsibility categories ordered by specificity (more specific first)
+const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
+    ResponsibilityCategory {
+        name: "Formatting & Output",
+        prefixes: &["format", "render", "write", "print"],
+    },
+    ResponsibilityCategory {
+        name: "Parsing & Input",
+        prefixes: &["parse", "read", "extract"],
+    },
+    ResponsibilityCategory {
+        name: "Filtering & Selection",
+        prefixes: &["filter", "select", "find"],
+    },
+    ResponsibilityCategory {
+        name: "Transformation",
+        prefixes: &["transform", "convert", "map", "apply"],
+    },
+    ResponsibilityCategory {
+        name: "Data Access",
+        prefixes: &["get", "set"],
+    },
+    ResponsibilityCategory {
+        name: "Validation",
+        prefixes: &["validate", "check", "verify", "is"],
+    },
+    ResponsibilityCategory {
+        name: "Computation",
+        prefixes: &["calculate", "compute"],
+    },
+    ResponsibilityCategory {
+        name: "Construction",
+        prefixes: &["create", "build", "new"],
+    },
+    ResponsibilityCategory {
+        name: "Persistence",
+        prefixes: &["save", "load", "store"],
+    },
+    ResponsibilityCategory {
+        name: "Processing",
+        prefixes: &["process", "handle"],
+    },
+    ResponsibilityCategory {
+        name: "Communication",
+        prefixes: &["send", "receive"],
+    },
+    ResponsibilityCategory {
+        name: "Utilities",
+        prefixes: &[],
+    },
+];
+
 /// Infer responsibility category from function/method name.
 ///
 /// This function uses common naming patterns to categorize functions into
