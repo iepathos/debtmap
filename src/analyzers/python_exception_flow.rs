@@ -421,143 +421,19 @@ impl ExceptionFlowAnalyzer {
 
     /// Detect exception flow patterns
     fn detect_patterns(&self) -> Vec<ExceptionFlowPattern> {
-        let mut patterns = Vec::new();
-
-        for (func_name, flow) in &self.exception_flows {
-            // Pattern: Undocumented exceptions
-            for exc_info in &flow.raised_exceptions {
-                if !exc_info.is_documented
-                    && !flow
-                        .documented_exceptions
-                        .iter()
-                        .any(|doc| doc.exception_type == exc_info.exception_type.name())
-                {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::UndocumentedException,
-                        severity: Severity::Medium,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: Some(exc_info.exception_type.name()),
-                        explanation: format!(
-                            "Function '{}' raises {} but doesn't document it",
-                            func_name,
-                            exc_info.exception_type.name()
-                        ),
-                        suggestion: format!(
-                            "Add '{}' to the Raises section of the docstring",
-                            exc_info.exception_type.name()
-                        ),
-                    });
-                }
-            }
-
-            // Pattern: Documented but not raised
-            for doc_exc in &flow.documented_exceptions {
-                if !flow.raised_exceptions.iter().any(|exc| {
-                    exc.exception_type.name() == doc_exc.exception_type
-                        || exc.exception_type.is_subclass_of(&doc_exc.exception_type)
-                }) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::ExceptionNotRaised,
-                        severity: Severity::Low,
-                        confidence: 0.7,
-                        function_name: func_name.clone(),
-                        exception_type: Some(doc_exc.exception_type.clone()),
-                        explanation: format!(
-                            "Function '{}' documents {} but doesn't raise it",
-                            func_name, doc_exc.exception_type
-                        ),
-                        suggestion: "Remove from documentation or add the raise statement"
-                            .to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Bare except
-            for caught in &flow.caught_exceptions {
-                if caught.is_bare_except {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::BareExcept,
-                        severity: Severity::High,
-                        confidence: 1.0,
-                        function_name: func_name.clone(),
-                        exception_type: None,
-                        explanation:
-                            "Bare except clause catches all exceptions including system exits"
-                                .to_string(),
-                        suggestion: "Specify the exception types you want to catch".to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Overly broad handler
-            for caught in &flow.caught_exceptions {
-                if caught.is_overly_broad && !caught.is_bare_except {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::OverlyBroadHandler,
-                        severity: Severity::Medium,
-                        confidence: 0.8,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Overly broad exception catching may hide bugs".to_string(),
-                        suggestion: "Catch specific exception types instead".to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Exception swallowing
-            for caught in &flow.caught_exceptions {
-                if matches!(caught.handler_action, HandlerAction::Ignore) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::ExceptionSwallowing,
-                        severity: Severity::High,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Exception caught but not logged or re-raised".to_string(),
-                        suggestion: "Add logging, re-raise, or handle the error properly"
-                            .to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Log and ignore
-            for caught in &flow.caught_exceptions {
-                if matches!(caught.handler_action, HandlerAction::Log) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::LogAndIgnore,
-                        severity: Severity::Medium,
-                        confidence: 0.8,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Exception logged but not re-raised or handled".to_string(),
-                        suggestion: "Consider re-raising the exception after logging".to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Lost context in transformation
-            for transform in &flow.transformed_exceptions {
-                if !transform.preserves_context {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::TransformationLost,
-                        severity: Severity::Medium,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: Some(transform.raised_type.name()),
-                        explanation:
-                            "Exception transformation loses context (use 'raise ... from ...')"
-                                .to_string(),
-                        suggestion: format!(
-                            "Use 'raise {}(...) from e' to preserve exception context",
-                            transform.raised_type.name()
-                        ),
-                    });
-                }
-            }
-        }
-
-        patterns
+        self.exception_flows
+            .iter()
+            .flat_map(|(func_name, flow)| {
+                [
+                    detect_undocumented_exceptions(func_name, flow),
+                    detect_documented_not_raised(func_name, flow),
+                    detect_handler_patterns(func_name, &flow.caught_exceptions),
+                    detect_log_and_ignore(func_name, &flow.caught_exceptions),
+                    detect_transformation_lost(func_name, &flow.transformed_exceptions),
+                ]
+            })
+            .flatten()
+            .collect()
     }
 
     /// Build exception propagation graph integrated with call graph
@@ -669,6 +545,179 @@ impl ExceptionFlowAnalyzer {
             })
             .collect()
     }
+}
+
+/// Detect undocumented exceptions in a function
+///
+/// Pure function that identifies exceptions raised by a function that are not
+/// documented in its docstring.
+fn detect_undocumented_exceptions(
+    func_name: &str,
+    flow: &ExceptionFlow,
+) -> Vec<ExceptionFlowPattern> {
+    flow.raised_exceptions
+        .iter()
+        .filter(|exc_info| {
+            !exc_info.is_documented
+                && !flow
+                    .documented_exceptions
+                    .iter()
+                    .any(|doc| doc.exception_type == exc_info.exception_type.name())
+        })
+        .map(|exc_info| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::UndocumentedException,
+            severity: Severity::Medium,
+            confidence: 0.9,
+            function_name: func_name.to_string(),
+            exception_type: Some(exc_info.exception_type.name()),
+            explanation: format!(
+                "Function '{}' raises {} but doesn't document it",
+                func_name,
+                exc_info.exception_type.name()
+            ),
+            suggestion: format!(
+                "Add '{}' to the Raises section of the docstring",
+                exc_info.exception_type.name()
+            ),
+        })
+        .collect()
+}
+
+/// Detect documented exceptions that are not raised
+///
+/// Pure function that identifies exceptions documented in a function's docstring
+/// that are not actually raised in the function body.
+fn detect_documented_not_raised(
+    func_name: &str,
+    flow: &ExceptionFlow,
+) -> Vec<ExceptionFlowPattern> {
+    flow.documented_exceptions
+        .iter()
+        .filter(|doc_exc| {
+            !flow.raised_exceptions.iter().any(|exc| {
+                exc.exception_type.name() == doc_exc.exception_type
+                    || exc.exception_type.is_subclass_of(&doc_exc.exception_type)
+            })
+        })
+        .map(|doc_exc| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::ExceptionNotRaised,
+            severity: Severity::Low,
+            confidence: 0.7,
+            function_name: func_name.to_string(),
+            exception_type: Some(doc_exc.exception_type.clone()),
+            explanation: format!(
+                "Function '{}' documents {} but doesn't raise it",
+                func_name, doc_exc.exception_type
+            ),
+            suggestion: "Remove from documentation or add the raise statement".to_string(),
+        })
+        .collect()
+}
+
+/// Detect exception handler patterns
+///
+/// Pure function that identifies problematic exception handler patterns in caught exceptions.
+/// Detects three pattern types in a single pass: BareExcept, OverlyBroadHandler, and ExceptionSwallowing.
+fn detect_handler_patterns(
+    func_name: &str,
+    caught_exceptions: &[CaughtException],
+) -> Vec<ExceptionFlowPattern> {
+    caught_exceptions
+        .iter()
+        .flat_map(|caught| {
+            let mut patterns = Vec::new();
+
+            // Pattern: Bare except
+            if caught.is_bare_except {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::BareExcept,
+                    severity: Severity::High,
+                    confidence: 1.0,
+                    function_name: func_name.to_string(),
+                    exception_type: None,
+                    explanation: "Bare except clause catches all exceptions including system exits"
+                        .to_string(),
+                    suggestion: "Specify the exception types you want to catch".to_string(),
+                });
+            }
+
+            // Pattern: Overly broad handler
+            if caught.is_overly_broad && !caught.is_bare_except {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::OverlyBroadHandler,
+                    severity: Severity::Medium,
+                    confidence: 0.8,
+                    function_name: func_name.to_string(),
+                    exception_type: caught.exception_types.first().map(|t| t.name()),
+                    explanation: "Overly broad exception catching may hide bugs".to_string(),
+                    suggestion: "Catch specific exception types instead".to_string(),
+                });
+            }
+
+            // Pattern: Exception swallowing
+            if matches!(caught.handler_action, HandlerAction::Ignore) {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::ExceptionSwallowing,
+                    severity: Severity::High,
+                    confidence: 0.9,
+                    function_name: func_name.to_string(),
+                    exception_type: caught.exception_types.first().map(|t| t.name()),
+                    explanation: "Exception caught but not logged or re-raised".to_string(),
+                    suggestion: "Add logging, re-raise, or handle the error properly".to_string(),
+                });
+            }
+
+            patterns
+        })
+        .collect()
+}
+
+/// Detect log-and-ignore exception pattern
+///
+/// Pure function that identifies caught exceptions that are only logged but not re-raised or handled.
+fn detect_log_and_ignore(
+    func_name: &str,
+    caught_exceptions: &[CaughtException],
+) -> Vec<ExceptionFlowPattern> {
+    caught_exceptions
+        .iter()
+        .filter(|caught| matches!(caught.handler_action, HandlerAction::Log))
+        .map(|caught| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::LogAndIgnore,
+            severity: Severity::Medium,
+            confidence: 0.8,
+            function_name: func_name.to_string(),
+            exception_type: caught.exception_types.first().map(|t| t.name()),
+            explanation: "Exception logged but not re-raised or handled".to_string(),
+            suggestion: "Consider re-raising the exception after logging".to_string(),
+        })
+        .collect()
+}
+
+/// Detect lost exception context in transformations
+///
+/// Pure function that identifies exception transformations that don't preserve context.
+fn detect_transformation_lost(
+    func_name: &str,
+    transformations: &[ExceptionTransformation],
+) -> Vec<ExceptionFlowPattern> {
+    transformations
+        .iter()
+        .filter(|transform| !transform.preserves_context)
+        .map(|transform| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::TransformationLost,
+            severity: Severity::Medium,
+            confidence: 0.9,
+            function_name: func_name.to_string(),
+            exception_type: Some(transform.raised_type.name()),
+            explanation: "Exception transformation loses context (use 'raise ... from ...')"
+                .to_string(),
+            suggestion: format!(
+                "Use 'raise {}(...) from e' to preserve exception context",
+                transform.raised_type.name()
+            ),
+        })
+        .collect()
 }
 
 /// Information about a raised exception
