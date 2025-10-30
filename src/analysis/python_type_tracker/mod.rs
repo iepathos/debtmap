@@ -2,6 +2,15 @@
 //!
 //! Provides type inference and tracking for Python code to improve call graph accuracy.
 //! Uses two-pass resolution for better method resolution and reduced false positives.
+//!
+//! This module is organized into focused sub-modules:
+//! - `types`: Core type definitions (PythonType, ClassInfo, FunctionSignature, Scope)
+//! - (More modules will be added as refactoring progresses)
+
+mod types;
+
+// Re-export public types for backward compatibility
+pub use types::{ClassInfo, FunctionSignature, PythonType, Scope};
 
 use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
@@ -10,78 +19,6 @@ use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId}
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-
-/// Python type representation for tracking
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PythonType {
-    /// Class type (e.g., `MyClass`)
-    Class(String),
-    /// Instance of a class (e.g., `MyClass()`)
-    Instance(String),
-    /// Function or method
-    Function(FunctionSignature),
-    /// Module
-    Module(String),
-    /// Union of multiple possible types
-    Union(Vec<PythonType>),
-    /// Built-in type
-    BuiltIn(String),
-    /// Unknown type
-    Unknown,
-}
-
-/// Function signature information
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FunctionSignature {
-    pub name: String,
-    pub params: Vec<String>,
-    pub return_type: Option<Box<PythonType>>,
-}
-
-/// Class information including hierarchy and members
-#[derive(Debug, Clone)]
-pub struct ClassInfo {
-    pub name: String,
-    pub bases: Vec<String>,
-    pub methods: HashMap<String, FunctionId>,
-    pub attributes: HashMap<String, PythonType>,
-    pub static_methods: HashSet<String>,
-    pub class_methods: HashSet<String>,
-    pub properties: HashSet<String>,
-}
-
-/// Scope information for tracking variables
-#[derive(Debug, Clone)]
-pub struct Scope {
-    pub variables: HashMap<String, PythonType>,
-    pub parent: Option<Box<Scope>>,
-}
-
-impl Scope {
-    fn new() -> Self {
-        Self {
-            variables: HashMap::new(),
-            parent: None,
-        }
-    }
-
-    fn with_parent(parent: Scope) -> Self {
-        Self {
-            variables: HashMap::new(),
-            parent: Some(Box::new(parent)),
-        }
-    }
-
-    fn lookup(&self, name: &str) -> Option<&PythonType> {
-        self.variables
-            .get(name)
-            .or_else(|| self.parent.as_ref().and_then(|p| p.lookup(name)))
-    }
-
-    fn insert(&mut self, name: String, ty: PythonType) {
-        self.variables.insert(name, ty);
-    }
-}
 
 /// Python type tracker for improved call resolution
 pub struct PythonTypeTracker {
