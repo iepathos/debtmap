@@ -4,7 +4,7 @@ Debtmap automatically detects common design patterns in your codebase to provide
 
 ## Overview
 
-Debtmap detects 9 design patterns across Python, JavaScript, TypeScript, and Rust:
+Debtmap detects 7 design patterns across Python, JavaScript, TypeScript, and Rust:
 
 | Pattern | Primary Language | Detection Confidence |
 |---------|-----------------|---------------------|
@@ -15,8 +15,6 @@ Debtmap detects 9 design patterns across Python, JavaScript, TypeScript, and Rus
 | Callback | Python, JavaScript | High (0.8-0.9) |
 | Template Method | Python | Medium (0.7-0.8) |
 | Dependency Injection | Python | Medium (0.65-0.75) |
-| Builder | Rust | Medium (0.7-0.8) |
-| Visitor | Rust | High (0.85-0.95) |
 
 Pattern detection serves multiple purposes:
 - **Reduces false positives**: Avoids flagging idiomatic pattern implementations as overly complex
@@ -432,24 +430,24 @@ class ReportGenerator:
 # No user-configurable options currently
 ```
 
-### Builder Pattern (Rust)
+## Internal Pattern Detection
 
-Builder pattern detection in Rust identifies builder structs with chaining methods that construct complex objects.
+Debtmap also detects certain patterns internally for analysis purposes, but these are not exposed as user-facing design pattern detection features. These internal patterns help improve the accuracy of other analyses like god object detection and complexity calculations.
 
-**Detection Criteria**:
+### Builder Pattern (Internal Use Only)
+
+The Builder pattern is detected internally during **god object detection** to avoid false positives. Classes that follow the builder pattern are given adjusted scores in god object analysis since builder classes naturally have many methods and fields.
+
+**Note**: Builder pattern detection is **not available** via the `--patterns` CLI flag. It's used only internally for scoring adjustments.
+
+**Internal Detection Criteria**:
 - Struct with builder suffix or builder-related naming
 - Methods returning `Self` for chaining
 - Final `build()` method returning the constructed type
 - Type-state pattern usage (optional)
 
-**Example**:
+**Example** (Internal Detection):
 ```rust
-pub struct HttpClient {
-    base_url: String,
-    timeout: Duration,
-    headers: HashMap<String, String>,
-}
-
 pub struct HttpClientBuilder {
     base_url: Option<String>,
     timeout: Duration,
@@ -457,57 +455,34 @@ pub struct HttpClientBuilder {
 }
 
 impl HttpClientBuilder {
-    pub fn new() -> Self {
-        Self {
-            base_url: None,
-            timeout: Duration::from_secs(30),
-            headers: HashMap::new(),
-        }
-    }
+    pub fn new() -> Self { /* ... */ }
 
-    pub fn base_url(mut self, url: impl Into<String>) -> Self {
-        self.base_url = Some(url.into());
-        self
-    }
+    // Chaining methods detected internally
+    pub fn base_url(mut self, url: impl Into<String>) -> Self { /* ... */ }
+    pub fn timeout(mut self, timeout: Duration) -> Self { /* ... */ }
+    pub fn header(mut self, key: String, value: String) -> Self { /* ... */ }
 
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = timeout;
-        self
-    }
-
-    pub fn header(mut self, key: String, value: String) -> Self {
-        self.headers.insert(key, value);
-        self
-    }
-
-    pub fn build(self) -> Result<HttpClient> {
-        let base_url = self.base_url.ok_or("base_url is required")?;
-        Ok(HttpClient {
-            base_url,
-            timeout: self.timeout,
-            headers: self.headers,
-        })
-    }
+    pub fn build(self) -> Result<HttpClient> { /* ... */ }
 }
 ```
 
-**Confidence**: Medium-High (0.7-0.8) based on method signatures and naming conventions.
+**Why Internal Only**: Builder patterns are a legitimate design choice for complex object construction. Debtmap detects them to prevent flagging builder classes as god objects, but doesn't report them as design patterns since they don't require complexity adjustments like other patterns.
 
-**Source**: Analyzed via `src/organization/builder_pattern.rs`
+**Source**: `src/organization/builder_pattern.rs` - Used for god object detection score adjustment
 
-### Visitor Pattern (Rust)
+### Visitor Pattern (Internal Use Only)
 
-Visitor pattern detection in Rust identifies trait-based exhaustive matching patterns used for complexity normalization.
+The Visitor pattern is detected internally for **complexity analysis normalization**. When exhaustive pattern matching is detected (typical of visitor patterns), Debtmap applies logarithmic complexity scaling instead of linear scaling to avoid penalizing idiomatic exhaustive match expressions.
 
-**Detection Criteria**:
+**Note**: Visitor pattern detection is **not available** via the `--patterns` CLI flag. It's used only internally for complexity scaling adjustments.
+
+**Internal Detection Criteria**:
 - Trait with visit methods for different types
 - Implementations providing behavior for each visited type
 - Exhaustive pattern matching across enum variants
 - Used primarily for AST traversal or data structure processing
 
-**Note**: Debtmap's Visitor pattern detection is primarily used internally for complexity analysis adjustments rather than as a general-purpose design pattern detector. It identifies visitor-like patterns to apply logarithmic complexity scaling instead of linear scaling.
-
-**Example** (Internal Usage):
+**Example** (Internal Detection):
 ```rust
 trait Visitor {
     fn visit_function(&mut self, func: &Function);
@@ -517,20 +492,18 @@ trait Visitor {
 
 impl Visitor for ComplexityVisitor {
     fn visit_function(&mut self, func: &Function) {
-        // Calculate function complexity
+        // Exhaustive matching detected for complexity scaling
         match &func.body {
             FunctionBody::Simple => { /* ... */ }
             FunctionBody::Complex(statements) => { /* ... */ }
         }
     }
-
-    // Exhaustive matching triggers visitor pattern recognition
 }
 ```
 
-**Confidence**: High (0.85-0.95) for trait-based exhaustive matching patterns.
+**Why Internal Only**: Visitor patterns often involve exhaustive pattern matching which can appear complex by traditional metrics. Debtmap detects these patterns to apply logarithmic scaling (`log2(match_arms) * avg_complexity`) instead of linear, preventing false positives in complexity analysis. This is a complexity adjustment mechanism, not a user-visible pattern detection feature.
 
-**Source**: Implemented in `src/complexity/visitor_detector.rs`
+**Source**: `src/complexity/visitor_detector.rs` - Used for complexity analysis, not pattern reporting
 
 ## Configuration
 
@@ -542,7 +515,10 @@ Enable or configure pattern detection using command-line flags:
 # Disable all pattern detection
 debtmap analyze --no-pattern-detection
 
-# Enable only specific patterns
+# Enable only specific patterns (all 7 available patterns shown)
+debtmap analyze --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
+
+# Enable a subset of patterns
 debtmap analyze --patterns observer,singleton,factory
 
 # Set confidence threshold (0.0-1.0)
@@ -551,6 +527,17 @@ debtmap analyze --pattern-threshold 0.8
 # Show warnings for uncertain pattern detections
 debtmap analyze --show-pattern-warnings
 ```
+
+**Available Patterns for `--patterns` Flag**:
+- `observer` - Observer pattern detection
+- `singleton` - Singleton pattern detection
+- `factory` - Factory pattern detection
+- `strategy` - Strategy pattern detection
+- `callback` - Callback pattern detection
+- `template_method` - Template method pattern detection
+- `dependency_injection` - Dependency injection detection
+
+**Note**: Builder and Visitor patterns are detected internally but are **not available** via the `--patterns` flag. See [Internal Pattern Detection](#internal-pattern-detection) for details.
 
 ### Configuration File
 
@@ -784,13 +771,13 @@ Example:
 
 ### Visitor Pattern Special Case
 
-Visitor patterns use **logarithmic scaling** instead of linear:
+Debtmap internally detects visitor-like patterns (exhaustive matching) and applies **logarithmic scaling** instead of linear complexity:
 
 ```
 visitor_complexity = log2(match_arms) * average_arm_complexity
 ```
 
-This prevents exhaustive pattern matching from being flagged as overly complex.
+This prevents exhaustive pattern matching from being flagged as overly complex. Note that this is an internal complexity adjustment mechanism, not a user-visible design pattern detection feature. See [Visitor Pattern (Internal Use Only)](#visitor-pattern-internal-use-only) for more details.
 
 **See Also**:
 - [Entropy Analysis](./entropy-analysis.md) - Pattern dampening in entropy calculations
@@ -968,6 +955,18 @@ debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 3. Implementation doesn't match detection criteria
    - Solution: Review pattern-specific criteria above or add custom rule
 
+### Builder or Visitor Pattern Not Available via CLI
+
+**Symptoms**: Using `--patterns builder` or `--patterns visitor` has no effect
+
+**Explanation**: Builder and Visitor patterns are detected **internally only** and are not available as user-facing pattern detection features:
+- **Builder**: Used internally during god object detection to adjust scores for builder classes
+- **Visitor**: Used internally for complexity analysis to apply logarithmic scaling to exhaustive match expressions
+
+**Solution**: These patterns are detected automatically when needed for internal analyses. They don't require manual enablement and won't appear in pattern detection output. See [Internal Pattern Detection](#internal-pattern-detection) for details.
+
+**Available user-facing patterns**: `observer`, `singleton`, `factory`, `strategy`, `callback`, `template_method`, `dependency_injection`
+
 ### False Positive Detection
 
 **Symptoms**: Pattern detected incorrectly
@@ -1000,11 +999,12 @@ debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 ## Summary
 
 Debtmap's design pattern detection provides:
-- **9 built-in patterns** covering common OOP and functional patterns
+- **7 user-facing patterns** covering common OOP and functional patterns (Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection)
+- **2 internal patterns** (Builder, Visitor) used for god object detection and complexity normalization
 - **Configurable confidence thresholds** for precision vs. recall tradeoff
 - **Custom pattern rules** for project-specific patterns
 - **Cross-file detection** for patterns spanning multiple modules
 - **Rust trait support** for idiomatic Rust pattern detection
 - **Complexity integration** to reduce false positives in analysis
 
-Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments.
+Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments. Internal pattern detection helps prevent false positives in god object and complexity analyses without exposing implementation details to users.
