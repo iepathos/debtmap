@@ -1384,48 +1384,74 @@ impl TwoPassExtractor {
         }
     }
 
-    /// Discover observer interfaces via usage analysis (after type flow tracking)
-    /// This identifies interfaces by analyzing how types are used in observer collections
-    fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
+    /// Find observer collections in module by analyzing class __init__ methods
+    /// Returns a list of (class_name, field_name) tuples for observer collections
+    fn find_observer_collections(module: &ast::ModModule) -> Vec<(String, String)> {
         use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
 
-        // Step 1: Find all observer collections
-        let mut observer_collections: Vec<(String, String)> = Vec::new();
-
-        for stmt in &module.body {
-            if let ast::Stmt::ClassDef(class_def) = stmt {
-                let class_name = &class_def.name.to_string();
-
-                // Look for observer collections in __init__
-                for method_stmt in &class_def.body {
-                    if let ast::Stmt::FunctionDef(func_def) = method_stmt {
-                        if func_def.name.as_str() == "__init__" {
-                            for init_stmt in &func_def.body {
+        module
+            .body
+            .iter()
+            .filter_map(|stmt| {
+                if let ast::Stmt::ClassDef(class_def) = stmt {
+                    Some((class_def.name.to_string(), &class_def.body))
+                } else {
+                    None
+                }
+            })
+            .flat_map(|(class_name, body)| {
+                body.iter()
+                    .filter_map(move |method_stmt| {
+                        if let ast::Stmt::FunctionDef(func_def) = method_stmt {
+                            if func_def.name.as_str() == "__init__" {
+                                Some((class_name.clone(), &func_def.body))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .flat_map(|(class_name, init_body)| {
+                        init_body
+                            .iter()
+                            .filter_map(move |init_stmt| {
                                 if let ast::Stmt::Assign(assign) = init_stmt {
-                                    for target in &assign.targets {
-                                        if let ast::Expr::Attribute(attr) = target {
-                                            if let ast::Expr::Name(name) = &*attr.value {
-                                                if name.id.as_str() == "self" {
-                                                    let field_name = attr.attr.as_str();
-                                                    if ObserverRegistry::is_observer_collection_name(
-                                                        field_name,
-                                                    ) {
-                                                        observer_collections.push((
-                                                            class_name.clone(),
-                                                            field_name.to_string(),
-                                                        ));
-                                                    }
+                                    Some((class_name.clone(), &assign.targets))
+                                } else {
+                                    None
+                                }
+                            })
+                            .flat_map(|(class_name, targets)| {
+                                targets.iter().filter_map(move |target| {
+                                    if let ast::Expr::Attribute(attr) = target {
+                                        if let ast::Expr::Name(name) = &*attr.value {
+                                            if name.id.as_str() == "self" {
+                                                let field_name = attr.attr.as_str();
+                                                if ObserverRegistry::is_observer_collection_name(
+                                                    field_name,
+                                                ) {
+                                                    return Some((
+                                                        class_name.clone(),
+                                                        field_name.to_string(),
+                                                    ));
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                                    None
+                                })
+                            })
+                    })
+            })
+            .collect()
+    }
+
+    /// Discover observer interfaces via usage analysis (after type flow tracking)
+    /// This identifies interfaces by analyzing how types are used in observer collections
+    fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
+        // Step 1: Find all observer collections
+        let observer_collections = Self::find_observer_collections(module);
 
         // Step 2: For each observer collection, get types from type flow tracker
         for (class_name, field_name) in observer_collections {
