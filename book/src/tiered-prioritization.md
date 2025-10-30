@@ -6,6 +6,12 @@ Debtmap uses a sophisticated tiered prioritization system to surface critical ar
 
 The tiered prioritization system organizes technical debt into four distinct tiers based on impact, urgency, and architectural significance. This prevents "walls of similar-scored items" and ensures critical issues don't get lost among minor problems.
 
+**Two Tier Systems**: Debtmap uses two complementary tier systems:
+1. **RecommendationTier** (T1-T4): Used internally to classify items based on architectural significance and testing needs
+2. **Display Tier** (Critical/High/Moderate/Low): Score-based tiers shown in terminal output, derived from final calculated scores
+
+The configuration examples below control the RecommendationTier classification logic, which influences scoring through tier weights. The final display uses score-based tiers for consistency across all output formats.
+
 ## The Four Tiers
 
 ### Tier 1: Critical Architecture
@@ -21,7 +27,7 @@ The tiered prioritization system organizes technical debt into four distinct tie
 **Examples**:
 - Files with 15+ responsibilities
 - Modules with 50+ methods
-- Functions with cyclomatic complexity > 50 (extreme complexity hotspots requiring architectural redesign)
+- ComplexityHotspot debt items with cyclomatic complexity > 50 (extreme complexity requiring architectural redesign)
 - God objects flagged by detection algorithms
 - Circular dependencies affecting core modules
 
@@ -91,6 +97,8 @@ debtmap analyze . --lcov coverage.lcov --min-priority high
 
 ## Configuration
 
+Tier configuration is optional in `.debtmap.toml`. If not specified, Debtmap uses the balanced defaults shown below.
+
 ### Default Tier Thresholds
 
 ```toml
@@ -103,7 +111,7 @@ t2_dependency_threshold = 10         # Dependency count cutoff
 t3_complexity_threshold = 10         # Lower complexity threshold
 
 # Display options
-show_t4_in_main_report = false      # Hide Tier 4 from main output
+show_t4_in_main_report = false      # Hide Tier 4 from main output (not yet implemented)
 
 # Tier weights (multipliers applied to base scores)
 t1_weight = 1.5    # Critical architecture
@@ -112,20 +120,54 @@ t3_weight = 0.7    # Testing gaps
 t4_weight = 0.3    # Maintenance
 ```
 
-### Customizing Tier Thresholds
+To use tier-based prioritization with custom settings, add the `[tiers]` section to your `.debtmap.toml` configuration file:
 
-Adjust thresholds to match your team's standards:
+```bash
+# Analyze with custom tier configuration
+debtmap analyze . --config .debtmap.toml
+```
 
+### Tier Preset Configurations
+
+Debtmap provides three built-in tier presets for different project needs:
+
+**Balanced (Default)**
 ```toml
-# Stricter thresholds for high-quality codebases
 [tiers]
-t2_complexity_threshold = 12
-t3_complexity_threshold = 8
+t2_complexity_threshold = 15
+t2_dependency_threshold = 10
+t3_complexity_threshold = 10
+```
+Suitable for most projects. Balances detection sensitivity with manageable issue counts.
 
-# More lenient for legacy codebases
+**Strict**
+```toml
+[tiers]
+t2_complexity_threshold = 10
+t2_dependency_threshold = 7
+t3_complexity_threshold = 7
+```
+For high-quality codebases or teams with strict quality standards. Flags more items as requiring attention.
+
+**Lenient**
+```toml
 [tiers]
 t2_complexity_threshold = 20
+t2_dependency_threshold = 15
 t3_complexity_threshold = 15
+```
+For legacy codebases or gradual technical debt reduction. Focuses on the most critical issues first.
+
+### Customizing Tier Thresholds
+
+You can also create custom threshold configurations tailored to your project:
+
+```toml
+# Custom thresholds for specific project needs
+[tiers]
+t2_complexity_threshold = 12
+t2_dependency_threshold = 8
+t3_complexity_threshold = 8
 ```
 
 ### Tier Weight Customization
@@ -197,49 +239,76 @@ debtmap analyze . --lcov coverage.lcov --min-priority medium
 
 ### Terminal Output
 
+Terminal output displays items grouped by **score-based tiers**:
+
 ```
-════════════════════════════════════════════
-    TIERED TECHNICAL DEBT REPORT
-════════════════════════════════════════════
+TECHNICAL DEBT ANALYSIS - PRIORITY TIERS
 
-🔴 TIER 1: CRITICAL ARCHITECTURE (3 items)
-  1. src/services.rs - God Object (85% god score, 52 methods)
-  2. src/core/engine.rs - Circular dependency with parsers module
-  3. src/api/handlers.rs - God Module (15 responsibilities)
+Critical (score >= 90)
+  src/services.rs - God Object (score: 127.5)
+  src/core/engine.rs - Circular dependency (score: 95.2)
 
-🟠 TIER 2: COMPLEX UNTESTED (12 items)
-  1. src/processing/transform.rs:145 - Complexity 18, Coverage 0%
+High (score 70-89.9)
+  src/processing/transform.rs:145 - UntestableComplexity (score: 85.0)
+  src/api/handlers.rs - God Module (score: 78.3)
   ...
 
-🟡 TIER 3: TESTING GAPS (45 items)
+Moderate (score 50-69.9)
+  src/utils/parser.rs:220 - TestingGap (score: 62.1)
   ...
 
-⚪ TIER 4: MAINTENANCE (120 items) [hidden]
-  To show Tier 4 items, add show_t4_in_main_report = true under [tiers] in .debtmap.toml
+Low (score < 50)
+  [Items with score < 50 appear here]
 ```
+
+**Note**: The scores shown reflect tier weight multipliers applied during classification. Items classified as Tier 1 (Critical Architecture) receive a 1.5x weight boost, which often elevates them into the Critical or High score ranges.
 
 ### JSON Output
 
-Tier values use PascalCase enum variants without underscores: `T1CriticalArchitecture`, `T2ComplexUntested`, `T3TestingGaps`, `T4Maintenance`.
+JSON output uses the same **score-based priority** levels as terminal output:
 
 ```json
 {
-  "tier_distribution": {
-    "t1_count": 3,
-    "t2_count": 12,
-    "t3_count": 45,
-    "t4_count": 120
+  "summary": {
+    "score_distribution": {
+      "critical": 2,
+      "high": 5,
+      "medium": 12,
+      "low": 45
+    }
   },
   "items": [
     {
-      "tier": "T1CriticalArchitecture",
-      "priority_weight": 1.5,
-      "base_score": 8.5,
-      "final_score": 12.75
+      "type": "File",
+      "score": 127.5,
+      "priority": "critical",
+      "location": {
+        "file": "src/services.rs"
+      },
+      "debt_type": "GodObject"
+    },
+    {
+      "type": "Function",
+      "score": 85.0,
+      "priority": "high",
+      "location": {
+        "file": "src/processing/transform.rs",
+        "line": 145,
+        "function": "process_data"
+      },
+      "debt_type": "UntestableComplexity"
     }
   ]
 }
 ```
+
+The `priority` field is derived from the `score` field using these thresholds:
+- `critical`: score >= 100.0
+- `high`: score >= 50.0
+- `medium`: score >= 20.0
+- `low`: score < 20.0
+
+**Note**: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.
 
 ## Troubleshooting
 
