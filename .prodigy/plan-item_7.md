@@ -1,254 +1,280 @@
-# Implementation Plan: Decompose analyze_comprehensive into Focused Functions
+# Implementation Plan: Refactor God Object in src/analyzers/rust.rs
 
 ## Problem Summary
 
-**Location**: ./src/organization/god_object_detector.rs:GodObjectDetector::analyze_comprehensive:490
-**Priority Score**: 16.77
-**Debt Type**: ComplexityHotspot (Cognitive: 78, Cyclomatic: 34)
-**Current Metrics**:
-- Function Length: 315 lines
-- Cyclomatic Complexity: 34
-- Cognitive Complexity: 78
-- Function Role: Pure Logic
-- Nesting Depth: 3
+**Location**: ./src/analyzers/rust.rs:file:0
+**Priority Score**: 58.25
+**Debt Type**: God Object (GodClass)
 
-**Issue**: High complexity (34/78) makes function hard to test and maintain. This pure logic function should be decomposed into smaller, focused functions that each handle a single responsibility.
+**Current Metrics**:
+- Lines of Code: 2034
+- Functions: 124
+- Cyclomatic Complexity: 186
+- Coverage: 0%
+- God Object: FunctionVisitor (11 fields, 33 methods, 7 responsibilities)
+
+**Issue**: URGENT: File contains a God Class (FunctionVisitor) with 7 distinct responsibilities mixed together: Transformation, Data Access, Parsing & Input, Construction, Computation, Utilities, and Validation. The file has 124 functions handling everything from AST parsing to debt item creation to complexity calculation.
 
 ## Target State
 
-**Expected Impact** (from debtmap):
-- Complexity Reduction: 17.0 (target cyclomatic ~10-15)
-- Coverage Improvement: 0.0 (already testable as pure function)
-- Risk Reduction: 5.87
+**Expected Impact**:
+- Complexity Reduction: 37.2
+- Maintainability Improvement: 5.82
+- Test Effort: 203.4
 
 **Success Criteria**:
-- [ ] Cyclomatic complexity reduced from 34 to ≤15
-- [ ] Cognitive complexity reduced from 78 to ≤40
-- [ ] Function broken into 4-5 focused sub-functions
-- [ ] Each extracted function has single responsibility
+- [ ] FunctionVisitor split into focused, single-responsibility modules
+- [ ] Each new module has <30 functions
+- [ ] Clear separation between pure computation, I/O, and visitor logic
 - [ ] All existing tests continue to pass
 - [ ] No clippy warnings
-- [ ] Proper formatting
+- [ ] Proper formatting with cargo fmt
+- [ ] File size reduced to <500 lines per module
 
 ## Implementation Phases
 
-### Phase 1: Extract God Object Type Detection Logic
+### Phase 1: Extract Complexity Calculation Module
 
-**Goal**: Extract the complex conditional logic that determines whether we have a God Class vs God File into a dedicated function.
-
-**Changes**:
-- Extract lines 512-558 into `determine_god_object_type()` function
-- This function takes visitor data and returns `(total_methods, total_fields, all_methods, total_complexity, detection_type)`
-- Reduce nesting by separating the decision logic
-- Make the function pure and independently testable
-
-**Rationale**: This block has high cognitive complexity with nested conditionals and filtering logic. Extracting it will reduce the main function's cyclomatic complexity by ~8 points.
-
-**Testing**:
-```bash
-cargo test god_object_detector
-cargo clippy -- -D warnings
-```
-
-**Success Criteria**:
-- [ ] New `determine_god_object_type()` function created
-- [ ] Function is pure (no side effects)
-- [ ] Main function cyclomatic complexity reduced by 6-8 points
-- [ ] All tests pass
-- [ ] Ready to commit
-
-### Phase 2: Extract Complexity Weighting Logic
-
-**Goal**: Extract the complexity-weighted metrics calculation into a focused function.
+**Goal**: Separate pure complexity calculation functions into a dedicated module
 
 **Changes**:
-- Extract lines 583-630 into `calculate_weighted_metrics()` function
-- This function handles filtering by detection type and calculating purity weights
-- Returns `(weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution)`
-- Simplifies the conditional logic for purity weighting
-
-**Rationale**: This section has multiple nested conditionals based on detection type and involves complex filtering. Extracting it reduces cognitive load and makes the weighting logic testable.
+- Create `src/analyzers/rust/complexity_calculation.rs`
+- Move 7 computation functions:
+  - `calculate_cyclomatic_with_visitor`
+  - `calculate_cognitive_with_visitor`
+  - `calculate_cognitive_syn`
+  - `apply_cognitive_pattern_scaling`
+  - `calculate_nesting`
+  - `count_lines`
+  - `count_function_lines`
+- These are pure functions with no side effects
+- Add public interface and proper documentation
 
 **Testing**:
-```bash
-cargo test god_object_detector
-cargo clippy -- -D warnings
-```
+- Run existing unit tests for these functions
+- Verify complexity calculations are identical
+- Check imports in main rust.rs file
 
 **Success Criteria**:
-- [ ] New `calculate_weighted_metrics()` function created
-- [ ] Cyclomatic complexity reduced by 5-7 points
-- [ ] Function handles both GodClass and GodFile cases
-- [ ] All tests pass
-- [ ] Ready to commit
+- [ ] New module compiles successfully
+- [ ] All tests pass: `cargo test --lib analyzers::rust`
+- [ ] No clippy warnings: `cargo clippy`
+- [ ] Functions are properly exported and used
 
-### Phase 3: Extract God Object Scoring Logic
+### Phase 2: Extract Metadata and Construction Logic
 
-**Goal**: Consolidate the three different scoring code paths into a single focused function.
+**Goal**: Separate function metadata extraction and metrics construction into a builder module
 
 **Changes**:
-- Extract lines 632-672 into `calculate_final_god_object_score()` function
-- This function takes all metrics and thresholds
-- Returns `(god_object_score, is_god_object)`
-- Eliminates the three-way conditional (purity vs weighted vs raw)
-
-**Rationale**: The scoring logic has three different code paths with similar structure. Consolidating into one function with clear parameter handling reduces duplication and complexity.
+- Create `src/analyzers/rust/function_builder.rs`
+- Move construction-related structs and functions:
+  - `FunctionMetadata`
+  - `ComplexityMetricsData`
+  - `ClosureComplexityMetrics`
+  - `FunctionContext`
+  - `FunctionAnalysisData`
+- Move builder functions:
+  - `extract_function_metadata`
+  - `create_function_context`
+  - `create_function_analysis_data`
+  - `build_function_metrics`
+  - `build_closure_metrics`
+  - `create_analysis_result`
+- Implement builder pattern for FunctionMetrics construction
 
 **Testing**:
-```bash
-cargo test god_object_detector
-cargo clippy -- -D warnings
-```
+- Verify FunctionMetrics objects are constructed correctly
+- Test metadata extraction for various function types
+- Ensure purity detection still works
 
 **Success Criteria**:
-- [ ] New `calculate_final_god_object_score()` function created
-- [ ] Cyclomatic complexity reduced by 4-6 points
-- [ ] Scoring logic is clear and testable
-- [ ] All tests pass
-- [ ] Ready to commit
+- [ ] Builder module compiles and exports clean API
+- [ ] All tests pass: `cargo test --lib analyzers::rust`
+- [ ] FunctionVisitor uses builder instead of inline construction
+- [ ] No behavioral changes
 
-### Phase 4: Extract Domain Analysis and Recommendations
+### Phase 3: Extract Utility and Classification Functions
 
-**Goal**: Extract the cross-domain analysis and recommendation generation into a dedicated function.
+**Goal**: Move pure utility and classification logic to dedicated module
 
 **Changes**:
-- Extract lines 674-735 into `analyze_domains_and_recommend_splits()` function
-- This function handles domain counting, cross-domain severity, and split recommendations
-- Returns `(recommended_splits, analysis_method, cross_domain_severity, domain_count, domain_diversity, struct_ratio)`
-- Simplifies the priority-based recommendation logic
-
-**Rationale**: This section handles a complete sub-concern (domain analysis) and has complex nested conditionals. Extracting it makes the main function focus on orchestration.
+- Create `src/analyzers/rust/utilities.rs`
+- Move utility functions:
+  - `classify_test_file`
+  - `is_test_function`
+  - `has_test_attribute`
+  - `has_test_name_pattern`
+  - `extract_visibility`
+  - `classify_function_role`
+  - `classify_priority`
+  - `detect_purity`
+  - `calculate_entropy_if_enabled`
+  - `calculate_closure_entropy`
+  - `try_detect_visitor_pattern`
+- All pure classification and detection logic
 
 **Testing**:
-```bash
-cargo test god_object_detector
-cargo clippy -- -D warnings
-```
+- Run comprehensive test suite for classification functions
+- Verify test detection still works correctly
+- Check visibility extraction
 
 **Success Criteria**:
-- [ ] New `analyze_domains_and_recommend_splits()` function created
-- [ ] Cyclomatic complexity reduced by 5-7 points
-- [ ] Domain analysis logic is isolated and testable
-- [ ] All tests pass
-- [ ] Ready to commit
+- [ ] Utilities module with clear, single-purpose functions
+- [ ] All existing tests pass
+- [ ] Functions are well-documented with examples
+- [ ] Module is independently testable
 
-### Phase 5: Extract Module Structure and Visibility Analysis
+### Phase 4: Extract Debt Item Creation Module
 
-**Goal**: Extract the final section that handles module structure and visibility breakdown.
+**Goal**: Separate debt item creation and aggregation logic
 
 **Changes**:
-- Extract lines 739-770 into `analyze_module_structure_and_visibility()` function
-- This function handles Rust-specific visibility and module structure analysis
-- Returns `(visibility_breakdown, module_structure)`
-- Separates the Rust-specific logic from the general analysis
-
-**Rationale**: This is the final complex section with nested conditionals. Extracting it completes the decomposition and reduces the main function to pure orchestration.
+- Create `src/analyzers/rust/debt_creation.rs`
+- Move debt-related functions:
+  - `create_debt_items`
+  - `collect_all_rust_debt_items`
+  - `extract_debt_items_with_enhanced`
+  - `create_debt_item_for_function`
+  - `find_enhanced_analysis_for_function`
+  - `create_enhanced_debt_item`
+  - `create_complexity_debt_item`
+  - `format_enhanced_context`
+  - `extract_rust_module_smell_items`
+  - `extract_rust_function_smell_items`
+  - `report_rust_unclosed_blocks`
+  - `analyze_rust_test_quality`
+- Move pattern analysis functions:
+  - `analyze_resource_patterns`
+  - `analyze_organization_patterns`
+  - `convert_organization_pattern_to_debt_item`
+  - `pattern_to_message_context`
+  - `impact_to_priority`
 
 **Testing**:
-```bash
-cargo test god_object_detector
-cargo clippy -- -D warnings
-```
+- Verify debt items are created with correct priorities
+- Test enhanced message formatting
+- Ensure suppression context works
 
 **Success Criteria**:
-- [ ] New `analyze_module_structure_and_visibility()` function created
-- [ ] Main function now ~50-80 lines of pure orchestration
-- [ ] Cyclomatic complexity ≤15, cognitive ≤40
-- [ ] All tests pass
-- [ ] Ready to commit
+- [ ] Debt creation module is self-contained
+- [ ] All debt detection tests pass
+- [ ] Clear separation between detection and item creation
+- [ ] No circular dependencies
+
+### Phase 5: Refactor FunctionVisitor into Focused Visitor
+
+**Goal**: Reduce FunctionVisitor to core visitor pattern responsibilities only
+
+**Changes**:
+- Keep FunctionVisitor focused on AST traversal
+- Delegate to specialized modules:
+  - Use `complexity_calculation` for metrics
+  - Use `function_builder` for creating FunctionMetrics
+  - Use `utilities` for classification
+  - Use `debt_creation` only in coordinator functions
+- Reduce FunctionVisitor to ~300 lines
+- Move closure analysis to separate trait/module if needed
+- Simplify visitor methods to delegate instead of implement
+
+**Testing**:
+- Run full test suite
+- Verify visitor traversal is correct
+- Check function detection works for all patterns
+
+**Success Criteria**:
+- [ ] FunctionVisitor has <300 lines
+- [ ] Clear, focused responsibility (AST traversal only)
+- [ ] All visitor methods are simple delegators
+- [ ] All tests pass: `cargo test --lib`
+- [ ] No clippy warnings
+
+### Phase 6: Create Module Facade and Documentation
+
+**Goal**: Create clean public API and comprehensive documentation
+
+**Changes**:
+- Create `src/analyzers/rust/mod.rs` as module root
+- Re-export public APIs from submodules
+- Keep only RustAnalyzer and high-level functions in main rust.rs
+- Add module-level documentation
+- Update import statements throughout codebase
+- Final cleanup and organization
+
+**Testing**:
+- Run full test suite across entire codebase
+- Verify public API is unchanged
+- Test integration with other analyzers
+- Run CI checks: `just ci`
+
+**Success Criteria**:
+- [ ] Clean module structure under src/analyzers/rust/
+- [ ] All tests pass: `cargo test`
+- [ ] No clippy warnings: `cargo clippy --all-targets`
+- [ ] Documentation builds: `cargo doc --no-deps`
+- [ ] CI passes: `just ci`
 
 ## Testing Strategy
 
 **For each phase**:
-1. Run `cargo test --lib god_object_detector` to verify existing tests pass
-2. Run `cargo clippy -- -D warnings` to ensure no new warnings
-3. Verify function signatures are correct and types align
-4. Check that the main function's complexity is decreasing
+1. Run unit tests: `cargo test --lib analyzers::rust`
+2. Check for clippy warnings: `cargo clippy --all-targets -- -D warnings`
+3. Format code: `cargo fmt --all`
+4. Verify compilation: `cargo check --all-features`
+
+**Integration testing after Phase 6**:
+1. Full test suite: `cargo test --all-features`
+2. Coverage analysis: `cargo tarpaulin`
+3. Run debtmap on itself: `debtmap analyze`
+4. Verify improvements in metrics
 
 **Final verification**:
-1. `just ci` - Full CI checks
-2. `cargo test --all` - All tests across codebase
-3. Verify cyclomatic complexity ≤15 (use debtmap or manual inspection)
-4. Verify cognitive complexity ≤40
-
-**Tracking Progress**:
-After each phase, document the complexity reduction:
-```bash
-# Check complexity metrics
-cargo clippy -- -W clippy::cognitive_complexity
-```
+1. CI checks: `just ci`
+2. Documentation: `cargo doc --no-deps`
+3. Security audit: `cargo deny check`
 
 ## Rollback Plan
 
 If a phase fails:
 1. Revert the phase with `git reset --hard HEAD~1`
-2. Review the compilation or test errors
-3. Check if function signatures need adjustment
-4. Retry with corrected implementation
-
-If multiple phases fail:
-1. Return to last known good commit
-2. Re-evaluate the extraction strategy
-3. Consider smaller extraction steps
-
-## Function Signatures (Proposed)
-
-```rust
-// Phase 1
-fn determine_god_object_type(
-    visitor: &TypeVisitor,
-    standalone_count: usize,
-) -> (usize, usize, Vec<String>, u32, DetectionType);
-
-// Phase 2
-fn calculate_weighted_metrics(
-    visitor: &TypeVisitor,
-    detection_type: DetectionType,
-    relevant_complexity: &[FunctionComplexityInfo],
-) -> (f64, f64, f64, Option<PurityDistribution>);
-
-// Phase 3
-fn calculate_final_god_object_score(
-    purity_weighted_count: f64,
-    weighted_method_count: f64,
-    total_methods: usize,
-    total_fields: usize,
-    responsibility_count: usize,
-    lines_of_code: usize,
-    avg_complexity: f64,
-    purity_distribution: Option<PurityDistribution>,
-    has_complexity_data: bool,
-    thresholds: &GodObjectThresholds,
-) -> (f64, bool);
-
-// Phase 4
-fn analyze_domains_and_recommend_splits(
-    per_struct_metrics: &[StructMetrics],
-    total_methods: usize,
-    lines_of_code: usize,
-    is_god_object: bool,
-    path: &Path,
-    all_methods: &[String],
-    responsibility_groups: &HashMap<String, Vec<String>>,
-) -> (Vec<ModuleSplit>, SplitAnalysisMethod, Option<CrossDomainSeverity>, usize, f64, f64);
-
-// Phase 5
-fn analyze_module_structure_and_visibility(
-    path: &Path,
-    is_god_object: bool,
-    visitor: &TypeVisitor,
-    all_methods: &[String],
-    total_methods: usize,
-    source_content: &Option<String>,
-) -> (Option<FunctionVisibilityBreakdown>, Option<ModuleStructure>);
-```
+2. Review the compilation errors or test failures
+3. Identify the root cause (missing imports, circular deps, etc.)
+4. Adjust the plan:
+   - If it's a dependency issue, reorder the phases
+   - If it's a module boundary issue, adjust what goes where
+   - If tests fail, ensure test helpers are properly exported
+5. Retry the phase with adjustments
+6. Document lessons learned in commit message
 
 ## Notes
 
-- The main function `analyze_comprehensive` will be reduced to ~50-80 lines of orchestration
-- Each extracted function is pure and independently testable
-- The extraction follows the natural sections of the current implementation
-- No behavior changes - purely structural refactoring
-- Function parameters may need adjustment during implementation to handle ownership/borrowing correctly
-- Consider using references vs cloning based on actual usage patterns
-- The `TypeVisitor` is already computed, so passing it to helper functions is efficient
+**Key Refactoring Principles**:
+- Extract pure functions first (easiest, safest)
+- Maintain existing behavior exactly
+- Each module should be independently testable
+- Use functional patterns (immutable data, pure functions)
+- Clear data flow: parse → analyze → create metrics → create debt items
+
+**Module Dependencies** (should flow downward):
+```
+rust.rs (coordinator)
+  ├─> function_builder (constructs metrics)
+  │     ├─> complexity_calculation (pure math)
+  │     └─> utilities (classification)
+  ├─> debt_creation (creates debt items)
+  │     ├─> utilities (classification)
+  │     └─> pattern analyzers (existing crate modules)
+  └─> utilities (pure classification functions)
+```
+
+**Watch out for**:
+- Circular dependencies between modules
+- Test helpers that need to be shared
+- Configuration access (entropy, thresholds)
+- External dependencies (syn, quote, etc.)
+- Trait implementations (Visit trait for FunctionVisitor)
+
+**Performance Considerations**:
+- These refactorings are pure code organization
+- No algorithmic changes, so performance should be identical
+- Module boundaries may enable future parallelization
+- Smaller modules compile faster during development
