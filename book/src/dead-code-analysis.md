@@ -107,13 +107,17 @@ detect_external_api = true
 api_functions = [
     "calculate_score",           # Just function name
     "mylib.api::process_data",   # Module-qualified name
+    "public_handler",            # Any function matching this name
 ]
 
 # Mark entire files as containing external APIs (supports glob patterns)
 api_files = [
-    "src/api/*.py",              # All files in api directory
-    "src/public_interface.py",   # Specific file
-    "**/__init__.py",            # All __init__.py files
+    "src/api/**/*.py",           # All Python files in api directory recursively
+    "src/lib.rs",                # Rust library entry point (all public functions)
+    "src/public_interface.py",   # Specific Python file
+    "**/__init__.py",            # All __init__.py files in any directory
+    "**/public_*.py",            # Any file starting with 'public_'
+    "myapp/api.py",              # Specific API module
 ]
 ```
 
@@ -141,10 +145,32 @@ The analyzer recognizes entry points from popular Python frameworks to avoid fal
 
 ### Event Systems
 
-- **Qt/PyQt**: Signal connections, slot decorators
-- **Tkinter**: Event bindings, button command callbacks
+- **Qt/PyQt**: Signal connections, slot decorators (`@pyqtSlot`)
+- **Tkinter**: Event bindings, button command callbacks, widget event handlers
 
-See [Framework Patterns documentation](context-providers.md) for comprehensive framework support details.
+### Framework Detection Matrix
+
+| Framework | Pattern | Decorator/Keyword | Detection Method | Example |
+|-----------|---------|-------------------|------------------|---------|
+| **Flask** | Routes | `@app.route` | Decorator analysis | `@app.route('/')` |
+| Flask | Before request | `@app.before_request` | Decorator analysis | Handler hooks |
+| Flask | Error handlers | `@app.errorhandler` | Decorator analysis | Custom error pages |
+| **Django** | Views | Function-based views | Module structure | `def my_view(request):` |
+| Django | Admin actions | `@admin.action` | Decorator analysis | Admin panel actions |
+| Django | Signals | `@receiver` | Decorator analysis | Signal handlers |
+| **FastAPI** | Routes | `@app.get`, `@app.post` | Decorator analysis | REST endpoints |
+| FastAPI | Dependencies | `Depends()` | Call graph analysis | Dependency injection |
+| **Click** | Commands | `@click.command` | Decorator analysis | CLI commands |
+| Click | Groups | `@click.group` | Decorator analysis | Command groups |
+| **pytest** | Tests | `test_*` prefix | Naming convention | `def test_foo():` |
+| pytest | Fixtures | `@pytest.fixture` | Decorator analysis | Test fixtures |
+| **unittest** | Tests | `TestCase` methods | Class hierarchy | `class TestFoo(TestCase):` |
+| unittest | Setup/Teardown | `setUp`, `tearDown` | Method naming | Lifecycle methods |
+| **Qt/PyQt** | Slots | `@pyqtSlot` | Decorator analysis | Signal handlers |
+| Qt | Connections | `.connect()` calls | Call graph analysis | Event wiring |
+| **Tkinter** | Callbacks | `command=func` | Assignment tracking | Button callbacks |
+
+See [Framework Patterns documentation](context-providers.md) for comprehensive framework support details and language-specific patterns.
 
 ## Confidence Thresholds
 
@@ -247,34 +273,111 @@ This catches functions called:
 - Through plugin systems
 - By external libraries or C extensions
 
+### Programmatic Coverage Usage
+
+In Rust code, you can provide coverage data programmatically:
+
+```rust
+use debtmap::analysis::python_dead_code_enhanced::{EnhancedDeadCodeAnalyzer, CoverageData};
+
+// Load coverage from coverage.json file
+let coverage = CoverageData::from_coverage_json("coverage.json")?;
+
+// Create analyzer with coverage data
+let analyzer = EnhancedDeadCodeAnalyzer::new()
+    .with_coverage(coverage);
+
+// Analyze functions - covered functions will have higher "live" confidence
+let result = analyzer.analyze_function(&func, &call_graph);
+```
+
 ### Accuracy Improvement
 
 Coverage integration typically provides:
 - **60-70% reduction** in false positives for complex codebases
 - **Near-zero false positives** for functions with test coverage
 - **Confidence in removal** for uncovered code
+- **Detection of dynamic calls** that static analysis misses
+
+**Coverage data format**: Debtmap uses the standard `coverage.json` format produced by `coverage.py` and `pytest-cov`. The file should be in your project root and contain executed line numbers for each source file.
 
 ## Configuration Reference
+
+### TOML Configuration
 
 Complete dead code analysis configuration in `.debtmap.toml`:
 
 ```toml
+# Language-specific dead code detection
+[languages.python]
+detect_dead_code = true           # Enable Python dead code analysis (default: true)
+
 # External API detection (Spec 113)
 [external_api]
-detect_external_api = true
+detect_external_api = true        # Enable automatic public API detection (default: true)
 
 api_functions = [
-    "public_function_name",
-    "module::qualified_name",
+    "public_function_name",       # Function name only
+    "module::qualified_name",     # Module-qualified format
 ]
 
 api_files = [
-    "src/api/**/*.py",           # Glob patterns supported
-    "src/public_interface.py",   # Exact file paths
+    "src/api/**/*.py",            # Glob patterns supported
+    "src/public_interface.py",    # Exact file paths
+    "**/__init__.py",             # All package entry points
 ]
+```
 
-# Note: Confidence thresholds are configured programmatically
-# via AnalysisConfig in the Rust API
+### Programmatic Configuration (Rust API)
+
+Confidence thresholds and analysis behavior are configured programmatically:
+
+```rust
+use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
+
+let config = AnalysisConfig {
+    // Confidence thresholds
+    high_confidence_threshold: 0.8,       // Default: 0.8 (80%)
+    medium_confidence_threshold: 0.5,     // Default: 0.5 (50%)
+
+    // Analysis options
+    respect_suppression_comments: true,   // Honor # debtmap: not-dead (default: true)
+    include_private_api: true,            // Analyze private functions (default: true)
+    enable_public_api_detection: true,    // Use public API heuristics (default: true)
+
+    // Public API detector configuration (optional)
+    public_api_config: None,              // Use default PublicApiConfig
+};
+
+let analyzer = EnhancedDeadCodeAnalyzer::new()
+    .with_config(config);
+```
+
+### Configuration Tuning by Project Type
+
+**Libraries and Public APIs** (conservative):
+```rust
+AnalysisConfig {
+    high_confidence_threshold: 0.9,       // Very strict
+    medium_confidence_threshold: 0.7,
+    enable_public_api_detection: true,    // Critical for libraries
+    ..Default::default()
+}
+```
+
+**Internal Applications** (aggressive):
+```rust
+AnalysisConfig {
+    high_confidence_threshold: 0.7,       // More lenient
+    medium_confidence_threshold: 0.4,
+    include_private_api: true,            // Analyze everything
+    ..Default::default()
+}
+```
+
+**Balanced Approach** (recommended default):
+```rust
+AnalysisConfig::default()  // Uses 0.8/0.5 thresholds
 ```
 
 ## Understanding Results
@@ -304,6 +407,47 @@ Dead code analysis for 'calculate_total':
 | `is_dead: true` | Medium (0.5-0.8) | **Review manually** - Might be dead, verify first |
 | `is_dead: true` | Low (0.0-0.5) | **Keep** - Likely used dynamically |
 | `is_dead: false` | Any | **Keep** - Function is in use |
+
+### Decision Tree for Confidence Interpretation
+
+Use this decision tree to determine what action to take:
+
+```
+Is the function flagged as dead?
+│
+├─ NO → Keep the function (it's in use)
+│
+└─ YES → What is the confidence level?
+    │
+    ├─ HIGH (0.8-1.0)
+    │   ├─ Is it a public API function? → Review, add suppression comment if keeping
+    │   └─ Is it private (_prefix)? → **SAFE TO REMOVE**
+    │
+    ├─ MEDIUM (0.5-0.8)
+    │   ├─ Check git history: recently added? → Keep for now, review in next sprint
+    │   ├─ Has coverage data been generated? → Run with coverage first
+    │   ├─ Is it used dynamically (getattr, plugins)? → Add suppression comment
+    │   └─ No clear reason to keep? → **REVIEW MANUALLY, likely safe to remove**
+    │
+    └─ LOW (0.0-0.5)
+        ├─ Review "Reasons it's LIVE" → If reasons are valid, keep it
+        ├─ Function is public and might be external API? → Keep it
+        └─ Truly unused but marked live incorrectly? → Report issue or use suppression
+```
+
+### Confidence Level Quick Reference
+
+**When to act without review:**
+- `is_dead: true` + `confidence: HIGH` + `private function (_prefix)` → **Remove immediately**
+- `is_dead: true` + `confidence: HIGH` + `in test file` + `not test function` → **Remove immediately**
+
+**When to review before acting:**
+- `is_dead: true` + `confidence: MEDIUM` → **Manual review required**
+- `is_dead: true` + `confidence: HIGH` + `public function` → **Check git history, verify external usage**
+
+**When to keep:**
+- `is_dead: false` → **Always keep (function is live)**
+- `is_dead: true` + `confidence: LOW` → **Keep (too uncertain to remove)**
 
 ### CLI Filtering by Confidence
 
