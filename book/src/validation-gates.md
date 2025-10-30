@@ -630,23 +630,36 @@ When you run `validate` with deprecated metrics, you'll see:
 
 Use verbosity flags to understand why validation failed:
 
-**Level 1: Basic details**
+**Level 1: Basic details (`-v`)**
 ```bash
 debtmap validate . -v
 ```
-Shows which thresholds failed and by how much.
+Shows which thresholds failed, by how much, and timing breakdown:
+- Call graph building time
+- Trait resolution time
+- Coverage loading time
+- Individual analysis phase durations
 
-**Level 2: Detailed breakdown**
+**Level 2: Detailed breakdown (`-vv`)**
 ```bash
 debtmap validate . -vv
 ```
-Shows score components and top violating functions.
+Shows everything from `-v` plus:
+- Score calculation factors and weights
+- Top violating functions with metrics
+- Detailed phase timing information
+- Risk score component breakdown
 
-**Level 3: Full diagnostic output**
+**Level 3: Full diagnostic output (`-vvv`)**
 ```bash
 debtmap validate . -vvv
 ```
-Shows complete analysis details including all debt items and risk calculations.
+Shows complete debug information:
+- All debt items with full details
+- Complete risk calculations for each function
+- All timing information including sub-phases
+- File-level and function-level analysis data
+- Context provider outputs (if enabled)
 
 ### Common Issues
 
@@ -661,6 +674,15 @@ debtmap validate . -vv
 # Solution: Use --top flag
 debtmap validate . --top 10 -v
 ```
+
+**Issue: Output is too verbose for CI logs**
+```bash
+# Solution: Use --summary flag for compact tiered output
+debtmap validate . --summary
+# or
+debtmap validate . -s
+```
+This provides a condensed view focused on priority tiers rather than individual items.
 
 **Issue: Validation passes locally but fails in CI**
 ```bash
@@ -687,6 +709,13 @@ ls -lh coverage/lcov.info
 # Disable expensive providers
 debtmap validate . --enable-context --disable-context git_history
 ```
+
+**Issue: Semantic analysis causing errors or unexpected behavior**
+```bash
+# Solution: Disable semantic analysis with fallback mode
+debtmap validate . --semantic-off
+```
+This disables advanced semantic features and uses basic syntax analysis only. Useful for debugging or working with unsupported language constructs.
 
 ### Validation Report Generation
 
