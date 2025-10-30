@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
 mod queries;
+mod validators;
 use queries::*;
+use validators::*;
 
 #[derive(Debug, Clone)]
 pub enum TestingAntiPattern {
@@ -138,15 +140,6 @@ pub fn detect_testing_patterns(
     detect_react_test_issues(root, source, language, issues);
     detect_async_test_issues(root, source, language, issues);
     detect_snapshot_overuse(root, source, language, issues);
-}
-
-fn is_test_file(path: &Path) -> bool {
-    let path_str = path.to_string_lossy();
-    path_str.contains(".test.")
-        || path_str.contains(".spec.")
-        || path_str.contains("__tests__")
-        || path_str.contains("/test/")
-        || path_str.contains("/tests/")
 }
 
 fn detect_missing_assertions(
@@ -404,20 +397,6 @@ fn detect_async_test_issues(
     }
 }
 
-fn is_snapshot_method(method_name: &str) -> bool {
-    method_name == "toMatchSnapshot" || method_name == "toMatchInlineSnapshot"
-}
-
-fn count_snapshot_methods(query: &Query, root: Node, source: &str) -> usize {
-    let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(query, root, source.as_bytes());
-
-    matches
-        .filter_map(|match_| match_.captures.iter().find(|c| c.index == 0))
-        .filter(|method| is_snapshot_method(get_node_text(method.node, source)))
-        .count()
-}
-
 fn detect_snapshot_overuse(
     root: Node,
     source: &str,
@@ -444,79 +423,6 @@ fn detect_snapshot_overuse(
     }
 }
 
-// Helper functions
-fn is_test_function(name: &str) -> bool {
-    matches!(name, "test" | "it" | "describe" | "suite" | "context")
-}
-
-fn has_assertions(body: &str) -> bool {
-    body.contains("expect")
-        || body.contains("assert")
-        || body.contains("should")
-        || body.contains("chai.")
-        || body.contains("jest.")
-        || body.contains("sinon.")
-}
-
-fn calculate_test_complexity(node: Node) -> usize {
-    let mut complexity = 0;
-    let mut cursor = node.walk();
-
-    loop {
-        let node_kind = cursor.node().kind();
-
-        // Count complexity indicators
-        match node_kind {
-            "if_statement" | "conditional_expression" => complexity += 1,
-            "for_statement" | "while_statement" | "do_statement" => complexity += 2,
-            "try_statement" => complexity += 1,
-            "call_expression" => {
-                // Count mock/stub calls as complexity
-                // Note: We'd need the source string to get text content
-                // For now, just count all call expressions as adding complexity
-                complexity += 1;
-            }
-            _ => {}
-        }
-
-        if !cursor.goto_first_child() {
-            while !cursor.goto_next_sibling() {
-                if !cursor.goto_parent() {
-                    return complexity;
-                }
-            }
-        }
-    }
-}
-
-fn detect_timing_dependency(body: &str) -> Option<String> {
-    if body.contains("setTimeout") {
-        return Some("setTimeout".to_string());
-    }
-    if body.contains("setInterval") {
-        return Some("setInterval".to_string());
-    }
-    if body.contains("Date.now()") || body.contains("new Date()") {
-        return Some("Date dependency".to_string());
-    }
-    if body.contains("Math.random()") {
-        return Some("random values".to_string());
-    }
-    if body.contains("performance.now()") {
-        return Some("performance timing".to_string());
-    }
-    None
-}
-
-fn contains_async_operations(body: &str) -> bool {
-    (body.contains("fetch")
-        || body.contains("axios")
-        || body.contains("$.ajax")
-        || body.contains("Promise")
-        || body.contains(".then("))
-        && !body.contains("await")
-        && !body.contains("done()")
-}
 // debtmap:ignore-end
 
 #[cfg(test)]
