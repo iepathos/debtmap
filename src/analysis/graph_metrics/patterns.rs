@@ -251,6 +251,33 @@ impl PatternDetector {
         }
     }
 
+    /// Classify UtilityCluster pattern
+    fn classify_utility_cluster(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
+        let primary = "Domain-Specific Utilities".to_string();
+        let confidence = 0.65;
+        let evidence = vec![format!(
+            "Part of tightly-connected functional group (clustering: {:.2})",
+            metrics.clustering
+        )];
+        (primary, confidence, evidence)
+    }
+
+    /// Classify fallback when no specific pattern matches
+    fn classify_fallback(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
+        if let Some(profile) = io_profile {
+            let responsibility = profile.primary_responsibility();
+            let primary = responsibility.as_str().to_string();
+            let confidence = 0.50;
+            let evidence = vec!["Classified based on I/O behavior".to_string()];
+            (primary, confidence, evidence)
+        } else {
+            let primary = "General Logic".to_string();
+            let confidence = 0.40;
+            let evidence = vec!["No strong call graph pattern detected".to_string()];
+            (primary, confidence, evidence)
+        }
+    }
+
     /// Classify responsibility based on detected patterns and I/O profile
     pub fn classify_responsibility(
         &self,
@@ -270,27 +297,9 @@ impl PatternDetector {
         } else if patterns.contains(&CallGraphPattern::LeafNode) {
             Self::classify_leaf_node(io_profile)
         } else if patterns.contains(&CallGraphPattern::UtilityCluster) {
-            let primary = "Domain-Specific Utilities".to_string();
-            let confidence = 0.65;
-            let evidence = vec![format!(
-                "Part of tightly-connected functional group (clustering: {:.2})",
-                metrics.clustering
-            )];
-            (primary, confidence, evidence)
+            Self::classify_utility_cluster(metrics)
         } else {
-            // Default fallback based on I/O profile
-            if let Some(profile) = io_profile {
-                let responsibility = profile.primary_responsibility();
-                let primary = responsibility.as_str().to_string();
-                let confidence = 0.50;
-                let evidence = vec!["Classified based on I/O behavior".to_string()];
-                (primary, confidence, evidence)
-            } else {
-                let primary = "General Logic".to_string();
-                let confidence = 0.40;
-                let evidence = vec!["No strong call graph pattern detected".to_string()];
-                (primary, confidence, evidence)
-            }
+            Self::classify_fallback(io_profile)
         };
 
         ResponsibilityClassification {
