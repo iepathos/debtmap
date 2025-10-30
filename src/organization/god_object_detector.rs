@@ -544,6 +544,77 @@ impl GodObjectDetector {
         }
     }
 
+    /// Calculates complexity-weighted metrics for the god object analysis
+    ///
+    /// # Arguments
+    /// * `visitor` - Type visitor containing function information
+    /// * `detection_type` - Whether analyzing a God Class or God File
+    ///
+    /// # Returns
+    /// Tuple of (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution)
+    fn calculate_weighted_metrics(
+        visitor: &TypeVisitor,
+        detection_type: &DetectionType,
+    ) -> (f64, f64, f64, Option<PurityDistribution>) {
+        // Calculate complexity-weighted metrics
+        // Spec 130: For God Class, use production functions only; for God File, use all
+        let relevant_complexity: Vec<_> = match detection_type {
+            DetectionType::GodClass => {
+                // Filter to production functions only (exclude tests)
+                visitor
+                    .function_complexity
+                    .iter()
+                    .filter(|fc| !fc.is_test)
+                    .cloned()
+                    .collect()
+            }
+            DetectionType::GodFile | DetectionType::GodModule => {
+                // Include all functions (production + tests)
+                visitor.function_complexity.clone()
+            }
+        };
+
+        let weighted_method_count = aggregate_weighted_complexity(&relevant_complexity);
+        let avg_complexity = calculate_avg_complexity(&relevant_complexity);
+
+        // Calculate purity-weighted metrics
+        let (purity_weighted_count, purity_distribution) = if !visitor.function_items.is_empty() {
+            // Filter function items based on detection type
+            let relevant_items: Vec<_> = match detection_type {
+                DetectionType::GodClass => {
+                    // Production functions only
+                    visitor
+                        .function_items
+                        .iter()
+                        .filter(|item| {
+                            !visitor
+                                .function_complexity
+                                .iter()
+                                .find(|fc| item.sig.ident == fc.name)
+                                .map(|fc| fc.is_test)
+                                .unwrap_or(false)
+                        })
+                        .cloned()
+                        .collect()
+                }
+                DetectionType::GodFile | DetectionType::GodModule => {
+                    // All functions
+                    visitor.function_items.clone()
+                }
+            };
+            Self::calculate_purity_weights(&relevant_items, &relevant_complexity)
+        } else {
+            (weighted_method_count, None)
+        };
+
+        (
+            weighted_method_count,
+            avg_complexity,
+            purity_weighted_count,
+            purity_distribution,
+        )
+    }
+
     /// # God Class vs God Module
     ///
     /// This function distinguishes between:
@@ -597,56 +668,9 @@ impl GodObjectDetector {
             responsibility_groups.len()
         };
 
-        // Calculate complexity-weighted metrics
-        // Spec 130: For God Class, use production functions only; for God File, use all
-        let relevant_complexity: Vec<_> = match detection_type {
-            DetectionType::GodClass => {
-                // Filter to production functions only (exclude tests)
-                visitor
-                    .function_complexity
-                    .iter()
-                    .filter(|fc| !fc.is_test)
-                    .cloned()
-                    .collect()
-            }
-            DetectionType::GodFile | DetectionType::GodModule => {
-                // Include all functions (production + tests)
-                visitor.function_complexity.clone()
-            }
-        };
-
-        let weighted_method_count = aggregate_weighted_complexity(&relevant_complexity);
-        let avg_complexity = calculate_avg_complexity(&relevant_complexity);
-
-        // Calculate purity-weighted metrics
-        let (purity_weighted_count, purity_distribution) = if !visitor.function_items.is_empty() {
-            // Filter function items based on detection type
-            let relevant_items: Vec<_> = match detection_type {
-                DetectionType::GodClass => {
-                    // Production functions only
-                    visitor
-                        .function_items
-                        .iter()
-                        .filter(|item| {
-                            !visitor
-                                .function_complexity
-                                .iter()
-                                .find(|fc| item.sig.ident == fc.name)
-                                .map(|fc| fc.is_test)
-                                .unwrap_or(false)
-                        })
-                        .cloned()
-                        .collect()
-                }
-                DetectionType::GodFile | DetectionType::GodModule => {
-                    // All functions
-                    visitor.function_items.clone()
-                }
-            };
-            Self::calculate_purity_weights(&relevant_items, &relevant_complexity)
-        } else {
-            (weighted_method_count, None)
-        };
+        // Calculate complexity-weighted and purity-weighted metrics
+        let (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution) =
+            Self::calculate_weighted_metrics(&visitor, &detection_type);
 
         // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
         let god_object_score = if purity_distribution.is_some() {
