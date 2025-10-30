@@ -295,7 +295,7 @@ Accurately identifying constructors helps:
 
 ## Debt Patterns
 
-Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
+Debtmap detects 25 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
 
 ### Debt Type Enum
 
@@ -974,14 +974,16 @@ Debtmap provides codebase-wide risk metrics:
 - **Needs attention**: Many Critical/High priority functions
 - **Technical debt**: High codebase risk score
 
-**Note on minimal_count and well-tested functions:**
+**Note on minimal_count:**
 
-In unified scoring, `minimal_count` represents all functions scoring 0-2.9, which naturally includes:
+In unified scoring (0-10 scale), `minimal_count` represents functions scoring 0-2.9, which includes:
 - Simple utility functions
 - Helper functions with low complexity
-- **Well-tested complex code** that scores low due to coverage dampening
+- Well-tested complex code that scores low due to coverage dampening
 
-This is not a special category but an **outcome** of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk. These functions are correctly de-prioritized because they're well-managed, not because they need special handling.
+This is not a separate risk category but an **outcome** of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score, reflecting that good testing mitigates complexity risk.
+
+**Important:** `minimal_count` does not appear in the standard `risk_categories` from features.json (Low, Medium, High, Critical, WellTested). It's specific to unified scoring's 0-10 scale priority classifications (Minimal, Low, Medium, High, Critical).
 
 ### Testing Recommendations
 
@@ -1051,6 +1053,7 @@ debtmap analyze . --format markdown --output report.md
         "line": 42,
         "cyclomatic": 15,
         "cognitive": 22,
+        "est_branches": 20,
         "nesting": 4,
         "length": 68,
         "is_test": false,
@@ -1122,7 +1125,7 @@ Debtmap supports two JSON output format variants for different integration needs
 }
 ```
 
-**Note:** The unified format is currently an internal representation. If you need this format exposed as a CLI option, please open a feature request on GitHub. The legacy format remains the stable default for all current integrations.
+**Note:** The unified format is currently an internal representation and is **not available** as a user-facing CLI option. The legacy format remains the stable default for all current integrations. If you need the unified format exposed as a CLI option (`--format json-unified`), please open a feature request on GitHub.
 
 ### Reading Function Metrics
 
@@ -1130,6 +1133,7 @@ Debtmap supports two JSON output format variants for different integration needs
 
 - `cyclomatic`: Decision points - guides test case count
 - `cognitive`: Understanding difficulty - guides refactoring priority
+- `est_branches`: Estimated execution paths (formula: max(nesting_depth, 1) × cyclomatic ÷ 3) - approximates test cases needed for branch coverage
 - `nesting`: Indentation depth - signals need for extraction
 - `length`: Lines of code - signals SRP violations
 - `visibility`: Function visibility (`"Private"`, `"Crate"`, or `"Public"` from FunctionVisibility enum)
