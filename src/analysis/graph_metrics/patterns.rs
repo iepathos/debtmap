@@ -175,7 +175,10 @@ impl PatternDetector {
         self.classify_responsibility(patterns, metrics, io_profile)
     }
 
-    /// Classify Orchestrator pattern
+    /// Classify Orchestrator pattern - functions that coordinate multiple operations
+    ///
+    /// Returns classification for functions with high outdegree, indicating they
+    /// orchestrate complex workflows by calling many other functions.
     fn classify_orchestrator(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
         let primary = "Orchestration & Coordination".to_string();
         let confidence = 0.85;
@@ -186,7 +189,10 @@ impl PatternDetector {
         (primary, confidence, evidence)
     }
 
-    /// Classify IoGateway pattern
+    /// Classify IoGateway pattern - functions that handle I/O operations
+    ///
+    /// Returns classification for functions that act as gateways to external I/O,
+    /// including file, network, and database operations.
     fn classify_io_gateway(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
         let primary = "I/O & External Communication".to_string();
         let confidence = 0.80;
@@ -207,7 +213,10 @@ impl PatternDetector {
         (primary, confidence, evidence)
     }
 
-    /// Classify Hub pattern
+    /// Classify Hub pattern - frequently called core functions
+    ///
+    /// Returns classification for functions with high indegree, indicating they
+    /// are central to the module and called by many other functions.
     fn classify_hub(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
         let primary = "Core Business Logic".to_string();
         let confidence = 0.75;
@@ -218,7 +227,10 @@ impl PatternDetector {
         (primary, confidence, evidence)
     }
 
-    /// Classify Bridge pattern
+    /// Classify Bridge pattern - functions that connect different modules
+    ///
+    /// Returns classification for functions with high betweenness centrality,
+    /// indicating they bridge different parts of the codebase.
     fn classify_bridge(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
         let primary = "Module Integration".to_string();
         let confidence = 0.70;
@@ -229,7 +241,11 @@ impl PatternDetector {
         (primary, confidence, evidence)
     }
 
-    /// Classify LeafNode pattern
+    /// Classify LeafNode pattern - functions with no outgoing calls
+    ///
+    /// Returns classification for leaf functions, distinguishing between pure
+    /// computation (no side effects) and utility functions (with side effects)
+    /// based on the I/O profile.
     fn classify_leaf_node(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
         if let Some(profile) = io_profile {
             if profile.is_pure {
@@ -251,7 +267,10 @@ impl PatternDetector {
         }
     }
 
-    /// Classify UtilityCluster pattern
+    /// Classify UtilityCluster pattern - tightly coupled utility groups
+    ///
+    /// Returns classification for functions that are part of a tightly-connected
+    /// functional group, indicated by high clustering coefficient.
     fn classify_utility_cluster(metrics: &GraphMetrics) -> (String, f64, Vec<String>) {
         let primary = "Domain-Specific Utilities".to_string();
         let confidence = 0.65;
@@ -263,6 +282,9 @@ impl PatternDetector {
     }
 
     /// Classify fallback when no specific pattern matches
+    ///
+    /// Returns classification based on I/O profile when available, or a generic
+    /// classification when no strong pattern or I/O profile is detected.
     fn classify_fallback(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
         if let Some(profile) = io_profile {
             let responsibility = profile.primary_responsibility();
@@ -279,6 +301,18 @@ impl PatternDetector {
     }
 
     /// Classify responsibility based on detected patterns and I/O profile
+    ///
+    /// This method uses a priority-based strategy to classify functions:
+    /// 1. Orchestrator - High outdegree, coordinates operations
+    /// 2. IoGateway - Handles I/O operations
+    /// 3. Hub - High indegree, core business logic
+    /// 4. Bridge - High betweenness, connects modules
+    /// 5. LeafNode - No outgoing calls (pure or utility)
+    /// 6. UtilityCluster - Part of tightly-coupled group
+    /// 7. Fallback - Uses I/O profile or generic classification
+    ///
+    /// Each classification is delegated to a specialized pure function
+    /// for improved maintainability and testability.
     pub fn classify_responsibility(
         &self,
         patterns: &[CallGraphPattern],
@@ -475,7 +509,8 @@ mod tests {
             .push(crate::analysis::io_detection::IoOperation::FileRead { path_expr: None });
         io_profile.is_pure = false;
 
-        let (primary, confidence, evidence) = PatternDetector::classify_io_gateway(Some(&io_profile));
+        let (primary, confidence, evidence) =
+            PatternDetector::classify_io_gateway(Some(&io_profile));
 
         assert_eq!(primary, "I/O & External Communication");
         assert_eq!(confidence, 0.80);
@@ -521,7 +556,8 @@ mod tests {
         let mut io_profile = IoProfile::new();
         io_profile.is_pure = true;
 
-        let (primary, confidence, evidence) = PatternDetector::classify_leaf_node(Some(&io_profile));
+        let (primary, confidence, evidence) =
+            PatternDetector::classify_leaf_node(Some(&io_profile));
 
         assert_eq!(primary, "Pure Computation");
         assert_eq!(confidence, 0.75);
@@ -534,7 +570,8 @@ mod tests {
         let mut io_profile = IoProfile::new();
         io_profile.is_pure = false;
 
-        let (primary, confidence, evidence) = PatternDetector::classify_leaf_node(Some(&io_profile));
+        let (primary, confidence, evidence) =
+            PatternDetector::classify_leaf_node(Some(&io_profile));
 
         assert_eq!(primary, "Utility & Helper Functions");
         assert_eq!(confidence, 0.70);
@@ -568,7 +605,8 @@ mod tests {
     #[test]
     fn test_classify_fallback_with_io_profile() {
         let io_profile = IoProfile::new();
-        let (primary, confidence, evidence) = PatternDetector::classify_fallback(Some(&io_profile));
+        let (_primary, confidence, evidence) =
+            PatternDetector::classify_fallback(Some(&io_profile));
 
         assert_eq!(confidence, 0.50);
         assert_eq!(evidence.len(), 1);
