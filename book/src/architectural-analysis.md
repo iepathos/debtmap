@@ -317,6 +317,8 @@ Debtmap detects code duplication using **hash-based chunk comparison**:
 4. **Match duplicates** - Find chunks with identical hashes
 5. **Merge adjacent** - Consolidate consecutive duplicate blocks
 
+**Note:** The minimum chunk size is configurable via the `--threshold-duplication` flag (default: 50 lines).
+
 **Implementation:** `src/debt/duplication.rs:6-44` (detect_duplication)
 
 ### Algorithm Details
@@ -365,7 +367,7 @@ threshold_duplication = 50  # Default value
 # threshold_duplication = 100  # Less noise
 ```
 
-**Configuration reference:** `features.json:21` (threshold_duplication)
+**Configuration reference:** `src/cli.rs:69` (threshold_duplication flag definition)
 
 **Implementation:** `src/debt/duplication.rs:6-10`
 
@@ -423,17 +425,15 @@ Debtmap provides specific refactoring recommendations for each architectural iss
 ### Running Architectural Analysis
 
 ```bash
-# Full analysis with all architectural checks
-debtmap analyze --include-architecture
-
-# Focus on circular dependencies
-debtmap analyze --check circular-deps
-
-# Coupling analysis with custom threshold
-debtmap analyze --coupling-threshold 5
+# Architectural analysis runs automatically with standard analysis
+debtmap analyze .
 
 # Duplication detection with custom chunk size
-debtmap analyze --duplication-min-lines 30
+debtmap analyze . --threshold-duplication 30
+
+# Note: Circular dependencies, coupling metrics, and SDP violations
+# are analyzed automatically. There are no separate flags to enable
+# or disable specific architectural checks.
 ```
 
 ### Example: Circular Dependency
@@ -563,7 +563,7 @@ Architectural analysis results are integrated with debtmap's debt categorization
 - **Duplication** - Duplicated code blocks found
 - **ArchitecturalViolation** - SDP violations, zone issues
 
-**Reference:** `features.json:240-253` (core_patterns section)
+**Reference:** See `src/core/mod.rs` for debt type definitions
 
 ### Tiered Prioritization
 
@@ -574,7 +574,7 @@ Architectural issues are assigned priority tiers:
 - **Tier 3 (Medium)** - High coupling, large duplications
 - **Tier 4 (Low)** - Small duplications, minor coupling issues
 
-**Reference:** `features.json:522-560` (tiered prioritization)
+**Reference:** See [Tiered Prioritization](tiered-prioritization.md) for complete priority assignment logic
 
 ## Cohesion Analysis
 
@@ -593,31 +593,39 @@ Full cohesion analysis would measure:
 
 ## Configuration
 
-Configure architectural analysis thresholds in `.debtmap.toml`:
+### Configurable Parameters
+
+Configure duplication detection in `.debtmap.toml` or via CLI:
 
 ```toml
-[architectural]
-# Coupling threshold (modules with more dependencies flagged)
-coupling_threshold = 5
-
 # Minimum lines for duplication detection
-duplication_min_lines = 50
-
-# Instability threshold for SDP violations
-instability_threshold = 0.8
-
-# Minimum afferent coupling for SDP violations
-sdp_afferent_threshold = 2
-
-# Zone of pain thresholds
-zone_pain_abstractness = 0.2
-zone_pain_instability = 0.2
-zone_pain_afferent = 3
-
-# Zone of uselessness thresholds
-zone_useless_abstractness = 0.8
-zone_useless_instability = 0.8
+threshold_duplication = 50  # Default value
 ```
+
+Or via command line:
+
+```bash
+debtmap analyze . --threshold-duplication 50
+```
+
+**Configuration reference:** `src/cli.rs:69` (threshold_duplication flag definition)
+
+### Hardcoded Thresholds
+
+**Note:** Most architectural thresholds are currently hardcoded in the implementation and cannot be configured:
+
+- **Coupling threshold:** 5 (modules with >5 dependencies are flagged)
+- **Instability threshold:** 0.8 (for SDP violations)
+- **SDP afferent threshold:** 2 (minimum dependents for SDP violations)
+- **Zone of pain thresholds:**
+  - Abstractness < 0.2
+  - Instability < 0.2
+  - Afferent coupling > 3
+- **Zone of uselessness thresholds:**
+  - Abstractness > 0.8
+  - Instability > 0.8
+
+**Source:** `src/debt/coupling.rs:70-76` (hardcoded threshold definitions)
 
 See [Configuration](configuration.md) for complete options.
 
