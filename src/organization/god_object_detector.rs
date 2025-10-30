@@ -615,6 +615,70 @@ impl GodObjectDetector {
         )
     }
 
+    /// Calculates the final god object score using the best available metrics
+    ///
+    /// # Arguments
+    /// * `purity_weighted_count` - Purity-based weighted count
+    /// * `weighted_method_count` - Complexity-weighted method count
+    /// * `total_methods` - Raw method count
+    /// * `total_fields` - Number of fields
+    /// * `responsibility_count` - Number of responsibilities
+    /// * `lines_of_code` - Estimated lines of code
+    /// * `avg_complexity` - Average complexity
+    /// * `purity_distribution` - Optional purity distribution
+    /// * `has_complexity_data` - Whether complexity data is available
+    /// * `thresholds` - God object thresholds
+    ///
+    /// # Returns
+    /// Tuple of (god_object_score, is_god_object)
+    fn calculate_final_god_object_score(
+        purity_weighted_count: f64,
+        weighted_method_count: f64,
+        total_methods: usize,
+        total_fields: usize,
+        responsibility_count: usize,
+        lines_of_code: usize,
+        avg_complexity: f64,
+        purity_distribution: &Option<PurityDistribution>,
+        has_complexity_data: bool,
+        thresholds: &GodObjectThresholds,
+    ) -> (f64, bool) {
+        // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
+        let god_object_score = if purity_distribution.is_some() {
+            calculate_god_object_score_weighted(
+                purity_weighted_count,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                avg_complexity,
+                thresholds,
+            )
+        } else if has_complexity_data {
+            calculate_god_object_score_weighted(
+                weighted_method_count,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                avg_complexity,
+                thresholds,
+            )
+        } else {
+            calculate_god_object_score(
+                total_methods,
+                total_fields,
+                responsibility_count,
+                lines_of_code,
+                thresholds,
+            )
+        };
+
+        // With complexity weighting, use the god_object_score to determine if it's a god object
+        // rather than just the confidence level (which still uses raw counts)
+        let is_god_object = god_object_score >= 70.0;
+
+        (god_object_score, is_god_object)
+    }
+
     /// # God Class vs God Module
     ///
     /// This function distinguishes between:
@@ -672,34 +736,19 @@ impl GodObjectDetector {
         let (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution) =
             Self::calculate_weighted_metrics(&visitor, &detection_type);
 
-        // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
-        let god_object_score = if purity_distribution.is_some() {
-            calculate_god_object_score_weighted(
-                purity_weighted_count,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                avg_complexity,
-                &thresholds,
-            )
-        } else if !visitor.function_complexity.is_empty() {
-            calculate_god_object_score_weighted(
-                weighted_method_count,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                avg_complexity,
-                &thresholds,
-            )
-        } else {
-            calculate_god_object_score(
-                total_methods,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                &thresholds,
-            )
-        };
+        // Calculate the final god object score and determination
+        let (god_object_score, is_god_object) = Self::calculate_final_god_object_score(
+            purity_weighted_count,
+            weighted_method_count,
+            total_methods,
+            total_fields,
+            responsibility_count,
+            lines_of_code,
+            avg_complexity,
+            &purity_distribution,
+            !visitor.function_complexity.is_empty(),
+            &thresholds,
+        );
 
         let confidence = determine_confidence(
             total_methods,
@@ -709,10 +758,6 @@ impl GodObjectDetector {
             total_complexity,
             &thresholds,
         );
-
-        // With complexity weighting, use the god_object_score to determine if it's a god object
-        // rather than just the confidence level (which still uses raw counts)
-        let is_god_object = god_object_score >= 70.0;
 
         // Cross-domain struct mixing analysis (Spec 140)
         let struct_count = per_struct_metrics.len();
