@@ -27,6 +27,8 @@ A struct/class is classified as a god class when it violates multiple thresholds
 4. **Lines of Code** - Estimated lines for the struct and its impl blocks
 5. **Complexity Sum** - Combined cyclomatic complexity of struct methods
 
+**Note:** All five criteria are evaluated by the `determine_confidence` function to calculate confidence levels. Each criterion that exceeds its threshold contributes to the violation count.
+
 ### God Module Criteria
 
 A file is classified as a god module when it has excessive standalone functions:
@@ -64,6 +66,8 @@ A file is classified as a god module when it has excessive standalone functions:
 - **Max Lines**: 500
 - **Max Complexity**: 150
 
+**Note:** TypeScript uses the same thresholds as JavaScript since both languages have similar structural patterns. The implementation treats them identically for god object detection purposes.
+
 These thresholds can be customized per-language in your `.debtmap.toml` configuration file.
 
 ## God Class vs God Module Detection
@@ -90,9 +94,14 @@ A **god module** is a file with excessive standalone functions (no dominant stru
 1. No struct/class is found, OR
 2. The file has many standalone functions outside of any impl blocks
 
-**Threshold:** Files with >50 standalone functions are considered god modules.
+**Implementation Detail:** Debtmap uses the `DetectionType` enum with three variants:
+- `GodClass` - Single struct with excessive methods/fields
+- `GodFile` - File with excessive functions or lines of code
+- `GodModule` - Alias for `GodFile` (both represent the same detection type)
 
-**Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module.
+The `GodModule` variant is provided for clarity when discussing files with many standalone functions, but internally it's the same as `GodFile`.
+
+**Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module (using the `GodFile`/`GodModule` detection type).
 
 ### Why Separate Analysis?
 
@@ -118,6 +127,12 @@ Debtmap assigns confidence levels based **solely on the number of thresholds vio
 - **NotGodObject** (0 violations) - All metrics within acceptable limits
 
 **Note:** The confidence level is determined by violation count alone. The god object score (calculated separately) is used for prioritization and ranking, but does not affect the confidence classification.
+
+**Example:** Consider two files both with `violation_count=2` (Possible confidence):
+- File A: 21 methods, 16 fields (just over the threshold)
+- File B: 100 methods, 50 fields (severely over the threshold)
+
+Both receive the same "Possible" confidence level, but File B will have a much higher god object score for prioritization purposes. This separation ensures consistent confidence classification while still allowing scores to reflect severity.
 
 See `src/organization/god_object_analysis.rs:236-268` for the `determine_confidence` function.
 
@@ -175,7 +190,7 @@ See `src/organization/god_object_analysis.rs:142-209`.
 
 **Available for Rust only** (requires `syn::ItemFn` analysis)
 
-This advanced scoring variant reduces the impact of pure functions, preventing pure functional modules from being unfairly penalized. The algorithm:
+This advanced scoring variant combines both **complexity weighting** and **purity analysis**, building on top of complexity-weighted scoring to further reduce the impact of pure functions. This prevents pure functional modules from being unfairly penalized. The algorithm:
 
 1. Analyzes each function for purity using three levels:
    - **Pure** (no side effects): Functions with read-only operations, no I/O, no mutation
@@ -195,12 +210,14 @@ This advanced scoring variant reduces the impact of pure functions, preventing p
    - **Impure indicators**: File/network operations, mutable state, database access, logging
    - **Probably Pure**: Generic functions, trait method calls, or ambiguous patterns
 
-3. Combines complexity and purity weights:
+3. Combines complexity and purity weights to calculate the total contribution:
    ```
    total_weight = complexity_weight × purity_multiplier
    ```
 
-   Example: A pure function with complexity 5 contributes only `5 × 0.3 = 1.5` to the weighted count.
+   This means pure functions get both the complexity-based weight AND the purity multiplier applied together.
+
+   **Example:** A pure function with complexity 5 contributes only `5 × 0.3 = 1.5` to the weighted count (compared to 5.0 for an impure function of the same complexity).
 
 4. Tracks the `PurityDistribution`:
    - `pure_count`, `probably_pure_count`, `impure_count`
@@ -227,8 +244,9 @@ Responsibilities are inferred from method names using common prefixes. Debtmap r
 | `save`, `load`, `store` | Persistence |
 | `process`, `handle` | Processing |
 | `send`, `receive` | Communication |
+| *(no prefix match)* | Utilities |
 
-**Fallback:** If a method name doesn't match any category, it's classified as `Utilities`.
+**Note:** `Utilities` serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, `Utilities` is included in `RESPONSIBILITY_CATEGORIES` with an empty prefixes array, making it the catch-all category returned by `infer_responsibility_from_method` when no other category matches.
 
 **Distinct Responsibility Counting:** Debtmap counts the number of **unique** responsibility categories used by a struct/module's methods. A high responsibility count (e.g., >5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.
 
@@ -381,6 +399,10 @@ max_fields = 15
 max_traits = 5      # max_traits = max responsibilities
 max_lines = 1000
 max_complexity = 200
+
+# Note: The configuration field is named 'max_traits' for historical reasons,
+# but it controls the maximum number of responsibilities/concerns, not Rust traits.
+# This is a legacy naming issue from early development.
 
 [god_object_detection.python]
 max_methods = 15
