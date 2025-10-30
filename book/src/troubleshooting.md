@@ -270,6 +270,8 @@ debtmap --validate-loc
 debtmap --cache-stats
 ```
 
+**Note**: The `--explain-score` flag is deprecated and hidden. Use `-v`, `-vv`, or `-vvv` for verbosity levels instead to see score breakdowns.
+
 ### Debugging Score Calculations
 
 ```bash
