@@ -5,9 +5,11 @@
 //!
 //! This module is organized into focused sub-modules:
 //! - `types`: Core type definitions (PythonType, ClassInfo, FunctionSignature, Scope)
+//! - `utils`: Utility functions for AST extraction and manipulation
 //! - (More modules will be added as refactoring progresses)
 
 mod types;
+mod utils;
 
 // Re-export public types for backward compatibility
 pub use types::{ClassInfo, FunctionSignature, PythonType, Scope};
@@ -634,33 +636,6 @@ pub struct TwoPassExtractor {
     pending_observer_dispatches: Vec<(ast::StmtFor, FunctionId, Option<String>)>,
 }
 
-/// Helper function to extract callback expression as a string
-fn extract_callback_expr_impl(expr: &ast::Expr) -> String {
-    match expr {
-        ast::Expr::Name(name) => name.id.to_string(),
-        ast::Expr::Attribute(attr) => {
-            if let ast::Expr::Name(obj) = &*attr.value {
-                format!("{}.{}", obj.id, attr.attr)
-            } else {
-                attr.attr.to_string()
-            }
-        }
-        ast::Expr::Call(call) => {
-            // For functools.partial(func, ...) extract func
-            if let ast::Expr::Attribute(attr) = &*call.func {
-                if attr.attr.as_str() == "partial" {
-                    if let Some(first_arg) = call.args.first() {
-                        let func_name = extract_callback_expr_impl(first_arg);
-                        return format!("partial({})", func_name);
-                    }
-                }
-            }
-            "<lambda>".to_string()
-        }
-        ast::Expr::Lambda(_) => "<lambda>".to_string(),
-        _ => "<unknown>".to_string(),
-    }
-}
 
 impl TwoPassExtractor {
     /// Check if a function name is a framework entry point using the framework registry
@@ -1773,7 +1748,7 @@ impl TwoPassExtractor {
 
     /// Extract full attribute name (e.g., "self.observers" from attribute expression)
     fn extract_full_attribute_name(&self, expr: &ast::Expr) -> String {
-        extract_attribute_name_recursive(expr)
+        utils::extract_attribute_name_recursive(expr)
     }
 
     /// Populate observer registry from class definition
@@ -2056,7 +2031,7 @@ impl TwoPassExtractor {
 
     /// Extract callback expression as a string for tracking
     fn extract_callback_expr(&self, expr: &ast::Expr) -> String {
-        extract_callback_expr_impl(expr)
+        utils::extract_callback_expr_impl(expr)
     }
 
     /// Check for event binding patterns like obj.Bind(event, self.method)
@@ -2390,18 +2365,6 @@ impl TwoPassExtractor {
             }
         }
         None
-    }
-}
-
-/// Helper function to extract full attribute name recursively
-fn extract_attribute_name_recursive(expr: &ast::Expr) -> String {
-    match expr {
-        ast::Expr::Name(name) => name.id.to_string(),
-        ast::Expr::Attribute(attr) => {
-            let base = extract_attribute_name_recursive(&attr.value);
-            format!("{}.{}", base, attr.attr)
-        }
-        _ => "<unknown>".to_string(),
     }
 }
 
