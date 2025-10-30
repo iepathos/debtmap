@@ -118,8 +118,6 @@ fn is_entry_point(func_id: &FunctionId, call_graph: &CallGraph) -> bool {
     call_graph.is_entry_point(func_id) || is_entry_point_by_name(&func_id.name)
 }
 
-
-
 /// Detect simple accessor/getter methods (spec 125)
 ///
 /// Identifies simple accessor and getter methods that should be classified as
@@ -177,8 +175,6 @@ fn is_accessor_method(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) ->
 
     true
 }
-
-
 
 pub fn get_role_multiplier(role: FunctionRole) -> f64 {
     // Get multipliers from configuration

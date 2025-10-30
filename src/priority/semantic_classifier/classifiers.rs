@@ -3,13 +3,13 @@
 //! This module contains the core classification logic that determines
 //! function roles based on metrics, patterns, and AST analysis.
 
+use super::pattern_matchers::{matches_debug_pattern, matches_output_io_pattern};
 use crate::analyzers::rust_constructor_detector::{
     analyze_function_body, extract_return_type, ConstructorReturnType,
 };
 use crate::analyzers::rust_enum_converter_detector::is_enum_converter;
 use crate::core::FunctionMetrics;
 use crate::priority::call_graph::{CallGraph, FunctionId};
-use super::pattern_matchers::{matches_debug_pattern, matches_output_io_pattern};
 
 /// Detect debug/diagnostic functions (Spec 119)
 ///
@@ -137,7 +137,10 @@ pub(crate) fn is_simple_constructor(func: &FunctionMetrics) -> bool {
 /// - Standard constructor names: `new`, `default`, `from_*`, `with_*`
 /// - Short functions (< 15 lines) with low complexity
 /// - Minimal nesting and simple initialization patterns
-pub(crate) fn is_constructor_enhanced(func: &FunctionMetrics, syn_func: Option<&syn::ItemFn>) -> bool {
+pub(crate) fn is_constructor_enhanced(
+    func: &FunctionMetrics,
+    syn_func: Option<&syn::ItemFn>,
+) -> bool {
     // Check configuration
     let config = crate::config::get_constructor_detection_config();
 
@@ -251,7 +254,11 @@ pub(crate) fn is_pattern_matching_function(func: &FunctionMetrics, func_id: &Fun
 /// Check if function is an orchestrator
 ///
 /// Orchestrators coordinate multiple other functions with simple delegation logic.
-pub(crate) fn is_orchestrator(func: &FunctionMetrics, func_id: &FunctionId, call_graph: &CallGraph) -> bool {
+pub(crate) fn is_orchestrator(
+    func: &FunctionMetrics,
+    func_id: &FunctionId,
+    call_graph: &CallGraph,
+) -> bool {
     use super::pattern_matchers::is_orchestrator_by_name;
 
     // First check if there are meaningful callees to orchestrate
@@ -339,7 +346,10 @@ pub(crate) fn is_io_wrapper(func: &FunctionMetrics) -> bool {
 ///
 /// Returns the ratio of function calls to total statements (approximated by function length).
 /// A higher ratio indicates more coordination/delegation behavior.
-pub(crate) fn calculate_delegation_ratio(func: &FunctionMetrics, meaningful_callees: &[&FunctionId]) -> f64 {
+pub(crate) fn calculate_delegation_ratio(
+    func: &FunctionMetrics,
+    meaningful_callees: &[&FunctionId],
+) -> f64 {
     if func.length == 0 {
         return 0.0;
     }
