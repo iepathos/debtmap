@@ -190,6 +190,16 @@ A function's effective coverage considers:
 Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
 ```
 
+### Algorithm Parameters
+
+The transitive coverage propagation uses carefully tuned parameters to balance accuracy and performance:
+
+- **Well-Tested Threshold**: 80% - Only functions with ≥80% direct coverage contribute to indirect coverage, ensuring high confidence
+- **Distance Discount**: 70% per hop - Each level of indirection reduces contribution by 30%, reflecting decreased confidence
+- **Maximum Distance**: 3 hops - Limits recursion depth to prevent exponential complexity (after 3 hops, contribution drops to ~34%)
+
+These parameters ensure that indirect coverage signals are meaningful while preventing false confidence from distant call relationships. See `src/priority/coverage_propagation.rs:38-46` for the implementation.
+
 ### Why It Matters
 
 A function with 0% direct coverage might have high transitive coverage if it's only called by well-tested functions:
@@ -219,7 +229,7 @@ Coverage integration is highly optimized for large codebases:
 
 - **Index Build**: O(n), ~20-30ms for 5,000 functions
 - **Exact Lookup**: O(1), ~0.5μs per lookup
-- **Fallback Lookup**: O(log n), ~5-8μs when exact match fails
+- **Fallback Lookup**: O(files) iteration with O(1) per-file lookup, ~5-8μs when exact match fails. Uses suffix matching and normalized path equality strategies
 - **Memory Usage**: ~200 bytes per record (~2MB for 5,000 functions)
 - **Thread Safety**: Lock-free parallel access via `Arc<CoverageIndex>`
 - **Analysis Overhead**: ~2.5x baseline (target: ≤3x)
@@ -433,7 +443,7 @@ minimum_risk_score = 15.0
 minimum_cyclomatic_complexity = 5
 ```
 
-**Important**: These weights only apply when coverage data is **not** available. When you provide `--lcov`, coverage acts as a dampening multiplier instead of a weighted component. See `src/config.rs:122-132` for default weight definitions.
+**Important**: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: `Final Score = Base Score × (1.0 - coverage_pct)`. These weights only apply when coverage data is **not** available. See `src/priority/scoring/calculation.rs:68-82` and `src/config.rs:122-132` for the implementation.
 
 See [Configuration](configuration.md) for complete options.
 
