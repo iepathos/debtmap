@@ -1,6 +1,7 @@
 use crate::priority::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
-    DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedDebtItem,
+    DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedAnalysisQueries,
+    UnifiedDebtItem,
 };
 use std::fmt::Write;
 

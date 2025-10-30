@@ -1,4 +1,4 @@
-use crate::priority;
+use crate::priority::{self, UnifiedAnalysisQueries};
 use anyhow::Result;
 use serde::Serialize;
 use std::fs;

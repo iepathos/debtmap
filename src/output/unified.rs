@@ -7,7 +7,8 @@
 //! - Simplifies filtering and sorting across item types
 
 use crate::priority::{
-    DebtItem, DebtType, FileDebtItem, FunctionRole, GodObjectIndicators, UnifiedDebtItem,
+    DebtItem, DebtType, FileDebtItem, FunctionRole, GodObjectIndicators, UnifiedAnalysisQueries,
+    UnifiedDebtItem,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

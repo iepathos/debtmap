@@ -1,7 +1,7 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, FunctionVisibility, Tier,
-    UnifiedAnalysis, UnifiedDebtItem,
+    UnifiedAnalysis, UnifiedAnalysisQueries, UnifiedDebtItem,
 };
 use colored::*;
 use std::fmt::Write;

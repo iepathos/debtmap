@@ -1,212 +1,279 @@
-# Implementation Plan: Refactor extract_pipeline_from_method_call
+# Implementation Plan: Refactor src/priority/mod.rs God Object
 
 ## Problem Summary
 
-**Location**: ./src/analysis/functional_composition.rs:extract_pipeline_from_method_call:317
-**Priority Score**: 11.95
-**Debt Type**: ComplexityHotspot (Cyclomatic: 33, Cognitive: 40)
+**Location**: ./src/priority/mod.rs:file:0
+**Priority Score**: 50.48
+**Debt Type**: God Object (File-Level)
 **Current Metrics**:
-- Lines of Code: 219
-- Cyclomatic Complexity: 33
-- Cognitive Complexity: 40
-- Function Role: PureLogic
+- Lines of Code: 1658
+- Functions: 58 (22 methods on UnifiedAnalysis impl, 36 others)
+- Cyclomatic Complexity: 181 total (avg 3.12)
+- Max Complexity: 22
+- Coverage: 0.0%
+- God Object Score: 1.0 (maximum)
+- Responsibilities: 6 (Construction, Utilities, Computation, Validation, Data Access, Filtering & Selection)
 
-**Issue**: Reduce complexity from 33 to ~10
-
-**Rationale**: High complexity 33/40 makes function hard to test and maintain. The function contains a massive match statement with 30+ branches handling different iterator method names, making it difficult to understand, test, and extend.
+**Issue**: URGENT: 1658 lines, 58 functions! This file violates the single responsibility principle with the UnifiedAnalysis struct having 22 methods across 6 distinct responsibilities. The debtmap analysis identifies two high-priority splits: 1) Utilities (11 methods, ~220 lines) and 2) Data Access (7 methods, ~140 lines). The file mixes data structures, business logic, formatting, and utilities.
 
 ## Target State
 
-**Expected Impact** (from debtmap):
-- Complexity Reduction: 16.5
-- Coverage Improvement: 0.0
-- Risk Reduction: 4.18
+**Expected Impact**:
+- Complexity Reduction: 36.2
+- Maintainability Improvement: 5.05
+- Test Effort Reduction: 165.8
 
 **Success Criteria**:
-- [ ] Cyclomatic complexity reduced from 33 to ~10 (target: 8-12)
-- [ ] Cognitive complexity reduced from 40 to ~15
-- [ ] Function length reduced from 219 lines to <100 lines
-- [ ] Each extracted function has single responsibility
+- [ ] File reduced to < 600 lines (core types and constructor only)
+- [ ] UnifiedAnalysis impl has ≤ 10 methods (down from 22)
+- [ ] New modules created for extracted responsibilities
 - [ ] All existing tests continue to pass
 - [ ] No clippy warnings
-- [ ] Proper formatting with cargo fmt
+- [ ] Proper formatting (cargo fmt)
+- [ ] Public API remains unchanged (backward compatible)
 
 ## Implementation Phases
 
-### Phase 1: Extract Method Classification Logic
+### Phase 1: Extract Data Access Module
 
-**Goal**: Extract the method-to-stage mapping logic into a pure, data-driven system
+**Goal**: Extract the 7 data access methods from UnifiedAnalysis into a new `unified_analysis_queries` module
 
 **Changes**:
-- Create an enum `MethodClassification` to categorize iterator methods
-- Create a pure function `classify_method(method: &str) -> Option<MethodClassification>`
-- Use a lookup table or pattern matching to map method names to classifications
-- This separates the "what method is this" logic from the "what stage to create" logic
+- Create `src/priority/unified_analysis_queries.rs`
+- Extract these methods from UnifiedAnalysis impl:
+  - `get_top_priorities`
+  - `get_top_mixed_priorities`
+  - `get_top_mixed_priorities_tiered`
+  - `get_bottom_priorities`
+  - `get_tiered_display`
+  - `get_debt_type_key` (private helper)
+  - `get_categorized_debt`
+- Implement as pure functions or extension trait
+- Update UnifiedAnalysis impl to delegate to new module
+- Add module to `mod.rs` exports
 
 **Testing**:
-- Run `cargo test extract_pipeline_from_method_call` to ensure existing tests pass
+- Run `cargo test --lib` to ensure all tests pass
 - Run `cargo clippy` to check for warnings
-- Verify the function still produces the same output
+- Verify no breaking changes to public API
 
 **Success Criteria**:
-- [ ] New `classify_method` function created with <10 complexity
-- [ ] Method classification logic extracted and testable
-- [ ] All existing tests pass
-- [ ] No clippy warnings
-- [ ] Ready to commit
-
-**Expected Complexity Impact**: -8 (move 30+ match arms to data-driven classification)
-
-### Phase 2: Extract Stage Creation Logic
-
-**Goal**: Extract the logic that creates PipelineStage instances based on method classification
-
-**Changes**:
-- Create a pure function `create_stage_from_classification(classification: MethodClassification, method: &str) -> Option<PipelineStage>`
-- Map each classification to its corresponding stage type
-- Remove stage creation logic from the main match statement
-- This separates "what stage to create" from "how to walk the chain"
-
-**Testing**:
-- Run `cargo test extract_pipeline_from_method_call` to ensure functionality preserved
-- Run `cargo clippy`
-- Verify stage creation works correctly for all method types
-
-**Success Criteria**:
-- [ ] New `create_stage_from_classification` function created
-- [ ] Stage creation logic extracted and independently testable
-- [ ] All existing tests pass
-- [ ] No clippy warnings
-- [ ] Ready to commit
-
-**Expected Complexity Impact**: -5 (separate stage creation from chain traversal)
-
-### Phase 3: Extract Terminal Operation Detection
-
-**Goal**: Extract terminal operation detection into a separate pure function
-
-**Changes**:
-- Create a pure function `detect_terminal_op(method: &str) -> Option<TerminalOp>`
-- Move all terminal operation detection logic to this function
-- Simplify the main function's match statement
-- This isolates terminal operation logic for easier testing
-
-**Testing**:
-- Run `cargo test` to verify terminal operations detected correctly
-- Test edge cases: methods with no terminal op, multiple terminal ops
-- Run `cargo clippy`
-
-**Success Criteria**:
-- [ ] New `detect_terminal_op` function created
-- [ ] Terminal operation detection extracted
-- [ ] All existing tests pass
-- [ ] No clippy warnings
-- [ ] Ready to commit
-
-**Expected Complexity Impact**: -4 (isolate terminal operation logic)
-
-### Phase 4: Refactor Chain Walking Logic
-
-**Goal**: Simplify the main function to focus only on walking the method chain
-
-**Changes**:
-- Refactor the main loop to use the extracted helper functions
-- Remove inline logic for method handling
-- Use functional composition: classify_method -> create_stage -> accumulate
-- The main function becomes a simple chain walker that delegates to pure functions
-
-**Testing**:
-- Run full test suite: `cargo test --lib`
-- Verify all pipeline extraction cases work correctly
-- Test with nested pipelines and parallel iterators
-- Run `cargo clippy`
-
-**Success Criteria**:
-- [ ] Main function simplified to chain walking only
-- [ ] Function length reduced to <100 lines
-- [ ] Cyclomatic complexity reduced to 8-12
-- [ ] All existing tests pass
-- [ ] No clippy warnings
-- [ ] Ready to commit
-
-**Expected Complexity Impact**: Main function complexity reduced to 8-10
-
-### Phase 5: Add Unit Tests for Extracted Functions
-
-**Goal**: Add comprehensive unit tests for the newly extracted pure functions
-
-**Changes**:
-- Add unit tests for `classify_method` covering all method types
-- Add unit tests for `create_stage_from_classification`
-- Add unit tests for `detect_terminal_op`
-- Add integration tests for the refactored `extract_pipeline_from_method_call`
-- Tests should cover edge cases and error conditions
-
-**Testing**:
-- Run `cargo test` to verify all new tests pass
-- Run `cargo tarpaulin` to check coverage
-- Aim for >90% coverage of the extracted functions
-
-**Success Criteria**:
-- [ ] Unit tests added for all extracted functions
-- [ ] Coverage >90% for new functions
+- [ ] New module created with 7 functions/methods
+- [ ] UnifiedAnalysis impl reduced by 7 methods (down to 15)
 - [ ] All tests pass
 - [ ] No clippy warnings
 - [ ] Ready to commit
 
-**Expected Benefit**: Improved maintainability and confidence in future changes
+### Phase 2: Extract Utilities Module
+
+**Goal**: Extract the 11 utility methods from UnifiedAnalysis into a new `unified_analysis_utils` module
+
+**Changes**:
+- Create `src/priority/unified_analysis_utils.rs`
+- Extract these methods from UnifiedAnalysis impl:
+  - `timings`
+  - `add_file_item`
+  - `add_item`
+  - `sort_by_priority`
+  - `generate_batch_action` (private helper)
+  - `data_flow_graph`
+  - `data_flow_graph_mut`
+  - `populate_purity_analysis`
+  - `add_io_operation`
+  - `add_variable_dependencies`
+  - `identify_cross_category_dependencies` (private helper)
+- Consider splitting into sub-responsibilities:
+  - Item management: `add_file_item`, `add_item`, `sort_by_priority`
+  - Data flow operations: `data_flow_graph`, `data_flow_graph_mut`, `populate_purity_analysis`, `add_io_operation`, `add_variable_dependencies`
+  - Helpers: `generate_batch_action`, `identify_cross_category_dependencies`, `timings`
+- Update UnifiedAnalysis impl to use new utilities
+- Add module to `mod.rs` exports (if public API needed)
+
+**Testing**:
+- Run `cargo test --lib` to ensure all tests pass
+- Run `cargo clippy` to check for warnings
+- Verify backward compatibility
+
+**Success Criteria**:
+- [ ] New module(s) created with 11 functions
+- [ ] UnifiedAnalysis impl reduced by 11 methods (down to 4)
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Ready to commit
+
+### Phase 3: Extract Computation Module
+
+**Goal**: Extract `calculate_total_impact` and `filter_by_categories` computation logic into a focused module
+
+**Changes**:
+- Create `src/priority/unified_analysis_computation.rs`
+- Extract computation methods:
+  - `calculate_total_impact` - complex aggregation logic
+  - `filter_by_categories` - filtering and recalculation
+  - `is_critical_item` (private helper)
+- Refactor `calculate_total_impact` to be more functional:
+  - Extract pure calculation functions
+  - Separate I/O (file reading) from computation
+  - Use iterator chains where possible
+- Update UnifiedAnalysis impl to use computation module
+- Add module to `mod.rs`
+
+**Testing**:
+- Run `cargo test --lib` to ensure all tests pass
+- Run specific tests for debt density calculation (lines 1303-1366)
+- Run `cargo clippy`
+- Verify metrics calculations remain accurate
+
+**Success Criteria**:
+- [ ] New module created with extracted computation logic
+- [ ] UnifiedAnalysis impl reduced to ~2 core methods
+- [ ] Computation logic more functional and testable
+- [ ] All tests pass (especially debt density tests)
+- [ ] No clippy warnings
+- [ ] Ready to commit
+
+### Phase 4: Organize Type Definitions
+
+**Goal**: Move supporting type definitions to focused submodules to reduce main file size
+
+**Changes**:
+- Create `src/priority/types.rs` for shared types:
+  - `FunctionAnalysis`
+  - `ImpactMetrics`
+  - `ActionableRecommendation`
+  - `ActionStep`
+  - `Difficulty`
+  - `FunctionVisibility`
+- Create `src/priority/debt_types.rs`:
+  - `DebtType` enum (24 variants)
+  - `DebtCategory` enum
+  - Related implementations
+- Create `src/priority/display_types.rs`:
+  - `Tier` enum
+  - `DisplayGroup`
+  - `TieredDisplay`
+  - `DebtItem` enum
+  - `CategorySummary`
+  - `CategorizedDebt`
+  - `CrossCategoryDependency`
+  - `ImpactLevel`
+- Update `mod.rs` to re-export types from new modules
+- Keep `UnifiedAnalysis` struct in main `mod.rs` (core type)
+
+**Testing**:
+- Run `cargo test --all` to ensure all tests pass
+- Run `cargo clippy --all-targets`
+- Verify no breaking changes to imports
+
+**Success Criteria**:
+- [ ] Three new type modules created
+- [ ] Main `mod.rs` reduced to < 200 lines
+- [ ] All re-exports properly configured
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Ready to commit
+
+### Phase 5: Final Cleanup and Documentation
+
+**Goal**: Finalize the refactoring with documentation and verification
+
+**Changes**:
+- Add module-level documentation to each new module
+- Update any inline documentation referencing old structure
+- Verify all new modules follow project conventions
+- Run full test suite with coverage
+- Final `cargo fmt` pass
+- Update any references in other modules if needed
+
+**Testing**:
+- Run `just ci` - Full CI checks
+- Run `cargo test --all-features`
+- Run `cargo doc --no-deps` to ensure docs build
+- Visual inspection of module structure
+
+**Success Criteria**:
+- [ ] All new modules have proper documentation
+- [ ] Full test suite passes
+- [ ] No clippy warnings
+- [ ] Documentation builds successfully
+- [ ] Module structure is clean and logical
+- [ ] Ready for final commit
 
 ## Testing Strategy
 
 **For each phase**:
 1. Run `cargo test --lib` to verify existing tests pass
-2. Run `cargo clippy --all-targets --all-features -- -D warnings` to check for warnings
+2. Run `cargo clippy` to check for warnings
 3. Run `cargo fmt --all -- --check` to verify formatting
-4. Manually review the changes for correctness
+4. Manual review of public API compatibility
 
 **Final verification**:
 1. `just ci` - Full CI checks
-2. `cargo tarpaulin --out Html` - Generate coverage report
-3. Verify complexity reduction with analysis tools
-4. Code review: ensure functional programming principles followed
+2. `cargo test --all-features` - All tests with all feature combinations
+3. `cargo doc --no-deps` - Documentation builds
+4. Manual verification of file sizes:
+   - `wc -l src/priority/mod.rs` (should be < 200)
+   - `wc -l src/priority/*.rs` (verify distribution)
 
 ## Rollback Plan
 
 If a phase fails:
 1. Revert the phase with `git reset --hard HEAD~1`
-2. Review the failure and error messages
-3. Identify the root cause (test failure, compilation error, logic error)
-4. Adjust the plan or implementation approach
-5. Retry with fixes
-
-If multiple phases fail:
-1. Consider breaking the phase into smaller steps
-2. Add more comprehensive tests before refactoring
-3. Consult with team or seek code review
+2. Review the failure cause:
+   - Compilation errors → check for missing imports or visibility
+   - Test failures → check for behavioral changes in extraction
+   - Clippy warnings → address before proceeding
+3. Adjust the approach:
+   - For compilation: ensure all types are properly re-exported
+   - For tests: verify extracted logic maintains same behavior
+   - For complexity: consider smaller extraction steps
+4. Retry the phase with adjustments
 
 ## Notes
 
-**Key Insights**:
-- The main complexity comes from the large match statement with 30+ branches
-- Each branch is relatively simple, but the sheer number creates high complexity
-- The function mixes three concerns: classification, stage creation, and chain walking
-- Extracting these into separate functions will dramatically reduce complexity
+### Key Considerations
 
-**Refactoring Strategy**:
-- Use functional programming principles: pure functions, immutability, composition
-- Create data-driven classification instead of imperative match statements
-- Each extracted function should be independently testable
-- Maintain backward compatibility throughout all phases
+1. **Backward Compatibility**: The public API of UnifiedAnalysis must remain unchanged. All extracted functionality should be accessed through the original methods (which will delegate to new modules) or through clearly documented new paths.
 
-**Potential Challenges**:
-- Ensuring all method types are correctly classified and mapped
-- Maintaining the correct order of operations (walking backward, reversing)
-- Handling edge cases like nested pipelines and parallel iterators
-- Preserving the exact semantics of terminal operation detection
+2. **Module Organization**: Following Rust conventions:
+   - New modules should be added to `src/priority/`
+   - Re-export types at the appropriate level
+   - Use `pub(crate)` for internal helpers
 
-**Success Metrics**:
-- Cyclomatic complexity: 33 -> 8-12 (60-75% reduction)
-- Cognitive complexity: 40 -> ~15 (62% reduction)
-- Function length: 219 -> <100 lines (>50% reduction)
-- Test coverage: maintained or improved
-- All existing functionality preserved
+3. **Functional Refactoring**: Where possible during extraction:
+   - Convert mutable patterns to immutable
+   - Extract pure calculation functions
+   - Separate I/O from computation
+
+4. **Test Coverage**: The existing test suite (lines 1180-1659) should continue to pass without modification. These tests are comprehensive and cover:
+   - Serialization (File vs Function variants)
+   - Debt density calculations
+   - Threshold filtering
+   - Priority sorting
+
+5. **Incremental Progress**: Each phase should:
+   - Compile successfully
+   - Pass all tests
+   - Be committable independently
+   - Reduce file size measurably
+
+### Potential Challenges
+
+1. **Circular Dependencies**: The UnifiedAnalysis struct is used throughout. May need to use traits or accept `&UnifiedAnalysis` parameters.
+
+2. **Privacy Boundaries**: Some helper methods (like `is_critical_item`, `generate_batch_action`) are private but may need to become pub(crate) when extracted.
+
+3. **Complex Interactions**: Methods like `get_tiered_display` call multiple helpers. May need to extract helpers first or keep them in same module.
+
+4. **Test Module Location**: The test modules at the end (lines 1180-1659) may need imports updated as types move.
+
+### Success Metrics
+
+After completion, verify:
+- Main file: ~150-200 lines (types + minimal impl)
+- Queries module: ~150-200 lines (7 methods)
+- Utils module: ~250-300 lines (11 methods, may split further)
+- Computation module: ~200-250 lines (complex calculations)
+- Type modules: ~200-300 lines each (type definitions)
+- **Total reduction**: 1658 → ~200 lines in main file
+- **Responsibilities**: 6 → 1 per file/module

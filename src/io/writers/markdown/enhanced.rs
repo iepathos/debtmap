@@ -3,7 +3,7 @@
 //! Contains the EnhancedMarkdownWriter trait and its implementation for MarkdownWriter,
 //! providing unified analysis output capabilities.
 
-use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
+use crate::priority::{UnifiedAnalysis, UnifiedAnalysisQueries, UnifiedDebtItem};
 use std::io::Write;
 
 use super::core::MarkdownWriter;

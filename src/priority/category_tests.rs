@@ -3,7 +3,7 @@ mod tests {
     use crate::priority::{
         ActionableRecommendation, CallGraph, DebtCategory, DebtType, FileDebtItem, FileDebtMetrics,
         FileImpact, FunctionRole, FunctionVisibility, GodObjectIndicators, ImpactMetrics, Location,
-        UnifiedAnalysis, UnifiedDebtItem, UnifiedScore,
+        UnifiedAnalysis, UnifiedAnalysisQueries, UnifiedDebtItem, UnifiedScore,
     };
     use std::path::PathBuf;
 
