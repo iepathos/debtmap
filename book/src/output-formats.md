@@ -22,6 +22,8 @@ Available formats:
 - **json**: Structured data for programmatic processing
 - **markdown**: Reports suitable for documentation and PR comments
 
+> **Note:** The codebase also includes an `Html` format variant in `src/core/types.rs` and `src/analysis/diagnostics/`, but this is only available internally for diagnostic reporting and is not exposed as a CLI option. For HTML output, convert markdown reports using tools like pandoc (see [Rendering to HTML/PDF](#rendering-to-htmlpdf)).
+
 ### Writing to Files
 
 By default, output goes to stdout. Use `-o` or `--output` to write to a file:
@@ -147,10 +149,13 @@ Plain mode:
 - Uses ASCII box-drawing characters
 - Machine-parseable structure
 
-> **Note:** Terminal output formatting can be customized via `FormattingConfig`, which controls color mode. The `--plain` flag uses this configuration to disable colors. Additionally, you can control formatting through environment variables:
+> **Note:** Terminal output formatting is controlled internally via `FormattingConfig` (found in `src/formatting` and `src/io/writers/terminal.rs`), which manages color mode settings. The `--plain` flag and environment variables provide user-facing control over these settings:
+> - `--plain` flag - Disables colors and fancy formatting
 > - `NO_COLOR=1` - Disables colors (per [no-color.org](https://no-color.org) standard)
 > - `CLICOLOR=0` - Disables colors
 > - `CLICOLOR_FORCE=1` - Forces colors even when output is not a terminal
+>
+> `FormattingConfig` is not directly exposed to CLI users but can be accessed when using debtmap as a library through `TerminalWriter::with_formatting`.
 
 ### Verbosity Levels
 
@@ -591,7 +596,7 @@ The legacy format will be maintained for backward compatibility, but unified is 
 
 ### Risk Insights JSON
 
-When using `--lcov`, debtmap also outputs risk analysis in JSON:
+When coverage data is provided via `--lcov`, risk insights are included as part of the analysis output. The `write_risk_insights` method (found in `src/io/writers/json.rs`, `terminal.rs`, and `markdown/core.rs`) outputs risk analysis data in the following JSON structure:
 
 ```json
 {
@@ -739,16 +744,11 @@ Markdown output includes:
    - Estimated effort: 2-3 hours
 ```
 
-### Enhanced Markdown Features
+### CLI vs Library Markdown Features
 
-The standard markdown output already includes comprehensive analysis sections. The codebase includes additional enhanced markdown capabilities (`EnhancedMarkdownWriter` trait in `src/io/writers/markdown/enhanced.rs`) that provide:
+**CLI Markdown Output (`--format markdown`):**
 
-- **Priority-based debt rankings** - Debt items ranked by unified priority scores
-- **Dead code detection** - Identification and reporting of unused code
-- **Call graph insights** - Function dependency and usage analysis
-- **Testing recommendations** - Targeted suggestions for improving test coverage
-
-These enhanced features are available through the `EnhancedMarkdownWriter` trait when using debtmap as a library. The standard `--format markdown` CLI output uses the base `MarkdownWriter` which provides comprehensive reports including:
+When you use `debtmap analyze . --format markdown`, you get comprehensive reports that include:
 
 - Executive summary with health dashboard
 - Complexity analysis with refactoring recommendations
@@ -756,7 +756,32 @@ These enhanced features are available through the `EnhancedMarkdownWriter` trait
 - Dependency analysis with circular reference detection
 - Actionable recommendations
 
-For additional visualization capabilities, the `src/io/writers/enhanced_markdown/` module provides building blocks for custom report generation when using debtmap as a library in your own tools.
+This uses the base `MarkdownWriter` implementation and provides everything needed for documentation and PR comments.
+
+**Enhanced Library Features:**
+
+If you're using debtmap as a Rust library in your own tools, additional markdown capabilities are available:
+
+- **`EnhancedMarkdownWriter` trait** (`src/io/writers/markdown/enhanced.rs`) - Provides advanced formatting and analysis features
+- **Enhanced markdown modules** (`src/io/writers/enhanced_markdown/`) - Building blocks for custom visualizations including:
+  - Priority-based debt rankings with unified scoring
+  - Dead code detection and reporting
+  - Call graph insights and dependency visualization
+  - Testing recommendations with ROI analysis
+
+To use enhanced features in your Rust code:
+
+```rust
+use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
+use debtmap::io::writers::enhanced_markdown::*;
+
+// Create custom reports with enhanced features
+let mut writer = create_enhanced_writer(output)?;
+writer.write_priority_rankings(&analysis)?;
+writer.write_dead_code_analysis(&call_graph)?;
+```
+
+> **Note:** Enhanced markdown features are only available through the library API, not via the CLI. The CLI `--format markdown` output is comprehensive for most use cases.
 
 ### Rendering to HTML/PDF
 
@@ -1204,14 +1229,13 @@ For very large codebases (>10,000 files), use `--top` or `--filter` to limit out
 
 ### Exit Codes
 
-> **IMPORTANT:** Exit codes 1 and 2 are NOT YET IMPLEMENTED. Current behavior: Always returns `0` on successful analysis, regardless of threshold violations.
->
-> Planned behavior includes:
-> - `0`: Success, all checks passed
-> - `1`: Analysis completed, but validation thresholds exceeded
-> - `2`: Error during analysis (invalid path, parsing error, etc.)
+Current behavior (as verified in `src/main.rs`):
+- `0`: Successful analysis completed without errors
+- Non-zero: Error during analysis (invalid path, parsing error, etc.)
 
-For now, use the `validate` command with threshold checks to enforce quality gates:
+> **Note:** Threshold-based exit codes (where analysis succeeds but fails quality gates) are not currently implemented. The `analyze` command returns 0 on successful analysis regardless of debt scores or complexity thresholds.
+
+To enforce quality gates based on thresholds, use the `validate` command or parse JSON output:
 
 ```bash
 # Use validate command for threshold enforcement

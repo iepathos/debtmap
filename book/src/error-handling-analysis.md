@@ -221,10 +221,10 @@ def get_user_age(user_id):
 
 ### Exception Flow Analysis
 
-Debtmap analyzes exception propagation through Python codebases:
+Debtmap tracks exception propagation through Python codebases to identify functions that can raise exceptions without proper handling. This analysis helps ensure that exceptions are either caught at appropriate levels or documented in the function's interface.
 
 ```python
-# Detected: Exception raised but never caught at top level
+# Potential issue: Exceptions may propagate unhandled
 def process_batch(items):
     for item in items:
         validate_item(item)  # Can raise ValueError
@@ -255,6 +255,8 @@ def process_batch(items):
 ## Async Error Handling
 
 ### Unhandled Promise Rejections (JavaScript/TypeScript)
+
+**Note:** JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code. Enhanced JavaScript/TypeScript async error detection is planned for future releases.
 
 ```javascript
 // ❌ CRITICAL: Unhandled promise rejection
@@ -418,39 +420,18 @@ Configure error handling analysis in `.debtmap.toml`:
 
 ```toml
 [error_handling]
-# Patterns to detect (all enabled by default)
-patterns = [
-    "panic_patterns",        # Rust unwrap/expect/panic
-    "error_swallowing",      # Silent exception handling
-    "bare_except",           # Python bare except clauses
-    "async_errors",          # Unhandled promises, dropped futures
-    "missing_context",       # Error propagation without context
-]
+# Enable/disable specific detection patterns (all enabled by default)
+detect_panic_patterns = true     # Rust unwrap/expect/panic detection
+detect_swallowing = true         # Silent exception handling
+detect_async_errors = true       # Unhandled promises, dropped futures
+detect_context_loss = true       # Error propagation without context
+detect_propagation = true        # Error propagation analysis
 
-# Severity levels for different error types
-severity_levels = { panic = "critical", bare_except = "critical", error_swallowing = "major" }
-
-# Error context requirements
-context_requirements = { min_context_length = 10, require_values = true }
-
-# Exclude specific patterns (useful for legacy code migration)
-exclude_patterns = [
-    # "unwrap_in_tests",  # Already excluded by default
-]
+# Disable specific patterns for gradual adoption
+# detect_async_errors = false
 ```
 
-### Custom Severity Overrides
-
-```toml
-[debt_categories.ErrorSwallowing]
-weight = 4  # Default is 4 (Major severity)
-severity = "Major"
-description = "Silenced exceptions"
-
-# Lower weight for gradual adoption
-# weight = 2
-# severity = "Warning"
-```
+**Note:** The `[error_handling]` configuration is currently in development. Most error handling patterns are detected by default with `ErrorSwallowing` debt category (weight 4). Per-pattern severity customization is planned for future releases.
 
 ## Detection Examples
 
@@ -627,7 +608,7 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
 
 1. **Run analysis with error focus**
    ```bash
-   debtmap analyze --debt-type ErrorSwallowing
+   debtmap analyze --filter-categories ErrorSwallowing
    ```
 
 2. **Review priority issues first**
@@ -657,20 +638,26 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
 ```toml
 # .debtmap.toml - Gradual adoption
 [error_handling]
-# Start with just critical issues
-patterns = ["panic_patterns", "bare_except"]
+# Start with just critical panic patterns
+detect_panic_patterns = true
+detect_swallowing = false      # Add later
+detect_async_errors = false    # Add later
+detect_context_loss = false    # Add later
 
-# After fixing critical issues, add more patterns
-# patterns = ["panic_patterns", "bare_except", "error_swallowing"]
+# After fixing panic patterns, enable error swallowing detection
+# detect_swallowing = true
 
 # Eventually enable all patterns
-# patterns = ["panic_patterns", "error_swallowing", "bare_except", "async_errors", "missing_context"]
+# detect_swallowing = true
+# detect_async_errors = true
+# detect_context_loss = true
+# detect_propagation = true
 ```
 
 Track progress over time:
 ```bash
 # Weekly error handling health check
-debtmap analyze --debt-type ErrorSwallowing | tee weekly-error-health.txt
+debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
 ```
 
 ## Troubleshooting
@@ -705,7 +692,9 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 2. **Pattern disabled in config**
    ```toml
    [error_handling]
-   patterns = ["panic_patterns", "error_swallowing"]  # Ensure pattern is listed
+   detect_panic_patterns = true
+   detect_swallowing = true
+   detect_async_errors = true  # Ensure relevant detectors are enabled
    ```
 
 3. **Suppression comment present**

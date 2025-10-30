@@ -1,0 +1,106 @@
+{
+  "chapter_id": "dead-code-analysis",
+  "chapter_title": "Dead Code Analysis",
+  "chapter_file": "book/src/dead-code-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter is comprehensive and accurate overall, with excellent examples and practical guidance. Main drift is incorrect CLI syntax and incomplete configuration explanation. The chapter demonstrates strong understanding of the feature and provides valuable user guidance.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Configuration Reference (line 153-163)",
+      "description": "Chapter shows Rust API configuration but this is not how users configure the feature",
+      "current_content": "```rust\nuse debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;\n\nlet config = AnalysisConfig {\n    high_confidence_threshold: 0.8,\n    medium_confidence_threshold: 0.5,\n    respect_suppression_comments: true,\n    include_private_api: true,\n    enable_public_api_detection: true,\n    ..Default::default()\n};```",
+      "should_be": "Users configure via CLI flags or TOML file, not Rust API. The confidence thresholds are hardcoded (0.8/0.5) and not user-configurable.",
+      "fix_suggestion": "Replace Rust API example with actual CLI usage: `debtmap analyze --no-public-api-detection` or `--public-api-threshold 0.7`. Remove the false impression that users can configure thresholds - they are internal constants.",
+      "source_reference": "src/analysis/python_dead_code_enhanced.rs:293-317 (AnalysisConfig struct), src/cli.rs:233-238 (CLI flags)"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "CLI Filtering by Confidence (line 308-319)",
+      "description": "Chapter documents --min-confidence flag that doesn't exist in CLI",
+      "current_content": "```bash\n# Show only high confidence dead code\ndebtmap analyze --min-confidence=0.8\n\n# Show high and medium confidence\ndebtmap analyze --min-confidence=0.5\n\n# Show all results (including low confidence)\ndebtmap analyze --min-confidence=0.0\n```",
+      "should_be": "The --min-confidence flag does not exist in the actual CLI implementation",
+      "fix_suggestion": "Remove this entire section. If filtering by confidence is needed, document actual available filtering mechanisms or note this as a future feature.",
+      "source_reference": "src/cli.rs (no min-confidence flag exists)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Configuration section (line 98-120)",
+      "description": "Chapter shows [external_api] TOML section but doesn't explain it's only for Rust code, not Python",
+      "current_content": "Configure public API detection in `.debtmap.toml`:\n```toml\n[external_api]\ndetect_external_api = true\napi_functions = [...]\napi_files = [...]```",
+      "should_be": "The [external_api] configuration is for marking Rust APIs. Python public API detection uses different heuristics (PublicApiDetector) that are NOT configurable via TOML - only via CLI flag --no-public-api-detection and --public-api-threshold",
+      "fix_suggestion": "Clarify that TOML [external_api] section is for Rust code. For Python, explain that public API detection is automatic using heuristics (naming, docstrings, __all__, etc.) and can be controlled via --public-api-threshold flag.",
+      "source_reference": "src/debt/public_api_detector.rs:56-90 (PublicApiConfig for Python), examples/library_config.toml:19-37 (Rust external_api)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "CLI Options",
+      "description": "Chapter doesn't document the --public-api-threshold CLI flag",
+      "should_add": "Document `--public-api-threshold` flag: Controls the confidence threshold (0.0-1.0) for considering functions as public APIs. Default is 0.7. Higher values are more conservative (fewer functions marked as public API).",
+      "fix_suggestion": "Add to Configuration Reference section: `debtmap analyze --public-api-threshold 0.8` for more aggressive dead code detection (fewer false positives from public API heuristics)",
+      "source_reference": "src/cli.rs:236-238"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Coverage Integration",
+      "description": "Chapter mentions coverage.json detection but doesn't explain the actual implementation uses LCOV format",
+      "should_add": "Clarify that debtmap uses LCOV format for coverage data, not coverage.json. The --coverage-file flag expects LCOV format (.info files)",
+      "fix_suggestion": "Update coverage examples to show: `pytest --cov=myapp --cov-report=lcov` and `debtmap analyze --coverage-file coverage.lcov` instead of coverage.json",
+      "source_reference": "Inferred from CLI options in features.json showing 'coverage-file (lcov)'"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Public API Detection Heuristics (line 87-95)",
+      "description": "Chapter lists heuristics but doesn't mention they're Python-specific",
+      "current_content": "Lists detection heuristics: public visibility, file location patterns, naming conventions, export declarations, explicit configuration",
+      "should_be": "These heuristics are specific to Python dead code detection. Clarify the language scope.",
+      "fix_suggestion": "Add note: 'These heuristics apply to Python dead code analysis. For other languages, see language-specific documentation.'",
+      "source_reference": "src/debt/public_api_detector.rs (Python-specific implementation)"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent practical examples with Flask, pytest, and public API scenarios (lines 514-610)",
+    "Comprehensive troubleshooting section with clear solutions (lines 459-512)",
+    "Clear confidence level explanations with decision guidance (lines 19-82, 299-307)",
+    "Strong best practices section with workflow recommendations (lines 374-420)",
+    "Accurate suppression comment documentation (lines 173-219)",
+    "Well-structured limitation section explaining what can and cannot be detected (lines 422-457)",
+    "Good coverage integration explanation showing the value proposition (lines 220-256)",
+    "Accurate framework support list matching implementation (lines 122-147)",
+    "Clear decision guide table for interpreting results (lines 301-307)"
+  ],
+  "improvement_suggestions": [
+    "Replace Rust API configuration example with actual user-facing CLI/TOML configuration",
+    "Remove non-existent --min-confidence flag documentation",
+    "Clarify distinction between Rust [external_api] TOML config and Python public API heuristics",
+    "Add --public-api-threshold flag documentation",
+    "Update coverage format examples to use LCOV instead of coverage.json",
+    "Add language scope clarifications for Python-specific features",
+    "Consider adding a 'Quick Start' section at the top for users who want to get started immediately",
+    "Add cross-references to other chapters for related topics (already has some, but could be expanded)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-30",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [
+      "Confidence scoring",
+      "Public API detection heuristics",
+      "Framework support",
+      "Coverage integration",
+      "Suppression comments",
+      "Configuration",
+      "CLI usage",
+      "Best practices",
+      "Troubleshooting",
+      "Examples"
+    ],
+    "validation_focus": "Check that dead code analysis and public API detection are documented"
+  }
+}

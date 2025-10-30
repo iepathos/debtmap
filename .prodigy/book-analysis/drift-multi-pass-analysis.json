@@ -3,144 +3,116 @@
   "chapter_title": "Multi-Pass Analysis",
   "chapter_file": "book/src/multi-pass-analysis.md",
   "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter is completely missing. The feature is fully implemented in the codebase with CLI flags and comprehensive functionality, but there is no user-facing documentation.",
+  "severity": "medium",
+  "quality_assessment": "Chapter is comprehensive and mostly accurate, but has minor inconsistencies in configuration field names and some missing implementation details. The chapter provides excellent conceptual coverage with detailed examples.",
   "issues": [
     {
-      "type": "missing_content",
-      "severity": "critical",
-      "section": "Entire Chapter",
-      "description": "The chapter file does not exist, but the multi-pass analysis feature is fully implemented in the codebase",
-      "current_content": "File does not exist: book/src/multi-pass-analysis.md",
-      "should_be": "Complete chapter explaining multi-pass analysis with attribution, including:\n1. Overview of multi-pass analysis concept\n2. How it works (raw vs normalized complexity)\n3. Attribution engine capabilities\n4. CLI usage (--multi-pass and --show-attribution flags)\n5. Understanding attribution output\n6. Performance considerations\n7. Use cases and examples",
-      "fix_suggestion": "Create comprehensive chapter documenting the multi-pass analysis feature that analyzes code twice (raw and normalized) to attribute complexity to logical structure vs formatting artifacts",
-      "source_reference": "src/analysis/multi_pass.rs:MultiPassAnalyzer, src/cli.rs:189,194"
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Configuration Options (line 575)",
+      "description": "Chapter shows OutputFormat with 'Json' variant, but actual implementation has additional variants including 'Yaml', 'Html', 'Text'",
+      "current_content": "output_format: OutputFormat::Json,",
+      "should_be": "output_format: OutputFormat::Json, // Also available: Yaml, Markdown, Html, Text",
+      "fix_suggestion": "Update OutputFormat documentation to include all available variants: Json, Yaml, Markdown, Html, Text",
+      "source_reference": "src/analysis/diagnostics/mod.rs:123-129"
     },
     {
       "type": "missing_content",
-      "severity": "high",
-      "section": "Multi-Pass Analysis Overview",
-      "description": "No explanation of what multi-pass analysis is and why it's useful",
-      "should_add": "Multi-pass analysis performs two complexity analyses on the same code:\n1. Raw analysis - measures complexity of code as written\n2. Normalized analysis - measures complexity after removing formatting artifacts\n\nThe difference between these reveals how much 'complexity' is due to formatting vs genuine logical complexity.",
-      "fix_suggestion": "Add section explaining the multi-pass concept and its benefits for distinguishing true complexity from formatting artifacts",
-      "source_reference": "src/analysis/multi_pass.rs:49-57"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Attribution Engine",
-      "description": "No documentation of the attribution engine that breaks down complexity sources",
-      "should_add": "The attribution engine categorizes complexity into three types:\n1. Logical complexity - inherent complexity from control flow (if, loops, match, etc.)\n2. Formatting artifacts - complexity introduced by code formatting (multiline expressions, whitespace)\n3. Pattern complexity - complexity from recognized code patterns\n\nEach category includes:\n- Total contribution to overall complexity\n- Detailed breakdown with specific locations\n- Confidence score (0.0-1.0)\n- Actionable suggestions for improvement",
-      "fix_suggestion": "Add section explaining the attribution engine's analysis breakdown and how to interpret the results",
-      "source_reference": "src/analysis/attribution/mod.rs:39-65, ComplexityAttribution struct"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
+      "severity": "low",
       "section": "CLI Usage",
-      "description": "No documentation of --multi-pass and --show-attribution flags",
-      "should_add": "Enable multi-pass analysis with attribution:\n```bash\ndebtmap analyze . --multi-pass --show-attribution\n```\n\nFlags:\n- `--multi-pass`: Enable multi-pass analysis (raw + normalized)\n- `--show-attribution`: Display detailed attribution breakdown showing which code constructs contribute to complexity",
-      "fix_suggestion": "Add section showing how to use the multi-pass analysis flags with examples",
-      "source_reference": "src/cli.rs:188-194"
+      "description": "Chapter doesn't mention that --show-attribution requires --multi-pass to be enabled",
+      "should_add": "Note that --attribution flag requires --multi-pass to be enabled first",
+      "fix_suggestion": "Add a note in the CLI Usage section clarifying the dependency between --multi-pass and --attribution flags",
+      "source_reference": "src/cli.rs:192-198"
     },
     {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Attribution Display Options",
-      "description": "No explanation of different detail levels and output formats for attribution",
-      "should_add": "Attribution output can be customized with:\n- Detail levels: summary, standard, comprehensive, debug\n- Output formats: json, markdown, terminal\n- Performance tracking: optional performance metrics\n\nConfigure via MultiPassOptions:\n```rust\nMultiPassOptions {\n    detail_level: DetailLevel::Comprehensive,\n    output_format: OutputFormat::Json,\n    enable_recommendations: true,\n    track_source_locations: true,\n    generate_insights: true,\n    performance_tracking: true,\n}\n```",
-      "fix_suggestion": "Add section explaining configuration options for attribution output",
-      "source_reference": "src/analysis/multi_pass.rs:300-324, MultiPassOptions"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Understanding Attribution Output",
-      "description": "No guide for interpreting attribution results",
-      "should_add": "Attribution output includes:\n\n1. **Logical Complexity Breakdown**\n   - Source type: LogicalStructure (Function, If, Loop, Match, Try, Closure)\n   - Contribution: complexity points from this construct\n   - Location: file, line, column, span\n   - Suggestions: actionable refactoring recommendations\n\n2. **Formatting Artifacts**\n   - Artifact types: MultilineExpression, ExcessiveWhitespace, InconsistentIndentation, etc.\n   - Severity: Low, Medium, High\n   - Impact on measured complexity\n\n3. **Pattern Analysis**\n   - Recognized patterns: ErrorHandling, Validation, DataTransformation, etc.\n   - Pattern confidence score\n   - Opportunities for pattern extraction\n\n4. **Source Mappings**\n   - Maps each complexity point to exact AST location\n   - AST path showing construct hierarchy\n   - Context information for navigation",
-      "fix_suggestion": "Add comprehensive section with examples showing how to interpret attribution output",
-      "source_reference": "src/analysis/attribution/mod.rs:259-356, ComplexityAttribution, AttributedComplexity, ComplexityComponent"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Insights and Recommendations",
-      "description": "No documentation of automatically generated insights and recommendations",
-      "should_add": "Multi-pass analysis generates actionable insights:\n\n**Insight Types:**\n- FormattingImpact: when formatting contributes >20% of complexity\n- PatternOpportunity: when pattern recognition is low (<0.5 confidence)\n- RefactoringCandidate: when logical complexity exceeds threshold (>20)\n- ComplexityHotspot: areas of concentrated complexity\n\n**Recommendations:**\n- Priority levels: Low, Medium, High\n- Categories: Refactoring, Pattern, Formatting, General\n- Estimated impact: reduction in complexity points\n- Suggested actions: specific steps to reduce complexity\n\nExample:\n```json\n{\n  \"insight_type\": \"RefactoringCandidate\",\n  \"impact_level\": \"High\",\n  \"actionable_steps\": [\n    \"Break down into smaller functions\",\n    \"Extract complex conditions into named variables\",\n    \"Consider using early returns to reduce nesting\"\n  ]\n}\n```",
-      "fix_suggestion": "Add section explaining insights and recommendations with real examples",
-      "source_reference": "src/analysis/multi_pass.rs:147-246, ComplexityInsight, ComplexityRecommendation"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Performance Considerations",
-      "description": "No documentation of performance overhead and tracking",
-      "should_add": "Multi-pass analysis overhead is monitored and limited:\n\n**Performance Metrics:**\n- Raw analysis time (ms)\n- Normalized analysis time (ms)\n- Attribution time (ms)\n- Total analysis time (ms)\n- Memory used (MB)\n\n**Overhead Limits:**\n- Target: ≤25% overhead compared to single-pass analysis\n- Warning issued if overhead exceeds limit\n- Performance tracking optional (disabled by default)\n\n**Optimization Tips:**\n- Use caching to reduce repeated analysis\n- Disable performance_tracking in production\n- Consider using --no-parallel for smaller codebases to reduce overhead\n- Attribution adds ~10-15% overhead on average",
-      "fix_suggestion": "Add section explaining performance characteristics and how to monitor/optimize",
-      "source_reference": "src/analysis/multi_pass.rs:76-99, AnalysisPerformanceMetrics"
-    },
-    {
-      "type": "missing_content",
+      "type": "incomplete_explanation",
       "severity": "low",
       "section": "Comparative Analysis",
-      "description": "No documentation of compare_complexity function for before/after comparison",
-      "should_add": "Multi-pass analysis supports comparing code changes:\n\n```rust\nuse debtmap::analysis::multi_pass::compare_complexity;\n\nlet before_code = \"...\"; // Original code\nlet after_code = \"...\";  // Refactored code\n\nlet comparison = compare_complexity(before_code, after_code, Language::Rust)?;\n\nprintln!(\"Complexity change: {}\", comparison.complexity_change);\nprintln!(\"Improvements: {:?}\", comparison.improvements);\nprintln!(\"Regressions: {:?}\", comparison.regressions);\n```\n\nComparison results include:\n- Complexity change (positive = increase, negative = decrease)\n- Cognitive complexity change\n- Formatting impact change\n- List of improvements detected\n- List of regressions detected",
-      "fix_suggestion": "Add section on using multi-pass for refactoring validation",
-      "source_reference": "src/analysis/multi_pass.rs:531-591, compare_complexity, ComparativeAnalysis"
+      "description": "Chapter shows compare_complexity function signature but doesn't mention that it's a standalone function, not a method on MultiPassAnalyzer",
+      "current_content": "use debtmap::analysis::multi_pass::compare_complexity;",
+      "should_add": "Clarify that compare_complexity is a module-level function that performs complete analysis internally",
+      "fix_suggestion": "Add a note explaining that compare_complexity is a convenience function that internally creates analyzers and performs the analysis",
+      "source_reference": "src/analysis/multi_pass.rs:532-541"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Integration with Spec 84",
-      "description": "No mention of future AST-based source mapping improvements",
-      "should_add": "The current implementation uses estimated complexity locations. Spec 84 (Detailed AST-Based Source Mapping) will enhance attribution with:\n- Precise AST node locations (line, column, span)\n- 100% accurate mapping to source locations\n- Exact navigation from complexity reports to code\n- IDE integration for inline complexity visualization\n- Statement-level complexity heat maps\n\nThis will replace the current EstimatedComplexityLocation with precise SourceLocation tracking.",
-      "fix_suggestion": "Add future enhancements section mentioning roadmap for precise AST mapping",
-      "source_reference": "specs/84-detailed-ast-source-mapping.md"
+      "section": "Configuration Options",
+      "description": "Chapter shows default value for detail_level as 'Standard', but doesn't mention that CLI default is also 'standard' (lowercase)",
+      "should_add": "Note that detail_level uses lowercase in CLI (--detail-level standard) but enum is DetailLevel::Standard",
+      "fix_suggestion": "Clarify the difference between CLI parameter syntax and programmatic enum values",
+      "source_reference": "src/cli.rs:200-202, src/analysis/multi_pass.rs:316"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "ComparativeAnalysis struct (line 545)",
+      "description": "Chapter shows ComparativeAnalysis with before/after fields, but actual implementation only has change metrics",
+      "current_content": "pub struct ComparativeAnalysis {\n    pub before: MultiPassResult,\n    pub after: MultiPassResult,\n    pub complexity_change: i32,\n    ...",
+      "should_be": "pub struct ComparativeAnalysis {\n    pub complexity_change: i32,\n    pub cognitive_change: i32,\n    pub formatting_impact_change: f32,\n    pub improvements: Vec<String>,\n    pub regressions: Vec<String>,\n}",
+      "fix_suggestion": "Update the ComparativeAnalysis struct definition to match actual implementation - it only contains change metrics, not full before/after results",
+      "source_reference": "src/analysis/multi_pass.rs:544-551"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Performance Considerations",
+      "description": "Chapter mentions --jobs flag but doesn't clarify that it's a general debtmap flag, not multi-pass specific",
+      "should_add": "Clarify that --jobs is a general parallelism control for all debtmap analysis, not specific to multi-pass",
+      "fix_suggestion": "Add note that multi-pass benefits from parallelism when analyzing multiple files, but overhead is still calculated per-file",
+      "source_reference": "src/cli.rs:160-162"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Attribution Engine (line 96)",
+      "description": "Chapter describes pattern complexity attribution but doesn't clarify that pattern detection requires separate enabling",
+      "should_add": "Note that pattern complexity analysis may require enabling pattern detection features",
+      "fix_suggestion": "Add a cross-reference to pattern detection configuration or clarify that it's part of standard multi-pass analysis",
+      "source_reference": "src/analysis/attribution/mod.rs:35-36, src/analysis/attribution/pattern_tracker.rs"
     }
   ],
   "positive_aspects": [
-    "Feature is well-implemented with comprehensive functionality",
-    "Solid architecture with separation of concerns (multi_pass.rs, attribution/mod.rs)",
-    "Good test coverage in implementation files",
-    "Performance monitoring built-in with overhead warnings",
-    "Extensible design supports multiple languages"
+    "Excellent visual diagram of two-pass analysis process",
+    "Comprehensive examples with realistic Rust code",
+    "Clear explanation of logical vs formatting complexity",
+    "Detailed sample output showing attribution breakdown",
+    "Good coverage of performance overhead and optimization tips",
+    "Well-structured progression from concepts to usage to implementation",
+    "Helpful comparative analysis examples",
+    "Clear explanation of insight types and recommendations",
+    "Good coverage of when to use multi-pass vs standard analysis",
+    "Spec 84 future enhancement clearly documented"
   ],
   "improvement_suggestions": [
-    "Create the missing chapter with comprehensive documentation",
-    "Include real-world examples showing before/after attribution output",
-    "Add diagrams explaining the two-pass analysis flow",
-    "Provide use cases: when to use multi-pass vs standard analysis",
-    "Include troubleshooting section for common issues",
-    "Add comparison with other complexity analysis approaches",
-    "Document integration with other debtmap features (coverage, scoring, etc.)",
-    "Include examples of using attribution for targeted refactoring",
-    "Add cookbook-style recipes for common scenarios"
+    "Update ComparativeAnalysis struct definition to match implementation",
+    "Add note about OutputFormat variants (Yaml, Html, Text)",
+    "Clarify dependency between --multi-pass and --attribution flags",
+    "Add example showing how to enable performance_tracking programmatically",
+    "Include note about pattern detection configuration",
+    "Add troubleshooting section for common multi-pass issues",
+    "Consider adding example of multi-pass output in JSON format",
+    "Link to pattern detection chapter for more details on pattern complexity"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-26",
+    "analyzed_at": "2025-10-30",
     "feature_inventory": ".prodigy/book-analysis/features.json",
-    "topics_covered": [],
-    "topics_missing": [
+    "topics_covered": [
       "Multi-pass analysis overview",
       "Complexity attribution",
       "Attribution display options",
       "Configuration and usage",
       "Performance considerations",
-      "Insights and recommendations",
       "Comparative analysis",
-      "Use cases and examples"
+      "Insights and recommendations"
     ],
     "validation_focus": "Check that multi-pass analysis and attribution features are documented",
-    "implementation_files": [
+    "code_references_verified": [
       "src/analysis/multi_pass.rs",
       "src/analysis/attribution/mod.rs",
-      "src/analysis/attribution/change_tracker.rs",
-      "src/analysis/attribution/pattern_tracker.rs",
-      "src/analysis/attribution/source_tracker.rs",
-      "src/cli.rs (lines 188-194)"
-    ],
-    "related_specs": [
-      "specs/84-detailed-ast-source-mapping.md"
+      "src/analysis/diagnostics/mod.rs",
+      "src/cli.rs"
     ]
   }
 }

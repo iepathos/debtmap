@@ -1,0 +1,128 @@
+{
+  "chapter_id": "design-patterns",
+  "chapter_title": "Design Pattern Detection",
+  "chapter_file": "book/src/design-patterns.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter documents patterns (Builder, Visitor) that are not actually available as user-facing design pattern detection features. These are internal implementation details, not part of the public pattern detection API. This creates a significant mismatch between documented capabilities and actual functionality.",
+  "issues": [
+    {
+      "type": "incorrect_content",
+      "severity": "high",
+      "section": "Overview - Pattern Count",
+      "description": "Chapter states 'Debtmap detects 9 design patterns' but the actual pattern detector only has 7 recognizers",
+      "current_content": "Debtmap detects 9 design patterns across Python, JavaScript, TypeScript, and Rust",
+      "should_be": "Debtmap detects 7 design patterns across Python, JavaScript, TypeScript, and Rust",
+      "fix_suggestion": "Update pattern count to 7 and remove Builder and Visitor from the main pattern table",
+      "source_reference": "src/analysis/patterns/mod.rs:84-92 - PatternDetector::new() creates 7 recognizers"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Builder Pattern (Rust)",
+      "description": "Builder pattern is documented as a user-facing design pattern, but it's only used internally for god object detection, not exposed via PatternDetector",
+      "current_content": "Builder pattern detection in Rust identifies builder structs with chaining methods",
+      "should_be": "Builder pattern is detected internally during god object analysis to avoid false positives, but is not exposed as a standalone design pattern detection feature",
+      "fix_suggestion": "Move Builder pattern to an 'Internal Patterns' section or remove it from the design pattern detection chapter. Clarify it's used for scoring adjustments in god object detection, not pattern reporting.",
+      "source_reference": "src/organization/builder_pattern.rs - Used for god object detection score adjustment, not in src/analysis/patterns/mod.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Visitor Pattern (Rust)",
+      "description": "Visitor pattern is documented as a user-facing design pattern, but it's only used internally for complexity normalization, not exposed via PatternDetector",
+      "current_content": "Visitor pattern detection in Rust identifies trait-based exhaustive matching patterns",
+      "should_be": "Visitor pattern is detected internally for applying logarithmic complexity scaling to exhaustive match expressions, but is not exposed as a standalone design pattern detection feature",
+      "fix_suggestion": "Move Visitor pattern to an 'Internal Patterns' or 'Complexity Adjustments' section. Explain it's used for complexity scaling, not pattern reporting to users.",
+      "source_reference": "src/complexity/visitor_detector.rs - Used for complexity analysis, not in src/analysis/patterns/mod.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "CLI Options",
+      "description": "Chapter doesn't document the --no-pattern-detection flag",
+      "should_add": "Document --no-pattern-detection flag to disable all pattern detection",
+      "fix_suggestion": "Add --no-pattern-detection to CLI Options section",
+      "source_reference": "src/cli.rs:241-242"
+    },
+    {
+      "type": "incorrect_content",
+      "severity": "medium",
+      "section": "CLI Options - Enable specific patterns",
+      "description": "CLI flag description lists only 6 patterns (observer,singleton,factory,strategy,callback,template_method) but chapter documents 9",
+      "current_content": "debtmap analyze --patterns observer,singleton,factory",
+      "should_be": "Update CLI examples to match the actual 7 available patterns, or clarify that Builder and Visitor are not user-selectable",
+      "fix_suggestion": "Update --patterns flag documentation to list all 7 actual patterns: observer,singleton,factory,strategy,callback,template_method,dependency_injection",
+      "source_reference": "src/cli.rs:244-246 and src/analysis/patterns/mod.rs:84-92"
+    },
+    {
+      "type": "inconsistency",
+      "severity": "low",
+      "section": "Overview and Validation",
+      "description": "Validation requirement says 'Check that all 8 design patterns are documented' but overview lists 9 patterns",
+      "current_content": "Validation: Check that all 8 design patterns are documented",
+      "should_be": "Validation should match actual count (7 user-facing patterns)",
+      "fix_suggestion": "Update validation requirement to match the corrected pattern count",
+      "source_reference": "Chapter metadata in command arguments"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Visitor Pattern Special Case",
+      "description": "Chapter implies Visitor pattern is part of the design pattern detection system and used for complexity adjustments, but it's actually only an internal complexity analysis tool",
+      "current_content": "Visitor patterns use logarithmic scaling instead of linear",
+      "should_be": "Debtmap internally detects visitor-like patterns (exhaustive matching) to apply logarithmic complexity scaling, but this is not exposed as a design pattern detection feature",
+      "fix_suggestion": "Clarify this is an internal complexity adjustment mechanism, not a user-visible pattern detection feature",
+      "source_reference": "src/complexity/visitor_detector.rs"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Pattern Table",
+      "description": "Pattern table doesn't include Dependency Injection which is actually implemented",
+      "current_content": "Table shows 9 patterns including Builder and Visitor",
+      "should_be": "Table should show 7 patterns: Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection",
+      "fix_suggestion": "Update table to match actual implemented patterns in PatternDetector",
+      "source_reference": "src/analysis/patterns/mod.rs:84-92 includes dependency_injection::DependencyInjectionRecognizer"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent detailed documentation of Observer pattern detection with Python and Rust examples",
+    "Good explanation of confidence scoring system (0.0-1.0)",
+    "Comprehensive examples for each documented pattern",
+    "Clear explanation of cross-file pattern detection",
+    "Well-structured sections with detection criteria, examples, and configuration",
+    "Good integration documentation showing how patterns affect complexity analysis",
+    "Pattern confidence threshold default (0.7) matches implementation"
+  ],
+  "improvement_suggestions": [
+    "Clearly separate 'User-Facing Design Patterns' from 'Internal Pattern Detection'",
+    "Add a section explaining that Builder and Visitor are detected internally but not exposed to users",
+    "Update all pattern counts to be consistent (7 user-facing patterns)",
+    "Add examples showing the actual CLI flag with all available patterns",
+    "Consider adding a 'Pattern Detection Architecture' section explaining the difference between pattern recognition for reporting vs. pattern detection for complexity adjustment",
+    "Add troubleshooting entry for 'Why doesn't --patterns builder work?'",
+    "Update features.json reference to clarify builder and dependency_injection as detected but for different purposes"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-10-30",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Observer pattern detection",
+      "Singleton pattern detection",
+      "Factory pattern detection",
+      "Strategy pattern detection",
+      "Callback pattern detection",
+      "Template method pattern detection",
+      "Dependency injection detection",
+      "Builder pattern (internal only)",
+      "Visitor pattern (internal only)",
+      "Pattern confidence thresholds",
+      "Configuration options"
+    ],
+    "validation_focus": "Check that all 8 design patterns are documented with detection criteria and examples",
+    "actual_user_facing_patterns": 7,
+    "documented_patterns": 9,
+    "internal_only_patterns": ["Builder", "Visitor"]
+  }
+}

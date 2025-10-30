@@ -18,8 +18,8 @@ Debtmap uses a platform-specific, XDG-compliant cache directory structure by def
 
 Debtmap supports two cache storage strategies:
 
-- **Shared (default)**: Stores cache in XDG-compliant shared directory
-- **Custom**: Stores cache in user-specified location via `DEBTMAP_CACHE_DIR`
+- **Shared (default)**: Stores cache in XDG-compliant shared directory (maps to `CacheStrategy::Shared` in code)
+- **Custom**: Stores cache in user-specified location via `DEBTMAP_CACHE_DIR` (maps to `CacheStrategy::Custom` in code)
 
 ### Project Identification
 
@@ -76,6 +76,8 @@ export DEBTMAP_CACHE_STRATEGY=lru
 export DEBTMAP_CACHE_AUTO_PRUNE=false
 
 # Branch-specific caching
+# Creates isolated cache namespaces for different branches, useful when
+# switching between branches with different code states
 export DEBTMAP_CACHE_SCOPE="$(git branch --show-current)"
 ```
 
@@ -147,9 +149,9 @@ export DEBTMAP_CACHE_STRATEGY=fifo
 
 ### Age-Based Only
 
-Only removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits.
+Only removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits - this means the cache can grow unbounded if all entries are recent.
 
-**When to use:** When disk space is not a concern but you want to ensure cache freshness.
+**When to use:** When disk space is not a concern but you want to ensure cache freshness. Note that this strategy ignores size and count thresholds entirely.
 
 ```bash
 export DEBTMAP_CACHE_STRATEGY=age

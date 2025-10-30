@@ -88,10 +88,11 @@ orchestrator = 0.8      # Reduce for delegation functions (default: 0.8)
 io_wrapper = 0.7        # Reduce for I/O wrappers (default: 0.7)
 entry_point = 0.9       # Slight reduction for main/CLI (default: 0.9)
 pattern_match = 0.6     # Reduce for pattern matching (default: 0.6)
+debug = 0.3             # Debug/diagnostic functions (default: 0.3)
 unknown = 1.0           # No adjustment (default: 1.0)
 ```
 
-These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels.
+These multipliers help reduce false positives by recognizing that different function types have naturally different complexity levels. The **debug** role has the lowest multiplier (0.3) since debug and diagnostic functions typically have low testing priority.
 
 ### Role-Based Scoring Configuration
 
@@ -107,9 +108,10 @@ The first stage adjusts how much coverage gaps penalize different function types
 [scoring.role_coverage_weights]
 entry_point = 0.6       # Reduce coverage penalty (often integration tested)
 orchestrator = 0.8      # Reduce coverage penalty (tested via higher-level tests)
-pure_logic = 1.2        # Increase penalty (should have unit tests)
-io_wrapper = 0.7        # Reduce penalty (often integration tested)
+pure_logic = 1.0        # Pure logic should have unit tests, no reduction (default: 1.0)
+io_wrapper = 0.5        # I/O wrappers are integration tested (default: 0.5)
 pattern_match = 1.0     # Standard penalty
+debug = 0.3             # Debug functions have lowest coverage expectations (default: 0.3)
 unknown = 1.0           # Standard penalty (default behavior)
 ```
 
@@ -119,9 +121,10 @@ unknown = 1.0           # Standard penalty (default behavior)
 |---------------|--------|----------------|
 | **Entry Point** | 0.6 | CLI handlers, HTTP routes, `main` functions are integration tested, not unit tested |
 | **Orchestrator** | 0.8 | Coordination functions tested via higher-level tests |
-| **Pure Logic** | 1.2 | Core business logic should have comprehensive unit tests |
-| **I/O Wrapper** | 0.7 | File/network operations tested via integration tests |
+| **Pure Logic** | 1.0 | Core business logic should have unit tests (default: 1.0) |
+| **I/O Wrapper** | 0.5 | File/network operations tested via integration tests (default: 0.5) |
 | **Pattern Match** | 1.0 | Standard coverage expectations |
+| **Debug** | 0.3 | Debug/diagnostic functions have lowest testing priority (default: 0.3) |
 | **Unknown** | 1.0 | Default when role cannot be determined |
 
 **Example Impact**:
@@ -131,7 +134,7 @@ unknown = 1.0           # Standard penalty (default behavior)
 [scoring.role_coverage_weights]
 pure_logic = 1.5        # 50% higher penalty for untested logic
 entry_point = 0.5       # 50% lower penalty for untested entry points
-io_wrapper = 0.5        # 50% lower penalty for untested I/O
+io_wrapper = 0.4        # 60% lower penalty for untested I/O
 
 # Conservative approach (smaller adjustments)
 [scoring.role_coverage_weights]
@@ -142,9 +145,9 @@ entry_point = 0.9       # Only 10% decrease
 **How It Works**:
 
 When a function has 0% coverage:
-- **Entry Point** (weight 0.6): Gets 40% penalty instead of 100% penalty
-- **Pure Logic** (weight 1.2): Gets 120% penalty (extra emphasis on testing)
-- **I/O Wrapper** (weight 0.7): Gets 70% penalty
+- **Entry Point** (weight 0.6): Gets 60% penalty instead of 100% penalty
+- **Pure Logic** (weight 1.0): Gets 100% penalty (standard emphasis on testing)
+- **I/O Wrapper** (weight 0.5): Gets 50% penalty
 
 This prevents entry points from dominating the priority list due to low unit test coverage while emphasizing the importance of testing pure business logic.
 
@@ -229,11 +232,12 @@ Here's a complete example showing both stages configured together:
 ```toml
 # Stage 1: Coverage weight adjustments
 [scoring.role_coverage_weights]
-pure_logic = 1.2        # Emphasize testing pure logic
+pure_logic = 1.0        # Pure logic should have unit tests (default: 1.0)
 entry_point = 0.6       # Reduce penalty for integration-tested entry points
 orchestrator = 0.8      # Partially reduce penalty for orchestrators
-io_wrapper = 0.7        # Reduce penalty for integration-tested I/O
+io_wrapper = 0.5        # I/O wrappers are integration tested (default: 0.5)
 pattern_match = 1.0     # Standard
+debug = 0.3             # Debug functions have lowest coverage expectations (default: 0.3)
 unknown = 1.0           # Standard
 
 # Stage 2: Role multiplier with clamping
@@ -320,14 +324,24 @@ The `[thresholds.validation]` subsection configures limits for the `debtmap vali
 ```toml
 [thresholds.validation]
 max_average_complexity = 10.0         # Maximum allowed average complexity (default: 10.0)
-max_high_complexity_count = 100       # Maximum high complexity functions (default: 100)
-max_debt_items = 2000                 # Maximum technical debt items (default: 2000)
-max_total_debt_score = 1000           # Maximum total debt score (default: 1000)
+max_high_complexity_count = 100       # DEPRECATED: Use max_debt_density instead (default: 100)
+max_debt_items = 2000                 # DEPRECATED: Use max_debt_density instead (default: 2000)
+max_total_debt_score = 10000          # Maximum total debt score (default: 10000)
 max_codebase_risk_score = 7.0         # Maximum codebase risk score (default: 7.0)
-max_high_risk_functions = 50          # Maximum high-risk functions (default: 50)
+max_high_risk_functions = 50          # DEPRECATED: Use max_debt_density instead (default: 50)
 min_coverage_percentage = 0.0         # Minimum required coverage % (default: 0.0)
 max_debt_density = 50.0               # Maximum debt per 1000 LOC (default: 50.0)
 ```
+
+**Deprecated Fields (v0.3.0+):**
+
+The following validation thresholds are **deprecated** since v0.3.0 and will be removed in v1.0:
+
+- `max_high_complexity_count` - Replaced by `max_debt_density` (scale-independent)
+- `max_debt_items` - Replaced by `max_debt_density` (scale-independent)
+- `max_high_risk_functions` - Replaced by `max_debt_density` (scale-independent)
+
+**Migration:** Use `max_debt_density` instead, which provides a scale-independent metric (debt per 1000 lines of code). This allows the same threshold to work across codebases of different sizes.
 
 Use `debtmap validate` in CI to enforce code quality standards:
 
@@ -652,6 +666,47 @@ api_files = []                      # Explicitly mark API files
 
 When enabled, public API functions receive higher priority for test coverage.
 
+### Classification Configuration
+
+The **`[classification]`** section controls how Debtmap classifies functions by their semantic role (constructor, accessor, data flow, etc.). This classification drives role-based adjustments and reduces false positives.
+
+```toml
+[classification]
+# Constructor detection
+[classification.constructors]
+detect_constructors = true            # Enable constructor detection (default: true)
+constructor_patterns = ["new", "create", "build", "from"]  # Common constructor names
+
+# Accessor detection
+[classification.accessors]
+detect_accessors = true               # Enable accessor/getter detection (default: true)
+accessor_patterns = ["get_*", "set_*", "is_*", "has_*"]   # Common accessor patterns
+
+# Data flow detection
+[classification.data_flow]
+detect_data_flow = true               # Enable data flow analysis (default: true)
+```
+
+**Configuration Options:**
+
+| Section | Option | Default | Description |
+|---------|--------|---------|-------------|
+| `constructors` | `detect_constructors` | true | Identify constructor functions |
+| `constructors` | `constructor_patterns` | ["new", "create", "build", "from"] | Name patterns for constructors |
+| `accessors` | `detect_accessors` | true | Identify accessor/getter functions |
+| `accessors` | `accessor_patterns` | ["get_*", "set_*", "is_*", "has_*"] | Name patterns for accessors |
+| `data_flow` | `detect_data_flow` | true | Enable data flow analysis |
+
+**Why Classification Matters:**
+
+Classification helps Debtmap understand function intent and apply appropriate complexity adjustments:
+
+- **Constructors** typically have boilerplate initialization code with naturally higher complexity
+- **Accessors** are simple getters/setters that shouldn't be flagged as debt
+- **Data flow functions** (mappers, filters) have predictable patterns that inflate metrics
+
+By detecting these patterns, Debtmap reduces false positives and focuses on genuine technical debt.
+
 ### Additional Advanced Options
 
 Debtmap supports additional advanced configuration options:
@@ -720,6 +775,73 @@ The **`[complexity_thresholds]`** section provides more granular control over co
 This supplements the basic `[thresholds]` section with minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions.
 
 These options are advanced features with sensible defaults. Most users won't need to configure them explicitly.
+
+#### Orchestration Adjustment
+
+The **`[orchestration_adjustment]`** section configures complexity reduction for orchestrator functions that primarily delegate to other functions:
+
+```toml
+[orchestration_adjustment]
+enabled = true                        # Enable orchestration detection (default: true)
+min_delegation_ratio = 0.6            # Minimum ratio of delegated calls (default: 0.6)
+complexity_reduction = 0.25           # Reduce complexity by 25% (default: 0.25)
+```
+
+**Configuration Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | true | Enable orchestration pattern detection |
+| `min_delegation_ratio` | 0.6 | Minimum % of function that delegates to be considered orchestrator |
+| `complexity_reduction` | 0.25 | Percentage to reduce complexity score (0.0-1.0) |
+
+Orchestrator functions coordinate multiple operations but don't contain complex logic themselves. This adjustment prevents them from being over-penalized.
+
+#### Boilerplate Detection
+
+The **`[boilerplate_detection]`** section identifies and reduces penalties for boilerplate code patterns:
+
+```toml
+[boilerplate_detection]
+enabled = true                        # Enable boilerplate detection (default: true)
+detect_constructors = true            # Detect constructor boilerplate (default: true)
+detect_error_conversions = true       # Detect error conversion boilerplate (default: true)
+complexity_reduction = 0.20           # Reduce complexity by 20% (default: 0.20)
+```
+
+**Configuration Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | true | Enable boilerplate pattern detection |
+| `detect_constructors` | true | Identify constructor initialization boilerplate |
+| `detect_error_conversions` | true | Identify error type conversion boilerplate |
+| `complexity_reduction` | 0.20 | Percentage to reduce complexity for boilerplate (0.0-1.0) |
+
+Boilerplate code often inflates complexity metrics without representing true technical debt. This detection reduces false positives from necessary but repetitive code.
+
+#### Functional Analysis
+
+The **`[functional_analysis]`** section configures detection of functional programming patterns:
+
+```toml
+[functional_analysis]
+enabled = true                        # Enable functional pattern detection (default: true)
+detect_pure_functions = true          # Detect pure functions (default: true)
+detect_higher_order = true            # Detect higher-order functions (default: true)
+detect_immutable_patterns = true      # Detect immutable data patterns (default: true)
+```
+
+**Configuration Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | true | Enable functional programming analysis |
+| `detect_pure_functions` | true | Identify functions without side effects |
+| `detect_higher_order` | true | Identify functions that take/return functions |
+| `detect_immutable_patterns` | true | Identify immutable data structure usage |
+
+Functional patterns often lead to cleaner, more testable code. This analysis helps Debtmap recognize and appropriately score functional programming idioms.
 
 ## CLI Integration
 
@@ -814,11 +936,11 @@ minimum_risk_score = 2.0
 # Validation thresholds for CI
 [thresholds.validation]
 max_average_complexity = 10.0
-max_high_complexity_count = 100
-max_debt_items = 2000
-max_total_debt_score = 1000
+max_high_complexity_count = 100       # DEPRECATED: Use max_debt_density
+max_debt_items = 2000                 # DEPRECATED: Use max_debt_density
+max_total_debt_score = 10000
 max_codebase_risk_score = 7.0
-max_high_risk_functions = 50
+max_high_risk_functions = 50          # DEPRECATED: Use max_debt_density
 min_coverage_percentage = 0.0
 max_debt_density = 50.0
 
@@ -862,6 +984,36 @@ enabled = true
 [god_object_detection.rust]
 max_methods = 20
 max_fields = 15
+
+# Classification configuration
+[classification.constructors]
+detect_constructors = true
+constructor_patterns = ["new", "create", "build", "from"]
+
+[classification.accessors]
+detect_accessors = true
+accessor_patterns = ["get_*", "set_*", "is_*", "has_*"]
+
+[classification.data_flow]
+detect_data_flow = true
+
+# Advanced analysis
+[orchestration_adjustment]
+enabled = true
+min_delegation_ratio = 0.6
+complexity_reduction = 0.25
+
+[boilerplate_detection]
+enabled = true
+detect_constructors = true
+detect_error_conversions = true
+complexity_reduction = 0.20
+
+[functional_analysis]
+enabled = true
+detect_pure_functions = true
+detect_higher_order = true
+detect_immutable_patterns = true
 ```
 
 ## Configuration Best Practices

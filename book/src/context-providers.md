@@ -90,6 +90,9 @@ debtmap analyze . --context-providers critical_path
 [analysis]
 context_providers = ["critical_path"]
 
+# Note: Provider-specific TOML sections below are planned features.
+# Currently, providers use hard-coded defaults. Use CLI flags for now.
+
 [context.critical_path]
 # Multiplier for entry points (default: 1.5)
 entry_point_multiplier = 1.5
@@ -167,6 +170,9 @@ debtmap analyze . --context-providers dependency
 ```toml
 [analysis]
 context_providers = ["dependency"]
+
+# Note: Provider-specific TOML sections below are planned features.
+# Currently, providers use hard-coded defaults. Use CLI flags for now.
 
 [context.dependency]
 # Include transitive dependencies (default: true)
@@ -250,6 +256,9 @@ debtmap analyze . --context-providers git_history
 ```toml
 [analysis]
 context_providers = ["git_history"]
+
+# Note: Provider-specific TOML sections below are planned features.
+# Currently, providers use hard-coded defaults. Use CLI flags for now.
 
 [context.git_history]
 # Commits to analyze (default: 100)
@@ -588,37 +597,42 @@ Configure context providers in `.debtmap.toml`:
 
 ```toml
 [analysis]
-# Enable context-aware analysis (default: true)
+# Enable context-aware analysis (default: false)
 enable_context = true
 
 # Specify which providers to use
 context_providers = ["critical_path", "dependency", "git_history"]
 
-# Disable specific providers
-# disable_context = ["git_history"]
+# Disable specific providers (use CLI flag --disable-context instead)
+# disable_context = ["git_history"]  # Not yet implemented in config
+
+# Note: The provider-specific TOML sections below are planned features.
+# Currently, all provider settings use hard-coded defaults from the implementation.
+# Use CLI flags (--context, --context-providers, --disable-context) to control providers.
+# See the CLI examples throughout this chapter for working configurations.
 
 [context.git_history]
-# Commits to analyze (default: 100)
+# Commits to analyze (default: 100) - PLANNED
 max_commits = 100
 
-# Time range in days (default: 90)
+# Time range in days (default: 90) - PLANNED
 time_range_days = 90
 
-# Minimum commits to consider "high churn" (default: 10)
+# Minimum commits to consider "high churn" (default: 10) - PLANNED
 high_churn_threshold = 10
 
 [context.critical_path]
-# Multiplier for entry points (default: 1.5)
+# Multiplier for entry points (default: 1.5) - PLANNED
 entry_point_multiplier = 1.5
 
-# Multiplier for business logic (default: 1.2)
+# Multiplier for business logic (default: 1.2) - PLANNED
 business_logic_multiplier = 1.2
 
 [context.dependency]
-# Include transitive dependencies (default: true)
+# Include transitive dependencies (default: true) - PLANNED
 include_transitive = true
 
-# Maximum depth for transitive analysis (default: 5)
+# Maximum depth for transitive analysis (default: 5) - PLANNED
 max_depth = 5
 ```
 

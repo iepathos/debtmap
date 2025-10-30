@@ -64,6 +64,8 @@ The difference between raw and normalized complexity reveals how much "complexit
 - **Formatting Artifacts** - From code formatting choices (difference between raw and normalized)
 - **Pattern Complexity** - From recognized code patterns (error handling, validation, etc.)
 
+> **Note**: Pattern complexity analysis is part of the standard multi-pass analysis. No additional configuration is required to enable pattern detection.
+
 ## CLI Usage
 
 Enable multi-pass analysis with the `--multi-pass` flag:
@@ -87,9 +89,11 @@ debtmap analyze . --multi-pass --attribution --json
 | Flag | Description |
 |------|-------------|
 | `--multi-pass` | Enable two-pass analysis (raw + normalized) |
-| `--attribution` | Show detailed complexity attribution breakdown |
+| `--attribution` | Show detailed complexity attribution breakdown (requires `--multi-pass`) |
 | `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` |
 | `--json` | Output results in JSON format |
+
+> **Note**: The `--attribution` flag requires `--multi-pass` to be enabled, as attribution depends on comparing raw and normalized analyses.
 
 ## Attribution Engine
 
@@ -461,6 +465,7 @@ MultiPassOptions {
 **Use Parallel Processing**
 ```bash
 # Parallel analysis amortizes overhead across cores
+# Note: --jobs is a general debtmap flag controlling parallelism for all analysis
 debtmap analyze . --multi-pass --jobs 8
 ```
 
@@ -475,6 +480,8 @@ debtmap analyze src/complex_module.rs --multi-pass --attribution
 Multi-pass analysis supports comparing code changes to validate refactoring efforts.
 
 ### Basic Comparison
+
+The `compare_complexity` function is a standalone convenience function that performs complete multi-pass analysis on both code versions and returns the computed differences:
 
 ```rust
 use debtmap::analysis::multi_pass::compare_complexity;
@@ -515,12 +522,10 @@ println!("Formatting impact change: {}", comparison.formatting_impact_change);
 
 ### Comparison Results
 
-The `ComparativeAnalysis` struct includes:
+The `ComparativeAnalysis` struct contains the computed differences between before and after analyses:
 
 ```rust
 pub struct ComparativeAnalysis {
-    pub before: MultiPassResult,
-    pub after: MultiPassResult,
     pub complexity_change: i32,        // Negative = improvement
     pub cognitive_change: i32,         // Negative = improvement
     pub formatting_impact_change: f32, // Negative = less formatting noise
@@ -528,6 +533,8 @@ pub struct ComparativeAnalysis {
     pub regressions: Vec<String>,
 }
 ```
+
+> **Note**: The `compare_complexity` function performs both analyses internally and returns only the change metrics. To access the full before/after results, perform separate analyses using `MultiPassAnalyzer`.
 
 **Interpreting Changes:**
 - **Negative complexity change** - Refactoring reduced complexity ✓
@@ -572,7 +579,7 @@ let options = MultiPassOptions {
     enable_recommendations: true,
     track_source_locations: true,
     generate_insights: true,
-    output_format: OutputFormat::Json,
+    output_format: OutputFormat::Json, // Also available: Yaml, Markdown, Html, Text
     performance_tracking: true,
 };
 
@@ -584,11 +591,11 @@ let analyzer = MultiPassAnalyzer::new(options);
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `language` | `Language` | `Rust` | Target programming language |
-| `detail_level` | `DetailLevel` | `Standard` | Output detail: Summary, Standard, Comprehensive, Debug |
+| `detail_level` | `DetailLevel` | `Standard` | Output detail: Summary, Standard, Comprehensive, Debug (CLI uses lowercase: `--detail-level standard`) |
 | `enable_recommendations` | `bool` | `true` | Generate actionable recommendations |
 | `track_source_locations` | `bool` | `true` | Include file/line/column in attribution |
 | `generate_insights` | `bool` | `true` | Automatically generate insights |
-| `output_format` | `OutputFormat` | `Json` | Output format: Json, Markdown, Terminal |
+| `output_format` | `OutputFormat` | `Json` | Output format: Json, Yaml, Markdown, Html, Text |
 | `performance_tracking` | `bool` | `false` | Track and report performance metrics |
 
 ## Use Cases

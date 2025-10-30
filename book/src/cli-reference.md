@@ -210,6 +210,7 @@ Control how analysis results are formatted and displayed.
 - `--top <N>` / `--head <N>` - Show only top N priority items
 - `--tail <N>` - Show only bottom N priority items (lowest priority)
 - `-s, --summary` - Use summary format with tiered priority display (compact output)
+- `--compact` - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv)
 - `--min-priority <PRIORITY>` - Minimum priority to display: low, medium, high, critical
 - `--filter <CATEGORIES>` - Filter by debt categories (comma-separated)
 - `--aggregate-only` - Show only aggregated file-level scores
@@ -377,11 +378,12 @@ debtmap init --force
 
 ### Environment Variables
 
-- `DEBTMAP_CACHE_DIR` - Override default cache directory location
-  - Can also be set via `--cache-location` flag
+- `DEBTMAP_CACHE_DIR` - Cache location (same as `--cache-location` flag)
+  - Example: `export DEBTMAP_CACHE_DIR=/shared/team/cache`
   - Affects where analysis results are cached for faster subsequent runs
-- `DEBTMAP_JOBS` - Number of threads for parallel processing (0 = use all cores)
-  - Can also be set via `--jobs` / `-j` flag
+- `DEBTMAP_JOBS` - Number of threads for parallel processing (same as `--jobs` / `-j` flag)
+  - Example: `export DEBTMAP_JOBS=8  # Same as --jobs 8`
+  - Use `0` to utilize all available CPU cores
   - Controls thread pool size for parallel call graph construction
 
 ### Getting Help

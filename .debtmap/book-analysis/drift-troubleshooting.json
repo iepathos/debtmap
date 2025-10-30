@@ -1,0 +1,129 @@
+{
+  "chapter_id": "troubleshooting",
+  "chapter_title": "Troubleshooting",
+  "chapter_file": "book/src/troubleshooting.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Comprehensive troubleshooting guide with excellent practical examples and detailed explanations. Missing documentation for several new features (call graph debugging, boilerplate detection, functional analysis). Overall very good but needs updates for newer capabilities.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Advanced Analysis Troubleshooting",
+      "description": "Missing entire subsection on call graph debugging despite extensive call graph flags in features.json",
+      "should_add": "Add dedicated 'Call Graph Troubleshooting' subsection covering:\n- --debug-call-graph: Enable call graph debugging output\n- --trace-functions: Trace specific function calls\n- --call-graph-stats-only: Show only statistics\n- --validate-call-graph: Validate call graph correctness\n- --show-dependencies: Display dependency information\n- --no-dependencies: Disable dependency tracking\n- --max-callers/--max-callees: Limit displayed relationships\n- --show-external/--show-std-lib: Control external code visibility\n- --debug-format (text/json): Choose debug output format",
+      "fix_suggestion": "Create new subsection after 'Context Provider Troubleshooting' with examples of common call graph issues and solutions",
+      "source_reference": "features.json:cli_commands.analyze.call_graph"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Advanced Analysis Troubleshooting / Language-Specific Issues",
+      "description": "Boilerplate detection feature not documented in troubleshooting despite being significant feature",
+      "should_add": "Add 'Boilerplate Detection Issues' section covering:\n- Pattern detection problems\n- Trait implementation analysis\n- Macro recommendation issues\n- False positives in boilerplate scoring\n- Configuring thresholds: --pattern-threshold, --no-pattern-detection\n- Debug flags: --show-pattern-warnings",
+      "fix_suggestion": "Add subsection in 'Advanced Analysis Troubleshooting' or 'Language-Specific Issues' for Rust",
+      "source_reference": "features.json:boilerplate_detection, cli_commands.analyze.advanced_analysis"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Analysis Troubleshooting",
+      "description": "Functional analysis troubleshooting not documented",
+      "should_add": "Document functional analysis flags and common issues:\n- --ast-functional-analysis: Enable functional programming analysis\n- --functional-analysis-profile (strict/balanced/lenient): Choose analysis profile\n- Common issues: purity detection failures, side effect analysis errors\n- When to use different profiles",
+      "fix_suggestion": "Add subsection on functional analysis troubleshooting with examples",
+      "source_reference": "features.json:cli_commands.analyze.functional_analysis"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Advanced Analysis Troubleshooting",
+      "description": "Public API detection flags not documented",
+      "should_add": "Document public API detection troubleshooting:\n- --no-public-api-detection: Disable public API detection\n- --public-api-threshold: Configure detection sensitivity\n- When public API detection affects scoring\n- False positives in API boundary detection",
+      "fix_suggestion": "Add to 'Advanced Analysis Troubleshooting' section",
+      "source_reference": "features.json:cli_commands.analyze.advanced_analysis"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Debug Mode",
+      "description": "Debug mode section missing some diagnostic flags mentioned in features.json",
+      "current_content": "Lists --verbose-macro-warnings, --show-macro-stats, --semantic-off, --validate-loc, --cache-stats",
+      "should_add": "Add to diagnostic options:\n- --debug-call-graph: Call graph debugging\n- --trace-functions: Function call tracing\n- --show-pattern-warnings: Pattern detection warnings\n- --validate-call-graph: Call graph validation",
+      "fix_suggestion": "Expand 'Diagnostic Options' subsection to include all debugging flags",
+      "source_reference": "features.json:cli_commands.analyze.call_graph, advanced_analysis"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Language-Specific Issues / Rust",
+      "description": "Rust section doesn't mention call graph or boilerplate detection features",
+      "should_add": "Expand Rust-specific issues to cover:\n- Call graph construction issues with traits and generics\n- Boilerplate detection in trait implementations\n- Functional analysis for pure functions\n- Macro expansion impact on analysis",
+      "fix_suggestion": "Add subsections for advanced Rust features under 'Language-Specific Issues'",
+      "source_reference": "features.json:core_analysis.language_support.rust"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "FAQ",
+      "description": "Context providers explanation could mention additional provider capabilities",
+      "current_content": "Mentions critical_path, dependency, git_history at high level",
+      "should_add": "Expand context provider explanations:\n- critical_path: Includes centrality metrics, clustering coefficient\n- dependency: Cross-module tracking, impact analysis\n- git_history: Bug correlation, change frequency patterns",
+      "fix_suggestion": "Enhance 'What are context providers?' FAQ answer with more detail",
+      "source_reference": "features.json:core_analysis.analysis_algorithms.call_graph, risk_assessment.contextual_analysis"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Common Issues",
+      "description": "God object validation issues not explicitly documented",
+      "should_add": "Add troubleshooting for god object detection:\n- Visibility breakdown inconsistencies\n- Responsibility count mismatches\n- Domain diversity calculation issues\n- When to adjust god object thresholds\n- Validation flags and their use",
+      "fix_suggestion": "Expand 'God Object Detection' subsection or add to 'Common Issues'",
+      "source_reference": "features.json:responsibility_analysis.god_object_detection.validation"
+    }
+  ],
+  "positive_aspects": [
+    "Extremely comprehensive troubleshooting coverage",
+    "Excellent practical examples throughout all sections",
+    "Very detailed score calculation formula explanation (lines 1646-1703)",
+    "Outstanding cache troubleshooting with pruning configuration details",
+    "Good progression from quick fixes to advanced troubleshooting",
+    "Helpful error messages reference section",
+    "Well-organized FAQ section covering common user questions",
+    "Strong CI/CD integration guidance",
+    "Clear language-specific troubleshooting sections",
+    "Good use of code examples and command snippets"
+  ],
+  "improvement_suggestions": [
+    "Add dedicated 'Call Graph Debugging' section - this is a major feature gap",
+    "Document boilerplate detection troubleshooting for Rust users",
+    "Add functional analysis troubleshooting subsection",
+    "Expand debug mode section to cover all diagnostic flags",
+    "Add examples of using trace functions and call graph validation",
+    "Include troubleshooting for new pattern detection features",
+    "Add cross-references between related troubleshooting sections",
+    "Consider adding a 'New Features Troubleshooting' section for recent additions",
+    "Add troubleshooting flowchart or decision tree for common scenarios",
+    "Include more examples of interpreting debug output from new flags"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-30",
+    "feature_inventory": ".debtmap/book-analysis/features.json",
+    "topics_covered": [
+      "Common issues",
+      "Parse errors",
+      "Performance optimization",
+      "Cache management",
+      "Debug mode",
+      "Context providers",
+      "Compare command",
+      "Validate command",
+      "Advanced analysis flags",
+      "Language-specific issues",
+      "Output formatting",
+      "Error messages",
+      "FAQ"
+    ],
+    "validation_focus": "Check troubleshooting covers common user issues",
+    "project": "Debtmap"
+  }
+}
