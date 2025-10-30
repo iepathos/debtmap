@@ -409,6 +409,87 @@ fn classify_method(method: &str) -> MethodClassification {
     }
 }
 
+/// Create pipeline stage from method classification
+/// Returns Some(stage) if the classification should add a transformation stage
+fn create_stage_from_classification(classification: MethodClassification) -> Option<PipelineStage> {
+    match classification {
+        // Core transformation stages
+        MethodClassification::Map => Some(PipelineStage::Map {
+            closure_complexity: 1,
+            has_nested_pipeline: false,
+        }),
+        MethodClassification::Filter => Some(PipelineStage::Filter {
+            closure_complexity: 1,
+            has_nested_pipeline: false,
+        }),
+        MethodClassification::Fold => Some(PipelineStage::Fold {
+            init_complexity: 1,
+            fold_complexity: 1,
+        }),
+        MethodClassification::FlatMap => Some(PipelineStage::FlatMap {
+            closure_complexity: 1,
+            has_nested_pipeline: false,
+        }),
+        MethodClassification::FilterMap => Some(PipelineStage::FlatMap {
+            closure_complexity: 1,
+            has_nested_pipeline: false,
+        }),
+        // Adapter methods map with no closure
+        MethodClassification::AdapterMethod
+        | MethodClassification::SimpleTransform
+        | MethodClassification::OrderAdapter => Some(PipelineStage::Map {
+            closure_complexity: 0,
+            has_nested_pipeline: false,
+        }),
+        // Terminal operations with transformation stage
+        MethodClassification::TerminalSum | MethodClassification::TerminalCount => {
+            Some(PipelineStage::Fold {
+                init_complexity: 0,
+                fold_complexity: 0,
+            })
+        }
+        MethodClassification::TerminalAny
+        | MethodClassification::TerminalAll
+        | MethodClassification::TerminalFind
+        | MethodClassification::TerminalPartition
+        | MethodClassification::TerminalPosition => Some(PipelineStage::Filter {
+            closure_complexity: 1,
+            has_nested_pipeline: false,
+        }),
+        MethodClassification::TerminalUnzip => Some(PipelineStage::Map {
+            closure_complexity: 0,
+            has_nested_pipeline: false,
+        }),
+        MethodClassification::TerminalProduct => Some(PipelineStage::Fold {
+            init_complexity: 0,
+            fold_complexity: 0,
+        }),
+        // Iterator constructors, terminal ops without stages, and unknown don't add stages
+        _ => None,
+    }
+}
+
+/// Extract terminal operation from method classification
+fn extract_terminal_op(classification: MethodClassification) -> Option<TerminalOp> {
+    match classification {
+        MethodClassification::TerminalCollect
+        | MethodClassification::TerminalPartition
+        | MethodClassification::TerminalUnzip => Some(TerminalOp::Collect),
+        MethodClassification::TerminalSum | MethodClassification::TerminalProduct => {
+            Some(TerminalOp::Sum)
+        }
+        MethodClassification::TerminalCount => Some(TerminalOp::Count),
+        MethodClassification::TerminalAny => Some(TerminalOp::Any),
+        MethodClassification::TerminalAll => Some(TerminalOp::All),
+        MethodClassification::TerminalFind
+        | MethodClassification::TerminalPosition
+        | MethodClassification::TerminalElementAccess => Some(TerminalOp::Find),
+        MethodClassification::TerminalForEach => Some(TerminalOp::ForEach),
+        MethodClassification::TerminalReduce => Some(TerminalOp::Reduce),
+        _ => None,
+    }
+}
+
 fn extract_pipeline_from_method_call(
     method_call: &ExprMethodCall,
     _config: &FunctionalAnalysisConfig,
@@ -429,127 +510,30 @@ fn extract_pipeline_from_method_call(
             is_parallel = true;
         }
 
-        // Process based on classification
-        match classification {
-            // Iterator constructors - all become Iterator stages
+        // Check if this is an iterator constructor
+        let is_iterator_constructor = matches!(
+            classification,
             MethodClassification::ParallelIterator
-            | MethodClassification::StandardIterator
-            | MethodClassification::IteratorConstructor
-            | MethodClassification::SliceIterator
-            | MethodClassification::CollectionIterator
-            | MethodClassification::StdIterConstructor => {
-                stages.push(PipelineStage::Iterator { method: method_str });
-            }
+                | MethodClassification::StandardIterator
+                | MethodClassification::IteratorConstructor
+                | MethodClassification::SliceIterator
+                | MethodClassification::CollectionIterator
+                | MethodClassification::StdIterConstructor
+        );
 
-            // Core transformation stages
-            MethodClassification::Map => stages.push(PipelineStage::Map {
-                closure_complexity: 1,
-                has_nested_pipeline: false,
-            }),
-            MethodClassification::Filter => stages.push(PipelineStage::Filter {
-                closure_complexity: 1,
-                has_nested_pipeline: false,
-            }),
-            MethodClassification::Fold => stages.push(PipelineStage::Fold {
-                init_complexity: 1,
-                fold_complexity: 1,
-            }),
-            MethodClassification::FlatMap => stages.push(PipelineStage::FlatMap {
-                closure_complexity: 1,
-                has_nested_pipeline: false,
-            }),
-            MethodClassification::FilterMap => stages.push(PipelineStage::FlatMap {
-                // filter_map is like flat_map with Option
-                closure_complexity: 1,
-                has_nested_pipeline: false,
-            }),
+        // Iterator constructors become Iterator stages
+        if is_iterator_constructor {
+            stages.push(PipelineStage::Iterator { method: method_str });
+        }
 
-            // Adapter methods - map with no closure
-            MethodClassification::AdapterMethod
-            | MethodClassification::SimpleTransform
-            | MethodClassification::OrderAdapter => stages.push(PipelineStage::Map {
-                closure_complexity: 0,
-                has_nested_pipeline: false,
-            }),
+        // Add transformation stage if the classification requires one
+        if let Some(stage) = create_stage_from_classification(classification) {
+            stages.push(stage);
+        }
 
-            // Terminal operations - set terminal_op and optionally add stages
-            MethodClassification::TerminalCollect => {
-                terminal_op = Some(TerminalOp::Collect);
-            }
-            MethodClassification::TerminalSum => {
-                stages.push(PipelineStage::Fold {
-                    init_complexity: 0,
-                    fold_complexity: 0,
-                });
-                terminal_op = Some(TerminalOp::Sum);
-            }
-            MethodClassification::TerminalCount => {
-                stages.push(PipelineStage::Fold {
-                    init_complexity: 0,
-                    fold_complexity: 0,
-                });
-                terminal_op = Some(TerminalOp::Count);
-            }
-            MethodClassification::TerminalAny => {
-                stages.push(PipelineStage::Filter {
-                    closure_complexity: 1,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::Any);
-            }
-            MethodClassification::TerminalAll => {
-                stages.push(PipelineStage::Filter {
-                    closure_complexity: 1,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::All);
-            }
-            MethodClassification::TerminalFind => {
-                stages.push(PipelineStage::Filter {
-                    closure_complexity: 1,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::Find);
-            }
-            MethodClassification::TerminalForEach => {
-                terminal_op = Some(TerminalOp::ForEach);
-            }
-            MethodClassification::TerminalPartition => {
-                stages.push(PipelineStage::Filter {
-                    closure_complexity: 1,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::Collect);
-            }
-            MethodClassification::TerminalUnzip => {
-                stages.push(PipelineStage::Map {
-                    closure_complexity: 0,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::Collect);
-            }
-            MethodClassification::TerminalReduce => {
-                terminal_op = Some(TerminalOp::Reduce);
-            }
-            MethodClassification::TerminalPosition => {
-                stages.push(PipelineStage::Filter {
-                    closure_complexity: 1,
-                    has_nested_pipeline: false,
-                });
-                terminal_op = Some(TerminalOp::Find);
-            }
-            MethodClassification::TerminalElementAccess => {
-                terminal_op = Some(TerminalOp::Find);
-            }
-            MethodClassification::TerminalProduct => {
-                stages.push(PipelineStage::Fold {
-                    init_complexity: 0,
-                    fold_complexity: 0,
-                });
-                terminal_op = Some(TerminalOp::Sum);
-            }
-
-            MethodClassification::Unknown => {} // Ignore unknown methods
+        // Set terminal operation if present
+        if let Some(terminal) = extract_terminal_op(classification) {
+            terminal_op = Some(terminal);
         }
 
         // Move to the receiver
