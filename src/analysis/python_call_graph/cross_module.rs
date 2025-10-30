@@ -194,118 +194,104 @@ impl CrossModuleContext {
         self.symbols.insert(full_path_name, func_id);
     }
 
-    pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
-        // Check resolution cache first
-        let cache_key = (module_path.to_path_buf(), name.to_string());
-        {
-            let cache = self.resolution_cache.read().unwrap();
-            if let Some(cached) = cache.get(&cache_key) {
-                return cached.clone();
+    /// Check the resolution cache for a previously resolved function
+    fn check_resolution_cache(&self, cache_key: &(PathBuf, String)) -> Option<Option<FunctionId>> {
+        let cache = self.resolution_cache.read().unwrap();
+        cache.get(cache_key).cloned()
+    }
+
+    /// Update the resolution cache with a new result
+    fn update_resolution_cache(&self, cache_key: (PathBuf, String), result: Option<FunctionId>) {
+        self.resolution_cache
+            .write()
+            .unwrap()
+            .insert(cache_key, result);
+    }
+
+    /// Try to resolve using the enhanced resolver
+    fn try_enhanced_resolver(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        let mut resolver = self.enhanced_resolver.write().unwrap();
+        if let Some(ref mut resolver) = *resolver {
+            if let Some(resolved) = resolver.resolve_symbol(module_path, name) {
+                // Look up the FunctionId from the resolved symbol
+                return self
+                    .symbols
+                    .get(&format!(
+                        "{}:{}",
+                        resolved.module_path.display(),
+                        resolved.name
+                    ))
+                    .or_else(|| self.symbols.get(&resolved.name))
+                    .cloned();
+            }
+        }
+        None
+    }
+
+    /// Try to resolve using namespace-based resolution
+    fn try_namespace_resolution(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        let namespace = self.namespaces.get(module_path)?;
+
+        // Try direct import resolution
+        if let Some((source_module, original_name)) = namespace.resolve_import(name) {
+            if let Some(func_id) = self.resolve_function_in_module(&source_module, &original_name) {
+                return Some(func_id);
             }
         }
 
-        // Try enhanced resolver first if available
-        {
-            let mut resolver = self.enhanced_resolver.write().unwrap();
-            if let Some(ref mut resolver) = *resolver {
-                if let Some(resolved) = resolver.resolve_symbol(module_path, name) {
-                    // Look up the FunctionId from the resolved symbol
-                    let func_id = self
+        // Try wildcard imports
+        for wildcard_module in &namespace.wildcard_imports {
+            if let Some(func_id) = self.resolve_function_in_module(wildcard_module, name) {
+                return Some(func_id);
+            }
+        }
+
+        None
+    }
+
+    /// Try to find a function by scanning exports
+    fn try_export_scan(&self, resolved: &str) -> Option<FunctionId> {
+        for exports in self.exports.values() {
+            for export in exports {
+                if export.qualified_name == resolved || export.name == resolved {
+                    if let Some(func_id) = self
                         .symbols
-                        .get(&format!(
-                            "{}:{}",
-                            resolved.module_path.display(),
-                            resolved.name
-                        ))
-                        .or_else(|| self.symbols.get(&resolved.name))
-                        .cloned();
-
-                    if func_id.is_some() {
-                        self.resolution_cache
-                            .write()
-                            .unwrap()
-                            .insert(cache_key, func_id.clone());
-                        return func_id;
-                    }
-                }
-            }
-        }
-
-        // Try namespace-based resolution
-        if let Some(namespace) = self.namespaces.get(module_path) {
-            if let Some((source_module, original_name)) = namespace.resolve_import(name) {
-                // Resolve through the source module
-                if let Some(func_id) =
-                    self.resolve_function_in_module(&source_module, &original_name)
-                {
-                    self.resolution_cache
-                        .write()
-                        .unwrap()
-                        .insert(cache_key, Some(func_id.clone()));
-                    return Some(func_id);
-                }
-            }
-
-            // Check wildcard imports
-            for wildcard_module in &namespace.wildcard_imports {
-                if let Some(func_id) = self.resolve_function_in_module(wildcard_module, name) {
-                    self.resolution_cache
-                        .write()
-                        .unwrap()
-                        .insert(cache_key, Some(func_id.clone()));
-                    return Some(func_id);
-                }
-            }
-        }
-
-        // Fall back to tracker-based resolution
-        if let Some(tracker) = self.module_trackers.get(module_path) {
-            if let Some(resolved) = tracker.resolve_name(name) {
-                // Try direct resolution first
-                if let Some(func_id) = self.symbols.get(&resolved) {
-                    self.resolution_cache
-                        .write()
-                        .unwrap()
-                        .insert(cache_key, Some(func_id.clone()));
-                    return Some(func_id.clone());
-                }
-
-                // Try without module qualification if it's a module.function format
-                if let Some(dot_pos) = resolved.rfind('.') {
-                    let func_name = &resolved[dot_pos + 1..];
-                    if let Some(func_id) = self.symbols.get(func_name) {
-                        self.resolution_cache
-                            .write()
-                            .unwrap()
-                            .insert(cache_key, Some(func_id.clone()));
+                        .get(&export.qualified_name)
+                        .or_else(|| self.symbols.get(&export.name))
+                    {
                         return Some(func_id.clone());
                     }
                 }
+            }
+        }
+        None
+    }
 
-                // Try to find it in any module's exports
-                for exports in self.exports.values() {
-                    for export in exports {
-                        if export.qualified_name == resolved || export.name == resolved {
-                            if let Some(func_id) = self
-                                .symbols
-                                .get(&export.qualified_name)
-                                .or_else(|| self.symbols.get(&export.name))
-                            {
-                                self.resolution_cache
-                                    .write()
-                                    .unwrap()
-                                    .insert(cache_key, Some(func_id.clone()));
-                                return Some(func_id.clone());
-                            }
-                        }
-                    }
-                }
+    /// Try to resolve using tracker-based resolution
+    fn try_tracker_resolution(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        let tracker = self.module_trackers.get(module_path)?;
+        let resolved = tracker.resolve_name(name)?;
+
+        // Try direct resolution
+        if let Some(func_id) = self.symbols.get(&resolved) {
+            return Some(func_id.clone());
+        }
+
+        // Try without module qualification if it's a module.function format
+        if let Some(dot_pos) = resolved.rfind('.') {
+            let func_name = &resolved[dot_pos + 1..];
+            if let Some(func_id) = self.symbols.get(func_name) {
+                return Some(func_id.clone());
             }
         }
 
-        // Try direct lookup
-        let result = self
-            .symbols
+        // Try to find it in any module's exports
+        self.try_export_scan(&resolved)
+    }
+
+    /// Try direct lookup in symbols
+    fn try_direct_lookup(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        self.symbols
             .get(name)
             .or_else(|| {
                 let qualified = format!(
@@ -318,12 +304,26 @@ impl CrossModuleContext {
                 );
                 self.symbols.get(&qualified)
             })
-            .cloned();
+            .cloned()
+    }
 
-        self.resolution_cache
-            .write()
-            .unwrap()
-            .insert(cache_key, result.clone());
+    pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
+        let cache_key = (module_path.to_path_buf(), name.to_string());
+
+        // Check cache first
+        if let Some(cached) = self.check_resolution_cache(&cache_key) {
+            return cached;
+        }
+
+        // Try resolution strategies in order
+        let result = self
+            .try_enhanced_resolver(module_path, name)
+            .or_else(|| self.try_namespace_resolution(module_path, name))
+            .or_else(|| self.try_tracker_resolution(module_path, name))
+            .or_else(|| self.try_direct_lookup(module_path, name));
+
+        // Update cache
+        self.update_resolution_cache(cache_key, result.clone());
         result
     }
 
