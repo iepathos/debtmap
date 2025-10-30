@@ -1,0 +1,55 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: llvm-tools-preview
+
+    - name: Install cargo-llvm-cov
+      run: cargo install cargo-llvm-cov
+
+    - name: Build debtmap binary
+      run: cargo build --bin debtmap
+
+    - name: Generate code coverage
+      run: |
+        cargo llvm-cov clean
+        cargo llvm-cov --all-features --html --output-dir target/coverage
+
+    - name: Archive code coverage results
+      uses: actions/upload-artifact@v5
+      with:
+        name: code-coverage-report
+        path: target/coverage/
+
+    - name: Check coverage threshold
+      run: |
+        cargo llvm-cov clean
+        cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
+        COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
+        echo "Current coverage: ${COVERAGE}%"
+
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "⚠️  Coverage is below 80%: $COVERAGE%"
+          exit 1
+        else
+          echo "✅ Coverage meets 80% threshold: $COVERAGE%"
+        fi
