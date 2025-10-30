@@ -6,6 +6,9 @@ use crate::core::{DebtItem, DebtType, Priority};
 use std::path::{Path, PathBuf};
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
+mod queries;
+use queries::*;
+
 #[derive(Debug, Clone)]
 pub enum TestingAntiPattern {
     MissingAssertions {
@@ -359,57 +362,6 @@ fn detect_react_test_issues(
             resource_type: "React components".to_string(),
         });
     }
-}
-
-fn build_async_test_query(
-    language: &tree_sitter::Language,
-) -> Result<Query, tree_sitter::QueryError> {
-    let query_string = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (arrow_function
-          body: (_) @body
-        )
-      )
-    ) @test_call
-    "#;
-    Query::new(language, query_string)
-}
-
-fn extract_test_function_name<'a>(
-    match_: &tree_sitter::QueryMatch<'a, '_>,
-) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 0)
-        .map(|c| &c.node)
-}
-
-fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 1)
-        .map(|c| &c.node)
-}
-
-fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 2)
-        .map(|c| &c.node)
-}
-
-fn parse_test_name(node: Node, source: &str) -> String {
-    get_node_text(node, source)
-        .trim_matches('"')
-        .trim_matches('\'')
-        .trim_matches('`')
-        .to_string()
 }
 
 fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
