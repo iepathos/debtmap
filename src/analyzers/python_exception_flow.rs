@@ -430,53 +430,8 @@ impl ExceptionFlowAnalyzer {
             // Pattern: Documented but not raised
             patterns.extend(detect_documented_not_raised(func_name, flow));
 
-            // Pattern: Bare except
-            for caught in &flow.caught_exceptions {
-                if caught.is_bare_except {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::BareExcept,
-                        severity: Severity::High,
-                        confidence: 1.0,
-                        function_name: func_name.clone(),
-                        exception_type: None,
-                        explanation:
-                            "Bare except clause catches all exceptions including system exits"
-                                .to_string(),
-                        suggestion: "Specify the exception types you want to catch".to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Overly broad handler
-            for caught in &flow.caught_exceptions {
-                if caught.is_overly_broad && !caught.is_bare_except {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::OverlyBroadHandler,
-                        severity: Severity::Medium,
-                        confidence: 0.8,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Overly broad exception catching may hide bugs".to_string(),
-                        suggestion: "Catch specific exception types instead".to_string(),
-                    });
-                }
-            }
-
-            // Pattern: Exception swallowing
-            for caught in &flow.caught_exceptions {
-                if matches!(caught.handler_action, HandlerAction::Ignore) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::ExceptionSwallowing,
-                        severity: Severity::High,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Exception caught but not logged or re-raised".to_string(),
-                        suggestion: "Add logging, re-raise, or handle the error properly"
-                            .to_string(),
-                    });
-                }
-            }
+            // Patterns: Exception handler issues (BareExcept, OverlyBroadHandler, ExceptionSwallowing)
+            patterns.extend(detect_handler_patterns(func_name, &flow.caught_exceptions));
 
             // Pattern: Log and ignore
             for caught in &flow.caught_exceptions {
@@ -691,6 +646,64 @@ fn detect_documented_not_raised(
                 func_name, doc_exc.exception_type
             ),
             suggestion: "Remove from documentation or add the raise statement".to_string(),
+        })
+        .collect()
+}
+
+/// Detect exception handler patterns
+///
+/// Pure function that identifies problematic exception handler patterns in caught exceptions.
+/// Detects three pattern types in a single pass: BareExcept, OverlyBroadHandler, and ExceptionSwallowing.
+fn detect_handler_patterns(
+    func_name: &str,
+    caught_exceptions: &[CaughtException],
+) -> Vec<ExceptionFlowPattern> {
+    caught_exceptions
+        .iter()
+        .flat_map(|caught| {
+            let mut patterns = Vec::new();
+
+            // Pattern: Bare except
+            if caught.is_bare_except {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::BareExcept,
+                    severity: Severity::High,
+                    confidence: 1.0,
+                    function_name: func_name.to_string(),
+                    exception_type: None,
+                    explanation: "Bare except clause catches all exceptions including system exits"
+                        .to_string(),
+                    suggestion: "Specify the exception types you want to catch".to_string(),
+                });
+            }
+
+            // Pattern: Overly broad handler
+            if caught.is_overly_broad && !caught.is_bare_except {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::OverlyBroadHandler,
+                    severity: Severity::Medium,
+                    confidence: 0.8,
+                    function_name: func_name.to_string(),
+                    exception_type: caught.exception_types.first().map(|t| t.name()),
+                    explanation: "Overly broad exception catching may hide bugs".to_string(),
+                    suggestion: "Catch specific exception types instead".to_string(),
+                });
+            }
+
+            // Pattern: Exception swallowing
+            if matches!(caught.handler_action, HandlerAction::Ignore) {
+                patterns.push(ExceptionFlowPattern {
+                    pattern_type: ExceptionPatternType::ExceptionSwallowing,
+                    severity: Severity::High,
+                    confidence: 0.9,
+                    function_name: func_name.to_string(),
+                    exception_type: caught.exception_types.first().map(|t| t.name()),
+                    explanation: "Exception caught but not logged or re-raised".to_string(),
+                    suggestion: "Add logging, re-raise, or handle the error properly".to_string(),
+                });
+            }
+
+            patterns
         })
         .collect()
 }
