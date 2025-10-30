@@ -453,4 +453,135 @@ mod tests {
         assert_eq!(classification.primary, "Pure Computation");
         assert!(classification.confidence > 0.7);
     }
+
+    // Unit tests for extracted classification functions
+
+    #[test]
+    fn test_classify_orchestrator() {
+        let metrics = create_test_metrics(6, 2);
+        let (primary, confidence, evidence) = PatternDetector::classify_orchestrator(&metrics);
+
+        assert_eq!(primary, "Orchestration & Coordination");
+        assert_eq!(confidence, 0.85);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("6 functions"));
+    }
+
+    #[test]
+    fn test_classify_io_gateway_with_profile() {
+        let mut io_profile = IoProfile::new();
+        io_profile
+            .file_operations
+            .push(crate::analysis::io_detection::IoOperation::FileRead { path_expr: None });
+        io_profile.is_pure = false;
+
+        let (primary, confidence, evidence) = PatternDetector::classify_io_gateway(Some(&io_profile));
+
+        assert_eq!(primary, "I/O & External Communication");
+        assert_eq!(confidence, 0.80);
+        assert!(evidence.len() >= 2); // Base + file operation
+        assert!(evidence.iter().any(|e| e.contains("file I/O")));
+    }
+
+    #[test]
+    fn test_classify_io_gateway_without_profile() {
+        let (primary, confidence, evidence) = PatternDetector::classify_io_gateway(None);
+
+        assert_eq!(primary, "I/O & External Communication");
+        assert_eq!(confidence, 0.80);
+        assert_eq!(evidence.len(), 1);
+    }
+
+    #[test]
+    fn test_classify_hub() {
+        let metrics = create_test_metrics(2, 15);
+        let (primary, confidence, evidence) = PatternDetector::classify_hub(&metrics);
+
+        assert_eq!(primary, "Core Business Logic");
+        assert_eq!(confidence, 0.75);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("15 functions"));
+    }
+
+    #[test]
+    fn test_classify_bridge() {
+        let mut metrics = create_test_metrics(3, 3);
+        metrics.betweenness = 0.6;
+
+        let (primary, confidence, evidence) = PatternDetector::classify_bridge(&metrics);
+
+        assert_eq!(primary, "Module Integration");
+        assert_eq!(confidence, 0.70);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("0.60"));
+    }
+
+    #[test]
+    fn test_classify_leaf_node_pure() {
+        let mut io_profile = IoProfile::new();
+        io_profile.is_pure = true;
+
+        let (primary, confidence, evidence) = PatternDetector::classify_leaf_node(Some(&io_profile));
+
+        assert_eq!(primary, "Pure Computation");
+        assert_eq!(confidence, 0.75);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("no side effects"));
+    }
+
+    #[test]
+    fn test_classify_leaf_node_impure() {
+        let mut io_profile = IoProfile::new();
+        io_profile.is_pure = false;
+
+        let (primary, confidence, evidence) = PatternDetector::classify_leaf_node(Some(&io_profile));
+
+        assert_eq!(primary, "Utility & Helper Functions");
+        assert_eq!(confidence, 0.70);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("side effects"));
+    }
+
+    #[test]
+    fn test_classify_leaf_node_no_profile() {
+        let (primary, confidence, evidence) = PatternDetector::classify_leaf_node(None);
+
+        assert_eq!(primary, "Utility & Helper Functions");
+        assert_eq!(confidence, 0.70);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("no external calls"));
+    }
+
+    #[test]
+    fn test_classify_utility_cluster() {
+        let mut metrics = create_test_metrics(2, 5);
+        metrics.clustering = 0.7;
+
+        let (primary, confidence, evidence) = PatternDetector::classify_utility_cluster(&metrics);
+
+        assert_eq!(primary, "Domain-Specific Utilities");
+        assert_eq!(confidence, 0.65);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("0.70"));
+    }
+
+    #[test]
+    fn test_classify_fallback_with_io_profile() {
+        let io_profile = IoProfile::new();
+        let (primary, confidence, evidence) = PatternDetector::classify_fallback(Some(&io_profile));
+
+        assert_eq!(confidence, 0.50);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("I/O behavior"));
+    }
+
+    #[test]
+    fn test_classify_fallback_without_profile() {
+        let (primary, confidence, evidence) = PatternDetector::classify_fallback(None);
+
+        assert_eq!(primary, "General Logic");
+        assert_eq!(confidence, 0.40);
+        assert_eq!(evidence.len(), 1);
+        assert!(evidence[0].contains("No strong call graph pattern"));
+    }
 }
