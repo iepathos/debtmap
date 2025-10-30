@@ -80,6 +80,22 @@ def mock_api_responses():
 
 You can suppress specific types of debt using bracket notation instead of suppressing everything:
 
+### Quick Reference: Debt Type Suppression
+
+| Debt Type | Bracket Name(s) | Example | Notes |
+|-----------|-----------------|---------|-------|
+| TODO comments | `[todo]` | `// debtmap:ignore[todo]` | Also suppresses TestTodo |
+| FIXME comments | `[fixme]` | `// debtmap:ignore[fixme]` | |
+| Code smells | `[smell]` or `[codesmell]` | `// debtmap:ignore[smell]` | |
+| High complexity | `[complexity]` | `// debtmap:ignore[complexity]` | Also suppresses TestComplexity |
+| Code duplication | `[duplication]` or `[duplicate]` | `// debtmap:ignore[duplication]` | Also suppresses TestDuplication |
+| Dependency issues | `[dependency]` | `// debtmap:ignore[dependency]` | |
+| Error swallowing | ❌ Not supported | `// debtmap:ignore` | Use general suppression only |
+| Resource management | ❌ Not supported | `// debtmap:ignore` | Use general suppression only |
+| Code organization | ❌ Not supported | `// debtmap:ignore` | Use general suppression only |
+| Test quality | ❌ Not supported | `// debtmap:ignore` | Use general suppression only |
+| All types | `[*]` | `// debtmap:ignore[*]` | Wildcard matches everything |
+
 ### Suppress Specific Types
 
 ```rust
@@ -106,16 +122,50 @@ You can suppress the following debt types by name in bracket notation:
 - `dependency` - Dependency issues
 - `*` - All types (wildcard)
 
-**Auto-Detected Types** (can be suppressed but not from inline comments):
+**Auto-Detected Types** (cannot be suppressed by name):
 
-These types are detected by code analysis rather than comment scanning. To suppress them, use inline suppression markers (`debtmap:ignore`) on the relevant lines:
+The following debt types are detected by code analysis rather than comment scanning. These types **cannot** be suppressed using bracket notation like `[error_swallowing]`. To suppress them, use the general `debtmap:ignore` marker without brackets:
 
 - `error_swallowing` - Error handling issues (empty catch blocks, ignored errors)
 - `resource_management` - Resource cleanup issues (file handles, connections)
 - `code_organization` - Structural issues (god objects, large classes)
-- `test_quality` - Test-specific quality issues
 
-> **Note:** Additional type names like `hack`, `god_object`, and `testing` may be supported in future versions. Use the types listed above for reliable suppression.
+**Example:**
+```rust
+// ✅ Correct: General suppression without brackets
+// debtmap:ignore -- Intentional empty catch for cleanup
+match result {
+    Err(_) => {} // Empty catch block
+    Ok(v) => process(v)
+}
+
+// ❌ Wrong: Bracket notation not supported for auto-detected types
+// debtmap:ignore[error_swallowing]
+```
+
+**Test-Specific Debt Types:**
+
+Test-specific variants like `TestComplexity`, `TestTodo`, `TestDuplication`, and `TestQuality` are suppressed through their base types:
+
+- `TestComplexity` → suppressed with `[complexity]`
+- `TestTodo` → suppressed with `[todo]`
+- `TestDuplication` → suppressed with `[duplication]`
+- `TestQuality` → suppressed with general `debtmap:ignore` (no bracket notation)
+
+**Example:**
+```rust
+#[cfg(test)]
+mod tests {
+    // Suppresses both Complexity and TestComplexity
+    // debtmap:ignore[complexity] -- Complex test setup acceptable
+    fn setup_test_environment() {
+        // Complex test initialization
+    }
+
+    // debtmap:ignore[todo] -- Suppresses both Todo and TestTodo
+    // TODO: Add more test cases
+    fn test_feature() { }
+}
 
 ### Wildcard Suppression
 
@@ -285,7 +335,23 @@ Debtmap internally tracks suppression usage during analysis:
 - **Suppressions by type**: How many of each debt type are suppressed
 - **Unclosed blocks**: Detection of `ignore-start` without matching `ignore-end`
 
-These statistics are tracked in real-time as files are analyzed. Future CLI enhancements may expose these statistics through a dedicated command to help you audit suppression usage across your codebase.
+**Current Status**: These statistics are tracked internally but not yet exposed through the CLI. Future releases may add a dedicated command to view suppression metrics.
+
+**Auditing Suppressions Now**: You can audit your suppressions using standard tools:
+
+```bash
+# Find all suppressions in Rust code
+rg "debtmap:ignore" --type rust
+
+# Count suppressions by type
+rg "debtmap:ignore\[" --type rust | grep -o "\[.*\]" | sort | uniq -c
+
+# Find unclosed blocks
+rg "debtmap:ignore-start" --type rust -A 100 | grep -v "debtmap:ignore-end"
+
+# List files with suppressions
+rg "debtmap:ignore" --files-with-matches
+```
 
 ## Best Practices
 
