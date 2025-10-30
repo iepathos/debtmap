@@ -3,10 +3,10 @@ number: 146
 title: Rust-Specific Responsibility Patterns
 category: optimization
 priority: medium
-status: draft
+status: ready-for-implementation
 dependencies: [141, 142]
 created: 2025-10-27
-updated: 2025-10-29
+updated: 2025-10-30
 ---
 
 # Specification 146: Rust-Specific Responsibility Patterns
@@ -80,10 +80,33 @@ pub struct ImplContext {
 }
 ```
 
-**Existing Structure** (do not modify):
+**Existing Structure** (to be extended):
 - `FunctionMetrics` at `src/core/mod.rs:42-64` stores computed metrics
 - `syn::ItemFn` provides full AST access
 - `CallGraph` at `src/priority/call_graph/types.rs` provides call relationships
+
+**Memory Footprint Optimization**:
+```rust
+// Extension to FunctionMetrics (src/core/mod.rs)
+// Use language-specific extension to avoid memory overhead for non-Rust files
+
+#[derive(Debug, Clone)]
+pub struct FunctionMetrics {
+    // ... existing fields ...
+    pub language_specific: Option<LanguageSpecificData>,  // NEW
+}
+
+#[derive(Debug, Clone)]
+pub enum LanguageSpecificData {
+    Rust(RustPatternResult),
+    // Future: Python(PythonPatternResult), JavaScript(JSPatternResult)
+}
+```
+
+This approach:
+- Avoids allocating Rust-specific data for Python/JavaScript files
+- Provides extensibility for future language-specific analyzers
+- Maintains memory efficiency (Option wrapper + enum discriminant = ~24 bytes overhead)
 
 ## Requirements
 
@@ -105,7 +128,14 @@ pub struct ImplContext {
 - Count `?` operator usage via AST traversal (not string counting)
 - Detect custom error type definitions via type analysis
 - Track error conversion patterns (`From<E>` for error types)
-- Identify panic/unwrap usage via AST expression matching
+- Identify comprehensive anti-patterns via AST expression matching:
+  - `unwrap()` - panic on None/Err
+  - `expect()` - panic with message
+  - `panic!()` - explicit panic macro
+  - `unreachable!()` - assertion that code is unreachable
+  - `unwrap_or_default()` - silent error suppression
+  - `ok().unwrap()` - chained anti-pattern
+  - `expect_err()` - inverse unwrap for Err values
 
 **Memory Management Pattern Detection**:
 - Detect unsafe blocks via `syn::Block` analysis
@@ -113,11 +143,12 @@ pub struct ImplContext {
 - Track reference counting patterns (Rc, Arc) via type path analysis
 - Detect memory leaks (`Box::leak`, `mem::forget`) via function call detection
 
-**Builder Pattern Detection**:
+**Builder Pattern Detection** (Phase 1 - High ROI):
 - Identify builder structs (methods returning `Self`)
 - Detect constructor patterns (`new`, `with_*`, `from_*`)
 - Track builder finalization methods (`build`, `finalize`)
 - Use existing signature extraction infrastructure
+- Rationale for Phase 1 inclusion: Low implementation complexity, high value for debtmap's own codebase
 
 **Type Conversion Detection**:
 - Detect `From`/`Into` trait implementations
@@ -128,7 +159,16 @@ pub struct ImplContext {
 ### Non-Functional Requirements
 
 - **Accuracy**: Correctly identify >90% of Rust-specific patterns
-- **Performance**: Pattern detection adds <5% overhead (to be validated via benchmarks)
+- **Performance**: Pattern detection adds <5% overhead (empirical validation required)
+  - Baseline: Measure current analysis speed on 10k+ function corpus
+  - With patterns: Re-measure with all detectors enabled
+  - Memory: Measure heap allocation increase (target <10% increase)
+  - Per-function: Pattern detection should complete in <100μs per function
+  - Validation: Use criterion benchmarks with statistical significance testing
+- **Memory Footprint**: Language-specific data adds <10% memory overhead
+  - Measured on debtmap's own codebase (~500 functions)
+  - Use `LanguageSpecificData` enum to avoid overhead for non-Rust code
+  - Benchmark with `dhat` or similar memory profiling tools
 - **Rust Version Support**: Support stable Rust patterns (no nightly-only)
 - **Idiomatic**: Classifications align with Rust community terminology
 - **AST-Based**: Use `syn::visit::Visit` patterns, not string matching
@@ -137,15 +177,19 @@ pub struct ImplContext {
 
 - [ ] Standard trait implementations are correctly classified (Display, From, Into, etc.)
 - [ ] Async functions detected via `sig.asyncness.is_some()`
+- [ ] Comprehensive error anti-patterns detected (unwrap, expect, panic, unreachable, ok().unwrap())
 - [ ] Error handling patterns detected via AST traversal (not string matching)
 - [ ] Unsafe blocks and memory management patterns flagged via AST analysis
-- [ ] Builder patterns identified via signature analysis
+- [ ] Builder patterns identified via signature analysis (Phase 1 implementation)
 - [ ] Type conversion implementations detected via trait tracker integration
 - [ ] Custom Drop implementations classified as "Resource Cleanup"
 - [ ] Iterator implementations classified as "Iteration Logic"
-- [ ] Performance overhead validated with criterion benchmarks
+- [ ] Performance overhead <5% validated with criterion benchmarks (baseline vs with-patterns)
+- [ ] Memory overhead <10% validated with memory profiler (dhat or similar)
+- [ ] Per-function detection completes in <100μs (99th percentile)
 - [ ] Test suite includes debtmap's own Rust code examples
 - [ ] No false positives from comments or string literals (AST-based detection)
+- [ ] `LanguageSpecificData` enum prevents memory waste on non-Rust files
 
 ## Technical Details
 
@@ -590,6 +634,10 @@ pub enum ErrorPatternType {
     UnwrapUsage,
     PanicUsage,
     ExpectUsage,
+    UnreachableUsage,        // NEW: unreachable!() macro
+    UnwrapOrDefaultUsage,    // NEW: silent error suppression
+    OkUnwrapChain,           // NEW: .ok().unwrap() anti-pattern
+    ExpectErrUsage,          // NEW: .expect_err() for inverting Result
 }
 
 /// AST visitor for error handling patterns
@@ -598,6 +646,10 @@ pub struct ErrorPatternVisitor {
     pub unwrap_count: usize,
     pub expect_count: usize,
     pub panic_count: usize,
+    pub unreachable_count: usize,           // NEW
+    pub unwrap_or_default_count: usize,     // NEW
+    pub ok_unwrap_chain_count: usize,       // NEW
+    pub expect_err_count: usize,            // NEW
 }
 
 impl ErrorPatternVisitor {
@@ -607,6 +659,10 @@ impl ErrorPatternVisitor {
             unwrap_count: 0,
             expect_count: 0,
             panic_count: 0,
+            unreachable_count: 0,
+            unwrap_or_default_count: 0,
+            ok_unwrap_chain_count: 0,
+            expect_err_count: 0,
         }
     }
 }
@@ -622,8 +678,18 @@ impl<'ast> Visit<'ast> for ErrorPatternVisitor {
         let method_name = method.method.to_string();
 
         match method_name.as_str() {
-            "unwrap" => self.unwrap_count += 1,
+            "unwrap" => {
+                // Check if this is part of .ok().unwrap() chain
+                if let Expr::MethodCall(inner) = &*method.receiver {
+                    if inner.method.to_string() == "ok" {
+                        self.ok_unwrap_chain_count += 1;
+                    }
+                }
+                self.unwrap_count += 1;
+            }
             "expect" => self.expect_count += 1,
+            "expect_err" => self.expect_err_count += 1,
+            "unwrap_or_default" => self.unwrap_or_default_count += 1,
             _ => {}
         }
 
@@ -635,8 +701,10 @@ impl<'ast> Visit<'ast> for ErrorPatternVisitor {
             .map(|s| s.ident.to_string())
             .unwrap_or_default();
 
-        if macro_name == "panic" {
-            self.panic_count += 1;
+        match macro_name.as_str() {
+            "panic" => self.panic_count += 1,
+            "unreachable" => self.unreachable_count += 1,
+            _ => {}
         }
 
         syn::visit::visit_macro(self, mac);
@@ -696,6 +764,42 @@ impl RustErrorDetector {
             });
         }
 
+        // Unreachable usage (anti-pattern in production code)
+        if visitor.unreachable_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::UnreachableUsage,
+                count: visitor.unreachable_count,
+                evidence: format!("Uses unreachable!() {} times", visitor.unreachable_count),
+            });
+        }
+
+        // Unwrap or default (silent error suppression)
+        if visitor.unwrap_or_default_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::UnwrapOrDefaultUsage,
+                count: visitor.unwrap_or_default_count,
+                evidence: format!("Uses unwrap_or_default() {} times (may hide errors)", visitor.unwrap_or_default_count),
+            });
+        }
+
+        // Ok().unwrap() chain (particularly bad anti-pattern)
+        if visitor.ok_unwrap_chain_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::OkUnwrapChain,
+                count: visitor.ok_unwrap_chain_count,
+                evidence: format!("Uses .ok().unwrap() {} times (severe anti-pattern)", visitor.ok_unwrap_chain_count),
+            });
+        }
+
+        // Expect_err usage (uncommon, may indicate test code)
+        if visitor.expect_err_count > 0 {
+            patterns.push(ErrorPattern {
+                pattern_type: ErrorPatternType::ExpectErrUsage,
+                count: visitor.expect_err_count,
+                evidence: format!("Uses expect_err() {} times", visitor.expect_err_count),
+            });
+        }
+
         // Check return type for Result
         if let ReturnType::Type(_, ty) = &context.item_fn.sig.output {
             if Self::is_result_type(ty) {
@@ -743,7 +847,155 @@ impl RustErrorDetector {
 }
 ```
 
-**Phase 5: Main Pattern Detector and Integration**
+**Phase 5: Builder Pattern Detection (AST-Based)**
+
+Detect builder patterns common in Rust codebases:
+
+```rust
+// File: src/analysis/rust_patterns/builder_detector.rs
+
+use syn::{FnArg, ItemFn, ReturnType, Type};
+
+#[derive(Debug, Clone)]
+pub struct BuilderPattern {
+    pub pattern_type: BuilderPatternType,
+    pub confidence: f64,
+    pub evidence: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BuilderPatternType {
+    Constructor,           // new(), default()
+    BuilderMethod,         // Methods returning Self
+    WithMethod,            // with_* pattern
+    SetterMethod,          // set_* pattern
+    BuildFinalization,     // build(), finalize()
+}
+
+pub struct RustBuilderDetector;
+
+impl RustBuilderDetector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn detect_builder_patterns(
+        &self,
+        context: &RustFunctionContext,
+    ) -> Vec<BuilderPattern> {
+        let mut patterns = Vec::new();
+        let fn_name = context.item_fn.sig.ident.to_string();
+
+        // Constructor pattern
+        if matches!(fn_name.as_str(), "new" | "default" | "create") {
+            patterns.push(BuilderPattern {
+                pattern_type: BuilderPatternType::Constructor,
+                confidence: 0.9,
+                evidence: format!("Constructor method: {}", fn_name),
+            });
+        }
+
+        // Check return type for Self
+        if let ReturnType::Type(_, ty) = &context.item_fn.sig.output {
+            if Self::returns_self(ty) {
+                // with_* pattern
+                if fn_name.starts_with("with_") {
+                    patterns.push(BuilderPattern {
+                        pattern_type: BuilderPatternType::WithMethod,
+                        confidence: 0.95,
+                        evidence: format!("Builder with_* method: {}", fn_name),
+                    });
+                    patterns.push(BuilderPattern {
+                        pattern_type: BuilderPatternType::BuilderMethod,
+                        confidence: 0.9,
+                        evidence: "Returns Self for chaining".into(),
+                    });
+                }
+                // set_* pattern
+                else if fn_name.starts_with("set_") {
+                    patterns.push(BuilderPattern {
+                        pattern_type: BuilderPatternType::SetterMethod,
+                        confidence: 0.85,
+                        evidence: format!("Builder set_* method: {}", fn_name),
+                    });
+                    patterns.push(BuilderPattern {
+                        pattern_type: BuilderPatternType::BuilderMethod,
+                        confidence: 0.85,
+                        evidence: "Returns Self for chaining".into(),
+                    });
+                }
+                // Generic builder method returning Self
+                else if Self::takes_self_param(&context.item_fn) {
+                    patterns.push(BuilderPattern {
+                        pattern_type: BuilderPatternType::BuilderMethod,
+                        confidence: 0.75,
+                        evidence: "Method returns Self for chaining".into(),
+                    });
+                }
+            }
+        }
+
+        // Build finalization pattern
+        if matches!(fn_name.as_str(), "build" | "finalize" | "finish") {
+            patterns.push(BuilderPattern {
+                pattern_type: BuilderPatternType::BuildFinalization,
+                confidence: 0.9,
+                evidence: format!("Builder finalization method: {}", fn_name),
+            });
+        }
+
+        patterns
+    }
+
+    /// Check if return type is Self
+    fn returns_self(ty: &Type) -> bool {
+        if let Type::Path(type_path) = ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                return segment.ident == "Self";
+            }
+        }
+        false
+    }
+
+    /// Check if function takes &self or &mut self
+    fn takes_self_param(item_fn: &ItemFn) -> bool {
+        item_fn.sig.inputs.iter().any(|arg| {
+            matches!(arg, FnArg::Receiver(_))
+        })
+    }
+
+    pub fn classify_from_builder_patterns(
+        &self,
+        patterns: &[BuilderPattern],
+    ) -> Option<ResponsibilityCategory> {
+        if patterns.is_empty() {
+            return None;
+        }
+
+        // Constructor = Construction
+        if patterns.iter().any(|p| p.pattern_type == BuilderPatternType::Constructor) {
+            return Some(ResponsibilityCategory::Construction);
+        }
+
+        // Builder methods = Configuration
+        if patterns.iter().any(|p| matches!(
+            p.pattern_type,
+            BuilderPatternType::WithMethod | BuilderPatternType::SetterMethod
+        )) {
+            return Some(ResponsibilityCategory::ConfigurationBuilder);
+        }
+
+        // Build finalization = Finalization
+        if patterns.iter().any(|p| p.pattern_type == BuilderPatternType::BuildFinalization) {
+            return Some(ResponsibilityCategory::Finalization);
+        }
+
+        None
+    }
+}
+```
+
+**Phase 6: Main Pattern Detector and Integration**
 
 ```rust
 // File: src/analysis/rust_patterns/detector.rs
@@ -752,6 +1004,7 @@ pub struct RustPatternDetector {
     trait_detector: RustTraitDetector,
     async_detector: RustAsyncDetector,
     error_detector: RustErrorDetector,
+    builder_detector: RustBuilderDetector,  // NEW
 }
 
 impl RustPatternDetector {
@@ -760,6 +1013,7 @@ impl RustPatternDetector {
             trait_detector: RustTraitDetector::new(),
             async_detector: RustAsyncDetector::new(),
             error_detector: RustErrorDetector::new(),
+            builder_detector: RustBuilderDetector::new(),  // NEW
         }
     }
 
@@ -772,11 +1026,12 @@ impl RustPatternDetector {
             trait_impl: self.trait_detector.detect_trait_impl(context),
             async_patterns: self.async_detector.detect_async_patterns(context),
             error_patterns: self.error_detector.detect_error_patterns(context),
+            builder_patterns: self.builder_detector.detect_builder_patterns(context),  // NEW
         }
     }
 
     /// Classify function based on detected patterns
-    /// Priority order: Trait impls > Async > Error handling
+    /// Priority order: Trait impls > Async > Builder > Error handling
     pub fn classify_function(
         &self,
         context: &RustFunctionContext,
@@ -802,7 +1057,18 @@ impl RustPatternDetector {
             });
         }
 
-        // 3. Error handling patterns
+        // 3. Builder patterns (NEW)
+        let builder_patterns = self.builder_detector.detect_builder_patterns(context);
+        if let Some(category) = self.builder_detector.classify_from_builder_patterns(&builder_patterns) {
+            return Some(RustSpecificClassification {
+                category,
+                confidence: 0.80,
+                evidence: format!("Builder patterns: {:?}", builder_patterns),
+                rust_pattern: RustPattern::BuilderPattern(builder_patterns),
+            });
+        }
+
+        // 4. Error handling patterns
         let error_patterns = self.error_detector.detect_error_patterns(context);
         if let Some(category) = self.error_detector.classify_from_error_patterns(&error_patterns) {
             return Some(RustSpecificClassification {
@@ -822,6 +1088,7 @@ pub struct RustPatternResult {
     pub trait_impl: Option<TraitImplClassification>,
     pub async_patterns: Vec<AsyncPattern>,
     pub error_patterns: Vec<ErrorPattern>,
+    pub builder_patterns: Vec<BuilderPattern>,  // NEW
 }
 
 #[derive(Debug, Clone)]
@@ -836,11 +1103,12 @@ pub struct RustSpecificClassification {
 pub enum RustPattern {
     TraitImplementation(TraitImplClassification),
     AsyncConcurrency(Vec<AsyncPattern>),
+    BuilderPattern(Vec<BuilderPattern>),  // NEW
     ErrorHandling(Vec<ErrorPattern>),
 }
 ```
 
-**Phase 6: Integration into RustAnalyzer**
+**Phase 7: Integration into RustAnalyzer**
 
 ```rust
 // File: src/analyzers/rust.rs (modifications)
@@ -893,10 +1161,10 @@ impl FunctionVisitor {
 
         let rust_patterns = self.rust_pattern_detector.detect_all_patterns(&context);
 
-        // Store patterns in metrics (extend FunctionMetrics with optional field)
+        // Store patterns in metrics using language-specific extension
         let mut metrics = FunctionMetrics::new(name.clone(), self.path.clone(), line);
         // ... set other metrics ...
-        metrics.rust_pattern_result = Some(rust_patterns);  // NEW optional field
+        metrics.language_specific = Some(LanguageSpecificData::Rust(rust_patterns));  // NEW
 
         self.functions.push(metrics);
     }
@@ -927,15 +1195,17 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 - `mod.rs` - Module exports and public API
 - `context.rs` - `RustFunctionContext` and `ImplContext`
 - `detector.rs` - Main `RustPatternDetector`
-- `trait_detector.rs` - Trait implementation detection
-- `async_detector.rs` - Async/concurrency patterns
-- `error_detector.rs` - Error handling patterns
-- `builder_detector.rs` - Builder pattern detection (future)
-- `conversion_detector.rs` - Type conversion patterns (future)
+- `trait_detector.rs` - Trait implementation detection (Phase 2)
+- `async_detector.rs` - Async/concurrency patterns (Phase 3)
+- `error_detector.rs` - Comprehensive error handling patterns (Phase 4)
+- `builder_detector.rs` - Builder pattern detection (Phase 5)
+- `conversion_detector.rs` - Type conversion patterns (future Phase 8)
 
 **Modified Files**:
 - `src/analyzers/rust.rs` - Integration point for pattern detection
-- `src/core/mod.rs` - Add optional `rust_pattern_result` field to `FunctionMetrics`
+- `src/core/mod.rs` - Add `LanguageSpecificData` enum and optional field to `FunctionMetrics`
+  - Avoids memory overhead for non-Rust files
+  - Provides extensibility for future Python/JavaScript pattern detectors
 
 **No Integration with Spec 145**: This module operates standalone. If multi-signal aggregation is implemented later, it can consume `RustPatternResult` as one signal.
 
@@ -1143,6 +1413,47 @@ fn benchmark_pattern_detection(c: &mut Criterion) {
 criterion_group!(benches, benchmark_pattern_detection);
 criterion_main!(benches);
 ```
+
+### Performance Validation Strategy
+
+**Baseline Establishment (Phase 1)**:
+```bash
+# Measure current analysis speed without pattern detection
+cargo bench --bench analysis_baseline -- --save-baseline before-patterns
+
+# Measure memory usage without pattern detection
+cargo run --release --features dhat-heap -- analyze src/
+```
+
+**Per-Detector Validation (Phases 2-5)**:
+After each detector implementation:
+1. Run benchmarks: `cargo bench --bench analysis_baseline -- --baseline before-patterns`
+2. Verify <5% regression from baseline
+3. If overhead exceeds threshold, profile and optimize before proceeding
+
+**Memory Profiling**:
+```rust
+// benches/memory_footprint.rs
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+#[bench]
+fn measure_memory_with_patterns() {
+    let _profiler = dhat::Profiler::new_heap();
+
+    // Analyze debtmap's own codebase (~500 functions)
+    let analyzer = RustAnalyzer::new();
+    let results = analyzer.analyze_directory("src/");
+
+    // dhat will report total allocations and peak memory
+}
+```
+
+**Performance Acceptance Criteria**:
+- Total overhead: <5% increase in wall-clock time
+- Per-function latency: 99th percentile <100μs
+- Memory overhead: <10% increase in heap allocations
+- Zero performance impact on non-Rust files
 
 ## Documentation Requirements
 
@@ -1378,13 +1689,15 @@ pub enum ResponsibilityCategory {
     // ... etc ...
 
     // NEW: Rust-specific categories
-    TypeConversion,           // From/Into traits
-    Construction,             // Default/Clone/new()
-    ResourceCleanup,          // Drop trait
-    Iteration,                // Iterator trait
-    ConcurrencyManagement,    // tokio::spawn, threads
+    TypeConversion,             // From/Into traits
+    Construction,               // Default/Clone/new()
+    ConfigurationBuilder,       // Builder with_*/set_* methods
+    Finalization,               // build()/finalize() methods
+    ResourceCleanup,            // Drop trait
+    Iteration,                  // Iterator trait
+    ConcurrencyManagement,      // tokio::spawn, threads
     CommunicationOrchestration, // Channels
-    AsynchronousOperation,    // async fn
+    AsynchronousOperation,      // async fn
 
     // Existing...
     Unknown,
@@ -1514,14 +1827,20 @@ With Rust patterns integrated:
 
 1. ✅ **Multi-Signal Integration**: **RESOLVED** - Spec 145 is implemented, integrate as new signal type
 
-2. **Builder Pattern Detection**: Include in initial implementation?
-   - **Recommendation**: Defer to Phase 2, focus on traits/async/errors first
+2. ✅ **Builder Pattern Detection**: **RESOLVED** - Included in Phase 5 (high ROI, low complexity)
 
-3. **Configuration**: Should pattern detection be always-on or opt-in?
-   - **Recommendation**: Always-on for Rust files (minimal overhead, high value)
+3. ✅ **Memory Footprint**: **RESOLVED** - Use `LanguageSpecificData` enum to avoid overhead for non-Rust files
 
-4. **Signal Weight**: Is 5% appropriate or should it be higher?
+4. ✅ **Comprehensive Error Patterns**: **RESOLVED** - Detect unwrap, expect, panic, unreachable, ok().unwrap(), etc.
+
+5. **Configuration**: Should pattern detection be always-on or opt-in?
+   - **Recommendation**: Always-on for Rust files (minimal overhead validated via benchmarks)
+
+6. **Signal Weight**: Is 5% appropriate or should it be higher?
    - **Recommendation**: Start with 5%, monitor accuracy metrics, adjust if needed
+
+7. **Performance Validation**: When should benchmarks be established?
+   - **Recommendation**: Baseline benchmarks in Phase 1, re-validate after each detector addition
 
 ## Revision History
 
@@ -1539,3 +1858,13 @@ With Rust patterns integrated:
   - Defined ResponsibilityCategory extensions
   - Clarified language-specific activation strategy
   - Set 5% weight for rust_patterns signal
+- 2025-10-30: Performance and feature enhancements
+  - Added `LanguageSpecificData` enum for memory footprint optimization
+  - Expanded error pattern detection (unreachable!, unwrap_or_default(), ok().unwrap(), expect_err())
+  - Moved builder pattern detection from "future" to Phase 5 (high ROI)
+  - Added comprehensive performance validation requirements (baseline, memory, per-function latency)
+  - Added memory footprint benchmarking with dhat
+  - Added builder-specific ResponsibilityCategory values (ConfigurationBuilder, Finalization)
+  - Defined empirical performance targets (<5% overhead, <100μs per function)
+  - Updated acceptance criteria with performance and memory validation
+  - Resolved open questions (builder patterns, memory footprint, error patterns)
