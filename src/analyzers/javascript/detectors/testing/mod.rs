@@ -1,10 +1,57 @@
 // debtmap:ignore-start -- This file contains test pattern detection and may trigger false security positives
-// Testing pattern detection for JavaScript/TypeScript
+//! Testing pattern detection for JavaScript/TypeScript
+//!
+//! This module analyzes JavaScript and TypeScript test code to detect anti-patterns
+//! and quality issues. It identifies problems such as:
+//! - Missing assertions in tests
+//! - Overly complex test logic
+//! - Timing-dependent tests
+//! - Missing cleanup in React tests
+//! - Async test issues
+//! - Snapshot test overuse
+//!
+//! # Structure
+//!
+//! The module is organized into focused sub-modules:
+//! - `queries`: Tree-sitter query building and node extraction
+//! - `validators`: Pure validation and helper functions
+//! - `detectors`: Individual pattern detection implementations
+//!
+//! # Example
+//!
+//! ```no_run
+//! use tree_sitter::Parser;
+//! use std::path::PathBuf;
+//!
+//! let mut parser = Parser::new();
+//! let language = tree_sitter_javascript::LANGUAGE.into();
+//! parser.set_language(&language).unwrap();
+//!
+//! let source = "test('example', () => { /* no assertion */ });";
+//! let tree = parser.parse(source, None).unwrap();
+//!
+//! let mut issues = Vec::new();
+//! detect_testing_patterns(
+//!     tree.root_node(),
+//!     source,
+//!     &language,
+//!     PathBuf::from("test.js"),
+//!     &mut issues
+//! );
+//! ```
 
 use super::{get_node_text, SourceLocation};
 use crate::core::{DebtItem, DebtType, Priority};
 use std::path::{Path, PathBuf};
-use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
+use tree_sitter::Node;
+
+mod detectors;
+mod queries;
+mod validators;
+
+use detectors::*;
+use queries::*;
+use validators::*;
 
 #[derive(Debug, Clone)]
 pub enum TestingAntiPattern {
@@ -137,440 +184,12 @@ pub fn detect_testing_patterns(
     detect_snapshot_overuse(root, source, language, issues);
 }
 
-fn is_test_file(path: &Path) -> bool {
-    let path_str = path.to_string_lossy();
-    path_str.contains(".test.")
-        || path_str.contains(".spec.")
-        || path_str.contains("__tests__")
-        || path_str.contains("/test/")
-        || path_str.contains("/tests/")
-}
-
-fn detect_missing_assertions(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    // Find test functions
-    let test_query = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (_) @test_body
-      )
-    ) @test_call
-    "#;
-
-    if let Ok(query) = Query::new(language, test_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
-
-                if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) = (
-                        match_.captures.iter().find(|c| c.index == 1),
-                        match_.captures.iter().find(|c| c.index == 2),
-                    ) {
-                        let test_name = get_node_text(name.node, source)
-                            .trim_matches('"')
-                            .trim_matches('\'');
-                        let body_text = get_node_text(body.node, source);
-
-                        if !has_assertions(body_text) {
-                            issues.push(TestingAntiPattern::MissingAssertions {
-                                location: SourceLocation::from_node(body.node),
-                                test_name: test_name.to_string(),
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn detect_complex_tests(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    let test_query = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (_) @test_body
-      )
-    ) @test_call
-    "#;
-
-    if let Ok(query) = Query::new(language, test_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
-
-                if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) = (
-                        match_.captures.iter().find(|c| c.index == 1),
-                        match_.captures.iter().find(|c| c.index == 2),
-                    ) {
-                        let test_name = get_node_text(name.node, source)
-                            .trim_matches('"')
-                            .trim_matches('\'');
-                        let complexity = calculate_test_complexity(body.node);
-
-                        if complexity > 10 {
-                            issues.push(TestingAntiPattern::ComplexTest {
-                                location: SourceLocation::from_node(body.node),
-                                test_name: test_name.to_string(),
-                                complexity,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn detect_timing_dependent_tests(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    let test_query = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (_) @test_body
-      )
-    ) @test_call
-    "#;
-
-    if let Ok(query) = Query::new(language, test_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
-
-                if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) = (
-                        match_.captures.iter().find(|c| c.index == 1),
-                        match_.captures.iter().find(|c| c.index == 2),
-                    ) {
-                        let test_name = get_node_text(name.node, source)
-                            .trim_matches('"')
-                            .trim_matches('\'');
-                        let body_text = get_node_text(body.node, source);
-
-                        if let Some(timing_type) = detect_timing_dependency(body_text) {
-                            issues.push(TestingAntiPattern::TimingDependentTest {
-                                location: SourceLocation::from_node(body.node),
-                                test_name: test_name.to_string(),
-                                timing_type,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn detect_react_test_issues(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    // Detect render without cleanup
-    let render_query = r#"
-    (call_expression
-      function: (identifier) @func
-    ) @render_call
-    "#;
-
-    let cleanup_query = r#"
-    (call_expression
-      function: [
-        (identifier) @func
-        (member_expression
-          property: (property_identifier) @prop
-        )
-      ]
-    ) @cleanup_call
-    "#;
-
-    let mut render_count = 0;
-    let mut cleanup_count = 0;
-
-    if let Ok(query) = Query::new(language, render_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            if let Some(func) = match_.captures.iter().find(|c| c.index == 0) {
-                let func_name = get_node_text(func.node, source);
-                if func_name == "render" || func_name == "mount" {
-                    render_count += 1;
-                }
-            }
-        }
-    }
-
-    if let Ok(query) = Query::new(language, cleanup_query) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            let is_cleanup = match_
-                .captures
-                .iter()
-                .filter(|c| c.index == 0 || c.index == 1) // Only check @func and @prop
-                .map(|c| get_node_text(c.node, source))
-                .any(|text| {
-                    let lower = text.to_lowercase();
-                    text == "cleanup" || text == "unmount" || lower.contains("unmount")
-                });
-
-            if is_cleanup {
-                cleanup_count += 1;
-            }
-        }
-    }
-
-    if render_count > cleanup_count {
-        issues.push(TestingAntiPattern::MissingCleanup {
-            location: SourceLocation::from_node(root),
-            test_name: "React test".to_string(),
-            resource_type: "React components".to_string(),
-        });
-    }
-}
-
-fn build_async_test_query(
-    language: &tree_sitter::Language,
-) -> Result<Query, tree_sitter::QueryError> {
-    let query_string = r#"
-    (call_expression
-      function: (identifier) @func
-      arguments: (arguments
-        (string) @test_name
-        (arrow_function
-          body: (_) @body
-        )
-      )
-    ) @test_call
-    "#;
-    Query::new(language, query_string)
-}
-
-fn extract_test_function_name<'a>(
-    match_: &tree_sitter::QueryMatch<'a, '_>,
-) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 0)
-        .map(|c| &c.node)
-}
-
-fn extract_test_name<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 1)
-        .map(|c| &c.node)
-}
-
-fn extract_test_body<'a>(match_: &tree_sitter::QueryMatch<'a, '_>) -> Option<&'a Node<'a>> {
-    match_
-        .captures
-        .iter()
-        .find(|c| c.index == 2)
-        .map(|c| &c.node)
-}
-
-fn parse_test_name(node: Node, source: &str) -> String {
-    get_node_text(node, source)
-        .trim_matches('"')
-        .trim_matches('\'')
-        .trim_matches('`')
-        .to_string()
-}
-
-fn create_async_test_issue(body_node: Node, test_name: String) -> TestingAntiPattern {
-    TestingAntiPattern::AsyncTestIssue {
-        location: SourceLocation::from_node(body_node),
-        test_name,
-        issue_type: "async operations without await or done callback".to_string(),
-    }
-}
-
-fn detect_async_test_issues(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    if let Ok(query) = build_async_test_query(language) {
-        let mut cursor = QueryCursor::new();
-        let mut matches = cursor.matches(&query, root, source.as_bytes());
-
-        while let Some(match_) = matches.next() {
-            if let Some(func) = extract_test_function_name(match_) {
-                let func_name = get_node_text(*func, source);
-
-                if is_test_function(func_name) {
-                    if let (Some(name), Some(body)) =
-                        (extract_test_name(match_), extract_test_body(match_))
-                    {
-                        let test_name = parse_test_name(*name, source);
-                        let body_text = get_node_text(*body, source);
-
-                        // Check if test contains async operations without proper handling
-                        if contains_async_operations(body_text) {
-                            issues.push(create_async_test_issue(*body, test_name));
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn is_snapshot_method(method_name: &str) -> bool {
-    method_name == "toMatchSnapshot" || method_name == "toMatchInlineSnapshot"
-}
-
-fn count_snapshot_methods(query: &Query, root: Node, source: &str) -> usize {
-    let mut cursor = QueryCursor::new();
-    let matches = cursor.matches(query, root, source.as_bytes());
-
-    matches
-        .filter_map(|match_| match_.captures.iter().find(|c| c.index == 0))
-        .filter(|method| is_snapshot_method(get_node_text(method.node, source)))
-        .count()
-}
-
-fn detect_snapshot_overuse(
-    root: Node,
-    source: &str,
-    language: &tree_sitter::Language,
-    issues: &mut Vec<TestingAntiPattern>,
-) {
-    let snapshot_query = r#"
-    (call_expression
-      function: (member_expression
-        property: (property_identifier) @method
-      )
-    ) @snapshot_call
-    "#;
-
-    if let Ok(query) = Query::new(language, snapshot_query) {
-        let snapshot_count = count_snapshot_methods(&query, root, source);
-
-        if snapshot_count > 5 {
-            issues.push(TestingAntiPattern::SnapshotOveruse {
-                location: SourceLocation::from_node(root),
-                snapshot_count,
-            });
-        }
-    }
-}
-
-// Helper functions
-fn is_test_function(name: &str) -> bool {
-    matches!(name, "test" | "it" | "describe" | "suite" | "context")
-}
-
-fn has_assertions(body: &str) -> bool {
-    body.contains("expect")
-        || body.contains("assert")
-        || body.contains("should")
-        || body.contains("chai.")
-        || body.contains("jest.")
-        || body.contains("sinon.")
-}
-
-fn calculate_test_complexity(node: Node) -> usize {
-    let mut complexity = 0;
-    let mut cursor = node.walk();
-
-    loop {
-        let node_kind = cursor.node().kind();
-
-        // Count complexity indicators
-        match node_kind {
-            "if_statement" | "conditional_expression" => complexity += 1,
-            "for_statement" | "while_statement" | "do_statement" => complexity += 2,
-            "try_statement" => complexity += 1,
-            "call_expression" => {
-                // Count mock/stub calls as complexity
-                // Note: We'd need the source string to get text content
-                // For now, just count all call expressions as adding complexity
-                complexity += 1;
-            }
-            _ => {}
-        }
-
-        if !cursor.goto_first_child() {
-            while !cursor.goto_next_sibling() {
-                if !cursor.goto_parent() {
-                    return complexity;
-                }
-            }
-        }
-    }
-}
-
-fn detect_timing_dependency(body: &str) -> Option<String> {
-    if body.contains("setTimeout") {
-        return Some("setTimeout".to_string());
-    }
-    if body.contains("setInterval") {
-        return Some("setInterval".to_string());
-    }
-    if body.contains("Date.now()") || body.contains("new Date()") {
-        return Some("Date dependency".to_string());
-    }
-    if body.contains("Math.random()") {
-        return Some("random values".to_string());
-    }
-    if body.contains("performance.now()") {
-        return Some("performance timing".to_string());
-    }
-    None
-}
-
-fn contains_async_operations(body: &str) -> bool {
-    (body.contains("fetch")
-        || body.contains("axios")
-        || body.contains("$.ajax")
-        || body.contains("Promise")
-        || body.contains(".then("))
-        && !body.contains("await")
-        && !body.contains("done()")
-}
 // debtmap:ignore-end
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tree_sitter::Parser;
+    use tree_sitter::{Parser, StreamingIterator};
 
     #[test]
     fn test_is_snapshot_method_match_snapshot() {
