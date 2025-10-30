@@ -434,39 +434,13 @@ impl ExceptionFlowAnalyzer {
             patterns.extend(detect_handler_patterns(func_name, &flow.caught_exceptions));
 
             // Pattern: Log and ignore
-            for caught in &flow.caught_exceptions {
-                if matches!(caught.handler_action, HandlerAction::Log) {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::LogAndIgnore,
-                        severity: Severity::Medium,
-                        confidence: 0.8,
-                        function_name: func_name.clone(),
-                        exception_type: caught.exception_types.first().map(|t| t.name()),
-                        explanation: "Exception logged but not re-raised or handled".to_string(),
-                        suggestion: "Consider re-raising the exception after logging".to_string(),
-                    });
-                }
-            }
+            patterns.extend(detect_log_and_ignore(func_name, &flow.caught_exceptions));
 
             // Pattern: Lost context in transformation
-            for transform in &flow.transformed_exceptions {
-                if !transform.preserves_context {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::TransformationLost,
-                        severity: Severity::Medium,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: Some(transform.raised_type.name()),
-                        explanation:
-                            "Exception transformation loses context (use 'raise ... from ...')"
-                                .to_string(),
-                        suggestion: format!(
-                            "Use 'raise {}(...) from e' to preserve exception context",
-                            transform.raised_type.name()
-                        ),
-                    });
-                }
-            }
+            patterns.extend(detect_transformation_lost(
+                func_name,
+                &flow.transformed_exceptions,
+            ));
         }
 
         patterns
@@ -704,6 +678,53 @@ fn detect_handler_patterns(
             }
 
             patterns
+        })
+        .collect()
+}
+
+/// Detect log-and-ignore exception pattern
+///
+/// Pure function that identifies caught exceptions that are only logged but not re-raised or handled.
+fn detect_log_and_ignore(
+    func_name: &str,
+    caught_exceptions: &[CaughtException],
+) -> Vec<ExceptionFlowPattern> {
+    caught_exceptions
+        .iter()
+        .filter(|caught| matches!(caught.handler_action, HandlerAction::Log))
+        .map(|caught| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::LogAndIgnore,
+            severity: Severity::Medium,
+            confidence: 0.8,
+            function_name: func_name.to_string(),
+            exception_type: caught.exception_types.first().map(|t| t.name()),
+            explanation: "Exception logged but not re-raised or handled".to_string(),
+            suggestion: "Consider re-raising the exception after logging".to_string(),
+        })
+        .collect()
+}
+
+/// Detect lost exception context in transformations
+///
+/// Pure function that identifies exception transformations that don't preserve context.
+fn detect_transformation_lost(
+    func_name: &str,
+    transformations: &[ExceptionTransformation],
+) -> Vec<ExceptionFlowPattern> {
+    transformations
+        .iter()
+        .filter(|transform| !transform.preserves_context)
+        .map(|transform| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::TransformationLost,
+            severity: Severity::Medium,
+            confidence: 0.9,
+            function_name: func_name.to_string(),
+            exception_type: Some(transform.raised_type.name()),
+            explanation: "Exception transformation loses context (use 'raise ... from ...')".to_string(),
+            suggestion: format!(
+                "Use 'raise {}(...) from e' to preserve exception context",
+                transform.raised_type.name()
+            ),
         })
         .collect()
 }
