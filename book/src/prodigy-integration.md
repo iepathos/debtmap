@@ -11,7 +11,7 @@ Before using Prodigy with Debtmap, ensure you have:
 - [ ] Prodigy installed (`cargo install --git https://github.com/iepathos/prodigy prodigy`)
 - [ ] Anthropic API key for Claude access
 - [ ] Git (for worktree management)
-- [ ] Optional: `just` command runner, or use direct `cargo` commands as alternatives
+- [ ] Optional: `just` command runner (a command runner like make), or use direct `cargo` commands as alternatives
 
 ## What is Prodigy?
 
@@ -130,7 +130,7 @@ Create a workflow file `workflows/debtmap.yml`:
     commands:
       - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
       - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
-      - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+      - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
     result_file: ".prodigy/debtmap-validation.json"
     threshold: 75
     on_incomplete:
@@ -413,7 +413,7 @@ Generate and use coverage data in workflows. See [Coverage Integration](./covera
 
 ## Claude Slash Commands
 
-> **Important**: The slash commands documented below are custom commands that should be created in your `.claude/commands/` directory. They are not built into Prodigy or Debtmap. You can find example command implementations in the Debtmap repository or create your own based on the parameter descriptions below.
+> **Important**: The slash commands documented below are custom commands provided in Debtmap's `.claude/commands/` directory as examples. They are not built into Prodigy or Debtmap. You can use them as-is from the Debtmap repository or create your own based on these patterns.
 
 Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:
 
@@ -632,7 +632,7 @@ map:
           - shell: "just coverage-lcov"
           - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
           - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
-          - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
+          - shell: "debtmap validate-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
         result_file: ".prodigy/debtmap-validation-${item_id}.json"
         threshold: 75
         on_incomplete:
