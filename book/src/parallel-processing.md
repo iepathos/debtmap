@@ -50,16 +50,30 @@ debtmap analyze -j 4
 - Use `--jobs 1-4` in memory-constrained environments like CI/CD
 - Use `--jobs 1` for deterministic analysis order during debugging
 
-**Environment Variable:**
+**Environment Variables:**
 
-You can also set the default via the `RAYON_NUM_THREADS` or `DEBTMAP_JOBS` environment variable:
+You can also set the default via environment variables:
+
+**`DEBTMAP_JOBS`** - Set the default thread count:
 
 ```bash
-export RAYON_NUM_THREADS=4
+export DEBTMAP_JOBS=4
 debtmap analyze  # Uses 4 threads
 ```
 
-The CLI flag takes precedence over the environment variable.
+**`DEBTMAP_PARALLEL`** - Enable/disable parallel processing programmatically:
+
+```bash
+export DEBTMAP_PARALLEL=true
+debtmap analyze  # Parallel processing enabled
+
+export DEBTMAP_PARALLEL=1
+debtmap analyze  # Parallel processing enabled (also accepts '1')
+```
+
+The `DEBTMAP_PARALLEL` variable accepts `true` or `1` to enable parallel processing. This is useful for programmatic control in scripts or CI environments.
+
+The CLI flags (`--jobs`, `--no-parallel`) take precedence over environment variables.
 
 ### --no-parallel
 
