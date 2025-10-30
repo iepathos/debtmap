@@ -301,6 +301,9 @@ debtmap init
 # Validate against thresholds (CI/CD integration)
 debtmap validate ./src --max-debt-density 5.0
 
+# Validate using config file settings
+debtmap validate . --config .debtmap.toml --max-debt-density 5.0
+
 # Compare before/after to track improvements
 debtmap analyze . --format json --output before.json
 # ... make improvements ...

@@ -707,18 +707,37 @@ New: max_debt_density = (100 / 10000) × 1000 = 10.0
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="debugging-validation-failures"><a class="header" href="#debugging-validation-failures">Debugging Validation Failures</a></h3>
 <p>Use verbosity flags to understand why validation failed:</p>
-<p><strong>Level 1: Basic details</strong></p>
+<p><strong>Level 1: Basic details (<code>-v</code>)</strong></p>
 <pre><code class="language-bash">debtmap validate . -v
 </code></pre>
-<p>Shows which thresholds failed and by how much.</p>
-<p><strong>Level 2: Detailed breakdown</strong></p>
+<p>Shows which thresholds failed, by how much, and timing breakdown:</p>
+<ul>
+<li>Call graph building time</li>
+<li>Trait resolution time</li>
+<li>Coverage loading time</li>
+<li>Individual analysis phase durations</li>
+</ul>
+<p><strong>Level 2: Detailed breakdown (<code>-vv</code>)</strong></p>
 <pre><code class="language-bash">debtmap validate . -vv
 </code></pre>
-<p>Shows score components and top violating functions.</p>
-<p><strong>Level 3: Full diagnostic output</strong></p>
+<p>Shows everything from <code>-v</code> plus:</p>
+<ul>
+<li>Score calculation factors and weights</li>
+<li>Top violating functions with metrics</li>
+<li>Detailed phase timing information</li>
+<li>Risk score component breakdown</li>
+</ul>
+<p><strong>Level 3: Full diagnostic output (<code>-vvv</code>)</strong></p>
 <pre><code class="language-bash">debtmap validate . -vvv
 </code></pre>
-<p>Shows complete analysis details including all debt items and risk calculations.</p>
+<p>Shows complete debug information:</p>
+<ul>
+<li>All debt items with full details</li>
+<li>Complete risk calculations for each function</li>
+<li>All timing information including sub-phases</li>
+<li>File-level and function-level analysis data</li>
+<li>Context provider outputs (if enabled)</li>
+</ul>
 <h3 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h3>
 <p><strong>Issue: Validation fails but output unclear</strong></p>
 <pre><code class="language-bash"># Solution: Increase verbosity
@@ -728,6 +747,13 @@ debtmap validate . -vv
 <pre><code class="language-bash"># Solution: Use --top flag
 debtmap validate . --top 10 -v
 </code></pre>
+<p><strong>Issue: Output is too verbose for CI logs</strong></p>
+<pre><code class="language-bash"># Solution: Use --summary flag for compact tiered output
+debtmap validate . --summary
+# or
+debtmap validate . -s
+</code></pre>
+<p>This provides a condensed view focused on priority tiers rather than individual items.</p>
 <p><strong>Issue: Validation passes locally but fails in CI</strong></p>
 <pre><code class="language-bash"># Possible causes:
 # 1. Different code (stale local branch)
@@ -748,6 +774,11 @@ ls -lh coverage/lcov.info
 <pre><code class="language-bash"># Disable expensive providers
 debtmap validate . --enable-context --disable-context git_history
 </code></pre>
+<p><strong>Issue: Semantic analysis causing errors or unexpected behavior</strong></p>
+<pre><code class="language-bash"># Solution: Disable semantic analysis with fallback mode
+debtmap validate . --semantic-off
+</code></pre>
+<p>This disables advanced semantic features and uses basic syntax analysis only. Useful for debugging or working with unsupported language constructs.</p>
 <h3 id="validation-report-generation"><a class="header" href="#validation-report-generation">Validation Report Generation</a></h3>
 <p>Generate detailed reports for debugging:</p>
 <p><strong>JSON format for programmatic analysis:</strong></p>

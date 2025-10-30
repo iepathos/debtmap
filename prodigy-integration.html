@@ -194,7 +194,7 @@ Anthropic API key for Claude access</li>
 <li><input disabled="" type="checkbox"/>
 Git (for worktree management)</li>
 <li><input disabled="" type="checkbox"/>
-Optional: <code>just</code> command runner, or use direct <code>cargo</code> commands as alternatives</li>
+Optional: <code>just</code> command runner (a command runner like make), or use direct <code>cargo</code> commands as alternatives</li>
 </ul>
 <h2 id="what-is-prodigy"><a class="header" href="#what-is-prodigy">What is Prodigy?</a></h2>
 <blockquote>
@@ -299,7 +299,7 @@ debtmap --version
     commands:
       - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
       - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
-      - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+      - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
     result_file: ".prodigy/debtmap-validation.json"
     threshold: 75
     on_incomplete:
@@ -534,7 +534,7 @@ prodigy clean
 </code></pre>
 <h2 id="claude-slash-commands"><a class="header" href="#claude-slash-commands">Claude Slash Commands</a></h2>
 <blockquote>
-<p><strong>Important</strong>: The slash commands documented below are custom commands that should be created in your <code>.claude/commands/</code> directory. They are not built into Prodigy or Debtmap. You can find example command implementations in the Debtmap repository or create your own based on the parameter descriptions below.</p>
+<p><strong>Important</strong>: The slash commands documented below are custom commands provided in Debtmap’s <code>.claude/commands/</code> directory as examples. They are not built into Prodigy or Debtmap. You can use them as-is from the Debtmap repository or create your own based on these patterns.</p>
 </blockquote>
 <p>Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:</p>
 <h3 id="planning-commands"><a class="header" href="#planning-commands">Planning Commands</a></h3>
@@ -720,7 +720,7 @@ map:
           - shell: "just coverage-lcov"
           - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
           - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after-${item_id}.json --plan .prodigy/plan-${item_id}.md --output .prodigy/comparison-${item_id}.json --format json"
-          - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
+          - shell: "debtmap validate-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json"
         result_file: ".prodigy/debtmap-validation-${item_id}.json"
         threshold: 75
         on_incomplete:

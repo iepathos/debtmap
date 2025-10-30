@@ -194,7 +194,7 @@
 <ul>
 <li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
 <li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
-<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%</li>
+<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
 <li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
 <li><strong>Performance</strong>: Significantly faster than Java/Python-based competitors (written in Rust with parallel processing)</li>
 </ul>
@@ -215,7 +215,7 @@
 <li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)</li>
 <li><strong>Token classification system</strong> - Advanced token categorization with weighted entropy for accurate complexity assessment</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
-<li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types)</li>
+<li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>
 <li><strong>Security vulnerability detection</strong> - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns</li>
 <li><strong>Resource management analysis</strong> - Identifies inefficient allocations, nested loops, and blocking I/O patterns</li>
 <li><strong>Code organization analysis</strong> - Detects god objects, feature envy, primitive obsession, and magic values</li>
@@ -228,7 +228,7 @@
 <li><strong>Coverage-based risk analysis</strong> - Correlates complexity with test coverage to identify truly risky code</li>
 <li><strong>Risk-driven testing recommendations</strong> - Prioritizes testing efforts based on complexity-coverage correlation and dependency impact</li>
 <li><strong>Call graph analysis</strong> - Tracks upstream callers and downstream callees to understand dependency impact</li>
-<li><strong>Tiered prioritization</strong> - Surfaces critical architectural issues above simple testing gaps</li>
+<li><strong>Tiered prioritization</strong> - Multi-stage pipeline (zero coverage, complexity-risk, critical path, dependency impact, effort optimization) surfaces critical architectural issues above simple testing gaps</li>
 <li><strong>Quantified impact</strong> - Shows concrete metrics like “refactoring this will reduce complexity by 60%”</li>
 </ul>
 <h3 id="performance--output"><a class="header" href="#performance--output">Performance &amp; Output</a></h3>
@@ -237,13 +237,13 @@
 <li><strong>Multiple output formats</strong> - JSON (legacy and unified structures), Markdown, and human-readable terminal formats for different tool integration needs</li>
 <li><strong>Configurable thresholds</strong> - Customize complexity and duplication thresholds to match your standards</li>
 <li><strong>Incremental analysis</strong> - Smart caching system for analyzing only changed files</li>
-<li><strong>Intelligent caching</strong> - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), location options (local/shared), and environment-based configuration for fast repeated analysis</li>
+<li><strong>Intelligent caching</strong> - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), location options (local/shared/custom path), and environment-based configuration for fast repeated analysis</li>
 <li><strong>Verbosity controls</strong> - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail</li>
 </ul>
 <h3 id="configuration--customization"><a class="header" href="#configuration--customization">Configuration &amp; Customization</a></h3>
 <ul>
 <li><strong>Flexible suppression</strong> - Inline comment-based suppression for specific code sections</li>
-<li><strong>Configuration file</strong> - <code>.debtmap.toml</code>, <code>.debtmap.yml</code>, or <code>.debtmap.json</code> for project-specific settings</li>
+<li><strong>Configuration file</strong> - <code>.debtmap.toml</code> or <code>debtmap.toml</code> for project-specific settings</li>
 <li><strong>Test-friendly</strong> - Easily exclude test fixtures and example code from debt analysis</li>
 <li><strong>Macro expansion support</strong> - Handles Rust macro expansions with configurable warnings</li>
 </ul>
@@ -269,6 +269,7 @@
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding the metrics and output</li>
 <li><a href="./output-formats.html">Output Formats</a> - JSON, Markdown, and terminal formats</li>
 </ul>
+<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview of your codebase health before diving into detailed analysis.</p>
 
                     </main>
 

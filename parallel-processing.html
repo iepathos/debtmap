@@ -223,12 +223,21 @@ debtmap analyze -j 4
 <li>Use <code>--jobs 1-4</code> in memory-constrained environments like CI/CD</li>
 <li>Use <code>--jobs 1</code> for deterministic analysis order during debugging</li>
 </ul>
-<p><strong>Environment Variable:</strong></p>
-<p>You can also set the default via the <code>RAYON_NUM_THREADS</code> or <code>DEBTMAP_JOBS</code> environment variable:</p>
-<pre><code class="language-bash">export RAYON_NUM_THREADS=4
+<p><strong>Environment Variables:</strong></p>
+<p>You can also set the default via environment variables:</p>
+<p><strong><code>DEBTMAP_JOBS</code></strong> - Set the default thread count:</p>
+<pre><code class="language-bash">export DEBTMAP_JOBS=4
 debtmap analyze  # Uses 4 threads
 </code></pre>
-<p>The CLI flag takes precedence over the environment variable.</p>
+<p><strong><code>DEBTMAP_PARALLEL</code></strong> - Enable/disable parallel processing programmatically:</p>
+<pre><code class="language-bash">export DEBTMAP_PARALLEL=true
+debtmap analyze  # Parallel processing enabled
+
+export DEBTMAP_PARALLEL=1
+debtmap analyze  # Parallel processing enabled (also accepts '1')
+</code></pre>
+<p>The <code>DEBTMAP_PARALLEL</code> variable accepts <code>true</code> or <code>1</code> to enable parallel processing. This is useful for programmatic control in scripts or CI environments.</p>
+<p>The CLI flags (<code>--jobs</code>, <code>--no-parallel</code>) take precedence over environment variables.</p>
 <h3 id="no-parallel"><a class="header" href="#no-parallel">–no-parallel</a></h3>
 <p>Disable parallel call graph construction entirely:</p>
 <pre><code class="language-bash">debtmap analyze --no-parallel

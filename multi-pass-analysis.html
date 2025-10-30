@@ -239,6 +239,9 @@
 <li><strong>Formatting Artifacts</strong> - From code formatting choices (difference between raw and normalized)</li>
 <li><strong>Pattern Complexity</strong> - From recognized code patterns (error handling, validation, etc.)</li>
 </ul>
+<blockquote>
+<p><strong>Note</strong>: Pattern complexity analysis is part of the standard multi-pass analysis. No additional configuration is required to enable pattern detection.</p>
+</blockquote>
 <h2 id="cli-usage"><a class="header" href="#cli-usage">CLI Usage</a></h2>
 <p>Enable multi-pass analysis with the <code>--multi-pass</code> flag:</p>
 <pre><code class="language-bash"># Basic multi-pass analysis
@@ -256,11 +259,14 @@ debtmap analyze . --multi-pass --attribution --json
 <h3 id="available-flags"><a class="header" href="#available-flags">Available Flags</a></h3>
 <div class="table-wrapper"><table><thead><tr><th>Flag</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>--multi-pass</code></td><td>Enable two-pass analysis (raw + normalized)</td></tr>
-<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown</td></tr>
+<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires <code>--multi-pass</code>)</td></tr>
 <tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code></td></tr>
 <tr><td><code>--json</code></td><td>Output results in JSON format</td></tr>
 </tbody></table>
 </div>
+<blockquote>
+<p><strong>Note</strong>: The <code>--attribution</code> flag requires <code>--multi-pass</code> to be enabled, as attribution depends on comparing raw and normalized analyses.</p>
+</blockquote>
 <h2 id="attribution-engine"><a class="header" href="#attribution-engine">Attribution Engine</a></h2>
 <p>The attribution engine breaks down complexity into three main categories, each with detailed tracking and suggestions.</p>
 <h3 id="logical-complexity"><a class="header" href="#logical-complexity">Logical Complexity</a></h3>
@@ -612,6 +618,7 @@ debtmap analyze . --multi-pass --cache-location shared
 <span class="boring">}</span></code></pre></pre>
 <p><strong>Use Parallel Processing</strong></p>
 <pre><code class="language-bash"># Parallel analysis amortizes overhead across cores
+# Note: --jobs is a general debtmap flag controlling parallelism for all analysis
 debtmap analyze . --multi-pass --jobs 8
 </code></pre>
 <p><strong>Target Specific Files</strong></p>
@@ -621,6 +628,7 @@ debtmap analyze src/complex_module.rs --multi-pass --attribution
 <h2 id="comparative-analysis"><a class="header" href="#comparative-analysis">Comparative Analysis</a></h2>
 <p>Multi-pass analysis supports comparing code changes to validate refactoring efforts.</p>
 <h3 id="basic-comparison"><a class="header" href="#basic-comparison">Basic Comparison</a></h3>
+<p>The <code>compare_complexity</code> function is a standalone convenience function that performs complete multi-pass analysis on both code versions and returns the computed differences:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use debtmap::analysis::multi_pass::compare_complexity;
@@ -659,12 +667,10 @@ println!("Cognitive complexity change: {}", comparison.cognitive_change);
 println!("Formatting impact change: {}", comparison.formatting_impact_change);
 <span class="boring">}</span></code></pre></pre>
 <h3 id="comparison-results"><a class="header" href="#comparison-results">Comparison Results</a></h3>
-<p>The <code>ComparativeAnalysis</code> struct includes:</p>
+<p>The <code>ComparativeAnalysis</code> struct contains the computed differences between before and after analyses:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct ComparativeAnalysis {
-    pub before: MultiPassResult,
-    pub after: MultiPassResult,
     pub complexity_change: i32,        // Negative = improvement
     pub cognitive_change: i32,         // Negative = improvement
     pub formatting_impact_change: f32, // Negative = less formatting noise
@@ -672,6 +678,9 @@ println!("Formatting impact change: {}", comparison.formatting_impact_change);
     pub regressions: Vec&lt;String&gt;,
 }
 <span class="boring">}</span></code></pre></pre>
+<blockquote>
+<p><strong>Note</strong>: The <code>compare_complexity</code> function performs both analyses internally and returns only the change metrics. To access the full before/after results, perform separate analyses using <code>MultiPassAnalyzer</code>.</p>
+</blockquote>
 <p><strong>Interpreting Changes:</strong></p>
 <ul>
 <li><strong>Negative complexity change</strong> - Refactoring reduced complexity ✓</li>
@@ -712,7 +721,7 @@ let options = MultiPassOptions {
     enable_recommendations: true,
     track_source_locations: true,
     generate_insights: true,
-    output_format: OutputFormat::Json,
+    output_format: OutputFormat::Json, // Also available: Yaml, Markdown, Html, Text
     performance_tracking: true,
 };
 
@@ -721,11 +730,11 @@ let analyzer = MultiPassAnalyzer::new(options);
 <h3 id="configuration-fields"><a class="header" href="#configuration-fields">Configuration Fields</a></h3>
 <div class="table-wrapper"><table><thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>language</code></td><td><code>Language</code></td><td><code>Rust</code></td><td>Target programming language</td></tr>
-<tr><td><code>detail_level</code></td><td><code>DetailLevel</code></td><td><code>Standard</code></td><td>Output detail: Summary, Standard, Comprehensive, Debug</td></tr>
+<tr><td><code>detail_level</code></td><td><code>DetailLevel</code></td><td><code>Standard</code></td><td>Output detail: Summary, Standard, Comprehensive, Debug (CLI uses lowercase: <code>--detail-level standard</code>)</td></tr>
 <tr><td><code>enable_recommendations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Generate actionable recommendations</td></tr>
 <tr><td><code>track_source_locations</code></td><td><code>bool</code></td><td><code>true</code></td><td>Include file/line/column in attribution</td></tr>
 <tr><td><code>generate_insights</code></td><td><code>bool</code></td><td><code>true</code></td><td>Automatically generate insights</td></tr>
-<tr><td><code>output_format</code></td><td><code>OutputFormat</code></td><td><code>Json</code></td><td>Output format: Json, Markdown, Terminal</td></tr>
+<tr><td><code>output_format</code></td><td><code>OutputFormat</code></td><td><code>Json</code></td><td>Output format: Json, Yaml, Markdown, Html, Text</td></tr>
 <tr><td><code>performance_tracking</code></td><td><code>bool</code></td><td><code>false</code></td><td>Track and report performance metrics</td></tr>
 </tbody></table>
 </div>

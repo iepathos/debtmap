@@ -197,6 +197,9 @@ debtmap analyze . --format markdown
 <li><strong>json</strong>: Structured data for programmatic processing</li>
 <li><strong>markdown</strong>: Reports suitable for documentation and PR comments</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> The codebase also includes an <code>Html</code> format variant in <code>src/core/types.rs</code> and <code>src/analysis/diagnostics/</code>, but this is only available internally for diagnostic reporting and is not exposed as a CLI option. For HTML output, convert markdown reports using tools like pandoc (see <a href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a>).</p>
+</blockquote>
 <h3 id="writing-to-files"><a class="header" href="#writing-to-files">Writing to Files</a></h3>
 <p>By default, output goes to stdout. Use <code>-o</code> or <code>--output</code> to write to a file:</p>
 <pre><code class="language-bash"># Write JSON to file
@@ -308,12 +311,14 @@ debtmap analyze . --plain
 <li>Machine-parseable structure</li>
 </ul>
 <blockquote>
-<p><strong>Note:</strong> Terminal output formatting can be customized via <code>FormattingConfig</code>, which controls color mode. The <code>--plain</code> flag uses this configuration to disable colors. Additionally, you can control formatting through environment variables:</p>
+<p><strong>Note:</strong> Terminal output formatting is controlled internally via <code>FormattingConfig</code> (found in <code>src/formatting</code> and <code>src/io/writers/terminal.rs</code>), which manages color mode settings. The <code>--plain</code> flag and environment variables provide user-facing control over these settings:</p>
 <ul>
+<li><code>--plain</code> flag - Disables colors and fancy formatting</li>
 <li><code>NO_COLOR=1</code> - Disables colors (per <a href="https://no-color.org">no-color.org</a> standard)</li>
 <li><code>CLICOLOR=0</code> - Disables colors</li>
 <li><code>CLICOLOR_FORCE=1</code> - Forces colors even when output is not a terminal</li>
 </ul>
+<p><code>FormattingConfig</code> is not directly exposed to CLI users but can be accessed when using debtmap as a library through <code>TerminalWriter::with_formatting</code>.</p>
 </blockquote>
 <h3 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h3>
 <p>Control detail level with <code>-v</code> flags (can be repeated):</p>
@@ -756,7 +761,7 @@ debtmap analyze . --format json --output-format unified
 </code></pre>
 <p><strong>Key difference:</strong> Legacy uses <code>{File: {...}}</code> wrapper objects, while unified uses a flat structure with <code>"type": "File"</code> field. This makes unified format easier to parse in most programming languages.</p>
 <h3 id="risk-insights-json"><a class="header" href="#risk-insights-json">Risk Insights JSON</a></h3>
-<p>When using <code>--lcov</code>, debtmap also outputs risk analysis in JSON:</p>
+<p>When coverage data is provided via <code>--lcov</code>, risk insights are included as part of the analysis output. The <code>write_risk_insights</code> method (found in <code>src/io/writers/json.rs</code>, <code>terminal.rs</code>, and <code>markdown/core.rs</code>) outputs risk analysis data in the following JSON structure:</p>
 <pre><code class="language-json">{
   "items": [
     {
@@ -892,15 +897,9 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
    - Target coverage: 80%
    - Estimated effort: 2-3 hours
 </code></pre>
-<h3 id="enhanced-markdown-features"><a class="header" href="#enhanced-markdown-features">Enhanced Markdown Features</a></h3>
-<p>The standard markdown output already includes comprehensive analysis sections. The codebase includes additional enhanced markdown capabilities (<code>EnhancedMarkdownWriter</code> trait in <code>src/io/writers/markdown/enhanced.rs</code>) that provide:</p>
-<ul>
-<li><strong>Priority-based debt rankings</strong> - Debt items ranked by unified priority scores</li>
-<li><strong>Dead code detection</strong> - Identification and reporting of unused code</li>
-<li><strong>Call graph insights</strong> - Function dependency and usage analysis</li>
-<li><strong>Testing recommendations</strong> - Targeted suggestions for improving test coverage</li>
-</ul>
-<p>These enhanced features are available through the <code>EnhancedMarkdownWriter</code> trait when using debtmap as a library. The standard <code>--format markdown</code> CLI output uses the base <code>MarkdownWriter</code> which provides comprehensive reports including:</p>
+<h3 id="cli-vs-library-markdown-features"><a class="header" href="#cli-vs-library-markdown-features">CLI vs Library Markdown Features</a></h3>
+<p><strong>CLI Markdown Output (<code>--format markdown</code>):</strong></p>
+<p>When you use <code>debtmap analyze . --format markdown</code>, you get comprehensive reports that include:</p>
 <ul>
 <li>Executive summary with health dashboard</li>
 <li>Complexity analysis with refactoring recommendations</li>
@@ -908,7 +907,34 @@ debtmap analyze . --format markdown -o docs/DEBT_REPORT.md
 <li>Dependency analysis with circular reference detection</li>
 <li>Actionable recommendations</li>
 </ul>
-<p>For additional visualization capabilities, the <code>src/io/writers/enhanced_markdown/</code> module provides building blocks for custom report generation when using debtmap as a library in your own tools.</p>
+<p>This uses the base <code>MarkdownWriter</code> implementation and provides everything needed for documentation and PR comments.</p>
+<p><strong>Enhanced Library Features:</strong></p>
+<p>If you’re using debtmap as a Rust library in your own tools, additional markdown capabilities are available:</p>
+<ul>
+<li><strong><code>EnhancedMarkdownWriter</code> trait</strong> (<code>src/io/writers/markdown/enhanced.rs</code>) - Provides advanced formatting and analysis features</li>
+<li><strong>Enhanced markdown modules</strong> (<code>src/io/writers/enhanced_markdown/</code>) - Building blocks for custom visualizations including:
+<ul>
+<li>Priority-based debt rankings with unified scoring</li>
+<li>Dead code detection and reporting</li>
+<li>Call graph insights and dependency visualization</li>
+<li>Testing recommendations with ROI analysis</li>
+</ul>
+</li>
+</ul>
+<p>To use enhanced features in your Rust code:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use debtmap::io::writers::markdown::enhanced::EnhancedMarkdownWriter;
+use debtmap::io::writers::enhanced_markdown::*;
+
+// Create custom reports with enhanced features
+let mut writer = create_enhanced_writer(output)?;
+writer.write_priority_rankings(&amp;analysis)?;
+writer.write_dead_code_analysis(&amp;call_graph)?;
+<span class="boring">}</span></code></pre></pre>
+<blockquote>
+<p><strong>Note:</strong> Enhanced markdown features are only available through the library API, not via the CLI. The CLI <code>--format markdown</code> output is comprehensive for most use cases.</p>
+</blockquote>
 <h3 id="rendering-to-htmlpdf"><a class="header" href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a></h3>
 <p>Markdown reports can be converted to other formats:</p>
 <pre><code class="language-bash"># Generate markdown
@@ -1299,16 +1325,15 @@ debtmap analyze . --format markdown -o docs/DEBT.md
 <li>Check locale settings (LC_ALL, LANG environment variables)</li>
 </ul>
 <h3 id="exit-codes"><a class="header" href="#exit-codes">Exit Codes</a></h3>
-<blockquote>
-<p><strong>IMPORTANT:</strong> Exit codes 1 and 2 are NOT YET IMPLEMENTED. Current behavior: Always returns <code>0</code> on successful analysis, regardless of threshold violations.</p>
-<p>Planned behavior includes:</p>
+<p>Current behavior (as verified in <code>src/main.rs</code>):</p>
 <ul>
-<li><code>0</code>: Success, all checks passed</li>
-<li><code>1</code>: Analysis completed, but validation thresholds exceeded</li>
-<li><code>2</code>: Error during analysis (invalid path, parsing error, etc.)</li>
+<li><code>0</code>: Successful analysis completed without errors</li>
+<li>Non-zero: Error during analysis (invalid path, parsing error, etc.)</li>
 </ul>
+<blockquote>
+<p><strong>Note:</strong> Threshold-based exit codes (where analysis succeeds but fails quality gates) are not currently implemented. The <code>analyze</code> command returns 0 on successful analysis regardless of debt scores or complexity thresholds.</p>
 </blockquote>
-<p>For now, use the <code>validate</code> command with threshold checks to enforce quality gates:</p>
+<p>To enforce quality gates based on thresholds, use the <code>validate</code> command or parse JSON output:</p>
 <pre><code class="language-bash"># Use validate command for threshold enforcement
 debtmap validate . --config debtmap.toml
 

@@ -211,7 +211,10 @@
 <h2 id="analyzing-rust-projects"><a class="header" href="#analyzing-rust-projects">Analyzing Rust Projects</a></h2>
 <h3 id="basic-rust-analysis"><a class="header" href="#basic-rust-analysis">Basic Rust Analysis</a></h3>
 <p>Start with a simple analysis of your Rust project:</p>
-<pre><code class="language-bash"># Analyze all Rust files in current directory
+<pre><code class="language-bash"># Analyze current directory (path defaults to '.')
+debtmap analyze
+
+# Same as above (explicit current directory)
 debtmap analyze .
 
 # Analyze specific directory
@@ -726,8 +729,35 @@ debtmap analyze . --format json | jq '[.items[] | select(.debt_type == "TestGap"
 }
 </code></pre>
 <h3 id="markdown-report"><a class="header" href="#markdown-report">Markdown Report</a></h3>
-<pre><code class="language-bash">debtmap analyze . --format markdown --output DEBT_REPORT.md
+<pre><code class="language-bash"># Standard markdown report
+debtmap analyze . --format markdown --output DEBT_REPORT.md
+
+# Summary level for executives (minimal detail)
+debtmap analyze . --format markdown --detail-level summary --output SUMMARY.md
+
+# Standard level for team review (default)
+debtmap analyze . --format markdown --detail-level standard --output DEBT.md
+
+# Comprehensive level for deep analysis
+debtmap analyze . --format markdown --detail-level comprehensive --output DETAILED.md
+
+# Debug level for troubleshooting
+debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
 </code></pre>
+<p><strong>Detail levels:</strong></p>
+<ul>
+<li><strong>summary</strong>: Executive summary with key metrics and top issues only</li>
+<li><strong>standard</strong>: Balanced detail suitable for team reviews (default)</li>
+<li><strong>comprehensive</strong>: Full details including all debt items and analysis</li>
+<li><strong>debug</strong>: Maximum detail including AST information and parser internals</li>
+</ul>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li>Summary: Management reports, PR comments</li>
+<li>Standard: Regular team reviews</li>
+<li>Comprehensive: Deep dives, refactoring planning</li>
+<li>Debug: Troubleshooting debtmap behavior</li>
+</ul>
 <p>Great for documentation or PR comments.</p>
 <h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
 <pre><code class="language-bash"># JSON output (default is legacy format)
@@ -744,23 +774,117 @@ debtmap analyze . --format terminal
 </code></pre>
 <p><strong>Unified vs Legacy JSON Formats:</strong></p>
 <p>The unified format provides a consistent structure with a <code>type</code> field to distinguish between different item types, replacing the File/Function wrapper objects used in legacy format.</p>
+<p><strong>Legacy format (default):</strong></p>
+<pre><code class="language-json">{
+  "items": [
+    {"File": {"path": "src/main.rs", "score": 45.2}},
+    {"Function": {"name": "process", "complexity": 12}}
+  ]
+}
+</code></pre>
+<p><strong>Unified format:</strong></p>
+<pre><code class="language-json">{
+  "items": [
+    {"type": "file", "path": "src/main.rs", "score": 45.2},
+    {"type": "function", "name": "process", "complexity": 12}
+  ]
+}
+</code></pre>
+<p><strong>Key differences:</strong></p>
 <ul>
-<li><strong>Unified format</strong>: Cleaner schema, consistent structure across all items, easier to parse programmatically</li>
-<li><strong>Legacy format</strong>: Default for backward compatibility with existing tooling and scripts</li>
+<li><strong>Unified format</strong>: Consistent structure with <code>type</code> discriminator field, easier to parse programmatically, better for new integrations</li>
+<li><strong>Legacy format</strong>: Uses wrapper objects for backward compatibility with existing tooling and scripts</li>
 </ul>
 <p>Use unified format for new integrations and tools. Use legacy format when working with existing debtmap analysis pipelines.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
+<h3 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h3>
+<p>Detect design patterns in your codebase to understand architectural choices and identify potential overuse of certain patterns:</p>
+<pre><code class="language-bash"># Detect specific design patterns
+debtmap analyze . --patterns observer,singleton,factory
+
+# Adjust pattern confidence threshold (0.0-1.0, default: 0.7)
+debtmap analyze . --pattern-threshold 0.8
+
+# Show uncertain pattern matches with warnings
+debtmap analyze . --show-pattern-warnings
+
+# Disable pattern detection entirely
+debtmap analyze . --no-pattern-detection
+</code></pre>
+<p><strong>Available patterns:</strong></p>
+<ul>
+<li><code>observer</code> - Event listener registrations, callback patterns</li>
+<li><code>singleton</code> - Static instance management</li>
+<li><code>factory</code> - Object creation methods</li>
+<li><code>strategy</code> - Algorithm selection via traits/interfaces</li>
+<li><code>callback</code> - Function passing and invocation</li>
+<li><code>template_method</code> - Abstract methods with concrete implementations</li>
+</ul>
+<p><strong>Use cases:</strong></p>
+<ul>
+<li>Identify architectural patterns in unfamiliar codebases</li>
+<li>Detect potential overuse of certain patterns (e.g., too many singletons)</li>
+<li>Understand code organization and design decisions</li>
+</ul>
+<h3 id="dead-code-and-public-api-analysis"><a class="header" href="#dead-code-and-public-api-analysis">Dead Code and Public API Analysis</a></h3>
+<p>Control how Debtmap detects public APIs to prevent false positives when analyzing libraries vs CLI tools:</p>
+<pre><code class="language-bash"># Analyze with public API awareness (default for libraries)
+debtmap analyze . --context
+
+# Disable public API heuristics (useful for CLI tools)
+debtmap analyze . --no-public-api-detection
+
+# Adjust public API confidence threshold (default: 0.7)
+debtmap analyze . --public-api-threshold 0.8
+</code></pre>
+<p><strong>When to use:</strong></p>
+<ul>
+<li><strong>Libraries</strong>: Keep default public API detection to avoid flagging exported functions as unused</li>
+<li><strong>CLI tools</strong>: Use <code>--no-public-api-detection</code> since there’s no public API</li>
+<li><strong>Mixed projects</strong>: Adjust threshold based on false positive rate</li>
+</ul>
+<p><strong>What it detects:</strong></p>
+<ul>
+<li>Functions exported in <code>lib.rs</code> or <code>api.rs</code></li>
+<li>Public trait implementations</li>
+<li>Functions matching API naming patterns</li>
+<li>Prevents false positives for “unused” library functions</li>
+</ul>
 <h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
 <p>Enable advanced context providers for more accurate prioritization:</p>
-<pre><code class="language-bash"># Enable all context providers
+<pre><code class="language-bash"># Enable all context providers for comprehensive analysis
 debtmap analyze . \
   --context \
   --context-providers critical_path,dependency,git_history
+</code></pre>
+<p><strong>Context Providers:</strong></p>
+<p><strong>critical_path</strong> - Identifies functions on critical execution paths</p>
+<ul>
+<li>Analyzes call graph to find frequently-called functions</li>
+<li>Prioritizes functions that affect many code paths</li>
+<li>Use for: Understanding impact of potential failures</li>
+</ul>
+<p><strong>dependency</strong> - Analyzes dependency impact and cascade effects</p>
+<ul>
+<li>Tracks caller/callee relationships</li>
+<li>Calculates cascade impact of changes</li>
+<li>Use for: Understanding change propagation and refactoring risk</li>
+</ul>
+<p><strong>git_history</strong> - Tracks change frequency and churn</p>
+<ul>
+<li>Analyzes git blame and commit history</li>
+<li>Identifies frequently-changed functions</li>
+<li>Use for: Finding volatile code that needs stabilization</li>
+</ul>
+<p><strong>Example workflows:</strong></p>
+<pre><code class="language-bash"># Find volatile high-complexity code
+debtmap analyze . --context --context-providers git_history
 
-# Disable specific providers
-debtmap analyze . \
-  --context \
-  --disable-context git_history
+# Understand refactoring impact
+debtmap analyze . --context --context-providers dependency
+
+# Disable slow provider for faster analysis
+debtmap analyze . --context --disable-context git_history
 </code></pre>
 <h3 id="multi-pass-analysis-1"><a class="header" href="#multi-pass-analysis-1">Multi-Pass Analysis</a></h3>
 <pre><code class="language-bash"># Multi-pass with attribution tracking
@@ -777,7 +901,28 @@ debtmap analyze . --clear-cache
 
 # Force cache rebuild
 debtmap analyze . --force-cache-rebuild
+
+# Use per-project cache (default)
+debtmap analyze . --cache-location local
+
+# Use shared system-wide cache for faster multi-project analysis
+debtmap analyze . --cache-location shared
+
+# Use custom cache directory
+debtmap analyze . --cache-location /custom/path/to/cache
 </code></pre>
+<p><strong>Cache strategies:</strong></p>
+<ul>
+<li><strong>local</strong>: Per-project cache in <code>.debtmap-cache/</code> (default)</li>
+<li><strong>shared</strong>: Shared cache directory for all projects (faster when analyzing multiple projects)</li>
+<li><strong>custom path</strong>: Specify exact cache location</li>
+</ul>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Shared cache reduces analysis time when working on multiple projects</li>
+<li>Custom path useful for CI systems with specific cache directories</li>
+<li>Local cache isolates project-specific analysis results</li>
+</ul>
 <h3 id="aggregation-methods"><a class="header" href="#aggregation-methods">Aggregation Methods</a></h3>
 <pre><code class="language-bash"># Use logarithmic sum for aggregation
 debtmap analyze . --aggregation-method logarithmic_sum
@@ -795,6 +940,40 @@ debtmap analyze . --filter Architecture,Testing
 # Show only high-priority items
 debtmap analyze . --min-priority high --top 10
 </code></pre>
+<h3 id="call-graph-debugging"><a class="header" href="#call-graph-debugging">Call Graph Debugging</a></h3>
+<p>Debug and validate call graph construction for accurate dependency analysis:</p>
+<pre><code class="language-bash"># Enable call graph debugging output
+debtmap analyze . --debug-call-graph
+
+# Trace specific function resolution
+debtmap analyze . --trace-function my_function --trace-function another_fn
+
+# Validate call graph structure (detect orphans and cycles)
+debtmap analyze . --validate-call-graph
+
+# Show detailed caller/callee relationships
+debtmap analyze . --show-dependencies
+</code></pre>
+<p><strong>Use cases:</strong></p>
+<p><strong>Troubleshooting resolution failures:</strong></p>
+<pre><code class="language-bash"># When a function isn't being analyzed correctly
+debtmap analyze . --debug-call-graph --trace-function problematic_function
+</code></pre>
+<p><strong>Understanding function relationships:</strong></p>
+<pre><code class="language-bash"># See who calls what
+debtmap analyze . --show-dependencies --top 10
+</code></pre>
+<p><strong>Validating call graph integrity:</strong></p>
+<pre><code class="language-bash"># Detect cycles and orphaned nodes
+debtmap analyze . --validate-call-graph
+</code></pre>
+<p>Output includes:</p>
+<ul>
+<li>Resolution statistics (success/failure rates)</li>
+<li>DFS cycle detection results</li>
+<li>Orphan node detection</li>
+<li>Cross-module resolution details</li>
+</ul>
 <h3 id="verbosity-levels"><a class="header" href="#verbosity-levels">Verbosity Levels</a></h3>
 <p>Control the level of diagnostic output for debugging and understanding analysis decisions:</p>
 <pre><code class="language-bash"># Level 1: Show main score factors
@@ -818,6 +997,73 @@ debtmap analyze . --verbose-macro-warnings --show-macro-stats
 <li><strong>-vv</strong>: Detailed calculations, coverage lookups, and metric computations</li>
 <li><strong>-vvv</strong>: Full debug information including AST details and parser internals</li>
 </ul>
+<h3 id="understanding-metrics"><a class="header" href="#understanding-metrics">Understanding Metrics</a></h3>
+<p>Learn how Debtmap calculates complexity metrics and scores:</p>
+<pre><code class="language-bash"># Show metric definitions and formulas
+debtmap analyze . --explain-metrics
+</code></pre>
+<p><strong>What it explains:</strong></p>
+<p><strong>Measured metrics</strong> (counted from AST):</p>
+<ul>
+<li><code>cyclomatic_complexity</code> - Decision points (if, match, while, for, etc.)</li>
+<li><code>cognitive_complexity</code> - Weighted readability measure</li>
+<li><code>nesting_depth</code> - Maximum nested control structure levels</li>
+<li><code>loc</code> - Lines of code in function</li>
+<li><code>parameter_count</code> - Number of function parameters</li>
+</ul>
+<p><strong>Estimated metrics</strong> (formula-based approximations):</p>
+<ul>
+<li><code>est_branches</code> - Estimated execution paths
+<ul>
+<li>Formula: <code>max(nesting_depth, 1) × cyclomatic_complexity ÷ 3</code></li>
+<li>Purpose: Estimate test cases needed for branch coverage</li>
+<li>Note: This is an ESTIMATE, not a count from the AST</li>
+</ul>
+</li>
+</ul>
+<p><strong>Scoring formulas:</strong></p>
+<ul>
+<li>Complexity factor calculation</li>
+<li>Coverage factor weight</li>
+<li>Dependency factor impact</li>
+<li>Role multiplier application</li>
+<li>Final score aggregation</li>
+</ul>
+<p><strong>Use –explain-metrics when:</strong></p>
+<ul>
+<li>First learning debtmap</li>
+<li>Questioning why something is flagged</li>
+<li>Understanding score differences</li>
+<li>Teaching team members about technical debt metrics</li>
+</ul>
+<h3 id="ast-functional-analysis"><a class="header" href="#ast-functional-analysis">AST Functional Analysis</a></h3>
+<p>Enable AST-based functional composition analysis to detect functional programming patterns:</p>
+<pre><code class="language-bash"># Enable AST-based functional composition analysis
+debtmap analyze . --ast-functional-analysis
+
+# Combine with verbose mode to see purity analysis
+debtmap analyze . --ast-functional-analysis -v
+</code></pre>
+<p><strong>What it detects:</strong></p>
+<ul>
+<li>Pure functions (no side effects, immutable)</li>
+<li>Impure functions (I/O, mutations, side effects)</li>
+<li>Function composition patterns</li>
+<li>Immutability patterns</li>
+</ul>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Distinguishes functional patterns from god objects (see purity weighting in God Object Detection section)</li>
+<li>Identifies opportunities for better testability</li>
+<li>Highlights side effect boundaries</li>
+<li>Supports functional programming code reviews</li>
+</ul>
+<p><strong>Example output with -v:</strong></p>
+<pre><code>PURITY DISTRIBUTION:
+  Pure: 70 functions (65%) → complexity weight: 6.3
+  Impure: 37 functions (35%) → complexity weight: 14.0
+  Total weighted complexity: 20.3
+</code></pre>
 <h3 id="parallel-processing-control"><a class="header" href="#parallel-processing-control">Parallel Processing Control</a></h3>
 <p>Control thread count for CPU-bound systems or to limit resource usage in CI environments. By default, Debtmap uses all available cores for optimal performance.</p>
 <pre><code class="language-bash"># Use 8 parallel jobs
@@ -873,6 +1119,11 @@ dependency = 0.20    # Dependency criticality
 <pre><code class="language-toml">[god_object]
 enabled = true
 
+# Purity-based scoring reduces false positives for functional code
+# Pure functions (no side effects) get lower weight in god object scoring
+purity_weight_pure = 0.3    # Pure function complexity weight (default: 0.3)
+purity_weight_impure = 1.0  # Impure function complexity weight (default: 1.0)
+
 # Rust-specific thresholds
 [god_object.rust]
 max_methods = 25
@@ -895,6 +1146,18 @@ max_fields = 12
 max_lines = 300
 max_complexity = 40
 </code></pre>
+<p><strong>Why purity weighting matters:</strong>
+See the Purity-Weighted God Object Scoring section for detailed explanation. In short:</p>
+<ul>
+<li>Modules with many pure helper functions avoid false god object flags</li>
+<li>Focus shifts to modules with excessive stateful/impure code</li>
+<li>Functional programming patterns are properly recognized</li>
+</ul>
+<p><strong>Example:</strong></p>
+<ul>
+<li>Module with 100 pure functions → Normal (functional design) ✅</li>
+<li>Module with 100 impure functions → God object detected ✅</li>
+</ul>
 <h3 id="external-api-configuration"><a class="header" href="#external-api-configuration">External API Configuration</a></h3>
 <p>For libraries (not CLI tools):</p>
 <pre><code class="language-toml">[external_api]

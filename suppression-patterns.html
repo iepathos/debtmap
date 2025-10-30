@@ -238,6 +238,21 @@ def mock_api_responses():
 <p><strong>Important</strong>: Every <code>ignore-start</code> must have a matching <code>ignore-end</code>. Debtmap tracks unclosed blocks and can warn you about them.</p>
 <h2 id="type-specific-suppression"><a class="header" href="#type-specific-suppression">Type-Specific Suppression</a></h2>
 <p>You can suppress specific types of debt using bracket notation instead of suppressing everything:</p>
+<h3 id="quick-reference-debt-type-suppression"><a class="header" href="#quick-reference-debt-type-suppression">Quick Reference: Debt Type Suppression</a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Debt Type</th><th>Bracket Name(s)</th><th>Example</th><th>Notes</th></tr></thead><tbody>
+<tr><td>TODO comments</td><td><code>[todo]</code></td><td><code>// debtmap:ignore[todo]</code></td><td>Also suppresses TestTodo</td></tr>
+<tr><td>FIXME comments</td><td><code>[fixme]</code></td><td><code>// debtmap:ignore[fixme]</code></td><td></td></tr>
+<tr><td>Code smells</td><td><code>[smell]</code> or <code>[codesmell]</code></td><td><code>// debtmap:ignore[smell]</code></td><td></td></tr>
+<tr><td>High complexity</td><td><code>[complexity]</code></td><td><code>// debtmap:ignore[complexity]</code></td><td>Also suppresses TestComplexity</td></tr>
+<tr><td>Code duplication</td><td><code>[duplication]</code> or <code>[duplicate]</code></td><td><code>// debtmap:ignore[duplication]</code></td><td>Also suppresses TestDuplication</td></tr>
+<tr><td>Dependency issues</td><td><code>[dependency]</code></td><td><code>// debtmap:ignore[dependency]</code></td><td></td></tr>
+<tr><td>Error swallowing</td><td>❌ Not supported</td><td><code>// debtmap:ignore</code></td><td>Use general suppression only</td></tr>
+<tr><td>Resource management</td><td>❌ Not supported</td><td><code>// debtmap:ignore</code></td><td>Use general suppression only</td></tr>
+<tr><td>Code organization</td><td>❌ Not supported</td><td><code>// debtmap:ignore</code></td><td>Use general suppression only</td></tr>
+<tr><td>Test quality</td><td>❌ Not supported</td><td><code>// debtmap:ignore</code></td><td>Use general suppression only</td></tr>
+<tr><td>All types</td><td><code>[*]</code></td><td><code>// debtmap:ignore[*]</code></td><td>Wildcard matches everything</td></tr>
+</tbody></table>
+</div>
 <h3 id="suppress-specific-types"><a class="header" href="#suppress-specific-types">Suppress Specific Types</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -262,22 +277,56 @@ def mock_api_responses():
 <li><code>dependency</code> - Dependency issues</li>
 <li><code>*</code> - All types (wildcard)</li>
 </ul>
-<p><strong>Auto-Detected Types</strong> (can be suppressed but not from inline comments):</p>
-<p>These types are detected by code analysis rather than comment scanning. To suppress them, use inline suppression markers (<code>debtmap:ignore</code>) on the relevant lines:</p>
+<p><strong>Auto-Detected Types</strong> (cannot be suppressed by name):</p>
+<p>The following debt types are detected by code analysis rather than comment scanning. These types <strong>cannot</strong> be suppressed using bracket notation like <code>[error_swallowing]</code>. To suppress them, use the general <code>debtmap:ignore</code> marker without brackets:</p>
 <ul>
 <li><code>error_swallowing</code> - Error handling issues (empty catch blocks, ignored errors)</li>
 <li><code>resource_management</code> - Resource cleanup issues (file handles, connections)</li>
 <li><code>code_organization</code> - Structural issues (god objects, large classes)</li>
-<li><code>test_quality</code> - Test-specific quality issues</li>
 </ul>
-<blockquote>
-<p><strong>Note:</strong> Additional type names like <code>hack</code>, <code>god_object</code>, and <code>testing</code> may be supported in future versions. Use the types listed above for reliable suppression.</p>
-</blockquote>
-<h3 id="wildcard-suppression"><a class="header" href="#wildcard-suppression">Wildcard Suppression</a></h3>
-<p>Use <code>[*]</code> to explicitly suppress all types (equivalent to no bracket notation):</p>
+<p><strong>Example:</strong></p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// debtmap:ignore[*]
+</span>// ✅ Correct: General suppression without brackets
+// debtmap:ignore -- Intentional empty catch for cleanup
+match result {
+    Err(_) =&gt; {} // Empty catch block
+    Ok(v) =&gt; process(v)
+}
+
+// ❌ Wrong: Bracket notation not supported for auto-detected types
+// debtmap:ignore[error_swallowing]
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Test-Specific Debt Types:</strong></p>
+<p>Test-specific variants like <code>TestComplexity</code>, <code>TestTodo</code>, <code>TestDuplication</code>, and <code>TestQuality</code> are suppressed through their base types:</p>
+<ul>
+<li><code>TestComplexity</code> → suppressed with <code>[complexity]</code></li>
+<li><code>TestTodo</code> → suppressed with <code>[todo]</code></li>
+<li><code>TestDuplication</code> → suppressed with <code>[duplication]</code></li>
+<li><code>TestQuality</code> → suppressed with general <code>debtmap:ignore</code> (no bracket notation)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    // Suppresses both Complexity and TestComplexity
+    // debtmap:ignore[complexity] -- Complex test setup acceptable
+    fn setup_test_environment() {
+        // Complex test initialization
+    }
+
+    // debtmap:ignore[todo] -- Suppresses both Todo and TestTodo
+    // TODO: Add more test cases
+    fn test_feature() { }
+}
+
+## Wildcard Suppression
+
+Use `[*]` to explicitly suppress all types (equivalent to no bracket notation):
+
+```rust
+// debtmap:ignore[*]
 // Suppresses all debt types
 <span class="boring">}</span></code></pre></pre>
 <h3 id="type-specific-blocks"><a class="header" href="#type-specific-blocks">Type-Specific Blocks</a></h3>
@@ -408,7 +457,20 @@ debtmap analyze src/test_helper.rs
 <li><strong>Suppressions by type</strong>: How many of each debt type are suppressed</li>
 <li><strong>Unclosed blocks</strong>: Detection of <code>ignore-start</code> without matching <code>ignore-end</code></li>
 </ul>
-<p>These statistics are tracked in real-time as files are analyzed. Future CLI enhancements may expose these statistics through a dedicated command to help you audit suppression usage across your codebase.</p>
+<p><strong>Current Status</strong>: These statistics are tracked internally but not yet exposed through the CLI. Future releases may add a dedicated command to view suppression metrics.</p>
+<p><strong>Auditing Suppressions Now</strong>: You can audit your suppressions using standard tools:</p>
+<pre><code class="language-bash"># Find all suppressions in Rust code
+rg "debtmap:ignore" --type rust
+
+# Count suppressions by type
+rg "debtmap:ignore\[" --type rust | grep -o "\[.*\]" | sort | uniq -c
+
+# Find unclosed blocks
+rg "debtmap:ignore-start" --type rust -A 100 | grep -v "debtmap:ignore-end"
+
+# List files with suppressions
+rg "debtmap:ignore" --files-with-matches
+</code></pre>
 <h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
 <h3 id="use-suppressions-sparingly"><a class="header" href="#use-suppressions-sparingly">Use Suppressions Sparingly</a></h3>
 <p>Suppressions hide information, so use them intentionally:</p>

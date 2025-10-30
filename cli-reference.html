@@ -371,6 +371,7 @@ debtmap validate-improvement \
 <li><code>--top &lt;N&gt;</code> / <code>--head &lt;N&gt;</code> - Show only top N priority items</li>
 <li><code>--tail &lt;N&gt;</code> - Show only bottom N priority items (lowest priority)</li>
 <li><code>-s, --summary</code> - Use summary format with tiered priority display (compact output)</li>
+<li><code>--compact</code> - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv)</li>
 <li><code>--min-priority &lt;PRIORITY&gt;</code> - Minimum priority to display: low, medium, high, critical</li>
 <li><code>--filter &lt;CATEGORIES&gt;</code> - Filter by debt categories (comma-separated)</li>
 <li><code>--aggregate-only</code> - Show only aggregated file-level scores</li>
@@ -579,15 +580,16 @@ debtmap init --force
 </code></pre>
 <h3 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h3>
 <ul>
-<li><code>DEBTMAP_CACHE_DIR</code> - Override default cache directory location
+<li><code>DEBTMAP_CACHE_DIR</code> - Cache location (same as <code>--cache-location</code> flag)
 <ul>
-<li>Can also be set via <code>--cache-location</code> flag</li>
+<li>Example: <code>export DEBTMAP_CACHE_DIR=/shared/team/cache</code></li>
 <li>Affects where analysis results are cached for faster subsequent runs</li>
 </ul>
 </li>
-<li><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (0 = use all cores)
+<li><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)
 <ul>
-<li>Can also be set via <code>--jobs</code> / <code>-j</code> flag</li>
+<li>Example: <code>export DEBTMAP_JOBS=8  # Same as --jobs 8</code></li>
+<li>Use <code>0</code> to utilize all available CPU cores</li>
 <li>Controls thread pool size for parallel call graph construction</li>
 </ul>
 </li>

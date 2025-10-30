@@ -435,6 +435,7 @@ concrete value. It changes often, breaking implementations.
 <li><strong>Match duplicates</strong> - Find chunks with identical hashes</li>
 <li><strong>Merge adjacent</strong> - Consolidate consecutive duplicate blocks</li>
 </ol>
+<p><strong>Note:</strong> The minimum chunk size is configurable via the <code>--threshold-duplication</code> flag (default: 50 lines).</p>
 <p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-44</code> (detect_duplication)</p>
 <h3 id="algorithm-details"><a class="header" href="#algorithm-details">Algorithm Details</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -475,7 +476,7 @@ threshold_duplication = 50  # Default value
 # Larger values only catch major duplications
 # threshold_duplication = 100  # Less noise
 </code></pre>
-<p><strong>Configuration reference:</strong> <code>features.json:21</code> (threshold_duplication)</p>
+<p><strong>Configuration reference:</strong> <code>src/cli.rs:69</code> (threshold_duplication flag definition)</p>
 <p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-10</code></p>
 <h3 id="current-limitations"><a class="header" href="#current-limitations">Current Limitations</a></h3>
 <ul>
@@ -526,17 +527,15 @@ threshold_duplication = 50  # Default value
 </ol>
 <h2 id="examples-and-use-cases"><a class="header" href="#examples-and-use-cases">Examples and Use Cases</a></h2>
 <h3 id="running-architectural-analysis"><a class="header" href="#running-architectural-analysis">Running Architectural Analysis</a></h3>
-<pre><code class="language-bash"># Full analysis with all architectural checks
-debtmap analyze --include-architecture
-
-# Focus on circular dependencies
-debtmap analyze --check circular-deps
-
-# Coupling analysis with custom threshold
-debtmap analyze --coupling-threshold 5
+<pre><code class="language-bash"># Architectural analysis runs automatically with standard analysis
+debtmap analyze .
 
 # Duplication detection with custom chunk size
-debtmap analyze --duplication-min-lines 30
+debtmap analyze . --threshold-duplication 30
+
+# Note: Circular dependencies, coupling metrics, and SDP violations
+# are analyzed automatically. There are no separate flags to enable
+# or disable specific architectural checks.
 </code></pre>
 <h3 id="example-circular-dependency"><a class="header" href="#example-circular-dependency">Example: Circular Dependency</a></h3>
 <p><strong>Before:</strong></p>
@@ -665,7 +664,7 @@ Is there significant duplication?
 <li><strong>Duplication</strong> - Duplicated code blocks found</li>
 <li><strong>ArchitecturalViolation</strong> - SDP violations, zone issues</li>
 </ul>
-<p><strong>Reference:</strong> <code>features.json:240-253</code> (core_patterns section)</p>
+<p><strong>Reference:</strong> See <code>src/core/mod.rs</code> for debt type definitions</p>
 <h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
 <p>Architectural issues are assigned priority tiers:</p>
 <ul>
@@ -674,7 +673,7 @@ Is there significant duplication?
 <li><strong>Tier 3 (Medium)</strong> - High coupling, large duplications</li>
 <li><strong>Tier 4 (Low)</strong> - Small duplications, minor coupling issues</li>
 </ul>
-<p><strong>Reference:</strong> <code>features.json:522-560</code> (tiered prioritization)</p>
+<p><strong>Reference:</strong> See <a href="tiered-prioritization.html">Tiered Prioritization</a> for complete priority assignment logic</p>
 <h2 id="cohesion-analysis"><a class="header" href="#cohesion-analysis">Cohesion Analysis</a></h2>
 <p><strong>Note:</strong> Module cohesion analysis is currently a simplified placeholder implementation.</p>
 <p><strong>Current status:</strong> <code>src/debt/coupling.rs:82-95</code> (analyze_module_cohesion)</p>
@@ -687,29 +686,36 @@ Is there significant duplication?
 <li>Communicational cohesion (functions operating on same data structures)</li>
 </ul>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
-<p>Configure architectural analysis thresholds in <code>.debtmap.toml</code>:</p>
-<pre><code class="language-toml">[architectural]
-# Coupling threshold (modules with more dependencies flagged)
-coupling_threshold = 5
-
-# Minimum lines for duplication detection
-duplication_min_lines = 50
-
-# Instability threshold for SDP violations
-instability_threshold = 0.8
-
-# Minimum afferent coupling for SDP violations
-sdp_afferent_threshold = 2
-
-# Zone of pain thresholds
-zone_pain_abstractness = 0.2
-zone_pain_instability = 0.2
-zone_pain_afferent = 3
-
-# Zone of uselessness thresholds
-zone_useless_abstractness = 0.8
-zone_useless_instability = 0.8
+<h3 id="configurable-parameters"><a class="header" href="#configurable-parameters">Configurable Parameters</a></h3>
+<p>Configure duplication detection in <code>.debtmap.toml</code> or via CLI:</p>
+<pre><code class="language-toml"># Minimum lines for duplication detection
+threshold_duplication = 50  # Default value
 </code></pre>
+<p>Or via command line:</p>
+<pre><code class="language-bash">debtmap analyze . --threshold-duplication 50
+</code></pre>
+<p><strong>Configuration reference:</strong> <code>src/cli.rs:69</code> (threshold_duplication flag definition)</p>
+<h3 id="hardcoded-thresholds"><a class="header" href="#hardcoded-thresholds">Hardcoded Thresholds</a></h3>
+<p><strong>Note:</strong> Most architectural thresholds are currently hardcoded in the implementation and cannot be configured:</p>
+<ul>
+<li><strong>Coupling threshold:</strong> 5 (modules with &gt;5 dependencies are flagged)</li>
+<li><strong>Instability threshold:</strong> 0.8 (for SDP violations)</li>
+<li><strong>SDP afferent threshold:</strong> 2 (minimum dependents for SDP violations)</li>
+<li><strong>Zone of pain thresholds:</strong>
+<ul>
+<li>Abstractness &lt; 0.2</li>
+<li>Instability &lt; 0.2</li>
+<li>Afferent coupling &gt; 3</li>
+</ul>
+</li>
+<li><strong>Zone of uselessness thresholds:</strong>
+<ul>
+<li>Abstractness &gt; 0.8</li>
+<li>Instability &gt; 0.8</li>
+</ul>
+</li>
+</ul>
+<p><strong>Source:</strong> <code>src/debt/coupling.rs:70-76</code> (hardcoded threshold definitions)</p>
 <p>See <a href="configuration.html">Configuration</a> for complete options.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="no-circular-dependencies-detected-but-build-fails"><a class="header" href="#no-circular-dependencies-detected-but-build-fails">“No circular dependencies detected but build fails”</a></h3>

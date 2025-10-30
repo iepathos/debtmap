@@ -180,12 +180,33 @@
                     <main>
                         <h1 id="compare-analysis"><a class="header" href="#compare-analysis">Compare Analysis</a></h1>
 <p>The <code>compare</code> command enables you to track technical debt changes over time by comparing two analysis results. This is essential for validating refactoring efforts, detecting regressions in pull requests, and monitoring project health trends.</p>
+<h2 id="implementation-status"><a class="header" href="#implementation-status">Implementation Status</a></h2>
+<p><strong>Current Implementation (Available Now)</strong>:</p>
+<ul>
+<li>✅ Basic validation comparing before/after analyses</li>
+<li>✅ Resolved items tracking (debt eliminated)</li>
+<li>✅ Improved items detection (score reduction ≥ 30%)</li>
+<li>✅ New critical items detection (regressions)</li>
+<li>✅ Unchanged critical items tracking</li>
+<li>✅ Project health summaries</li>
+<li>✅ JSON output format</li>
+<li>✅ CI/CD integration support</li>
+</ul>
+<p><strong>Planned Features (Coming Soon)</strong>:</p>
+<ul>
+<li>🚧 Target location tracking with fuzzy matching</li>
+<li>🚧 Detailed improvement percentage calculations (per-item)</li>
+<li>🚧 Markdown and terminal output formats</li>
+<li>🚧 Implementation plan parsing for target extraction</li>
+<li>🚧 Match strategies (Exact, FuzzyFunction, FuzzyFile)</li>
+</ul>
+<p><strong>Note</strong>: This chapter documents both current and planned features. Current implementation focuses on validation workflows (resolved, improved, new critical items). Full comparison features including target tracking are under development.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>The compare command analyzes differences between “before” and “after” debtmap analyses, providing:</p>
 <ul>
-<li><strong>Target location tracking</strong> - Monitor specific functions or files you’re refactoring</li>
+<li><strong>Validation tracking</strong> - Verify debt items are resolved or improved</li>
 <li><strong>Project health metrics</strong> - Track overall debt trends across your codebase</li>
-<li><strong>Regression detection</strong> - Identify new critical debt items introduced</li>
+<li><strong>Regression detection</strong> - Identify new critical debt items introduced (score ≥ 8.0)</li>
 <li><strong>Improvement tracking</strong> - Measure and celebrate debt reduction</li>
 <li><strong>CI/CD integration</strong> - Automate quality gates in your pipeline</li>
 </ul>
@@ -194,32 +215,36 @@
 <pre><code class="language-bash">debtmap compare \
   --before path/to/before.json \
   --after path/to/after.json \
-  --plan IMPLEMENTATION_PLAN.md \
-  --format json \
-  --output comparison.json
+  --output validation.json
 </code></pre>
 <h3 id="command-line-options"><a class="header" href="#command-line-options">Command-Line Options</a></h3>
 <div class="table-wrapper"><table><thead><tr><th>Option</th><th>Required</th><th>Description</th></tr></thead><tbody>
 <tr><td><code>--before FILE</code></td><td>Yes</td><td>Path to “before” analysis JSON</td></tr>
 <tr><td><code>--after FILE</code></td><td>Yes</td><td>Path to “after” analysis JSON</td></tr>
-<tr><td><code>--plan FILE</code></td><td>No</td><td>Implementation plan to extract target location</td></tr>
-<tr><td><code>--target-location LOCATION</code></td><td>No</td><td>Manual target location (alternative to <code>--plan</code>)</td></tr>
-<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code> or <code>markdown</code> (default: <code>json</code>)</td></tr>
 <tr><td><code>--output FILE</code></td><td>No</td><td>Output file path (default: stdout)</td></tr>
 </tbody></table>
 </div>
-<p><strong>Note</strong>: <code>--plan</code> and <code>--target-location</code> are mutually exclusive. Use one or neither, but not both.</p>
+<p><strong>Currently Available</strong>: Basic comparison with JSON output showing resolved, improved, and new critical items.</p>
+<p><strong>Planned Options</strong> (not yet implemented):</p>
+<ul>
+<li><code>--plan FILE</code> - Implementation plan to extract target location</li>
+<li><code>--target-location LOCATION</code> - Manual target location</li>
+<li><code>--format FORMAT</code> - Output format (markdown, terminal)</li>
+</ul>
 <h2 id="target-location-tracking"><a class="header" href="#target-location-tracking">Target Location Tracking</a></h2>
-<p>Target location tracking allows you to monitor specific code locations through refactoring changes.</p>
-<h3 id="location-format"><a class="header" href="#location-format">Location Format</a></h3>
-<p>Target locations use the format: <code>file:function:line</code></p>
+<blockquote>
+<p><strong>⚠️ Planned Feature</strong>: Target location tracking with fuzzy matching is currently under development. The types are defined in <code>src/comparison/types.rs</code> but not yet implemented in the compare command. This section describes the planned functionality.</p>
+</blockquote>
+<p>Target location tracking will allow you to monitor specific code locations through refactoring changes.</p>
+<h3 id="location-format-planned"><a class="header" href="#location-format-planned">Location Format (Planned)</a></h3>
+<p>Target locations will use the format: <code>file:function:line</code></p>
 <p>Examples:</p>
 <ul>
 <li><code>src/main.rs:complex_function:42</code></li>
 <li><code>lib/parser.rs:parse_expression:156</code></li>
 <li><code>api/handler.rs:process_request:89</code></li>
 </ul>
-<h3 id="specifying-target-locations"><a class="header" href="#specifying-target-locations">Specifying Target Locations</a></h3>
+<h3 id="specifying-target-locations-planned"><a class="header" href="#specifying-target-locations-planned">Specifying Target Locations (Planned)</a></h3>
 <h4 id="option-1-via-implementation-plan"><a class="header" href="#option-1-via-implementation-plan">Option 1: Via Implementation Plan</a></h4>
 <p>Create an <code>IMPLEMENTATION_PLAN.md</code> file with a target location section:</p>
 <pre><code class="language-markdown"># Implementation Plan
@@ -247,16 +272,16 @@ The `complex_function` has high cognitive complexity...
   --after after.json \
   --target-location "src/example.rs:complex_function:45"
 </code></pre>
-<h3 id="matching-strategies"><a class="header" href="#matching-strategies">Matching Strategies</a></h3>
-<p>Debtmap uses intelligent matching to find your target item even when code changes:</p>
+<h3 id="matching-strategies-planned"><a class="header" href="#matching-strategies-planned">Matching Strategies (Planned)</a></h3>
+<p>Debtmap will use intelligent matching to find your target item even when code changes:</p>
 <div class="table-wrapper"><table><thead><tr><th>Strategy</th><th>When Used</th><th>Confidence</th></tr></thead><tbody>
 <tr><td><strong>Exact</strong></td><td>Location matches exactly</td><td>1.0</td></tr>
 <tr><td><strong>FuzzyFunction</strong></td><td>Function moved but name unchanged</td><td>0.8 - 0.95</td></tr>
 <tr><td><strong>FuzzyFile</strong></td><td>File changed but function exists</td><td>0.6 - 0.8</td></tr>
 </tbody></table>
 </div>
-<p>The comparison result includes the match strategy and confidence score used.</p>
-<h3 id="target-status-values"><a class="header" href="#target-status-values">Target Status Values</a></h3>
+<p>The comparison result will include the match strategy and confidence score used.</p>
+<h3 id="target-status-values-planned"><a class="header" href="#target-status-values-planned">Target Status Values (Planned)</a></h3>
 <p>After comparing, the target item will have one of these statuses:</p>
 <ul>
 <li><strong>Resolved</strong> - Item no longer exists in after analysis (debt eliminated!)</li>
@@ -298,8 +323,8 @@ The `complex_function` has high cognitive complexity...
 <ul>
 <li><strong>total_debt_score</strong> - Sum of all debt item scores</li>
 <li><strong>total_items</strong> - Total number of debt items detected</li>
-<li><strong>critical_items</strong> - Items with score ≥ 60</li>
-<li><strong>high_priority_items</strong> - Items with score ≥ 40</li>
+<li><strong>critical_items</strong> - Items with score ≥ 8.0 (critical threshold)</li>
+<li><strong>high_priority_items</strong> - Items requiring attention</li>
 <li><strong>average_score</strong> - Mean debt score across all items</li>
 <li><strong>debt_score_change</strong> - Absolute change in total debt</li>
 <li><strong>debt_score_change_pct</strong> - Percentage change in total debt</li>
@@ -312,20 +337,40 @@ The `complex_function` has high cognitive complexity...
 <li><strong>Regressing</strong> - Debt increased by more than 5%</li>
 </ul>
 <h2 id="regression-detection"><a class="header" href="#regression-detection">Regression Detection</a></h2>
-<p>Regressions are new critical debt items (score ≥ 60) that appear in the after analysis.</p>
+<p>Regressions are new critical debt items (score ≥ 8.0) that appear in the after analysis.</p>
 <h3 id="what-counts-as-a-regression"><a class="header" href="#what-counts-as-a-regression">What Counts as a Regression</a></h3>
 <p>A regression is detected when:</p>
 <ol>
 <li>An item exists in the after analysis</li>
 <li>The item does NOT exist in the before analysis</li>
-<li>The item has a debt score ≥ 60.0 (critical severity)</li>
+<li>The item has a debt score ≥ 8.0 (critical severity threshold)</li>
 </ol>
 <h3 id="regression-output"><a class="header" href="#regression-output">Regression Output</a></h3>
+<blockquote>
+<p><strong>Note</strong>: Current implementation tracks new critical items. Full regression details (debt_type, description) are planned for future releases.</p>
+</blockquote>
+<p><strong>Current Output Structure</strong> (ValidationResult):</p>
+<pre><code class="language-json">{
+  "gaps": {
+    "new_critical_item_1": {
+      "description": "New critical debt item detected",
+      "location": "src/new_feature.rs:process_data",
+      "severity": "critical",
+      "suggested_fix": "...",
+      "current_score": 9.5
+    }
+  },
+  "remaining_issues": [
+    "New critical item: src/new_feature.rs:process_data (score: 9.5)"
+  ]
+}
+</code></pre>
+<p><strong>Planned Output Structure</strong> (ComparisonResult):</p>
 <pre><code class="language-json">{
   "regressions": [
     {
       "location": "src/new_feature.rs:process_data:23",
-      "score": 72.5,
+      "score": 9.5,
       "debt_type": "high_complexity",
       "description": "Function has cyclomatic complexity of 12 and cognitive complexity of 15"
     }
@@ -337,12 +382,20 @@ The `complex_function` has high cognitive complexity...
 <pre><code class="language-bash"># Run comparison
 debtmap compare --before before.json --after after.json --output result.json
 
-# Check for regressions
-REGRESSION_COUNT=$(jq '.summary.new_critical_count' result.json)
+# Check completion status (current implementation)
+STATUS=$(jq -r '.status' result.json)
+COMPLETION=$(jq '.completion_percentage' result.json)
 
-if [ "$REGRESSION_COUNT" -gt 0 ]; then
-  echo "❌ Found $REGRESSION_COUNT new critical debt items"
+if [ "$STATUS" = "regression_detected" ]; then
+  echo "❌ Regression detected - new critical debt items found"
   exit 1
+fi
+
+# Or check for remaining critical issues
+REMAINING=$(jq '.remaining_issues | length' result.json)
+if [ "$REMAINING" -gt 0 ]; then
+  echo "⚠️ Warning: $REMAINING remaining issues"
+  jq '.remaining_issues[]' result.json
 fi
 </code></pre>
 <h2 id="improvement-tracking"><a class="header" href="#improvement-tracking">Improvement Tracking</a></h2>
@@ -350,10 +403,22 @@ fi
 <h3 id="improvement-types"><a class="header" href="#improvement-types">Improvement Types</a></h3>
 <ol>
 <li><strong>Resolved</strong> - Debt item completely eliminated (no longer in after analysis)</li>
-<li><strong>ScoreReduced</strong> - Debt item still exists but score reduced by ≥ 30%</li>
+<li><strong>Improved</strong> - Debt item still exists but score reduced by ≥ 30%</li>
 </ol>
-<h3 id="improvement-metrics"><a class="header" href="#improvement-metrics">Improvement Metrics</a></h3>
-<p>When comparing target items, debtmap calculates:</p>
+<h3 id="current-implementation"><a class="header" href="#current-implementation">Current Implementation</a></h3>
+<p>The current implementation provides improvements as human-readable strings in the ValidationResult:</p>
+<pre><code class="language-json">{
+  "improvements": [
+    "2 high priority items resolved",
+    "Average complexity reduction: 35%",
+    "3 items showed improvement (score reduction ≥ 30%)"
+  ],
+  "completion_percentage": 75.0,
+  "status": "good_progress"
+}
+</code></pre>
+<h3 id="planned-detailed-improvement-metrics"><a class="header" href="#planned-detailed-improvement-metrics">Planned: Detailed Improvement Metrics</a></h3>
+<p>Future versions will include per-item improvement metrics:</p>
 <pre><code class="language-json">{
   "improvements": {
     "score_reduction_pct": 45.2,
@@ -367,18 +432,18 @@ fi
 <li><strong>complexity_reduction_pct</strong> - Reduction in cyclomatic/cognitive complexity</li>
 <li><strong>coverage_improvement_pct</strong> - Increase in test coverage</li>
 </ul>
-<h3 id="improvement-items-list"><a class="header" href="#improvement-items-list">Improvement Items List</a></h3>
+<h3 id="planned-improvement-items-list"><a class="header" href="#planned-improvement-items-list">Planned: Improvement Items List</a></h3>
 <pre><code class="language-json">{
   "improvements": [
     {
       "location": "src/example.rs:complex_function:45",
-      "before_score": 85.5,
-      "after_score": 32.1,
+      "before_score": 10.5,
+      "after_score": 4.1,
       "improvement_type": "ScoreReduced"
     },
     {
       "location": "src/legacy.rs:old_code:120",
-      "before_score": 65.0,
+      "before_score": 9.0,
       "after_score": null,
       "improvement_type": "Resolved"
     }
@@ -386,8 +451,26 @@ fi
 }
 </code></pre>
 <h2 id="beforeafter-metrics"><a class="header" href="#beforeafter-metrics">Before/After Metrics</a></h2>
-<p>For target items, debtmap compares detailed metrics:</p>
-<h3 id="target-metrics-structure"><a class="header" href="#target-metrics-structure">Target Metrics Structure</a></h3>
+<blockquote>
+<p><strong>⚠️ Planned Feature</strong>: Detailed target item tracking with before/after metrics is under development.</p>
+</blockquote>
+<h3 id="current-implementation-1"><a class="header" href="#current-implementation-1">Current Implementation</a></h3>
+<p>The current implementation provides before/after summaries at the project level:</p>
+<pre><code class="language-json">{
+  "before_summary": {
+    "total_items": 25,
+    "high_priority_items": 8,
+    "average_score": 6.5
+  },
+  "after_summary": {
+    "total_items": 22,
+    "high_priority_items": 5,
+    "average_score": 5.2
+  }
+}
+</code></pre>
+<h3 id="planned-target-metrics-structure"><a class="header" href="#planned-target-metrics-structure">Planned: Target Metrics Structure</a></h3>
+<p>Future versions will support detailed target item comparison:</p>
 <pre><code class="language-json">{
   "target_item": {
     "location": "src/example.rs:complex_function:45",
@@ -395,7 +478,7 @@ fi
     "match_confidence": 1.0,
     "matched_items_count": 1,
     "before": {
-      "score": 85.5,
+      "score": 10.5,
       "cyclomatic_complexity": 8,
       "cognitive_complexity": 15,
       "coverage": 45.0,
@@ -403,7 +486,7 @@ fi
       "nesting_depth": 4
     },
     "after": {
-      "score": 32.1,
+      "score": 4.1,
       "cyclomatic_complexity": 3,
       "cognitive_complexity": 5,
       "coverage": 85.0,
@@ -419,8 +502,8 @@ fi
   }
 }
 </code></pre>
-<h3 id="metric-aggregation"><a class="header" href="#metric-aggregation">Metric Aggregation</a></h3>
-<p>When multiple items match the target location (due to fuzzy matching), metrics are aggregated:</p>
+<h3 id="planned-metric-aggregation"><a class="header" href="#planned-metric-aggregation">Planned: Metric Aggregation</a></h3>
+<p>When multiple items match the target location (due to fuzzy matching), metrics will be aggregated:</p>
 <ul>
 <li><strong>score</strong> - Average across matched items</li>
 <li><strong>cyclomatic_complexity</strong> - Average</li>
@@ -429,35 +512,74 @@ fi
 <li><strong>function_length</strong> - Average</li>
 <li><strong>nesting_depth</strong> - Maximum (worst case)</li>
 </ul>
-<p>The <code>matched_items_count</code> field tells you how many items were aggregated.</p>
+<p>The <code>matched_items_count</code> field will tell you how many items were aggregated.</p>
 <h3 id="validating-refactoring-success"><a class="header" href="#validating-refactoring-success">Validating Refactoring Success</a></h3>
-<p>Use these metrics to verify your refactoring achieved its goals:</p>
-<pre><code class="language-bash"># Example: Verify complexity reduction
-COMPLEXITY_REDUCTION=$(jq '.target_item.improvements.complexity_reduction_pct' result.json)
+<p>Use the current validation output to verify your refactoring:</p>
+<pre><code class="language-bash"># Check validation completion
+COMPLETION=$(jq '.completion_percentage' result.json)
+STATUS=$(jq -r '.status' result.json)
 
-if (( $(echo "$COMPLEXITY_REDUCTION &lt; 30" | bc -l) )); then
-  echo "⚠️ Complexity reduction ($COMPLEXITY_REDUCTION%) below 30% target"
+echo "Completion: ${COMPLETION}%"
+echo "Status: $STATUS"
+
+# Check for improvements
+jq '.improvements[]' result.json
+
+# Verify no regressions
+REMAINING=$(jq '.remaining_issues | length' result.json)
+if [ "$REMAINING" -eq 0 ]; then
+  echo "✅ All issues resolved!"
+else
+  echo "⚠️ $REMAINING issues remaining"
 fi
 </code></pre>
 <h2 id="output-formats"><a class="header" href="#output-formats">Output Formats</a></h2>
-<h3 id="json-format"><a class="header" href="#json-format">JSON Format</a></h3>
-<p>The default JSON format provides complete structured data for programmatic use:</p>
-<pre><code class="language-bash">debtmap compare --before before.json --after after.json --format json
+<h3 id="json-format-current"><a class="header" href="#json-format-current">JSON Format (Current)</a></h3>
+<p>The current JSON format provides validation results:</p>
+<pre><code class="language-bash">debtmap compare --before before.json --after after.json --output result.json
 </code></pre>
-<p>The JSON output includes:</p>
+<p>The ValidationResult JSON output includes:</p>
 <ul>
-<li><code>metadata</code> - Comparison metadata (date, files, target location)</li>
-<li><code>target_item</code> - Target comparison details (if specified)</li>
-<li><code>project_health</code> - Project-wide metrics and trends</li>
-<li><code>regressions</code> - List of new critical items</li>
-<li><code>improvements</code> - List of resolved/reduced items</li>
-<li><code>summary</code> - High-level summary statistics</li>
+<li><code>completion_percentage</code> - Percentage of debt resolved/improved</li>
+<li><code>status</code> - Overall status (good_progress, regression_detected, etc.)</li>
+<li><code>improvements</code> - List of improvement descriptions</li>
+<li><code>remaining_issues</code> - List of issues still present</li>
+<li><code>gaps</code> - Detailed gap analysis with locations and scores</li>
+<li><code>before_summary</code> - Summary of before analysis</li>
+<li><code>after_summary</code> - Summary of after analysis</li>
 </ul>
-<h3 id="markdown-format"><a class="header" href="#markdown-format">Markdown Format</a></h3>
-<p>For human-readable reports:</p>
+<p>Example output:</p>
+<pre><code class="language-json">{
+  "completion_percentage": 75.0,
+  "status": "good_progress",
+  "improvements": [
+    "2 high priority items resolved",
+    "Average complexity reduction: 35%"
+  ],
+  "remaining_issues": [
+    "1 unchanged critical item: src/legacy.rs:old_function"
+  ],
+  "gaps": {},
+  "before_summary": {
+    "total_items": 25,
+    "high_priority_items": 8,
+    "average_score": 6.5
+  },
+  "after_summary": {
+    "total_items": 22,
+    "high_priority_items": 5,
+    "average_score": 5.2
+  }
+}
+</code></pre>
+<h3 id="markdown-format-planned"><a class="header" href="#markdown-format-planned">Markdown Format (Planned)</a></h3>
+<blockquote>
+<p><strong>🚧 Coming Soon</strong>: Markdown output format for human-readable reports.</p>
+</blockquote>
+<p>Planned for pull request comments and documentation:</p>
 <pre><code class="language-bash">debtmap compare --before before.json --after after.json --format markdown
 </code></pre>
-<p>The markdown output provides a formatted report suitable for:</p>
+<p>The markdown output will be suitable for:</p>
 <ul>
 <li>Pull request comments</li>
 <li>Documentation</li>
@@ -496,32 +618,53 @@ jobs:
           debtmap compare \
             --before before.json \
             --after after.json \
-            --format markdown \
-            --output comparison.md
+            --output validation.json
 
-      - name: Check for regressions
+      - name: Check validation result
         run: |
-          REGRESSIONS=$(debtmap compare \
-            --before before.json \
-            --after after.json \
-            --format json | jq '.summary.new_critical_count')
+          STATUS=$(jq -r '.status' validation.json)
+          COMPLETION=$(jq '.completion_percentage' validation.json)
 
-          if [ "$REGRESSIONS" -gt 0 ]; then
-            echo "❌ Found $REGRESSIONS new critical debt items"
+          echo "Validation Status: $STATUS"
+          echo "Completion: ${COMPLETION}%"
+
+          # Fail on regression
+          if [ "$STATUS" = "regression_detected" ]; then
+            echo "❌ Regression detected"
+            jq '.remaining_issues[]' validation.json
             exit 1
           fi
 
-      - name: Post comparison to PR
+          # Warn on incomplete
+          if (( $(echo "$COMPLETION &lt; 50" | bc -l) )); then
+            echo "⚠️ Warning: Only ${COMPLETION}% complete"
+          fi
+
+      - name: Post validation to PR
         uses: actions/github-script@v6
         with:
           script: |
             const fs = require('fs');
-            const comparison = fs.readFileSync('comparison.md', 'utf8');
+            const validation = JSON.parse(fs.readFileSync('validation.json', 'utf8'));
+
+            const body = `## Debt Validation Results
+
+            **Status:** ${validation.status}
+            **Completion:** ${validation.completion_percentage}%
+
+            ### Improvements
+            ${validation.improvements.map(i =&gt; `- ${i}`).join('\n')}
+
+            ${validation.remaining_issues.length &gt; 0 ? `
+            ### Remaining Issues
+            ${validation.remaining_issues.map(i =&gt; `- ${i}`).join('\n')}
+            ` : ''}`;
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comparison
+              body: body
             });
 </code></pre>
 <h3 id="gitlab-ci-example"><a class="header" href="#gitlab-ci-example">GitLab CI Example</a></h3>
@@ -537,33 +680,39 @@ jobs:
     - git checkout $CI_COMMIT_SHA
     - debtmap analyze --output after.json
 
-    # Compare and fail on regressions
-    - debtmap compare --before before.json --after after.json --output result.json
+    # Compare and check status
+    - debtmap compare --before before.json --after after.json --output validation.json
     - |
-      REGRESSIONS=$(jq '.summary.new_critical_count' result.json)
-      if [ "$REGRESSIONS" -gt 0 ]; then
-        echo "Failed: $REGRESSIONS new critical items"
+      STATUS=$(jq -r '.status' validation.json)
+      COMPLETION=$(jq '.completion_percentage' validation.json)
+
+      echo "Status: $STATUS"
+      echo "Completion: ${COMPLETION}%"
+
+      if [ "$STATUS" = "regression_detected" ]; then
+        echo "Failed: Regression detected"
+        jq '.remaining_issues[]' validation.json
         exit 1
       fi
   artifacts:
     paths:
       - before.json
       - after.json
-      - result.json
+      - validation.json
     expire_in: 1 week
 </code></pre>
 <h3 id="best-practices-for-cicd"><a class="header" href="#best-practices-for-cicd">Best Practices for CI/CD</a></h3>
 <ol>
 <li><strong>Store analyses as artifacts</strong> - Keep before/after JSON for debugging</li>
-<li><strong>Set appropriate thresholds</strong> - Don’t fail on minor increases</li>
-<li><strong>Track trends over time</strong> - Store comparison results for historical analysis</li>
-<li><strong>Use target locations for focused work</strong> - Track specific refactoring efforts</li>
-<li><strong>Generate reports</strong> - Use markdown format for team visibility</li>
-<li><strong>Gate deployments</strong> - Require debt improvements for major releases</li>
+<li><strong>Check status field</strong> - Use <code>status</code> to determine pass/fail</li>
+<li><strong>Track completion percentage</strong> - Monitor progress toward debt resolution</li>
+<li><strong>Review improvements</strong> - Celebrate and document successful refactorings</li>
+<li><strong>Act on remaining issues</strong> - Create follow-up tasks for unresolved items</li>
+<li><strong>Set completion thresholds</strong> - Require minimum completion percentage for merges</li>
 </ol>
 <h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
 <h3 id="example-1-basic-comparison"><a class="header" href="#example-1-basic-comparison">Example 1: Basic Comparison</a></h3>
-<p>Compare two analyses without targeting specific items:</p>
+<p>Compare two analyses to track debt changes:</p>
 <pre><code class="language-bash"># Run before analysis
 debtmap analyze --output before.json
 
@@ -573,42 +722,46 @@ debtmap analyze --output before.json
 debtmap analyze --output after.json
 
 # Compare
-debtmap compare --before before.json --after after.json --format markdown
+debtmap compare --before before.json --after after.json --output validation.json
+
+# Check results
+cat validation.json | jq '.'
+# Output shows: completion_percentage, status, improvements, remaining_issues
 </code></pre>
-<h3 id="example-2-tracking-function-refactoring"><a class="header" href="#example-2-tracking-function-refactoring">Example 2: Tracking Function Refactoring</a></h3>
-<p>Monitor a specific function you’re refactoring:</p>
-<pre><code class="language-bash"># Create implementation plan
-cat &gt; IMPLEMENTATION_PLAN.md &lt;&lt;EOF
-# Refactoring complex_function
-
-## Target Item
-**Location**: ./src/parser.rs:parse_expression:156
-**Current Debt Score**: 78.5
-**Severity**: critical
-EOF
-
-# Run before analysis
+<h3 id="example-2-validating-function-refactoring"><a class="header" href="#example-2-validating-function-refactoring">Example 2: Validating Function Refactoring</a></h3>
+<blockquote>
+<p><strong>Note</strong>: Target location tracking is planned. Current implementation validates overall improvements.</p>
+</blockquote>
+<p>Validate your refactoring work:</p>
+<pre><code class="language-bash"># Run before analysis
 debtmap analyze --output before.json
 
-# Refactor the function...
+# Identify high-priority items to fix
+jq '.items[] | select(.unified_score.final_score &gt;= 8.0)' before.json
+
+# Refactor the high-priority functions...
 
 # Run after analysis
 debtmap analyze --output after.json
 
-# Compare with target tracking
+# Compare and validate
 debtmap compare \
   --before before.json \
   --after after.json \
-  --plan IMPLEMENTATION_PLAN.md \
-  --format json \
-  --output result.json
+  --output validation.json
 
-# Check improvement
-jq '.target_item.status' result.json  # Should show "Improved" or "Resolved"
-jq '.target_item.improvements.score_reduction_pct' result.json
+# Check validation results
+STATUS=$(jq -r '.status' validation.json)
+COMPLETION=$(jq '.completion_percentage' validation.json)
+
+echo "Status: $STATUS"
+echo "Completion: ${COMPLETION}%"
+
+# Review improvements
+jq '.improvements[]' validation.json
 </code></pre>
 <h3 id="example-3-detecting-pr-regressions"><a class="header" href="#example-3-detecting-pr-regressions">Example 3: Detecting PR Regressions</a></h3>
-<p>Check if a pull request introduces new complexity:</p>
+<p>Check if a pull request introduces new critical debt:</p>
 <pre><code class="language-bash"># Analyze base branch
 git checkout main
 debtmap analyze --output main.json
@@ -621,17 +774,22 @@ debtmap analyze --output feature.json
 debtmap compare \
   --before main.json \
   --after feature.json \
-  --output comparison.json
+  --output validation.json
 
-# Extract summary
-jq '.summary' comparison.json
+# Check status
+STATUS=$(jq -r '.status' validation.json)
+echo "Validation Status: $STATUS"
 
-# Example output:
+# Example output structure:
+jq '.' validation.json
 # {
-#   "target_improved": false,
-#   "new_critical_count": 2,
-#   "resolved_count": 0,
-#   "overall_debt_trend": "Regressing"
+#   "completion_percentage": 100.0,
+#   "status": "all_resolved",  // or "regression_detected"
+#   "improvements": ["All items resolved"],
+#   "remaining_issues": [],
+#   "gaps": {},
+#   "before_summary": {...},
+#   "after_summary": {...}
 # }
 </code></pre>
 <h3 id="example-4-monitoring-project-health-over-releases"><a class="header" href="#example-4-monitoring-project-health-over-releases">Example 4: Monitoring Project Health Over Releases</a></h3>
@@ -648,12 +806,19 @@ debtmap analyze --output v1.1.json
 debtmap compare \
   --before v1.0.json \
   --after v1.1.json \
-  --format json \
   --output v1.0-to-v1.1.json
 
-# Check trend
-jq '.project_health.changes.debt_score_change_pct' v1.0-to-v1.1.json
-# Example: -12.5 (12.5% debt reduction - good!)
+# Check summaries
+echo "Before (v1.0):"
+jq '.before_summary' v1.0-to-v1.1.json
+
+echo "After (v1.1):"
+jq '.after_summary' v1.0-to-v1.1.json
+
+# Calculate improvement
+BEFORE_AVG=$(jq '.before_summary.average_score' v1.0-to-v1.1.json)
+AFTER_AVG=$(jq '.after_summary.average_score' v1.0-to-v1.1.json)
+echo "Average score change: $BEFORE_AVG → $AFTER_AVG"
 </code></pre>
 <h3 id="example-5-full-cicd-workflow"><a class="header" href="#example-5-full-cicd-workflow">Example 5: Full CI/CD Workflow</a></h3>
 <p>Complete workflow for continuous debt monitoring:</p>
@@ -664,8 +829,7 @@ set -e
 
 BEFORE="before.json"
 AFTER="after.json"
-RESULT="comparison.json"
-PLAN="IMPLEMENTATION_PLAN.md"
+VALIDATION="validation.json"
 
 # Step 1: Analyze baseline (main branch)
 echo "📊 Analyzing baseline..."
@@ -677,118 +841,110 @@ echo "📊 Analyzing current branch..."
 git checkout -
 debtmap analyze --output "$AFTER"
 
-# Step 3: Run comparison
-echo "🔍 Comparing analyses..."
-if [ -f "$PLAN" ]; then
-  debtmap compare \
-    --before "$BEFORE" \
-    --after "$AFTER" \
-    --plan "$PLAN" \
-    --format json \
-    --output "$RESULT"
-else
-  debtmap compare \
-    --before "$BEFORE" \
-    --after "$AFTER" \
-    --format json \
-    --output "$RESULT"
-fi
+# Step 3: Run validation
+echo "🔍 Running validation..."
+debtmap compare \
+  --before "$BEFORE" \
+  --after "$AFTER" \
+  --output "$VALIDATION"
 
 # Step 4: Extract metrics
-NEW_CRITICAL=$(jq '.summary.new_critical_count' "$RESULT")
-RESOLVED=$(jq '.summary.resolved_count' "$RESULT")
-TREND=$(jq -r '.summary.overall_debt_trend' "$RESULT")
-TARGET_STATUS=$(jq -r '.target_item.status // "N/A"' "$RESULT")
+STATUS=$(jq -r '.status' "$VALIDATION")
+COMPLETION=$(jq '.completion_percentage' "$VALIDATION")
+IMPROVEMENTS=$(jq '.improvements | length' "$VALIDATION")
+REMAINING=$(jq '.remaining_issues | length' "$VALIDATION")
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📈 Technical Debt Comparison Results"
+echo "📈 Debt Validation Results"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "New Critical Items: $NEW_CRITICAL"
-echo "Resolved Items: $RESOLVED"
-echo "Overall Trend: $TREND"
-echo "Target Status: $TARGET_STATUS"
+echo "Status: $STATUS"
+echo "Completion: ${COMPLETION}%"
+echo "Improvements: $IMPROVEMENTS"
+echo "Remaining Issues: $REMAINING"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Step 5: Quality gate
-if [ "$NEW_CRITICAL" -gt 0 ]; then
-  echo "❌ FAILED: New critical debt items introduced"
+if [ "$STATUS" = "regression_detected" ]; then
+  echo "❌ FAILED: Regression detected"
+  jq '.remaining_issues[]' "$VALIDATION"
   exit 1
 fi
 
-if [ "$TREND" = "Regressing" ]; then
-  echo "⚠️  WARNING: Overall debt is regressing"
+if (( $(echo "$COMPLETION &lt; 50" | bc -l) )); then
+  echo "⚠️  WARNING: Completion below 50%"
   # Don't fail, just warn
 fi
 
-if [ "$TARGET_STATUS" = "Regressed" ]; then
-  echo "❌ FAILED: Target item regressed"
-  exit 1
+if [ "$STATUS" = "all_resolved" ]; then
+  echo "🎉 SUCCESS: All debt items resolved!"
 fi
 
 echo "✅ PASSED: No regressions detected"
 </code></pre>
 <h3 id="example-6-interpreting-different-status-outcomes"><a class="header" href="#example-6-interpreting-different-status-outcomes">Example 6: Interpreting Different Status Outcomes</a></h3>
-<p>Understanding what each status means:</p>
-<pre><code class="language-bash"># Run comparison
-debtmap compare --before before.json --after after.json --output result.json
+<p>Understanding what each validation status means:</p>
+<pre><code class="language-bash"># Run validation
+debtmap compare --before before.json --after after.json --output validation.json
 
-# Check target status
-STATUS=$(jq -r '.target_item.status' result.json)
+# Check validation status
+STATUS=$(jq -r '.status' validation.json)
+COMPLETION=$(jq '.completion_percentage' validation.json)
 
 case "$STATUS" in
-  "Resolved")
-    echo "🎉 Success! Target item completely eliminated."
-    echo "The function/file no longer appears in debt analysis."
+  "all_resolved")
+    echo "🎉 Success! All debt items eliminated."
+    echo "Completion: 100%"
     ;;
-  "Improved")
-    REDUCTION=$(jq '.target_item.improvements.score_reduction_pct' result.json)
-    echo "✅ Improvement! Debt score reduced by $REDUCTION%"
+  "good_progress")
+    echo "✅ Good progress! Completion: ${COMPLETION}%"
+    jq '.improvements[]' validation.json
     ;;
-  "Unchanged")
-    echo "➡️  No significant change (within 5% threshold)"
-    echo "Consider further refactoring if debt is still high."
+  "some_improvement")
+    echo "➡️  Some improvement detected: ${COMPLETION}%"
+    echo "Remaining issues to address:"
+    jq '.remaining_issues[]' validation.json
     ;;
-  "Regressed")
-    BEFORE=$(jq '.target_item.before.score' result.json)
-    AFTER=$(jq '.target_item.after.score' result.json)
-    echo "❌ Regression! Score increased from $BEFORE to $AFTER"
-    echo "Review recent changes to this location."
+  "regression_detected")
+    echo "❌ Regression detected!"
+    echo "New critical items or increased debt:"
+    jq '.remaining_issues[]' validation.json
     ;;
-  "NotFoundBefore")
-    echo "ℹ️  Target didn't exist in before analysis"
-    echo "This is a new code location."
+  "no_change")
+    echo "ℹ️  No significant changes detected"
+    echo "Consider refactoring high-priority items."
     ;;
 esac
 </code></pre>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
-<h3 id="target-location-not-found"><a class="header" href="#target-location-not-found">Target Location Not Found</a></h3>
-<p><strong>Problem</strong>: <code>Error: Target item not found in before analysis</code></p>
-<p><strong>Solutions</strong>:</p>
-<ol>
-<li>Verify the location format: <code>file:function:line</code></li>
-<li>Check that the file path is relative to project root</li>
-<li>Ensure the function exists in the before analysis</li>
-<li>Try a fuzzy match by using just <code>file:function</code> (omit line number)</li>
-</ol>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># Instead of exact line number
---target-location "src/parser.rs:parse_expression:156"
-
-# Try without line number for fuzzy matching
---target-location "src/parser.rs:parse_expression"
-</code></pre>
-<h3 id="location-format-errors"><a class="header" href="#location-format-errors">Location Format Errors</a></h3>
-<p><strong>Problem</strong>: Invalid location format</p>
-<p><strong>Solution</strong>: Ensure format is <code>file:function:line</code> with:</p>
+<h3 id="understanding-validation-status"><a class="header" href="#understanding-validation-status">Understanding Validation Status</a></h3>
+<p><strong>Issue</strong>: Confused about what validation status means</p>
+<p><strong>Solution</strong>: Check the <code>status</code> field in validation output:</p>
 <ul>
-<li>File path relative to project root (can start with <code>./</code>)</li>
-<li>Function name exactly as it appears in code</li>
-<li>Line number (optional for fuzzy matching)</li>
+<li><code>all_resolved</code> - All debt items from before analysis are resolved (100% completion)</li>
+<li><code>good_progress</code> - Significant improvements made (typically &gt;70% completion)</li>
+<li><code>some_improvement</code> - Some items improved but work remains (&lt;70% completion)</li>
+<li><code>regression_detected</code> - New critical items detected or debt increased</li>
+<li><code>no_change</code> - No significant changes in debt metrics</li>
 </ul>
-<p><strong>Valid examples</strong>:</p>
-<pre><code class="language-bash">src/main.rs:complex_function:42
-./lib/parser.rs:parse_expr:89
-api/handlers.rs:process_request
+<p><strong>Check completion percentage</strong>:</p>
+<pre><code class="language-bash">COMPLETION=$(jq '.completion_percentage' validation.json)
+echo "Validation is ${COMPLETION}% complete"
+</code></pre>
+<h3 id="no-improvements-detected"><a class="header" href="#no-improvements-detected">No Improvements Detected</a></h3>
+<p><strong>Issue</strong>: Made changes but validation shows no improvements</p>
+<p><strong>Possible causes</strong>:</p>
+<ol>
+<li>Changes didn’t reduce debt scores by ≥30% (improvement threshold)</li>
+<li>Refactored items had scores &lt;8.0 (not tracked as critical)</li>
+<li>Changes were neutral (e.g., code moved but complexity unchanged)</li>
+</ol>
+<p><strong>Solution</strong>: Check the details:</p>
+<pre><code class="language-bash"># Compare before/after summaries
+jq '.before_summary' validation.json
+jq '.after_summary' validation.json
+
+# Look for high-priority items in before analysis
+jq '.items[] | select(.unified_score.final_score &gt;= 8.0)' before.json
 </code></pre>
 <h3 id="json-parsing-errors"><a class="header" href="#json-parsing-errors">JSON Parsing Errors</a></h3>
 <p><strong>Problem</strong>: <code>Error parsing JSON file</code></p>
@@ -799,14 +955,13 @@ api/handlers.rs:process_request
 <li>Check file permissions and path</li>
 <li>Regenerate the analysis if corrupted</li>
 </ol>
-<h3 id="understanding-target-status-values"><a class="header" href="#understanding-target-status-values">Understanding Target Status Values</a></h3>
+<h3 id="understanding-validation-status-values"><a class="header" href="#understanding-validation-status-values">Understanding Validation Status Values</a></h3>
 <div class="table-wrapper"><table><thead><tr><th>Status</th><th>Meaning</th><th>Action Required</th></tr></thead><tbody>
-<tr><td><code>Resolved</code></td><td>Item eliminated</td><td>✅ Celebrate! Document what worked</td></tr>
-<tr><td><code>Improved</code></td><td>Score reduced</td><td>✅ Good progress, consider pushing further</td></tr>
-<tr><td><code>Unchanged</code></td><td>No significant change</td><td>⚠️ Review approach, may need different refactoring</td></tr>
-<tr><td><code>Regressed</code></td><td>Score increased</td><td>❌ Investigate and fix before merging</td></tr>
-<tr><td><code>NotFoundBefore</code></td><td>New item</td><td>ℹ️ Normal for new code, ensure it’s not high debt</td></tr>
-<tr><td><code>NotFound</code></td><td>Missing in both</td><td>❌ Check location format and file path</td></tr>
+<tr><td><code>all_resolved</code></td><td>All items eliminated</td><td>✅ Celebrate! Document what worked</td></tr>
+<tr><td><code>good_progress</code></td><td>Significant improvement</td><td>✅ Good progress, verify remaining items</td></tr>
+<tr><td><code>some_improvement</code></td><td>Partial improvement</td><td>⚠️ Continue refactoring remaining issues</td></tr>
+<tr><td><code>regression_detected</code></td><td>New critical debt</td><td>❌ Investigate and fix before merging</td></tr>
+<tr><td><code>no_change</code></td><td>No significant change</td><td>⚠️ Review approach, may need different strategy</td></tr>
 </tbody></table>
 </div>
 <h3 id="handling-missing-files"><a class="header" href="#handling-missing-files">Handling Missing Files</a></h3>
@@ -861,15 +1016,24 @@ debtmap compare \
 <li><a href="ci-cd.html">CI/CD Integration</a> - Advanced pipeline configurations</li>
 </ul>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
-<p>The compare command is a powerful tool for:</p>
+<p>The compare command provides validation for refactoring efforts:</p>
+<p><strong>Current Capabilities:</strong></p>
 <ul>
-<li>✅ Validating refactoring efforts with concrete metrics</li>
-<li>✅ Detecting regressions before they reach production</li>
-<li>✅ Tracking project health trends over time</li>
-<li>✅ Automating quality gates in CI/CD pipelines</li>
-<li>✅ Celebrating and documenting technical debt victories</li>
+<li>✅ Validate debt resolution with before/after comparison</li>
+<li>✅ Detect regressions (new critical items with score ≥ 8.0)</li>
+<li>✅ Track resolved items and improvements (≥30% score reduction)</li>
+<li>✅ Calculate completion percentage for validation workflows</li>
+<li>✅ Automate quality gates in CI/CD pipelines</li>
+<li>✅ Generate structured JSON output for programmatic use</li>
 </ul>
-<p>Use it regularly to maintain visibility into your codebase’s technical health and ensure continuous improvement.</p>
+<p><strong>Coming Soon:</strong></p>
+<ul>
+<li>🚧 Target location tracking with fuzzy matching</li>
+<li>🚧 Detailed per-item improvement metrics</li>
+<li>🚧 Markdown and terminal output formats</li>
+<li>🚧 Implementation plan parsing for target extraction</li>
+</ul>
+<p>Use the compare command regularly to maintain visibility into your codebase’s technical health and ensure continuous improvement. The current implementation focuses on validation workflows - perfect for CI/CD integration and refactoring validation.</p>
 
                     </main>
 

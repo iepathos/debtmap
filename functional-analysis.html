@@ -221,16 +221,17 @@
 <li>You have complex closures that are still fundamentally functional</li>
 </ul>
 <h3 id="cli-usage"><a class="header" href="#cli-usage">CLI Usage</a></h3>
-<p>Enable functional analysis with the <code>--functional-analysis-profile</code> flag:</p>
-<pre><code class="language-bash"># Use balanced profile (default)
-debtmap analyze . --functional-analysis-profile balanced
+<p>Enable functional analysis with the <code>--ast-functional-analysis</code> flag and select a profile with <code>--functional-analysis-profile</code>:</p>
+<pre><code class="language-bash"># Enable with balanced profile (default)
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced
 
 # Use strict profile for functional-first codebases
-debtmap analyze . --functional-analysis-profile strict
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
 
 # Use lenient profile for legacy code
-debtmap analyze . --functional-analysis-profile lenient
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenient
 </code></pre>
+<p><strong>Note:</strong> The <code>--ast-functional-analysis</code> flag enables the feature, while <code>--functional-analysis-profile</code> selects the configuration profile (strict/balanced/lenient).</p>
 <h2 id="pure-function-detection"><a class="header" href="#pure-function-detection">Pure Function Detection</a></h2>
 <p>A function is considered pure when it:</p>
 <ol>
@@ -420,7 +421,15 @@ let values = items.iter()
 <h2 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h2>
 <p>Debtmap analyzes functions to determine their purity level - whether they have side effects and mutable state.</p>
 <h3 id="purity-levels"><a class="header" href="#purity-levels">Purity Levels</a></h3>
-<p>Functions are classified into three purity levels:</p>
+<p>Functions are classified into three purity levels for god object weighting (defined in <code>src/organization/purity_analyzer.rs</code>):</p>
+<blockquote>
+<p><strong>Note:</strong> Debtmap has two purity analysis systems serving different purposes:</p>
+<ol>
+<li><strong>PurityLevel</strong> (three levels) - Used for god object scoring with weight multipliers (this section)</li>
+<li><strong>PurityLevel</strong> (four levels) - Used in <code>src/analysis/purity_analysis.rs</code> for detailed responsibility classification (Strictly Pure, Locally Pure, Read-Only, Impure)</li>
+</ol>
+<p>This chapter focuses on the three-level system for god object integration.</p>
+</blockquote>
 <h4 id="pure-weight-03"><a class="header" href="#pure-weight-03">Pure (Weight 0.3)</a></h4>
 <p>Guaranteed no side effects:</p>
 <ul>
@@ -492,12 +501,13 @@ fn process_items(items: &amp;mut Vec&lt;i32&gt;) {
 }
 <span class="boring">}</span></code></pre></pre>
 <h3 id="purity-weight-multipliers"><a class="header" href="#purity-weight-multipliers">Purity Weight Multipliers</a></h3>
-<p>Purity levels affect god object detection through weight multipliers. Pure functions contribute <strong>less</strong> to god object scores, rewarding codebases with many small pure helper functions:</p>
+<p>Purity levels affect god object detection through weight multipliers (implemented in <code>src/organization/purity_analyzer.rs:29-39</code>). Pure functions contribute <strong>less</strong> to god object scores, rewarding codebases with many small pure helper functions:</p>
 <ul>
-<li><strong>Pure (0.3)</strong>: A pure function counts as 30% of a regular function</li>
+<li><strong>Pure (0.3)</strong>: A pure function counts as 30% of a regular function in god object method count calculations</li>
 <li><strong>Probably Pure (0.5)</strong>: Counts as 50%</li>
 <li><strong>Impure (1.0)</strong>: Full weight</li>
 </ul>
+<p>The <code>purity_score</code> dampens god object scores via the <code>weight_multiplier</code> calculation. For example, pure functions with weight 0.3 count as only 30% of a regular function when calculating method counts for god object detection.</p>
 <p><strong>Example</strong>: A module with 20 pure helper functions (20 × 0.3 = 6.0 effective) is less likely to trigger god object warnings than a module with 10 impure functions (10 × 1.0 = 10.0 effective).</p>
 <h2 id="side-effect-detection"><a class="header" href="#side-effect-detection">Side Effect Detection</a></h2>
 <h3 id="detected-side-effects"><a class="header" href="#detected-side-effects">Detected Side Effects</a></h3>
@@ -587,7 +597,7 @@ async fn fetch_data(url: &amp;str) -&gt; Result&lt;String, reqwest::Error&gt; {
 <span class="boring">}</span></code></pre></pre>
 <p>Impure side effects receive a <strong>large penalty</strong> in purity scoring.</p>
 <h3 id="purity-metrics"><a class="header" href="#purity-metrics">Purity Metrics</a></h3>
-<p>For each function, debtmap calculates:</p>
+<p>For each function, debtmap calculates purity metrics through the functional composition analysis (<code>src/analysis/functional_composition.rs</code>). These metrics are computed by <code>analyze_composition()</code> and returned in <code>CompositionMetrics</code> and <code>PurityMetrics</code>:</p>
 <ul>
 <li><strong><code>has_mutable_state</code></strong> - Whether the function uses mutable bindings</li>
 <li><strong><code>has_side_effects</code></strong> - Whether I/O or global mutations are detected</li>
@@ -684,13 +694,14 @@ Side Effect Density = total_side_effects / total_functions
 - Overall: 50%+ pure
 </code></pre>
 <h3 id="integration-with-risk-scoring"><a class="header" href="#integration-with-risk-scoring">Integration with Risk Scoring</a></h3>
-<p>Functional composition quality integrates with debtmap’s risk scoring system:</p>
+<p>Functional composition quality integrates with debtmap’s risk scoring system and multi-signal aggregation framework:</p>
 <ul>
-<li><strong>High composition quality</strong> → Lower risk scores</li>
-<li><strong>Pure functions</strong> → Reduced god object penalties</li>
+<li><strong>High composition quality</strong> → Lower risk scores (functions with quality above threshold receive score boosts)</li>
+<li><strong>Pure functions</strong> → Reduced god object penalties (via weight multipliers in <code>purity_analyzer.rs</code>)</li>
 <li><strong>Deep pipelines</strong> → Bonus for functional patterns</li>
 <li><strong>Impure side effects</strong> → Risk penalties applied</li>
 </ul>
+<p><strong>Multi-Signal Integration</strong>: Functional composition analysis is one of several signals aggregated in the unified analysis system (<code>src/builders/unified_analysis.rs</code> and <code>src/analysis/multi_signal_aggregation.rs</code>) alongside complexity metrics, god object detection, and risk assessment. This ensures that functional programming quality contributes to the comprehensive technical debt assessment across multiple dimensions.</p>
 <p>This integration ensures that well-written functional code is properly rewarded in the overall technical debt assessment.</p>
 <h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
 <h3 id="example-1-detecting-imperative-vs-functional-code"><a class="header" href="#example-1-detecting-imperative-vs-functional-code">Example 1: Detecting Imperative vs Functional Code</a></h3>
@@ -750,19 +761,19 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 <span class="boring">}</span></code></pre></pre>
 <h3 id="example-3-using-profiles-for-different-codebases"><a class="header" href="#example-3-using-profiles-for-different-codebases">Example 3: Using Profiles for Different Codebases</a></h3>
 <p><strong>Strict profile</strong> - Catches subtle functional patterns:</p>
-<pre><code class="language-bash">$ debtmap analyze --functional-analysis-profile strict src/
+<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/
 # Detects pipelines with 3+ stages
 # Requires purity ≥ 0.9 for "pure" classification
 # Flags closures with complexity &gt; 3
 </code></pre>
 <p><strong>Balanced profile</strong> - Default for most projects:</p>
-<pre><code class="language-bash">$ debtmap analyze --functional-analysis-profile balanced src/
+<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.8 for "pure" classification
 # Flags closures with complexity &gt; 5
 </code></pre>
 <p><strong>Lenient profile</strong> - For legacy code:</p>
-<pre><code class="language-bash">$ debtmap analyze --functional-analysis-profile lenient src/
+<pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient src/
 # Detects pipelines with 2+ stages
 # Requires purity ≥ 0.5 for "pure" classification
 # Flags closures with complexity &gt; 10
@@ -913,7 +924,7 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <ol>
 <li>
 <p><strong>Start with lenient profile</strong> to understand current state:</p>
-<pre><code class="language-bash">debtmap analyze --functional-analysis-profile lenient .
+<pre><code class="language-bash">debtmap analyze --ast-functional-analysis --functional-analysis-profile lenient .
 </code></pre>
 </li>
 <li>
@@ -935,10 +946,10 @@ let results: Vec&lt;_&gt; = large_dataset.par_iter()
 <li>
 <p><strong>Tighten profile</strong> as codebase improves:</p>
 <pre><code class="language-bash"># After refactoring
-debtmap analyze --functional-analysis-profile balanced .
+debtmap analyze --ast-functional-analysis --functional-analysis-profile balanced .
 
 # For new modules
-debtmap analyze --functional-analysis-profile strict src/new_module/
+debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/new_module/
 </code></pre>
 </li>
 <li>
@@ -948,15 +959,15 @@ debtmap analyze --functional-analysis-profile strict src/new_module/
 <h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
 <h3 id="code-quality-audit"><a class="header" href="#code-quality-audit">Code Quality Audit</a></h3>
 <pre><code class="language-bash"># Assess functional purity
-debtmap analyze . --functional-analysis-profile balanced --format markdown
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced --format markdown
 </code></pre>
 <h3 id="refactoring-targets"><a class="header" href="#refactoring-targets">Refactoring Targets</a></h3>
 <pre><code class="language-bash"># Find impure functions in core logic
-debtmap analyze src/core/ --functional-analysis-profile strict
+debtmap analyze src/core/ --ast-functional-analysis --functional-analysis-profile strict
 </code></pre>
 <h3 id="onboarding-guide"><a class="header" href="#onboarding-guide">Onboarding Guide</a></h3>
 <pre><code class="language-bash"># Show functional patterns in codebase
-debtmap analyze . --functional-analysis-profile balanced --summary
+debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanced --summary
 </code></pre>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="no-pipelines-detected-but-i-have-iterator-chains"><a class="header" href="#no-pipelines-detected-but-i-have-iterator-chains">“No pipelines detected” but I have iterator chains</a></h3>

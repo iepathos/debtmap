@@ -381,8 +381,8 @@ def get_user_age(user_id):
         raise  # Re-raise for caller to handle
 </code></pre>
 <h3 id="exception-flow-analysis"><a class="header" href="#exception-flow-analysis">Exception Flow Analysis</a></h3>
-<p>Debtmap analyzes exception propagation through Python codebases:</p>
-<pre><code class="language-python"># Detected: Exception raised but never caught at top level
+<p>Debtmap tracks exception propagation through Python codebases to identify functions that can raise exceptions without proper handling. This analysis helps ensure that exceptions are either caught at appropriate levels or documented in the function’s interface.</p>
+<pre><code class="language-python"># Potential issue: Exceptions may propagate unhandled
 def process_batch(items):
     for item in items:
         validate_item(item)  # Can raise ValueError
@@ -411,6 +411,7 @@ def process_batch(items):
 </code></pre>
 <h2 id="async-error-handling"><a class="header" href="#async-error-handling">Async Error Handling</a></h2>
 <h3 id="unhandled-promise-rejections-javascripttypescript"><a class="header" href="#unhandled-promise-rejections-javascripttypescript">Unhandled Promise Rejections (JavaScript/TypeScript)</a></h3>
+<p><strong>Note:</strong> JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code. Enhanced JavaScript/TypeScript async error detection is planned for future releases.</p>
 <pre><code class="language-javascript">// ❌ CRITICAL: Unhandled promise rejection
 async function loadUserData(userId) {
     const response = await fetch(`/api/users/${userId}`);
@@ -556,36 +557,17 @@ fn process_transaction(tx: Transaction) -&gt; bool {  // Cyclomatic: 12, Cogniti
 <h3 id="error-handling-configuration-options"><a class="header" href="#error-handling-configuration-options">Error Handling Configuration Options</a></h3>
 <p>Configure error handling analysis in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[error_handling]
-# Patterns to detect (all enabled by default)
-patterns = [
-    "panic_patterns",        # Rust unwrap/expect/panic
-    "error_swallowing",      # Silent exception handling
-    "bare_except",           # Python bare except clauses
-    "async_errors",          # Unhandled promises, dropped futures
-    "missing_context",       # Error propagation without context
-]
+# Enable/disable specific detection patterns (all enabled by default)
+detect_panic_patterns = true     # Rust unwrap/expect/panic detection
+detect_swallowing = true         # Silent exception handling
+detect_async_errors = true       # Unhandled promises, dropped futures
+detect_context_loss = true       # Error propagation without context
+detect_propagation = true        # Error propagation analysis
 
-# Severity levels for different error types
-severity_levels = { panic = "critical", bare_except = "critical", error_swallowing = "major" }
-
-# Error context requirements
-context_requirements = { min_context_length = 10, require_values = true }
-
-# Exclude specific patterns (useful for legacy code migration)
-exclude_patterns = [
-    # "unwrap_in_tests",  # Already excluded by default
-]
+# Disable specific patterns for gradual adoption
+# detect_async_errors = false
 </code></pre>
-<h3 id="custom-severity-overrides"><a class="header" href="#custom-severity-overrides">Custom Severity Overrides</a></h3>
-<pre><code class="language-toml">[debt_categories.ErrorSwallowing]
-weight = 4  # Default is 4 (Major severity)
-severity = "Major"
-description = "Silenced exceptions"
-
-# Lower weight for gradual adoption
-# weight = 2
-# severity = "Warning"
-</code></pre>
+<p><strong>Note:</strong> The <code>[error_handling]</code> configuration is currently in development. Most error handling patterns are detected by default with <code>ErrorSwallowing</code> debt category (weight 4). Per-pattern severity customization is planned for future releases.</p>
 <h2 id="detection-examples"><a class="header" href="#detection-examples">Detection Examples</a></h2>
 <h3 id="what-gets-detected-vs-not-detected"><a class="header" href="#what-gets-detected-vs-not-detected">What Gets Detected vs. Not Detected</a></h3>
 <p><strong>Rust examples:</strong></p>
@@ -757,7 +739,7 @@ except Exception as e:  # Not bare except:
 <ol>
 <li>
 <p><strong>Run analysis with error focus</strong></p>
-<pre><code class="language-bash">debtmap analyze --debt-type ErrorSwallowing
+<pre><code class="language-bash">debtmap analyze --filter-categories ErrorSwallowing
 </code></pre>
 </li>
 <li>
@@ -792,18 +774,24 @@ debtmap compare before.json after.json
 <h3 id="migration-strategy-for-legacy-code"><a class="header" href="#migration-strategy-for-legacy-code">Migration Strategy for Legacy Code</a></h3>
 <pre><code class="language-toml"># .debtmap.toml - Gradual adoption
 [error_handling]
-# Start with just critical issues
-patterns = ["panic_patterns", "bare_except"]
+# Start with just critical panic patterns
+detect_panic_patterns = true
+detect_swallowing = false      # Add later
+detect_async_errors = false    # Add later
+detect_context_loss = false    # Add later
 
-# After fixing critical issues, add more patterns
-# patterns = ["panic_patterns", "bare_except", "error_swallowing"]
+# After fixing panic patterns, enable error swallowing detection
+# detect_swallowing = true
 
 # Eventually enable all patterns
-# patterns = ["panic_patterns", "error_swallowing", "bare_except", "async_errors", "missing_context"]
+# detect_swallowing = true
+# detect_async_errors = true
+# detect_context_loss = true
+# detect_propagation = true
 </code></pre>
 <p>Track progress over time:</p>
 <pre><code class="language-bash"># Weekly error handling health check
-debtmap analyze --debt-type ErrorSwallowing | tee weekly-error-health.txt
+debtmap analyze --filter-categories ErrorSwallowing | tee weekly-error-health.txt
 </code></pre>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="too-many-false-positives-in-test-code"><a class="header" href="#too-many-false-positives-in-test-code">Too Many False Positives in Test Code</a></h3>
@@ -833,7 +821,9 @@ let value = result.unwrap();  // debtmap: ignore - Test assertion
 <li>
 <p><strong>Pattern disabled in config</strong></p>
 <pre><code class="language-toml">[error_handling]
-patterns = ["panic_patterns", "error_swallowing"]  # Ensure pattern is listed
+detect_panic_patterns = true
+detect_swallowing = true
+detect_async_errors = true  # Ensure relevant detectors are enabled
 </code></pre>
 </li>
 <li>

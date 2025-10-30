@@ -312,6 +312,14 @@ Final Score = Base Score × Coverage Multiplier
 </ol>
 <pre><code>Transitive Coverage = Direct Coverage + Σ(Caller Coverage × Weight)
 </code></pre>
+<h3 id="algorithm-parameters"><a class="header" href="#algorithm-parameters">Algorithm Parameters</a></h3>
+<p>The transitive coverage propagation uses carefully tuned parameters to balance accuracy and performance:</p>
+<ul>
+<li><strong>Well-Tested Threshold</strong>: 80% - Only functions with ≥80% direct coverage contribute to indirect coverage, ensuring high confidence</li>
+<li><strong>Distance Discount</strong>: 70% per hop - Each level of indirection reduces contribution by 30%, reflecting decreased confidence</li>
+<li><strong>Maximum Distance</strong>: 3 hops - Limits recursion depth to prevent exponential complexity (after 3 hops, contribution drops to ~34%)</li>
+</ul>
+<p>These parameters ensure that indirect coverage signals are meaningful while preventing false confidence from distant call relationships. See <code>src/priority/coverage_propagation.rs:38-46</code> for the implementation.</p>
 <h3 id="why-it-matters"><a class="header" href="#why-it-matters">Why It Matters</a></h3>
 <p>A function with 0% direct coverage might have high transitive coverage if it’s only called by well-tested functions:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -337,7 +345,7 @@ fn process_request(input: String) -&gt; Result&lt;()&gt; {
 <ul>
 <li><strong>Index Build</strong>: O(n), ~20-30ms for 5,000 functions</li>
 <li><strong>Exact Lookup</strong>: O(1), ~0.5μs per lookup</li>
-<li><strong>Fallback Lookup</strong>: O(log n), ~5-8μs when exact match fails</li>
+<li><strong>Fallback Lookup</strong>: O(files) iteration with O(1) per-file lookup, ~5-8μs when exact match fails. Uses suffix matching and normalized path equality strategies</li>
 <li><strong>Memory Usage</strong>: ~200 bytes per record (~2MB for 5,000 functions)</li>
 <li><strong>Thread Safety</strong>: Lock-free parallel access via <code>Arc&lt;CoverageIndex&gt;</code></li>
 <li><strong>Analysis Overhead</strong>: ~2.5x baseline (target: ≤3x)</li>
@@ -528,7 +536,7 @@ minimum_risk_score = 15.0
 # Skip simple functions even if uncovered
 minimum_cyclomatic_complexity = 5
 </code></pre>
-<p><strong>Important</strong>: These weights only apply when coverage data is <strong>not</strong> available. When you provide <code>--lcov</code>, coverage acts as a dampening multiplier instead of a weighted component. See <code>src/config.rs:122-132</code> for default weight definitions.</p>
+<p><strong>Important</strong>: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: <code>Final Score = Base Score × (1.0 - coverage_pct)</code>. These weights only apply when coverage data is <strong>not</strong> available. See <code>src/priority/scoring/calculation.rs:68-82</code> and <code>src/config.rs:122-132</code> for the implementation.</p>
 <p>See <a href="configuration.html">Configuration</a> for complete options.</p>
 <h3 id="ci-integration"><a class="header" href="#ci-integration">CI Integration</a></h3>
 <p><strong>Example GitHub Actions Workflow</strong>:</p>

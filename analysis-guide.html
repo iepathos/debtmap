@@ -466,7 +466,7 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
 <li>Understand initialization patterns across the codebase</li>
 </ul>
 <h2 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h2>
-<p>Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
+<p>Debtmap detects 25 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
 <h3 id="debt-type-enum"><a class="header" href="#debt-type-enum">Debt Type Enum</a></h3>
 <p>The <code>DebtType</code> enum defines all specific debt patterns that Debtmap can detect:</p>
 <p><strong>Testing Debt:</strong></p>
@@ -1074,14 +1074,15 @@ Calculation:
 <li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
 <li><strong>Technical debt</strong>: High codebase risk score</li>
 </ul>
-<p><strong>Note on minimal_count and well-tested functions:</strong></p>
-<p>In unified scoring, <code>minimal_count</code> represents all functions scoring 0-2.9, which naturally includes:</p>
+<p><strong>Note on minimal_count:</strong></p>
+<p>In unified scoring (0-10 scale), <code>minimal_count</code> represents functions scoring 0-2.9, which includes:</p>
 <ul>
 <li>Simple utility functions</li>
 <li>Helper functions with low complexity</li>
-<li><strong>Well-tested complex code</strong> that scores low due to coverage dampening</li>
+<li>Well-tested complex code that scores low due to coverage dampening</li>
 </ul>
-<p>This is not a special category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk. These functions are correctly de-prioritized because they’re well-managed, not because they need special handling.</p>
+<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score, reflecting that good testing mitigates complexity risk.</p>
+<p><strong>Important:</strong> <code>minimal_count</code> does not appear in the standard <code>risk_categories</code> from features.json (Low, Medium, High, Critical, WellTested). It’s specific to unified scoring’s 0-10 scale priority classifications (Minimal, Low, Medium, High, Critical).</p>
 <h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
 <p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis:</p>
 <pre><code class="language-json">{
@@ -1132,6 +1133,7 @@ Calculation:
         "line": 42,
         "cyclomatic": 15,
         "cognitive": 22,
+        "est_branches": 20,
         "nesting": 4,
         "length": 68,
         "is_test": false,
@@ -1201,12 +1203,13 @@ Calculation:
   "metrics": { /* ... */ }
 }
 </code></pre>
-<p><strong>Note:</strong> The unified format is currently an internal representation. If you need this format exposed as a CLI option, please open a feature request on GitHub. The legacy format remains the stable default for all current integrations.</p>
+<p><strong>Note:</strong> The unified format is currently an internal representation and is <strong>not available</strong> as a user-facing CLI option. The legacy format remains the stable default for all current integrations. If you need the unified format exposed as a CLI option (<code>--format json-unified</code>), please open a feature request on GitHub.</p>
 <h3 id="reading-function-metrics"><a class="header" href="#reading-function-metrics">Reading Function Metrics</a></h3>
 <p><strong>Key fields:</strong></p>
 <ul>
 <li><code>cyclomatic</code>: Decision points - guides test case count</li>
 <li><code>cognitive</code>: Understanding difficulty - guides refactoring priority</li>
+<li><code>est_branches</code>: Estimated execution paths (formula: max(nesting_depth, 1) × cyclomatic ÷ 3) - approximates test cases needed for branch coverage</li>
 <li><code>nesting</code>: Indentation depth - signals need for extraction</li>
 <li><code>length</code>: Lines of code - signals SRP violations</li>
 <li><code>visibility</code>: Function visibility (<code>"Private"</code>, <code>"Crate"</code>, or <code>"Public"</code> from FunctionVisibility enum)</li>
