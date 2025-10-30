@@ -314,6 +314,101 @@ fn extract_pipeline_from_expr(
 }
 
 /// Extract pipeline from a method call chain
+/// Classification of iterator methods by their semantic role
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MethodClassification {
+    // Iterator constructors
+    ParallelIterator,
+    StandardIterator,
+    IteratorConstructor,
+    SliceIterator,
+    CollectionIterator,
+    StdIterConstructor,
+
+    // Transformation stages
+    Map,
+    Filter,
+    Fold,
+    FlatMap,
+    FilterMap,
+    AdapterMethod,
+    SimpleTransform,
+    OrderAdapter,
+
+    // Terminal operations (with or without transformation)
+    TerminalCollect,
+    TerminalSum,
+    TerminalCount,
+    TerminalAny,
+    TerminalAll,
+    TerminalFind,
+    TerminalForEach,
+    TerminalPartition,
+    TerminalUnzip,
+    TerminalReduce,
+    TerminalPosition,
+    TerminalElementAccess,
+    TerminalProduct,
+
+    // Not recognized
+    Unknown,
+}
+
+/// Classify an iterator method by its semantic role
+fn classify_method(method: &str) -> MethodClassification {
+    match method {
+        // Parallel iterators
+        "par_iter" | "par_iter_mut" | "into_par_iter" | "par_bridge" => {
+            MethodClassification::ParallelIterator
+        }
+        // Standard iterators
+        "iter" | "into_iter" | "iter_mut" => MethodClassification::StandardIterator,
+        // Iterator constructors (these ARE iterators, not receivers)
+        "lines" | "chars" | "bytes" | "split_whitespace" => {
+            MethodClassification::IteratorConstructor
+        }
+        // Slice/collection iterators
+        "windows" | "chunks" | "chunks_exact" | "rchunks" | "split" | "rsplit"
+        | "split_terminator" => MethodClassification::SliceIterator,
+        // Collection-specific iterators
+        "into_values" | "into_keys" | "values" | "keys" => MethodClassification::CollectionIterator,
+        // std::iter constructors
+        "once" | "repeat" | "repeat_with" | "from_fn" | "successors" | "empty" => {
+            MethodClassification::StdIterConstructor
+        }
+        // Core transformation stages
+        "map" => MethodClassification::Map,
+        "filter" => MethodClassification::Filter,
+        "fold" | "reduce" | "scan" | "try_fold" | "try_for_each" => MethodClassification::Fold,
+        "flat_map" => MethodClassification::FlatMap,
+        "filter_map" => MethodClassification::FilterMap,
+        // Adapter methods
+        "take" | "skip" | "step_by" | "chain" | "zip" | "enumerate" | "peekable" | "fuse"
+        | "take_while" | "skip_while" | "map_while" | "by_ref" | "inspect" | "flatten" => {
+            MethodClassification::AdapterMethod
+        }
+        "cloned" | "copied" => MethodClassification::SimpleTransform,
+        "rev" | "cycle" => MethodClassification::OrderAdapter,
+        // Terminal operations
+        "collect" => MethodClassification::TerminalCollect,
+        "sum" => MethodClassification::TerminalSum,
+        "count" => MethodClassification::TerminalCount,
+        "any" => MethodClassification::TerminalAny,
+        "all" => MethodClassification::TerminalAll,
+        "find" => MethodClassification::TerminalFind,
+        "for_each" => MethodClassification::TerminalForEach,
+        "partition" => MethodClassification::TerminalPartition,
+        "unzip" => MethodClassification::TerminalUnzip,
+        "max" | "min" | "max_by" | "min_by" | "max_by_key" | "min_by_key" => {
+            MethodClassification::TerminalReduce
+        }
+        "position" | "rposition" => MethodClassification::TerminalPosition,
+        "nth" | "last" => MethodClassification::TerminalElementAccess,
+        "product" => MethodClassification::TerminalProduct,
+        _ => MethodClassification::Unknown,
+    }
+}
+
 fn extract_pipeline_from_method_call(
     method_call: &ExprMethodCall,
     _config: &FunctionalAnalysisConfig,
@@ -326,173 +421,135 @@ fn extract_pipeline_from_method_call(
 
     // Walk backwards through the chain
     loop {
-        // Use ident directly instead of converting to string
-        let method_ident = &current.method;
-        let method_str = method_ident.to_string();
+        let method_str = current.method.to_string();
+        let classification = classify_method(&method_str);
 
-        // Detect parallel iterators - check without allocating string each time
-        match method_str.as_str() {
-            "par_iter" | "par_iter_mut" | "into_par_iter" | "par_bridge" => {
-                is_parallel = true;
-                stages.push(PipelineStage::Iterator {
-                    method: method_str.clone(),
-                });
-            }
-            // Standard iterators
-            "iter" | "into_iter" | "iter_mut" => {
+        // Handle parallel iterators (special case for tracking is_parallel)
+        if classification == MethodClassification::ParallelIterator {
+            is_parallel = true;
+        }
+
+        // Process based on classification
+        match classification {
+            // Iterator constructors - all become Iterator stages
+            MethodClassification::ParallelIterator
+            | MethodClassification::StandardIterator
+            | MethodClassification::IteratorConstructor
+            | MethodClassification::SliceIterator
+            | MethodClassification::CollectionIterator
+            | MethodClassification::StdIterConstructor => {
                 stages.push(PipelineStage::Iterator { method: method_str });
             }
-            // Iterator constructors (these ARE iterators, not receivers)
-            "lines" | "chars" | "bytes" | "split_whitespace" => {
-                stages.push(PipelineStage::Iterator { method: method_str });
-            }
-            // Slice/collection iterators
-            "windows" | "chunks" | "chunks_exact" | "rchunks" | "split" | "rsplit"
-            | "split_terminator" => {
-                stages.push(PipelineStage::Iterator { method: method_str });
-            }
-            // Collection-specific iterators
-            "into_values" | "into_keys" | "values" | "keys" => {
-                stages.push(PipelineStage::Iterator { method: method_str });
-            }
-            // std::iter constructors (from expressions, not method calls)
-            // These won't appear as method calls usually, but include for completeness
-            "once" | "repeat" | "repeat_with" | "from_fn" | "successors" | "empty" => {
-                stages.push(PipelineStage::Iterator { method: method_str });
-            }
-            "map" => stages.push(PipelineStage::Map {
+
+            // Core transformation stages
+            MethodClassification::Map => stages.push(PipelineStage::Map {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "filter" => stages.push(PipelineStage::Filter {
+            MethodClassification::Filter => stages.push(PipelineStage::Filter {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "fold" | "reduce" | "scan" | "try_fold" | "try_for_each" => {
-                stages.push(PipelineStage::Fold {
-                    init_complexity: 1,
-                    fold_complexity: 1,
-                })
-            }
-            "flat_map" => stages.push(PipelineStage::FlatMap {
+            MethodClassification::Fold => stages.push(PipelineStage::Fold {
+                init_complexity: 1,
+                fold_complexity: 1,
+            }),
+            MethodClassification::FlatMap => stages.push(PipelineStage::FlatMap {
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "filter_map" => stages.push(PipelineStage::FlatMap {
+            MethodClassification::FilterMap => stages.push(PipelineStage::FlatMap {
                 // filter_map is like flat_map with Option
                 closure_complexity: 1,
                 has_nested_pipeline: false,
             }),
-            "take" | "skip" | "step_by" | "chain" | "zip" | "enumerate" | "peekable" | "fuse"
-            | "take_while" | "skip_while" | "map_while" | "by_ref" | "inspect" | "flatten" => {
-                // Adapter methods that transform the iterator
-                stages.push(PipelineStage::Map {
-                    closure_complexity: 0, // No closure for these (or it's implicit)
-                    has_nested_pipeline: false,
-                });
-            }
-            "cloned" | "copied" => {
-                // Simple transformation adapters
-                stages.push(PipelineStage::Map {
-                    closure_complexity: 0,
-                    has_nested_pipeline: false,
-                });
-            }
-            "rev" | "cycle" => {
-                // Order/repetition adapters
-                stages.push(PipelineStage::Map {
-                    closure_complexity: 0,
-                    has_nested_pipeline: false,
-                });
-            }
-            "collect" => {
+
+            // Adapter methods - map with no closure
+            MethodClassification::AdapterMethod
+            | MethodClassification::SimpleTransform
+            | MethodClassification::OrderAdapter => stages.push(PipelineStage::Map {
+                closure_complexity: 0,
+                has_nested_pipeline: false,
+            }),
+
+            // Terminal operations - set terminal_op and optionally add stages
+            MethodClassification::TerminalCollect => {
                 terminal_op = Some(TerminalOp::Collect);
-                // Don't add terminal ops as stages - they terminate, not transform
             }
-            "sum" => {
-                // sum() is a reducing operation, counts as transformation
+            MethodClassification::TerminalSum => {
                 stages.push(PipelineStage::Fold {
                     init_complexity: 0,
                     fold_complexity: 0,
                 });
                 terminal_op = Some(TerminalOp::Sum);
             }
-            "count" => {
-                // count() is a reducing operation
+            MethodClassification::TerminalCount => {
                 stages.push(PipelineStage::Fold {
                     init_complexity: 0,
                     fold_complexity: 0,
                 });
                 terminal_op = Some(TerminalOp::Count);
             }
-            "any" => {
-                // any() has a closure, so it's also a transformation
+            MethodClassification::TerminalAny => {
                 stages.push(PipelineStage::Filter {
                     closure_complexity: 1,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::Any);
             }
-            "all" => {
-                // all() has a closure, so it's also a transformation
+            MethodClassification::TerminalAll => {
                 stages.push(PipelineStage::Filter {
                     closure_complexity: 1,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::All);
             }
-            "find" => {
-                // find() has a closure, so it's also a transformation
+            MethodClassification::TerminalFind => {
                 stages.push(PipelineStage::Filter {
                     closure_complexity: 1,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::Find);
             }
-            "for_each" => {
+            MethodClassification::TerminalForEach => {
                 terminal_op = Some(TerminalOp::ForEach);
             }
-            "partition" => {
-                // Partitioning has a closure
+            MethodClassification::TerminalPartition => {
                 stages.push(PipelineStage::Filter {
                     closure_complexity: 1,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::Collect);
             }
-            "unzip" => {
-                // Unzip is a transformation without a closure
+            MethodClassification::TerminalUnzip => {
                 stages.push(PipelineStage::Map {
                     closure_complexity: 0,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::Collect);
             }
-            "max" | "min" | "max_by" | "min_by" | "max_by_key" | "min_by_key" => {
-                // Extrema operations are terminal
+            MethodClassification::TerminalReduce => {
                 terminal_op = Some(TerminalOp::Reduce);
             }
-            "position" | "rposition" => {
-                // Position finding operations have a closure
+            MethodClassification::TerminalPosition => {
                 stages.push(PipelineStage::Filter {
                     closure_complexity: 1,
                     has_nested_pipeline: false,
                 });
                 terminal_op = Some(TerminalOp::Find);
             }
-            "nth" | "last" => {
-                // Element access operations
+            MethodClassification::TerminalElementAccess => {
                 terminal_op = Some(TerminalOp::Find);
             }
-            "product" => {
-                // Product is like sum - a reducing operation
+            MethodClassification::TerminalProduct => {
                 stages.push(PipelineStage::Fold {
                     init_complexity: 0,
                     fold_complexity: 0,
                 });
                 terminal_op = Some(TerminalOp::Sum);
             }
-            _ => {} // Ignore other methods
+
+            MethodClassification::Unknown => {} // Ignore unknown methods
         }
 
         // Move to the receiver
