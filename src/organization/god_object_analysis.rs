@@ -1359,6 +1359,130 @@ mod tests {
         assert_eq!(infer_responsibility_from_method("IS_VALID"), "Validation");
     }
 
+    #[test]
+    fn test_calculate_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("calculate_total"),
+            "Computation"
+        );
+        assert_eq!(
+            infer_responsibility_from_method("calculate_sum"),
+            "Computation"
+        );
+    }
+
+    #[test]
+    fn test_compute_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("compute_result"),
+            "Computation"
+        );
+    }
+
+    #[test]
+    fn test_create_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("create_instance"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_build_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("build_object"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_new_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("new_connection"),
+            "Construction"
+        );
+    }
+
+    #[test]
+    fn test_save_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("save_to_disk"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_load_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("load_from_file"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_store_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("store_data"),
+            "Persistence"
+        );
+    }
+
+    #[test]
+    fn test_process_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("process_request"),
+            "Processing"
+        );
+    }
+
+    #[test]
+    fn test_handle_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("handle_event"),
+            "Processing"
+        );
+    }
+
+    #[test]
+    fn test_send_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("send_message"),
+            "Communication"
+        );
+    }
+
+    #[test]
+    fn test_receive_prefix_recognized() {
+        assert_eq!(
+            infer_responsibility_from_method("receive_data"),
+            "Communication"
+        );
+    }
+
+    #[test]
+    fn test_empty_string_returns_utilities() {
+        assert_eq!(infer_responsibility_from_method(""), "Utilities");
+    }
+
+    #[test]
+    fn test_underscore_only_returns_utilities() {
+        assert_eq!(infer_responsibility_from_method("_"), "Utilities");
+        assert_eq!(infer_responsibility_from_method("__"), "Utilities");
+    }
+
+    #[test]
+    fn test_special_chars_return_utilities() {
+        assert_eq!(infer_responsibility_from_method("@#$%"), "Utilities");
+    }
+
+    #[test]
+    fn test_function_is_deterministic() {
+        let input = "calculate_average";
+        let result1 = infer_responsibility_from_method(input);
+        let result2 = infer_responsibility_from_method(input);
+        assert_eq!(result1, result2);
+    }
+
     // Spec 134: Tests for metric validation
     #[test]
     fn test_validation_passes_consistent_metrics() {
