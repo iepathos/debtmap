@@ -3,8 +3,9 @@ use super::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
     EnhancedGodObjectAnalysis, FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds,
-    GodObjectType, MaintainabilityImpact, OrganizationAntiPattern, OrganizationDetector,
-    PurityAnalyzer, PurityDistribution, PurityLevel, ResponsibilityGroup, StructMetrics,
+    GodObjectType, MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern,
+    OrganizationDetector, PurityAnalyzer, PurityDistribution, PurityLevel,
+    RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use crate::complexity::cyclomatic::calculate_cyclomatic;
@@ -679,6 +680,109 @@ impl GodObjectDetector {
         (god_object_score, is_god_object)
     }
 
+    /// Analyzes cross-domain struct mixing and generates module split recommendations
+    ///
+    /// # Arguments
+    /// * `per_struct_metrics` - Metrics for each struct in the file
+    /// * `total_methods` - Total number of methods
+    /// * `lines_of_code` - Estimated lines of code
+    /// * `is_god_object` - Whether this is classified as a god object
+    /// * `path` - File path for generating split names
+    /// * `all_methods` - All method names
+    /// * `responsibility_groups` - Methods grouped by responsibility
+    ///
+    /// # Returns
+    /// Tuple of (recommended_splits, analysis_method, cross_domain_severity, domain_count, domain_diversity, struct_ratio)
+    #[allow(clippy::type_complexity)]
+    fn analyze_domains_and_recommend_splits(
+        per_struct_metrics: &[StructMetrics],
+        total_methods: usize,
+        lines_of_code: usize,
+        is_god_object: bool,
+        path: &Path,
+        all_methods: &[String],
+        responsibility_groups: &HashMap<String, Vec<String>>,
+    ) -> (
+        Vec<ModuleSplit>,
+        crate::organization::SplitAnalysisMethod,
+        Option<RecommendationSeverity>,
+        usize,
+        f64,
+        f64,
+    ) {
+        // Cross-domain struct mixing analysis (Spec 140)
+        let struct_count = per_struct_metrics.len();
+        let domain_count = if struct_count >= 5 {
+            crate::organization::count_distinct_domains(per_struct_metrics)
+        } else {
+            0
+        };
+        let struct_ratio = crate::organization::calculate_struct_ratio(struct_count, total_methods);
+
+        // Determine cross-domain severity
+        let cross_domain_severity = if domain_count >= 3 {
+            Some(crate::organization::determine_cross_domain_severity(
+                struct_count,
+                domain_count,
+                lines_of_code,
+                is_god_object,
+            ))
+        } else {
+            None
+        };
+
+        // Calculate domain diversity (0.0 to 1.0)
+        let domain_diversity = if struct_count > 0 {
+            (domain_count as f64) / (struct_count as f64)
+        } else {
+            0.0
+        };
+
+        // Determine analysis method and generate recommendations
+        let (recommended_splits, analysis_method) = if struct_count >= 5 && domain_count >= 3 {
+            // PRIORITY 1: Cross-domain mixing analysis (primary strategy)
+            let mut splits =
+                crate::organization::suggest_module_splits_by_domain(per_struct_metrics);
+
+            // Attach severity to all splits
+            if let Some(severity) = cross_domain_severity {
+                for split in &mut splits {
+                    split.severity = Some(severity);
+                }
+            }
+
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::CrossDomain,
+            )
+        } else if is_god_object {
+            // PRIORITY 2: Method-based analysis (fallback for god objects)
+            let file_name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
+            (
+                crate::organization::recommend_module_splits(
+                    file_name,
+                    all_methods,
+                    responsibility_groups,
+                ),
+                crate::organization::SplitAnalysisMethod::MethodBased,
+            )
+        } else {
+            (Vec::new(), crate::organization::SplitAnalysisMethod::None)
+        };
+
+        (
+            recommended_splits,
+            analysis_method,
+            cross_domain_severity,
+            domain_count,
+            domain_diversity,
+            struct_ratio,
+        )
+    }
+
     /// # God Class vs God Module
     ///
     /// This function distinguishes between:
@@ -759,68 +863,23 @@ impl GodObjectDetector {
             &thresholds,
         );
 
-        // Cross-domain struct mixing analysis (Spec 140)
-        let struct_count = per_struct_metrics.len();
-        let domain_count = if struct_count >= 5 {
-            crate::organization::count_distinct_domains(&per_struct_metrics)
-        } else {
-            0
-        };
-        let struct_ratio = crate::organization::calculate_struct_ratio(struct_count, total_methods);
-
-        // Determine cross-domain severity
-        let cross_domain_severity = if domain_count >= 3 {
-            Some(crate::organization::determine_cross_domain_severity(
-                struct_count,
-                domain_count,
-                lines_of_code,
-                is_god_object,
-            ))
-        } else {
-            None
-        };
-
-        // Calculate domain diversity (0.0 to 1.0)
-        let domain_diversity = if struct_count > 0 {
-            (domain_count as f64) / (struct_count as f64)
-        } else {
-            0.0
-        };
-
-        // Determine analysis method and generate recommendations
-        let (recommended_splits, analysis_method) = if struct_count >= 5 && domain_count >= 3 {
-            // PRIORITY 1: Cross-domain mixing analysis (primary strategy)
-            let mut splits =
-                crate::organization::suggest_module_splits_by_domain(&per_struct_metrics);
-
-            // Attach severity to all splits
-            if let Some(severity) = cross_domain_severity {
-                for split in &mut splits {
-                    split.severity = Some(severity);
-                }
-            }
-
-            (
-                splits,
-                crate::organization::SplitAnalysisMethod::CrossDomain,
-            )
-        } else if is_god_object {
-            // PRIORITY 2: Method-based analysis (fallback for god objects)
-            let file_name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("module");
-            (
-                crate::organization::recommend_module_splits(
-                    file_name,
-                    &all_methods,
-                    &responsibility_groups,
-                ),
-                crate::organization::SplitAnalysisMethod::MethodBased,
-            )
-        } else {
-            (Vec::new(), crate::organization::SplitAnalysisMethod::None)
-        };
+        // Analyze cross-domain mixing and generate split recommendations
+        let (
+            recommended_splits,
+            analysis_method,
+            cross_domain_severity,
+            domain_count,
+            domain_diversity,
+            struct_ratio,
+        ) = Self::analyze_domains_and_recommend_splits(
+            &per_struct_metrics,
+            total_methods,
+            lines_of_code,
+            is_god_object,
+            path,
+            &all_methods,
+            &responsibility_groups,
+        );
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
