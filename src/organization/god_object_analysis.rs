@@ -809,73 +809,12 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
-    // Formatting & Output
-    if lower.starts_with("format")
-        || lower.starts_with("render")
-        || lower.starts_with("write")
-        || lower.starts_with("print")
-    {
-        "Formatting & Output".to_string()
-    }
-    // Parsing & Input
-    else if lower.starts_with("parse")
-        || lower.starts_with("read")
-        || lower.starts_with("extract")
-    {
-        "Parsing & Input".to_string()
-    }
-    // Filtering & Selection
-    else if lower.starts_with("filter")
-        || lower.starts_with("select")
-        || lower.starts_with("find")
-    {
-        "Filtering & Selection".to_string()
-    }
-    // Transformation
-    else if lower.starts_with("transform")
-        || lower.starts_with("convert")
-        || lower.starts_with("map")
-        || lower.starts_with("apply")
-    {
-        "Transformation".to_string()
-    }
-    // Data Access (existing)
-    else if lower.starts_with("get") || lower.starts_with("set") {
-        "Data Access".to_string()
-    }
-    // Validation (existing, enhanced with 'is_' prefix)
-    else if lower.starts_with("validate")
-        || lower.starts_with("check")
-        || lower.starts_with("verify")
-        || lower.starts_with("is")
-    {
-        "Validation".to_string()
-    }
-    // Computation (existing)
-    else if lower.starts_with("calculate") || lower.starts_with("compute") {
-        "Computation".to_string()
-    }
-    // Construction (existing)
-    else if lower.starts_with("create") || lower.starts_with("build") || lower.starts_with("new")
-    {
-        "Construction".to_string()
-    }
-    // Persistence (existing)
-    else if lower.starts_with("save") || lower.starts_with("load") || lower.starts_with("store") {
-        "Persistence".to_string()
-    }
-    // Processing (existing)
-    else if lower.starts_with("process") || lower.starts_with("handle") {
-        "Processing".to_string()
-    }
-    // Communication (existing)
-    else if lower.starts_with("send") || lower.starts_with("receive") {
-        "Communication".to_string()
-    }
-    // Utilities (renamed from "Core Operations")
-    else {
-        "Utilities".to_string()
-    }
+    RESPONSIBILITY_CATEGORIES
+        .iter()
+        .find(|cat| cat.matches(&lower))
+        .map(|cat| cat.name)
+        .unwrap_or("Utilities")
+        .to_string()
 }
 
 /// Metrics for an individual struct within a file
