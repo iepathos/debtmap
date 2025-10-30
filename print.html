@@ -1090,7 +1090,7 @@ debtmap init
 debtmap validate . --config debtmap.toml
 </code></pre>
 <h2 id="commands-1"><a class="header" href="#commands-1">Commands</a></h2>
-<p>Debtmap provides four main commands:</p>
+<p>Debtmap provides five main commands:</p>
 <h3 id="analyze"><a class="header" href="#analyze"><code>analyze</code></a></h3>
 <p>Analyze code for complexity and technical debt.</p>
 <p><strong>Usage:</strong></p>
@@ -1206,6 +1206,42 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 </ul>
 <p><strong>Description:</strong>
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.</p>
+<h3 id="validate-improvement"><a class="header" href="#validate-improvement"><code>validate-improvement</code></a></h3>
+<p>Validate that technical debt improvements meet quality thresholds.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash">debtmap validate-improvement --comparison &lt;FILE&gt; [OPTIONS]
+</code></pre>
+<p><strong>Required Options:</strong></p>
+<ul>
+<li><code>--comparison &lt;FILE&gt;</code> - Path to comparison JSON file (from <code>debtmap compare</code>)</li>
+</ul>
+<p><strong>Optional Options:</strong></p>
+<ul>
+<li><code>-o, --output &lt;FILE&gt;</code> - Output file path for validation results (default: <code>.prodigy/debtmap-validation.json</code>)</li>
+<li><code>--previous-validation &lt;FILE&gt;</code> - Path to previous validation result for trend tracking</li>
+<li><code>--threshold &lt;N&gt;</code> - Improvement threshold percentage (default: 75.0)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>--quiet</code> - Suppress console output (useful for automation)</li>
+</ul>
+<p><strong>Description:</strong>
+Validates improvement quality by analyzing comparison output from <code>debtmap compare</code>. Calculates a composite improvement score based on:</p>
+<ul>
+<li>Target item improvement (50% weight)</li>
+<li>Overall project health (30% weight)</li>
+<li>Absence of regressions (20% weight)</li>
+</ul>
+<p>When <code>--previous-validation</code> is provided, tracks progress trends across multiple attempts and provides recommendations for continuing or adjusting the improvement approach.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Basic validation
+debtmap validate-improvement --comparison comparison.json
+
+# With trend tracking and custom threshold
+debtmap validate-improvement \
+  --comparison .prodigy/comparison.json \
+  --previous-validation .prodigy/validation.json \
+  --output .prodigy/validation.json \
+  --threshold 80.0
+</code></pre>
 <h2 id="options"><a class="header" href="#options">Options</a></h2>
 <p>Options are organized by category for clarity. Most options apply to the <code>analyze</code> command, with a subset available for <code>validate</code>.</p>
 <h3 id="output-control"><a class="header" href="#output-control">Output Control</a></h3>
@@ -16880,12 +16916,25 @@ prodigy clean
 </ul>
 <h4 id="prodigy-validate-debtmap-improvement-1"><a class="header" href="#prodigy-validate-debtmap-improvement-1"><code>/prodigy-validate-debtmap-improvement</code></a></h4>
 <p>Validates that the implementation successfully addressed the debt item.</p>
-<pre><code class="language-yaml">- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+<blockquote>
+<p><strong>Note</strong>: This slash command now wraps the <code>debtmap validate-improvement</code> subcommand. You can use either approach:</p>
+<ul>
+<li>Claude slash command: <code>/prodigy-validate-debtmap-improvement</code> (recommended for Prodigy workflows)</li>
+<li>Direct subcommand: <code>debtmap validate-improvement</code> (recommended for shell scripts)</li>
+</ul>
+</blockquote>
+<pre><code class="language-yaml"># Using Claude slash command (recommended for workflows)
+- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+
+# Or using shell command directly
+- shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
 </code></pre>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><code>--comparison</code>: Debtmap comparison results (before vs after)</li>
 <li><code>--output</code>: Validation results JSON (with score 0-100)</li>
+<li><code>--previous-validation</code>: (Optional) Previous validation result for trend tracking</li>
+<li><code>--threshold</code>: (Optional) Improvement threshold percentage (default: 75.0)</li>
 </ul>
 <h4 id="prodigy-complete-debtmap-fix"><a class="header" href="#prodigy-complete-debtmap-fix"><code>/prodigy-complete-debtmap-fix</code></a></h4>
 <p>Completes a partial fix based on validation gaps.</p>
@@ -19010,11 +19059,233 @@ io_wrapper = 0.5     # De-emphasize I/O wrappers more
 <pre><code class="language-toml">[thresholds]
 minimum_debt_score = 3.0
 </code></pre>
-<h2 id="see-also-6"><a class="header" href="#see-also-6">See Also</a></h2>
+<h2 id="rebalanced-debt-scoring-spec-136"><a class="header" href="#rebalanced-debt-scoring-spec-136">Rebalanced Debt Scoring (Spec 136)</a></h2>
+<p>Debtmap now includes an advanced <strong>rebalanced scoring algorithm</strong> that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.</p>
+<h3 id="philosophy"><a class="header" href="#philosophy">Philosophy</a></h3>
+<p>Traditional scoring often over-emphasizes file size, causing large but simple files to rank higher than complex, untested code. The rebalanced algorithm fixes this by:</p>
+<ol>
+<li><strong>De-emphasizing size</strong>: Reduces size weight from ~1.5 to 0.3 (80% reduction)</li>
+<li><strong>Emphasizing quality</strong>: Increases weights for complexity (1.0) and coverage gaps (1.0)</li>
+<li><strong>Additive bonuses</strong>: Provides +20 bonus for complex + untested code (not multiplicative)</li>
+<li><strong>Context-aware thresholds</strong>: Integrates with file type classification from Spec 135</li>
+</ol>
+<h3 id="multi-dimensional-scoring"><a class="header" href="#multi-dimensional-scoring">Multi-Dimensional Scoring</a></h3>
+<p>The rebalanced algorithm computes five scoring components:</p>
+<div class="table-wrapper"><table><thead><tr><th>Component</th><th>Weight</th><th>Range</th><th>Description</th></tr></thead><tbody>
+<tr><td><strong>Complexity</strong></td><td>1.0</td><td>0-100</td><td>Cyclomatic + cognitive complexity</td></tr>
+<tr><td><strong>Coverage Gap</strong></td><td>1.0</td><td>0-80</td><td>Testing coverage deficit with complexity bonus</td></tr>
+<tr><td><strong>Structural</strong></td><td>0.8</td><td>0-60</td><td>God objects and architectural issues</td></tr>
+<tr><td><strong>Size</strong></td><td>0.3</td><td>0-30</td><td>File size (reduced from previous ~1.5)</td></tr>
+<tr><td><strong>Code Smells</strong></td><td>0.6</td><td>0-40</td><td>Long functions, deep nesting, impure logic</td></tr>
+</tbody></table>
+</div>
+<p><strong>Weighted Total Formula</strong>:</p>
+<pre><code>weighted_total = (complexity × 1.0) + (coverage × 1.0) + (structural × 0.8)
+                 + (size × 0.3) + (smells × 0.6)
+
+normalized_score = (weighted_total / 237.0) × 200.0  // Normalize to 0-200 range
+</code></pre>
+<h3 id="scoring-presets"><a class="header" href="#scoring-presets">Scoring Presets</a></h3>
+<p>Debtmap provides four presets for different prioritization strategies:</p>
+<h4 id="balanced-default"><a class="header" href="#balanced-default">Balanced (Default)</a></h4>
+<pre><code class="language-toml">[scoring_rebalanced]
+preset = "balanced"
+</code></pre>
+<p>Weights:</p>
+<ul>
+<li>Complexity: 1.0, Coverage: 1.0, Structural: 0.8, Size: 0.3, Smells: 0.6</li>
+</ul>
+<p><strong>Use when</strong>: Standard development with focus on actual code quality</p>
+<h4 id="quality-focused"><a class="header" href="#quality-focused">Quality-Focused</a></h4>
+<pre><code class="language-toml">[scoring_rebalanced]
+preset = "quality-focused"
+</code></pre>
+<p>Weights:</p>
+<ul>
+<li>Complexity: 1.2, Coverage: 1.1, Structural: 0.9, Size: 0.2, Smells: 0.7</li>
+</ul>
+<p><strong>Use when</strong>: Maximum emphasis on code quality, minimal concern for file size</p>
+<h4 id="test-coverage-focused"><a class="header" href="#test-coverage-focused">Test-Coverage-Focused</a></h4>
+<pre><code class="language-toml">[scoring_rebalanced]
+preset = "test-coverage"
+</code></pre>
+<p>Weights:</p>
+<ul>
+<li>Complexity: 0.8, Coverage: 1.3, Structural: 0.6, Size: 0.2, Smells: 0.5</li>
+</ul>
+<p><strong>Use when</strong>: Prioritizing test coverage improvements</p>
+<h4 id="size-focused-legacy"><a class="header" href="#size-focused-legacy">Size-Focused (Legacy)</a></h4>
+<pre><code class="language-toml">[scoring_rebalanced]
+preset = "size-focused"
+</code></pre>
+<p>Weights:</p>
+<ul>
+<li>Complexity: 0.5, Coverage: 0.4, Structural: 0.6, Size: 1.5, Smells: 0.3</li>
+</ul>
+<p><strong>Use when</strong>: Maintaining legacy scoring behavior, file size is primary concern</p>
+<h3 id="custom-weights"><a class="header" href="#custom-weights">Custom Weights</a></h3>
+<p>You can define custom weights in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[scoring_rebalanced]
+complexity_weight = 1.2
+coverage_weight = 1.0
+structural_weight = 0.8
+size_weight = 0.2
+smell_weight = 0.7
+</code></pre>
+<h3 id="severity-levels"><a class="header" href="#severity-levels">Severity Levels</a></h3>
+<p>The rebalanced algorithm assigns severity based on normalized score and risk factors:</p>
+<div class="table-wrapper"><table><thead><tr><th>Severity</th><th>Criteria</th><th>Description</th></tr></thead><tbody>
+<tr><td><strong>CRITICAL</strong></td><td>Score &gt; 120 OR (complexity &gt; 60 AND coverage &gt; 40)</td><td>Requires immediate attention</td></tr>
+<tr><td><strong>HIGH</strong></td><td>Score &gt; 80 OR (complexity &gt; 40 AND coverage &gt; 20) OR structural &gt; 50</td><td>High priority for next sprint</td></tr>
+<tr><td><strong>MEDIUM</strong></td><td>Score &gt; 40 OR single moderate issue</td><td>Plan for future sprint</td></tr>
+<tr><td><strong>LOW</strong></td><td>Everything else</td><td>Minor concerns, size-only issues</td></tr>
+</tbody></table>
+</div>
+<h3 id="example-prioritization"><a class="header" href="#example-prioritization">Example Prioritization</a></h3>
+<p><strong>Complex Untested Function</strong> (HIGH priority):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn process_payment(cart: &amp;Cart, user: &amp;User) -&gt; Result&lt;Receipt&gt; {
+    // 150 lines, cyclomatic: 42, cognitive: 77
+    // Coverage: 38%
+
+    // Rebalanced Score:
+    // - Complexity: 100.0 (very high)
+    // - Coverage: 57.2 (gap × 0.6 + 20 bonus for complex+untested)
+    // - Structural: 0.0
+    // - Size: 0.0 (function-level scoring)
+    // - Smells: 25.0 (long function)
+    // Total: 95.3 → CRITICAL severity
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Large Simple Function</strong> (LOW priority):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn format_report(data: &amp;ReportData) -&gt; String {
+    // 2000 lines, cyclomatic: 3, cognitive: 5
+    // Coverage: 100%
+
+    // Rebalanced Score:
+    // - Complexity: 0.0 (trivial)
+    // - Coverage: 0.0 (well tested)
+    // - Structural: 0.0
+    // - Size: 0.0 (function-level scoring)
+    // - Smells: 15.0 (long but simple)
+    // Total: 3.2 → LOW severity
+}
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Result</strong>: Complex untested code ranks 30× higher than large simple code.</p>
+<h3 id="integration-with-file-classification-spec-135"><a class="header" href="#integration-with-file-classification-spec-135">Integration with File Classification (Spec 135)</a></h3>
+<p>The rebalanced scoring integrates with context-aware file size thresholds:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use debtmap::organization::file_classifier::{classify_file, get_threshold};
+
+let file_type = classify_file(source, path);
+let threshold = get_threshold(&amp;file_type, function_count, lines);
+
+// Apply context-aware scoring:
+// - Generated code: 0.1× size multiplier
+// - Test code: Lenient thresholds (650 lines)
+// - Business logic: Strict thresholds (400 lines)
+<span class="boring">}</span></code></pre></pre>
+<h3 id="generated-code-detection"><a class="header" href="#generated-code-detection">Generated Code Detection</a></h3>
+<p>The rebalanced scoring automatically detects and reduces scores for generated code:</p>
+<p><strong>Detection Markers</strong> (first 20 lines):</p>
+<ul>
+<li>“DO NOT EDIT”</li>
+<li>“automatically generated”</li>
+<li>“AUTO-GENERATED”</li>
+<li>“@generated”</li>
+<li>“Code generated by”</li>
+</ul>
+<p><strong>Generated Code Score Adjustment</strong>:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if is_generated_code(source) {
+    size_score *= 0.1;  // 90% reduction
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="scoring-rationale"><a class="header" href="#scoring-rationale">Scoring Rationale</a></h3>
+<p>Each debt item includes a detailed rationale explaining the score:</p>
+<pre><code>Debt Item: src/payment/processor.rs:142 - process_payment()
+Score: 95.3 (CRITICAL)
+
+Primary factors:
+  - High cyclomatic complexity (+100.0)
+  - Significant coverage gap (+57.2)
+
+Bonuses:
+  - Complex + untested: +20 bonus applied
+  - Code smells detected (+25.0)
+
+Context adjustments:
+  - Size de-emphasized (weight: 0.3)
+</code></pre>
+<h3 id="migration-from-legacy-scoring"><a class="header" href="#migration-from-legacy-scoring">Migration from Legacy Scoring</a></h3>
+<p><strong>Breaking Changes</strong>:</p>
+<ul>
+<li>Scores will change significantly for all debt items</li>
+<li>Large files with low complexity will rank lower</li>
+<li>Complex untested code will rank higher</li>
+<li>Size-based prioritization reduced by 80%</li>
+</ul>
+<p><strong>Restoring Legacy Behavior</strong>:</p>
+<pre><code class="language-toml">[scoring_rebalanced]
+preset = "size-focused"
+</code></pre>
+<p><strong>Gradual Migration</strong>:</p>
+<ol>
+<li>Run analysis with both algorithms: <code>debtmap analyze . --legacy-scoring</code></li>
+<li>Compare results to understand impact</li>
+<li>Adjust team priorities based on new rankings</li>
+<li>Switch to rebalanced scoring after validation</li>
+</ol>
+<p>See <a href="./migration-guide.html">Migration Guide</a> for detailed migration instructions.</p>
+<h3 id="configuration-reference-1"><a class="header" href="#configuration-reference-1">Configuration Reference</a></h3>
+<p>Complete configuration example:</p>
+<pre><code class="language-toml"># .debtmap.toml
+
+[scoring_rebalanced]
+# Use a preset (balanced, quality-focused, test-coverage, size-focused)
+preset = "balanced"
+
+# Or define custom weights
+complexity_weight = 1.0
+coverage_weight = 1.0
+structural_weight = 0.8
+size_weight = 0.3
+smell_weight = 0.6
+</code></pre>
+<h3 id="when-to-use-rebalanced-scoring"><a class="header" href="#when-to-use-rebalanced-scoring">When to Use Rebalanced Scoring</a></h3>
+<p>✅ <strong>Use rebalanced scoring when</strong>:</p>
+<ul>
+<li>You want to prioritize code quality over file size</li>
+<li>Complex untested code is a concern</li>
+<li>You’re building new features and need quality focus</li>
+<li>Your team values testability and maintainability</li>
+</ul>
+<p>❌ <strong>Use legacy/size-focused when</strong>:</p>
+<ul>
+<li>You’re managing a legacy codebase with large files</li>
+<li>File size reduction is the primary concern</li>
+<li>You need compatibility with existing workflows</li>
+<li>Your team’s priority is file splitting over quality</li>
+</ul>
+<h3 id="performance"><a class="header" href="#performance">Performance</a></h3>
+<p>The rebalanced scoring algorithm has minimal performance impact:</p>
+<ul>
+<li>Same O(n) complexity as legacy scoring</li>
+<li>No additional file I/O required</li>
+<li>Parallel processing compatible</li>
+<li>Adds ~5% to analysis time for rationale generation</li>
+</ul>
+<h3 id="see-also-6"><a class="header" href="#see-also-6">See Also</a></h3>
 <ul>
 <li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - Understanding tier-based classification</li>
 <li><a href="./configuration.html">Configuration</a> - Scoring and aggregation configuration</li>
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
+<li><a href="./file-classification.html">File Classification</a> - Context-aware file size thresholds (Spec 135)</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="tiered-prioritization-3"><a class="header" href="#tiered-prioritization-3">Tiered Prioritization</a></h1>
 <p>Debtmap uses a sophisticated tiered prioritization system to surface critical architectural issues above simple testing gaps. This chapter explains the tier strategy, how to interpret tier classifications, and how to customize tier thresholds for your project.</p>

@@ -198,7 +198,7 @@ debtmap init
 debtmap validate . --config debtmap.toml
 </code></pre>
 <h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
-<p>Debtmap provides four main commands:</p>
+<p>Debtmap provides five main commands:</p>
 <h3 id="analyze"><a class="header" href="#analyze"><code>analyze</code></a></h3>
 <p>Analyze code for complexity and technical debt.</p>
 <p><strong>Usage:</strong></p>
@@ -314,6 +314,42 @@ Similar to <code>analyze</code> but enforces thresholds defined in configuration
 </ul>
 <p><strong>Description:</strong>
 Compares two analysis results and generates a diff showing improvements or regressions in code quality metrics.</p>
+<h3 id="validate-improvement"><a class="header" href="#validate-improvement"><code>validate-improvement</code></a></h3>
+<p>Validate that technical debt improvements meet quality thresholds.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash">debtmap validate-improvement --comparison &lt;FILE&gt; [OPTIONS]
+</code></pre>
+<p><strong>Required Options:</strong></p>
+<ul>
+<li><code>--comparison &lt;FILE&gt;</code> - Path to comparison JSON file (from <code>debtmap compare</code>)</li>
+</ul>
+<p><strong>Optional Options:</strong></p>
+<ul>
+<li><code>-o, --output &lt;FILE&gt;</code> - Output file path for validation results (default: <code>.prodigy/debtmap-validation.json</code>)</li>
+<li><code>--previous-validation &lt;FILE&gt;</code> - Path to previous validation result for trend tracking</li>
+<li><code>--threshold &lt;N&gt;</code> - Improvement threshold percentage (default: 75.0)</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: json)</li>
+<li><code>--quiet</code> - Suppress console output (useful for automation)</li>
+</ul>
+<p><strong>Description:</strong>
+Validates improvement quality by analyzing comparison output from <code>debtmap compare</code>. Calculates a composite improvement score based on:</p>
+<ul>
+<li>Target item improvement (50% weight)</li>
+<li>Overall project health (30% weight)</li>
+<li>Absence of regressions (20% weight)</li>
+</ul>
+<p>When <code>--previous-validation</code> is provided, tracks progress trends across multiple attempts and provides recommendations for continuing or adjusting the improvement approach.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Basic validation
+debtmap validate-improvement --comparison comparison.json
+
+# With trend tracking and custom threshold
+debtmap validate-improvement \
+  --comparison .prodigy/comparison.json \
+  --previous-validation .prodigy/validation.json \
+  --output .prodigy/validation.json \
+  --threshold 80.0
+</code></pre>
 <h2 id="options"><a class="header" href="#options">Options</a></h2>
 <p>Options are organized by category for clarity. Most options apply to the <code>analyze</code> command, with a subset available for <code>validate</code>.</p>
 <h3 id="output-control"><a class="header" href="#output-control">Output Control</a></h3>

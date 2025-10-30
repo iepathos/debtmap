@@ -579,12 +579,25 @@ prodigy clean
 </ul>
 <h4 id="prodigy-validate-debtmap-improvement"><a class="header" href="#prodigy-validate-debtmap-improvement"><code>/prodigy-validate-debtmap-improvement</code></a></h4>
 <p>Validates that the implementation successfully addressed the debt item.</p>
-<pre><code class="language-yaml">- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+<blockquote>
+<p><strong>Note</strong>: This slash command now wraps the <code>debtmap validate-improvement</code> subcommand. You can use either approach:</p>
+<ul>
+<li>Claude slash command: <code>/prodigy-validate-debtmap-improvement</code> (recommended for Prodigy workflows)</li>
+<li>Direct subcommand: <code>debtmap validate-improvement</code> (recommended for shell scripts)</li>
+</ul>
+</blockquote>
+<pre><code class="language-yaml"># Using Claude slash command (recommended for workflows)
+- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+
+# Or using shell command directly
+- shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
 </code></pre>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><code>--comparison</code>: Debtmap comparison results (before vs after)</li>
 <li><code>--output</code>: Validation results JSON (with score 0-100)</li>
+<li><code>--previous-validation</code>: (Optional) Previous validation result for trend tracking</li>
+<li><code>--threshold</code>: (Optional) Improvement threshold percentage (default: 75.0)</li>
 </ul>
 <h4 id="prodigy-complete-debtmap-fix"><a class="header" href="#prodigy-complete-debtmap-fix"><code>/prodigy-complete-debtmap-fix</code></a></h4>
 <p>Completes a partial fix based on validation gaps.</p>
