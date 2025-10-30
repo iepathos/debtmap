@@ -896,6 +896,166 @@ mod tests {
     use super::*;
     use syn::parse_quote;
 
+    // Tests for extracted helper functions
+    #[test]
+    fn test_classify_method_parallel_iterators() {
+        assert_eq!(
+            classify_method("par_iter"),
+            MethodClassification::ParallelIterator
+        );
+        assert_eq!(
+            classify_method("into_par_iter"),
+            MethodClassification::ParallelIterator
+        );
+    }
+
+    #[test]
+    fn test_classify_method_standard_iterators() {
+        assert_eq!(
+            classify_method("iter"),
+            MethodClassification::StandardIterator
+        );
+        assert_eq!(
+            classify_method("into_iter"),
+            MethodClassification::StandardIterator
+        );
+    }
+
+    #[test]
+    fn test_classify_method_transformations() {
+        assert_eq!(classify_method("map"), MethodClassification::Map);
+        assert_eq!(classify_method("filter"), MethodClassification::Filter);
+        assert_eq!(classify_method("fold"), MethodClassification::Fold);
+        assert_eq!(classify_method("flat_map"), MethodClassification::FlatMap);
+        assert_eq!(
+            classify_method("filter_map"),
+            MethodClassification::FilterMap
+        );
+    }
+
+    #[test]
+    fn test_classify_method_terminals() {
+        assert_eq!(
+            classify_method("collect"),
+            MethodClassification::TerminalCollect
+        );
+        assert_eq!(classify_method("sum"), MethodClassification::TerminalSum);
+        assert_eq!(classify_method("any"), MethodClassification::TerminalAny);
+        assert_eq!(classify_method("find"), MethodClassification::TerminalFind);
+    }
+
+    #[test]
+    fn test_classify_method_unknown() {
+        assert_eq!(
+            classify_method("unknown_method"),
+            MethodClassification::Unknown
+        );
+    }
+
+    #[test]
+    fn test_create_stage_from_classification_map() {
+        let stage = create_stage_from_classification(MethodClassification::Map);
+        assert!(matches!(
+            stage,
+            Some(PipelineStage::Map {
+                closure_complexity: 1,
+                has_nested_pipeline: false
+            })
+        ));
+    }
+
+    #[test]
+    fn test_create_stage_from_classification_filter() {
+        let stage = create_stage_from_classification(MethodClassification::Filter);
+        assert!(matches!(
+            stage,
+            Some(PipelineStage::Filter {
+                closure_complexity: 1,
+                has_nested_pipeline: false
+            })
+        ));
+    }
+
+    #[test]
+    fn test_create_stage_from_classification_fold() {
+        let stage = create_stage_from_classification(MethodClassification::Fold);
+        assert!(matches!(
+            stage,
+            Some(PipelineStage::Fold {
+                init_complexity: 1,
+                fold_complexity: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn test_create_stage_from_classification_terminal_with_stage() {
+        // Terminal operations like sum should add a Fold stage
+        let stage = create_stage_from_classification(MethodClassification::TerminalSum);
+        assert!(matches!(
+            stage,
+            Some(PipelineStage::Fold {
+                init_complexity: 0,
+                fold_complexity: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn test_create_stage_from_classification_no_stage() {
+        // Iterator constructors don't create transformation stages
+        let stage = create_stage_from_classification(MethodClassification::StandardIterator);
+        assert_eq!(stage, None);
+
+        // Pure terminals without transformation don't create stages
+        let stage = create_stage_from_classification(MethodClassification::TerminalCollect);
+        assert_eq!(stage, None);
+    }
+
+    #[test]
+    fn test_extract_terminal_op_collect() {
+        assert_eq!(
+            extract_terminal_op(MethodClassification::TerminalCollect),
+            Some(TerminalOp::Collect)
+        );
+    }
+
+    #[test]
+    fn test_extract_terminal_op_sum() {
+        assert_eq!(
+            extract_terminal_op(MethodClassification::TerminalSum),
+            Some(TerminalOp::Sum)
+        );
+        assert_eq!(
+            extract_terminal_op(MethodClassification::TerminalProduct),
+            Some(TerminalOp::Sum)
+        );
+    }
+
+    #[test]
+    fn test_extract_terminal_op_find() {
+        assert_eq!(
+            extract_terminal_op(MethodClassification::TerminalFind),
+            Some(TerminalOp::Find)
+        );
+        assert_eq!(
+            extract_terminal_op(MethodClassification::TerminalPosition),
+            Some(TerminalOp::Find)
+        );
+    }
+
+    #[test]
+    fn test_extract_terminal_op_none() {
+        assert_eq!(
+            extract_terminal_op(MethodClassification::Map),
+            None
+        );
+        assert_eq!(
+            extract_terminal_op(MethodClassification::StandardIterator),
+            None
+        );
+    }
+
     #[test]
     fn test_config_profiles() {
         let strict = FunctionalAnalysisConfig::strict();
