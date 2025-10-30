@@ -1,247 +1,349 @@
-# Implementation Plan: Reduce Complexity in CrossModuleContext::resolve_function
+# Implementation Plan: Refactor SharedCache God Object
 
 ## Problem Summary
 
-**Location**: ./src/analysis/python_call_graph/cross_module.rs:CrossModuleContext::resolve_function:197
-**Priority Score**: 17.81
-**Debt Type**: ComplexityHotspot (cyclomatic: 19, cognitive: 62)
+**Location**: ./src/cache/shared_cache/mod.rs:file:0
+**Priority Score**: 59.94
+**Debt Type**: God Object (GodClass)
 
 **Current Metrics**:
-- Function Length: 132 lines
-- Cyclomatic Complexity: 19
-- Cognitive Complexity: 62
-- Nesting Depth: 6
-- Function Role: PureLogic (marked as not pure due to side effects)
+- Lines of Code: 1201
+- Functions: 69 (61 impl methods, 4 module-level functions, 2 trait methods)
+- Cyclomatic Complexity: 226 (avg 3.28, max 13)
+- Coverage: 0.0%
+- Responsibilities: 8 (Data Access, Utilities, Construction, Processing, Persistence, Computation, Filtering & Selection, Validation)
+- God Object Score: 1.0 (confirmed god object)
 
-**Issue**: High complexity 19/62 makes function hard to test and maintain. The function attempts to resolve a function name through 5 different strategies:
-1. Cache lookup
-2. Enhanced resolver
-3. Namespace-based resolution (with wildcard imports)
-4. Tracker-based resolution (with multiple fallback strategies)
-5. Direct symbol lookup
-
-Each strategy has nested conditionals and side effects (cache writes), leading to high cognitive load.
+**Issue**: The SharedCache struct has 61 methods handling 8 different responsibilities, making it difficult to maintain, test, and reason about. The debtmap analysis recommends splitting into focused modules with <30 functions each, organized by data flow: 1) Input/parsing functions 2) Core logic/transformation 3) Output/formatting.
 
 ## Target State
 
 **Expected Impact** (from debtmap):
-- Complexity Reduction: 9.5 (target cyclomatic: ~10)
-- Coverage Improvement: 0.0
-- Risk Reduction: 6.23
+- Complexity Reduction: 45.2 points
+- Maintainability Improvement: 5.99 points
+- Test Effort: 120.1 hours
 
 **Success Criteria**:
-- [ ] Cyclomatic complexity reduced from 19 to ≤10
-- [ ] Cognitive complexity reduced from 62 to <40
-- [ ] Nesting depth reduced from 6 to ≤3
-- [ ] Extract at least 4 pure helper functions
+- [ ] Separate pruning logic into dedicated module (~40 methods)
+- [ ] Extract construction/initialization logic into builder module (~6 methods)
+- [ ] Reduce SharedCache impl to core coordination methods (<25 methods)
 - [ ] All existing tests continue to pass
 - [ ] No clippy warnings
-- [ ] Proper formatting with cargo fmt
+- [ ] Proper formatting with `cargo fmt`
+- [ ] Each extracted module has clear, single responsibility
+- [ ] Public API remains unchanged (backward compatibility)
 
 ## Implementation Phases
 
-### Phase 1: Extract Cache Management Functions
+### Phase 1: Extract Pruning Logic Module
 
-**Goal**: Separate caching concerns from resolution logic to reduce nesting and clarify intent.
-
-**Changes**:
-- Extract `check_resolution_cache(&self, cache_key: &(PathBuf, String)) -> Option<FunctionId>` - Pure read from cache
-- Extract `update_resolution_cache(&self, cache_key: (PathBuf, String), result: Option<FunctionId>)` - Write to cache
-- Replace inline cache read/write blocks with these helper functions
-
-**Testing**:
-- Run `cargo test cross_module` to verify existing tests pass
-- Run `cargo clippy` to check for warnings
-
-**Success Criteria**:
-- [ ] Two new private helper functions created
-- [ ] Cache read/write logic removed from main function
-- [ ] Nesting depth reduced by 1 level
-- [ ] All tests pass
-- [ ] Ready to commit
-
-**Expected Impact**: Reduces nesting from 6→5, improves readability
-
----
-
-### Phase 2: Extract Enhanced Resolver Strategy
-
-**Goal**: Extract the enhanced resolver resolution strategy into a dedicated function.
+**Goal**: Extract all pruning-related methods (40 methods) into a dedicated `pruning.rs` submodule.
 
 **Changes**:
-- Extract `try_enhanced_resolver(&self, module_path: &Path, name: &str) -> Option<FunctionId>`
-  - Move enhanced resolver logic (lines 208-232) into this function
-  - Handle the resolver lock and symbol lookup internally
-  - Return `Some(FunctionId)` on success, `None` on failure
+- Create `src/cache/shared_cache/pruning.rs` module
+- Extract pure pruning functions:
+  - `calculate_cache_projections`
+  - `should_prune_based_on_projections`
+  - `calculate_pruning_decision`
+  - `should_remove_entry_by_age`
+  - `filter_entries_by_age`
+  - `calculate_max_age_duration`
+  - `should_prune_after_insertion`
+- Extract pruning decision functions:
+  - `determine_pruning_config`
+  - `determine_pruning_strategy`
+  - `should_perform_post_insertion_pruning`
+- Extract pruning execution methods (keep &self references):
+  - `trigger_pruning_if_needed`
+  - `trigger_pruning_if_needed_with_new_entry`
+  - `trigger_pruning`
+  - `execute_sync_pruning`
+  - `execute_pruning_strategy`
+  - `handle_pre_insertion_pruning`
+  - `handle_post_insertion_pruning`
+  - `execute_post_insertion_check`
+  - `prune_with_strategy`
+  - `clean_orphaned_entries`
+  - `cleanup_old_entries`
+- Extract pruning helper methods:
+  - `calculate_entries_to_prune`
+  - `remove_entries_from_index`
+  - `delete_pruned_files`
+  - `execute_fallback_cleanup`
+  - `log_post_insertion_debug`
+  - `log_config_if_test_environment`
+- Extract stats creation methods:
+  - `create_no_prune_stats`
+  - `create_empty_prune_stats`
+  - `create_prune_stats`
+- Update `mod.rs` to:
+  - Add `mod pruning;` declaration
+  - Delegate to pruning module methods
+  - Keep public API surface unchanged
 
 **Testing**:
-- Run `cargo test cross_module` to verify existing tests pass
+- Run `cargo test --lib` to verify existing tests pass
 - Run `cargo clippy` to check for warnings
+- Verify all pruning-related tests still work
 
 **Success Criteria**:
-- [ ] New `try_enhanced_resolver` private method created
-- [ ] Enhanced resolver block removed from main function
-- [ ] Cyclomatic complexity reduced by ~2
-- [ ] All tests pass
-- [ ] Ready to commit
-
-**Expected Impact**: Reduces cyclomatic complexity 19→17, improves separation of concerns
-
----
-
-### Phase 3: Extract Namespace Resolution Strategy
-
-**Goal**: Extract namespace-based resolution (including wildcard imports) into a focused function.
-
-**Changes**:
-- Extract `try_namespace_resolution(&self, module_path: &Path, name: &str) -> Option<FunctionId>`
-  - Move namespace lookup logic (lines 235-259) into this function
-  - Handle both direct namespace resolution and wildcard import iteration
-  - Return `Some(FunctionId)` on success, `None` on failure
-
-**Testing**:
-- Run `cargo test cross_module` to verify existing tests pass
-- Run `cargo clippy` to check for warnings
-
-**Success Criteria**:
-- [ ] New `try_namespace_resolution` private method created
-- [ ] Namespace resolution block removed from main function
-- [ ] Cyclomatic complexity reduced by ~3
-- [ ] All tests pass
-- [ ] Ready to commit
-
-**Expected Impact**: Reduces cyclomatic complexity 17→14, reduces nesting depth
-
----
-
-### Phase 4: Extract Tracker Resolution Strategy
-
-**Goal**: Extract the complex tracker-based resolution with multiple fallback strategies.
-
-**Changes**:
-- Extract `try_tracker_resolution(&self, module_path: &Path, name: &str) -> Option<FunctionId>`
-  - Move tracker-based logic (lines 262-304) into this function
-  - Includes: direct resolution, module.function split, export scanning
-  - Return `Some(FunctionId)` on success, `None` on failure
-- Consider extracting sub-helper: `try_export_scan(&self, resolved: &str) -> Option<FunctionId>`
-  - Move the exports iteration loop (lines 286-302) into this sub-helper
-  - Reduces complexity of the tracker resolution function
-
-**Testing**:
-- Run `cargo test cross_module` to verify existing tests pass
-- Run `cargo clippy` to check for warnings
-
-**Success Criteria**:
-- [ ] New `try_tracker_resolution` private method created
-- [ ] Optional `try_export_scan` helper created if tracker function is still >15 lines
-- [ ] Tracker resolution block removed from main function
-- [ ] Cyclomatic complexity reduced by ~4
-- [ ] All tests pass
-- [ ] Ready to commit
-
-**Expected Impact**: Reduces cyclomatic complexity 14→10, significantly improves readability
-
----
-
-### Phase 5: Simplify Main Function with Strategy Chain
-
-**Goal**: Refactor main `resolve_function` to be a clean strategy chain with caching.
-
-**Changes**:
-- Rewrite `resolve_function` as a pipeline:
-  ```rust
-  pub fn resolve_function(&self, module_path: &Path, name: &str) -> Option<FunctionId> {
-      let cache_key = (module_path.to_path_buf(), name.to_string());
-
-      // Check cache first
-      if let Some(cached) = self.check_resolution_cache(&cache_key) {
-          return cached;
-      }
-
-      // Try resolution strategies in order
-      let result = self.try_enhanced_resolver(module_path, name)
-          .or_else(|| self.try_namespace_resolution(module_path, name))
-          .or_else(|| self.try_tracker_resolution(module_path, name))
-          .or_else(|| self.try_direct_lookup(module_path, name));
-
-      // Update cache
-      self.update_resolution_cache(cache_key, result.clone());
-      result
-  }
-  ```
-- Extract `try_direct_lookup(&self, module_path: &Path, name: &str) -> Option<FunctionId>`
-  - Move the final fallback logic (lines 307-321) into this function
-
-**Testing**:
-- Run `cargo test cross_module` to verify existing tests pass
-- Run `cargo test --all` to ensure no regressions elsewhere
-- Run `cargo clippy` to check for warnings
-
-**Success Criteria**:
-- [ ] Main function reduced to ~15 lines
-- [ ] Clear strategy chain using `.or_else()` pattern
-- [ ] Cyclomatic complexity ≤10
-- [ ] Cognitive complexity <40
-- [ ] Nesting depth ≤2
+- [ ] New `pruning.rs` module created with ~40 methods
+- [ ] Pure functions (no &self) are top-level functions in pruning module
+- [ ] Methods needing cache access accept SharedCache reference
+- [ ] SharedCache delegates to pruning module
 - [ ] All tests pass
 - [ ] No clippy warnings
-- [ ] Ready to commit
+- [ ] Code compiles successfully
 
-**Expected Impact**: Achieves target complexity ≤10, dramatically improves readability and testability
+### Phase 2: Extract Builder/Construction Module
 
----
+**Goal**: Extract construction and builder methods into a dedicated `builder.rs` submodule.
+
+**Changes**:
+- Create `src/cache/shared_cache/builder.rs` module
+- Create `SharedCacheBuilder` struct with builder pattern
+- Move construction methods to builder:
+  - `new` -> `SharedCacheBuilder::build()`
+  - `new_with_cache_dir` -> `SharedCacheBuilder::with_cache_dir()`
+  - `new_with_location` -> `SharedCacheBuilder::with_location()`
+  - `with_auto_pruning` -> `SharedCacheBuilder::with_auto_pruning()`
+  - `with_auto_pruning_and_cache_dir` -> `SharedCacheBuilder::with_auto_pruning_and_cache_dir()`
+- Implement builder methods:
+  - `new()` - Start building
+  - `cache_dir()` - Set custom cache directory
+  - `auto_pruner()` - Configure auto-pruning
+  - `max_cache_size()` - Set max size
+  - `cleanup_threshold()` - Set cleanup threshold
+  - `build()` - Construct SharedCache
+- Update `SharedCache` to:
+  - Keep `new()` as public API (delegates to builder)
+  - Re-export builder for advanced use cases
+- Update `mod.rs`:
+  - Add `mod builder;` declaration
+  - Add `pub use builder::SharedCacheBuilder;`
+  - Update existing constructors to use builder internally
+
+**Testing**:
+- Run `cargo test --lib` to verify existing tests pass
+- Verify all construction patterns still work
+- Test builder pattern explicitly
+
+**Success Criteria**:
+- [ ] New `builder.rs` module created
+- [ ] `SharedCacheBuilder` implements builder pattern
+- [ ] All construction methods preserved (backward compatible)
+- [ ] Builder provides flexible construction API
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Code compiles successfully
+
+### Phase 3: Extract File Operations Module
+
+**Goal**: Extract file management and cleanup methods into `file_ops.rs` submodule.
+
+**Changes**:
+- Create `src/cache/shared_cache/file_ops.rs` module
+- Move file operation functions:
+  - `classify_entry` (already module-level)
+  - `build_dest_path` (already module-level)
+  - `copy_file_entry` (already module-level)
+  - `copy_dir_entry` (already module-level)
+  - `get_cache_file_path` (make it accept `&CacheLocation`)
+- Move file management methods:
+  - `delete_cache_files`
+  - `delete_cache_files_for_keys`
+  - `delete_component_file`
+  - `copy_dir_recursive`
+  - `clear_component_files`
+- Move cleanup methods:
+  - `maybe_cleanup`
+  - `cleanup`
+  - `determine_keys_to_remove`
+  - `select_keys_for_removal`
+- Update `mod.rs`:
+  - Add `mod file_ops;` declaration
+  - Delegate to file_ops module
+  - Re-export if needed for tests
+
+**Testing**:
+- Run `cargo test --lib` to verify tests pass
+- Verify file operations still work correctly
+- Check migration logic still functions
+
+**Success Criteria**:
+- [ ] New `file_ops.rs` module created
+- [ ] File operations extracted and organized
+- [ ] Cleanup logic extracted
+- [ ] SharedCache delegates to file_ops
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Code compiles successfully
+
+### Phase 4: Simplify Core SharedCache Coordination
+
+**Goal**: Reduce SharedCache to pure coordination logic, delegating to specialized modules.
+
+**Changes**:
+- Keep only coordination methods in SharedCache:
+  - `get()` - Delegates to reader
+  - `put()` - Coordinates pruning + writer
+  - `exists()` - Delegates to reader
+  - `delete()` - Delegates to writer
+  - `compute_cache_key()` - Delegates to reader
+  - `get_stats()` - Delegates to index_manager
+  - `get_full_stats()` - Delegates to index_manager
+  - `save_index()` - Delegates to index_manager
+  - `validate_version()` - Delegates to index_manager
+  - `clear()` - Coordinates file_ops + index_manager
+  - `clear_project()` - Coordinates file_ops + index_manager
+  - `migrate_from_local()` - Delegates to file_ops
+- Move remaining private helpers to appropriate modules:
+  - `is_existing_entry()` -> inline or remove
+  - `is_new_entry()` -> inline in pruning module
+  - `put_with_config()` -> keep as coordination method
+  - `execute_cache_storage()` -> inline into put_with_config
+- Update documentation:
+  - Add module-level docs explaining architecture
+  - Document each submodule's responsibility
+  - Add examples for common usage patterns
+
+**Testing**:
+- Run full test suite: `cargo test --lib`
+- Run clippy: `cargo clippy --all-targets`
+- Run formatter: `cargo fmt --all -- --check`
+- Verify no functionality regressions
+
+**Success Criteria**:
+- [ ] SharedCache reduced to <25 methods
+- [ ] Clear separation of concerns across modules
+- [ ] All delegation properly implemented
+- [ ] Module-level documentation complete
+- [ ] All tests pass
+- [ ] No clippy warnings
+- [ ] Code properly formatted
+- [ ] Public API unchanged (backward compatible)
+
+### Phase 5: Add Tests and Final Verification
+
+**Goal**: Ensure test coverage for extracted modules and verify overall quality.
+
+**Changes**:
+- Add unit tests for pure functions in pruning module:
+  - `calculate_cache_projections` tests
+  - `should_prune_based_on_projections` tests
+  - `calculate_pruning_decision` tests
+  - `should_remove_entry_by_age` tests
+  - `filter_entries_by_age` tests
+- Add unit tests for builder module:
+  - Test various builder configurations
+  - Test default values
+  - Test error cases
+- Add unit tests for file_ops module:
+  - Test file classification
+  - Test path building
+  - Test cleanup logic
+- Update integration tests in `tests.rs`:
+  - Verify end-to-end workflows still work
+  - Test pruning integration
+  - Test builder integration
+- Run full CI verification:
+  - `cargo test --all-features`
+  - `cargo clippy --all-targets --all-features`
+  - `cargo fmt --all -- --check`
+  - `cargo doc --no-deps`
+
+**Testing**:
+- Run full test suite with coverage: `cargo tarpaulin`
+- Verify coverage improves from 0%
+- Run full CI locally: `just ci`
+
+**Success Criteria**:
+- [ ] Unit tests added for all pure functions
+- [ ] Builder module has comprehensive tests
+- [ ] File ops module has tests
+- [ ] Integration tests updated and passing
+- [ ] Test coverage significantly improved from 0%
+- [ ] All CI checks pass
+- [ ] Documentation builds without warnings
+- [ ] Ready for final commit
 
 ## Testing Strategy
 
 **For each phase**:
-1. Run `cargo test --lib cross_module` to verify cross-module tests pass
-2. Run `cargo clippy -- -D warnings` to ensure no warnings
-3. Run `cargo fmt --check` to verify formatting
-4. Visual inspection: Confirm complexity reduction in changed function
+1. Run `cargo test --lib` after each change
+2. Run `cargo clippy` to ensure no warnings
+3. Run `cargo fmt` to ensure proper formatting
+4. Commit working code incrementally
+
+**Integration testing**:
+1. Run existing test suite in `src/cache/shared_cache/tests.rs`
+2. Verify all cache operations still work
+3. Test pruning behavior with various configurations
+4. Test builder patterns
 
 **Final verification**:
-1. `just ci` - Full CI checks (compile, test, clippy, fmt)
-2. `cargo test --all` - All tests pass
-3. `debtmap analyze` - Verify complexity metrics improved:
-   - Cyclomatic complexity: 19 → ≤10
-   - Cognitive complexity: 62 → <40
-   - Function should rank lower in next debtmap run
-
-**Coverage Verification**:
-- Run `cargo tarpaulin --lib` to ensure coverage is maintained or improved
-- Focus on `cross_module.rs` module coverage
+1. `just ci` - Full CI checks (build, test, clippy, fmt)
+2. `cargo tarpaulin` - Coverage analysis (expect significant improvement from 0%)
+3. `cargo doc --no-deps` - Verify documentation builds
+4. Manual smoke testing of key workflows
 
 ## Rollback Plan
 
 If a phase fails:
-1. Revert the phase with `git reset --hard HEAD~1`
-2. Review the failure:
-   - Test failures: Check if new function has different behavior
-   - Compilation errors: Check function signatures and lifetimes
-   - Clippy warnings: Adjust to follow Rust idioms
-3. Adjust the implementation approach
-4. Retry the phase with corrections
+1. **Immediate rollback**: `git reset --hard HEAD~1`
+2. **Review failure**: Check compiler errors, test failures, clippy warnings
+3. **Adjust approach**:
+   - If extraction is too aggressive, do smaller incremental changes
+   - If tests fail, examine test assumptions and update carefully
+   - If API breaks, ensure backward compatibility wrappers exist
+4. **Retry**: Make smaller, more focused changes
 
 ## Notes
 
-**Key Insights**:
-- The function is marked as "PureLogic" by debtmap but has side effects (cache writes)
-- Each resolution strategy is independent and can be extracted cleanly
-- The `.or_else()` chain pattern is idiomatic Rust for fallback strategies
-- Cache management should be separate from business logic
+### Key Architectural Decisions
 
-**Potential Challenges**:
-- RwLock handling in extracted functions - may need to take locks in helpers
-- Ensuring cache updates happen correctly after extraction
-- Maintaining exact same resolution behavior (order matters)
+1. **Preserve Public API**: All existing public methods remain available for backward compatibility
+2. **Progressive Extraction**: Extract modules one at a time, ensuring tests pass after each
+3. **Pure Functions First**: Extract pure functions (no &self) before methods
+4. **Delegation Pattern**: SharedCache becomes coordinator, delegating to specialized modules
+5. **Module Organization**:
+   - `pruning.rs` - All pruning/eviction logic (~40 methods)
+   - `builder.rs` - Construction and initialization (~6 methods)
+   - `file_ops.rs` - File management and cleanup (~15 methods)
+   - `mod.rs` - Core coordination (<25 methods)
+   - `reader.rs` - Already exists, handles reads
+   - `writer.rs` - Already exists, handles writes
 
-**Functional Programming Principles Applied**:
-- Extract pure functions where possible (cache reads, symbol lookups)
-- Separate side effects (cache writes) from computation
-- Use `.or_else()` for functional composition of strategies
-- Each strategy function has single responsibility
+### Challenges and Mitigations
 
-**Performance Considerations**:
-- Cache check remains first for performance
-- Lock acquisition order preserved to avoid deadlocks
-- Each strategy short-circuits on success (via `or_else`)
+**Challenge**: SharedCache has extensive state (&self references everywhere)
+**Mitigation**: Use delegation pattern - methods accept `&SharedCache` or needed fields
+
+**Challenge**: Tests may depend on implementation details
+**Mitigation**: Keep public API identical, only change internal organization
+
+**Challenge**: Pruning logic is tightly coupled with cache operations
+**Mitigation**: Use dependency injection pattern - pass what's needed to pruning functions
+
+**Challenge**: 0% test coverage makes refactoring risky
+**Mitigation**: Add property tests for pure functions as we extract them
+
+### Expected Outcomes
+
+After completion:
+- **Maintainability**: 8 responsibilities → 4 focused modules
+- **Testability**: Pure functions easily testable, coverage improves from 0%
+- **Complexity**: 226 total complexity → distributed across modules (<100 per module)
+- **Comprehension**: Each module has clear, single responsibility
+- **Lines per file**: 1201 lines → ~300-400 per module (manageable size)
+
+### Related Files to Watch
+
+- `src/cache/shared_cache/tests.rs` - Integration tests
+- `src/cache/shared_cache/reader.rs` - Reader module (already refactored)
+- `src/cache/shared_cache/writer.rs` - Writer module (already refactored)
+- `src/cache/auto_pruner.rs` - Auto-pruning configuration
+- `src/cache/index_manager.rs` - Index management
+- `src/cache/pruning.rs` - Pruning configuration types
+
+These files should NOT be modified during this refactoring - we're only restructuring the SharedCache module itself.

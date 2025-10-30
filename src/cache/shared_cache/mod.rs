@@ -1,4 +1,5 @@
 // Module declarations
+mod pruning;
 pub mod reader;
 pub mod writer;
 
@@ -150,23 +151,11 @@ impl SharedCache {
         self.reader.get(key, component)
     }
 
-    // Pure functions for configuration and decision making
+    // Delegate to pruning module
 
     /// Determine pruning configuration based on environment and test conditions
     fn determine_pruning_config() -> PruningConfig {
-        let auto_prune_enabled =
-            std::env::var("DEBTMAP_CACHE_AUTO_PRUNE").unwrap_or_default() == "true";
-        let sync_prune_requested =
-            std::env::var("DEBTMAP_CACHE_SYNC_PRUNE").unwrap_or_default() == "true";
-        let is_test_environment = cfg!(test);
-
-        let use_sync_pruning = auto_prune_enabled && (is_test_environment || sync_prune_requested);
-
-        PruningConfig {
-            auto_prune_enabled,
-            use_sync_pruning,
-            is_test_environment,
-        }
+        pruning::determine_pruning_config()
     }
 
     /// Determine if an entry already exists in the index
@@ -176,9 +165,7 @@ impl SharedCache {
 
     /// Determine if pruning is needed after insertion
     fn should_prune_after_insertion(pruner: &AutoPruner, stats: &InternalCacheStats) -> bool {
-        let size_exceeded = stats.total_size > pruner.max_size_bytes as u64;
-        let count_exceeded = stats.entry_count > pruner.max_entries;
-        size_exceeded || count_exceeded
+        pruning::should_prune_after_insertion(pruner, stats)
     }
 
     /// Check if key represents a new entry
@@ -202,24 +189,7 @@ impl SharedCache {
         has_auto_pruner: bool,
         has_background_pruner: bool,
     ) -> PruningStrategyType {
-        if !has_auto_pruner {
-            return PruningStrategyType::NoAutoPruner;
-        }
-
-        // If auto-pruning is disabled, don't perform any automatic pruning
-        if !config.auto_prune_enabled {
-            return PruningStrategyType::NoAutoPruner;
-        }
-
-        if config.use_sync_pruning {
-            return PruningStrategyType::SyncPruning;
-        }
-
-        if has_background_pruner {
-            PruningStrategyType::BackgroundPruning
-        } else {
-            PruningStrategyType::SyncPruning
-        }
+        pruning::determine_pruning_strategy(config, has_auto_pruner, has_background_pruner)
     }
 
     /// Execute the determined pruning strategy
@@ -271,18 +241,12 @@ impl SharedCache {
         config: &PruningConfig,
         has_auto_pruner: bool,
     ) -> bool {
-        has_auto_pruner && config.use_sync_pruning
+        pruning::should_perform_post_insertion_pruning(config, has_auto_pruner)
     }
 
     /// Log debug information for post-insertion pruning in test mode
     fn log_post_insertion_debug(stats: &CacheStats, pruner: &AutoPruner) {
-        if cfg!(test) {
-            println!(
-                "Post-insertion check: size={}/{}, count={}/{}",
-                stats.total_size, pruner.max_size_bytes, stats.entry_count, pruner.max_entries
-            );
-            println!("Triggering post-insertion pruning due to limit exceeded");
-        }
+        pruning::log_post_insertion_debug(stats, pruner)
     }
 
     /// Execute post-insertion pruning check and action
@@ -312,14 +276,7 @@ impl SharedCache {
 
     /// Log configuration details for debugging in test environment - pure function
     fn log_config_if_test_environment(config: &PruningConfig) {
-        if config.is_test_environment {
-            log::debug!(
-                "use_sync_pruning={}, auto_prune={}, cfg_test={}",
-                config.use_sync_pruning,
-                config.auto_prune_enabled,
-                config.is_test_environment
-            );
-        }
+        pruning::log_config_if_test_environment(config)
     }
 
     /// Execute the core cache storage operation - coordinates all steps
@@ -705,28 +662,7 @@ impl SharedCache {
         })
     }
 
-    // Pure function to calculate projected cache state after adding a new entry
-    fn calculate_cache_projections(
-        current_size: u64,
-        current_count: usize,
-        new_entry_size: usize,
-    ) -> (u64, usize) {
-        let projected_size = current_size + new_entry_size as u64;
-        let projected_count = current_count + if new_entry_size > 0 { 1 } else { 0 };
-        (projected_size, projected_count)
-    }
-
-    // Pure function to determine if pruning is needed based on projections
-    fn should_prune_based_on_projections(
-        projected_size: u64,
-        projected_count: usize,
-        max_size_bytes: usize,
-        max_entries: usize,
-    ) -> bool {
-        projected_size > max_size_bytes as u64 || projected_count > max_entries
-    }
-
-    // Pure function to determine pruning decision given all inputs
+    // Delegate to pruning module
     fn calculate_pruning_decision(
         current_size: u64,
         current_count: usize,
@@ -735,89 +671,46 @@ impl SharedCache {
         max_entries: usize,
         additional_check: bool,
     ) -> bool {
-        let (projected_size, projected_count) =
-            Self::calculate_cache_projections(current_size, current_count, new_entry_size);
-
-        Self::should_prune_based_on_projections(
-            projected_size,
-            projected_count,
+        pruning::calculate_pruning_decision(
+            current_size,
+            current_count,
+            new_entry_size,
             max_size_bytes,
             max_entries,
-        ) || additional_check
+            additional_check,
+        )
     }
 
-    // Pure function to create empty prune stats with current cache state
     fn create_no_prune_stats(entry_count: usize, total_size: u64) -> PruneStats {
-        PruneStats {
-            entries_removed: 0,
-            bytes_freed: 0,
-            entries_remaining: entry_count,
-            bytes_remaining: total_size,
-            duration_ms: 0,
-            files_deleted: 0,
-            files_not_found: 0,
-        }
+        pruning::create_no_prune_stats(entry_count, total_size)
     }
 
-    // Pure functions for age-based cleanup
-
-    /// Calculate the maximum age duration from days
     fn calculate_max_age_duration(max_age_days: i64) -> Duration {
-        Duration::from_secs(max_age_days as u64 * 86400)
+        pruning::calculate_max_age_duration(max_age_days)
     }
 
-    /// Determine if an entry should be removed based on age
+    #[allow(dead_code)] // Used in tests
     fn should_remove_entry_by_age(
         now: SystemTime,
         last_accessed: SystemTime,
         max_age: Duration,
     ) -> bool {
-        now.duration_since(last_accessed)
-            .map(|age| age >= max_age) // Use >= to handle zero-age case
-            .unwrap_or(false) // If time calculation fails, don't remove
+        pruning::should_remove_entry_by_age(now, last_accessed, max_age)
     }
 
-    /// Filter entries to find those that should be removed based on age
     fn filter_entries_by_age(
         entries: &HashMap<String, CacheMetadata>,
         now: SystemTime,
         max_age: Duration,
     ) -> Vec<String> {
-        entries
-            .iter()
-            .filter_map(|(key, metadata)| {
-                if Self::should_remove_entry_by_age(now, metadata.last_accessed, max_age) {
-                    Some(key.clone())
-                } else {
-                    None
-                }
-            })
-            .collect()
+        pruning::filter_entries_by_age(entries, now, max_age)
     }
 
-    /// Delete cache files for the given keys and components
     fn delete_cache_files_for_keys(
         cache: &SharedCache,
         keys: &[String],
     ) -> std::result::Result<(), ()> {
-        let components = [
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for key in keys {
-            for component in &components {
-                let cache_path = cache.get_cache_file_path(key, component);
-                if cache_path.exists() {
-                    let _ = fs::remove_file(&cache_path); // Ignore errors
-                }
-            }
-        }
-        Ok(())
+        pruning::delete_cache_files_for_keys(|k, c| cache.get_cache_file_path(k, c), keys)
     }
 
     /// Trigger pruning if needed based on auto-pruner configuration
@@ -924,16 +817,12 @@ impl SharedCache {
         })
     }
 
-    /// Calculate which entries should be pruned - pure function
+    /// Calculate which entries should be pruned
     fn calculate_entries_to_prune(
         &self,
         pruner: &AutoPruner,
     ) -> Result<Vec<(String, CacheMetadata)>> {
-        let index_arc = self.index_manager.get_index_arc();
-        let index = index_arc
-            .read()
-            .map_err(|e| anyhow::anyhow!("Failed to acquire read lock: {}", e))?;
-        Ok(pruner.calculate_entries_to_remove(&index))
+        pruning::calculate_entries_to_prune(&self.index_manager, pruner)
     }
 
     /// Remove entries from index and return bytes freed
@@ -941,30 +830,13 @@ impl SharedCache {
         &self,
         entries_to_remove: &[(String, CacheMetadata)],
     ) -> Result<u64> {
-        let keys: Vec<String> = entries_to_remove.iter().map(|(k, _)| k.clone()).collect();
-
-        let bytes_freed: u64 = entries_to_remove
-            .iter()
-            .map(|(_, metadata)| metadata.size_bytes)
-            .sum();
-
-        self.index_manager.remove_entries(&keys)?;
-
-        Ok(bytes_freed)
+        pruning::remove_entries_from_index(&self.index_manager, entries_to_remove)
     }
 
     /// Create empty stats when no pruning is needed
     fn create_empty_prune_stats(&self) -> PruneStats {
         let stats = self.get_stats();
-        PruneStats {
-            entries_removed: 0,
-            bytes_freed: 0,
-            entries_remaining: stats.entry_count,
-            bytes_remaining: stats.total_size,
-            duration_ms: 0,
-            files_deleted: 0,
-            files_not_found: 0,
-        }
+        pruning::create_no_prune_stats(stats.entry_count, stats.total_size)
     }
 
     /// Create prune stats from operation results
@@ -976,57 +848,21 @@ impl SharedCache {
         files_deleted: usize,
         files_not_found: usize,
     ) -> Result<PruneStats> {
-        let duration = start.elapsed().unwrap_or(Duration::ZERO).as_millis() as u64;
-        let final_stats = self.get_stats();
-
-        Ok(PruneStats {
+        let stats = self.get_stats();
+        pruning::create_prune_stats(
+            start,
             entries_removed,
             bytes_freed,
-            entries_remaining: final_stats.entry_count,
-            bytes_remaining: final_stats.total_size,
-            duration_ms: duration,
             files_deleted,
             files_not_found,
-        })
+            stats.entry_count,
+            stats.total_size,
+        )
     }
 
     /// Delete files for pruned entries and return counts
     fn delete_pruned_files(&self, entries_to_remove: &[(String, CacheMetadata)]) -> (usize, usize) {
-        let mut files_deleted = 0usize;
-        let mut files_not_found = 0usize;
-        let components = [
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for (key, _) in entries_to_remove {
-            let mut any_file_found = false;
-
-            for component in &components {
-                let cache_path = self.get_cache_file_path(key, component);
-                if !cache_path.exists() {
-                    continue;
-                }
-
-                any_file_found = true;
-                if fs::remove_file(&cache_path).is_ok() {
-                    files_deleted += 1;
-                } else {
-                    log::warn!("Failed to delete cache file: {:?}", cache_path);
-                }
-            }
-
-            if !any_file_found {
-                files_not_found += 1;
-                log::debug!("No files found for cache entry: {}", key);
-            }
-        }
-
-        (files_deleted, files_not_found)
+        pruning::delete_pruned_files(|k, c| self.get_cache_file_path(k, c), entries_to_remove)
     }
 
     /// Prune entries with a specific strategy
