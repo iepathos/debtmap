@@ -255,21 +255,119 @@ fn generate_functional_decomposition_recommendation(
     )
 }
 
-fn generate_simple_extraction_recommendation(
+/// Generate refactoring-related steps based on complexity and nesting
+fn generate_refactoring_steps(
     cyclo: u32,
+    nesting_depth: u32,
+    coverage_gap_pct: u32,
+    tests_needed: u32,
+    coverage_gap: &CoverageGap,
+    has_coverage_data: bool,
+) -> Vec<String> {
+    let mut steps = vec![];
+
+    if nesting_depth > 3 && cyclo > 10 {
+        steps.push(format!(
+            "Current nesting depth is {} levels - use early returns with ? operator",
+            nesting_depth
+        ));
+        steps.push("Extract deeply nested blocks into separate functions".to_string());
+        steps.push(
+            "Replace nested if-else chains with match expressions where appropriate".to_string(),
+        );
+    } else if nesting_depth > 2 && cyclo > 5 {
+        steps.push(format!(
+            "Nesting depth of {} can be reduced with guard clauses",
+            nesting_depth
+        ));
+        steps.push("Move validation checks to the beginning with early returns".to_string());
+    } else if cyclo > 10 {
+        steps.push("Extract helper functions for complex boolean expressions".to_string());
+        steps.push("Consider using match expressions instead of if-else chains".to_string());
+    } else if cyclo > 5 {
+        steps.push("Current structure is acceptable - prioritize test coverage".to_string());
+        if nesting_depth > 1 {
+            steps.push("Consider extracting guard clauses for precondition checks".to_string());
+        }
+    } else {
+        steps.push("Current structure is clean and simple".to_string());
+        if has_coverage_data && coverage_gap_pct > 0 {
+            steps.push(format!(
+                "Focus on adding the {} missing tests - {}",
+                tests_needed,
+                coverage_gap.format()
+            ));
+        }
+    }
+
+    steps
+}
+
+/// Generate test-related steps for improving coverage
+fn generate_test_steps(
+    cyclo: u32,
+    coverage_gap_pct: u32,
+    tests_needed: u32,
+    has_coverage_data: bool,
+) -> Vec<String> {
+    let mut steps = vec![];
+
+    if has_coverage_data && coverage_gap_pct > 20 {
+        steps.push(format!(
+            "Write {} focused tests for uncovered branches",
+            tests_needed
+        ));
+        steps.push("Each test should be <15 lines and test ONE path".to_string());
+
+        // Add specific guidance based on complexity
+        if cyclo <= 5 {
+            steps.push("Test edge cases and boundary conditions".to_string());
+        } else if cyclo <= 10 {
+            steps.push("Focus on testing each decision branch independently".to_string());
+        }
+    }
+
+    steps
+}
+
+/// Generate rationale message explaining why action is recommended
+fn generate_rationale_message(
+    cyclo: u32,
+    coverage_gap: &CoverageGap,
+    has_coverage_data: bool,
+) -> String {
+    let coverage_gap_pct = coverage_gap.percentage() as u32;
+
+    if has_coverage_data && coverage_gap_pct > 0 {
+        format!(
+            "Complexity {} is manageable. {}. Focus on test coverage, not refactoring",
+            cyclo,
+            coverage_gap.format()
+        )
+    } else if has_coverage_data {
+        format!(
+            "Complexity {} with full coverage. Well-maintained function",
+            cyclo
+        )
+    } else {
+        // No coverage data provided - don't mention coverage
+        format!(
+            "Complexity {} is manageable. Focus on maintaining simplicity",
+            cyclo
+        )
+    }
+}
+
+/// Generate action message based on complexity, coverage, and nesting depth
+fn generate_action_message(
+    cyclo: u32,
+    coverage_gap_pct: u32,
     coverage_gap: &CoverageGap,
     nesting_depth: u32,
     has_coverage_data: bool,
-) -> (String, String, Vec<String>) {
-    let coverage_percent = 1.0 - (coverage_gap.percentage() / 100.0);
-    let coverage_gap_pct = coverage_gap.percentage() as u32;
-
-    // Use unified test calculation module for consistency (spec 109)
-    let test_rec = calculate_tests_needed(cyclo, coverage_percent, None);
-    let tests_needed = test_rec.count;
-
-    // Generate specific action based on actual metrics with precise gap info
-    let action = if has_coverage_data && coverage_gap_pct > 40 {
+    tests_needed: u32,
+) -> String {
+    if has_coverage_data && coverage_gap_pct > 40 {
         format!(
             "Add {} tests for {}. NO refactoring needed (complexity {} is acceptable)",
             tests_needed,
@@ -310,79 +408,44 @@ fn generate_simple_extraction_recommendation(
             "Complexity {} is manageable. Consider refactoring if complexity increases",
             cyclo
         )
-    };
+    }
+}
 
-    let why = if has_coverage_data && coverage_gap_pct > 0 {
-        format!(
-            "Complexity {} is manageable. {}. Focus on test coverage, not refactoring",
-            cyclo,
-            coverage_gap.format()
-        )
-    } else if has_coverage_data {
-        format!(
-            "Complexity {} with full coverage. Well-maintained function",
-            cyclo
-        )
-    } else {
-        // No coverage data provided - don't mention coverage
-        format!(
-            "Complexity {} is manageable. Focus on maintaining simplicity",
-            cyclo
-        )
-    };
+fn generate_simple_extraction_recommendation(
+    cyclo: u32,
+    coverage_gap: &CoverageGap,
+    nesting_depth: u32,
+    has_coverage_data: bool,
+) -> (String, String, Vec<String>) {
+    let coverage_percent = 1.0 - (coverage_gap.percentage() / 100.0);
+    let coverage_gap_pct = coverage_gap.percentage() as u32;
+
+    // Use unified test calculation module for consistency (spec 109)
+    let test_rec = calculate_tests_needed(cyclo, coverage_percent, None);
+    let tests_needed = test_rec.count;
+
+    // Generate specific action based on actual metrics with precise gap info
+    let action = generate_action_message(
+        cyclo,
+        coverage_gap_pct,
+        coverage_gap,
+        nesting_depth,
+        has_coverage_data,
+        tests_needed,
+    );
+
+    let why = generate_rationale_message(cyclo, coverage_gap, has_coverage_data);
 
     // Generate specific steps based on actual values, no conditional "IF" statements
-    let mut steps = vec![];
-
-    if has_coverage_data && coverage_gap_pct > 20 {
-        steps.push(format!(
-            "Write {} focused tests for uncovered branches",
-            tests_needed
-        ));
-        steps.push("Each test should be <15 lines and test ONE path".to_string());
-
-        // Add specific guidance based on complexity
-        if cyclo <= 5 {
-            steps.push("Test edge cases and boundary conditions".to_string());
-        } else if cyclo <= 10 {
-            steps.push("Focus on testing each decision branch independently".to_string());
-        }
-    }
-
-    // Provide specific refactoring guidance based on actual nesting depth
-    if nesting_depth > 3 && cyclo > 10 {
-        steps.push(format!(
-            "Current nesting depth is {} levels - use early returns with ? operator",
-            nesting_depth
-        ));
-        steps.push("Extract deeply nested blocks into separate functions".to_string());
-        steps.push(
-            "Replace nested if-else chains with match expressions where appropriate".to_string(),
-        );
-    } else if nesting_depth > 2 && cyclo > 5 {
-        steps.push(format!(
-            "Nesting depth of {} can be reduced with guard clauses",
-            nesting_depth
-        ));
-        steps.push("Move validation checks to the beginning with early returns".to_string());
-    } else if cyclo > 10 {
-        steps.push("Extract helper functions for complex boolean expressions".to_string());
-        steps.push("Consider using match expressions instead of if-else chains".to_string());
-    } else if cyclo > 5 {
-        steps.push("Current structure is acceptable - prioritize test coverage".to_string());
-        if nesting_depth > 1 {
-            steps.push("Consider extracting guard clauses for precondition checks".to_string());
-        }
-    } else {
-        steps.push("Current structure is clean and simple".to_string());
-        if has_coverage_data && coverage_gap_pct > 0 {
-            steps.push(format!(
-                "Focus on adding the {} missing tests - {}",
-                tests_needed,
-                coverage_gap.format()
-            ));
-        }
-    }
+    let mut steps = generate_test_steps(cyclo, coverage_gap_pct, tests_needed, has_coverage_data);
+    steps.extend(generate_refactoring_steps(
+        cyclo,
+        nesting_depth,
+        coverage_gap_pct,
+        tests_needed,
+        coverage_gap,
+        has_coverage_data,
+    ));
 
     (action, why, steps)
 }
