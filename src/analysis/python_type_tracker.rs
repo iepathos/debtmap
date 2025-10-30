@@ -1384,8 +1384,22 @@ impl TwoPassExtractor {
         }
     }
 
-    /// Find observer collections in module by analyzing class __init__ methods
-    /// Returns a list of (class_name, field_name) tuples for observer collections
+    /// Find observer collections in module by analyzing class `__init__` methods.
+    ///
+    /// This function traverses the AST to find assignments to `self.*` attributes
+    /// in class constructors, filtering for observer collection names.
+    ///
+    /// # Returns
+    /// A vector of `(class_name, field_name)` tuples representing observer collections.
+    ///
+    /// # Example
+    /// For code like:
+    /// ```python
+    /// class Subject:
+    ///     def __init__(self):
+    ///         self.observers = []  # This will be found
+    /// ```
+    /// Returns: `[("Subject", "observers")]`
     fn find_observer_collections(module: &ast::ModModule) -> Vec<(String, String)> {
         use crate::analysis::python_call_graph::observer_registry::ObserverRegistry;
 
@@ -1447,7 +1461,18 @@ impl TwoPassExtractor {
             .collect()
     }
 
-    /// Collect type IDs for observer collections from the type flow tracker
+    /// Collect type IDs for observer collections from the type flow tracker.
+    ///
+    /// For each observer collection, queries the type flow tracker to determine
+    /// which types are stored in that collection.
+    ///
+    /// # Arguments
+    /// * `type_tracker` - The type flow tracker to query for type information
+    /// * `observer_collections` - List of (class_name, field_name) tuples
+    ///
+    /// # Returns
+    /// A vector of `(collection_path, type_ids)` tuples where collection_path
+    /// is in the format "ClassName.field_name".
     fn collect_type_ids_for_observers(
         type_tracker: &PythonTypeTracker,
         observer_collections: &[(String, String)],
@@ -1463,7 +1488,18 @@ impl TwoPassExtractor {
             .collect()
     }
 
-    /// Register observer interfaces discovered from usage analysis
+    /// Register observer interfaces discovered from usage analysis.
+    ///
+    /// This function registers each discovered type as an observer interface,
+    /// along with any base classes it inherits from.
+    ///
+    /// # Arguments
+    /// * `observer_registry` - The registry to register interfaces in
+    /// * `type_tracker` - The type flow tracker for querying base class information
+    /// * `type_ids_by_collection` - Map of collection paths to their type IDs
+    ///
+    /// # Side Effects
+    /// Mutates the observer registry by registering interfaces.
     fn register_observer_interfaces_from_usage(
         observer_registry: &std::sync::Arc<
             std::sync::RwLock<
@@ -1503,8 +1539,19 @@ impl TwoPassExtractor {
         }
     }
 
-    /// Discover observer interfaces via usage analysis (after type flow tracking)
-    /// This identifies interfaces by analyzing how types are used in observer collections
+    /// Discover observer interfaces via usage analysis (after type flow tracking).
+    ///
+    /// This identifies observer interfaces by analyzing how types are used in observer
+    /// collections, without requiring explicit ABC inheritance or decorators.
+    ///
+    /// # Algorithm
+    /// 1. Find all observer collections (e.g., `self.observers = []`)
+    /// 2. Query type flow tracker for types stored in those collections
+    /// 3. Register those types (and their base classes) as observer interfaces
+    /// 4. Analyze dispatch loops to identify interface methods
+    ///
+    /// # Arguments
+    /// * `module` - The Python module AST to analyze
     fn discover_observer_interfaces_from_usage(&mut self, module: &ast::ModModule) {
         // Step 1: Find all observer collections
         let observer_collections = Self::find_observer_collections(module);
