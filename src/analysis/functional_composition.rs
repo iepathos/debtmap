@@ -1046,10 +1046,7 @@ mod tests {
 
     #[test]
     fn test_extract_terminal_op_none() {
-        assert_eq!(
-            extract_terminal_op(MethodClassification::Map),
-            None
-        );
+        assert_eq!(extract_terminal_op(MethodClassification::Map), None);
         assert_eq!(
             extract_terminal_op(MethodClassification::StandardIterator),
             None
