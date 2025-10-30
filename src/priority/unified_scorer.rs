@@ -148,36 +148,15 @@ pub fn calculate_unified_priority_with_debt(
     // are not technical debt UNLESS they're untested and non-trivial
     let role = classify_function_role(func, &func_id, call_graph);
 
-    // Pure functions are inherently less risky and easier to test
-    let purity_bonus = if func.is_pure == Some(true) {
-        // High confidence pure functions get bigger bonus
-        if func.purity_confidence.unwrap_or(0.0) > 0.8 {
-            0.7 // 30% reduction in complexity perception
-        } else {
-            0.85 // 15% reduction
-        }
-    } else {
-        1.0 // No reduction for impure functions
-    };
+    // Check if function is trivial based on complexity and role
+    let is_trivial = is_trivial_function(func, role);
 
-    let is_trivial = (func.cyclomatic <= 3 && func.cognitive <= 5)
-        && (role == FunctionRole::IOWrapper
-            || role == FunctionRole::EntryPoint
-            || role == FunctionRole::PatternMatch
-            || role == FunctionRole::Debug
-            || (role == FunctionRole::PureLogic && func.length <= 10));
-
-    // Check actual test coverage if we have lcov data
-    let has_coverage = if let Some(cov) = coverage {
-        cov.get_function_coverage(&func.file, &func.name)
-            .map(|coverage_pct| coverage_pct > 0.0)
-            .unwrap_or(false)
-    } else {
-        false // No coverage data means assume untested
-    };
+    // Check actual test coverage
+    let coverage_pct = get_function_coverage(func, coverage);
+    let has_coverage = coverage_pct > 0.0;
 
     // If it's trivial AND tested, it's definitely not technical debt
-    if is_trivial && has_coverage {
+    if should_skip_as_non_debt(is_trivial, has_coverage) {
         return UnifiedScore {
             complexity_factor: 0.0,
             coverage_factor: 0.0,
@@ -193,10 +172,10 @@ pub fn calculate_unified_priority_with_debt(
     // Orchestrators typically have low cognitive complexity relative to cyclomatic
     let is_orchestrator_candidate = role == FunctionRole::Orchestrator;
 
-    // Calculate complexity factor (normalized to 0-10)
-    // Apply purity bonus first (pure functions are easier to understand and test)
-    let purity_adjusted_cyclomatic = (func.cyclomatic as f64 * purity_bonus) as u32;
-    let purity_adjusted_cognitive = (func.cognitive as f64 * purity_bonus) as u32;
+    // Calculate purity adjustment and apply to complexity metrics
+    let purity_bonus = calculate_purity_adjustment(func);
+    let (purity_adjusted_cyclomatic, purity_adjusted_cognitive) =
+        apply_purity_adjustment(func.cyclomatic, func.cognitive, purity_bonus);
 
     let raw_complexity = normalize_complexity(
         purity_adjusted_cyclomatic,
@@ -204,65 +183,24 @@ pub fn calculate_unified_priority_with_debt(
         is_orchestrator_candidate,
     );
 
-    // Get actual coverage percentage
-    let coverage_pct = if func.is_test {
-        1.0 // Test functions have 100% coverage by definition
-    } else if let Some(cov) = coverage {
-        // get_function_coverage already returns 0-1 fraction, no need to divide again
-        cov.get_function_coverage(&func.file, &func.name)
-            .unwrap_or(0.0)
-    } else {
-        0.0 // No coverage data - assume worst case
-    };
-
     // Calculate complexity and dependency factors
     let complexity_factor = calculate_complexity_factor(raw_complexity);
     let upstream_count = call_graph.get_callers(&func_id).len();
     let dependency_factor = calculate_dependency_factor(upstream_count);
 
-    // Get role multiplier - adjusted for better differentiation
-    let role_multiplier: f64 = match role {
-        FunctionRole::EntryPoint => 1.5,
-        FunctionRole::PureLogic if raw_complexity > 5.0 => 1.3, // Complex core logic
-        FunctionRole::PureLogic => 1.0,
-        FunctionRole::Orchestrator => 0.8,
-        FunctionRole::IOWrapper => 0.5,
-        FunctionRole::PatternMatch => 0.6,
-        FunctionRole::Debug => 0.3,
-        _ => 1.0,
-    };
+    // Get role-based values
+    let role_multiplier = calculate_role_multiplier(role, raw_complexity);
+    let coverage_weight = get_role_coverage_weight(role);
 
-    // Get role-based coverage weight multiplier (spec 110)
-    let role_coverage_weights = crate::config::get_role_coverage_weights();
-    let coverage_weight_multiplier = match role {
-        FunctionRole::EntryPoint => role_coverage_weights.entry_point,
-        FunctionRole::Orchestrator => role_coverage_weights.orchestrator,
-        FunctionRole::PureLogic => role_coverage_weights.pure_logic,
-        FunctionRole::IOWrapper => role_coverage_weights.io_wrapper,
-        FunctionRole::PatternMatch => role_coverage_weights.pattern_match,
-        FunctionRole::Debug => role_coverage_weights.pattern_match, // Same as pattern_match
-        _ => role_coverage_weights.unknown,
-    };
-
-    // Calculate base score with coverage as multiplier (spec 122)
-    let base_score = if has_coverage_data {
-        // With coverage: use multiplier approach (coverage dampens complexity+deps score)
-        let coverage_multiplier = if func.is_test {
-            0.0 // Test functions get maximum dampening (near-zero score)
-        } else {
-            // Apply role-based coverage weight adjustment (spec 110)
-            let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight_multiplier);
-            calculate_coverage_multiplier(adjusted_coverage_pct)
-        };
-        calculate_base_score_with_coverage_multiplier(
-            coverage_multiplier,
-            complexity_factor,
-            dependency_factor,
-        )
-    } else {
-        // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
-        calculate_base_score_no_coverage(complexity_factor, dependency_factor)
-    };
+    // Calculate base score
+    let base_score = calculate_base_score(
+        has_coverage_data,
+        func.is_test,
+        coverage_pct,
+        coverage_weight,
+        complexity_factor,
+        dependency_factor,
+    );
 
     // Store coverage_factor for display purposes (kept for backward compatibility)
     let _coverage_factor = if has_coverage_data {
@@ -276,10 +214,6 @@ pub fn calculate_unified_priority_with_debt(
     };
 
     // Apply role adjustment with configurable clamping (spec 119)
-    // NOTE: This is separate from role-based coverage weight adjustment (applied earlier at line 236).
-    // Coverage weight adjusts coverage expectations by role (entry points need less unit coverage).
-    // This multiplier provides a final adjustment for role importance (default 0.3-1.8x range).
-    // The two-stage approach ensures they don't interfere with each other.
     let role_config = crate::config::get_role_multiplier_config();
     let clamped_role_multiplier = if role_config.enable_clamping {
         role_multiplier.clamp(role_config.clamp_min, role_config.clamp_max)
@@ -288,69 +222,22 @@ pub fn calculate_unified_priority_with_debt(
     };
     let role_adjusted_score = base_score * clamped_role_multiplier;
 
-    // Add debt-based adjustments additively (not multiplicatively)
-    let debt_adjustment = if let Some(aggregator) = debt_aggregator {
-        let agg_func_id =
-            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
-        let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
-
-        // Add small additive adjustments for other debt types
-        (debt_scores.testing / 50.0)
-            + (debt_scores.resource / 50.0)
-            + (debt_scores.duplication / 50.0)
-    } else {
-        0.0
-    };
-
+    // Add debt-based adjustments
+    let debt_adjustment = calculate_debt_adjustment(func, debt_aggregator);
     let debt_adjusted_score = role_adjusted_score + debt_adjustment;
 
-    // Remove entropy dampening from scoring - it should not affect prioritization
-    // Entropy is already factored into complexity metrics
-    let final_score = debt_adjusted_score;
-
-    // Normalize to 0-10 scale with better distribution
-    let normalized_score = normalize_final_score(final_score);
+    // Normalize to 0-10 scale
+    let normalized_score = normalize_final_score(debt_adjusted_score);
 
     // Apply orchestration score adjustment (spec 110) if this is an orchestrator
-    let (final_normalized_score, pre_adjustment, adjustment) = if is_orchestrator_candidate {
-        let config = crate::config::get_orchestration_adjustment_config();
-        if config.enabled {
-            // Extract composition metrics from call graph
-            let composition_metrics =
-                crate::priority::scoring::orchestration_adjustment::extract_composition_metrics(
-                    &func_id, func, call_graph,
-                );
-
-            // Apply the adjustment
-            let adjustment = crate::priority::scoring::orchestration_adjustment::adjust_score(
-                &config,
-                normalized_score,
-                &role,
-                &composition_metrics,
-            );
-
-            // Log adjustment details for observability (spec 110)
-            log::debug!(
-                "Orchestration adjustment applied to {}:{} - Original: {:.2}, Adjusted: {:.2}, Reduction: {:.1}%, Reason: {}",
-                func.file.display(),
-                func.name,
-                adjustment.original_score,
-                adjustment.adjusted_score,
-                adjustment.reduction_percent,
-                adjustment.adjustment_reason
-            );
-
-            (
-                adjustment.adjusted_score,
-                Some(normalized_score),
-                Some(adjustment),
-            )
-        } else {
-            (normalized_score, None, None)
-        }
-    } else {
-        (normalized_score, None, None)
-    };
+    let (final_normalized_score, pre_adjustment, adjustment) = apply_orchestration_adjustment(
+        is_orchestrator_candidate,
+        normalized_score,
+        &func_id,
+        func,
+        call_graph,
+        &role,
+    );
 
     UnifiedScore {
         complexity_factor,
@@ -362,6 +249,208 @@ pub fn calculate_unified_priority_with_debt(
         adjustment_applied: adjustment,
     }
 }
+
+// Helper functions for calculate_unified_priority_with_debt
+
+/// Determine if a function is trivial based on complexity and role.
+///
+/// Trivial functions are simple enough that they're not considered technical debt.
+fn is_trivial_function(func: &FunctionMetrics, role: FunctionRole) -> bool {
+    (func.cyclomatic <= 3 && func.cognitive <= 5)
+        && (role == FunctionRole::IOWrapper
+            || role == FunctionRole::EntryPoint
+            || role == FunctionRole::PatternMatch
+            || role == FunctionRole::Debug
+            || (role == FunctionRole::PureLogic && func.length <= 10))
+}
+
+/// Get the coverage percentage for a function.
+///
+/// Returns 1.0 for test functions, or the actual coverage from lcov data.
+fn get_function_coverage(func: &FunctionMetrics, coverage: Option<&LcovData>) -> f64 {
+    if func.is_test {
+        1.0 // Test functions have 100% coverage by definition
+    } else if let Some(cov) = coverage {
+        cov.get_function_coverage(&func.file, &func.name)
+            .unwrap_or(0.0)
+    } else {
+        0.0 // No coverage data - assume worst case
+    }
+}
+
+/// Determine if a function should be skipped as non-debt.
+///
+/// Functions that are trivial AND tested are not technical debt.
+fn should_skip_as_non_debt(is_trivial: bool, has_coverage: bool) -> bool {
+    is_trivial && has_coverage
+}
+
+/// Calculate the purity adjustment multiplier.
+///
+/// Pure functions get a bonus (lower multiplier) because they're inherently less risky and easier to test.
+fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+    if func.is_pure == Some(true) {
+        // High confidence pure functions get bigger bonus
+        if func.purity_confidence.unwrap_or(0.0) > 0.8 {
+            0.7 // 30% reduction in complexity perception
+        } else {
+            0.85 // 15% reduction
+        }
+    } else {
+        1.0 // No reduction for impure functions
+    }
+}
+
+/// Apply purity adjustment to complexity metrics.
+///
+/// Returns adjusted cyclomatic and cognitive complexity values.
+fn apply_purity_adjustment(cyclomatic: u32, cognitive: u32, adjustment: f64) -> (u32, u32) {
+    (
+        (cyclomatic as f64 * adjustment) as u32,
+        (cognitive as f64 * adjustment) as u32,
+    )
+}
+
+/// Calculate the role multiplier based on function role and complexity.
+///
+/// Different roles have different impacts on technical debt priority.
+fn calculate_role_multiplier(role: FunctionRole, raw_complexity: f64) -> f64 {
+    match role {
+        FunctionRole::EntryPoint => 1.5,
+        FunctionRole::PureLogic if raw_complexity > 5.0 => 1.3, // Complex core logic
+        FunctionRole::PureLogic => 1.0,
+        FunctionRole::Orchestrator => 0.8,
+        FunctionRole::IOWrapper => 0.5,
+        FunctionRole::PatternMatch => 0.6,
+        FunctionRole::Debug => 0.3,
+        _ => 1.0,
+    }
+}
+
+/// Get the coverage weight multiplier for a function role.
+///
+/// Spec 110: Different roles have different coverage expectations.
+fn get_role_coverage_weight(role: FunctionRole) -> f64 {
+    let role_coverage_weights = crate::config::get_role_coverage_weights();
+    match role {
+        FunctionRole::EntryPoint => role_coverage_weights.entry_point,
+        FunctionRole::Orchestrator => role_coverage_weights.orchestrator,
+        FunctionRole::PureLogic => role_coverage_weights.pure_logic,
+        FunctionRole::IOWrapper => role_coverage_weights.io_wrapper,
+        FunctionRole::PatternMatch => role_coverage_weights.pattern_match,
+        FunctionRole::Debug => role_coverage_weights.pattern_match, // Same as pattern_match
+        _ => role_coverage_weights.unknown,
+    }
+}
+
+/// Calculate the base score using either coverage multiplier or no-coverage approach.
+///
+/// This handles the two different scoring paths depending on coverage data availability.
+fn calculate_base_score(
+    has_coverage_data: bool,
+    is_test: bool,
+    coverage_pct: f64,
+    coverage_weight: f64,
+    complexity_factor: f64,
+    dependency_factor: f64,
+) -> f64 {
+    if has_coverage_data {
+        // With coverage: use multiplier approach (coverage dampens complexity+deps score)
+        let coverage_multiplier = if is_test {
+            0.0 // Test functions get maximum dampening (near-zero score)
+        } else {
+            // Apply role-based coverage weight adjustment (spec 110)
+            let adjusted_coverage_pct = 1.0 - ((1.0 - coverage_pct) * coverage_weight);
+            calculate_coverage_multiplier(adjusted_coverage_pct)
+        };
+        calculate_base_score_with_coverage_multiplier(
+            coverage_multiplier,
+            complexity_factor,
+            dependency_factor,
+        )
+    } else {
+        // Without coverage: adjusted weights (50% complexity, 25% deps, 25% debt)
+        calculate_base_score_no_coverage(complexity_factor, dependency_factor)
+    }
+}
+
+/// Calculate debt-based adjustment to the score.
+///
+/// Adds small additive adjustments for various debt types.
+fn calculate_debt_adjustment(
+    func: &FunctionMetrics,
+    debt_aggregator: Option<&DebtAggregator>,
+) -> f64 {
+    if let Some(aggregator) = debt_aggregator {
+        let agg_func_id =
+            AggregatorFunctionId::new(func.file.clone(), func.name.clone(), func.line);
+        let debt_scores = aggregator.calculate_debt_scores(&agg_func_id);
+
+        // Add small additive adjustments for other debt types
+        (debt_scores.testing / 50.0)
+            + (debt_scores.resource / 50.0)
+            + (debt_scores.duplication / 50.0)
+    } else {
+        0.0
+    }
+}
+
+/// Apply orchestration adjustment if enabled.
+///
+/// Returns (final_score, pre_adjustment_score, adjustment_details).
+fn apply_orchestration_adjustment(
+    is_orchestrator: bool,
+    normalized_score: f64,
+    func_id: &FunctionId,
+    func: &FunctionMetrics,
+    call_graph: &CallGraph,
+    role: &FunctionRole,
+) -> (
+    f64,
+    Option<f64>,
+    Option<crate::priority::scoring::orchestration_adjustment::ScoreAdjustment>,
+) {
+    if !is_orchestrator {
+        return (normalized_score, None, None);
+    }
+
+    let config = crate::config::get_orchestration_adjustment_config();
+    if !config.enabled {
+        return (normalized_score, None, None);
+    }
+
+    // Extract composition metrics from call graph
+    let composition_metrics =
+        crate::priority::scoring::orchestration_adjustment::extract_composition_metrics(
+            func_id, func, call_graph,
+        );
+
+    // Apply the adjustment
+    let adjustment = crate::priority::scoring::orchestration_adjustment::adjust_score(
+        &config,
+        normalized_score,
+        role,
+        &composition_metrics,
+    );
+
+    // Log adjustment details for observability (spec 110)
+    log::debug!(
+        "Orchestration adjustment applied to {}:{} - Original: {:.2}, Adjusted: {:.2}, Reduction: {:.1}%, Reason: {}",
+        func.file.display(),
+        func.name,
+        adjustment.original_score,
+        adjustment.adjusted_score,
+        adjustment.reduction_percent,
+        adjustment.adjustment_reason
+    );
+
+    (
+        adjustment.adjusted_score,
+        Some(normalized_score),
+        Some(adjustment),
+    )
+}
+
 /// Normalize complexity to 0-10 scale using weighted complexity (spec 121).
 ///
 /// Uses configurable weights for cyclomatic and cognitive complexity.
