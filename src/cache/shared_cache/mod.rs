@@ -1,5 +1,6 @@
 // Module declarations
 pub mod builder;
+mod file_ops;
 mod pruning;
 pub mod reader;
 pub mod writer;
@@ -8,7 +9,7 @@ use crate::cache::auto_pruner::{AutoPruner, BackgroundPruner, PruneStats, PruneS
 use crate::cache::cache_location::{CacheLocation, CacheStrategy};
 use crate::cache::index_manager::{CacheMetadata, IndexManager};
 use crate::cache::pruning::{InternalCacheStats, PruningConfig, PruningStrategyType};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,42 +21,12 @@ pub use builder::SharedCacheBuilder;
 pub use reader::CacheReader;
 pub use writer::CacheWriter;
 
-/// Type of directory entry for classification
-#[derive(Debug, PartialEq)]
-pub(crate) enum EntryType {
-    File,
-    Directory,
-    Other,
-}
-
-/// Classify a path as file, directory, or other
-pub(crate) fn classify_entry(path: &Path) -> EntryType {
-    if path.is_file() {
-        EntryType::File
-    } else if path.is_dir() {
-        EntryType::Directory
-    } else {
-        EntryType::Other
-    }
-}
-
-/// Build destination path from base and entry name
-pub(crate) fn build_dest_path(dest: &Path, entry_name: &std::ffi::OsStr) -> PathBuf {
-    dest.join(entry_name)
-}
-
-/// Copy a single file with error context
-pub(crate) fn copy_file_entry(src: &Path, dest: &Path) -> Result<()> {
-    fs::copy(src, dest)
-        .with_context(|| format!("Failed to copy file from {:?} to {:?}", src, dest))?;
-    Ok(())
-}
-
-/// Create a directory with error context
-pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
-    fs::create_dir_all(dest).with_context(|| format!("Failed to create directory {:?}", dest))?;
-    Ok(())
-}
+// Re-export for testing
+#[cfg(test)]
+pub(crate) use file_ops::{
+    build_dest_path, classify_entry, copy_dir_entry, copy_file_entry, select_keys_for_removal,
+    EntryType,
+};
 
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
@@ -294,12 +265,7 @@ impl SharedCache {
 
     /// Get the file path for a cache entry
     fn get_cache_file_path(&self, key: &str, component: &str) -> PathBuf {
-        let component_path = self.location.get_component_path(component);
-
-        // Use first 2 chars of key for directory sharding
-        let shard = if key.len() >= 2 { &key[..2] } else { "00" };
-
-        component_path.join(shard).join(format!("{}.cache", key))
+        file_ops::get_cache_file_path(&self.location, key, component)
     }
 
     /// Perform cleanup if cache is too large
@@ -316,135 +282,32 @@ impl SharedCache {
 
     /// Clean up old cache entries
     pub fn cleanup(&self) -> Result<()> {
-        let removed_keys = self.determine_keys_to_remove()?;
-        self.delete_cache_files(&removed_keys)?;
+        let removed_keys =
+            file_ops::determine_keys_to_remove(&self.index_manager, self.max_cache_size)?;
+        file_ops::delete_cache_files(&self.location, &removed_keys)?;
         self.save_index()?;
         Ok(())
     }
 
-    /// Determine which cache keys should be removed based on size and age
-    fn determine_keys_to_remove(&self) -> Result<Vec<String>> {
-        let (sorted_entries, total_size) = self.index_manager.get_sorted_entries_and_stats();
-        let target_size = self.max_cache_size / 2;
-        let keys_to_remove = Self::select_keys_for_removal(sorted_entries, target_size, total_size);
-
-        self.index_manager.remove_entries(&keys_to_remove)?;
-        Ok(keys_to_remove)
+    /// Migrate cache from local to shared location
+    pub fn migrate_from_local(&self, local_cache_path: &Path) -> Result<()> {
+        file_ops::migrate_from_local(&self.location, local_cache_path)
     }
 
-    /// Select keys for removal until target size is reached
-    fn select_keys_for_removal(
+    /// Recursively copy directory contents (used in tests)
+    #[cfg(test)]
+    pub(crate) fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
+        file_ops::copy_dir_recursive(src, dest)
+    }
+
+    /// Select keys for removal (used in tests)
+    #[cfg(test)]
+    pub(crate) fn select_keys_for_removal(
         entries: Vec<(String, CacheMetadata)>,
         target_size: u64,
         current_size: u64,
     ) -> Vec<String> {
-        let mut removed_keys = Vec::new();
-        let mut remaining_size = current_size;
-
-        for (key, metadata) in entries {
-            if remaining_size <= target_size {
-                break;
-            }
-            removed_keys.push(key);
-            remaining_size -= metadata.size_bytes;
-        }
-        removed_keys
-    }
-
-    /// Delete cache files for the given keys
-    fn delete_cache_files(&self, removed_keys: &[String]) -> Result<()> {
-        const CACHE_COMPONENTS: &[&str] = &[
-            "call_graphs",
-            "analysis",
-            "metadata",
-            "temp",
-            "file_metrics",
-            "test",
-        ];
-
-        for key in removed_keys {
-            for component in CACHE_COMPONENTS {
-                self.delete_component_file(key, component);
-            }
-        }
-        Ok(())
-    }
-
-    /// Delete a single cache component file with error handling
-    fn delete_component_file(&self, key: &str, component: &str) {
-        let cache_path = self.get_cache_file_path(key, component);
-        if cache_path.exists() {
-            if let Err(e) = fs::remove_file(&cache_path) {
-                log::debug!(
-                    "Failed to delete cache file {:?}: {}. This may be due to concurrent access.",
-                    cache_path,
-                    e
-                );
-            }
-        }
-    }
-
-    /// Migrate cache from local to shared location
-    pub fn migrate_from_local(&self, local_cache_path: &Path) -> Result<()> {
-        if !local_cache_path.exists() {
-            return Ok(()); // Nothing to migrate
-        }
-
-        log::info!(
-            "Migrating cache from {:?} to {:?}",
-            local_cache_path,
-            self.location.get_cache_path()
-        );
-
-        // Copy all cache files
-        for entry in fs::read_dir(local_cache_path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() {
-                if let Some(file_name) = path.file_name() {
-                    let dest = self.location.get_cache_path().join(file_name);
-                    fs::copy(&path, &dest).with_context(|| {
-                        format!("Failed to copy cache file from {:?} to {:?}", path, dest)
-                    })?;
-                }
-            } else if path.is_dir() {
-                // Recursively copy subdirectories
-                if let Some(dir_name) = path.file_name() {
-                    let dest_dir = self.location.get_cache_path().join(dir_name);
-                    fs::create_dir_all(&dest_dir)?;
-                    self.copy_dir_recursive(&path, &dest_dir)?;
-                }
-            }
-        }
-
-        log::info!("Cache migration completed successfully");
-        Ok(())
-    }
-
-    /// Recursively copy directory contents
-    fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<()> {
-        #[allow(clippy::only_used_in_recursion)]
-        let _ = self; // Silence clippy warning
-        for entry in
-            fs::read_dir(src).with_context(|| format!("Failed to read directory {:?}", src))?
-        {
-            let entry = entry?;
-            let path = entry.path();
-            let dest_path = build_dest_path(dest, &entry.file_name());
-
-            match classify_entry(&path) {
-                EntryType::File => copy_file_entry(&path, &dest_path)?,
-                EntryType::Directory => {
-                    copy_dir_entry(&dest_path)?;
-                    self.copy_dir_recursive(&path, &dest_path)?;
-                }
-                EntryType::Other => {
-                    // Skip other entry types (symlinks, etc.)
-                }
-            }
-        }
-        Ok(())
+        file_ops::select_keys_for_removal(entries, target_size, current_size)
     }
 
     /// Get cache statistics
@@ -517,34 +380,7 @@ impl SharedCache {
 
     /// Clear all files in a component directory
     fn clear_component_files(&self, component: &str) -> Result<()> {
-        let component_path = self.location.get_component_path(component);
-        if !component_path.exists() {
-            return Ok(());
-        }
-
-        for entry in fs::read_dir(&component_path)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() {
-                fs::remove_file(&path)?;
-                continue;
-            }
-
-            if path.is_dir() {
-                // Remove files in sharded subdirectories
-                for subentry in fs::read_dir(&path)? {
-                    let subentry = subentry?;
-                    if subentry.path().is_file() {
-                        fs::remove_file(subentry.path())?;
-                    }
-                }
-                // Try to remove the now-empty shard directory
-                let _ = fs::remove_dir(&path);
-            }
-        }
-
-        Ok(())
+        file_ops::clear_component_files(&self.location, component)
     }
 
     pub fn get_stats(&self) -> CacheStats {
