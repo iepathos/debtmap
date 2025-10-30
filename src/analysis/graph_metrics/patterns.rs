@@ -229,6 +229,28 @@ impl PatternDetector {
         (primary, confidence, evidence)
     }
 
+    /// Classify LeafNode pattern
+    fn classify_leaf_node(io_profile: Option<&IoProfile>) -> (String, f64, Vec<String>) {
+        if let Some(profile) = io_profile {
+            if profile.is_pure {
+                let primary = "Pure Computation".to_string();
+                let confidence = 0.75;
+                let evidence = vec!["Pure function with no side effects or I/O".to_string()];
+                (primary, confidence, evidence)
+            } else {
+                let primary = "Utility & Helper Functions".to_string();
+                let confidence = 0.70;
+                let evidence = vec!["Leaf function with side effects".to_string()];
+                (primary, confidence, evidence)
+            }
+        } else {
+            let primary = "Utility & Helper Functions".to_string();
+            let confidence = 0.70;
+            let evidence = vec!["Pure function with no external calls".to_string()];
+            (primary, confidence, evidence)
+        }
+    }
+
     /// Classify responsibility based on detected patterns and I/O profile
     pub fn classify_responsibility(
         &self,
@@ -246,25 +268,7 @@ impl PatternDetector {
         } else if patterns.contains(&CallGraphPattern::Bridge) {
             Self::classify_bridge(metrics)
         } else if patterns.contains(&CallGraphPattern::LeafNode) {
-            // Check I/O profile to distinguish between pure computation and utilities
-            if let Some(profile) = io_profile {
-                if profile.is_pure {
-                    let primary = "Pure Computation".to_string();
-                    let confidence = 0.75;
-                    let evidence = vec!["Pure function with no side effects or I/O".to_string()];
-                    (primary, confidence, evidence)
-                } else {
-                    let primary = "Utility & Helper Functions".to_string();
-                    let confidence = 0.70;
-                    let evidence = vec!["Leaf function with side effects".to_string()];
-                    (primary, confidence, evidence)
-                }
-            } else {
-                let primary = "Utility & Helper Functions".to_string();
-                let confidence = 0.70;
-                let evidence = vec!["Pure function with no external calls".to_string()];
-                (primary, confidence, evidence)
-            }
+            Self::classify_leaf_node(io_profile)
         } else if patterns.contains(&CallGraphPattern::UtilityCluster) {
             let primary = "Domain-Specific Utilities".to_string();
             let confidence = 0.65;
