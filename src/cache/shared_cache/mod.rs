@@ -1,4 +1,5 @@
 // Module declarations
+pub mod builder;
 mod pruning;
 pub mod reader;
 pub mod writer;
@@ -15,6 +16,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 // Re-export for backward compatibility
+pub use builder::SharedCacheBuilder;
 pub use reader::CacheReader;
 pub use writer::CacheWriter;
 
@@ -58,13 +60,13 @@ pub(crate) fn copy_dir_entry(dest: &Path) -> Result<()> {
 /// Thread-safe shared cache implementation
 pub struct SharedCache {
     pub location: CacheLocation,
-    reader: CacheReader,
-    writer: CacheWriter,
-    index_manager: Arc<IndexManager>,
-    max_cache_size: u64,
-    cleanup_threshold: f64,
-    auto_pruner: Option<AutoPruner>,
-    background_pruner: Option<BackgroundPruner>,
+    pub(super) reader: CacheReader,
+    pub(super) writer: CacheWriter,
+    pub(super) index_manager: Arc<IndexManager>,
+    pub(super) max_cache_size: u64,
+    pub(super) cleanup_threshold: f64,
+    pub(super) auto_pruner: Option<AutoPruner>,
+    pub(super) background_pruner: Option<BackgroundPruner>,
 }
 
 impl std::fmt::Debug for SharedCache {
@@ -82,63 +84,24 @@ impl std::fmt::Debug for SharedCache {
 impl SharedCache {
     /// Create a new shared cache instance
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
-        let location = CacheLocation::resolve(repo_path)?;
-        let cache = Self::new_with_location(location)?;
+        let mut builder = SharedCacheBuilder::new();
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        let cache = builder.build()?;
         cache.validate_version()?;
         Ok(cache)
     }
 
     /// Create a new shared cache instance with explicit cache directory (for testing)
     pub fn new_with_cache_dir(repo_path: Option<&Path>, cache_dir: PathBuf) -> Result<Self> {
-        let strategy = CacheStrategy::Custom(cache_dir);
-        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
-        let cache = Self::new_with_location(location)?;
+        let mut builder = SharedCacheBuilder::new().cache_dir(cache_dir);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        let cache = builder.build()?;
         cache.validate_version()?;
         Ok(cache)
-    }
-
-    /// Create a new shared cache instance with explicit location
-    fn new_with_location(location: CacheLocation) -> Result<Self> {
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        // Create auto-pruner from environment or defaults
-        let auto_pruner = if std::env::var("DEBTMAP_CACHE_AUTO_PRUNE")
-            .unwrap_or_else(|_| "true".to_string())
-            .to_lowercase()
-            == "true"
-        {
-            Some(AutoPruner::from_env())
-        } else {
-            None
-        };
-
-        let background_pruner = auto_pruner
-            .as_ref()
-            .map(|p| BackgroundPruner::new(p.clone()));
-
-        // Use auto-pruner's max size if configured
-        let max_cache_size = auto_pruner
-            .as_ref()
-            .map(|p| p.max_size_bytes as u64)
-            .unwrap_or(1024 * 1024 * 1024); // 1GB default
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size,
-            cleanup_threshold: 0.9, // Cleanup when 90% full
-            auto_pruner,
-            background_pruner,
-        })
     }
 
     /// Save the current index to disk with comprehensive error handling
@@ -607,28 +570,11 @@ impl SharedCache {
 
     /// Create a new shared cache with auto-pruning enabled
     pub fn with_auto_pruning(repo_path: Option<&Path>, pruner: AutoPruner) -> Result<Self> {
-        let location = CacheLocation::resolve(repo_path)?;
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        let background_pruner = BackgroundPruner::new(pruner.clone());
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size: pruner.max_size_bytes as u64,
-            cleanup_threshold: 0.9,
-            auto_pruner: Some(pruner),
-            background_pruner: Some(background_pruner),
-        })
+        let mut builder = SharedCacheBuilder::new().auto_pruner(pruner);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        builder.build()
     }
 
     /// Create a new shared cache with auto-pruning enabled and explicit cache directory (for testing)
@@ -637,29 +583,13 @@ impl SharedCache {
         cache_dir: PathBuf,
         pruner: AutoPruner,
     ) -> Result<Self> {
-        let strategy = CacheStrategy::Custom(cache_dir);
-        let location = CacheLocation::resolve_with_strategy(repo_path, strategy)?;
-        location.ensure_directories()?;
-
-        // Create shared IndexManager wrapped in Arc
-        let index_manager = Arc::new(IndexManager::load_or_create(&location)?);
-
-        // Create reader and writer with shared index manager
-        let reader = CacheReader::new(location.clone(), Arc::clone(&index_manager));
-        let writer = CacheWriter::new(location.clone(), Arc::clone(&index_manager));
-
-        let background_pruner = BackgroundPruner::new(pruner.clone());
-
-        Ok(Self {
-            location,
-            reader,
-            writer,
-            index_manager,
-            max_cache_size: pruner.max_size_bytes as u64,
-            cleanup_threshold: 0.9,
-            auto_pruner: Some(pruner),
-            background_pruner: Some(background_pruner),
-        })
+        let mut builder = SharedCacheBuilder::new()
+            .cache_dir(cache_dir)
+            .auto_pruner(pruner);
+        if let Some(path) = repo_path {
+            builder = builder.repo_path(path);
+        }
+        builder.build()
     }
 
     // Delegate to pruning module
