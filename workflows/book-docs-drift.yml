@@ -8,7 +8,7 @@ mode: mapreduce
 # Environment variables for parameterization
 env:
   # Project configuration
-  PROJECT_NAME: "Prodigy"
+  PROJECT_NAME: "Debtmap"
   PROJECT_CONFIG: ".prodigy/book-config.json"
   FEATURES_PATH: ".prodigy/book-analysis/features.json"
 
