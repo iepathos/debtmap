@@ -11,6 +11,7 @@ pub mod scoring;
 pub mod semantic_classifier;
 pub mod tiers;
 pub mod unified_analysis_queries;
+pub mod unified_analysis_utils;
 pub mod unified_scorer;
 
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ pub use formatter_markdown::{
 pub use semantic_classifier::{classify_function_role, FunctionRole};
 pub use tiers::{classify_tier, RecommendationTier, TierConfig};
 pub use unified_analysis_queries::UnifiedAnalysisQueries;
+pub use unified_analysis_utils::UnifiedAnalysisUtils;
 pub use unified_scorer::{calculate_unified_priority, Location, UnifiedDebtItem, UnifiedScore};
 
 use im::Vector;
@@ -502,106 +504,6 @@ impl UnifiedAnalysis {
         }
     }
 
-    /// Get timing information for the analysis phases (spec 130)
-    pub fn timings(
-        &self,
-    ) -> Option<&crate::builders::parallel_unified_analysis::AnalysisPhaseTimings> {
-        self.timings.as_ref()
-    }
-
-    pub fn add_file_item(&mut self, item: FileDebtItem) {
-        // Get configurable thresholds
-        let min_score = crate::config::get_minimum_debt_score();
-
-        // Filter out items below minimum thresholds
-        if item.score < min_score {
-            return;
-        }
-
-        // Check for duplicates before adding
-        let is_duplicate = self
-            .file_items
-            .iter()
-            .any(|existing| existing.metrics.path == item.metrics.path);
-
-        if !is_duplicate {
-            self.file_items.push_back(item);
-        }
-    }
-
-    pub fn add_item(&mut self, item: UnifiedDebtItem) {
-        // Get configurable thresholds
-        let min_score = crate::config::get_minimum_debt_score();
-        let min_cyclomatic = crate::config::get_minimum_cyclomatic_complexity();
-        let min_cognitive = crate::config::get_minimum_cognitive_complexity();
-        let min_risk = crate::config::get_minimum_risk_score();
-
-        // Filter out items below minimum thresholds
-        if item.unified_score.final_score < min_score {
-            return;
-        }
-
-        // Check risk score threshold for Risk debt types
-        if let DebtType::Risk { risk_score, .. } = &item.debt_type {
-            if *risk_score < min_risk {
-                return;
-            }
-        }
-
-        // Filter out trivial functions based on configured complexity thresholds.
-        // Test-related items are exempt as they have different complexity characteristics.
-        if !matches!(
-            item.debt_type,
-            DebtType::TestComplexityHotspot { .. }
-                | DebtType::TestTodo { .. }
-                | DebtType::TestDuplication { .. }
-        ) {
-            // Enforce cyclomatic complexity threshold
-            if item.cyclomatic_complexity < min_cyclomatic {
-                return;
-            }
-
-            // Enforce cognitive complexity threshold
-            if item.cognitive_complexity < min_cognitive {
-                return;
-            }
-        }
-
-        // Check for duplicates before adding
-        // Two items are considered duplicates if they have the same location and debt type
-        let is_duplicate = self.items.iter().any(|existing| {
-            existing.location.file == item.location.file
-                && existing.location.line == item.location.line
-                && std::mem::discriminant(&existing.debt_type)
-                    == std::mem::discriminant(&item.debt_type)
-        });
-
-        if !is_duplicate {
-            self.items.push_back(item);
-        }
-    }
-
-    pub fn sort_by_priority(&mut self) {
-        // Sort function items
-        let mut items_vec: Vec<UnifiedDebtItem> = self.items.iter().cloned().collect();
-        items_vec.sort_by(|a, b| {
-            b.unified_score
-                .final_score
-                .partial_cmp(&a.unified_score.final_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        self.items = items_vec.into_iter().collect();
-
-        // Sort file items
-        let mut file_items_vec: Vec<FileDebtItem> = self.file_items.iter().cloned().collect();
-        file_items_vec.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        self.file_items = file_items_vec.into_iter().collect();
-    }
-
     pub fn calculate_total_impact(&mut self) {
         let mut coverage_improvement = 0.0;
         let mut lines_reduction = 0;
@@ -738,57 +640,6 @@ impl UnifiedAnalysis {
             has_coverage_data: self.has_coverage_data,
             timings: self.timings.clone(),
         }
-    }
-
-    /// Get a reference to the data flow graph
-    pub fn data_flow_graph(&self) -> &crate::data_flow::DataFlowGraph {
-        &self.data_flow_graph
-    }
-
-    /// Get a mutable reference to the data flow graph
-    pub fn data_flow_graph_mut(&mut self) -> &mut crate::data_flow::DataFlowGraph {
-        &mut self.data_flow_graph
-    }
-
-    /// Populate the data flow graph with purity analysis data from function metrics
-    pub fn populate_purity_analysis(&mut self, metrics: &[crate::core::FunctionMetrics]) {
-        use crate::data_flow::PurityInfo;
-        use crate::priority::call_graph::FunctionId;
-
-        for metric in metrics {
-            let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
-
-            let purity_info = PurityInfo {
-                is_pure: metric.is_pure.unwrap_or(false),
-                confidence: metric.purity_confidence.unwrap_or(0.0),
-                impurity_reasons: if !metric.is_pure.unwrap_or(false) {
-                    vec!["Function may have side effects".to_string()]
-                } else {
-                    vec![]
-                },
-            };
-
-            self.data_flow_graph.set_purity_info(func_id, purity_info);
-        }
-    }
-
-    /// Add I/O operation detected during analysis
-    pub fn add_io_operation(
-        &mut self,
-        func_id: call_graph::FunctionId,
-        operation: crate::data_flow::IoOperation,
-    ) {
-        self.data_flow_graph.add_io_operation(func_id, operation);
-    }
-
-    /// Add variable dependencies for a function
-    pub fn add_variable_dependencies(
-        &mut self,
-        func_id: call_graph::FunctionId,
-        variables: std::collections::HashSet<String>,
-    ) {
-        self.data_flow_graph
-            .add_variable_dependencies(func_id, variables);
     }
 }
 

@@ -80,7 +80,7 @@ mod tests {
     use super::*;
     use crate::priority::{
         call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
-        Location, UnifiedDebtItem, UnifiedScore,
+        Location, UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;

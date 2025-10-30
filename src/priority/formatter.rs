@@ -1984,6 +1984,7 @@ mod tests {
         FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
     };
     use crate::priority::unified_scorer::Location;
+    use crate::priority::UnifiedAnalysisUtils;
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
     use std::path::PathBuf;
 

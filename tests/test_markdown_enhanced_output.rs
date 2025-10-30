@@ -3,6 +3,7 @@ use debtmap::io::writers::MarkdownWriter;
 use debtmap::priority::{
     unified_scorer::{Location, UnifiedDebtItem, UnifiedScore},
     CallGraph, DebtType, FunctionRole, FunctionVisibility, ImpactMetrics, UnifiedAnalysis,
+    UnifiedAnalysisUtils,
 };
 use std::io::Cursor;
 use std::path::PathBuf;

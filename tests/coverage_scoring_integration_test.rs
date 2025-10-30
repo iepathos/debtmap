@@ -11,8 +11,8 @@ use debtmap::priority::scoring::calculation::{
     calculate_complexity_factor, calculate_coverage_multiplier, calculate_dependency_factor,
 };
 use debtmap::priority::{
-    CallGraph, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedAnalysis, UnifiedDebtItem,
-    UnifiedScore,
+    CallGraph, DebtType, FunctionRole, ImpactMetrics, Location, UnifiedAnalysis,
+    UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
 };
 use std::path::PathBuf;
 

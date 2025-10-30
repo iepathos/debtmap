@@ -16,7 +16,7 @@ use crate::{
         scoring::debt_item,
         unified_scorer::Location,
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedAnalysis,
-        UnifiedDebtItem, UnifiedScore,
+        UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
     },
     risk,
 };
