@@ -425,31 +425,7 @@ impl ExceptionFlowAnalyzer {
 
         for (func_name, flow) in &self.exception_flows {
             // Pattern: Undocumented exceptions
-            for exc_info in &flow.raised_exceptions {
-                if !exc_info.is_documented
-                    && !flow
-                        .documented_exceptions
-                        .iter()
-                        .any(|doc| doc.exception_type == exc_info.exception_type.name())
-                {
-                    patterns.push(ExceptionFlowPattern {
-                        pattern_type: ExceptionPatternType::UndocumentedException,
-                        severity: Severity::Medium,
-                        confidence: 0.9,
-                        function_name: func_name.clone(),
-                        exception_type: Some(exc_info.exception_type.name()),
-                        explanation: format!(
-                            "Function '{}' raises {} but doesn't document it",
-                            func_name,
-                            exc_info.exception_type.name()
-                        ),
-                        suggestion: format!(
-                            "Add '{}' to the Raises section of the docstring",
-                            exc_info.exception_type.name()
-                        ),
-                    });
-                }
-            }
+            patterns.extend(detect_undocumented_exceptions(func_name, flow));
 
             // Pattern: Documented but not raised
             for doc_exc in &flow.documented_exceptions {
@@ -669,6 +645,42 @@ impl ExceptionFlowAnalyzer {
             })
             .collect()
     }
+}
+
+/// Detect undocumented exceptions in a function
+///
+/// Pure function that identifies exceptions raised by a function that are not
+/// documented in its docstring.
+fn detect_undocumented_exceptions(
+    func_name: &str,
+    flow: &ExceptionFlow,
+) -> Vec<ExceptionFlowPattern> {
+    flow.raised_exceptions
+        .iter()
+        .filter(|exc_info| {
+            !exc_info.is_documented
+                && !flow
+                    .documented_exceptions
+                    .iter()
+                    .any(|doc| doc.exception_type == exc_info.exception_type.name())
+        })
+        .map(|exc_info| ExceptionFlowPattern {
+            pattern_type: ExceptionPatternType::UndocumentedException,
+            severity: Severity::Medium,
+            confidence: 0.9,
+            function_name: func_name.to_string(),
+            exception_type: Some(exc_info.exception_type.name()),
+            explanation: format!(
+                "Function '{}' raises {} but doesn't document it",
+                func_name,
+                exc_info.exception_type.name()
+            ),
+            suggestion: format!(
+                "Add '{}' to the Raises section of the docstring",
+                exc_info.exception_type.name()
+            ),
+        })
+        .collect()
 }
 
 /// Information about a raised exception
