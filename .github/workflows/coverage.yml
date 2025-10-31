@@ -59,6 +59,7 @@ jobs:
     - name: Generate code coverage
       run: |
         cargo llvm-cov clean
+        mkdir -p target/coverage
         cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
         cargo llvm-cov --all-features --html --output-dir target/coverage --no-clean
         COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
