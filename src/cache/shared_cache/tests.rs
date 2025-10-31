@@ -476,7 +476,8 @@ fn test_cleanup_removes_oldest_entries() {
     std::env::set_var("DEBTMAP_CACHE_AUTO_PRUNE", "false");
 
     let mut cache = SharedCache::new_with_cache_dir(None, temp_dir.path().to_path_buf()).unwrap();
-    cache.max_cache_size = 100; // Set small size to trigger cleanup
+    // Set large size initially to prevent cleanup during insertion
+    cache.max_cache_size = 1000;
 
     // Create large entries to ensure we exceed max_cache_size
     let large_data = vec![0u8; 40]; // Each entry is 40 bytes
@@ -491,6 +492,9 @@ fn test_cleanup_removes_oldest_entries() {
     // Add recent entries
     cache.put("recent_key1", "component1", &large_data).unwrap();
     cache.put("recent_key2", "component1", &large_data).unwrap();
+
+    // Now set small size to trigger cleanup when called manually
+    cache.max_cache_size = 100;
 
     // Access recent entries to update their access time
     cache.get("recent_key1", "component1").unwrap();
