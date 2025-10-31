@@ -17,7 +17,7 @@ debtmap-report.json
 
 # Rust build artifacts
 /target/
-/Cargo.lock
+# Note: Cargo.lock is committed for binary projects to ensure reproducible builds
 
 # IDE and editor files
 .vscode/
