@@ -23,8 +23,26 @@ jobs:
         override: true
         components: llvm-tools-preview
 
+    - name: Cache cargo-llvm-cov
+      id: cache-llvm-cov
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/cargo-llvm-cov
+        key: ${{ runner.os }}-cargo-llvm-cov-0.6.18
+
     - name: Install cargo-llvm-cov
+      if: steps.cache-llvm-cov.outputs.cache-hit != 'true'
       run: cargo install cargo-llvm-cov
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-coverage-
 
     - name: Build debtmap binary
       run: cargo build --bin debtmap
@@ -32,7 +50,9 @@ jobs:
     - name: Generate code coverage
       run: |
         cargo llvm-cov clean
-        cargo llvm-cov --all-features --html --output-dir target/coverage
+        cargo llvm-cov --all-features --html --json --output-dir target/coverage
+        COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
+        echo "Current coverage: ${COVERAGE}%"
 
     - name: Archive code coverage results
       uses: actions/upload-artifact@v5
@@ -42,8 +62,6 @@ jobs:
 
     - name: Check coverage threshold
       run: |
-        cargo llvm-cov clean
-        cargo llvm-cov --all-features --json --output-path target/coverage/coverage.json
         COVERAGE=$(cat target/coverage/coverage.json | jq -r '.data[0].totals.lines.percent')
         echo "Current coverage: ${COVERAGE}%"
 

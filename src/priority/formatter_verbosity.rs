@@ -1291,7 +1291,7 @@ mod tests {
             dampening_factor: 0.8,
         });
         format_complexity_summary(&mut output, &item, &formatter);
-        assert!(output.contains("adj:15"));
+        assert!(output.contains("(adj:15)"));
         assert!(output.contains("entropy=0.75"));
     }
 

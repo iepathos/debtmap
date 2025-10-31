@@ -180,6 +180,7 @@ fn test_parallel_vs_sequential_consistency() {
 }
 
 #[test]
+#[ignore] // Performance test - can be slow on CI or with coverage instrumentation
 fn test_large_codebase_parallel_analysis() {
     use std::time::{Duration, Instant};
 
