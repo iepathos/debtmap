@@ -213,43 +213,7 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             let average_severity = total_score / item_count as f64;
 
             // Estimate effort based on category and average severity
-            let effort_per_item = match category {
-                DebtCategory::Architecture => {
-                    if average_severity >= 90.0 {
-                        16
-                    }
-                    // 2 days
-                    else if average_severity >= 70.0 {
-                        8
-                    }
-                    // 1 day
-                    else {
-                        4
-                    } // Half day
-                }
-                DebtCategory::Testing => {
-                    if average_severity >= 70.0 {
-                        4
-                    } else {
-                        2
-                    }
-                }
-                DebtCategory::Performance => {
-                    if average_severity >= 70.0 {
-                        8
-                    } else {
-                        4
-                    }
-                }
-                DebtCategory::CodeQuality => {
-                    if average_severity >= 70.0 {
-                        4
-                    } else {
-                        2
-                    }
-                }
-            };
-
+            let effort_per_item = estimate_effort_per_item(&category, average_severity);
             let estimated_effort_hours = (item_count as u32) * effort_per_item;
 
             // Take top 5 items per category
@@ -304,6 +268,55 @@ fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
                 DebtCategory::Testing
             } else {
                 DebtCategory::CodeQuality
+            }
+        }
+    }
+}
+
+/// Estimate effort per item in hours based on category and average severity.
+///
+/// Returns the estimated number of hours needed to address a single debt item
+/// of the given category with the specified average severity score.
+///
+/// # Arguments
+///
+/// * `category` - The debt category (Architecture, Testing, Performance, CodeQuality)
+/// * `average_severity` - The average severity score (0-100)
+///
+/// # Returns
+///
+/// Estimated hours per item. Architecture issues take longest (4-16 hours),
+/// followed by Performance (4-8 hours), and Testing/CodeQuality (2-4 hours).
+fn estimate_effort_per_item(category: &DebtCategory, average_severity: f64) -> u32 {
+    match category {
+        DebtCategory::Architecture => {
+            if average_severity >= 90.0 {
+                16 // 2 days
+            } else if average_severity >= 70.0 {
+                8 // 1 day
+            } else {
+                4 // Half day
+            }
+        }
+        DebtCategory::Testing => {
+            if average_severity >= 70.0 {
+                4
+            } else {
+                2
+            }
+        }
+        DebtCategory::Performance => {
+            if average_severity >= 70.0 {
+                8
+            } else {
+                4
+            }
+        }
+        DebtCategory::CodeQuality => {
+            if average_severity >= 70.0 {
+                4
+            } else {
+                2
             }
         }
     }
