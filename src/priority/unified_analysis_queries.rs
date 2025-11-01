@@ -202,34 +202,14 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
         }
 
         // Create category summaries
-        let mut category_summaries = BTreeMap::new();
-        for (category, items) in categories {
-            if items.is_empty() {
-                continue;
-            }
-
-            let total_score: f64 = items.iter().map(|item| item.score()).sum();
-            let item_count = items.len();
-            let average_severity = total_score / item_count as f64;
-
-            // Estimate effort based on category and average severity
-            let effort_per_item = estimate_effort_per_item(&category, average_severity);
-            let estimated_effort_hours = (item_count as u32) * effort_per_item;
-
-            // Take top 5 items per category
-            let top_items = items.into_iter().take(5).collect();
-
-            let summary = CategorySummary {
-                category: category.clone(),
-                total_score,
-                item_count,
-                estimated_effort_hours,
-                average_severity,
-                top_items,
-            };
-
-            category_summaries.insert(category, summary);
-        }
+        let category_summaries: BTreeMap<DebtCategory, CategorySummary> = categories
+            .into_iter()
+            .filter(|(_, items)| !items.is_empty())
+            .map(|(category, items)| {
+                let summary = build_category_summary(category.clone(), items);
+                (category, summary)
+            })
+            .collect();
 
         // Identify cross-category dependencies
         let cross_dependencies = identify_cross_category_dependencies(&category_summaries);
@@ -319,6 +299,41 @@ fn estimate_effort_per_item(category: &DebtCategory, average_severity: f64) -> u
                 2
             }
         }
+    }
+}
+
+/// Build a CategorySummary from a collection of debt items.
+///
+/// Computes aggregate metrics for the given category including total score,
+/// item count, estimated effort, and selects the top 5 highest-priority items.
+///
+/// # Arguments
+///
+/// * `category` - The debt category for this summary
+/// * `items` - Vector of debt items in this category
+///
+/// # Returns
+///
+/// CategorySummary with computed metrics and top items
+fn build_category_summary(category: DebtCategory, items: Vec<DebtItem>) -> CategorySummary {
+    let total_score: f64 = items.iter().map(|item| item.score()).sum();
+    let item_count = items.len();
+    let average_severity = total_score / item_count as f64;
+
+    // Estimate effort based on category and average severity
+    let effort_per_item = estimate_effort_per_item(&category, average_severity);
+    let estimated_effort_hours = (item_count as u32) * effort_per_item;
+
+    // Take top 5 items per category
+    let top_items = items.into_iter().take(5).collect();
+
+    CategorySummary {
+        category,
+        total_score,
+        item_count,
+        estimated_effort_hours,
+        average_severity,
+        top_items,
     }
 }
 
