@@ -1732,6 +1732,35 @@ impl TwoPassExtractor {
         }
     }
 
+    /// Resolve a method to its FunctionId.
+    ///
+    /// Looks up the method in the function_name_map to get the correct FunctionId
+    /// with accurate line number. Falls back to creating a new FunctionId if not found.
+    ///
+    /// # Arguments
+    ///
+    /// * `class_name` - Name of the class containing the method
+    /// * `method_name` - Name of the method
+    ///
+    /// # Returns
+    ///
+    /// The FunctionId for the method
+    fn resolve_method_function_id(&self, class_name: &str, method_name: &str) -> FunctionId {
+        let func_name = format!("{}.{}", class_name, method_name);
+
+        // Look up the FunctionId from the function_name_map to get the correct line number
+        if let Some(existing_id) = self.function_name_map.get(&func_name) {
+            existing_id.clone()
+        } else {
+            // Fallback: create a new FunctionId (shouldn't happen in normal flow)
+            FunctionId::new(
+                self.type_tracker.file_path.clone(),
+                func_name.clone(),
+                self.estimate_line_number(&func_name),
+            )
+        }
+    }
+
     /// Register observer method implementations for a specific class-interface pair.
     ///
     /// This function iterates through the class methods and registers each non-special
@@ -1753,20 +1782,7 @@ impl TwoPassExtractor {
             if let ast::Stmt::FunctionDef(method_def) = stmt {
                 // Skip __init__ and other special methods
                 if !method_def.name.starts_with("__") {
-                    let func_name = format!("{}.{}", class_name, method_def.name);
-
-                    // Look up the FunctionId from the function_name_map to get the correct line number
-                    let func_id = if let Some(existing_id) = self.function_name_map.get(&func_name)
-                    {
-                        existing_id.clone()
-                    } else {
-                        // Fallback: create a new FunctionId (shouldn't happen in normal flow)
-                        FunctionId::new(
-                            self.type_tracker.file_path.clone(),
-                            func_name.clone(),
-                            self.estimate_line_number(&func_name),
-                        )
-                    };
+                    let func_id = self.resolve_method_function_id(class_name, &method_def.name);
 
                     {
                         let mut registry_mut = self.observer_registry.write().unwrap();
