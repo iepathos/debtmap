@@ -193,92 +193,19 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 
     fn get_categorized_debt(&self, limit: usize) -> CategorizedDebt {
         let all_items = self.get_top_mixed_priorities(limit);
-        let mut categories: BTreeMap<DebtCategory, Vec<DebtItem>> = BTreeMap::new();
 
-        // Categorize all items
-        for item in all_items {
-            let category = match &item {
-                DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
-                DebtItem::File(file) => {
-                    // File-level items typically indicate architectural issues
-                    if file.metrics.god_object_indicators.is_god_object {
-                        DebtCategory::Architecture
-                    } else if file.metrics.coverage_percent < 0.5 {
-                        DebtCategory::Testing
-                    } else {
-                        DebtCategory::CodeQuality
-                    }
-                }
-            };
+        // Collect and categorize items
+        let categories = collect_categorized_items(all_items);
 
-            categories.entry(category).or_default().push(item);
-        }
-
-        // Create category summaries
-        let mut category_summaries = BTreeMap::new();
-        for (category, items) in categories {
-            if items.is_empty() {
-                continue;
-            }
-
-            let total_score: f64 = items.iter().map(|item| item.score()).sum();
-            let item_count = items.len();
-            let average_severity = total_score / item_count as f64;
-
-            // Estimate effort based on category and average severity
-            let effort_per_item = match category {
-                DebtCategory::Architecture => {
-                    if average_severity >= 90.0 {
-                        16
-                    }
-                    // 2 days
-                    else if average_severity >= 70.0 {
-                        8
-                    }
-                    // 1 day
-                    else {
-                        4
-                    } // Half day
-                }
-                DebtCategory::Testing => {
-                    if average_severity >= 70.0 {
-                        4
-                    } else {
-                        2
-                    }
-                }
-                DebtCategory::Performance => {
-                    if average_severity >= 70.0 {
-                        8
-                    } else {
-                        4
-                    }
-                }
-                DebtCategory::CodeQuality => {
-                    if average_severity >= 70.0 {
-                        4
-                    } else {
-                        2
-                    }
-                }
-            };
-
-            let estimated_effort_hours = (item_count as u32) * effort_per_item;
-
-            // Take top 5 items per category
-            let top_items = items.into_iter().take(5).collect();
-
-            let summary = CategorySummary {
-                category: category.clone(),
-                total_score,
-                item_count,
-                estimated_effort_hours,
-                average_severity,
-                top_items,
-            };
-
-            category_summaries.insert(category, summary);
-        }
+        // Build category summaries
+        let category_summaries: BTreeMap<DebtCategory, CategorySummary> = categories
+            .into_iter()
+            .filter(|(_, items)| !items.is_empty())
+            .map(|(category, items)| {
+                let summary = build_category_summary(category.clone(), items);
+                (category, summary)
+            })
+            .collect();
 
         // Identify cross-category dependencies
         let cross_dependencies = identify_cross_category_dependencies(&category_summaries);
@@ -291,6 +218,142 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 }
 
 // Private helper functions
+
+/// Categorize a debt item into one of the standard categories.
+///
+/// Function-level items are categorized by their debt type.
+/// File-level items are categorized based on god object indicators,
+/// coverage, or default to code quality.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::priority::{DebtItem, DebtCategory, DebtType, UnifiedDebtItem};
+///
+/// let item = /* create a function debt item */;
+/// let category = categorize_debt_item(&item);
+/// ```
+fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
+    match item {
+        DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
+        DebtItem::File(file) => {
+            // File-level items typically indicate architectural issues
+            if file.metrics.god_object_indicators.is_god_object {
+                DebtCategory::Architecture
+            } else if file.metrics.coverage_percent < 0.5 {
+                DebtCategory::Testing
+            } else {
+                DebtCategory::CodeQuality
+            }
+        }
+    }
+}
+
+/// Estimate effort per item in hours based on category and average severity.
+///
+/// Returns the estimated number of hours needed to address a single debt item
+/// of the given category with the specified average severity score.
+///
+/// # Arguments
+///
+/// * `category` - The debt category (Architecture, Testing, Performance, CodeQuality)
+/// * `average_severity` - The average severity score (0-100)
+///
+/// # Returns
+///
+/// Estimated hours per item. Architecture issues take longest (4-16 hours),
+/// followed by Performance (4-8 hours), and Testing/CodeQuality (2-4 hours).
+fn estimate_effort_per_item(category: &DebtCategory, average_severity: f64) -> u32 {
+    match category {
+        DebtCategory::Architecture => {
+            if average_severity >= 90.0 {
+                16 // 2 days
+            } else if average_severity >= 70.0 {
+                8 // 1 day
+            } else {
+                4 // Half day
+            }
+        }
+        DebtCategory::Testing => {
+            if average_severity >= 70.0 {
+                4
+            } else {
+                2
+            }
+        }
+        DebtCategory::Performance => {
+            if average_severity >= 70.0 {
+                8
+            } else {
+                4
+            }
+        }
+        DebtCategory::CodeQuality => {
+            if average_severity >= 70.0 {
+                4
+            } else {
+                2
+            }
+        }
+    }
+}
+
+/// Collect and categorize debt items into a map of categories to items.
+///
+/// Takes a collection of debt items and groups them by their assigned
+/// debt category using the categorize_debt_item function.
+///
+/// # Arguments
+///
+/// * `items` - Vector of debt items to categorize
+///
+/// # Returns
+///
+/// BTreeMap with debt categories as keys and vectors of items as values
+fn collect_categorized_items(items: Vector<DebtItem>) -> BTreeMap<DebtCategory, Vec<DebtItem>> {
+    items
+        .into_iter()
+        .fold(BTreeMap::new(), |mut categories, item| {
+            let category = categorize_debt_item(&item);
+            categories.entry(category).or_default().push(item);
+            categories
+        })
+}
+
+/// Build a CategorySummary from a collection of debt items.
+///
+/// Computes aggregate metrics for the given category including total score,
+/// item count, estimated effort, and selects the top 5 highest-priority items.
+///
+/// # Arguments
+///
+/// * `category` - The debt category for this summary
+/// * `items` - Vector of debt items in this category
+///
+/// # Returns
+///
+/// CategorySummary with computed metrics and top items
+fn build_category_summary(category: DebtCategory, items: Vec<DebtItem>) -> CategorySummary {
+    let total_score: f64 = items.iter().map(|item| item.score()).sum();
+    let item_count = items.len();
+    let average_severity = total_score / item_count as f64;
+
+    // Estimate effort based on category and average severity
+    let effort_per_item = estimate_effort_per_item(&category, average_severity);
+    let estimated_effort_hours = (item_count as u32) * effort_per_item;
+
+    // Take top 5 items per category
+    let top_items = items.into_iter().take(5).collect();
+
+    CategorySummary {
+        category,
+        total_score,
+        item_count,
+        estimated_effort_hours,
+        average_severity,
+        top_items,
+    }
+}
 
 /// Get a descriptive key for the debt type
 fn get_debt_type_key(item: &DebtItem) -> String {
