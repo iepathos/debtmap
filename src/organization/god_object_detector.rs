@@ -514,15 +514,6 @@ impl GodObjectDetector {
         }
     }
 
-    /// Calculates complexity-weighted metrics for the god object analysis
-    ///
-    /// # Arguments
-    /// * `visitor` - Type visitor containing function information
-    /// * `detection_type` - Whether analyzing a God Class or God File
-    ///
-    /// # Returns
-    /// Tuple of (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution)
-
     /// Analyzes cross-domain struct mixing and generates module split recommendations
     ///
     /// # Arguments
