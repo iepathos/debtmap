@@ -7,5 +7,6 @@
 //! - `recommender`: Recommendation generation
 
 pub mod ast_visitor;
+pub mod metrics;
 
 pub use ast_visitor::{FunctionWeight, Responsibility, TypeAnalysis, TypeVisitor};
