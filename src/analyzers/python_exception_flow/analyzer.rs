@@ -859,7 +859,11 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
                 // Check if this looks like a section header
                 if NUMPY_SECTIONS.contains(&trimmed) {
                     // Save current exception before stopping
-                    save_current_exception(current_exception.take(), &current_description, &mut exceptions);
+                    save_current_exception(
+                        current_exception.take(),
+                        &current_description,
+                        &mut exceptions,
+                    );
                     break;
                 }
             }
@@ -867,7 +871,11 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
             // Stop at dashes that indicate a new section
             if trimmed.starts_with("---") || trimmed.starts_with("--") {
                 // Save current exception before stopping
-                save_current_exception(current_exception.take(), &current_description, &mut exceptions);
+                save_current_exception(
+                    current_exception.take(),
+                    &current_description,
+                    &mut exceptions,
+                );
                 break;
             }
 
@@ -883,12 +891,20 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
                 // Check if this is actually a section header
                 if NUMPY_SECTIONS.contains(&trimmed) {
                     // This is a section header, stop parsing
-                    save_current_exception(current_exception.take(), &current_description, &mut exceptions);
+                    save_current_exception(
+                        current_exception.take(),
+                        &current_description,
+                        &mut exceptions,
+                    );
                     break;
                 }
 
                 // Save previous exception
-                save_current_exception(current_exception.take(), &current_description, &mut exceptions);
+                save_current_exception(
+                    current_exception.take(),
+                    &current_description,
+                    &mut exceptions,
+                );
                 current_description.clear();
                 current_exception = Some(trimmed.to_string());
             } else if indent_count > 8 {
