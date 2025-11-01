@@ -9,6 +9,8 @@ mod classification;
 mod detection;
 mod scoring;
 mod thresholds;
+mod languages;
+mod display;
 
 // Re-export scoring types for backward compatibility
 pub use scoring::{
@@ -45,88 +47,14 @@ pub use classification::{
     ContextRuleConfig, FunctionPatternConfig,
 };
 
+// Re-export language types for backward compatibility
+pub use languages::{EntropyConfig, LanguageFeatures, LanguagesConfig};
+
+// Re-export display types for backward compatibility
+pub use display::{DisplayConfig, GodObjectConfig, VerbosityLevel};
+
 // Pure mapping pattern detection config (spec 118)
 pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
-
-/// God object detection configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GodObjectConfig {
-    /// Whether god object detection is enabled
-    #[serde(default = "default_god_object_enabled")]
-    pub enabled: bool,
-
-    /// Language-specific thresholds
-    #[serde(default)]
-    pub rust: GodObjectThresholds,
-
-    #[serde(default)]
-    pub python: GodObjectThresholds,
-
-    #[serde(default)]
-    pub javascript: GodObjectThresholds,
-}
-
-impl Default for GodObjectConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            rust: GodObjectThresholds::rust_defaults(),
-            python: GodObjectThresholds::python_defaults(),
-            javascript: GodObjectThresholds::javascript_defaults(),
-        }
-    }
-}
-
-fn default_god_object_enabled() -> bool {
-    true
-}
-
-/// Verbosity level for output formatting
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum VerbosityLevel {
-    /// Summary output - only essential information
-    Summary,
-    /// Detailed output - includes module structure details
-    #[default]
-    Detailed,
-    /// Comprehensive output - all available analysis data
-    Comprehensive,
-}
-
-/// Display configuration for output formatting
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisplayConfig {
-    /// Whether to use tiered priority display
-    #[serde(default = "default_tiered_display")]
-    pub tiered: bool,
-
-    /// Maximum items to show per tier (default: 5)
-    #[serde(default = "default_items_per_tier")]
-    pub items_per_tier: usize,
-
-    /// Verbosity level for output (summary/detailed/comprehensive)
-    #[serde(default)]
-    pub verbosity: VerbosityLevel,
-}
-
-impl Default for DisplayConfig {
-    fn default() -> Self {
-        Self {
-            tiered: default_tiered_display(),
-            items_per_tier: default_items_per_tier(),
-            verbosity: VerbosityLevel::default(),
-        }
-    }
-}
-
-fn default_tiered_display() -> bool {
-    true // Enable tiered display by default
-}
-
-fn default_items_per_tier() -> usize {
-    5
-}
 
 /// Root configuration structure for debtmap
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -262,172 +190,6 @@ impl DebtmapConfig {
             .map(|ig| ig.patterns.clone())
             .unwrap_or_default()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LanguagesConfig {
-    pub enabled: Vec<String>,
-
-    /// Rust-specific configuration
-    #[serde(default)]
-    pub rust: Option<LanguageFeatures>,
-
-    /// Python-specific configuration
-    #[serde(default)]
-    pub python: Option<LanguageFeatures>,
-
-    /// JavaScript-specific configuration
-    #[serde(default)]
-    pub javascript: Option<LanguageFeatures>,
-
-    /// TypeScript-specific configuration
-    #[serde(default)]
-    pub typescript: Option<LanguageFeatures>,
-}
-
-/// Language-specific feature configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LanguageFeatures {
-    /// Whether to detect dead code for this language
-    #[serde(default = "default_detect_dead_code")]
-    pub detect_dead_code: bool,
-
-    /// Whether to detect complexity issues for this language
-    #[serde(default = "default_detect_complexity")]
-    pub detect_complexity: bool,
-
-    /// Whether to detect duplication for this language
-    #[serde(default = "default_detect_duplication")]
-    pub detect_duplication: bool,
-}
-
-impl Default for LanguageFeatures {
-    fn default() -> Self {
-        Self {
-            detect_dead_code: default_detect_dead_code(),
-            detect_complexity: default_detect_complexity(),
-            detect_duplication: default_detect_duplication(),
-        }
-    }
-}
-
-// Default feature flags - all enabled except Rust dead code detection
-fn default_detect_dead_code() -> bool {
-    true // Will be overridden for Rust
-}
-
-fn default_detect_complexity() -> bool {
-    true
-}
-
-fn default_detect_duplication() -> bool {
-    true
-}
-
-/// Entropy-based complexity scoring configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntropyConfig {
-    /// Whether entropy-based scoring is enabled
-    #[serde(default = "default_entropy_enabled")]
-    pub enabled: bool,
-
-    /// Weight of entropy in complexity adjustment (0.0-1.0)
-    #[serde(default = "default_entropy_weight")]
-    pub weight: f64,
-
-    /// Minimum tokens required for entropy calculation
-    #[serde(default = "default_entropy_min_tokens")]
-    pub min_tokens: usize,
-
-    /// Pattern similarity threshold for repetition detection (0.0-1.0)
-    #[serde(default = "default_entropy_pattern_threshold")]
-    pub pattern_threshold: f64,
-
-    /// Entropy threshold for low entropy detection (0.0-1.0)
-    #[serde(default = "default_entropy_threshold")]
-    pub entropy_threshold: f64,
-
-    /// Whether to use smarter token classification (false by default for backward compatibility)
-    #[serde(default)]
-    pub use_classification: Option<bool>,
-
-    /// Branch similarity threshold for detection (0.0-1.0)
-    #[serde(default = "default_branch_threshold")]
-    pub branch_threshold: f64,
-
-    /// Maximum reduction for high repetition (0.0-1.0)
-    #[serde(default = "default_max_repetition_reduction")]
-    pub max_repetition_reduction: f64,
-
-    /// Maximum reduction for low entropy (0.0-1.0)
-    #[serde(default = "default_max_entropy_reduction")]
-    pub max_entropy_reduction: f64,
-
-    /// Maximum reduction for similar branches (0.0-1.0)
-    #[serde(default = "default_max_branch_reduction")]
-    pub max_branch_reduction: f64,
-
-    /// Maximum combined reduction (0.0-1.0)
-    #[serde(default = "default_max_combined_reduction")]
-    pub max_combined_reduction: f64,
-}
-
-impl Default for EntropyConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_entropy_enabled(),
-            weight: default_entropy_weight(),
-            min_tokens: default_entropy_min_tokens(),
-            pattern_threshold: default_entropy_pattern_threshold(),
-            entropy_threshold: default_entropy_threshold(),
-            use_classification: None, // Default to None for backward compatibility
-            branch_threshold: default_branch_threshold(),
-            max_repetition_reduction: default_max_repetition_reduction(),
-            max_entropy_reduction: default_max_entropy_reduction(),
-            max_branch_reduction: default_max_branch_reduction(),
-            max_combined_reduction: default_max_combined_reduction(),
-        }
-    }
-}
-
-fn default_entropy_enabled() -> bool {
-    true // Enabled by default for better match statement handling
-}
-
-fn default_entropy_weight() -> f64 {
-    1.0 // Full weight when enabled (user can adjust)
-}
-
-fn default_entropy_min_tokens() -> usize {
-    20
-}
-
-fn default_entropy_pattern_threshold() -> f64 {
-    0.7
-}
-
-fn default_entropy_threshold() -> f64 {
-    0.4 // Below 0.4 entropy is considered low
-}
-
-fn default_branch_threshold() -> f64 {
-    0.8 // Above 80% branch similarity triggers dampening
-}
-
-fn default_max_repetition_reduction() -> f64 {
-    0.20 // Max 20% reduction for high repetition
-}
-
-fn default_max_entropy_reduction() -> f64 {
-    0.15 // Max 15% reduction for low entropy
-}
-
-fn default_max_branch_reduction() -> f64 {
-    0.25 // Max 25% reduction for similar branches
-}
-
-fn default_max_combined_reduction() -> f64 {
-    0.30 // Max 30% total reduction (cap)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1316,6 +1078,7 @@ interface_weight = 0.15
 
     #[test]
     fn test_default_language_feature_functions() {
+        use crate::config::languages::*;
         assert!(default_detect_dead_code());
         assert!(default_detect_complexity());
         assert!(default_detect_duplication());
@@ -1323,6 +1086,7 @@ interface_weight = 0.15
 
     #[test]
     fn test_default_entropy_functions() {
+        use crate::config::languages::*;
         assert!(default_entropy_enabled());
         assert_eq!(default_entropy_weight(), 1.0);
         assert_eq!(default_entropy_min_tokens(), 20);
