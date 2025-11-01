@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::GodObjectThresholds;
+use serde::{Deserialize, Serialize};
 
 /// Verbosity level for output formatting
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

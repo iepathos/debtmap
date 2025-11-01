@@ -1,15 +1,15 @@
 // Sub-modules
 mod classification;
 mod detection;
+mod display;
+mod languages;
 mod scoring;
 mod thresholds;
-mod languages;
-mod display;
 
 // Core configuration types
+mod accessors;
 mod core;
 mod loader;
-mod accessors;
 
 // Re-export scoring types for backward compatibility
 pub use scoring::{
@@ -59,7 +59,7 @@ pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
 pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};
 
 // Re-export loader functions
-pub use loader::{load_config, parse_and_validate_config, directory_ancestors};
+pub use loader::{directory_ancestors, load_config, parse_and_validate_config};
 
 // Re-export accessor functions
 pub use accessors::*;

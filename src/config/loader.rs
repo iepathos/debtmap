@@ -72,14 +72,14 @@ pub(crate) fn handle_read_error(config_path: &Path, error: &std::io::Error) {
 }
 
 /// Pure function to generate directory ancestors up to a depth limit
-pub fn directory_ancestors(
-    start: PathBuf,
-    max_depth: usize,
-) -> impl Iterator<Item = PathBuf> {
+pub fn directory_ancestors(start: PathBuf, max_depth: usize) -> impl Iterator<Item = PathBuf> {
     directory_ancestors_impl(start, max_depth)
 }
 
-pub(crate) fn directory_ancestors_impl(start: PathBuf, max_depth: usize) -> impl Iterator<Item = PathBuf> {
+pub(crate) fn directory_ancestors_impl(
+    start: PathBuf,
+    max_depth: usize,
+) -> impl Iterator<Item = PathBuf> {
     std::iter::successors(Some(start), |dir| {
         let mut parent = dir.clone();
         if parent.pop() {

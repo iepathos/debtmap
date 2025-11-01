@@ -1,11 +1,11 @@
 use std::sync::OnceLock;
 
 use super::core::DebtmapConfig;
+use super::detection::ConstructorDetectionConfig;
 use super::detection::{
     AccessorDetectionConfig, DataFlowClassificationConfig, ErrorHandlingConfig,
     OrchestratorDetectionConfig,
 };
-use super::detection::ConstructorDetectionConfig;
 use super::display::DisplayConfig;
 use super::languages::{EntropyConfig, LanguageFeatures};
 use super::loader::load_config;
