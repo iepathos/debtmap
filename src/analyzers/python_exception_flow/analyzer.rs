@@ -801,6 +801,20 @@ fn parse_google_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
     }
 }
 
+/// Helper function to save current exception to the list
+fn save_current_exception(
+    current_exception: Option<String>,
+    description: &str,
+    exceptions: &mut Vec<DocumentedException>,
+) {
+    if let Some(exc) = current_exception {
+        exceptions.push(DocumentedException {
+            exception_type: exc,
+            description: description.trim().to_string(),
+        });
+    }
+}
+
 /// Parse NumPy-style Raises section
 fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
     let mut in_raises = false;
@@ -845,12 +859,7 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
                 // Check if this looks like a section header
                 if NUMPY_SECTIONS.contains(&trimmed) {
                     // Save current exception before stopping
-                    if let Some(exc) = current_exception.take() {
-                        exceptions.push(DocumentedException {
-                            exception_type: exc,
-                            description: current_description.trim().to_string(),
-                        });
-                    }
+                    save_current_exception(current_exception.take(), &current_description, &mut exceptions);
                     break;
                 }
             }
@@ -858,12 +867,7 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
             // Stop at dashes that indicate a new section
             if trimmed.starts_with("---") || trimmed.starts_with("--") {
                 // Save current exception before stopping
-                if let Some(exc) = current_exception.take() {
-                    exceptions.push(DocumentedException {
-                        exception_type: exc,
-                        description: current_description.trim().to_string(),
-                    });
-                }
+                save_current_exception(current_exception.take(), &current_description, &mut exceptions);
                 break;
             }
 
@@ -879,23 +883,13 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
                 // Check if this is actually a section header
                 if NUMPY_SECTIONS.contains(&trimmed) {
                     // This is a section header, stop parsing
-                    if let Some(exc) = current_exception.take() {
-                        exceptions.push(DocumentedException {
-                            exception_type: exc,
-                            description: current_description.trim().to_string(),
-                        });
-                    }
+                    save_current_exception(current_exception.take(), &current_description, &mut exceptions);
                     break;
                 }
 
                 // Save previous exception
-                if let Some(exc) = current_exception.take() {
-                    exceptions.push(DocumentedException {
-                        exception_type: exc,
-                        description: current_description.trim().to_string(),
-                    });
-                    current_description.clear();
-                }
+                save_current_exception(current_exception.take(), &current_description, &mut exceptions);
+                current_description.clear();
                 current_exception = Some(trimmed.to_string());
             } else if indent_count > 8 {
                 // Description line (more indented)
@@ -908,12 +902,7 @@ fn parse_numpy_raises(docstring: &str) -> Option<Vec<DocumentedException>> {
     }
 
     // Save last exception
-    if let Some(exc) = current_exception {
-        exceptions.push(DocumentedException {
-            exception_type: exc,
-            description: current_description.trim().to_string(),
-        });
-    }
+    save_current_exception(current_exception, &current_description, &mut exceptions);
 
     if exceptions.is_empty() {
         None
