@@ -123,6 +123,71 @@ The new format helps you:
 
 📖 See the [Getting Started Guide](https://iepathos.github.io/debtmap/getting-started.html) for detailed installation, examples, and next steps.
 
+## GitHub Actions Integration
+
+Automate debtmap analysis in your CI/CD pipeline with the [debtmap GitHub Action](https://github.com/iepathos/debtmap-action).
+
+### Quick Setup
+
+Add debtmap analysis to your workflow:
+
+```yaml
+name: Code Quality
+
+on: [push, pull_request]
+
+jobs:
+  debtmap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: iepathos/debtmap-action@v1
+        with:
+          format: 'json'
+          output: 'debtmap-report.json'
+```
+
+### With Coverage Analysis
+
+Combine with test coverage for comprehensive risk assessment:
+
+```yaml
+name: Code Quality with Coverage
+
+on: [push, pull_request]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate coverage
+        run: |
+          cargo tarpaulin --out lcov --output-dir target/coverage
+
+      - uses: iepathos/debtmap-action@v1
+        with:
+          coverage-file: 'target/coverage/lcov.info'
+          format: 'json'
+          output: 'debtmap-report.json'
+```
+
+### Enforce Quality Gates
+
+Fail builds when quality thresholds are exceeded:
+
+```yaml
+- uses: iepathos/debtmap-action@v1
+  with:
+    max-complexity-density: '10.0'
+    max-dependency-density: '5.0'
+    min-test-density: '2.0'
+    fail-on-violation: 'true'
+```
+
+📖 **See the [debtmap-action repository](https://github.com/iepathos/debtmap-action)** for complete documentation and configuration options.
+
 ## Key Features
 
 - **Coverage-Risk Correlation** - Combines complexity with test coverage to prioritize genuinely risky code
