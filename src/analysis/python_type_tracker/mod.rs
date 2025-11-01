@@ -1732,6 +1732,57 @@ impl TwoPassExtractor {
         }
     }
 
+    /// Register observer method implementations for a specific class-interface pair.
+    ///
+    /// This function iterates through the class methods and registers each non-special
+    /// method as an implementation of the given observer interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `class_name` - Name of the class implementing the interface
+    /// * `interface_name` - Name of the observer interface being implemented
+    /// * `class_def` - AST node for the class definition
+    fn register_observer_methods(
+        &mut self,
+        class_name: &str,
+        interface_name: &str,
+        class_def: &ast::StmtClassDef,
+    ) {
+        // Register method implementations
+        for stmt in &class_def.body {
+            if let ast::Stmt::FunctionDef(method_def) = stmt {
+                // Skip __init__ and other special methods
+                if !method_def.name.starts_with("__") {
+                    let func_name = format!("{}.{}", class_name, method_def.name);
+
+                    // Look up the FunctionId from the function_name_map to get the correct line number
+                    let func_id = if let Some(existing_id) = self.function_name_map.get(&func_name)
+                    {
+                        existing_id.clone()
+                    } else {
+                        // Fallback: create a new FunctionId (shouldn't happen in normal flow)
+                        FunctionId::new(
+                            self.type_tracker.file_path.clone(),
+                            func_name.clone(),
+                            self.estimate_line_number(&func_name),
+                        )
+                    };
+
+                    {
+                        let mut registry_mut = self.observer_registry.write().unwrap();
+                        registry_mut.register_implementation(
+                            interface_name,
+                            &method_def.name,
+                            func_id.clone(),
+                        );
+                        // Also register under generic "Observer" for heuristic matching
+                        registry_mut.register_implementation("Observer", &method_def.name, func_id);
+                    }
+                }
+            }
+        }
+    }
+
     /// Register observer implementations (concrete classes that implement observer interfaces)
     /// This must be called after all functions are registered in function_name_map
     fn register_observer_implementations(&mut self, class_def: &ast::StmtClassDef) {
@@ -1767,43 +1818,7 @@ impl TwoPassExtractor {
                         .register_class_interface(class_name, &interface_name);
 
                     // Register method implementations
-                    for stmt in &class_def.body {
-                        if let ast::Stmt::FunctionDef(method_def) = stmt {
-                            // Skip __init__ and other special methods
-                            if !method_def.name.starts_with("__") {
-                                let func_name = format!("{}.{}", class_name, method_def.name);
-
-                                // Look up the FunctionId from the function_name_map to get the correct line number
-                                let func_id = if let Some(existing_id) =
-                                    self.function_name_map.get(&func_name)
-                                {
-                                    existing_id.clone()
-                                } else {
-                                    // Fallback: create a new FunctionId (shouldn't happen in normal flow)
-                                    FunctionId::new(
-                                        self.type_tracker.file_path.clone(),
-                                        func_name.clone(),
-                                        self.estimate_line_number(&func_name),
-                                    )
-                                };
-
-                                {
-                                    let mut registry_mut = self.observer_registry.write().unwrap();
-                                    registry_mut.register_implementation(
-                                        &interface_name,
-                                        &method_def.name,
-                                        func_id.clone(),
-                                    );
-                                    // Also register under generic "Observer" for heuristic matching
-                                    registry_mut.register_implementation(
-                                        "Observer",
-                                        &method_def.name,
-                                        func_id,
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    self.register_observer_methods(class_name, &interface_name, class_def);
                 }
             }
         }
