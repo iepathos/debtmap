@@ -76,10 +76,6 @@ debtmap analyze .
 cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 debtmap analyze . --lcov target/coverage/lcov.info
 
-# Or using just command
-just coverage
-debtmap analyze . --lcov target/coverage/lcov.info
-
 # Generate JSON report
 debtmap analyze . --format json --output report.json
 ```
