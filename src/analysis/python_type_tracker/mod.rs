@@ -1761,6 +1761,23 @@ impl TwoPassExtractor {
         }
     }
 
+    /// Proactively register a base class as an observer interface if it matches patterns.
+    ///
+    /// Checks if the given name matches observer interface patterns (Observer, Listener, etc.)
+    /// and registers it as an interface if so.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface_name` - Name of the potential observer interface
+    fn register_interface_if_observer(&mut self, interface_name: &str) {
+        if is_observer_interface_name(interface_name) {
+            self.observer_registry
+                .write()
+                .unwrap()
+                .register_interface(interface_name);
+        }
+    }
+
     /// Register observer method implementations for a specific class-interface pair.
     ///
     /// This function iterates through the class methods and registers each non-special
@@ -1811,13 +1828,7 @@ impl TwoPassExtractor {
                 let interface_name = base_name.id.to_string();
 
                 // Proactively register the base class as an interface if it looks like an observer interface
-                // (ends with Observer, Listener, Handler, etc.)
-                if is_observer_interface_name(&interface_name) {
-                    self.observer_registry
-                        .write()
-                        .unwrap()
-                        .register_interface(&interface_name);
-                }
+                self.register_interface_if_observer(&interface_name);
 
                 // Check if the base class is a registered observer interface
                 let is_observer_impl = self
