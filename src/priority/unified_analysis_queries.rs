@@ -197,20 +197,7 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 
         // Categorize all items
         for item in all_items {
-            let category = match &item {
-                DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
-                DebtItem::File(file) => {
-                    // File-level items typically indicate architectural issues
-                    if file.metrics.god_object_indicators.is_god_object {
-                        DebtCategory::Architecture
-                    } else if file.metrics.coverage_percent < 0.5 {
-                        DebtCategory::Testing
-                    } else {
-                        DebtCategory::CodeQuality
-                    }
-                }
-            };
-
+            let category = categorize_debt_item(&item);
             categories.entry(category).or_default().push(item);
         }
 
@@ -291,6 +278,36 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 }
 
 // Private helper functions
+
+/// Categorize a debt item into one of the standard categories.
+///
+/// Function-level items are categorized by their debt type.
+/// File-level items are categorized based on god object indicators,
+/// coverage, or default to code quality.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::priority::{DebtItem, DebtCategory, DebtType, UnifiedDebtItem};
+///
+/// let item = /* create a function debt item */;
+/// let category = categorize_debt_item(&item);
+/// ```
+fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
+    match item {
+        DebtItem::Function(func) => DebtCategory::from_debt_type(&func.debt_type),
+        DebtItem::File(file) => {
+            // File-level items typically indicate architectural issues
+            if file.metrics.god_object_indicators.is_god_object {
+                DebtCategory::Architecture
+            } else if file.metrics.coverage_percent < 0.5 {
+                DebtCategory::Testing
+            } else {
+                DebtCategory::CodeQuality
+            }
+        }
+    }
+}
 
 /// Get a descriptive key for the debt type
 fn get_debt_type_key(item: &DebtItem) -> String {
