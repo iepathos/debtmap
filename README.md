@@ -17,7 +17,7 @@ Debtmap combines coverage-risk correlation with multi-factor analysis (complexit
 
 ## Why Debtmap?
 
-Unlike traditional static analysis tools that simply flag complex code, debtmap answers two critical questions:
+Debtmap answers two critical questions:
 
 1. **"What should I refactor to reduce cognitive burden?"** - Identifies overly complex code that slows down development
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
