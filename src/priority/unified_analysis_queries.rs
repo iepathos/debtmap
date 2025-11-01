@@ -193,15 +193,11 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 
     fn get_categorized_debt(&self, limit: usize) -> CategorizedDebt {
         let all_items = self.get_top_mixed_priorities(limit);
-        let mut categories: BTreeMap<DebtCategory, Vec<DebtItem>> = BTreeMap::new();
 
-        // Categorize all items
-        for item in all_items {
-            let category = categorize_debt_item(&item);
-            categories.entry(category).or_default().push(item);
-        }
+        // Collect and categorize items
+        let categories = collect_categorized_items(all_items);
 
-        // Create category summaries
+        // Build category summaries
         let category_summaries: BTreeMap<DebtCategory, CategorySummary> = categories
             .into_iter()
             .filter(|(_, items)| !items.is_empty())
@@ -300,6 +296,28 @@ fn estimate_effort_per_item(category: &DebtCategory, average_severity: f64) -> u
             }
         }
     }
+}
+
+/// Collect and categorize debt items into a map of categories to items.
+///
+/// Takes a collection of debt items and groups them by their assigned
+/// debt category using the categorize_debt_item function.
+///
+/// # Arguments
+///
+/// * `items` - Vector of debt items to categorize
+///
+/// # Returns
+///
+/// BTreeMap with debt categories as keys and vectors of items as values
+fn collect_categorized_items(items: Vector<DebtItem>) -> BTreeMap<DebtCategory, Vec<DebtItem>> {
+    items
+        .into_iter()
+        .fold(BTreeMap::new(), |mut categories, item| {
+            let category = categorize_debt_item(&item);
+            categories.entry(category).or_default().push(item);
+            categories
+        })
 }
 
 /// Build a CategorySummary from a collection of debt items.
