@@ -8,6 +8,7 @@
 //! - `utils`: Utility functions for AST extraction and manipulation
 //! - (More modules will be added as refactoring progresses)
 
+mod import_resolver;
 mod types;
 mod utils;
 
@@ -18,6 +19,7 @@ use crate::analysis::framework_patterns::FrameworkPatternRegistry;
 use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
 use crate::analysis::type_flow_tracker::{TypeFlowTracker, TypeId};
 use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
+use import_resolver::ImportResolver;
 use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -34,10 +36,8 @@ pub struct PythonTypeTracker {
     pub current_scope: Vec<Scope>,
     /// File path for generating function IDs
     file_path: PathBuf,
-    /// Imported modules and their aliases
-    imports: HashMap<String, String>, // alias -> module_name
-    /// Imported symbols from modules
-    from_imports: HashMap<String, (String, Option<String>)>, // name -> (module, alias)
+    /// Import resolver for tracking and resolving imports
+    import_resolver: ImportResolver,
     /// Framework pattern registry for entry point detection
     pub framework_registry: FrameworkPatternRegistry,
     /// Type flow tracker for data flow analysis (owned for standalone use)
@@ -54,8 +54,7 @@ impl PythonTypeTracker {
             function_signatures: HashMap::new(),
             current_scope: vec![Scope::new()],
             file_path,
-            imports: HashMap::new(),
-            from_imports: HashMap::new(),
+            import_resolver: ImportResolver::new(),
             framework_registry: FrameworkPatternRegistry::new(),
             type_flow_owned: Some(TypeFlowTracker::new()),
             type_flow_shared: None,
@@ -73,8 +72,7 @@ impl PythonTypeTracker {
             function_signatures: HashMap::new(),
             current_scope: vec![Scope::new()],
             file_path,
-            imports: HashMap::new(),
-            from_imports: HashMap::new(),
+            import_resolver: ImportResolver::new(),
             framework_registry: FrameworkPatternRegistry::new(),
             type_flow_owned: None,
             type_flow_shared: Some(shared_flow),
@@ -453,8 +451,7 @@ impl PythonTypeTracker {
     /// Resolve method in class hierarchy (with inheritance)
     /// Register a module import (import module as alias)
     pub fn register_import(&mut self, module_name: String, alias: Option<String>) {
-        let key = alias.unwrap_or_else(|| module_name.clone());
-        self.imports.insert(key, module_name);
+        self.import_resolver.register_import(module_name, alias);
     }
 
     /// Register a from import (from module import name as alias)
@@ -464,100 +461,38 @@ impl PythonTypeTracker {
         name: String,
         alias: Option<String>,
     ) {
-        let key = alias.clone().unwrap_or_else(|| name.clone());
-        self.from_imports.insert(key, (module_name, Some(name)));
+        self.import_resolver
+            .register_from_import(module_name, name, alias);
     }
 
     /// Resolve an imported name to its fully qualified form
     pub fn resolve_imported_name(&self, name: &str) -> Option<String> {
-        // Check if it's an aliased module import
-        if let Some(module_name) = self.imports.get(name) {
-            return Some(module_name.clone());
-        }
-
-        // Check if it's a from import
-        if let Some((module, original_name)) = self.from_imports.get(name) {
-            if let Some(orig) = original_name {
-                return Some(format!("{}.{}", module, orig));
-            }
-            return Some(module.clone());
-        }
-
-        None
+        self.import_resolver.resolve_imported_name(name)
     }
 
     /// Track import statement (import module as alias)
     pub fn track_import_stmt(&mut self, import: &ast::StmtImport) {
-        for alias in &import.names {
-            let module_name = alias.name.to_string();
-            let alias_name = alias.asname.as_ref().map(|s| s.to_string());
-            self.register_import(module_name, alias_name);
-        }
+        self.import_resolver.track_import_stmt(import);
     }
 
     /// Track from import statement (from module import name as alias)
     pub fn track_import_from_stmt(&mut self, import_from: &ast::StmtImportFrom) {
-        let module_name = import_from
-            .module
-            .as_ref()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| String::from("."));
-
-        for alias in &import_from.names {
-            let name = alias.name.to_string();
-            let alias_name = alias.asname.as_ref().map(|s| s.to_string());
-
-            // Handle wildcard imports
-            if name == "*" {
-                // For wildcard imports, we just track the module
-                self.register_import(module_name.clone(), None);
-            } else {
-                self.register_from_import(module_name.clone(), name, alias_name);
-            }
-        }
+        self.import_resolver.track_import_from_stmt(import_from);
     }
 
     /// Check if a name is an imported function/class
     pub fn is_imported_name(&self, name: &str) -> bool {
-        self.imports.contains_key(name) || self.from_imports.contains_key(name)
+        self.import_resolver.is_imported_name(name)
     }
 
     /// Get the module for an imported name
     pub fn get_import_module(&self, name: &str) -> Option<String> {
-        if let Some(module) = self.imports.get(name) {
-            return Some(module.clone());
-        }
-        if let Some((module, _)) = self.from_imports.get(name) {
-            return Some(module.clone());
-        }
-        None
+        self.import_resolver.get_import_module(name)
     }
 
     /// Get all import strings for framework detection
     pub fn get_all_imports(&self) -> Vec<String> {
-        let mut imports = Vec::new();
-
-        // Add module imports
-        for (alias, module) in &self.imports {
-            if alias == module {
-                imports.push(format!("import {}", module));
-            } else {
-                imports.push(format!("import {} as {}", module, alias));
-            }
-        }
-
-        // Add from imports
-        for (alias, (module, original_name)) in &self.from_imports {
-            if let Some(name) = original_name {
-                if alias == name {
-                    imports.push(format!("from {} import {}", module, name));
-                } else {
-                    imports.push(format!("from {} import {} as {}", module, name, alias));
-                }
-            }
-        }
-
-        imports
+        self.import_resolver.get_all_imports()
     }
 
     /// Detect frameworks from collected imports
