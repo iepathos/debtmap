@@ -1732,6 +1732,90 @@ impl TwoPassExtractor {
         }
     }
 
+    /// Resolve a method to its FunctionId.
+    ///
+    /// Looks up the method in the function_name_map to get the correct FunctionId
+    /// with accurate line number. Falls back to creating a new FunctionId if not found.
+    ///
+    /// # Arguments
+    ///
+    /// * `class_name` - Name of the class containing the method
+    /// * `method_name` - Name of the method
+    ///
+    /// # Returns
+    ///
+    /// The FunctionId for the method
+    fn resolve_method_function_id(&self, class_name: &str, method_name: &str) -> FunctionId {
+        let func_name = format!("{}.{}", class_name, method_name);
+
+        // Look up the FunctionId from the function_name_map to get the correct line number
+        if let Some(existing_id) = self.function_name_map.get(&func_name) {
+            existing_id.clone()
+        } else {
+            // Fallback: create a new FunctionId (shouldn't happen in normal flow)
+            FunctionId::new(
+                self.type_tracker.file_path.clone(),
+                func_name.clone(),
+                self.estimate_line_number(&func_name),
+            )
+        }
+    }
+
+    /// Proactively register a base class as an observer interface if it matches patterns.
+    ///
+    /// Checks if the given name matches observer interface patterns (Observer, Listener, etc.)
+    /// and registers it as an interface if so.
+    ///
+    /// # Arguments
+    ///
+    /// * `interface_name` - Name of the potential observer interface
+    fn register_interface_if_observer(&mut self, interface_name: &str) {
+        if is_observer_interface_name(interface_name) {
+            self.observer_registry
+                .write()
+                .unwrap()
+                .register_interface(interface_name);
+        }
+    }
+
+    /// Register observer method implementations for a specific class-interface pair.
+    ///
+    /// This function iterates through the class methods and registers each non-special
+    /// method as an implementation of the given observer interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `class_name` - Name of the class implementing the interface
+    /// * `interface_name` - Name of the observer interface being implemented
+    /// * `class_def` - AST node for the class definition
+    fn register_observer_methods(
+        &mut self,
+        class_name: &str,
+        interface_name: &str,
+        class_def: &ast::StmtClassDef,
+    ) {
+        // Register method implementations
+        for stmt in &class_def.body {
+            if let ast::Stmt::FunctionDef(method_def) = stmt {
+                // Skip __init__ and other special methods
+                if !method_def.name.starts_with("__") {
+                    let func_id = self.resolve_method_function_id(class_name, &method_def.name);
+
+                    {
+                        let mut registry_mut = self.observer_registry.write().unwrap();
+                        registry_mut.register_implementation(
+                            interface_name,
+                            &method_def.name,
+                            func_id.clone(),
+                        );
+                        // Also register under generic "Observer" for heuristic matching
+                        registry_mut.register_implementation("Observer", &method_def.name, func_id);
+                    }
+                }
+            }
+        }
+    }
+
     /// Register observer implementations (concrete classes that implement observer interfaces)
     /// This must be called after all functions are registered in function_name_map
     fn register_observer_implementations(&mut self, class_def: &ast::StmtClassDef) {
@@ -1744,17 +1828,7 @@ impl TwoPassExtractor {
                 let interface_name = base_name.id.to_string();
 
                 // Proactively register the base class as an interface if it looks like an observer interface
-                // (ends with Observer, Listener, Handler, etc.)
-                if interface_name.ends_with("Observer")
-                    || interface_name.ends_with("Listener")
-                    || interface_name.ends_with("Handler")
-                    || interface_name.ends_with("Callback")
-                {
-                    self.observer_registry
-                        .write()
-                        .unwrap()
-                        .register_interface(&interface_name);
-                }
+                self.register_interface_if_observer(&interface_name);
 
                 // Check if the base class is a registered observer interface
                 let is_observer_impl = self
@@ -1771,43 +1845,7 @@ impl TwoPassExtractor {
                         .register_class_interface(class_name, &interface_name);
 
                     // Register method implementations
-                    for stmt in &class_def.body {
-                        if let ast::Stmt::FunctionDef(method_def) = stmt {
-                            // Skip __init__ and other special methods
-                            if !method_def.name.starts_with("__") {
-                                let func_name = format!("{}.{}", class_name, method_def.name);
-
-                                // Look up the FunctionId from the function_name_map to get the correct line number
-                                let func_id = if let Some(existing_id) =
-                                    self.function_name_map.get(&func_name)
-                                {
-                                    existing_id.clone()
-                                } else {
-                                    // Fallback: create a new FunctionId (shouldn't happen in normal flow)
-                                    FunctionId::new(
-                                        self.type_tracker.file_path.clone(),
-                                        func_name.clone(),
-                                        self.estimate_line_number(&func_name),
-                                    )
-                                };
-
-                                {
-                                    let mut registry_mut = self.observer_registry.write().unwrap();
-                                    registry_mut.register_implementation(
-                                        &interface_name,
-                                        &method_def.name,
-                                        func_id.clone(),
-                                    );
-                                    // Also register under generic "Observer" for heuristic matching
-                                    registry_mut.register_implementation(
-                                        "Observer",
-                                        &method_def.name,
-                                        func_id,
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    self.register_observer_methods(class_name, &interface_name, class_def);
                 }
             }
         }
@@ -2302,9 +2340,65 @@ impl TwoPassExtractor {
     }
 }
 
+/// Check if a name matches observer interface patterns.
+///
+/// Returns true if the name ends with Observer, Listener, Handler, or Callback.
+/// This is a pure function for testability.
+///
+/// # Examples
+///
+/// ```ignore
+/// assert!(is_observer_interface_name("ClickListener"));
+/// assert!(is_observer_interface_name("EventObserver"));
+/// assert!(is_observer_interface_name("RequestHandler"));
+/// assert!(is_observer_interface_name("SuccessCallback"));
+/// assert!(!is_observer_interface_name("MyClass"));
+/// ```
+fn is_observer_interface_name(name: &str) -> bool {
+    name.ends_with("Observer")
+        || name.ends_with("Listener")
+        || name.ends_with("Handler")
+        || name.ends_with("Callback")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_observer_interface_name() {
+        // Test Observer suffix
+        assert!(is_observer_interface_name("ClickObserver"));
+        assert!(is_observer_interface_name("EventObserver"));
+        assert!(is_observer_interface_name("Observer"));
+
+        // Test Listener suffix
+        assert!(is_observer_interface_name("ClickListener"));
+        assert!(is_observer_interface_name("MouseListener"));
+        assert!(is_observer_interface_name("Listener"));
+
+        // Test Handler suffix
+        assert!(is_observer_interface_name("EventHandler"));
+        assert!(is_observer_interface_name("RequestHandler"));
+        assert!(is_observer_interface_name("Handler"));
+
+        // Test Callback suffix
+        assert!(is_observer_interface_name("SuccessCallback"));
+        assert!(is_observer_interface_name("ErrorCallback"));
+        assert!(is_observer_interface_name("Callback"));
+
+        // Test non-observer names
+        assert!(!is_observer_interface_name("MyClass"));
+        assert!(!is_observer_interface_name("UserService"));
+        assert!(!is_observer_interface_name("DataRepository"));
+        assert!(!is_observer_interface_name(""));
+
+        // Test partial matches (should not match)
+        assert!(!is_observer_interface_name("ObserverImpl"));
+        assert!(!is_observer_interface_name("ListenerFactory"));
+        assert!(!is_observer_interface_name("HandleRequest"));
+        assert!(!is_observer_interface_name("CallbackFunction"));
+    }
 
     #[test]
     fn test_type_inference_literals() {
