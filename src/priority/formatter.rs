@@ -10,8 +10,9 @@ use std::fmt::Write;
 mod verbosity;
 
 mod dependencies;
+mod sections;
 
-use dependencies::{filter_dependencies, format_function_reference};
+use sections::{apply_formatted_sections, generate_formatted_sections};
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
@@ -1313,22 +1314,22 @@ fn create_format_context(rank: usize, item: &UnifiedDebtItem) -> FormatContext {
 }
 
 // Data structures for formatted content
-struct FormatContext {
-    rank: usize,
-    score: f64,
-    severity_info: SeverityInfo,
-    location_info: LocationInfo,
-    action: String,
-    impact: crate::priority::ImpactMetrics,
-    complexity_info: ComplexityInfo,
-    dependency_info: DependencyInfo,
-    debt_specific_info: DebtSpecificInfo,
-    rationale: String,
+pub(crate) struct FormatContext {
+    pub rank: usize,
+    pub score: f64,
+    pub severity_info: SeverityInfo,
+    pub location_info: LocationInfo,
+    pub action: String,
+    pub impact: crate::priority::ImpactMetrics,
+    pub complexity_info: ComplexityInfo,
+    pub dependency_info: DependencyInfo,
+    pub debt_specific_info: DebtSpecificInfo,
+    pub rationale: String,
 }
 
-struct SeverityInfo {
-    label: String,
-    color: colored::Color,
+pub(crate) struct SeverityInfo {
+    pub label: String,
+    pub color: colored::Color,
 }
 
 impl SeverityInfo {
@@ -1340,10 +1341,10 @@ impl SeverityInfo {
     }
 }
 
-struct LocationInfo {
-    file: std::path::PathBuf,
-    line: u32,
-    function: String,
+pub(crate) struct LocationInfo {
+    pub file: std::path::PathBuf,
+    pub line: u32,
+    pub function: String,
 }
 
 impl LocationInfo {
@@ -1356,12 +1357,12 @@ impl LocationInfo {
     }
 }
 
-struct ComplexityInfo {
-    cyclomatic: u32,
-    cognitive: u32,
-    branch_count: u32,
-    nesting: u32,
-    has_complexity: bool,
+pub(crate) struct ComplexityInfo {
+    pub cyclomatic: u32,
+    pub cognitive: u32,
+    pub branch_count: u32,
+    pub nesting: u32,
+    pub has_complexity: bool,
 }
 
 impl ComplexityInfo {
@@ -1377,15 +1378,15 @@ impl ComplexityInfo {
     }
 }
 
-struct DependencyInfo {
+pub(crate) struct DependencyInfo {
     #[allow(dead_code)]
-    upstream: usize,
+    pub upstream: usize,
     #[allow(dead_code)]
-    downstream: usize,
-    upstream_callers: Vec<String>,
-    downstream_callees: Vec<String>,
+    pub downstream: usize,
+    pub upstream_callers: Vec<String>,
+    pub downstream_callees: Vec<String>,
     #[allow(dead_code)]
-    has_dependencies: bool,
+    pub has_dependencies: bool,
 }
 
 impl DependencyInfo {
@@ -1401,7 +1402,7 @@ impl DependencyInfo {
     }
 }
 
-enum DebtSpecificInfo {
+pub(crate) enum DebtSpecificInfo {
     DeadCode {
         visibility: String,
         usage_hints: Vec<String>,
@@ -1422,292 +1423,6 @@ impl DebtSpecificInfo {
             },
             _ => Self::Other,
         }
-    }
-}
-
-struct FormattedSections {
-    header: String,
-    location: String,
-    action: String,
-    impact: String,
-    evidence: Option<String>, // New: combines complexity + metrics
-    complexity: Option<String>,
-    dependencies: Option<String>,
-    debt_specific: Option<String>,
-    rationale: String,
-}
-
-// Pure function to generate all formatted sections
-fn generate_formatted_sections(context: &FormatContext) -> FormattedSections {
-    FormattedSections {
-        header: format_header_section(context),
-        location: format_location_section(context),
-        action: format_action_section(context),
-        impact: format_impact_section(context),
-        evidence: format_evidence_section(context), // New
-        complexity: format_complexity_section(context),
-        dependencies: format_dependencies_section(context),
-        debt_specific: format_debt_specific_section(context),
-        rationale: format_rationale_section(context),
-    }
-}
-
-// Pure function to format header section
-fn format_header_section(context: &FormatContext) -> String {
-    format!(
-        "#{} {} [{}]",
-        context.rank,
-        format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
-        context
-            .severity_info
-            .label
-            .color(context.severity_info.color)
-            .bold()
-    )
-}
-
-// Pure function to format location section
-fn format_location_section(context: &FormatContext) -> String {
-    format!(
-        "{} {}:{} {}()",
-        "├─ LOCATION:".bright_blue(),
-        context.location_info.file.display(),
-        context.location_info.line,
-        context.location_info.function.bright_green()
-    )
-}
-
-// Pure function to format action section
-fn format_action_section(context: &FormatContext) -> String {
-    format!(
-        "{} {}",
-        "├─ RECOMMENDED ACTION:".bright_blue(),
-        context.action.bright_green().bold()
-    )
-}
-
-// Pure function to format impact section
-fn format_impact_section(context: &FormatContext) -> String {
-    format!(
-        "{} {}",
-        "├─ IMPACT:".bright_blue(),
-        format_impact(&context.impact).bright_cyan()
-    )
-}
-
-// Pure function to format complexity section
-fn format_complexity_section(context: &FormatContext) -> Option<String> {
-    if !context.complexity_info.has_complexity {
-        return None;
-    }
-
-    Some(format!(
-        "{} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
-        "├─ COMPLEXITY:".bright_blue(),
-        format!("{}", context.complexity_info.cyclomatic).yellow(),
-        format!("{}", context.complexity_info.branch_count).yellow(),
-        format!("{}", context.complexity_info.cognitive).yellow(),
-        format!("{}", context.complexity_info.nesting).yellow()
-    ))
-}
-
-// Pure function to format evidence section (metrics only, no rationale)
-fn format_evidence_section(context: &FormatContext) -> Option<String> {
-    if !context.complexity_info.has_complexity {
-        return None;
-    }
-
-    let mut section = format!("{}", "├─ EVIDENCE:".bright_blue());
-
-    // Show complexity metrics in priority order
-    if context.complexity_info.cyclomatic > 0 {
-        section.push_str(&format!(
-            "\n│  {} Cyclomatic Complexity: {}",
-            "├─",
-            format!("{}", context.complexity_info.cyclomatic).yellow()
-        ));
-    }
-
-    if context.complexity_info.cognitive > 0 {
-        section.push_str(&format!(
-            "\n│  {} Cognitive Complexity: {}",
-            "├─",
-            format!("{}", context.complexity_info.cognitive).yellow()
-        ));
-    }
-
-    if context.complexity_info.branch_count > 0 {
-        section.push_str(&format!(
-            "\n│  {} Estimated Branches: {}",
-            "├─",
-            format!("{}", context.complexity_info.branch_count).yellow()
-        ));
-    }
-
-    if context.complexity_info.nesting > 0 {
-        section.push_str(&format!(
-            "\n│  {} Nesting Depth: {}",
-            "└─",
-            format!("{}", context.complexity_info.nesting).yellow()
-        ));
-    }
-
-    Some(section)
-}
-
-// Pure function to format dependencies section with enhanced caller/callee display
-fn format_dependencies_section_with_config(
-    context: &FormatContext,
-    formatting_config: FormattingConfig,
-) -> Option<String> {
-    let config = &formatting_config.caller_callee;
-    let _formatter = ColoredFormatter::new(formatting_config);
-
-    // Filter callers and callees based on configuration
-    let filtered_callers = filter_dependencies(&context.dependency_info.upstream_callers, config);
-    let filtered_callees = filter_dependencies(&context.dependency_info.downstream_callees, config);
-
-    // Always show dependencies section (per spec 117)
-    let mut section = format!("{}", "├─ DEPENDENCIES:".bright_blue());
-
-    // Display callers
-    if !filtered_callers.is_empty() {
-        let caller_count = filtered_callers.len();
-        let display_count = caller_count.min(config.max_callers);
-
-        section.push_str(&format!(
-            "\n{}  {} {} ({}):",
-            "|", "|-", "Called by", caller_count
-        ));
-
-        for caller in filtered_callers.iter().take(display_count) {
-            let formatted_caller = format_function_reference(caller);
-            section.push_str(&format!(
-                "\n{}  {}     {} {}",
-                "|",
-                "|",
-                "*",
-                formatted_caller.bright_cyan()
-            ));
-        }
-
-        if caller_count > display_count {
-            section.push_str(&format!(
-                "\n{}  {}     {} (showing {} of {})",
-                "|", "|", "...", display_count, caller_count
-            ));
-        }
-    } else {
-        section.push_str(&format!(
-            "\n{}  {} {} No direct callers detected",
-            "|", "|-", "Called by"
-        ));
-    }
-
-    // Display callees
-    if !filtered_callees.is_empty() {
-        let callee_count = filtered_callees.len();
-        let display_count = callee_count.min(config.max_callees);
-
-        section.push_str(&format!(
-            "\n{}  {} {} ({}):",
-            "|", "+-", "Calls", callee_count
-        ));
-
-        for callee in filtered_callees.iter().take(display_count) {
-            let formatted_callee = format_function_reference(callee);
-            section.push_str(&format!(
-                "\n{}       {} {}",
-                "|",
-                "*",
-                formatted_callee.bright_magenta()
-            ));
-        }
-
-        if callee_count > display_count {
-            section.push_str(&format!(
-                "\n{}       {} (showing {} of {})",
-                "|", "...", display_count, callee_count
-            ));
-        }
-    } else {
-        // Always show callees section, even when empty (per spec 117)
-        section.push_str(&format!(
-            "\n{}  {} {} Calls no other functions",
-            "|", "+-", "Calls"
-        ));
-    }
-
-    Some(section)
-}
-
-// Wrapper function that uses default formatting configuration
-fn format_dependencies_section(context: &FormatContext) -> Option<String> {
-    format_dependencies_section_with_config(context, FormattingConfig::default())
-}
-
-// Pure function to format debt-specific section
-fn format_debt_specific_section(context: &FormatContext) -> Option<String> {
-    match &context.debt_specific_info {
-        DebtSpecificInfo::DeadCode {
-            visibility,
-            usage_hints,
-        } => {
-            let mut section = format!(
-                "├─ VISIBILITY: {} function with no callers",
-                visibility.yellow()
-            );
-
-            for hint in usage_hints {
-                section.push_str(&format!("\n│  • {}", hint.bright_white()));
-            }
-
-            Some(section)
-        }
-        DebtSpecificInfo::Other => None,
-    }
-}
-
-// Pure function to format rationale section
-// This explains WHY the evidence matters (implications, not repeating metrics)
-fn format_rationale_section(context: &FormatContext) -> String {
-    let _formatter = ColoredFormatter::new(FormattingConfig::default());
-    format!(
-        "{} {}",
-        "├─ WHY THIS MATTERS:".bright_blue(),
-        context.rationale
-    )
-}
-
-// I/O function to apply formatted sections to output
-// Following spec 139: Header → Location → Impact → Evidence → WHY → Action
-fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
-    writeln!(output, "{}", sections.header).unwrap();
-    writeln!(output, "{}", sections.location).unwrap();
-    writeln!(output, "{}", sections.impact).unwrap();
-
-    // Evidence section (new) - metrics only
-    if let Some(evidence) = sections.evidence {
-        writeln!(output, "{}", evidence).unwrap();
-    }
-
-    // WHY section - rationale explaining why evidence matters
-    writeln!(output, "{}", sections.rationale).unwrap();
-
-    // Action comes after WHY (spec 139 ordering)
-    writeln!(output, "{}", sections.action).unwrap();
-
-    // Keep legacy complexity for backward compatibility
-    if let Some(complexity) = sections.complexity {
-        writeln!(output, "{}", complexity).unwrap();
-    }
-
-    if let Some(dependencies) = sections.dependencies {
-        writeln!(output, "{}", dependencies).unwrap();
-    }
-
-    if let Some(debt_specific) = sections.debt_specific {
-        writeln!(output, "{}", debt_specific).unwrap();
     }
 }
 
@@ -1986,6 +1701,7 @@ mod tests {
     use crate::priority::unified_scorer::Location;
     use crate::priority::UnifiedAnalysisUtils;
     use crate::priority::{ActionableRecommendation, ImpactMetrics, UnifiedScore};
+    use sections::format_dependencies_section_with_config;
     use std::path::PathBuf;
 
     fn strip_ansi_codes(s: &str) -> String {
