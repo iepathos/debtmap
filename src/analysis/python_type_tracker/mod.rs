@@ -1745,11 +1745,7 @@ impl TwoPassExtractor {
 
                 // Proactively register the base class as an interface if it looks like an observer interface
                 // (ends with Observer, Listener, Handler, etc.)
-                if interface_name.ends_with("Observer")
-                    || interface_name.ends_with("Listener")
-                    || interface_name.ends_with("Handler")
-                    || interface_name.ends_with("Callback")
-                {
+                if is_observer_interface_name(&interface_name) {
                     self.observer_registry
                         .write()
                         .unwrap()
@@ -2302,9 +2298,67 @@ impl TwoPassExtractor {
     }
 }
 
+/// Check if a name matches observer interface patterns.
+///
+/// Returns true if the name ends with Observer, Listener, Handler, or Callback.
+/// This is a pure function for testability.
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::analysis::python_type_tracker::is_observer_interface_name;
+///
+/// assert!(is_observer_interface_name("ClickListener"));
+/// assert!(is_observer_interface_name("EventObserver"));
+/// assert!(is_observer_interface_name("RequestHandler"));
+/// assert!(is_observer_interface_name("SuccessCallback"));
+/// assert!(!is_observer_interface_name("MyClass"));
+/// ```
+fn is_observer_interface_name(name: &str) -> bool {
+    name.ends_with("Observer")
+        || name.ends_with("Listener")
+        || name.ends_with("Handler")
+        || name.ends_with("Callback")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_observer_interface_name() {
+        // Test Observer suffix
+        assert!(is_observer_interface_name("ClickObserver"));
+        assert!(is_observer_interface_name("EventObserver"));
+        assert!(is_observer_interface_name("Observer"));
+
+        // Test Listener suffix
+        assert!(is_observer_interface_name("ClickListener"));
+        assert!(is_observer_interface_name("MouseListener"));
+        assert!(is_observer_interface_name("Listener"));
+
+        // Test Handler suffix
+        assert!(is_observer_interface_name("EventHandler"));
+        assert!(is_observer_interface_name("RequestHandler"));
+        assert!(is_observer_interface_name("Handler"));
+
+        // Test Callback suffix
+        assert!(is_observer_interface_name("SuccessCallback"));
+        assert!(is_observer_interface_name("ErrorCallback"));
+        assert!(is_observer_interface_name("Callback"));
+
+        // Test non-observer names
+        assert!(!is_observer_interface_name("MyClass"));
+        assert!(!is_observer_interface_name("UserService"));
+        assert!(!is_observer_interface_name("DataRepository"));
+        assert!(!is_observer_interface_name(""));
+
+        // Test partial matches (should not match)
+        assert!(!is_observer_interface_name("ObserverImpl"));
+        assert!(!is_observer_interface_name("ListenerFactory"));
+        assert!(!is_observer_interface_name("HandleRequest"));
+        assert!(!is_observer_interface_name("CallbackFunction"));
+    }
 
     #[test]
     fn test_type_inference_literals() {
