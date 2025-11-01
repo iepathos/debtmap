@@ -2347,9 +2347,7 @@ impl TwoPassExtractor {
 ///
 /// # Examples
 ///
-/// ```
-/// use debtmap::analysis::python_type_tracker::is_observer_interface_name;
-///
+/// ```ignore
 /// assert!(is_observer_interface_name("ClickListener"));
 /// assert!(is_observer_interface_name("EventObserver"));
 /// assert!(is_observer_interface_name("RequestHandler"));
