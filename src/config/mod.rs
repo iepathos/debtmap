@@ -1,9 +1,3 @@
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::io::{BufReader, Read};
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
 // Sub-modules
 mod classification;
 mod detection;
@@ -11,6 +5,11 @@ mod scoring;
 mod thresholds;
 mod languages;
 mod display;
+
+// Core configuration types
+mod core;
+mod loader;
+mod accessors;
 
 // Re-export scoring types for backward compatibility
 pub use scoring::{
@@ -56,467 +55,15 @@ pub use display::{DisplayConfig, GodObjectConfig, VerbosityLevel};
 // Pure mapping pattern detection config (spec 118)
 pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
 
-/// Root configuration structure for debtmap
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DebtmapConfig {
-    /// Scoring weights configuration
-    #[serde(default)]
-    pub scoring: Option<ScoringWeights>,
+// Re-export core types
+pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};
 
-    /// Display configuration for output formatting
-    #[serde(default)]
-    pub display: Option<DisplayConfig>,
+// Re-export loader functions
+pub use loader::{load_config, parse_and_validate_config, directory_ancestors};
 
-    /// External API detection configuration
-    #[serde(default)]
-    pub external_api: Option<crate::priority::external_api_detector::ExternalApiConfig>,
+// Re-export accessor functions
+pub use accessors::*;
 
-    /// God object detection configuration
-    #[serde(default)]
-    pub god_object_detection: Option<GodObjectConfig>,
-
-    /// Thresholds configuration
-    #[serde(default)]
-    pub thresholds: Option<ThresholdsConfig>,
-
-    /// Language configuration
-    #[serde(default)]
-    pub languages: Option<LanguagesConfig>,
-
-    /// Ignore patterns
-    #[serde(default)]
-    pub ignore: Option<IgnoreConfig>,
-
-    /// Output configuration
-    #[serde(default)]
-    pub output: Option<OutputConfig>,
-
-    /// Context-aware detection configuration
-    #[serde(default)]
-    pub context: Option<ContextConfig>,
-
-    /// Entropy-based complexity scoring configuration
-    #[serde(default)]
-    pub entropy: Option<EntropyConfig>,
-
-    /// Role multipliers for semantic classification
-    #[serde(default)]
-    pub role_multipliers: Option<RoleMultipliers>,
-
-    /// Complexity thresholds for enhanced detection
-    #[serde(default)]
-    pub complexity_thresholds: Option<crate::complexity::threshold_manager::ComplexityThresholds>,
-
-    /// Error handling detection configuration
-    #[serde(default)]
-    pub error_handling: Option<ErrorHandlingConfig>,
-
-    /// Score normalization configuration
-    #[serde(default)]
-    pub normalization: Option<NormalizationConfig>,
-
-    /// Lines of code counting configuration
-    #[serde(default)]
-    pub loc: Option<crate::metrics::LocCountingConfig>,
-
-    /// Tier configuration for prioritization
-    #[serde(default)]
-    pub tiers: Option<crate::priority::TierConfig>,
-
-    /// Role-based coverage weight multipliers
-    #[serde(default)]
-    pub role_coverage_weights: Option<RoleCoverageWeights>,
-
-    /// Role multiplier clamping configuration (spec 119)
-    #[serde(default)]
-    pub role_multiplier_config: Option<RoleMultiplierConfig>,
-
-    /// Orchestrator detection configuration
-    #[serde(default)]
-    pub orchestrator_detection: Option<OrchestratorDetectionConfig>,
-
-    /// Orchestration score adjustment configuration (spec 110)
-    #[serde(default)]
-    pub orchestration_adjustment:
-        Option<crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig>,
-
-    /// Constructor detection configuration (spec 117)
-    #[serde(default, rename = "classification")]
-    pub classification: Option<ClassificationConfig>,
-
-    /// Pure mapping pattern detection configuration (spec 118)
-    #[serde(default)]
-    pub mapping_patterns: Option<MappingPatternConfig>,
-
-    /// Role-based coverage expectations (spec 119)
-    #[serde(default)]
-    pub coverage_expectations: Option<crate::priority::scoring::CoverageExpectations>,
-
-    /// Complexity weights configuration (spec 121)
-    #[serde(default)]
-    pub complexity_weights: Option<ComplexityWeightsConfig>,
-
-    /// AST-based functional pattern analysis configuration (spec 111)
-    #[serde(default)]
-    pub functional_analysis: Option<crate::analysis::FunctionalAnalysisConfig>,
-
-    /// Boilerplate detection configuration (spec 131)
-    #[serde(default)]
-    pub boilerplate_detection:
-        Option<crate::organization::boilerplate_detector::BoilerplateDetectionConfig>,
-
-    /// Rebalanced scoring configuration (spec 136)
-    #[serde(default, rename = "scoring_rebalanced")]
-    pub scoring_rebalanced: Option<RebalancedScoringConfig>,
-}
-
-impl DebtmapConfig {
-    /// Get ignore patterns from configuration
-    ///
-    /// Returns a vector of glob patterns that should be excluded from analysis.
-    /// If no configuration is found or no patterns are specified, returns an empty vector.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use debtmap::config::DebtmapConfig;
-    /// let config = DebtmapConfig::default();
-    /// let patterns = config.get_ignore_patterns();
-    /// // patterns might contain ["tests/**/*", "*.test.rs"]
-    /// ```
-    pub fn get_ignore_patterns(&self) -> Vec<String> {
-        self.ignore
-            .as_ref()
-            .map(|ig| ig.patterns.clone())
-            .unwrap_or_default()
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IgnoreConfig {
-    pub patterns: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputConfig {
-    pub default_format: Option<String>,
-    /// Enable colored output (default: auto-detect based on TTY)
-    #[serde(default)]
-    pub use_color: Option<bool>,
-}
-
-/// Cache the configuration
-static CONFIG: OnceLock<DebtmapConfig> = OnceLock::new();
-static SCORING_WEIGHTS: OnceLock<ScoringWeights> = OnceLock::new();
-
-/// Load configuration from .debtmap.toml if it exists
-/// Pure function to read and parse config file contents
-fn read_config_file(path: &Path) -> Result<String, std::io::Error> {
-    let file = fs::File::open(path)?;
-    let mut reader = BufReader::new(file);
-    let mut contents = String::new();
-    reader.read_to_string(&mut contents)?;
-    Ok(contents)
-}
-
-/// Pure function to parse and validate config from TOML string
-#[cfg(test)]
-pub(crate) fn parse_and_validate_config(contents: &str) -> Result<DebtmapConfig, String> {
-    parse_and_validate_config_impl(contents)
-}
-
-fn parse_and_validate_config_impl(contents: &str) -> Result<DebtmapConfig, String> {
-    let mut config = toml::from_str::<DebtmapConfig>(contents)
-        .map_err(|e| format!("Failed to parse .debtmap.toml: {}", e))?;
-
-    // Validate and normalize scoring weights if present
-    if let Some(ref mut scoring) = config.scoring {
-        if let Err(e) = scoring.validate() {
-            eprintln!("Warning: Invalid scoring weights: {}. Using defaults.", e);
-            config.scoring = Some(ScoringWeights::default());
-        } else {
-            scoring.normalize(); // Ensure exact sum of 1.0
-        }
-    }
-
-    Ok(config)
-}
-
-/// Pure function to try loading config from a specific path
-fn try_load_config_from_path(config_path: &Path) -> Option<DebtmapConfig> {
-    let contents = match read_config_file(config_path) {
-        Ok(contents) => contents,
-        Err(e) => {
-            handle_read_error(config_path, &e);
-            return None;
-        }
-    };
-
-    match parse_and_validate_config_impl(&contents) {
-        Ok(config) => {
-            log::debug!("Loaded config from {}", config_path.display());
-            Some(config)
-        }
-        Err(e) => {
-            eprintln!("Warning: {}. Using defaults.", e);
-            None
-        }
-    }
-}
-
-/// Handle file read errors with appropriate logging
-fn handle_read_error(config_path: &Path, error: &std::io::Error) {
-    // Only log actual errors, not "file not found"
-    if error.kind() != std::io::ErrorKind::NotFound {
-        log::warn!(
-            "Failed to read config file {}: {}",
-            config_path.display(),
-            error
-        );
-    }
-}
-
-/// Pure function to generate directory ancestors up to a depth limit
-#[cfg(test)]
-pub(crate) fn directory_ancestors(
-    start: PathBuf,
-    max_depth: usize,
-) -> impl Iterator<Item = PathBuf> {
-    directory_ancestors_impl(start, max_depth)
-}
-
-fn directory_ancestors_impl(start: PathBuf, max_depth: usize) -> impl Iterator<Item = PathBuf> {
-    std::iter::successors(Some(start), |dir| {
-        let mut parent = dir.clone();
-        if parent.pop() {
-            Some(parent)
-        } else {
-            None
-        }
-    })
-    .take(max_depth)
-}
-
-pub fn load_config() -> DebtmapConfig {
-    const MAX_TRAVERSAL_DEPTH: usize = 10;
-
-    // Get current directory or return default
-    let current = match std::env::current_dir() {
-        Ok(dir) => dir,
-        Err(e) => {
-            log::warn!(
-                "Failed to get current directory: {}. Using default config.",
-                e
-            );
-            return DebtmapConfig::default();
-        }
-    };
-
-    // Search for config file in directory hierarchy
-    directory_ancestors_impl(current, MAX_TRAVERSAL_DEPTH)
-        .map(|dir| dir.join(".debtmap.toml"))
-        .find_map(|path| try_load_config_from_path(&path))
-        .unwrap_or_else(|| {
-            log::debug!(
-                "No config found after checking {} directories. Using default config.",
-                MAX_TRAVERSAL_DEPTH
-            );
-            DebtmapConfig::default()
-        })
-}
-
-/// Get the cached configuration
-pub fn get_config() -> &'static DebtmapConfig {
-    CONFIG.get_or_init(load_config)
-}
-
-/// Get the configuration without panicking on errors
-pub fn get_config_safe() -> Result<DebtmapConfig, std::io::Error> {
-    Ok(load_config())
-}
-
-/// Get the scoring weights (with defaults if not configured)
-pub fn get_scoring_weights() -> &'static ScoringWeights {
-    SCORING_WEIGHTS.get_or_init(|| get_config().scoring.clone().unwrap_or_default())
-}
-
-/// Get entropy-based complexity scoring configuration
-pub fn get_entropy_config() -> EntropyConfig {
-    get_config().entropy.clone().unwrap_or_default()
-}
-
-/// Get role multipliers configuration
-pub fn get_role_multipliers() -> RoleMultipliers {
-    get_config().role_multipliers.clone().unwrap_or_default()
-}
-
-/// Get minimum debt score threshold (default: 1.0)
-pub fn get_minimum_debt_score() -> f64 {
-    get_config()
-        .thresholds
-        .as_ref()
-        .and_then(|t| t.minimum_debt_score)
-        .unwrap_or(1.0)
-}
-
-/// Get minimum cyclomatic complexity threshold (default: 2)
-pub fn get_minimum_cyclomatic_complexity() -> u32 {
-    get_config()
-        .thresholds
-        .as_ref()
-        .and_then(|t| t.minimum_cyclomatic_complexity)
-        .unwrap_or(2)
-}
-
-/// Get minimum cognitive complexity threshold (default: 3)
-pub fn get_minimum_cognitive_complexity() -> u32 {
-    get_config()
-        .thresholds
-        .as_ref()
-        .and_then(|t| t.minimum_cognitive_complexity)
-        .unwrap_or(3)
-}
-
-/// Get minimum risk score threshold (default: 1.0)
-pub fn get_minimum_risk_score() -> f64 {
-    get_config()
-        .thresholds
-        .as_ref()
-        .and_then(|t| t.minimum_risk_score)
-        .unwrap_or(1.0)
-}
-
-/// Get display configuration (with defaults)
-pub fn get_display_config() -> DisplayConfig {
-    get_config().display.clone().unwrap_or_default()
-}
-
-/// Get validation thresholds (with defaults)
-pub fn get_validation_thresholds() -> ValidationThresholds {
-    get_config()
-        .thresholds
-        .as_ref()
-        .and_then(|t| t.validation.clone())
-        .unwrap_or_default()
-}
-
-/// Get language-specific feature configuration
-pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatures {
-    use crate::core::Language;
-
-    let config = get_config();
-    let languages_config = config.languages.as_ref();
-
-    match language {
-        Language::Rust => {
-            languages_config
-                .and_then(|lc| lc.rust.clone())
-                .unwrap_or(LanguageFeatures {
-                    detect_dead_code: false, // Rust dead code detection disabled by default
-                    detect_complexity: true,
-                    detect_duplication: true,
-                })
-        }
-        Language::Python => languages_config
-            .and_then(|lc| lc.python.clone())
-            .unwrap_or_default(),
-        Language::JavaScript => languages_config
-            .and_then(|lc| lc.javascript.clone())
-            .unwrap_or_default(),
-        Language::TypeScript => languages_config
-            .and_then(|lc| lc.typescript.clone())
-            .unwrap_or_default(),
-        Language::Unknown => LanguageFeatures::default(),
-    }
-}
-
-/// Get complexity thresholds configuration
-pub fn get_complexity_thresholds() -> crate::complexity::threshold_manager::ComplexityThresholds {
-    get_config()
-        .complexity_thresholds
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get error handling configuration
-pub fn get_error_handling_config() -> ErrorHandlingConfig {
-    get_config().error_handling.clone().unwrap_or_default()
-}
-
-/// Get role-based coverage weight multipliers
-pub fn get_role_coverage_weights() -> RoleCoverageWeights {
-    get_config()
-        .role_coverage_weights
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get role-based coverage expectations (spec 119)
-pub fn get_coverage_expectations() -> crate::priority::scoring::CoverageExpectations {
-    get_config()
-        .coverage_expectations
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get role multiplier clamping configuration (spec 119)
-pub fn get_role_multiplier_config() -> RoleMultiplierConfig {
-    get_config()
-        .role_multiplier_config
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get orchestrator detection configuration
-pub fn get_orchestrator_detection_config() -> OrchestratorDetectionConfig {
-    get_config()
-        .orchestrator_detection
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get orchestration adjustment configuration (spec 110)
-pub fn get_orchestration_adjustment_config(
-) -> crate::priority::scoring::orchestration_adjustment::OrchestrationAdjustmentConfig {
-    get_config()
-        .orchestration_adjustment
-        .clone()
-        .unwrap_or_default()
-}
-
-/// Get constructor detection configuration (spec 117)
-pub fn get_constructor_detection_config() -> ConstructorDetectionConfig {
-    get_config()
-        .classification
-        .as_ref()
-        .and_then(|c| c.constructors.clone())
-        .unwrap_or_default()
-}
-
-/// Get accessor detection configuration (spec 125)
-pub fn get_accessor_detection_config() -> AccessorDetectionConfig {
-    get_config()
-        .classification
-        .as_ref()
-        .and_then(|c| c.accessors.clone())
-        .unwrap_or_default()
-}
-
-/// Get data flow classification configuration (spec 126)
-pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
-    get_config()
-        .classification
-        .as_ref()
-        .and_then(|c| c.data_flow.clone())
-        .unwrap_or_default()
-}
-
-/// Get functional analysis configuration (spec 111)
-pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisConfig {
-    get_config().functional_analysis.clone().unwrap_or_default()
-}
-
-/// Get smart performance configuration
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -570,7 +117,7 @@ coverage = 0.50
 complexity = 0.35
 dependency = 0.15
 "#;
-        let result = super::parse_and_validate_config(toml_content);
+        let result = parse_and_validate_config(toml_content);
         assert!(result.is_ok());
         let config = result.unwrap();
         assert!(config.scoring.is_some());
@@ -591,7 +138,7 @@ dependency = 0.15
     #[test]
     fn test_parse_and_validate_config_invalid_toml() {
         let toml_content = "invalid toml [[ content";
-        let result = super::parse_and_validate_config(toml_content);
+        let result = parse_and_validate_config(toml_content);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Failed to parse"));
     }
@@ -607,7 +154,7 @@ dependency = 0.5
 security = 0.5
 organization = 0.5
 "#;
-        let result = super::parse_and_validate_config(toml_content);
+        let result = parse_and_validate_config(toml_content);
         assert!(result.is_ok());
         let config = result.unwrap();
         let scoring = config.scoring.unwrap();
@@ -627,7 +174,7 @@ organization = 0.5
         use std::path::PathBuf;
 
         let start = PathBuf::from("/a/b/c/d");
-        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 3).collect();
+        let ancestors: Vec<PathBuf> = directory_ancestors(start, 3).collect();
 
         assert_eq!(ancestors.len(), 3);
         assert_eq!(ancestors[0], PathBuf::from("/a/b/c/d"));
@@ -640,7 +187,7 @@ organization = 0.5
         use std::path::PathBuf;
 
         let start = PathBuf::from("/a/b/c/d/e/f/g/h");
-        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 2).collect();
+        let ancestors: Vec<PathBuf> = directory_ancestors(start, 2).collect();
 
         assert_eq!(ancestors.len(), 2);
     }
@@ -650,7 +197,7 @@ organization = 0.5
         use std::path::PathBuf;
 
         let start = PathBuf::from("/");
-        let ancestors: Vec<PathBuf> = super::directory_ancestors(start, 5).collect();
+        let ancestors: Vec<PathBuf> = directory_ancestors(start, 5).collect();
 
         // Root directory has no parent, so we only get the root itself
         assert_eq!(ancestors.len(), 1);
@@ -682,7 +229,7 @@ interface_weight = 0.15
         )
         .unwrap();
 
-        let result = try_load_config_from_path(&config_path);
+        let result = loader::try_load_config_from_path(&config_path);
         assert!(result.is_some());
 
         let config = result.unwrap();
@@ -704,7 +251,7 @@ interface_weight = 0.15
         // Write an invalid config file
         fs::write(&config_path, "invalid toml content").unwrap();
 
-        let result = try_load_config_from_path(&config_path);
+        let result = loader::try_load_config_from_path(&config_path);
         assert!(result.is_none());
     }
 
@@ -713,7 +260,7 @@ interface_weight = 0.15
         use std::path::PathBuf;
 
         let config_path = PathBuf::from("/nonexistent/path/to/config.toml");
-        let result = try_load_config_from_path(&config_path);
+        let result = loader::try_load_config_from_path(&config_path);
         assert!(result.is_none());
     }
 
@@ -726,7 +273,7 @@ interface_weight = 0.15
         let error = io::Error::new(io::ErrorKind::NotFound, "File not found");
 
         // This should not panic and should not log a warning for NotFound
-        handle_read_error(&path, &error);
+        loader::handle_read_error(&path, &error);
     }
 
     #[test]
@@ -738,7 +285,7 @@ interface_weight = 0.15
         let error = io::Error::new(io::ErrorKind::PermissionDenied, "Permission denied");
 
         // This should log a warning but not panic
-        handle_read_error(&path, &error);
+        loader::handle_read_error(&path, &error);
     }
 
     #[test]
@@ -1214,12 +761,12 @@ interface_weight = 0.15
         fs::write(&config_path, "[thresholds]\ncomplexity = 15\n").unwrap();
 
         // Test reading existing file
-        let contents = read_config_file(&config_path).unwrap();
+        let contents = loader::read_config_file(&config_path).unwrap();
         assert_eq!(contents, "[thresholds]\ncomplexity = 15\n");
 
         // Test reading non-existent file
         let non_existent = temp_dir.path().join("non_existent.toml");
-        assert!(read_config_file(&non_existent).is_err());
+        assert!(loader::read_config_file(&non_existent).is_err());
     }
 
     #[test]
@@ -1231,7 +778,7 @@ coverage = 0.50
 complexity = 0.35
 dependency = 0.15
 "#;
-        let config = parse_and_validate_config_impl(valid_toml).unwrap();
+        let config = loader::parse_and_validate_config_impl(valid_toml).unwrap();
         let scoring = config.scoring.unwrap();
         assert_eq!(scoring.coverage, 0.50);
         assert_eq!(scoring.complexity, 0.35);
@@ -1239,7 +786,7 @@ dependency = 0.15
 
         // Test invalid TOML
         let invalid_toml = "invalid [[ toml";
-        assert!(parse_and_validate_config_impl(invalid_toml).is_err());
+        assert!(loader::parse_and_validate_config_impl(invalid_toml).is_err());
 
         // Test config with invalid weights (should be normalized)
         let invalid_weights = r#"
@@ -1248,7 +795,7 @@ coverage = 0.6
 complexity = 0.6
 dependency = 0.6
 "#;
-        let config = parse_and_validate_config_impl(invalid_weights).unwrap();
+        let config = loader::parse_and_validate_config_impl(invalid_weights).unwrap();
         // Should use defaults due to invalid sum
         let scoring = config.scoring.unwrap();
         assert_eq!(scoring.coverage, 0.50);
@@ -1262,24 +809,24 @@ dependency = 0.6
 
         // Test normal path traversal
         let start = PathBuf::from("/a/b/c/d");
-        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start.clone(), 3).collect();
+        let ancestors: Vec<PathBuf> = loader::directory_ancestors_impl(start.clone(), 3).collect();
         assert_eq!(ancestors.len(), 3);
         assert_eq!(ancestors[0], PathBuf::from("/a/b/c/d"));
         assert_eq!(ancestors[1], PathBuf::from("/a/b/c"));
         assert_eq!(ancestors[2], PathBuf::from("/a/b"));
 
         // Test with depth limit
-        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start.clone(), 2).collect();
+        let ancestors: Vec<PathBuf> = loader::directory_ancestors_impl(start.clone(), 2).collect();
         assert_eq!(ancestors.len(), 2);
 
         // Test with root path
         let root = PathBuf::from("/");
-        let ancestors: Vec<PathBuf> = directory_ancestors_impl(root, 5).collect();
+        let ancestors: Vec<PathBuf> = loader::directory_ancestors_impl(root, 5).collect();
         assert_eq!(ancestors.len(), 1);
         assert_eq!(ancestors[0], PathBuf::from("/"));
 
         // Test with zero depth
-        let ancestors: Vec<PathBuf> = directory_ancestors_impl(start, 0).collect();
+        let ancestors: Vec<PathBuf> = loader::directory_ancestors_impl(start, 0).collect();
         assert_eq!(ancestors.len(), 0);
     }
 
@@ -1292,14 +839,14 @@ dependency = 0.6
 
         // Test NotFound error (should not log warning)
         let not_found = io::Error::new(io::ErrorKind::NotFound, "File not found");
-        handle_read_error(&path, &not_found); // Should not panic
+        loader::handle_read_error(&path, &not_found); // Should not panic
 
         // Test PermissionDenied error (should log warning)
         let permission = io::Error::new(io::ErrorKind::PermissionDenied, "Access denied");
-        handle_read_error(&path, &permission); // Should not panic
+        loader::handle_read_error(&path, &permission); // Should not panic
 
         // Test other errors
         let other = io::Error::other("Unknown error");
-        handle_read_error(&path, &other); // Should not panic
+        loader::handle_read_error(&path, &other); // Should not panic
     }
 }
