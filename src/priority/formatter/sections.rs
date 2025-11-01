@@ -1,10 +1,9 @@
-use super::{DebtSpecificInfo, FormatContext};
+use super::context::{DebtSpecificInfo, FormatContext};
+use super::dependencies::{filter_dependencies, format_function_reference};
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::score_formatter;
 use colored::*;
 use std::fmt::Write;
-
-use super::dependencies::{filter_dependencies, format_function_reference};
 
 pub(crate) struct FormattedSections {
     pub header: String,
