@@ -1,14 +1,12 @@
 use super::{
-    aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_weight,
-    calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
+    calculate_god_object_score, determine_confidence,
+    god_object::{metrics, TypeAnalysis, TypeVisitor},
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
-    EnhancedGodObjectAnalysis, FunctionComplexityInfo, GodObjectAnalysis, GodObjectThresholds,
-    GodObjectType, MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern,
-    OrganizationDetector, PurityAnalyzer, PurityDistribution, PurityLevel, RecommendationSeverity,
-    ResponsibilityGroup, StructMetrics,
+    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectThresholds, GodObjectType,
+    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector,
+    RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
-use crate::complexity::cyclomatic::calculate_cyclomatic;
 use std::collections::HashMap;
 use std::path::Path;
 use syn::{self, visit::Visit};
@@ -56,7 +54,7 @@ impl GodObjectDetector {
         let thresholds = Self::get_thresholds_for_path(path);
 
         // Build per-struct metrics
-        let per_struct_metrics = self.build_per_struct_metrics(&visitor);
+        let per_struct_metrics = metrics::build_per_struct_metrics(&visitor);
 
         // Get basic file-level analysis
         let file_metrics = self.analyze_comprehensive(path, ast);
@@ -88,34 +86,6 @@ impl GodObjectDetector {
             classification,
             recommendation,
         }
-    }
-
-    /// Build metrics for each struct in the file
-    ///
-    /// Spec 134 Phase 3: This returns ALL methods (including tests) per struct.
-    /// This is intentional for per-struct breakdown. For file-level god object
-    /// detection, use the filtered counts from analyze_comprehensive.
-    fn build_per_struct_metrics(&self, visitor: &TypeVisitor) -> Vec<StructMetrics> {
-        visitor
-            .types
-            .values()
-            .map(|type_analysis| {
-                let responsibilities = group_methods_by_responsibility(&type_analysis.methods);
-                StructMetrics {
-                    name: type_analysis.name.clone(),
-                    method_count: type_analysis.method_count, // All methods (including tests)
-                    field_count: type_analysis.field_count,
-                    responsibilities: responsibilities.keys().cloned().collect(),
-                    line_span: (
-                        type_analysis.location.line,
-                        type_analysis
-                            .location
-                            .end_line
-                            .unwrap_or(type_analysis.location.line),
-                    ),
-                }
-            })
-            .collect()
     }
 
     /// Classify whether this is a god class, god module, or neither
@@ -544,142 +514,6 @@ impl GodObjectDetector {
         }
     }
 
-    /// Calculates complexity-weighted metrics for the god object analysis
-    ///
-    /// # Arguments
-    /// * `visitor` - Type visitor containing function information
-    /// * `detection_type` - Whether analyzing a God Class or God File
-    ///
-    /// # Returns
-    /// Tuple of (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution)
-    fn calculate_weighted_metrics(
-        visitor: &TypeVisitor,
-        detection_type: &DetectionType,
-    ) -> (f64, f64, f64, Option<PurityDistribution>) {
-        // Calculate complexity-weighted metrics
-        // Spec 130: For God Class, use production functions only; for God File, use all
-        let relevant_complexity: Vec<_> = match detection_type {
-            DetectionType::GodClass => {
-                // Filter to production functions only (exclude tests)
-                visitor
-                    .function_complexity
-                    .iter()
-                    .filter(|fc| !fc.is_test)
-                    .cloned()
-                    .collect()
-            }
-            DetectionType::GodFile | DetectionType::GodModule => {
-                // Include all functions (production + tests)
-                visitor.function_complexity.clone()
-            }
-        };
-
-        let weighted_method_count = aggregate_weighted_complexity(&relevant_complexity);
-        let avg_complexity = calculate_avg_complexity(&relevant_complexity);
-
-        // Calculate purity-weighted metrics
-        let (purity_weighted_count, purity_distribution) = if !visitor.function_items.is_empty() {
-            // Filter function items based on detection type
-            let relevant_items: Vec<_> = match detection_type {
-                DetectionType::GodClass => {
-                    // Production functions only
-                    visitor
-                        .function_items
-                        .iter()
-                        .filter(|item| {
-                            !visitor
-                                .function_complexity
-                                .iter()
-                                .find(|fc| item.sig.ident == fc.name)
-                                .map(|fc| fc.is_test)
-                                .unwrap_or(false)
-                        })
-                        .cloned()
-                        .collect()
-                }
-                DetectionType::GodFile | DetectionType::GodModule => {
-                    // All functions
-                    visitor.function_items.clone()
-                }
-            };
-            Self::calculate_purity_weights(&relevant_items, &relevant_complexity)
-        } else {
-            (weighted_method_count, None)
-        };
-
-        (
-            weighted_method_count,
-            avg_complexity,
-            purity_weighted_count,
-            purity_distribution,
-        )
-    }
-
-    /// Calculates the final god object score using the best available metrics
-    ///
-    /// # Arguments
-    /// * `purity_weighted_count` - Purity-based weighted count
-    /// * `weighted_method_count` - Complexity-weighted method count
-    /// * `total_methods` - Raw method count
-    /// * `total_fields` - Number of fields
-    /// * `responsibility_count` - Number of responsibilities
-    /// * `lines_of_code` - Estimated lines of code
-    /// * `avg_complexity` - Average complexity
-    /// * `purity_distribution` - Optional purity distribution
-    /// * `has_complexity_data` - Whether complexity data is available
-    /// * `thresholds` - God object thresholds
-    ///
-    /// # Returns
-    /// Tuple of (god_object_score, is_god_object)
-    #[allow(clippy::too_many_arguments)]
-    fn calculate_final_god_object_score(
-        purity_weighted_count: f64,
-        weighted_method_count: f64,
-        total_methods: usize,
-        total_fields: usize,
-        responsibility_count: usize,
-        lines_of_code: usize,
-        avg_complexity: f64,
-        purity_distribution: &Option<PurityDistribution>,
-        has_complexity_data: bool,
-        thresholds: &GodObjectThresholds,
-    ) -> (f64, bool) {
-        // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
-        let god_object_score = if purity_distribution.is_some() {
-            calculate_god_object_score_weighted(
-                purity_weighted_count,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                avg_complexity,
-                thresholds,
-            )
-        } else if has_complexity_data {
-            calculate_god_object_score_weighted(
-                weighted_method_count,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                avg_complexity,
-                thresholds,
-            )
-        } else {
-            calculate_god_object_score(
-                total_methods,
-                total_fields,
-                responsibility_count,
-                lines_of_code,
-                thresholds,
-            )
-        };
-
-        // With complexity weighting, use the god_object_score to determine if it's a god object
-        // rather than just the confidence level (which still uses raw counts)
-        let is_god_object = god_object_score >= 70.0;
-
-        (god_object_score, is_god_object)
-    }
-
     /// Analyzes cross-domain struct mixing and generates module split recommendations
     ///
     /// # Arguments
@@ -808,7 +642,10 @@ impl GodObjectDetector {
     ) {
         // Calculate visibility breakdown for Rust files (Spec 134)
         let visibility_breakdown = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
-            Some(Self::calculate_visibility_breakdown(visitor, all_methods))
+            Some(metrics::calculate_visibility_breakdown(
+                visitor,
+                all_methods,
+            ))
         } else {
             None
         };
@@ -824,7 +661,7 @@ impl GodObjectDetector {
 
                     // Integrate visibility breakdown into function counts
                     if let Some(ref breakdown) = visibility_breakdown {
-                        structure.function_counts = Self::integrate_visibility_into_counts(
+                        structure.function_counts = metrics::integrate_visibility_into_counts(
                             &structure.function_counts,
                             breakdown,
                             total_methods,
@@ -856,7 +693,7 @@ impl GodObjectDetector {
         visitor.visit_file(ast);
 
         // Build per-struct metrics for domain analysis (Spec 140)
-        let per_struct_metrics = self.build_per_struct_metrics(&visitor);
+        let per_struct_metrics = metrics::build_per_struct_metrics(&visitor);
 
         // Get thresholds based on file extension
         let thresholds = Self::get_thresholds_for_path(path);
@@ -897,10 +734,10 @@ impl GodObjectDetector {
 
         // Calculate complexity-weighted and purity-weighted metrics
         let (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution) =
-            Self::calculate_weighted_metrics(&visitor, &detection_type);
+            metrics::calculate_weighted_metrics(&visitor, &detection_type);
 
         // Calculate the final god object score and determination
-        let (god_object_score, is_god_object) = Self::calculate_final_god_object_score(
+        let (god_object_score, is_god_object) = metrics::calculate_final_god_object_score(
             purity_weighted_count,
             weighted_method_count,
             total_methods,
@@ -974,170 +811,6 @@ impl GodObjectDetector {
             analysis_method,
             cross_domain_severity,
         }
-    }
-
-    /// Calculate visibility breakdown from TypeVisitor data (Spec 134)
-    fn calculate_visibility_breakdown(
-        visitor: &TypeVisitor,
-        method_names: &[String],
-    ) -> crate::organization::god_object_analysis::FunctionVisibilityBreakdown {
-        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
-
-        let mut breakdown = FunctionVisibilityBreakdown::new();
-
-        // Count visibility for function items (standalone functions)
-        for func_item in &visitor.function_items {
-            let name = func_item.sig.ident.to_string();
-            if !method_names.contains(&name) {
-                continue;
-            }
-
-            match &func_item.vis {
-                syn::Visibility::Public(_) => breakdown.public += 1,
-                syn::Visibility::Restricted(r) => {
-                    if let Some(ident) = r.path.get_ident() {
-                        if ident == "crate" {
-                            breakdown.pub_crate += 1;
-                        } else if ident == "super" {
-                            breakdown.pub_super += 1;
-                        } else {
-                            breakdown.private += 1;
-                        }
-                    } else {
-                        breakdown.private += 1;
-                    }
-                }
-                syn::Visibility::Inherited => breakdown.private += 1,
-            }
-        }
-
-        // Count visibility for impl methods (Spec 134 Phase 2: Fixed)
-        for type_info in visitor.types.values() {
-            for method_name in &type_info.methods {
-                if !method_names.contains(method_name) {
-                    continue;
-                }
-
-                // Look up the tracked visibility for this method
-                if let Some(vis) = visitor.method_visibility.get(method_name) {
-                    match vis {
-                        syn::Visibility::Public(_) => breakdown.public += 1,
-                        syn::Visibility::Restricted(r) => {
-                            if let Some(ident) = r.path.get_ident() {
-                                if ident == "crate" {
-                                    breakdown.pub_crate += 1;
-                                } else if ident == "super" {
-                                    breakdown.pub_super += 1;
-                                } else {
-                                    breakdown.private += 1;
-                                }
-                            } else {
-                                breakdown.private += 1;
-                            }
-                        }
-                        syn::Visibility::Inherited => breakdown.private += 1,
-                    }
-                } else {
-                    // Fallback: if visibility not tracked, assume private (conservative)
-                    breakdown.private += 1;
-                }
-            }
-        }
-
-        breakdown
-    }
-
-    /// Integrate visibility breakdown into FunctionCounts (Spec 140)
-    ///
-    /// This bridges the new visibility tracking system (Spec 134) with the existing
-    /// ModuleStructure.function_counts field used by output formatters.
-    ///
-    /// Maps visibility levels to public/private counts:
-    /// - public_functions = breakdown.public
-    /// - private_functions = breakdown.private + pub_crate + pub_super
-    /// - total = breakdown.total()
-    ///
-    /// Falls back to original counts if visibility_breakdown is unavailable.
-    fn integrate_visibility_into_counts(
-        original_counts: &crate::analysis::FunctionCounts,
-        breakdown: &crate::organization::god_object_analysis::FunctionVisibilityBreakdown,
-        _total_methods: usize,
-    ) -> crate::analysis::FunctionCounts {
-        use crate::analysis::FunctionCounts;
-
-        FunctionCounts {
-            module_level_functions: original_counts.module_level_functions,
-            impl_methods: original_counts.impl_methods,
-            trait_methods: original_counts.trait_methods,
-            nested_module_functions: original_counts.nested_module_functions,
-            // Use visibility breakdown for public/private counts
-            public_functions: breakdown.public,
-            private_functions: breakdown.private + breakdown.pub_crate + breakdown.pub_super,
-        }
-    }
-
-    /// Calculate purity-weighted function contributions
-    ///
-    /// Combines complexity weighting with purity weighting to produce a total weight
-    /// for each function. Pure functions contribute less to god object score.
-    fn calculate_purity_weights(
-        function_items: &[syn::ItemFn],
-        function_complexity: &[FunctionComplexityInfo],
-    ) -> (f64, Option<PurityDistribution>) {
-        if function_items.is_empty() {
-            return (0.0, None);
-        }
-
-        // Build a map of function names to complexity for quick lookup
-        let complexity_map: HashMap<String, u32> = function_complexity
-            .iter()
-            .map(|f| (f.name.clone(), f.cyclomatic_complexity))
-            .collect();
-
-        let mut pure_count = 0;
-        let mut probably_pure_count = 0;
-        let mut impure_count = 0;
-        let mut pure_weight = 0.0;
-        let mut probably_pure_weight = 0.0;
-        let mut impure_weight = 0.0;
-
-        // Analyze each function for purity and calculate combined weights
-        for func in function_items {
-            let name = func.sig.ident.to_string();
-            let purity_level = PurityAnalyzer::analyze(func);
-            let complexity = complexity_map.get(&name).copied().unwrap_or(1);
-
-            let complexity_weight = calculate_complexity_weight(complexity);
-            let purity_weight_multiplier = purity_level.weight_multiplier();
-            let total_weight = complexity_weight * purity_weight_multiplier;
-
-            match purity_level {
-                PurityLevel::Pure => {
-                    pure_count += 1;
-                    pure_weight += total_weight;
-                }
-                PurityLevel::ProbablyPure => {
-                    probably_pure_count += 1;
-                    probably_pure_weight += total_weight;
-                }
-                PurityLevel::Impure => {
-                    impure_count += 1;
-                    impure_weight += total_weight;
-                }
-            }
-        }
-
-        let total_weighted = pure_weight + probably_pure_weight + impure_weight;
-        let distribution = PurityDistribution {
-            pure_count,
-            probably_pure_count,
-            impure_count,
-            pure_weight_contribution: pure_weight,
-            probably_pure_weight_contribution: probably_pure_weight,
-            impure_weight_contribution: impure_weight,
-        };
-
-        (total_weighted, Some(distribution))
     }
 
     #[allow(dead_code)]
@@ -1378,239 +1051,6 @@ impl OrganizationDetector for GodObjectDetector {
             } => GodObjectDetector::classify_god_object_impact(*method_count, *field_count),
             _ => MaintainabilityImpact::Low,
         }
-    }
-}
-
-struct TypeAnalysis {
-    name: String,
-    method_count: usize,
-    field_count: usize,
-    methods: Vec<String>,
-    fields: Vec<String>,
-    responsibilities: Vec<Responsibility>,
-    trait_implementations: usize,
-    location: SourceLocation,
-}
-
-struct Responsibility {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    methods: Vec<String>,
-    #[allow(dead_code)]
-    fields: Vec<String>,
-    #[allow(dead_code)]
-    cohesion_score: f64,
-}
-
-/// Represents weighted contribution of a function to god object score
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-struct FunctionWeight {
-    pub name: String,
-    pub complexity: u32,
-    pub purity_level: PurityLevel,
-    pub complexity_weight: f64,
-    pub purity_weight: f64,
-    pub total_weight: f64,
-}
-
-struct TypeVisitor {
-    types: HashMap<String, TypeAnalysis>,
-    standalone_functions: Vec<String>,
-    function_complexity: Vec<FunctionComplexityInfo>,
-    function_items: Vec<syn::ItemFn>,
-    location_extractor: Option<UnifiedLocationExtractor>,
-    /// Tracks visibility of impl methods (Spec 134 Phase 2)
-    method_visibility: HashMap<String, syn::Visibility>,
-}
-
-impl TypeVisitor {
-    fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
-        Self {
-            types: HashMap::new(),
-            standalone_functions: Vec::new(),
-            function_complexity: Vec::new(),
-            function_items: Vec::new(),
-            location_extractor,
-            method_visibility: HashMap::new(),
-        }
-    }
-
-    /// Extract complexity from a function
-    fn extract_function_complexity(&self, item_fn: &syn::ItemFn) -> FunctionComplexityInfo {
-        let name = item_fn.sig.ident.to_string();
-
-        // Check if this is a test function
-        let is_test = item_fn.attrs.iter().any(|attr| {
-            attr.path().is_ident("test")
-                || attr.path().is_ident("cfg")
-                    && attr
-                        .meta
-                        .require_list()
-                        .ok()
-                        .map(|list| {
-                            list.tokens.to_string().contains("test")
-                                || list.tokens.to_string().contains("cfg(test)")
-                        })
-                        .unwrap_or(false)
-        });
-
-        // Calculate cyclomatic complexity from the function body
-        let cyclomatic_complexity = calculate_cyclomatic(&item_fn.block);
-
-        FunctionComplexityInfo {
-            name,
-            cyclomatic_complexity,
-            cognitive_complexity: cyclomatic_complexity, // Using cyclomatic as proxy for now
-            is_test,
-        }
-    }
-}
-
-impl TypeVisitor {
-    fn extract_type_name(self_ty: &syn::Type) -> Option<String> {
-        match self_ty {
-            syn::Type::Path(type_path) => type_path.path.get_ident().map(|id| id.to_string()),
-            _ => None,
-        }
-    }
-
-    fn count_impl_methods(items: &[syn::ImplItem]) -> (Vec<String>, usize) {
-        let mut methods = Vec::new();
-        let mut count = 0;
-
-        for item in items {
-            if let syn::ImplItem::Fn(method) = item {
-                methods.push(method.sig.ident.to_string());
-                count += 1;
-            }
-        }
-
-        (methods, count)
-    }
-
-    /// Extract complexity information from impl methods
-    fn extract_impl_complexity(&self, items: &[syn::ImplItem]) -> Vec<FunctionComplexityInfo> {
-        items
-            .iter()
-            .filter_map(|item| {
-                if let syn::ImplItem::Fn(method) = item {
-                    let name = method.sig.ident.to_string();
-
-                    // Check if this is a test function
-                    let is_test = method.attrs.iter().any(|attr| {
-                        attr.path().is_ident("test")
-                            || attr.path().is_ident("cfg")
-                                && attr
-                                    .meta
-                                    .require_list()
-                                    .ok()
-                                    .map(|list| {
-                                        list.tokens.to_string().contains("test")
-                                            || list.tokens.to_string().contains("cfg(test)")
-                                    })
-                                    .unwrap_or(false)
-                    });
-
-                    // Calculate cyclomatic complexity from the function body
-                    let cyclomatic_complexity = calculate_cyclomatic(&method.block);
-
-                    Some(FunctionComplexityInfo {
-                        name,
-                        cyclomatic_complexity,
-                        cognitive_complexity: cyclomatic_complexity,
-                        is_test,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn update_type_info(&mut self, type_name: &str, node: &syn::ItemImpl) {
-        if let Some(type_info) = self.types.get_mut(type_name) {
-            let (methods, count) = Self::count_impl_methods(&node.items);
-
-            type_info.methods.extend(methods);
-            type_info.method_count += count;
-
-            if node.trait_.is_some() {
-                type_info.trait_implementations += 1;
-            }
-
-            // Spec 134 Phase 2: Track visibility of impl methods
-            for item in &node.items {
-                if let syn::ImplItem::Fn(method) = item {
-                    let method_name = method.sig.ident.to_string();
-                    self.method_visibility
-                        .insert(method_name, method.vis.clone());
-                }
-            }
-        }
-    }
-}
-
-impl<'ast> Visit<'ast> for TypeVisitor {
-    fn visit_item_struct(&mut self, node: &'ast syn::ItemStruct) {
-        let type_name = node.ident.to_string();
-        let field_count = match &node.fields {
-            syn::Fields::Named(fields) => fields.named.len(),
-            syn::Fields::Unnamed(fields) => fields.unnamed.len(),
-            syn::Fields::Unit => 0,
-        };
-
-        let fields = match &node.fields {
-            syn::Fields::Named(fields) => fields
-                .named
-                .iter()
-                .filter_map(|f| f.ident.as_ref().map(|id| id.to_string()))
-                .collect(),
-            _ => Vec::new(),
-        };
-
-        let location = if let Some(ref extractor) = self.location_extractor {
-            extractor.extract_item_location(&syn::Item::Struct(node.clone()))
-        } else {
-            SourceLocation::default()
-        };
-
-        self.types.insert(
-            type_name.clone(),
-            TypeAnalysis {
-                name: type_name,
-                method_count: 0,
-                field_count,
-                methods: Vec::new(),
-                fields,
-                responsibilities: Vec::new(),
-                trait_implementations: 0,
-                location,
-            },
-        );
-    }
-
-    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
-        if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
-            self.update_type_info(&type_name, node);
-
-            // Extract complexity information for impl methods
-            let complexity_info = self.extract_impl_complexity(&node.items);
-            self.function_complexity.extend(complexity_info);
-        }
-    }
-
-    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
-        // Track standalone functions
-        self.standalone_functions.push(node.sig.ident.to_string());
-
-        // Extract complexity information
-        let complexity_info = self.extract_function_complexity(node);
-        self.function_complexity.push(complexity_info);
-
-        // Store the function item for purity analysis
-        self.function_items.push(node.clone());
     }
 }
 
@@ -2493,7 +1933,7 @@ mod tests {
         let mut visitor = TypeVisitor::with_location_extractor(detector.location_extractor.clone());
         visitor.visit_file(&ast);
 
-        let metrics = detector.build_per_struct_metrics(&visitor);
+        let metrics = metrics::build_per_struct_metrics(&visitor);
 
         assert_eq!(metrics.len(), 2);
 
@@ -2810,7 +2250,7 @@ mod tests {
         };
 
         let integrated =
-            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 27);
+            metrics::integrate_visibility_into_counts(&original_counts, &breakdown, 27);
 
         // Original counts preserved
         assert_eq!(integrated.module_level_functions, 5);
@@ -2846,7 +2286,7 @@ mod tests {
         };
 
         let integrated =
-            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 20);
+            metrics::integrate_visibility_into_counts(&original_counts, &breakdown, 20);
 
         assert_eq!(integrated.public_functions, 20);
         assert_eq!(integrated.private_functions, 0);
@@ -2874,7 +2314,7 @@ mod tests {
         };
 
         let integrated =
-            GodObjectDetector::integrate_visibility_into_counts(&original_counts, &breakdown, 15);
+            metrics::integrate_visibility_into_counts(&original_counts, &breakdown, 15);
 
         assert_eq!(integrated.public_functions, 0);
         assert_eq!(integrated.private_functions, 15);

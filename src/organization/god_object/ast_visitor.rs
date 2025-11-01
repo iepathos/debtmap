@@ -1,0 +1,248 @@
+//! AST Visitor for God Object Detection
+//!
+//! This module provides data collection from Rust ASTs for god object analysis.
+//! It traverses the syntax tree to gather information about types, methods, and complexity.
+
+use crate::common::{SourceLocation, UnifiedLocationExtractor};
+use crate::complexity::cyclomatic::calculate_cyclomatic;
+use crate::organization::{FunctionComplexityInfo, PurityLevel};
+use std::collections::HashMap;
+use syn::{self, visit::Visit};
+
+/// Analysis data for a single type (struct/enum)
+pub struct TypeAnalysis {
+    pub name: String,
+    pub method_count: usize,
+    pub field_count: usize,
+    pub methods: Vec<String>,
+    pub fields: Vec<String>,
+    pub responsibilities: Vec<Responsibility>,
+    pub trait_implementations: usize,
+    pub location: SourceLocation,
+}
+
+/// Represents a logical responsibility or concern within a type
+pub struct Responsibility {
+    #[allow(dead_code)]
+    pub name: String,
+    #[allow(dead_code)]
+    pub methods: Vec<String>,
+    #[allow(dead_code)]
+    pub fields: Vec<String>,
+    #[allow(dead_code)]
+    pub cohesion_score: f64,
+}
+
+/// Represents weighted contribution of a function to god object score
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct FunctionWeight {
+    pub name: String,
+    pub complexity: u32,
+    pub purity_level: PurityLevel,
+    pub complexity_weight: f64,
+    pub purity_weight: f64,
+    pub total_weight: f64,
+}
+
+/// Visitor for collecting type information from Rust ASTs
+pub struct TypeVisitor {
+    pub types: HashMap<String, TypeAnalysis>,
+    pub standalone_functions: Vec<String>,
+    pub function_complexity: Vec<FunctionComplexityInfo>,
+    pub function_items: Vec<syn::ItemFn>,
+    location_extractor: Option<UnifiedLocationExtractor>,
+    /// Tracks visibility of impl methods (Spec 134 Phase 2)
+    pub method_visibility: HashMap<String, syn::Visibility>,
+}
+
+impl TypeVisitor {
+    /// Create a new TypeVisitor with optional location extraction
+    pub fn with_location_extractor(location_extractor: Option<UnifiedLocationExtractor>) -> Self {
+        Self {
+            types: HashMap::new(),
+            standalone_functions: Vec::new(),
+            function_complexity: Vec::new(),
+            function_items: Vec::new(),
+            location_extractor,
+            method_visibility: HashMap::new(),
+        }
+    }
+
+    /// Extract complexity from a function
+    fn extract_function_complexity(&self, item_fn: &syn::ItemFn) -> FunctionComplexityInfo {
+        let name = item_fn.sig.ident.to_string();
+
+        // Check if this is a test function
+        let is_test = item_fn.attrs.iter().any(|attr| {
+            attr.path().is_ident("test")
+                || attr.path().is_ident("cfg")
+                    && attr
+                        .meta
+                        .require_list()
+                        .ok()
+                        .map(|list| {
+                            list.tokens.to_string().contains("test")
+                                || list.tokens.to_string().contains("cfg(test)")
+                        })
+                        .unwrap_or(false)
+        });
+
+        // Calculate cyclomatic complexity from the function body
+        let cyclomatic_complexity = calculate_cyclomatic(&item_fn.block);
+
+        FunctionComplexityInfo {
+            name,
+            cyclomatic_complexity,
+            cognitive_complexity: cyclomatic_complexity, // Using cyclomatic as proxy for now
+            is_test,
+        }
+    }
+
+    /// Extract type name from a syn::Type
+    pub fn extract_type_name(self_ty: &syn::Type) -> Option<String> {
+        match self_ty {
+            syn::Type::Path(type_path) => type_path.path.get_ident().map(|id| id.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Count methods in an impl block and return method names
+    pub fn count_impl_methods(items: &[syn::ImplItem]) -> (Vec<String>, usize) {
+        let mut methods = Vec::new();
+        let mut count = 0;
+
+        for item in items {
+            if let syn::ImplItem::Fn(method) = item {
+                methods.push(method.sig.ident.to_string());
+                count += 1;
+            }
+        }
+
+        (methods, count)
+    }
+
+    /// Extract complexity information from impl methods
+    fn extract_impl_complexity(&self, items: &[syn::ImplItem]) -> Vec<FunctionComplexityInfo> {
+        items
+            .iter()
+            .filter_map(|item| {
+                if let syn::ImplItem::Fn(method) = item {
+                    let name = method.sig.ident.to_string();
+
+                    // Check if this is a test function
+                    let is_test = method.attrs.iter().any(|attr| {
+                        attr.path().is_ident("test")
+                            || attr.path().is_ident("cfg")
+                                && attr
+                                    .meta
+                                    .require_list()
+                                    .ok()
+                                    .map(|list| {
+                                        list.tokens.to_string().contains("test")
+                                            || list.tokens.to_string().contains("cfg(test)")
+                                    })
+                                    .unwrap_or(false)
+                    });
+
+                    // Calculate cyclomatic complexity from the function body
+                    let cyclomatic_complexity = calculate_cyclomatic(&method.block);
+
+                    Some(FunctionComplexityInfo {
+                        name,
+                        cyclomatic_complexity,
+                        cognitive_complexity: cyclomatic_complexity,
+                        is_test,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Update type information with impl block data
+    pub fn update_type_info(&mut self, type_name: &str, node: &syn::ItemImpl) {
+        if let Some(type_info) = self.types.get_mut(type_name) {
+            let (methods, count) = Self::count_impl_methods(&node.items);
+
+            type_info.methods.extend(methods);
+            type_info.method_count += count;
+
+            if node.trait_.is_some() {
+                type_info.trait_implementations += 1;
+            }
+
+            // Spec 134 Phase 2: Track visibility of impl methods
+            for item in &node.items {
+                if let syn::ImplItem::Fn(method) = item {
+                    let method_name = method.sig.ident.to_string();
+                    self.method_visibility
+                        .insert(method_name, method.vis.clone());
+                }
+            }
+        }
+    }
+}
+
+impl<'ast> Visit<'ast> for TypeVisitor {
+    fn visit_item_struct(&mut self, node: &'ast syn::ItemStruct) {
+        let type_name = node.ident.to_string();
+        let field_count = match &node.fields {
+            syn::Fields::Named(fields) => fields.named.len(),
+            syn::Fields::Unnamed(fields) => fields.unnamed.len(),
+            syn::Fields::Unit => 0,
+        };
+
+        let fields = match &node.fields {
+            syn::Fields::Named(fields) => fields
+                .named
+                .iter()
+                .filter_map(|f| f.ident.as_ref().map(|id| id.to_string()))
+                .collect(),
+            _ => Vec::new(),
+        };
+
+        let location = if let Some(ref extractor) = self.location_extractor {
+            extractor.extract_item_location(&syn::Item::Struct(node.clone()))
+        } else {
+            SourceLocation::default()
+        };
+
+        self.types.insert(
+            type_name.clone(),
+            TypeAnalysis {
+                name: type_name,
+                method_count: 0,
+                field_count,
+                methods: Vec::new(),
+                fields,
+                responsibilities: Vec::new(),
+                trait_implementations: 0,
+                location,
+            },
+        );
+    }
+
+    fn visit_item_impl(&mut self, node: &'ast syn::ItemImpl) {
+        if let Some(type_name) = Self::extract_type_name(&node.self_ty) {
+            self.update_type_info(&type_name, node);
+
+            // Extract complexity information for impl methods
+            let complexity_info = self.extract_impl_complexity(&node.items);
+            self.function_complexity.extend(complexity_info);
+        }
+    }
+
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        // Track standalone functions
+        self.standalone_functions.push(node.sig.ident.to_string());
+
+        // Extract complexity information
+        let complexity_info = self.extract_function_complexity(node);
+        self.function_complexity.push(complexity_info);
+
+        // Store the function item for purity analysis
+        self.function_items.push(node.clone());
+    }
+}
