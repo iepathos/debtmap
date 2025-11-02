@@ -12,8 +12,14 @@ created: 2025-10-28
 
 **Category**: foundation
 **Priority**: critical
-**Status**: draft
-**Dependencies**: Specs 141 (I/O Detection), 142 (Call Graph), 145 (Multi-Signal Aggregation)
+**Status**: ready
+**Dependencies**: Multi-signal aggregation infrastructure (already implemented in `src/analysis/multi_signal_aggregation.rs`)
+
+**Note**: This spec references conceptual "Specs 141-145" which don't exist as standalone specification documents but are already implemented in the codebase:
+- Spec 141 (I/O Detection) → `src/analysis/io_detection.rs` (IoDetector)
+- Spec 142 (Call Graph) → `src/analysis/call_graph.rs` (RustCallGraph)
+- Spec 143 (Purity Analysis) → `src/organization/purity_analyzer.rs` (PurityAnalyzer)
+- Spec 145 (Multi-Signal Aggregation) → `src/analysis/multi_signal_aggregation.rs` (ResponsibilityAggregator)
 
 ## Context
 
@@ -149,6 +155,51 @@ pub fn recommend_splits(file: &FileAnalysis) -> Vec<ModuleSplit> {
     generate_responsibility_based_splits(responsibility_groups)
 }
 
+/// Data structure for function analysis (needs to be added/extended)
+#[derive(Debug, Clone)]
+pub struct FunctionAnalysis {
+    pub name: String,
+    pub body: String,  // Function body as string for multi-signal analysis
+    pub return_type: Option<String>,
+    pub parameters: Vec<Parameter>,
+    pub line_count: usize,
+    pub start_line: usize,
+    pub is_public: bool,
+    pub is_async: bool,
+    pub ast_node: Option<syn::ItemFn>,  // Original AST node for detailed analysis
+}
+
+#[derive(Debug, Clone)]
+pub struct Parameter {
+    pub name: String,
+    pub type_name: String,
+}
+
+/// Extract module-level functions from syn::File AST
+fn extract_module_functions(ast: &syn::File) -> Vec<FunctionAnalysis> {
+    use syn::visit::Visit;
+
+    let mut functions = Vec::new();
+
+    for item in &ast.items {
+        if let syn::Item::Fn(item_fn) = item {
+            functions.push(FunctionAnalysis {
+                name: item_fn.sig.ident.to_string(),
+                body: quote::quote!(#item_fn).to_string(),  // Convert AST to string
+                return_type: extract_return_type(&item_fn.sig.output),
+                parameters: extract_parameters(&item_fn.sig.inputs),
+                line_count: estimate_line_count(&item_fn.block),
+                start_line: 0,  // TODO: Extract from span
+                is_public: matches!(item_fn.vis, syn::Visibility::Public(_)),
+                is_async: item_fn.sig.asyncness.is_some(),
+                ast_node: Some(item_fn.clone()),
+            });
+        }
+    }
+
+    functions
+}
+
 fn collect_all_functions(file: &FileAnalysis) -> Vec<FunctionAnalysis> {
     let mut functions = Vec::new();
 
@@ -168,20 +219,34 @@ fn collect_all_functions(file: &FileAnalysis) -> Vec<FunctionAnalysis> {
     functions
 }
 
+/// Classified function with evidence (needs to be added)
+#[derive(Debug, Clone)]
+pub struct ClassifiedFunction {
+    pub function: FunctionAnalysis,
+    pub classification: ResponsibilityCategory,
+    pub confidence: f64,
+    pub evidence: AggregatedClassification,
+}
+
 fn classify_function_with_multi_signal(func: &FunctionAnalysis) -> ClassifiedFunction {
-    // Build signal set (from Spec 145)
+    // Create aggregator (already exists in codebase)
+    let aggregator = ResponsibilityAggregator::new();
+
+    // Build signal set using existing infrastructure
     let signals = SignalSet {
-        io_signal: Some(classify_io(func)),           // Spec 141
-        call_graph_signal: Some(classify_call_graph(func)),  // Spec 142
-        type_signal: Some(classify_types(func)),      // Spec 147
-        purity_signal: Some(classify_purity(func)),   // Spec 143
-        framework_signal: classify_framework(func),   // Spec 144
-        rust_signal: classify_rust_patterns(func),    // Spec 146
-        name_signal: Some(classify_name(func)),       // Fallback
+        io_signal: aggregator.collect_io_signal(&func.body, Language::Rust),
+        purity_signal: aggregator.collect_purity_signal(&func.body, Language::Rust),
+        type_signal: aggregator.collect_type_signature_signal(
+            &func.return_type,
+            &func.parameters.iter().map(|p| p.type_name.as_str()).collect::<Vec<_>>(),
+        ),
+        name_signal: Some(aggregator.collect_name_signal(&func.name)),
+        call_graph_signal: None,  // TODO: Requires call graph context
+        framework_signal: None,   // TODO: Requires file context
     };
 
-    // Aggregate signals
-    let evidence = ResponsibilityAggregator::default().aggregate(&signals);
+    // Aggregate signals (already implemented)
+    let evidence = aggregator.aggregate(&signals);
 
     ClassifiedFunction {
         function: func.clone(),
@@ -222,12 +287,22 @@ fn generate_responsibility_based_splits(
             .sum::<f64>() / functions.len() as f64;
 
         splits.push(ModuleSplit {
-            name: format!("{}_module", responsibility.to_snake_case()),
-            responsibility,
-            functions: functions.iter().map(|f| f.function.name.clone()).collect(),
-            line_estimate: functions.iter().map(|f| f.function.line_count).sum(),
-            confidence: avg_confidence,
-            evidence: aggregate_evidence(&functions),
+            suggested_name: format!("{}_module", responsibility.to_snake_case()),
+            responsibility: responsibility.as_str().to_string(),
+            methods_to_move: functions.iter().map(|f| f.function.name.clone()).collect(),
+            structs_to_move: vec![],  // Module functions don't belong to structs
+            estimated_lines: functions.iter().map(|f| f.function.line_count).sum(),
+            method_count: functions.len(),
+            warning: None,
+            priority: calculate_priority(avg_confidence, functions.len()),
+            cohesion_score: Some(avg_confidence),
+            dependencies_in: vec![],  // TODO: Extract from call graph
+            dependencies_out: vec![],  // TODO: Extract from call graph
+            domain: String::new(),
+            rationale: Some(aggregate_evidence(&functions)),
+            method: SplitAnalysisMethod::MethodBased,
+            severity: None,
+            interface_estimate: None,
         });
     }
 
@@ -239,6 +314,50 @@ fn generate_responsibility_based_splits(
     });
 
     splits
+}
+
+/// Helper: Calculate priority based on confidence and function count
+fn calculate_priority(confidence: f64, function_count: usize) -> Priority {
+    if confidence > 0.70 && function_count > 10 {
+        Priority::High
+    } else if confidence > 0.50 || function_count > 5 {
+        Priority::Medium
+    } else {
+        Priority::Low
+    }
+}
+
+/// Helper: Aggregate evidence from multiple classified functions
+fn aggregate_evidence(functions: &[ClassifiedFunction]) -> String {
+    use std::collections::HashMap;
+
+    let mut signal_counts: HashMap<&str, usize> = HashMap::new();
+    let mut total_confidence = 0.0;
+
+    for func in functions {
+        for evidence in &func.evidence.evidence {
+            *signal_counts.entry(evidence.description.as_str()).or_insert(0) += 1;
+        }
+        total_confidence += func.confidence;
+    }
+
+    let avg_confidence = total_confidence / functions.len() as f64;
+
+    // Find most common signals
+    let mut signal_list: Vec<_> = signal_counts.into_iter().collect();
+    signal_list.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let top_signals: Vec<String> = signal_list
+        .iter()
+        .take(3)
+        .map(|(signal, count)| format!("{} ({} functions)", signal, count))
+        .collect();
+
+    format!(
+        "Avg confidence: {:.2}. Top signals: {}",
+        avg_confidence,
+        top_signals.join(", ")
+    )
 }
 ```
 
@@ -322,6 +441,106 @@ fn fallback_with_diagnostics(file: &FileAnalysis) -> Vec<ModuleSplit> {
 }
 ```
 
+### AST Integration Details
+
+**Extracting Module Functions from syn::File**:
+
+The current `TypeVisitor` in `src/organization/god_object/mod.rs` primarily tracks struct methods. We need to extend it to also capture module-level functions:
+
+```rust
+// Add to TypeVisitor in src/organization/god_object/mod.rs
+impl<'ast> Visit<'ast> for TypeVisitor {
+    // Existing impl for syn::ItemStruct, syn::ItemImpl...
+
+    fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+        // Extract module-level function
+        let function_info = FunctionInfo {
+            name: node.sig.ident.to_string(),
+            visibility: extract_visibility(&node.vis),
+            is_async: node.sig.asyncness.is_some(),
+            parameters: extract_sig_parameters(&node.sig.inputs),
+            return_type: extract_sig_return_type(&node.sig.output),
+            body: quote::quote!(#node).to_string(),
+            line_count: estimate_block_lines(&node.block),
+        };
+
+        self.module_functions.push(function_info);
+
+        // Continue visiting nested items
+        syn::visit::visit_item_fn(self, node);
+    }
+}
+
+// Helper functions for AST extraction
+fn extract_visibility(vis: &syn::Visibility) -> bool {
+    matches!(vis, syn::Visibility::Public(_))
+}
+
+fn extract_sig_parameters(inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>) -> Vec<Parameter> {
+    inputs.iter()
+        .filter_map(|arg| {
+            if let syn::FnArg::Typed(pat_type) = arg {
+                Some(Parameter {
+                    name: extract_pat_name(&pat_type.pat),
+                    type_name: quote::quote!(#pat_type.ty).to_string(),
+                })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn extract_sig_return_type(output: &syn::ReturnType) -> Option<String> {
+    match output {
+        syn::ReturnType::Type(_, ty) => Some(quote::quote!(#ty).to_string()),
+        syn::ReturnType::Default => None,
+    }
+}
+
+fn extract_pat_name(pat: &syn::Pat) -> String {
+    match pat {
+        syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
+        _ => "unknown".to_string(),
+    }
+}
+
+fn estimate_block_lines(block: &syn::Block) -> usize {
+    // Simple estimation: count statements + 2 for braces
+    block.stmts.len() + 2
+}
+```
+
+**Converting AST to String for Analysis**:
+
+The `ResponsibilityAggregator` methods expect function bodies as strings. We use the `quote` crate to convert AST nodes:
+
+```rust
+use quote::ToTokens;
+
+// Convert function item to string
+let body_str = node.to_token_stream().to_string();
+
+// For better formatting, use prettyplease (optional)
+let formatted = prettyplease::unparse(&syn::parse_quote! {
+    #node
+});
+```
+
+**Integration Point**:
+
+The `GodObjectDetector::analyze_enhanced` method needs to populate `module_functions`:
+
+```rust
+// In src/organization/god_object_detector.rs
+pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
+    let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+    visitor.visit_file(ast);  // This now extracts both struct methods AND module functions
+
+    // Rest of analysis uses visitor.module_functions...
+}
+```
+
 ### Architecture Changes
 
 **Modified Module**: `src/organization/god_object_detector.rs`
@@ -349,14 +568,135 @@ pub struct ClassificationConfig {
 }
 ```
 
+### Fallback Policy
+
+**Goal**: Eliminate "generic - no detailed analysis available" message from all normal operation.
+
+**When Fallback is NEVER Acceptable**:
+- Module with 10+ functions → MUST use multi-signal classification
+- File being reported as god object → MUST have evidence-based splits
+- Any file in production analysis output → NO generic fallbacks visible to users
+
+**When Low-Confidence Evidence-Based Splits Are Used Instead**:
+If multi-signal classification produces low confidence (<0.50), we should:
+1. **Still show the splits** with low confidence markers
+2. **Include the evidence** that was available (even if weak)
+3. **Add recommendation for manual review**
+
+Example output for low-confidence case:
+```
+  - RECOMMENDED SPLITS (lower confidence - manual review suggested):
+  -  [L] formatter_output.rs - Output Generation (32 functions) [Confidence: 0.42]
+       Evidence: Weak type signals (0.35), Name patterns (0.48)
+       Recommendation: Consider manual classification or additional context
+```
+
+**When Fallback May Be Acceptable (with explicit logging)**:
+1. **Empty files** (0 functions) → Skip entirely, don't generate splits
+2. **Test-only files** (100% test functions) → Mark as "test utilities", no split needed
+3. **Single-function files** → No split needed regardless of confidence
+
+**Diagnostic Logging Requirements**:
+```rust
+// When confidence is low but we proceed
+if avg_confidence < 0.50 {
+    log::warn!(
+        "{}: Low confidence classification ({:.2}). Manual review recommended.",
+        file_path.display(),
+        avg_confidence
+    );
+}
+
+// When no signals are available (should be rare)
+if signals.all_none() {
+    log::error!(
+        "{}: No classification signals available. Multi-signal analysis may be broken.",
+        file_path.display()
+    );
+    // This should trigger investigation, not silent fallback
+}
+
+// When split generation produces no groups
+if responsibility_groups.is_empty() {
+    log::warn!(
+        "{}: No responsibility groups identified from {} functions. Check classification logic.",
+        file_path.display(),
+        function_count
+    );
+}
+```
+
+**Configuration Defaults**:
+```toml
+# aggregation_config.toml
+[classification]
+allow_generic_fallback = false  # NEVER allow generic splits
+min_functions_for_split = 3     # Need at least 3 functions to suggest a split
+min_confidence_for_split = 0.30 # Show splits even with low confidence (with warning)
+min_confidence_for_high_priority = 0.70  # High confidence threshold for priority marking
+```
+
+**User-Facing Behavior**:
+- **High confidence (>0.70)**: Show splits normally with [H] or [M] markers
+- **Medium confidence (0.50-0.70)**: Show splits with [M] or [L] markers
+- **Low confidence (0.30-0.50)**: Show splits with [L] marker + "manual review recommended"
+- **Very low confidence (<0.30)**: Don't show splits, log diagnostic message internally
+
+**No Generic Fallback Path**:
+Remove this entirely from formatter.rs:1050:
+```rust
+// DELETE THIS:
+writeln!(
+    output,
+    "  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
+    "-".yellow()
+)
+```
+
+Replace with evidence-based output that always includes confidence scores.
+
 ## Dependencies
 
-- **Prerequisites**: Specs 141 (I/O), 142 (Call Graph), 145 (Multi-Signal)
-- **Optional**: Spec 147 (Type Signatures) for formatter detection
-- **Affected Components**:
-  - `src/organization/god_object_detector.rs` - main classification entry point
-  - `src/organization/god_object_analysis.rs` - split generation
-  - `src/priority/formatter.rs` - will benefit from better classification
+### Required Infrastructure (Already Implemented)
+
+- ✅ **I/O Detection**: `src/analysis/io_detection.rs` - `IoDetector` with `detect_io()` method
+- ✅ **Purity Analysis**: `src/organization/purity_analyzer.rs` - `PurityAnalyzer` with `analyze_code()` method
+- ✅ **Type Signatures**: `src/analysis/type_signatures/analyzer.rs` - `TypeSignatureAnalyzer`
+- ✅ **Multi-Signal Aggregation**: `src/analysis/multi_signal_aggregation.rs` - `ResponsibilityAggregator::aggregate()`
+- ✅ **Call Graph**: `src/analysis/call_graph.rs` - `RustCallGraph` (optional, can be None initially)
+- ✅ **Framework Detection**: `src/analysis/framework_patterns_multi/detector.rs` - `FrameworkDetector`
+
+### Test Infrastructure (Already Exists)
+
+- ✅ `tests/multi_signal_integration_test.rs` - Integration tests for multi-signal aggregation
+- ✅ `tests/multi_signal_accuracy_test.rs` - Accuracy validation tests
+- ✅ `aggregation_config.toml` - Configuration for signal weights
+
+### Components to Modify
+
+- **`src/organization/god_object/mod.rs`** (Priority: HIGH)
+  - Extend `TypeVisitor` to capture module-level functions via `visit_item_fn()`
+  - Add `module_functions: Vec<FunctionInfo>` field to visitor
+
+- **`src/organization/god_object_detector.rs`** (Priority: HIGH)
+  - Replace generic fallback path with unified classification
+  - Route module functions through `ResponsibilityAggregator`
+  - Remove conditional logic for struct vs. module paths (lines 210-219)
+
+- **`src/organization/god_object_analysis.rs`** (Priority: MEDIUM)
+  - Update `recommend_module_splits()` to use multi-signal classification
+  - Replace `group_methods_by_responsibility()` name-based logic (line 470) with `ResponsibilityAggregator`
+
+- **`src/priority/formatter.rs`** (Priority: HIGH)
+  - Remove hardcoded "generic - no detailed analysis available" message (line 1050)
+  - Replace `format_generic_split_suggestions()` with evidence-based formatting
+
+### New Components to Add
+
+- **`src/organization/function_classifier.rs`** (Optional - recommended for clean architecture)
+  - Extract unified function classification logic
+  - Centralize `collect_all_functions()`, `classify_function_with_multi_signal()`, etc.
+  - Make reusable across god object and other analyzers
 
 ## Testing Strategy
 
@@ -656,3 +996,55 @@ Old output format with generic splits will be replaced with responsibility-based
 - [ ] Module function accuracy matches struct method accuracy (~85%)
 - [ ] User-reported issues about generic splits drop to zero
 - [ ] Classification confidence scores present for all splits
+
+## Implementation Checklist
+
+### Phase 1: AST Extraction (1 day)
+- [ ] Add `visit_item_fn()` to `TypeVisitor` in `src/organization/god_object/mod.rs`
+- [ ] Add `module_functions: Vec<FunctionInfo>` field to visitor struct
+- [ ] Implement helper functions: `extract_visibility()`, `extract_sig_parameters()`, `extract_sig_return_type()`
+- [ ] Test: Verify module functions are captured from test files
+- [ ] Commit: "feat: extract module-level functions in TypeVisitor"
+
+### Phase 2: Multi-Signal Integration (2 days)
+- [ ] Create `FunctionAnalysis` struct with `body: String` field
+- [ ] Implement `classify_function_with_multi_signal()` using `ResponsibilityAggregator`
+- [ ] Add `collect_all_functions()` to gather module functions + struct methods
+- [ ] Implement `group_by_responsibility()` using multi-signal classifications
+- [ ] Test: Unit test that module functions get multi-signal classification
+- [ ] Commit: "feat: route module functions through multi-signal classification"
+
+### Phase 3: Split Generation (1 day)
+- [ ] Implement `generate_responsibility_based_splits()` with evidence aggregation
+- [ ] Add `calculate_priority()` helper based on confidence + function count
+- [ ] Implement `aggregate_evidence()` to summarize signals
+- [ ] Replace `suggest_module_splits_by_domain()` calls with new unified path
+- [ ] Test: Integration test with formatter.rs showing evidence-based splits
+- [ ] Commit: "feat: generate responsibility-based splits with confidence scores"
+
+### Phase 4: Remove Generic Fallback (1 day)
+- [ ] Delete hardcoded "generic - no detailed analysis available" from `src/priority/formatter.rs:1050`
+- [ ] Remove `format_generic_split_suggestions()` function entirely
+- [ ] Add low-confidence warning display instead
+- [ ] Add diagnostic logging for edge cases (empty files, test-only files)
+- [ ] Update formatter to show confidence scores for all splits
+- [ ] Test: Ensure no "generic" message appears in any output
+- [ ] Commit: "fix: remove generic fallback, show evidence-based splits with confidence"
+
+### Phase 5: Testing & Validation (1 day)
+- [ ] Run full test suite: `cargo test --all-features`
+- [ ] Test with actual problem files: formatter.rs, god_object_detector.rs, semantic_classifier.rs
+- [ ] Verify confidence scores > 0.50 for all splits
+- [ ] Check that evidence is displayed for each split
+- [ ] Performance test: Ensure <5% regression on large files
+- [ ] Manual review: Compare before/after output quality
+- [ ] Commit: "test: validate multi-signal classification for module functions"
+
+### Phase 6: Documentation (0.5 days)
+- [ ] Update README.md with unified classification pipeline description
+- [ ] Update ARCHITECTURE.md with flow diagram
+- [ ] Add examples to docs showing evidence-based vs generic splits
+- [ ] Document when low-confidence splits are shown
+- [ ] Commit: "docs: document unified multi-signal classification for all functions"
+
+**Total Estimated Time**: 5-6 days
