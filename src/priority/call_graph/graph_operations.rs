@@ -373,6 +373,72 @@ impl CallGraph {
             .min_by_key(|func_id| target_line - func_id.line)
             .map(|&func_id| func_id.clone())
     }
+
+    /// Check if a function is recursive (calls itself directly or through a cycle)
+    pub fn is_recursive(&self, func_id: &FunctionId) -> bool {
+        let mut visited = HashSet::new();
+        let mut rec_stack = HashSet::new();
+        self.has_cycle_dfs(func_id, &mut visited, &mut rec_stack)
+    }
+
+    /// DFS helper to detect cycles
+    fn has_cycle_dfs(
+        &self,
+        func_id: &FunctionId,
+        visited: &mut HashSet<FunctionId>,
+        rec_stack: &mut HashSet<FunctionId>,
+    ) -> bool {
+        if !visited.contains(func_id) {
+            visited.insert(func_id.clone());
+            rec_stack.insert(func_id.clone());
+
+            for callee in self.get_callees(func_id) {
+                if rec_stack.contains(&callee) {
+                    return true;
+                }
+                if !visited.contains(&callee) && self.has_cycle_dfs(&callee, visited, rec_stack) {
+                    return true;
+                }
+            }
+        }
+        rec_stack.remove(func_id);
+        false
+    }
+
+    /// Topological sort of functions for bottom-up analysis
+    /// Returns functions in dependency order (leaves first, roots last)
+    pub fn topological_sort(&self) -> Result<Vec<FunctionId>, String> {
+        let mut visited = HashSet::new();
+        let mut result = Vector::new();
+
+        for func_id in self.nodes.keys() {
+            if !visited.contains(func_id) {
+                self.topo_sort_dfs(func_id, &mut visited, &mut result)?;
+            }
+        }
+
+        // DFS post-order already gives us leaves first, no need to reverse
+        Ok(result.iter().cloned().collect())
+    }
+
+    /// DFS helper for topological sort
+    fn topo_sort_dfs(
+        &self,
+        func_id: &FunctionId,
+        visited: &mut HashSet<FunctionId>,
+        result: &mut Vector<FunctionId>,
+    ) -> Result<(), String> {
+        visited.insert(func_id.clone());
+
+        for callee in self.get_callees(func_id) {
+            if !visited.contains(&callee) {
+                self.topo_sort_dfs(&callee, visited, result)?;
+            }
+        }
+
+        result.push_back(func_id.clone());
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -491,5 +557,77 @@ mod tests {
         // Exact match should be found immediately without fallback
         let result = graph.find_function(&func_id);
         assert_eq!(result, Some(func_id));
+    }
+
+    #[test]
+    fn test_is_recursive_direct() {
+        let mut graph = CallGraph::new();
+        let func_id = FunctionId::new(PathBuf::from("test.rs"), "factorial".to_string(), 100);
+        graph.add_function(func_id.clone(), false, false, 5, 10);
+        graph.add_call(FunctionCall {
+            caller: func_id.clone(),
+            callee: func_id.clone(),
+            call_type: CallType::Direct,
+        });
+
+        assert!(graph.is_recursive(&func_id));
+    }
+
+    #[test]
+    fn test_is_recursive_indirect() {
+        let mut graph = CallGraph::new();
+        let func_a = FunctionId::new(PathBuf::from("test.rs"), "a".to_string(), 100);
+        let func_b = FunctionId::new(PathBuf::from("test.rs"), "b".to_string(), 200);
+        graph.add_function(func_a.clone(), false, false, 5, 10);
+        graph.add_function(func_b.clone(), false, false, 5, 10);
+
+        // a -> b -> a (cycle)
+        graph.add_call(FunctionCall {
+            caller: func_a.clone(),
+            callee: func_b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: func_b.clone(),
+            callee: func_a.clone(),
+            call_type: CallType::Direct,
+        });
+
+        assert!(graph.is_recursive(&func_a));
+        assert!(graph.is_recursive(&func_b));
+    }
+
+    #[test]
+    fn test_topological_sort_simple() {
+        let mut graph = CallGraph::new();
+        let func_a = FunctionId::new(PathBuf::from("test.rs"), "a".to_string(), 100);
+        let func_b = FunctionId::new(PathBuf::from("test.rs"), "b".to_string(), 200);
+        let func_c = FunctionId::new(PathBuf::from("test.rs"), "c".to_string(), 300);
+
+        graph.add_function(func_a.clone(), false, false, 5, 10);
+        graph.add_function(func_b.clone(), false, false, 5, 10);
+        graph.add_function(func_c.clone(), false, false, 5, 10);
+
+        // a -> b -> c (linear dependency)
+        graph.add_call(FunctionCall {
+            caller: func_a.clone(),
+            callee: func_b.clone(),
+            call_type: CallType::Direct,
+        });
+        graph.add_call(FunctionCall {
+            caller: func_b.clone(),
+            callee: func_c.clone(),
+            call_type: CallType::Direct,
+        });
+
+        let sorted = graph.topological_sort().unwrap();
+
+        // c should come before b, b before a (dependency order)
+        let c_pos = sorted.iter().position(|id| id == &func_c).unwrap();
+        let b_pos = sorted.iter().position(|id| id == &func_b).unwrap();
+        let a_pos = sorted.iter().position(|id| id == &func_a).unwrap();
+
+        assert!(c_pos < b_pos);
+        assert!(b_pos < a_pos);
     }
 }

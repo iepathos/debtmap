@@ -95,6 +95,8 @@ impl EvidenceBasedRiskCalculator {
             entropy_score: None,    // TODO: Add entropy scoring for risk analysis
             is_pure: None,          // TODO: Add purity detection for risk analysis
             purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
             detected_patterns: None, // TODO: Add pattern detection for risk analysis
             upstream_callers: None,
             downstream_callees: None,

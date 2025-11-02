@@ -364,6 +364,8 @@ mod tests {
                 is_test: false,
                 is_pure: Some(i % 2 == 0),
                 purity_confidence: Some(0.8),
+                purity_reason: None,
+                call_dependencies: None,
                 visibility: Some("pub".to_string()),
                 is_trait_method: false,
                 in_test_module: false,

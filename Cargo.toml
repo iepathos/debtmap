@@ -71,6 +71,10 @@ crossbeam = "0.8"
 
 # Hashing for duplication detection
 sha2 = "0.10"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+
+# Binary serialization for caching
+bincode = "1.3"
 
 # Additional dependencies
 quote = "1.0"

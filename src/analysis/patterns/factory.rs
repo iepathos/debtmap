@@ -151,6 +151,8 @@ mod tests {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,

@@ -54,6 +54,8 @@ pub struct FunctionMetrics {
     pub entropy_score: Option<crate::complexity::entropy_core::EntropyScore>, // Optional entropy-based complexity score
     pub is_pure: Option<bool>, // Whether the function is pure (no side effects)
     pub purity_confidence: Option<f32>, // Confidence level of purity detection (0.0 to 1.0)
+    pub purity_reason: Option<String>, // Reason for purity classification (from propagation)
+    pub call_dependencies: Option<Vec<String>>, // Function IDs this function calls
     pub detected_patterns: Option<Vec<String>>, // Patterns detected for complexity adjustment
     pub upstream_callers: Option<Vec<String>>, // Functions that call this function
     pub downstream_callees: Option<Vec<String>>, // Functions that this function calls
@@ -100,6 +102,8 @@ impl FunctionMetrics {
             entropy_score: None,
             is_pure: None,
             purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
             detected_patterns: None,
             upstream_callers: None,
             downstream_callees: None,
