@@ -286,6 +286,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let result = recognizer.is_function_used_by_pattern(&function, &file_metrics);

@@ -168,6 +168,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         }];
 
         AnalysisResults {
@@ -346,6 +347,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -373,6 +375,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -400,6 +403,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -427,6 +431,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -458,6 +463,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             });
         }
 
@@ -501,6 +507,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -523,6 +530,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
 

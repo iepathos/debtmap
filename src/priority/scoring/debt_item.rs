@@ -473,6 +473,7 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -682,6 +683,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let debt = classify_test_debt(&test_func);
@@ -783,6 +785,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -824,6 +827,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -869,6 +873,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -912,6 +917,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -956,6 +962,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
@@ -1000,6 +1007,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let transitive_cov = TransitiveCoverage {
@@ -1048,6 +1056,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         // Test at cyclomatic=10 (not complex)
@@ -1106,6 +1115,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let func_id = create_function_id(&func);
@@ -1354,6 +1364,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let debt_type = DebtType::ComplexityHotspot {
@@ -1418,6 +1429,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let info = FunctionInfo::from_metrics(&func);

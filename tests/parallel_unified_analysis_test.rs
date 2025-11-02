@@ -29,6 +29,7 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         })
         .collect()
 }

@@ -24,6 +24,7 @@ fn create_test_function(name: &str, cyclomatic: u32, cognitive: u32) -> Function
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 

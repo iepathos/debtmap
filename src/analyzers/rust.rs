@@ -44,6 +44,7 @@ pub struct RustAnalyzer {
     enhanced_thresholds: ComplexityThresholds,
     use_enhanced_detection: bool,
     enable_functional_analysis: bool,
+    enable_rust_patterns: bool,
 }
 
 impl RustAnalyzer {
@@ -53,6 +54,7 @@ impl RustAnalyzer {
             enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
             use_enhanced_detection: true,
             enable_functional_analysis: false,
+            enable_rust_patterns: false,
         }
     }
 
@@ -62,11 +64,17 @@ impl RustAnalyzer {
             enhanced_thresholds: ComplexityThresholds::from_preset(preset),
             use_enhanced_detection: true,
             enable_functional_analysis: false,
+            enable_rust_patterns: false,
         }
     }
 
     pub fn with_functional_analysis(mut self, enable: bool) -> Self {
         self.enable_functional_analysis = enable;
+        self
+    }
+
+    pub fn with_rust_patterns(mut self, enable: bool) -> Self {
+        self.enable_rust_patterns = enable;
         self
     }
 }
@@ -91,6 +99,7 @@ impl Analyzer for RustAnalyzer {
                 &self.enhanced_thresholds,
                 self.use_enhanced_detection,
                 self.enable_functional_analysis,
+                self.enable_rust_patterns,
             ),
             _ => FileMetrics {
                 path: PathBuf::new(),
@@ -123,6 +132,7 @@ fn analyze_rust_file(
     enhanced_thresholds: &ComplexityThresholds,
     _use_enhanced: bool,
     enable_functional_analysis: bool,
+    enable_rust_patterns: bool,
 ) -> FileMetrics {
     let source_content = read_source_content(&ast.path);
     let analysis_result = analyze_ast_with_content(
@@ -130,6 +140,7 @@ fn analyze_rust_file(
         &source_content,
         enhanced_thresholds,
         enable_functional_analysis,
+        enable_rust_patterns,
     );
 
     let debt_items = create_debt_items(
@@ -169,6 +180,7 @@ fn analyze_ast_with_content(
     source_content: &str,
     enhanced_thresholds: &ComplexityThresholds,
     enable_functional_analysis: bool,
+    enable_rust_patterns: bool,
 ) -> AnalysisResult {
     let mut visitor = create_configured_visitor(
         ast.path.clone(),
@@ -176,6 +188,7 @@ fn analyze_ast_with_content(
         enhanced_thresholds.clone(),
         Some(ast.file.clone()),
         enable_functional_analysis,
+        enable_rust_patterns,
     );
     visitor.visit_file(&ast.file);
 
@@ -192,11 +205,13 @@ fn create_configured_visitor(
     enhanced_thresholds: ComplexityThresholds,
     file_ast: Option<syn::File>,
     enable_functional_analysis: bool,
+    enable_rust_patterns: bool,
 ) -> FunctionVisitor {
     let mut visitor = FunctionVisitor::new(path, source_content);
     visitor.file_ast = file_ast;
     visitor.enhanced_thresholds = enhanced_thresholds;
     visitor.enable_functional_analysis = enable_functional_analysis;
+    visitor.enable_rust_patterns = enable_rust_patterns;
     visitor
 }
 
@@ -374,6 +389,8 @@ struct FunctionContext {
     line: usize,
     is_trait_method: bool,
     in_test_module: bool,
+    impl_type_name: Option<String>,
+    trait_name: Option<String>,
 }
 
 /// Data structure to hold complete function analysis results
@@ -391,10 +408,12 @@ struct FunctionVisitor {
     current_function: Option<String>,
     current_impl_type: Option<String>,
     current_impl_is_trait: bool,
+    current_trait_name: Option<String>,
     file_ast: Option<syn::File>,
     enhanced_analysis: Vec<EnhancedFunctionAnalysis>,
     enhanced_thresholds: ComplexityThresholds,
     enable_functional_analysis: bool,
+    enable_rust_patterns: bool,
 }
 
 impl FunctionVisitor {
@@ -446,10 +465,12 @@ impl FunctionVisitor {
             current_function: None,
             current_impl_type: None,
             current_impl_is_trait: false,
+            current_trait_name: None,
             file_ast: None,
             enhanced_analysis: Vec::new(),
             enhanced_thresholds: ComplexityThresholds::from_preset(ThresholdPreset::Balanced),
             enable_functional_analysis: false,
+            enable_rust_patterns: false,
         }
     }
 
@@ -518,6 +539,8 @@ impl FunctionVisitor {
             line,
             is_trait_method,
             in_test_module: self.in_test_module,
+            impl_type_name: self.current_impl_type.clone(),
+            trait_name: self.current_trait_name.clone(),
         }
     }
 
@@ -635,6 +658,44 @@ impl FunctionVisitor {
             None
         };
 
+        // Rust-specific pattern detection (spec 146)
+        let language_specific = if self.enable_rust_patterns {
+            use crate::analysis::rust_patterns::{
+                ImplContext, RustFunctionContext, RustPatternDetector,
+            };
+
+            let impl_context = if context.is_trait_method {
+                Some(ImplContext {
+                    impl_type: context.impl_type_name.clone().unwrap_or_default(),
+                    is_trait_impl: true,
+                    trait_name: context.trait_name.clone(),
+                })
+            } else {
+                context
+                    .impl_type_name
+                    .as_ref()
+                    .map(|impl_type| ImplContext {
+                        impl_type: impl_type.clone(),
+                        is_trait_impl: false,
+                        trait_name: None,
+                    })
+            };
+
+            let rust_context = RustFunctionContext {
+                item_fn,
+                metrics: None,
+                impl_context,
+                file_path: &context.file,
+            };
+
+            let detector = RustPatternDetector::new();
+            Some(crate::core::LanguageSpecificData::Rust(
+                detector.detect_all_patterns(&rust_context),
+            ))
+        } else {
+            None
+        };
+
         FunctionMetrics {
             name: context.name,
             file: context.file,
@@ -664,6 +725,7 @@ impl FunctionVisitor {
             },
             adjusted_complexity,
             composition_metrics,
+            language_specific,
         }
     }
 
@@ -825,14 +887,21 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
             None
         };
 
-        // Check if this is a trait implementation
-        let is_trait_impl = item_impl.trait_.is_some();
+        // Check if this is a trait implementation and extract trait name
+        let (is_trait_impl, trait_name) = if let Some((_, trait_path, _)) = &item_impl.trait_ {
+            let name = trait_path.segments.last().map(|seg| seg.ident.to_string());
+            (true, name)
+        } else {
+            (false, None)
+        };
 
         // Store the current impl type and trait status
         let prev_impl_type = self.current_impl_type.clone();
         let prev_impl_is_trait = self.current_impl_is_trait;
+        let prev_trait_name = self.current_trait_name.clone();
         self.current_impl_type = impl_type;
         self.current_impl_is_trait = is_trait_impl;
+        self.current_trait_name = trait_name;
 
         // Continue visiting the impl block
         syn::visit::visit_item_impl(self, item_impl);
@@ -840,6 +909,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
         // Restore previous impl type and trait status
         self.current_impl_type = prev_impl_type;
         self.current_impl_is_trait = prev_impl_is_trait;
+        self.current_trait_name = prev_trait_name;
     }
 
     fn visit_item_mod(&mut self, item_mod: &'ast syn::ItemMod) {
@@ -1014,6 +1084,7 @@ impl FunctionVisitor {
             },
             adjusted_complexity,
             composition_metrics: None,
+            language_specific: None,
         }
     }
 
@@ -1452,6 +1523,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "func2".to_string(),
@@ -1474,6 +1546,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
 
@@ -1514,6 +1587,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         }];
         let debt_items = vec![];
         let dependencies = vec![Dependency {

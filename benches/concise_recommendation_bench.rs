@@ -32,6 +32,7 @@ fn create_test_metrics(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionM
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 

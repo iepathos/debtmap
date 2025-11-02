@@ -30,6 +30,7 @@ fn test_framework_pattern_exclusions_in_dead_code_detection() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let func_id = FunctionId::new(
@@ -96,6 +97,7 @@ fn test_visit_trait_pattern_exclusion() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let func_id = FunctionId::new(

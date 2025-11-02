@@ -572,6 +572,7 @@ mod tests {
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
                         composition_metrics: None,
+                        language_specific: None,
                     },
                     FunctionMetrics {
                         name: "func2".to_string(),
@@ -594,6 +595,7 @@ mod tests {
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
                         composition_metrics: None,
+                        language_specific: None,
                     },
                     FunctionMetrics {
                         name: "func3".to_string(),
@@ -616,6 +618,7 @@ mod tests {
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
                         composition_metrics: None,
+                        language_specific: None,
                     },
                 ],
                 summary: ComplexitySummary {

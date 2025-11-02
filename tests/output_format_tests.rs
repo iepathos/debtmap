@@ -30,6 +30,7 @@ fn test_output_json_format() {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

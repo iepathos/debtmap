@@ -120,6 +120,7 @@ fn test_cross_module_associated_function_call_false_positive() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     // Test dead code detection - this should return FALSE but will return TRUE due to the bug
