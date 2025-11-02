@@ -14,6 +14,7 @@
 //! - Call graph metrics and pattern detection for responsibility analysis
 //! - Purity analysis for function classification and refactoring guidance
 //! - Multi-signal aggregation for high-accuracy responsibility classification
+//! - Type signature-based classification for improved responsibility detection
 
 pub mod attribution;
 pub mod call_graph;
@@ -38,6 +39,7 @@ pub mod python_static_errors;
 pub mod python_type_tracker;
 pub mod rust_patterns;
 pub mod type_flow_tracker;
+pub mod type_signatures;
 
 pub use call_graph::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
@@ -102,3 +104,8 @@ pub use rust_patterns::{
     RustSpecificClassification,
 };
 pub use type_flow_tracker::{CollectionOp, Location, TypeFlowTracker, TypeId, TypeInfo};
+pub use type_signatures::{
+    extract_rust_signature, CanonicalType, GenericBound, Parameter, TypeBasedClassification,
+    TypeMatcher, TypeNormalizer, TypePattern, TypePatternLibrary, TypeSignature,
+    TypeSignatureAnalyzer,
+};
