@@ -171,6 +171,7 @@ impl TypeSignatureAnalyzer {
     }
 
     // AST-based type matching (no string parsing!)
+    #[allow(clippy::only_used_in_recursion)]
     fn canonical_matches(&self, canonical: &CanonicalType, matcher: &TypeMatcher) -> bool {
         match matcher {
             TypeMatcher::Exact(expected) => &canonical.base == expected,

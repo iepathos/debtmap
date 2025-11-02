@@ -210,6 +210,7 @@ impl TypeNormalizer {
     }
 
     /// Convert canonical type to string representation
+    #[allow(clippy::only_used_in_recursion)]
     pub fn canonical_to_string(&self, ty: &CanonicalType) -> String {
         let mut result = if ty.is_reference {
             if ty.is_mutable {
