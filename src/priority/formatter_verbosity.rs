@@ -682,6 +682,9 @@ fn format_item_body(
 
     // RELATED items
     format_related_items(output, &item.recommendation.related_items, _formatter);
+
+    // PATTERN ANALYSIS section (spec 151)
+    format_pattern_analysis(output, item, verbosity);
 }
 
 /// Format implementation steps
@@ -1053,6 +1056,34 @@ fn analyze_coverage_gaps(uncovered_lines: &[usize], item: &UnifiedDebtItem) -> V
     }
 
     recommendations
+}
+
+/// Format pattern analysis section if available (spec 151)
+fn format_pattern_analysis(
+    output: &mut String,
+    item: &UnifiedDebtItem,
+    verbosity: u8,
+) {
+    // Only show pattern analysis if verbosity >= 1 and patterns are available
+    if verbosity < 1 {
+        return;
+    }
+
+    if let Some(ref pattern_analysis) = item.pattern_analysis {
+        if pattern_analysis.has_patterns() {
+            writeln!(output, "├─ {}", "PATTERN ANALYSIS:".bright_blue()).unwrap();
+
+            // Use PatternFormatter to format the analysis
+            let formatted = crate::output::pattern_formatter::PatternFormatter::format(pattern_analysis);
+
+            // Indent each line for proper tree formatting
+            for line in formatted.lines() {
+                if !line.is_empty() {
+                    writeln!(output, "│  {}", line).unwrap();
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

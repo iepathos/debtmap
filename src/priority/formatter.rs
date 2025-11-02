@@ -1041,6 +1041,9 @@ fn format_module_structure_analysis(
 }
 
 // Format language-specific refactoring advice
+// NOTE (spec 151): This function provides generic advice for god object splitting.
+// It is context-specific (only shown during god object refactoring) rather than
+// generic pattern advice unrelated to detected issues.
 fn format_language_specific_advice(
     output: &mut String,
     _formatter: &ColoredFormatter,

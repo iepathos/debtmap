@@ -63,6 +63,14 @@ pub struct UnifiedDebtItem {
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
 }
 
+impl UnifiedDebtItem {
+    /// Builder method to attach pattern analysis to this debt item (spec 151)
+    pub fn with_pattern_analysis(mut self, pattern_analysis: crate::output::PatternAnalysis) -> Self {
+        self.pattern_analysis = Some(pattern_analysis);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntropyDetails {
     pub entropy_score: f64,
