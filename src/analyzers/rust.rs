@@ -664,6 +664,7 @@ impl FunctionVisitor {
             },
             adjusted_complexity,
             composition_metrics,
+            language_specific: None,
         }
     }
 
@@ -1014,6 +1015,7 @@ impl FunctionVisitor {
             },
             adjusted_complexity,
             composition_metrics: None,
+            language_specific: None,
         }
     }
 

@@ -393,6 +393,7 @@ mod tests {
                     mapping_pattern_result: None,
                     adjusted_complexity: None,
                     composition_metrics: None,
+                    language_specific: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -790,6 +791,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -881,6 +883,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         });
 
         inc.previous_state = inc

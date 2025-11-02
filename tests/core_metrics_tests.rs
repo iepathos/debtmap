@@ -225,6 +225,7 @@ fn test_complexity_metrics_from_function() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -268,6 +269,7 @@ fn test_complexity_metrics_from_function_zero_values() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -303,6 +305,7 @@ fn test_complexity_metrics_from_function_high_values() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -341,6 +344,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);

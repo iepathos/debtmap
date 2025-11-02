@@ -61,6 +61,14 @@ pub struct FunctionMetrics {
         Option<crate::complexity::pure_mapping_patterns::MappingPatternResult>, // Pure mapping pattern detection result (spec 118)
     pub adjusted_complexity: Option<f64>, // Adjusted complexity score after mapping pattern detection (spec 118)
     pub composition_metrics: Option<crate::analysis::CompositionMetrics>, // AST-based functional composition metrics (spec 111)
+    pub language_specific: Option<LanguageSpecificData>, // Language-specific pattern detection results (spec 146)
+}
+
+/// Language-specific data to avoid memory overhead for non-applicable files
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LanguageSpecificData {
+    Rust(crate::analysis::rust_patterns::RustPatternResult),
+    // Future: Python(PythonPatternResult), JavaScript(JSPatternResult)
 }
 
 /// Entropy details for explainable output
@@ -98,6 +106,7 @@ impl FunctionMetrics {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         }
     }
 

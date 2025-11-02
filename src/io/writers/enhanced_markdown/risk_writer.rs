@@ -163,6 +163,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -185,6 +186,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test3.rs"),
@@ -207,6 +209,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
 

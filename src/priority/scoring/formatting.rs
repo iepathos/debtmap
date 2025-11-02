@@ -323,6 +323,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         assert_eq!(determine_visibility(&pub_func), FunctionVisibility::Public);
@@ -383,6 +384,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[]);
@@ -412,6 +414,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[10, 11, 12, 15, 20, 21]);

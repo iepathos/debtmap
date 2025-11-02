@@ -300,6 +300,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         }];
         let smells = detect_data_clumps(&functions);
         assert_eq!(
@@ -333,6 +334,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "function_b".to_string(),
@@ -355,6 +357,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -389,6 +392,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "validate_user_data".to_string(),
@@ -411,6 +415,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -453,6 +458,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "func_b".to_string(),
@@ -475,6 +481,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "func_c".to_string(),
@@ -497,6 +504,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
             FunctionMetrics {
                 name: "small_func".to_string(),
@@ -519,6 +527,7 @@ mod tests {
                 mapping_pattern_result: None,
                 adjusted_complexity: None,
                 composition_metrics: None,
+                language_specific: None,
             },
         ];
         let smells = detect_data_clumps(&functions);
@@ -561,6 +570,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         // Test with parameter count below threshold
@@ -636,6 +646,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         // Test with length below threshold
@@ -683,6 +694,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         // Test with nesting below threshold
@@ -738,6 +750,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         // Test function with multiple smells
@@ -772,6 +785,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         };
 
         let smells = analyze_function_smells(&clean_func, 3);

@@ -143,6 +143,7 @@ fn create_getter() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -168,6 +169,7 @@ fn create_setter() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -193,6 +195,7 @@ fn create_simple_validator() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -218,6 +221,7 @@ fn create_small_util() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -243,6 +247,7 @@ fn create_test_helper() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -268,6 +273,7 @@ fn create_complex_handler() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -293,6 +299,7 @@ fn create_nested_logic() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -318,6 +325,7 @@ fn create_long_switch() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }
 
@@ -343,5 +351,6 @@ fn create_moderate_complexity() -> FunctionMetrics {
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
+        language_specific: None,
     }
 }

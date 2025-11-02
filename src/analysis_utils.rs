@@ -252,6 +252,7 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
+            language_specific: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -297,6 +298,7 @@ mod tests {
                         mapping_pattern_result: None,
                         adjusted_complexity: None,
                         composition_metrics: None,
+                        language_specific: None,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -333,6 +335,7 @@ mod tests {
                             mapping_pattern_result: None,
                             adjusted_complexity: None,
                             composition_metrics: None,
+                            language_specific: None,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -355,6 +358,7 @@ mod tests {
                             mapping_pattern_result: None,
                             adjusted_complexity: None,
                             composition_metrics: None,
+                            language_specific: None,
                         },
                     ],
                     cyclomatic_complexity: 10,
