@@ -6,14 +6,37 @@ priority: critical
 status: draft
 dependencies: [145]
 created: 2025-10-28
+updated: 2025-11-02
 ---
 
 # Specification 148: Multi-Signal Evidence Display in Output
 
 **Category**: optimization
 **Priority**: critical
-**Status**: draft
+**Status**: draft (clarified)
 **Dependencies**: Spec 145 (Multi-Signal Responsibility Aggregation)
+
+## Clarifications Made (2025-11-02)
+
+This spec has been updated with the following clarifications based on implementation review:
+
+1. **Structured Evidence Types**: Changed `SignalContribution.evidence` from free-form `String` to typed `SignalEvidence` enum for consistency and type safety
+
+2. **Alternative Classification Algorithm**: Documented how alternatives are computed from `all_scores` with explicit threshold logic
+
+3. **Spec 145 Integration**: Added detailed integration requirements, including required changes to `MultiSignalClassifier::classify_method()` return type
+
+4. **Functional Composition**: Refactored formatter to use pure function composition instead of mutable string building, aligning with project FP principles
+
+5. **Configuration Precedence**: Documented CLI flags > Environment > TOML > defaults hierarchy with complete Rust and TOML examples
+
+6. **Performance Optimization**: Added lazy evaluation as default implementation strategy with `OnceLock`, not just optimization
+
+7. **Benchmarking Requirements**: Added concrete performance benchmarks with targets and baseline measurement requirements
+
+8. **Implementation Plan**: Added detailed 6-phase implementation plan with time estimates and acceptance criteria
+
+All changes follow debtmap's functional programming guidelines.
 
 ## Context
 
@@ -110,7 +133,7 @@ pub struct ClassificationEvidence {
     pub primary: ResponsibilityCategory,
     pub confidence: f64,
     pub signals: Vec<SignalContribution>,
-    pub alternatives: Vec<AlternativeClassification>,
+    pub all_scores: Vec<(ResponsibilityCategory, f64)>,  // All category scores, sorted descending
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +143,7 @@ pub struct SignalContribution {
     pub confidence: f64,
     pub weight: f64,
     pub contribution: f64,  // confidence * weight
-    pub evidence: String,
+    pub evidence: SignalEvidence,  // Structured evidence instead of String
     pub is_available: bool,
 }
 
@@ -135,6 +158,133 @@ pub enum SignalType {
     Name,
 }
 
+/// Structured evidence types for type-safe formatting
+#[derive(Debug, Clone)]
+pub enum SignalEvidence {
+    IoDetection {
+        operations: Vec<IoOperation>,
+        primary_type: IoType,
+    },
+    CallGraph {
+        calls_count: usize,
+        pattern: StructuralPattern,
+    },
+    TypeSignature {
+        pattern: TypePattern,
+        confidence_reason: Cow<'static, str>,
+    },
+    Purity {
+        is_pure: bool,
+        impurity_reasons: Vec<ImpurityReason>,
+    },
+    Framework {
+        framework_type: FrameworkType,
+        pattern_matched: Cow<'static, str>,
+    },
+    RustPatterns {
+        pattern: RustPattern,
+        indicators: Vec<Cow<'static, str>>,
+    },
+    Name {
+        prefix: Option<Cow<'static, str>>,
+        keywords: Vec<Cow<'static, str>>,
+    },
+}
+
+impl SignalEvidence {
+    /// Format evidence for standard output (concise)
+    pub fn format_concise(&self) -> String {
+        match self {
+            Self::IoDetection { operations, primary_type } => {
+                format!("{} via {:?}", primary_type, operations.first())
+            }
+            Self::CallGraph { calls_count, pattern } => {
+                format!("{:?} pattern: calls {} functions", pattern, calls_count)
+            }
+            Self::TypeSignature { pattern, .. } => {
+                format!("Matches {:?} pattern", pattern)
+            }
+            Self::Purity { is_pure, impurity_reasons } => {
+                if *is_pure {
+                    "Pure function".into()
+                } else {
+                    format!("Impure: {:?}", impurity_reasons.first())
+                }
+            }
+            Self::Framework { framework_type, pattern_matched } => {
+                format!("{:?} framework pattern: {}", framework_type, pattern_matched)
+            }
+            Self::RustPatterns { pattern, .. } => {
+                format!("{:?} pattern detected", pattern)
+            }
+            Self::Name { prefix, keywords } => {
+                format!("Name indicates: {:?}", prefix.or_else(|| keywords.first()))
+            }
+        }
+    }
+
+    /// Format evidence for verbose output (detailed)
+    pub fn format_verbose(&self) -> String {
+        match self {
+            Self::IoDetection { operations, primary_type } => {
+                format!(
+                    "I/O Type: {:?}\nOperations: {}",
+                    primary_type,
+                    operations.iter()
+                        .map(|op| format!("{:?}", op))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            Self::CallGraph { calls_count, pattern } => {
+                format!(
+                    "Structural Pattern: {:?}\nCalls: {} function(s)\nIndicates orchestration/coordination behavior",
+                    pattern, calls_count
+                )
+            }
+            Self::TypeSignature { pattern, confidence_reason } => {
+                format!("Type Pattern: {:?}\nReason: {}", pattern, confidence_reason)
+            }
+            Self::Purity { is_pure, impurity_reasons } => {
+                if *is_pure {
+                    "Pure function: no side effects detected".into()
+                } else {
+                    format!(
+                        "Impure function\nReasons:\n{}",
+                        impurity_reasons.iter()
+                            .map(|r| format!("  - {:?}", r))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                }
+            }
+            Self::Framework { framework_type, pattern_matched } => {
+                format!(
+                    "Framework: {:?}\nPattern: {}\nIndicates framework-specific responsibility",
+                    framework_type, pattern_matched
+                )
+            }
+            Self::RustPatterns { pattern, indicators } => {
+                format!(
+                    "Rust Pattern: {:?}\nIndicators:\n{}",
+                    pattern,
+                    indicators.iter()
+                        .map(|i| format!("  - {}", i))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::Name { prefix, keywords } => {
+                format!(
+                    "Name Analysis:\nPrefix: {:?}\nKeywords: {}",
+                    prefix,
+                    keywords.join(", ")
+                )
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AlternativeClassification {
     pub category: ResponsibilityCategory,
@@ -143,6 +293,21 @@ pub struct AlternativeClassification {
 }
 
 impl ClassificationEvidence {
+    /// Create evidence from multi-signal classification results
+    pub fn from_classification(
+        primary: ResponsibilityCategory,
+        confidence: f64,
+        signals: Vec<SignalContribution>,
+        all_scores: Vec<(ResponsibilityCategory, f64)>,
+    ) -> Self {
+        Self {
+            primary,
+            confidence,
+            signals,
+            all_scores,
+        }
+    }
+
     pub fn confidence_band(&self) -> ConfidenceBand {
         match self.confidence {
             c if c >= 0.80 => ConfidenceBand::High,
@@ -152,9 +317,22 @@ impl ClassificationEvidence {
     }
 
     pub fn is_ambiguous(&self) -> bool {
-        self.alternatives.first()
-            .map(|alt| alt.difference < 0.10)
-            .unwrap_or(false)
+        self.alternatives(0.10).first().is_some()
+    }
+
+    /// Compute alternative classifications from all_scores
+    /// Returns alternatives within `threshold` of primary score
+    pub fn alternatives(&self, threshold: f64) -> Vec<AlternativeClassification> {
+        self.all_scores.iter()
+            .skip(1)  // Skip primary (first element)
+            .take(3)  // Top 3 alternatives max
+            .filter(|(_, score)| self.confidence - score < threshold)
+            .map(|(category, score)| AlternativeClassification {
+                category: *category,
+                confidence: *score,
+                difference: self.confidence - score,
+            })
+            .collect()
     }
 }
 ```
@@ -165,6 +343,8 @@ impl ClassificationEvidence {
 pub struct EvidenceFormatter {
     verbosity: VerbosityLevel,
     color_enabled: bool,
+    show_all_signals: bool,  // True at -vvv to override signal filters
+    config: OutputConfig,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -175,115 +355,170 @@ pub enum VerbosityLevel {
 }
 
 impl EvidenceFormatter {
-    pub fn format_evidence(&self, evidence: &ClassificationEvidence) -> String {
-        let mut output = String::new();
+    /// Create formatter from verbosity count
+    /// - 0: Minimal (category + confidence only)
+    /// - 1: Standard (signal summary)
+    /// - 2+: Verbose (detailed breakdown)
+    pub fn new(verbose_count: u8, config: &OutputConfig) -> Self {
+        let verbosity = match verbose_count {
+            0 => VerbosityLevel::Minimal,
+            1 => VerbosityLevel::Standard,
+            _ => VerbosityLevel::Verbose,
+        };
 
-        match self.verbosity {
-            VerbosityLevel::Minimal => {
-                output.push_str(&format!(
-                    "Classification: {} [{:.0}% confidence]\n",
-                    evidence.primary,
-                    evidence.confidence * 100.0
-                ));
-            }
-            VerbosityLevel::Standard => {
-                self.format_standard_evidence(&mut output, evidence);
-            }
-            VerbosityLevel::Verbose => {
-                self.format_verbose_evidence(&mut output, evidence);
-            }
+        // At -vvv (3+), override signal filters to show all signals
+        let show_all_signals = verbose_count >= 3;
+
+        Self {
+            verbosity,
+            color_enabled: atty::is(atty::Stream::Stdout),
+            show_all_signals,
+            config: config.clone(),
         }
-
-        output
     }
 
-    fn format_standard_evidence(&self, output: &mut String, evidence: &ClassificationEvidence) {
-        // Header
-        output.push_str(&format!(
+    pub fn format_evidence(&self, evidence: &ClassificationEvidence) -> String {
+        match self.verbosity {
+            VerbosityLevel::Minimal => self.format_minimal(evidence),
+            VerbosityLevel::Standard => self.format_standard_evidence(evidence),
+            VerbosityLevel::Verbose => self.format_verbose_evidence(evidence),
+        }
+    }
+
+    fn format_minimal(&self, evidence: &ClassificationEvidence) -> String {
+        format!(
+            "Classification: {} [{:.0}% confidence]\n",
+            evidence.primary,
+            evidence.confidence * 100.0
+        )
+    }
+
+    fn format_standard_evidence(&self, evidence: &ClassificationEvidence) -> String {
+        [
+            self.format_header(evidence),
+            self.format_signals(&evidence.signals),
+            self.format_alternatives_if_ambiguous(evidence),
+            self.format_score(evidence.confidence),
+        ]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+    }
+
+    fn format_header(&self, evidence: &ClassificationEvidence) -> String {
+        format!(
             "\nCLASSIFICATION ANALYSIS:\n\
-             Primary: {} [Confidence: {:.2}, {}]\n\n",
+             Primary: {} [Confidence: {:.2}, {}]\n",
             evidence.primary,
             evidence.confidence,
             self.format_confidence_band(evidence.confidence_band())
-        ));
-
-        // Contributing signals
-        output.push_str("Contributing Signals:\n");
-        for signal in &evidence.signals {
-            if !signal.is_available {
-                output.push_str(&format!(
-                    "  • {:?}: N/A\n",
-                    signal.signal_type
-                ));
-                continue;
-            }
-
-            let indicator = if signal.contribution > 0.15 {
-                "✓"
-            } else if signal.contribution > 0.05 {
-                "•"
-            } else {
-                "-"
-            };
-
-            output.push_str(&format!(
-                "  {} {:?} ({:.0}% conf, {:.0}% weight) = {:.3} contribution\n\
-                     Evidence: {}\n",
-                indicator,
-                signal.signal_type,
-                signal.confidence * 100.0,
-                signal.weight * 100.0,
-                signal.contribution,
-                signal.evidence
-            ));
-        }
-
-        // Alternatives if ambiguous
-        if evidence.is_ambiguous() {
-            output.push_str("\nAlternative Classifications:\n");
-            for alt in &evidence.alternatives {
-                output.push_str(&format!(
-                    "  - {} ({:.2} confidence, Δ{:.2})\n",
-                    alt.category,
-                    alt.confidence,
-                    alt.difference
-                ));
-            }
-            output.push_str("  ⚠ Classification is ambiguous - consider manual review\n");
-        }
-
-        // Total score
-        output.push_str(&format!(
-            "\nWeighted Score: {:.3}\n",
-            evidence.confidence
-        ));
+        )
     }
 
-    fn format_verbose_evidence(&self, output: &mut String, evidence: &ClassificationEvidence) {
-        self.format_standard_evidence(output, evidence);
+    fn format_signals(&self, signals: &[SignalContribution]) -> String {
+        let formatted_signals: Vec<String> = signals.iter()
+            .filter(|s| self.should_show_signal(s))
+            .map(|signal| self.format_signal(signal))
+            .collect();
 
-        output.push_str("\nDETAILED BREAKDOWN:\n");
+        format!("Contributing Signals:\n{}", formatted_signals.join("\n"))
+    }
 
-        for signal in &evidence.signals {
-            if !signal.is_available {
-                continue;
-            }
+    fn should_show_signal(&self, signal: &SignalContribution) -> bool {
+        // -vvv shows all signals, overriding config
+        if self.show_all_signals {
+            return true;
+        }
 
-            output.push_str(&format!(
+        // Otherwise respect signal filters
+        match signal.signal_type {
+            SignalType::IoDetection => self.config.signal_filters.show_io_detection,
+            SignalType::CallGraph => self.config.signal_filters.show_call_graph,
+            SignalType::TypeSignatures => self.config.signal_filters.show_type_signatures,
+            SignalType::Purity => self.config.signal_filters.show_purity,
+            SignalType::Framework => self.config.signal_filters.show_framework,
+            SignalType::RustPatterns => true,  // Always show
+            SignalType::Name => self.config.signal_filters.show_name_heuristics,
+        }
+    }
+
+    fn format_signal(&self, signal: &SignalContribution) -> String {
+        if !signal.is_available {
+            return format!("  • {:?}: N/A", signal.signal_type);
+        }
+
+        let indicator = match signal.contribution {
+            c if c > 0.15 => "✓",
+            c if c > 0.05 => "•",
+            _ => "-",
+        };
+
+        format!(
+            "  {} {:?} ({:.0}% conf, {:.0}% weight) = {:.3} contribution\n\
+                 Evidence: {}",
+            indicator,
+            signal.signal_type,
+            signal.confidence * 100.0,
+            signal.weight * 100.0,
+            signal.contribution,
+            signal.evidence.format_concise()  // Use structured evidence formatting
+        )
+    }
+
+    fn format_alternatives_if_ambiguous(&self, evidence: &ClassificationEvidence) -> String {
+        if !evidence.is_ambiguous() {
+            return String::new();
+        }
+
+        let alternatives = evidence.alternatives(0.10);
+        let formatted_alts: Vec<String> = alternatives.iter()
+            .map(|alt| format!(
+                "  - {} ({:.2} confidence, Δ{:.2})",
+                alt.category,
+                alt.confidence,
+                alt.difference
+            ))
+            .collect();
+
+        format!(
+            "\nAlternative Classifications:\n{}\n  ⚠ Classification is ambiguous - consider manual review",
+            formatted_alts.join("\n")
+        )
+    }
+
+    fn format_score(&self, confidence: f64) -> String {
+        format!("\nWeighted Score: {:.3}", confidence)
+    }
+
+    fn format_verbose_evidence(&self, evidence: &ClassificationEvidence) -> String {
+        [
+            self.format_standard_evidence(evidence),
+            self.format_detailed_breakdown(&evidence.signals),
+        ]
+        .join("\n")
+    }
+
+    fn format_detailed_breakdown(&self, signals: &[SignalContribution]) -> String {
+        let details: Vec<String> = signals.iter()
+            .filter(|s| s.is_available)
+            .map(|signal| format!(
                 "\n{:?} Signal:\n\
                    Category: {}\n\
                    Confidence: {:.4}\n\
                    Weight: {:.4}\n\
                    Contribution: {:.4}\n\
-                   Evidence: {}\n",
+                   Evidence:\n{}",
                 signal.signal_type,
                 signal.category,
                 signal.confidence,
                 signal.weight,
                 signal.contribution,
-                signal.evidence
-            ));
-        }
+                signal.evidence.format_verbose()  // Use detailed structured evidence
+            ))
+            .collect();
+
+        format!("\nDETAILED BREAKDOWN:{}", details.join(""))
     }
 
     fn format_confidence_band(&self, band: ConfidenceBand) -> &str {
@@ -403,26 +638,115 @@ impl EvidenceFormatter {
 
 ### Architecture Changes
 
+**Prerequisites: Verify/Modify Spec 145 Integration**
+
+Before implementing this spec, verify that `MultiSignalClassifier` from Spec 145 returns evidence data:
+
+```rust
+// In src/organization/multi_signal_classifier.rs
+// CURRENT (Spec 145 - verify this exists):
+impl MultiSignalClassifier {
+    pub fn classify_method(&self, method: &MethodInfo) -> ResponsibilityCategory {
+        // ... classification logic
+    }
+}
+
+// REQUIRED for Spec 148:
+pub struct ClassificationResult {
+    pub category: ResponsibilityCategory,
+    pub evidence: ClassificationEvidence,
+}
+
+impl MultiSignalClassifier {
+    pub fn classify_method(&self, method: &MethodInfo) -> ClassificationResult {
+        // Track all signal contributions during classification
+        let mut signals = Vec::new();
+        let mut category_scores: HashMap<ResponsibilityCategory, f64> = HashMap::new();
+
+        // I/O Detection signal
+        if let Some(io_result) = self.io_detector.classify(method) {
+            signals.push(SignalContribution {
+                signal_type: SignalType::IoDetection,
+                category: io_result.category,
+                confidence: io_result.confidence,
+                weight: self.weights.io_detection,
+                contribution: io_result.confidence * self.weights.io_detection,
+                evidence: io_result.evidence,  // Structured evidence
+                is_available: true,
+            });
+            *category_scores.entry(io_result.category).or_default() +=
+                io_result.confidence * self.weights.io_detection;
+        }
+
+        // CallGraph signal
+        if let Some(cg_result) = self.call_graph_analyzer.classify(method) {
+            signals.push(SignalContribution {
+                signal_type: SignalType::CallGraph,
+                category: cg_result.category,
+                confidence: cg_result.confidence,
+                weight: self.weights.call_graph,
+                contribution: cg_result.confidence * self.weights.call_graph,
+                evidence: cg_result.evidence,
+                is_available: true,
+            });
+            *category_scores.entry(cg_result.category).or_default() +=
+                cg_result.confidence * self.weights.call_graph;
+        }
+
+        // ... repeat for other signals
+
+        // Sort scores to find primary and alternatives
+        let mut all_scores: Vec<_> = category_scores.into_iter().collect();
+        all_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        let (primary_category, primary_confidence) = all_scores[0];
+
+        ClassificationResult {
+            category: primary_category,
+            evidence: ClassificationEvidence::from_classification(
+                primary_category,
+                primary_confidence,
+                signals,
+                all_scores,
+            ),
+        }
+    }
+}
+```
+
+**Action Items for Spec 145 Integration**:
+1. Verify Spec 145 implementation tracks individual signal results
+2. If not, modify to store signal contributions during classification
+3. Update return type from `ResponsibilityCategory` to `ClassificationResult`
+4. Update all call sites to use `.category` to access the category
+
 **New Module**: `src/output/evidence_formatter.rs`
 - Evidence display formatting
 - Verbosity level handling
 - Confidence band visualization
 - Alternative classification display
+- Lazy evaluation wrapper for performance
+
+**Modified Module**: `src/organization/multi_signal_classifier.rs`
+- Return `ClassificationResult` instead of just `ResponsibilityCategory`
+- Track signal contributions during classification
+- Build `ClassificationEvidence` from aggregated results
 
 **Modified Module**: `src/priority/formatter.rs`
 - Integrate evidence display into recommendations
 - Add verbosity configuration option
-- Format signal contributions
+- Format signal contributions using `EvidenceFormatter`
 
 **New Configuration**: Add to `DebtmapConfig`:
 ```rust
 #[derive(Debug, Clone, Deserialize)]
 pub struct OutputConfig {
-    pub show_evidence: bool,          // Default: true
-    pub evidence_verbosity: VerbosityLevel,  // Default: Standard
-    pub show_alternatives: bool,      // Default: true when ambiguous
+    pub show_alternatives: bool,      // Default: true
     pub min_confidence_warning: f64,  // Default: 0.60
+    pub signal_filters: SignalFilters,  // Control which signals to display
 }
+
+// Verbosity level determined by CLI args.verbose count (0, 1, 2, 3+)
 ```
 
 ### Data Structures
@@ -431,12 +755,17 @@ See Phase 1 above for main data structures.
 
 ## Dependencies
 
-- **Prerequisites**: Spec 145 (Multi-Signal Aggregation) - provides ClassificationEvidence
+- **Prerequisites**: Spec 145 (Multi-Signal Aggregation) - must be extended to return ClassificationEvidence
+  - **Required Changes to Spec 145**: Modify `MultiSignalClassifier::classify_method()` to return `ClassificationResult` instead of just `ResponsibilityCategory`
+  - **Verification Step**: Confirm Spec 145 implementation includes signal tracking and scoring data
 - **Affected Components**:
-  - `src/priority/formatter.rs` - output formatting
-  - `src/organization/god_object_detector.rs` - recommendation generation
-  - `src/config.rs` - configuration for evidence display
+  - `src/organization/multi_signal_classifier.rs` - extend return types to include evidence
+  - `src/output/evidence_formatter.rs` - new module for evidence display (create)
+  - `src/priority/formatter.rs` - integrate evidence into output formatting
+  - `src/organization/god_object_detector.rs` - pass evidence through recommendations
+  - `src/config.rs` - add OutputConfig for evidence display settings
 - **External Dependencies**: None
+- **Configuration Precedence**: CLI flags > Environment variables > debtmap.toml > defaults
 
 ## Testing Strategy
 
@@ -587,9 +916,10 @@ recommendation includes:
 
 **Verbosity Modes**:
 ```bash
-debtmap                           # Standard evidence (default)
-debtmap --output-verbosity minimal  # Minimal (confidence only)
-debtmap --output-verbosity verbose  # Verbose (all technical details)
+debtmap           # Minimal: category + confidence only
+debtmap -v        # Standard: signal summary with top contributors
+debtmap -vv       # Verbose: detailed signal breakdown
+debtmap -vvv      # Very verbose: all signals including low-weight ones
 ```
 ```
 
@@ -646,56 +976,329 @@ debtmap --output-verbosity verbose  # Verbose (all technical details)
 
 ### Performance Optimization
 
-Evidence formatting can be expensive for large projects. Optimize:
+Evidence formatting can be expensive for large projects. Optimize by using lazy evaluation from the start:
 
 ```rust
-// Lazy evaluation - only format when displaying
+use std::sync::OnceLock;
+use std::sync::Arc;
+
+/// Lazy evidence formatting - only formats when actually displayed
 pub struct LazyEvidence {
-    evidence: OnceCell<String>,
     data: Arc<ClassificationEvidence>,
+    formatted: OnceLock<FormattedEvidence>,
+}
+
+#[derive(Debug, Clone)]
+struct FormattedEvidence {
+    minimal: String,
+    standard: String,
+    verbose: String,
 }
 
 impl LazyEvidence {
+    pub fn new(evidence: ClassificationEvidence) -> Self {
+        Self {
+            data: Arc::new(evidence),
+            formatted: OnceLock::new(),
+        }
+    }
+
+    /// Get formatted evidence for given verbosity level
     pub fn format(&self, verbosity: VerbosityLevel) -> &str {
-        self.evidence.get_or_init(|| {
-            EvidenceFormatter::new(verbosity).format_evidence(&self.data)
-        })
+        let formatted = self.formatted.get_or_init(|| {
+            let formatter = EvidenceFormatter::new(VerbosityLevel::Standard);
+            FormattedEvidence {
+                minimal: formatter.format_minimal(&self.data),
+                standard: formatter.format_standard_evidence(&self.data),
+                verbose: formatter.format_verbose_evidence(&self.data),
+            }
+        });
+
+        match verbosity {
+            VerbosityLevel::Minimal => &formatted.minimal,
+            VerbosityLevel::Standard => &formatted.standard,
+            VerbosityLevel::Verbose => &formatted.verbose,
+        }
+    }
+
+    /// Get raw evidence data without formatting
+    pub fn raw(&self) -> &ClassificationEvidence {
+        &self.data
     }
 }
 ```
 
-### Configuration Example
+### Memory Optimization
 
-`debtmap.toml`:
+Use `Cow<'static, str>` for common evidence strings to avoid allocations:
+
+```rust
+// In SignalEvidence variants
+pub enum SignalEvidence {
+    TypeSignature {
+        pattern: TypePattern,
+        confidence_reason: Cow<'static, str>,  // Avoids allocation for common reasons
+    },
+    // ...
+}
+
+// Usage in classification code
+let evidence = SignalEvidence::TypeSignature {
+    pattern: TypePattern::Parser,
+    confidence_reason: Cow::Borrowed("Matches &str → Result<T, E> pattern"),  // No allocation!
+};
+```
+
+### Performance Benchmarks
+
+Add benchmarks before implementation to establish baseline:
+
+```rust
+// benches/evidence_formatting.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn create_test_evidence(signal_count: usize) -> ClassificationEvidence {
+    let signals = (0..signal_count)
+        .map(|i| SignalContribution {
+            signal_type: match i % 7 {
+                0 => SignalType::IoDetection,
+                1 => SignalType::CallGraph,
+                2 => SignalType::TypeSignatures,
+                3 => SignalType::Purity,
+                4 => SignalType::Framework,
+                5 => SignalType::RustPatterns,
+                _ => SignalType::Name,
+            },
+            category: ResponsibilityCategory::Parsing,
+            confidence: 0.8,
+            weight: 0.15,
+            contribution: 0.12,
+            evidence: create_test_signal_evidence(i),
+            is_available: true,
+        })
+        .collect();
+
+    ClassificationEvidence::from_classification(
+        ResponsibilityCategory::Parsing,
+        0.82,
+        signals,
+        vec![(ResponsibilityCategory::Parsing, 0.82)],
+    )
+}
+
+fn bench_evidence_formatting(c: &mut Criterion) {
+    let mut group = c.benchmark_group("evidence_formatting");
+
+    for signal_count in [1, 3, 7].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("standard", signal_count),
+            signal_count,
+            |b, &count| {
+                let evidence = create_test_evidence(count);
+                let formatter = EvidenceFormatter::new(VerbosityLevel::Standard);
+                b.iter(|| {
+                    formatter.format_evidence(black_box(&evidence))
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("lazy_first_access", signal_count),
+            signal_count,
+            |b, &count| {
+                let evidence = create_test_evidence(count);
+                b.iter(|| {
+                    let lazy = LazyEvidence::new(evidence.clone());
+                    lazy.format(VerbosityLevel::Standard)
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("lazy_cached_access", signal_count),
+            signal_count,
+            |b, &count| {
+                let evidence = create_test_evidence(count);
+                let lazy = LazyEvidence::new(evidence);
+                let _ = lazy.format(VerbosityLevel::Standard); // Prime cache
+                b.iter(|| {
+                    lazy.format(VerbosityLevel::Standard)
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn bench_full_analysis_overhead(c: &mut Criterion) {
+    // Benchmark full analysis with and without evidence formatting
+    let mut group = c.benchmark_group("full_analysis_overhead");
+
+    group.bench_function("analysis_without_evidence", |b| {
+        b.iter(|| {
+            // Run full analysis without formatting evidence
+            analyze_test_project_no_evidence()
+        });
+    });
+
+    group.bench_function("analysis_with_evidence_standard", |b| {
+        b.iter(|| {
+            // Run full analysis with standard evidence formatting
+            analyze_test_project_with_evidence(VerbosityLevel::Standard)
+        });
+    });
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_evidence_formatting, bench_full_analysis_overhead);
+criterion_main!(benches);
+```
+
+### Performance Targets
+
+- **Individual evidence formatting**: <1ms per classification
+- **Lazy evaluation cache hit**: <10μs (near-zero overhead)
+- **Full project analysis overhead**: <2% total runtime increase
+- **Memory overhead**: <5% increase for evidence storage
+
+Validate these targets with benchmarks before and after implementation.
+
+### Configuration Integration
+
+**Configuration precedence**: CLI flags > Environment variables > `debtmap.toml` > defaults
+
+**Rust configuration structure**:
+```rust
+// In src/config.rs
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DebtmapConfig {
+    // ... existing fields
+    #[serde(default)]
+    pub output: OutputConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OutputConfig {
+    #[serde(default = "default_show_alternatives")]
+    pub show_alternatives: bool,
+
+    #[serde(default = "default_min_confidence_warning")]
+    pub min_confidence_warning: f64,
+
+    #[serde(default)]
+    pub signal_filters: SignalFilters,
+}
+
+// Note: Verbosity level comes from CLI args.verbose, not config
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VerbosityLevel {
+    Minimal,
+    #[serde(alias = "default")]
+    Standard,
+    Verbose,
+}
+
+impl Default for VerbosityLevel {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SignalFilters {
+    #[serde(default = "default_true")]
+    pub show_io_detection: bool,
+    #[serde(default = "default_true")]
+    pub show_call_graph: bool,
+    #[serde(default = "default_true")]
+    pub show_type_signatures: bool,
+    #[serde(default = "default_true")]
+    pub show_purity: bool,
+    #[serde(default = "default_true")]
+    pub show_framework: bool,
+    #[serde(default = "default_false")]
+    pub show_name_heuristics: bool,  // Default off: low-weight fallback signal
+}
+
+impl Default for SignalFilters {
+    fn default() -> Self {
+        Self {
+            show_io_detection: true,
+            show_call_graph: true,
+            show_type_signatures: true,
+            show_purity: true,
+            show_framework: true,
+            show_name_heuristics: false,
+        }
+    }
+}
+
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self {
+            show_alternatives: true,
+            min_confidence_warning: 0.60,
+            signal_filters: SignalFilters::default(),
+        }
+    }
+}
+
+fn default_show_alternatives() -> bool { true }
+fn default_min_confidence_warning() -> f64 { 0.60 }
+fn default_true() -> bool { true }
+fn default_false() -> bool { false }
+```
+
+**TOML configuration file** (`debtmap.toml`):
 ```toml
-[output.evidence]
-show_evidence = true
-verbosity = "standard"  # minimal | standard | verbose
+[output]
 show_alternatives = true
 min_confidence_warning = 0.60
 
-[output.evidence.signals]
+[output.signal_filters]
 show_io_detection = true
 show_call_graph = true
 show_type_signatures = true
 show_purity = true
 show_framework = true
-show_name_heuristics = false  # Hide low-weight fallback
+show_name_heuristics = false  # Hide low-weight fallback signal
 ```
 
-## Migration and Compatibility
+Note: Verbosity is controlled via CLI flags (`-v`, `-vv`, `-vvv`) only, not config file.
 
-### Backward Compatibility
+**CLI flags** (add to `clap` argument parser):
+```rust
+#[derive(Parser)]
+pub struct Args {
+    // ... existing args
 
-- **Default behavior**: Show evidence in standard mode (new default)
-- **Legacy flag**: `--no-evidence` to disable and get old output format
-- **Gradual rollout**: Evidence shown but optional in v0.3.2, mandatory in v0.4.0
+    /// Increase verbosity (-v for standard evidence, -vv for detailed, -vvv for all signals)
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 
-### Migration Path
+    /// Minimum confidence threshold for low-confidence warnings
+    #[arg(long, value_name = "THRESHOLD", default_value = "0.60")]
+    pub min_confidence_warning: f64,
+}
+```
 
-1. **Phase 1**: Add evidence as optional output section (this spec)
-2. **Phase 2**: Make evidence default, add `--no-evidence` flag
-3. **Phase 3**: Deprecate `--no-evidence`, evidence always shown
+**Verbosity mapping**:
+- No flags (default): Minimal evidence (category + confidence only)
+- `-v`: Standard evidence (signal summary with top contributors)
+- `-vv`: Verbose evidence (detailed signal breakdown)
+- `-vvv`: Very verbose (all signals including low-weight ones)
+
+Evidence is always shown - verbosity level controls how much detail.
+
+## Migration Path
+
+Evidence display will be **always enabled** once implemented. No backward compatibility flags or gradual rollout needed - this is a pure improvement to output quality and user understanding.
 
 ## Expected Impact
 
@@ -741,3 +1344,129 @@ User thinks: "Ah, makes sense - the module is too mixed for clear classification
 - [ ] "Utilities" groupings include explanation of why they're unclear
 - [ ] Performance overhead <2% for evidence formatting
 - [ ] Zero user confusion about why classifications were made (via surveys/issues)
+
+## Implementation Plan (Revised with Clarifications)
+
+### Pre-Implementation: Spec 145 Verification (0.5 day)
+
+**Tasks**:
+1. Read Spec 145 implementation in `src/organization/multi_signal_classifier.rs`
+2. Verify if `classify_method()` currently returns evidence data
+3. If not, plan modification to track signal contributions
+4. Document required changes to Spec 145
+
+**Acceptance**:
+- Clear understanding of Spec 145's current state
+- Plan for extending return type to include evidence
+- List of all call sites that need updating
+
+### Phase 1: Data Structures + Spec 145 Integration (1.5-2 days)
+
+**Tasks**:
+1. Define `SignalEvidence` enum with structured variants (IoDetection, CallGraph, etc.)
+2. Define `ClassificationEvidence` struct with `all_scores` field
+3. Define `ClassificationResult` wrapper struct
+4. Implement `SignalEvidence::format_concise()` and `format_verbose()` methods
+5. Implement `ClassificationEvidence::alternatives()` method
+6. Modify `MultiSignalClassifier::classify_method()` to return `ClassificationResult`
+7. Update all call sites to use `.category` field
+8. Write unit tests for evidence data structures
+
+**Acceptance**:
+- All data structures compile with proper trait bounds
+- Spec 145 returns evidence data alongside classification
+- All existing tests pass with updated return type
+- Evidence alternatives are correctly computed from `all_scores`
+
+### Phase 2: Evidence Formatter (2 days)
+
+**Tasks**:
+1. Create `src/output/evidence_formatter.rs` module
+2. Implement `EvidenceFormatter` with functional composition (no mutable strings)
+3. Implement all three verbosity levels (Minimal, Standard, Verbose)
+4. Implement `LazyEvidence` wrapper with `OnceLock` caching
+5. Write unit tests for each formatting method
+6. Add performance benchmarks (baseline before integration)
+
+**Acceptance**:
+- Formatting produces expected output for all verbosity levels
+- Functional composition avoids mutable string building
+- Lazy evaluation caches formatted strings correctly
+- Benchmarks show <1ms formatting time per evidence
+- All unit tests pass
+
+### Phase 3: Configuration Support (0.5 day)
+
+**Tasks**:
+1. Add `OutputConfig` to `src/config.rs`
+2. Implement `SignalFilters` for hiding specific signals
+3. Add `-v` verbosity flag counting (existing or new)
+4. Add `--min-confidence-warning` CLI flag
+5. Update TOML deserialization for `[output]` section
+6. Wire verbosity count through to `EvidenceFormatter::new(verbose_count)`
+
+**Acceptance**:
+- Configuration loads from TOML correctly
+- CLI flags override config file settings
+- Verbosity count (0, 1, 2, 3+) correctly maps to evidence levels
+- Default configuration matches spec requirements
+
+### Phase 4: Output Integration (1.5 days)
+
+**Tasks**:
+1. Modify `src/priority/formatter.rs` to accept evidence data
+2. Integrate evidence display into module split recommendations
+3. Integrate evidence into function classification output (#10)
+4. Implement "Utilities" explanation logic (`explain_utilities_classification()`)
+5. Apply `SignalFilters` to hide unwanted signals
+6. Add integration tests for full output
+
+**Acceptance**:
+- Module recommendations show evidence for each proposed module
+- Function classifications show signal contributions
+- Low confidence classifications display warnings
+- Utilities groupings explain why they're ambiguous
+- Signal filtering works correctly
+- Integration tests verify full output format
+
+### Phase 5: Performance Validation & Documentation (1 day)
+
+**Tasks**:
+1. Run full project analysis benchmarks with evidence enabled
+2. Verify <2% performance overhead target
+3. Optimize if needed (string interning, caching, etc.)
+4. Update README.md with evidence explanation
+5. Add example output to documentation
+6. Update CHANGELOG.md
+
+**Acceptance**:
+- Performance benchmarks show <2% overhead
+- Memory overhead <5% for evidence storage
+- User documentation explains evidence display clearly
+- Example output demonstrates all features
+- CHANGELOG accurately describes changes
+
+### Phase 6: Testing & Polish (0.5 day)
+
+**Tasks**:
+1. Run full test suite (`cargo test --all-features`)
+2. Run clippy (`cargo clippy --all-targets -- -D warnings`)
+3. Format code (`cargo fmt --all`)
+4. Test with real codebases (debtmap itself, other Rust projects)
+5. Verify verbosity levels work correctly
+
+**Acceptance**:
+- All tests pass
+- No clippy warnings
+- Code formatted consistently
+- Real-world testing shows useful evidence at all verbosity levels
+- Evidence display improves user understanding
+
+**Total Estimated Time**: 6-8 days
+
+**Critical Path**:
+1. Spec 145 verification (blocking)
+2. Data structures (blocking for formatter)
+3. Formatter implementation (blocking for integration)
+4. Output integration (user-facing)
+5. Performance validation (quality gate)
