@@ -18,6 +18,7 @@ use crate::analysis::framework_patterns_multi::detector::{
 use crate::analysis::io_detection::{IoDetector, IoProfile, Language, Responsibility};
 use crate::analysis::purity_analysis::{PurityAnalyzer, PurityLevel};
 use crate::analysis::type_flow_tracker::TypeFlowTracker;
+use crate::analysis::type_signatures::{TypeSignature, TypeSignatureAnalyzer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -257,6 +258,7 @@ pub struct ResponsibilityAggregator {
     framework_detector: Option<FrameworkDetector>,
     call_graph: Option<RustCallGraph>,
     type_tracker: Option<TypeFlowTracker>,
+    type_signature_analyzer: TypeSignatureAnalyzer,
 }
 
 impl ResponsibilityAggregator {
@@ -274,6 +276,7 @@ impl ResponsibilityAggregator {
             framework_detector: Some(FrameworkDetector::with_defaults()),
             call_graph: None,
             type_tracker: Some(TypeFlowTracker::new()),
+            type_signature_analyzer: TypeSignatureAnalyzer::new(),
         }
     }
 
@@ -446,7 +449,22 @@ impl ResponsibilityAggregator {
         })
     }
 
-    /// Collect type signature signal
+    /// Collect type signature signal using AST-based analysis
+    pub fn collect_type_signal_from_signature(
+        &self,
+        signature: &TypeSignature,
+    ) -> Option<TypeSignatureClassification> {
+        let classification = self.type_signature_analyzer.analyze_signature(signature)?;
+
+        Some(TypeSignatureClassification {
+            category: classification.category,
+            confidence: classification.confidence,
+            evidence: classification.evidence,
+        })
+    }
+
+    /// Collect type signature signal (legacy interface, deprecated)
+    #[deprecated(note = "Use collect_type_signal_from_signature instead")]
     pub fn collect_type_signal(
         &self,
         return_type: Option<&str>,
