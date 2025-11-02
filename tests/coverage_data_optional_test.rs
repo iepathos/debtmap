@@ -64,6 +64,7 @@ fn create_untested_item() -> UnifiedDebtItem {
         function_context: None,
         context_confidence: None,
         contextual_recommendation: None,
+        pattern_analysis: None,
     }
 }
 

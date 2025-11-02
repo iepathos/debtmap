@@ -105,6 +105,7 @@ pub fn create_unified_debt_item_enhanced(
         function_context: Some(context_analysis.context),
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
+        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
     }
 }
 
@@ -292,6 +293,7 @@ fn build_unified_debt_item(
         function_context: Some(context_analysis.context),
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
+        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
     }
 }
 
@@ -445,6 +447,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         function_context: Some(context_analysis.context),
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
+        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
     }
 }
 
@@ -546,5 +549,6 @@ pub fn create_unified_debt_item_with_data_flow(
         function_context: Some(context_analysis.context),
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
+        pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
     }
 }

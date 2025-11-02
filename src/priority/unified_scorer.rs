@@ -59,6 +59,8 @@ pub struct UnifiedDebtItem {
     pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
     pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

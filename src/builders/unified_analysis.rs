@@ -1040,6 +1040,7 @@ fn convert_error_swallowing_to_unified(
                 function_context: None,
                 context_confidence: None,
                 contextual_recommendation: None,
+                pattern_analysis: None,
             }
         })
         .collect()
