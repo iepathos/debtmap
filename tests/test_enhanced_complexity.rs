@@ -335,8 +335,8 @@ fn test_false_positive_reduction() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
-        purity_reason: None,
-        call_dependencies: None,
+            purity_reason: None,
+            call_dependencies: None,
         };
 
         assert!(

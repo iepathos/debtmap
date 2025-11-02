@@ -2,7 +2,6 @@
 ///
 /// These tests verify that purity information propagates correctly through
 /// the call graph to reduce false negatives in purity detection.
-
 use debtmap::analysis::call_graph::{
     CrossModuleTracker, FrameworkPatternDetector, FunctionPointerTracker, RustCallGraph,
     TraitRegistry,
@@ -146,8 +145,11 @@ fn test_impure_recursive_function() {
 
     let mut call_graph = CallGraph::new();
 
-    let recursive_id =
-        FunctionId::new(PathBuf::from("test.rs"), "recursive_with_io".to_string(), 10);
+    let recursive_id = FunctionId::new(
+        PathBuf::from("test.rs"),
+        "recursive_with_io".to_string(),
+        10,
+    );
     call_graph.add_call_parts(recursive_id.clone(), recursive_id.clone(), CallType::Direct);
 
     let metrics = vec![create_test_metric(

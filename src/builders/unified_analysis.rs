@@ -419,10 +419,7 @@ fn perform_unified_analysis_computation(
     let purity_propagation_time = purity_propagation_start.elapsed();
 
     if !quiet_mode {
-        eprintln!(
-            "Purity propagation: {:?}",
-            purity_propagation_time
-        );
+        eprintln!("Purity propagation: {:?}", purity_propagation_time);
     }
 
     let result = create_unified_analysis_with_exclusions_and_timing(
@@ -1510,7 +1507,10 @@ fn run_purity_propagation(
     metrics: &[FunctionMetrics],
     call_graph: &priority::CallGraph,
 ) -> Vec<FunctionMetrics> {
-    use crate::analysis::call_graph::{RustCallGraph, TraitRegistry, FunctionPointerTracker, CrossModuleTracker, FrameworkPatternDetector};
+    use crate::analysis::call_graph::{
+        CrossModuleTracker, FrameworkPatternDetector, FunctionPointerTracker, RustCallGraph,
+        TraitRegistry,
+    };
     use crate::analysis::purity_analysis::PurityAnalyzer;
     use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
 
@@ -1540,12 +1540,17 @@ fn run_purity_propagation(
     metrics
         .iter()
         .map(|metric| {
-            let func_id =
-                priority::call_graph::FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+            let func_id = priority::call_graph::FunctionId::new(
+                metric.file.clone(),
+                metric.name.clone(),
+                metric.line,
+            );
 
             if let Some(result) = propagator.get_result(&func_id) {
                 let mut updated = metric.clone();
-                updated.is_pure = Some(result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure);
+                updated.is_pure = Some(
+                    result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure,
+                );
                 updated.purity_confidence = Some(result.confidence as f32);
                 updated.purity_reason = Some(format!("{:?}", result.reason));
                 updated

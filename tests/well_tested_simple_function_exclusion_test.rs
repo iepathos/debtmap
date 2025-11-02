@@ -47,8 +47,8 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
-        purity_reason: None,
-        call_dependencies: None,
+            purity_reason: None,
+            call_dependencies: None,
         };
 
         // Add 100% coverage for these functions
@@ -91,8 +91,8 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
-        purity_reason: None,
-        call_dependencies: None,
+            purity_reason: None,
+            call_dependencies: None,
         };
 
         // No coverage for these functions (untested)

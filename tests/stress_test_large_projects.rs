@@ -57,8 +57,8 @@ mod stress_tests {
                     adjusted_complexity: None,
                     composition_metrics: None,
                     language_specific: None,
-        purity_reason: None,
-        call_dependencies: None,
+                    purity_reason: None,
+                    call_dependencies: None,
                 });
             }
         }
