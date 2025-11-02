@@ -90,6 +90,7 @@ mod tests {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: None,
         }
     }
 

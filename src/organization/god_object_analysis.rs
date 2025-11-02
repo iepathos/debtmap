@@ -195,7 +195,7 @@ pub enum GodObjectConfidence {
     NotGodObject, // Within acceptable limits
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleSplit {
     pub suggested_name: String,
     pub methods_to_move: Vec<String>,
@@ -231,6 +231,34 @@ pub struct ModuleSplit {
     /// Estimated interface size between modules
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interface_estimate: Option<InterfaceEstimate>,
+    /// Multi-signal classification evidence for this split
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip)] // Skip in equality comparison
+    pub classification_evidence:
+        Option<crate::analysis::multi_signal_aggregation::AggregatedClassification>,
+}
+
+// Manual PartialEq implementation that skips classification_evidence field
+impl PartialEq for ModuleSplit {
+    fn eq(&self, other: &Self) -> bool {
+        self.suggested_name == other.suggested_name
+            && self.methods_to_move == other.methods_to_move
+            && self.structs_to_move == other.structs_to_move
+            && self.responsibility == other.responsibility
+            && self.estimated_lines == other.estimated_lines
+            && self.method_count == other.method_count
+            && self.warning == other.warning
+            && self.priority == other.priority
+            && self.cohesion_score == other.cohesion_score
+            && self.dependencies_in == other.dependencies_in
+            && self.dependencies_out == other.dependencies_out
+            && self.domain == other.domain
+            && self.rationale == other.rationale
+            && self.method == other.method
+            && self.severity == other.severity
+            && self.interface_estimate == other.interface_estimate
+        // Skip classification_evidence in equality comparison
+    }
 }
 
 /// Estimated interface size between proposed modules
@@ -648,12 +676,16 @@ fn find_dominant_category(
 ///
 /// # Returns
 ///
-/// Tuple of (responsibility string, confidence score)
+/// Tuple of (responsibility string, confidence score, classification evidence)
 pub fn infer_responsibility_multi_signal(
     method_name: &str,
     method_body: Option<&str>,
     language: crate::analysis::io_detection::Language,
-) -> (String, f64) {
+) -> (
+    String,
+    f64,
+    crate::analysis::multi_signal_aggregation::AggregatedClassification,
+) {
     use crate::analysis::multi_signal_aggregation::{ResponsibilityAggregator, SignalSet};
 
     let aggregator = ResponsibilityAggregator::new();
@@ -677,7 +709,7 @@ pub fn infer_responsibility_multi_signal(
     let responsibility = result.primary.as_str().to_string();
     let confidence = result.confidence;
 
-    (responsibility, confidence)
+    (responsibility, confidence, result)
 }
 
 /// Group methods by responsibility using multi-signal aggregation.
@@ -690,7 +722,7 @@ pub fn group_methods_by_responsibility_multi_signal(
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
 
     for (method_name, method_body) in methods {
-        let (responsibility, _confidence) =
+        let (responsibility, _confidence, _evidence) =
             infer_responsibility_multi_signal(method_name, method_body.as_deref(), language);
 
         groups
@@ -700,6 +732,40 @@ pub fn group_methods_by_responsibility_multi_signal(
     }
 
     groups
+}
+
+/// Group methods by responsibility with classification evidence.
+///
+/// Returns both grouped methods and their classification evidence.
+pub fn group_methods_by_responsibility_with_evidence(
+    methods: &[(String, Option<String>)],
+    language: crate::analysis::io_detection::Language,
+) -> (
+    HashMap<String, Vec<String>>,
+    HashMap<String, crate::analysis::multi_signal_aggregation::AggregatedClassification>,
+) {
+    let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+    let mut evidence_map: HashMap<
+        String,
+        crate::analysis::multi_signal_aggregation::AggregatedClassification,
+    > = HashMap::new();
+
+    for (method_name, method_body) in methods {
+        let (responsibility, _confidence, evidence) =
+            infer_responsibility_multi_signal(method_name, method_body.as_deref(), language);
+
+        // Store evidence for this responsibility (use first occurrence)
+        evidence_map
+            .entry(responsibility.clone())
+            .or_insert(evidence);
+
+        groups
+            .entry(responsibility)
+            .or_default()
+            .push(method_name.clone());
+    }
+
+    (groups, evidence_map)
 }
 
 /// Responsibility category definition for method name classification.
@@ -944,10 +1010,29 @@ pub fn recommend_module_splits(
     _methods: &[String],
     responsibility_groups: &HashMap<String, Vec<String>>,
 ) -> Vec<ModuleSplit> {
+    recommend_module_splits_with_evidence(
+        type_name,
+        _methods,
+        responsibility_groups,
+        &HashMap::new(),
+    )
+}
+
+pub fn recommend_module_splits_with_evidence(
+    type_name: &str,
+    _methods: &[String],
+    responsibility_groups: &HashMap<String, Vec<String>>,
+    evidence_map: &HashMap<
+        String,
+        crate::analysis::multi_signal_aggregation::AggregatedClassification,
+    >,
+) -> Vec<ModuleSplit> {
     let mut recommendations = Vec::new();
 
     for (responsibility, methods) in responsibility_groups {
         if methods.len() > 5 {
+            let classification_evidence = evidence_map.get(responsibility).cloned();
+
             recommendations.push(ModuleSplit {
                 suggested_name: format!(
                     "{}_{}",
@@ -972,6 +1057,7 @@ pub fn recommend_module_splits(
                 method: SplitAnalysisMethod::MethodBased,
                 severity: None,
                 interface_estimate: None,
+                classification_evidence,
             });
         }
     }
@@ -1075,6 +1161,7 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 method: SplitAnalysisMethod::CrossDomain,
                 severity: None, // Will be set by caller based on overall analysis
                 interface_estimate: None,
+                classification_evidence: None,
             }
         })
         .collect()
@@ -1195,6 +1282,7 @@ pub fn suggest_splits_by_struct_grouping(
                 method: SplitAnalysisMethod::CrossDomain,
                 severity: None,
                 interface_estimate: None,
+                classification_evidence: None,
             }
         })
         .collect();
