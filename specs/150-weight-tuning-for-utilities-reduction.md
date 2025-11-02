@@ -1269,21 +1269,301 @@ utilities_fallback = 0.50   # Require all signals weak to use Utilities
 
 ### Backward Compatibility
 
-Default weights remain the same initially. Users can opt-in to optimized weights:
+**No breaking changes**. Default weights remain the same initially (Spec 145). Users can opt-in to optimized weights:
 
 ```bash
-# Use default weights (Spec 145)
+# Use default weights (Spec 145) - UNCHANGED
 debtmap analyze
 
-# Use optimized weights (this spec)
-debtmap analyze --weights optimized
+# Use optimized weights (this spec) - NEW
+debtmap analyze --weights-preset optimized
+
+# Use custom weights - NEW
+debtmap analyze --weights .debtmap/weights.toml
 ```
 
-### Gradual Rollout
+### Migration Strategy
 
-1. **v0.4.0**: Add weight tuning capability, keep defaults
-2. **v0.4.1**: Ship optimized weights as optional preset
-3. **v0.5.0**: Make optimized weights the new default
+#### Phase 1: Add Infrastructure (v0.4.0)
+- Implement `WeightConfig` with validation
+- Add weight optimization engine
+- Add ground truth corpus support
+- Add CLI commands: `ground-truth`, `tune-weights`
+- **No change to default behavior**
+
+#### Phase 2: Gather Data (v0.4.1)
+- Ship built-in ground truth corpus (500+ examples)
+- Run optimization on corpus, publish results
+- Add `optimized` preset based on results
+- Add documentation and examples
+- **Still default to Spec 145 weights**
+
+#### Phase 3: Make Default (v0.5.0)
+- Make `optimized` preset the new default
+- Add `--weights-preset default` for old behavior
+- Update documentation to reflect new defaults
+- Add migration guide for projects that depend on old classifications
+
+### Compatibility Testing
+
+```rust
+#[test]
+fn weight_changes_dont_break_existing_workflows() {
+    let old_weights = WeightConfig::default_weights();  // Spec 145
+    let new_weights = WeightPreset::Optimized.to_config();
+
+    let corpus = load_test_corpus()?;
+
+    let old_results = evaluate_on_corpus(&corpus, &old_weights)?;
+    let new_results = evaluate_on_corpus(&corpus, &new_weights)?;
+
+    // Ensure overall accuracy doesn't regress
+    assert!(new_results.accuracy >= old_results.accuracy * 0.95);
+
+    // Ensure no category drops significantly
+    for category in ResponsibilityCategory::all() {
+        let old_acc = old_results.category_accuracies.get(&category).unwrap_or(&0.0);
+        let new_acc = new_results.category_accuracies.get(&category).unwrap_or(&0.0);
+
+        assert!(
+            new_acc >= old_acc * 0.90,
+            "Category {:?} accuracy dropped from {:.2} to {:.2}",
+            category, old_acc, new_acc
+        );
+    }
+}
+```
+
+### Gradual Rollout Timeline
+
+1. **v0.4.0** (Week 1-3): Add weight tuning capability, keep defaults
+2. **v0.4.1** (Week 4-6): Ship optimized weights as optional preset, gather feedback
+3. **v0.4.2** (Week 7-8): Refine based on user feedback, fix edge cases
+4. **v0.5.0** (Week 9+): Make optimized weights the new default
+
+## Observability and Monitoring
+
+### Logging During Optimization
+
+```rust
+impl WeightOptimizer {
+    pub fn optimize_grid_search(&self) -> Result<OptimizationResult> {
+        let weight_configs = self.generate_weight_grid();
+
+        log::info!("Starting grid search optimization");
+        log::info!("Testing {} weight configurations", weight_configs.len());
+        log::info!("Corpus size: {} examples", self.corpus.examples.len());
+
+        let progress = ProgressBar::new(weight_configs.len() as u64);
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+                .unwrap()
+        );
+
+        let results: Vec<_> = weight_configs
+            .into_par_iter()
+            .map(|weights| {
+                let result = self.evaluate_weights(&weights)?;
+                let score = calculate_optimization_score(&result);
+
+                progress.inc(1);
+
+                if score > 0.85 {
+                    log::debug!(
+                        "High-scoring config: score={:.3}, accuracy={:.3}, utilities_recall={:.3}",
+                        score, result.accuracy, result.utilities_recall
+                    );
+                }
+
+                Ok((score, result))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        progress.finish_with_message("Optimization complete");
+
+        let best = results
+            .into_iter()
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(score, result)| {
+                log::info!("Best configuration found:");
+                log::info!("  Score: {:.3}", score);
+                log::info!("  Accuracy: {:.3}", result.accuracy);
+                log::info!("  Utilities precision: {:.3}", result.utilities_precision);
+                log::info!("  Utilities recall: {:.3}", result.utilities_recall);
+                result
+            })
+            .ok_or_else(|| anyhow!("No valid weight configuration found"))?;
+
+        Ok(best)
+    }
+}
+```
+
+### Tuning Report Generation
+
+```rust
+pub struct TuningReport {
+    pub best_weights: WeightConfig,
+    pub optimization_score: f64,
+    pub metrics: OptimizationResult,
+    pub comparison_to_default: ComparisonMetrics,
+    pub top_n_configs: Vec<(f64, WeightConfig)>,
+}
+
+impl TuningReport {
+    pub fn generate_markdown(&self) -> String {
+        format!(
+            r#"# Weight Tuning Report
+
+## Best Configuration
+
+```toml
+[weights]
+io_detection = {:.2}
+call_graph = {:.2}
+type_signatures = {:.2}
+purity_side_effects = {:.2}
+framework_patterns = {:.2}
+name_heuristics = {:.2}
+```
+
+## Metrics
+
+- **Optimization Score**: {:.3}
+- **Overall Accuracy**: {:.1}%
+- **Utilities Precision**: {:.1}%
+- **Utilities Recall**: {:.1}%
+
+## Comparison to Default Weights
+
+| Metric | Default | Optimized | Change |
+|--------|---------|-----------|--------|
+| Accuracy | {:.1}% | {:.1}% | {:+.1}% |
+| Utilities Recall | {:.1}% | {:.1}% | {:+.1}% |
+| Avg Confidence | {:.1}% | {:.1}% | {:+.1}% |
+
+## Top 5 Configurations
+
+{}
+
+## Recommendations
+
+{}
+"#,
+            self.best_weights.io_detection(),
+            self.best_weights.call_graph(),
+            self.best_weights.type_signatures(),
+            self.best_weights.purity_side_effects(),
+            self.best_weights.framework_patterns(),
+            self.best_weights.name_heuristics(),
+            self.optimization_score,
+            self.metrics.accuracy * 100.0,
+            self.metrics.utilities_precision * 100.0,
+            self.metrics.utilities_recall * 100.0,
+            self.comparison_to_default.default_accuracy * 100.0,
+            self.comparison_to_default.optimized_accuracy * 100.0,
+            (self.comparison_to_default.optimized_accuracy - self.comparison_to_default.default_accuracy) * 100.0,
+            self.comparison_to_default.default_utilities_recall * 100.0,
+            self.comparison_to_default.optimized_utilities_recall * 100.0,
+            (self.comparison_to_default.optimized_utilities_recall - self.comparison_to_default.default_utilities_recall) * 100.0,
+            self.comparison_to_default.default_avg_confidence * 100.0,
+            self.comparison_to_default.optimized_avg_confidence * 100.0,
+            (self.comparison_to_default.optimized_avg_confidence - self.comparison_to_default.default_avg_confidence) * 100.0,
+            self.format_top_configs(),
+            self.generate_recommendations(),
+        )
+    }
+}
+```
+
+## Performance Benchmarks
+
+### Benchmark Suite
+
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+
+fn benchmark_weight_optimization(c: &mut Criterion) {
+    let corpus = load_test_corpus_500_examples();
+    let optimizer = WeightOptimizer::new(corpus, ResponsibilityAggregator::new());
+
+    c.bench_function("grid_search_500_examples", |b| {
+        b.iter(|| {
+            optimizer.optimize_grid_search().unwrap()
+        })
+    });
+}
+
+fn benchmark_single_evaluation(c: &mut Criterion) {
+    let corpus = load_test_corpus_500_examples();
+    let optimizer = WeightOptimizer::new(corpus, ResponsibilityAggregator::new());
+    let weights = WeightConfig::default_weights();
+
+    c.bench_function("evaluate_500_examples", |b| {
+        b.iter(|| {
+            optimizer.evaluate_weights(black_box(&weights)).unwrap()
+        })
+    });
+}
+
+fn benchmark_parallel_vs_sequential(c: &mut Criterion) {
+    let mut group = c.benchmark_group("evaluation_parallelism");
+
+    for size in [100, 250, 500, 1000] {
+        let corpus = load_test_corpus_n_examples(size);
+        let optimizer = WeightOptimizer::new(corpus, ResponsibilityAggregator::new());
+        let weights = WeightConfig::default_weights();
+
+        group.bench_with_input(
+            BenchmarkId::new("parallel", size),
+            &size,
+            |b, _| {
+                b.iter(|| {
+                    optimizer.evaluate_weights_parallel(black_box(&weights)).unwrap()
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("sequential", size),
+            &size,
+            |b, _| {
+                b.iter(|| {
+                    optimizer.evaluate_weights_sequential(black_box(&weights)).unwrap()
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    benchmark_weight_optimization,
+    benchmark_single_evaluation,
+    benchmark_parallel_vs_sequential
+);
+criterion_main!(benches);
+```
+
+### Performance Targets
+
+- **Grid search (500 examples)**: <5 minutes total
+- **Single evaluation (500 examples)**: <2 seconds
+- **Parallel speedup**: >4x on 8-core machine
+- **Memory usage**: <500 MB for 1000 examples
+
+### Optimization Opportunities
+
+If performance targets not met:
+
+1. **Caching**: Cache parsed ASTs and signal computations
+2. **Incremental evaluation**: Reuse signals across weight configurations
+3. **Early termination**: Stop evaluating clearly suboptimal configs
+4. **Smarter search**: Use Bayesian optimization instead of grid search
+5. **Batch processing**: Group similar functions for parallel analysis
 
 ## Expected Impact
 
