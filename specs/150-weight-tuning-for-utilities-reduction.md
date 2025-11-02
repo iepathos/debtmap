@@ -6,14 +6,28 @@ priority: high
 status: draft
 dependencies: [145]
 created: 2025-10-28
+revised: 2025-11-02
 ---
 
 # Specification 150: Weight Tuning for Utilities Reduction
 
 **Category**: optimization
 **Priority**: high
-**Status**: draft
+**Status**: draft (revised 2025-11-02)
 **Dependencies**: Spec 145 (Multi-Signal Responsibility Aggregation)
+
+## Revision History
+
+**2025-11-02**: Major revision to align with functional programming principles:
+- Refactored weight optimization to use functional pipelines instead of mutable loops
+- Added parallelization with `rayon` for grid search and evaluation
+- Improved error handling - removed all `.unwrap()` calls
+- Added comprehensive property-based tests with `proptest`
+- Removed `ndarray` dependency (unnecessary overhead)
+- Added corpus tooling specifications (interactive labeling CLI)
+- Documented configuration precedence and file locations
+- Simplified utilities threshold logic into pure functions
+- Added migration strategy, observability, and performance benchmarks
 
 ## Context
 
