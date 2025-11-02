@@ -233,7 +233,9 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::TaskSpawning));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == AsyncPatternType::TaskSpawning));
     }
 
     #[test]
@@ -247,7 +249,9 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::ChannelCommunication));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == AsyncPatternType::ChannelCommunication));
     }
 
     #[test]
@@ -262,7 +266,9 @@ mod tests {
         let context = create_test_context(code);
 
         let patterns = detector.detect_async_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::MutexUsage));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == AsyncPatternType::MutexUsage));
     }
 
     #[test]

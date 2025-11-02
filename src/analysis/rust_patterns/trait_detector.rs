@@ -230,15 +230,12 @@ mod tests {
         trait_name: &str,
         is_trait_impl: bool,
     ) -> RustFunctionContext<'static> {
-        let code = format!(
-            r#"
-            fn test_function() {{
+        let code = r#"
+            fn test_function() {
                 println!("test");
-            }}
-            "#
-        );
-        let item_fn: &'static syn::ItemFn =
-            Box::leak(Box::new(syn::parse_str(&code).unwrap()));
+            }
+            "#.to_string();
+        let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(&code).unwrap()));
         let file_path: &'static Path = Path::new("test.rs");
 
         let impl_context = if is_trait_impl {
@@ -269,10 +266,7 @@ mod tests {
 
         let classification = result.unwrap();
         assert_eq!(classification.trait_name, "Display");
-        assert_eq!(
-            classification.standard_trait,
-            Some(StandardTrait::Display)
-        );
+        assert_eq!(classification.standard_trait, Some(StandardTrait::Display));
         assert_eq!(classification.category, ResponsibilityCategory::Formatting);
         assert_eq!(classification.confidence, 0.95);
     }
@@ -305,10 +299,7 @@ mod tests {
         let classification = result.unwrap();
         assert_eq!(classification.trait_name, "Drop");
         assert_eq!(classification.standard_trait, Some(StandardTrait::Drop));
-        assert_eq!(
-            classification.category,
-            ResponsibilityCategory::SideEffects
-        );
+        assert_eq!(classification.category, ResponsibilityCategory::SideEffects);
     }
 
     #[test]
@@ -321,10 +312,7 @@ mod tests {
 
         let classification = result.unwrap();
         assert_eq!(classification.trait_name, "Iterator");
-        assert_eq!(
-            classification.standard_trait,
-            Some(StandardTrait::Iterator)
-        );
+        assert_eq!(classification.standard_trait, Some(StandardTrait::Iterator));
         assert_eq!(
             classification.category,
             ResponsibilityCategory::Transformation
@@ -339,8 +327,7 @@ mod tests {
                 println!("test");
             }
         "#;
-        let item_fn: &'static syn::ItemFn =
-            Box::leak(Box::new(syn::parse_str(code).unwrap()));
+        let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(code).unwrap()));
         let file_path: &'static Path = Path::new("test.rs");
 
         let context = RustFunctionContext {
@@ -364,10 +351,7 @@ mod tests {
 
         let classification = result.unwrap();
         assert_eq!(classification.trait_name, "std::fmt::Display");
-        assert_eq!(
-            classification.standard_trait,
-            Some(StandardTrait::Display)
-        );
+        assert_eq!(classification.standard_trait, Some(StandardTrait::Display));
     }
 
     #[test]

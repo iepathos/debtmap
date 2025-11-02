@@ -179,7 +179,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::Constructor));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == BuilderPatternType::Constructor));
     }
 
     #[test]
@@ -193,7 +195,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::WithMethod));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == BuilderPatternType::WithMethod));
     }
 
     #[test]
@@ -207,7 +211,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::SetterMethod));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == BuilderPatternType::SetterMethod));
     }
 
     #[test]
@@ -220,6 +226,8 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_builder_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::BuildFinalization));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == BuilderPatternType::BuildFinalization));
     }
 }

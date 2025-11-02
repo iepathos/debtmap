@@ -473,7 +473,8 @@ fn reconstruct_function_metrics(context: &RecommendationContext) -> FunctionMetr
         mapping_pattern_result: None,
         adjusted_complexity: None,
         composition_metrics: None,
-            language_specific: None,    }
+        language_specific: None,
+    }
 }
 
 fn generate_standard_recommendation(
@@ -682,7 +683,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let debt = classify_test_debt(&test_func);
         match debt {
@@ -783,7 +785,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             1.0, // 100% coverage
@@ -824,7 +827,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.0, // 0% coverage
@@ -869,7 +873,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.6, // 60% coverage
@@ -912,7 +917,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.0, // 0% coverage
@@ -956,7 +962,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let (action, rationale, steps) = generate_testing_gap_recommendation(
             0.75, // 75% coverage
@@ -1000,7 +1007,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let transitive_cov = TransitiveCoverage {
             direct: 0.5,
@@ -1048,7 +1056,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         // Test at cyclomatic=10 (not complex)
         let (action1, _, _) = generate_testing_gap_recommendation(
@@ -1106,7 +1115,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let func_id = create_function_id(&func);
         assert_eq!(func_id.name, "test_func");
@@ -1354,7 +1364,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let debt_type = DebtType::ComplexityHotspot {
             cyclomatic: 15,
@@ -1418,7 +1429,8 @@ mod tests {
             mapping_pattern_result: None,
             adjusted_complexity: None,
             composition_metrics: None,
-            language_specific: None,        };
+            language_specific: None,
+        };
 
         let info = FunctionInfo::from_metrics(&func);
 

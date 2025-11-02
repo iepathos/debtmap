@@ -660,7 +660,9 @@ impl FunctionVisitor {
 
         // Rust-specific pattern detection (spec 146)
         let language_specific = if self.enable_rust_patterns {
-            use crate::analysis::rust_patterns::{ImplContext, RustFunctionContext, RustPatternDetector};
+            use crate::analysis::rust_patterns::{
+                ImplContext, RustFunctionContext, RustPatternDetector,
+            };
 
             let impl_context = if context.is_trait_method {
                 Some(ImplContext {
@@ -669,11 +671,14 @@ impl FunctionVisitor {
                     trait_name: context.trait_name.clone(),
                 })
             } else {
-                context.impl_type_name.as_ref().map(|impl_type| ImplContext {
-                    impl_type: impl_type.clone(),
-                    is_trait_impl: false,
-                    trait_name: None,
-                })
+                context
+                    .impl_type_name
+                    .as_ref()
+                    .map(|impl_type| ImplContext {
+                        impl_type: impl_type.clone(),
+                        is_trait_impl: false,
+                        trait_name: None,
+                    })
             };
 
             let rust_context = RustFunctionContext {
@@ -884,10 +889,7 @@ impl<'ast> Visit<'ast> for FunctionVisitor {
 
         // Check if this is a trait implementation and extract trait name
         let (is_trait_impl, trait_name) = if let Some((_, trait_path, _)) = &item_impl.trait_ {
-            let name = trait_path
-                .segments
-                .last()
-                .map(|seg| seg.ident.to_string());
+            let name = trait_path.segments.last().map(|seg| seg.ident.to_string());
             (true, name)
         } else {
             (false, None)

@@ -267,7 +267,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator));
     }
 
     #[test]
@@ -280,7 +282,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::UnwrapUsage));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == ErrorPatternType::UnwrapUsage));
     }
 
     #[test]
@@ -293,7 +297,9 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::ExpectUsage));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == ErrorPatternType::ExpectUsage));
     }
 
     #[test]
@@ -306,6 +312,8 @@ mod tests {
         "#;
         let context = create_test_context(code);
         let patterns = detector.detect_error_patterns(&context);
-        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::PanicUsage));
+        assert!(patterns
+            .iter()
+            .any(|p| p.pattern_type == ErrorPatternType::PanicUsage));
     }
 }
