@@ -48,6 +48,8 @@ fn calculate_total(items: &[i32]) -> i32 {
 
 Implement **two-phase inter-procedural purity analysis** that propagates purity information from callees to callers, enabling whole-program purity inference while maintaining conservative safety guarantees.
 
+**Scope**: This specification targets **Rust-only** implementation initially. Multi-language support (Python, JavaScript, TypeScript) will be addressed in follow-up specifications once the Rust implementation is validated.
+
 ## Requirements
 
 ### Functional Requirements
@@ -97,104 +99,98 @@ Implement **two-phase inter-procedural purity analysis** that propagates purity 
 
 ## Technical Details
 
+### Integration with Existing Infrastructure
+
+This implementation leverages significant existing infrastructure in debtmap:
+
+1. **Call Graph System** (`src/analysis/call_graph/mod.rs`)
+   - Reuse existing `RustCallGraph` with trait dispatch, function pointers, closures
+   - Leverage `TraitRegistry`, `FunctionPointerTracker`, `CrossModuleTracker`
+   - Use existing `FunctionId` from `src/priority/call_graph/types.rs`
+
+2. **Purity Analysis** (`src/analysis/purity_analysis.rs`)
+   - Extend existing `PurityAnalyzer` for phase 1 (intrinsic analysis)
+   - Reuse `PurityLevel`, `PurityViolation`, `PurityAnalysis` types
+   - Integrate with existing `IoDetector` (Spec 141)
+
+3. **FunctionMetrics Integration** (`src/core/mod.rs`)
+   - Already has `is_pure: Option<bool>` and `purity_confidence: Option<f32>`
+   - Add optional fields: `purity_reason: Option<String>`, `call_dependencies: Option<Vec<String>>`
+
+4. **Multi-Pass Framework** (`src/analysis/multi_pass.rs`)
+   - Integrate propagation as additional analysis phase
+   - Use existing performance tracking (25% overhead limit)
+
 ### Implementation Approach
 
 #### Phase 1: Call Graph Construction
 
+**Note**: Leverage existing `RustCallGraph` from `src/analysis/call_graph/mod.rs` instead of building from scratch.
+
 ```rust
-// src/analysis/call_graph.rs
+// src/analysis/purity_propagation/call_graph_adapter.rs
 
-#[derive(Debug, Clone)]
-pub struct CallGraph {
-    /// Map from function ID to list of functions it calls
-    dependencies: DashMap<FunctionId, Vec<FunctionId>>,
+use crate::analysis::call_graph::RustCallGraph;
+use crate::priority::call_graph::{CallGraph, FunctionId};
 
-    /// Reverse map: function ID to functions that call it
-    dependents: DashMap<FunctionId, Vec<FunctionId>>,
-
-    /// Strongly connected components (for cycle detection)
-    sccs: Vec<Vec<FunctionId>>,
+/// Adapter to use existing RustCallGraph for purity propagation
+pub struct PurityCallGraphAdapter {
+    rust_graph: RustCallGraph,
 }
 
-impl CallGraph {
-    /// Build call graph from analyzed functions
-    pub fn build(functions: &[FunctionMetrics]) -> Result<Self> {
-        let mut graph = Self::new();
+impl PurityCallGraphAdapter {
+    /// Create adapter from existing call graph
+    pub fn from_rust_graph(rust_graph: RustCallGraph) -> Self {
+        Self { rust_graph }
+    }
 
-        for func in functions {
-            let func_id = FunctionId::from_metrics(func);
+    /// Get dependencies for a function
+    pub fn get_dependencies(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        self.rust_graph.base_graph.get_callees(func_id)
+    }
 
-            // Extract function calls from AST
-            let calls = Self::extract_function_calls(&func.ast)?;
+    /// Get dependents (callers) for a function
+    pub fn get_dependents(&self, func_id: &FunctionId) -> Vec<FunctionId> {
+        self.rust_graph.base_graph.get_callers(func_id)
+    }
 
-            for callee in calls {
-                graph.add_edge(func_id.clone(), callee);
-            }
-        }
-
-        // Detect cycles using Tarjan's algorithm
-        graph.sccs = graph.find_strongly_connected_components();
-
-        Ok(graph)
+    /// Check if function is in a cycle (recursive)
+    pub fn is_in_cycle(&self, func_id: &FunctionId) -> bool {
+        self.rust_graph.base_graph.is_recursive(func_id)
     }
 
     /// Topological sort for bottom-up analysis
     pub fn topological_sort(&self) -> Result<Vec<FunctionId>> {
-        // Kahn's algorithm
-        let mut in_degree = self.compute_in_degrees();
-        let mut queue = VecDeque::new();
-        let mut result = Vec::new();
-
-        // Start with leaf functions (in-degree 0)
-        for (func_id, degree) in &in_degree {
-            if *degree == 0 {
-                queue.push_back(func_id.clone());
-            }
-        }
-
-        while let Some(func_id) = queue.pop_front() {
-            result.push(func_id.clone());
-
-            // Reduce in-degree for dependents
-            if let Some(dependents) = self.dependents.get(&func_id) {
-                for dep in dependents.iter() {
-                    let degree = in_degree.get_mut(dep).unwrap();
-                    *degree -= 1;
-                    if *degree == 0 {
-                        queue.push_back(dep.clone());
-                    }
-                }
-            }
-        }
-
-        // Check for cycles
-        if result.len() != self.dependencies.len() {
-            bail!("Call graph contains cycles");
-        }
-
-        Ok(result)
-    }
-
-    /// Find strongly connected components (cycles)
-    fn find_strongly_connected_components(&self) -> Vec<Vec<FunctionId>> {
-        // Tarjan's algorithm for SCC detection
-        // Functions in same SCC are mutually recursive
-        tarjan_scc(&self.dependencies)
+        // Delegate to existing call graph implementation
+        self.rust_graph.base_graph.topological_sort()
     }
 }
 ```
 
+**Key Advantage**: Reusing `RustCallGraph` provides:
+- Trait method resolution (no false negatives from trait dispatch)
+- Function pointer and closure tracking
+- Framework pattern detection (test functions, handlers)
+- Cross-module dependency analysis
+- Already tested and validated infrastructure
+
 #### Phase 2: Purity Propagation
 
 ```rust
-// src/analysis/purity_propagation.rs
+// src/analysis/purity_propagation/mod.rs
+
+use crate::analysis::purity_analysis::{PurityAnalyzer, PurityAnalysis, PurityLevel};
+use crate::priority::call_graph::FunctionId;
 
 pub struct PurityPropagator {
     /// Cache of function purity results
     cache: DashMap<FunctionId, PurityResult>,
 
-    /// Call graph for dependency tracking
-    call_graph: CallGraph,
+    /// Call graph adapter for dependency tracking
+    call_graph: PurityCallGraphAdapter,
+
+    /// Existing purity analyzer for intrinsic analysis (phase 1)
+    purity_analyzer: PurityAnalyzer,
 }
 
 #[derive(Debug, Clone)]
@@ -215,19 +211,41 @@ pub enum PurityReason {
     /// Has side effects
     SideEffects { effects: Vec<SideEffect> },
 
-    /// Part of recursive cycle
-    Recursive,
+    /// Part of recursive cycle with side effects
+    RecursiveWithSideEffects,
+
+    /// Part of recursive cycle but otherwise pure
+    RecursivePure,
 
     /// Unknown dependencies
     UnknownDeps { count: usize },
 }
 
+impl PurityResult {
+    /// Convert from existing PurityAnalysis (phase 1 result)
+    pub fn from_analysis(analysis: PurityAnalysis) -> Self {
+        let reason = if !analysis.violations.is_empty() {
+            PurityReason::SideEffects {
+                effects: analysis.violations.iter().map(|v| v.description()).collect(),
+            }
+        } else {
+            PurityReason::Intrinsic
+        };
+
+        Self {
+            level: analysis.purity,
+            confidence: 1.0,
+            reason,
+        }
+    }
+}
+
 impl PurityPropagator {
     pub fn propagate(&mut self, functions: &[FunctionMetrics]) -> Result<()> {
-        // Phase 1: Initial purity analysis (existing code)
+        // Phase 1: Initial purity analysis using existing PurityAnalyzer
         for func in functions {
             let initial = self.analyze_intrinsic_purity(func)?;
-            let func_id = FunctionId::from_metrics(func);
+            let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
             self.cache.insert(func_id, initial);
         }
 
@@ -241,6 +259,18 @@ impl PurityPropagator {
         Ok(())
     }
 
+    /// Analyze intrinsic purity using existing PurityAnalyzer
+    fn analyze_intrinsic_purity(&self, func: &FunctionMetrics) -> Result<PurityResult> {
+        // Get function source code from file
+        let source = extract_function_source(&func.file, func.line)?;
+
+        // Use existing PurityAnalyzer for intrinsic analysis
+        let analysis = self.purity_analyzer.analyze_code(&source, Language::Rust);
+
+        // Convert to PurityResult
+        Ok(PurityResult::from_analysis(analysis))
+    }
+
     fn propagate_for_function(&mut self, func_id: &FunctionId) -> Result<()> {
         // Get current purity result
         let mut result = self.cache.get(func_id)
@@ -250,11 +280,20 @@ impl PurityPropagator {
         // Get all dependencies
         let deps = self.call_graph.get_dependencies(func_id);
 
-        // Check if function is in a cycle
+        // Check if function is in a cycle (recursive)
         if self.call_graph.is_in_cycle(func_id) {
-            result.level = PurityLevel::Impure;
-            result.reason = PurityReason::Recursive;
-            result.confidence = 0.95;
+            // Distinguish between pure recursion and recursion with side effects
+            if result.level == PurityLevel::StrictlyPure || result.level == PurityLevel::LocallyPure {
+                // Pure structural recursion (e.g., factorial, tree traversal)
+                // Keep pure but reduce confidence due to recursion complexity
+                result.reason = PurityReason::RecursivePure;
+                result.confidence *= 0.7; // Penalty for recursion
+            } else {
+                // Recursion with side effects is impure
+                result.level = PurityLevel::Impure;
+                result.reason = PurityReason::RecursiveWithSideEffects;
+                result.confidence = 0.95;
+            }
             self.cache.insert(func_id.clone(), result);
             return Ok(());
         }
@@ -304,27 +343,128 @@ impl PurityPropagator {
 
 ### Data Structures
 
+**Note**: Reuse existing `FunctionId` from `src/priority/call_graph/types.rs`:
+
 ```rust
-/// Unique identifier for functions across the codebase
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+// Existing FunctionId structure (no changes needed)
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FunctionId {
-    pub file_path: PathBuf,
+    pub file: PathBuf,
+    pub name: String,
+    pub line: usize,
+    #[serde(default)]
     pub module_path: String,
-    pub function_name: String,
-    pub signature_hash: u64,  // Hash of parameter types
 }
 
+// Already has constructor:
 impl FunctionId {
-    pub fn from_metrics(func: &FunctionMetrics) -> Self {
-        Self {
-            file_path: func.file_path.clone(),
-            module_path: func.module_path.clone(),
-            function_name: func.name.clone(),
-            signature_hash: Self::hash_signature(&func.params),
+    pub fn new(file: PathBuf, name: String, line: usize) -> Self { ... }
+}
+```
+
+**Limitation**: This `FunctionId` doesn't distinguish between function overloads (same name, different signatures). This is acceptable because:
+- Rust doesn't support function overloading (only trait methods can have same name)
+- Line numbers provide sufficient uniqueness for same-named functions in different scopes
+- Trait methods are handled separately by `TraitRegistry` in call graph
+
+### Persistent Caching
+
+Purity propagation results are cached to avoid re-analysis on subsequent runs:
+
+```rust
+// src/analysis/purity_propagation/cache.rs
+
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+const CACHE_VERSION: u32 = 1;
+const CACHE_FILE: &str = ".debtmap/purity_cache.bincode";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PurityCache {
+    /// Schema version for migration compatibility
+    version: u32,
+
+    /// Cached purity results indexed by function ID
+    entries: HashMap<FunctionId, CachedPurity>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CachedPurity {
+    /// Purity propagation result
+    result: PurityResult,
+
+    /// xxHash64 of function source code
+    source_hash: u64,
+
+    /// xxHash64 of sorted dependency IDs
+    deps_hash: u64,
+
+    /// File modification time (seconds since epoch)
+    file_mtime: u64,
+}
+
+impl PurityCache {
+    /// Load cache from disk, creating new if doesn't exist
+    pub fn load(project_root: &Path) -> Result<Self> {
+        let cache_path = project_root.join(CACHE_FILE);
+
+        if !cache_path.exists() {
+            return Ok(Self::new());
         }
+
+        let bytes = std::fs::read(&cache_path)?;
+        let cache: PurityCache = bincode::deserialize(&bytes)?;
+
+        // Validate version
+        if cache.version != CACHE_VERSION {
+            eprintln!("Cache version mismatch, rebuilding cache");
+            return Ok(Self::new());
+        }
+
+        Ok(cache)
+    }
+
+    /// Save cache to disk
+    pub fn save(&self, project_root: &Path) -> Result<()> {
+        let cache_path = project_root.join(CACHE_FILE);
+        std::fs::create_dir_all(cache_path.parent().unwrap())?;
+
+        let bytes = bincode::serialize(self)?;
+        std::fs::write(&cache_path, bytes)?;
+
+        Ok(())
+    }
+
+    /// Check if cached entry is still valid
+    pub fn is_valid(&self, func_id: &FunctionId, current_mtime: u64,
+                     current_source_hash: u64, current_deps_hash: u64) -> bool {
+        if let Some(cached) = self.entries.get(func_id) {
+            cached.file_mtime == current_mtime
+                && cached.source_hash == current_source_hash
+                && cached.deps_hash == current_deps_hash
+        } else {
+            false
+        }
+    }
+
+    /// Invalidate entries for a specific file
+    pub fn invalidate_file(&mut self, file_path: &Path) {
+        self.entries.retain(|id, _| id.file != file_path);
     }
 }
 ```
+
+**Cache Invalidation Strategy**:
+1. **File modification time** - Invalidate if file changed
+2. **Source hash** - Detect in-file changes even if mtime unchanged
+3. **Dependencies hash** - Invalidate if any dependency changed
+4. **Transitive invalidation** - If function A's purity changes, invalidate all callers of A
+
+**Memory Limit**: Cache size is bounded by file count × functions per file. For 100K LOC:
+- ~2000 files × 20 functions/file = 40,000 entries
+- ~200 bytes/entry × 40,000 = 8MB (well under 50MB limit)
 
 ### Integration with Scoring
 
@@ -351,12 +491,19 @@ fn calculate_purity_adjustment(func: &FunctionMetrics, purity: &PurityResult) ->
 ## Dependencies
 
 - **Prerequisites**: None (foundational change)
-- **Affected Components**:
-  - `src/analyzers/purity_detector.rs` - Extract call information
-  - `src/analysis/purity_analysis.rs` - Integrate propagation
-  - `src/priority/unified_scorer.rs` - Use propagated purity
-  - `src/data_flow.rs` - Use call graph
-- **External Dependencies**: None (pure Rust implementation)
+- **Existing Infrastructure** (reused):
+  - `src/analysis/call_graph/mod.rs` - RustCallGraph with trait dispatch
+  - `src/analysis/purity_analysis.rs` - PurityAnalyzer for intrinsic analysis
+  - `src/priority/call_graph/` - FunctionId and base CallGraph
+  - `src/core/mod.rs` - FunctionMetrics with purity fields
+  - `src/analysis/multi_pass.rs` - Multi-phase analysis framework
+- **New Components** (to be created):
+  - `src/analysis/purity_propagation/mod.rs` - PurityPropagator
+  - `src/analysis/purity_propagation/cache.rs` - PurityCache
+  - `src/analysis/purity_propagation/call_graph_adapter.rs` - Adapter
+- **External Dependencies**:
+  - `bincode` (already in dependencies) - Cache serialization
+  - `xxhash-rust` (add) - Fast hashing for cache validation
 
 ## Testing Strategy
 
@@ -384,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_recursive_function_marked_impure() {
+    fn test_pure_recursive_function() {
         let code = r#"
             fn factorial(n: u32) -> u32 {
                 if n <= 1 { 1 } else { n * factorial(n - 1) }
@@ -394,8 +541,30 @@ mod tests {
         let analysis = analyze_with_propagation(code).unwrap();
         let func = analysis.get_function("factorial").unwrap();
 
+        // Pure recursion should remain pure with reduced confidence
+        assert_eq!(func.purity_level, PurityLevel::StrictlyPure);
+        assert_eq!(func.purity_reason, PurityReason::RecursivePure);
+        assert!(func.purity_confidence < 1.0); // Reduced confidence
+        assert!(func.purity_confidence >= 0.7); // But still reasonably confident
+    }
+
+    #[test]
+    fn test_impure_recursive_function() {
+        let code = r#"
+            fn recursive_with_io(n: u32) {
+                if n > 0 {
+                    println!("Count: {}", n);
+                    recursive_with_io(n - 1);
+                }
+            }
+        "#;
+
+        let analysis = analyze_with_propagation(code).unwrap();
+        let func = analysis.get_function("recursive_with_io").unwrap();
+
+        // Recursion with side effects is impure
         assert_eq!(func.purity_level, PurityLevel::Impure);
-        assert_eq!(func.purity_reason, PurityReason::Recursive);
+        assert_eq!(func.purity_reason, PurityReason::RecursiveWithSideEffects);
     }
 
     #[test]
@@ -506,10 +675,22 @@ Add to `ARCHITECTURE.md`:
 
 ### Handling Edge Cases
 
-1. **Circular Dependencies**: Use Tarjan's algorithm to detect cycles, mark all functions in cycle as impure
-2. **Generic Functions**: Create separate `FunctionId` per monomorphization
-3. **Trait Methods**: Conservative approach - only propagate if concrete impl known
-4. **Closures**: Treat as inline code within parent function scope
+1. **Circular Dependencies**: Detect cycles using existing call graph infrastructure
+   - **Pure recursion** (e.g., factorial): Keep pure, reduce confidence by 30%
+   - **Impure recursion** (e.g., recursive I/O): Mark as impure with high confidence
+   - Rationale: Pure structural recursion is mathematically pure and common in functional code
+
+2. **Generic Functions**: Treat as single function (no per-monomorphization tracking)
+   - Line numbers differentiate same-named functions in different scopes
+   - Purity analysis is signature-agnostic (generic type parameters don't affect purity)
+
+3. **Trait Methods**: Leverage existing `TraitRegistry` from `RustCallGraph`
+   - Propagate purity for trait methods with known concrete implementations
+   - Unknown trait impls: conservative (impure) unless marked `#[pure]` attribute (future work)
+
+4. **Closures**: Leverage existing `FunctionPointerTracker`
+   - Closures analyzed inline within parent function
+   - Closure captures affect parent purity (mutable captures = impure parent)
 
 ### Performance Optimizations
 
@@ -530,17 +711,114 @@ Add to `ARCHITECTURE.md`:
 
 ### Breaking Changes
 
-- `FunctionMetrics` gains new fields: `purity_reason`, `call_dependencies`
-- Purity confidence formula changes (may affect scores)
+**None** - All changes are backward compatible:
+- `FunctionMetrics` already has `is_pure: Option<bool>` and `purity_confidence: Option<f32>`
+- New optional fields added with `Option<T>` wrapper
+- Scoring gracefully handles `None` values (no propagated purity = use existing logic)
+
+### New Optional Fields in FunctionMetrics
+
+```rust
+// src/core/mod.rs
+pub struct FunctionMetrics {
+    // ... existing fields ...
+
+    /// Optional: Reason for purity classification (from propagation)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_reason: Option<String>,
+
+    /// Optional: List of function IDs this function calls
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_dependencies: Option<Vec<String>>,
+}
+```
 
 ### Migration Strategy
 
-- Add new fields with `Option<T>` for backward compatibility
-- Populate during analysis, None indicates old analysis
-- Update scoring to handle both old and new formats
+1. **Phase 1**: Add purity propagation as opt-in feature flag
+   ```bash
+   debtmap analyze --enable-interprocedural-purity
+   ```
+
+2. **Phase 2**: Run both analyses in parallel, compare results
+   - Log discrepancies for validation
+   - Gather metrics on false negative reduction
+
+3. **Phase 3**: Enable by default after validation (4-6 weeks)
+   - Keep feature flag for rollback capability
+   - Monitor performance metrics
+
+4. **Phase 4**: Remove feature flag after stable (2-3 months)
+   - Old single-phase analysis code can be archived
 
 ### Compatibility Guarantees
 
-- Old analysis cache formats still readable (ignored fields)
-- New cache format versioned with schema version
-- Gradual rollout via feature flag
+- **Cache versioning**: `CACHE_VERSION` field ensures safe schema evolution
+- **Graceful degradation**: Missing cache file = full analysis (no errors)
+- **JSON output**: New fields only included when present (`skip_serializing_if`)
+- **Performance**: Feature flag allows rollback if performance degrades
+
+---
+
+## Specification Improvements Summary
+
+This specification has been updated with the following enhancements:
+
+### 1. **Language Scope Clarification**
+- **Added**: Explicit Rust-only scope for initial implementation
+- **Rationale**: Multi-language support requires separate designs for Python, JavaScript, TypeScript
+
+### 2. **Integration with Existing Infrastructure**
+- **Added**: Comprehensive section documenting reuse of existing components
+- **Key Reuse**:
+  - `RustCallGraph` with trait dispatch, function pointers, closures
+  - `PurityAnalyzer` for intrinsic (phase 1) analysis
+  - Existing `FunctionId` from call graph types
+  - `MultiPassAnalyzer` framework for performance tracking
+- **Benefit**: ~60% of infrastructure already exists, reducing implementation complexity
+
+### 3. **Persistent Caching Implementation**
+- **Added**: Complete cache implementation with:
+  - Binary serialization (bincode format)
+  - Multi-level invalidation (mtime, source hash, deps hash)
+  - Schema versioning for future migrations
+  - Memory bounds calculation (8MB for 100K LOC)
+- **Rationale**: Required for acceptable performance on large codebases
+
+### 4. **Refined Recursive Function Handling**
+- **Changed**: Distinguished between pure recursion vs recursion with side effects
+- **Before**: All recursive functions marked impure
+- **After**: Pure recursion (factorial, tree traversal) stays pure with 30% confidence penalty
+- **Rationale**: Pure structural recursion is mathematically pure and common in functional programming
+
+### 5. **Data Structure Simplification**
+- **Changed**: Use existing `FunctionId` instead of new structure
+- **Removed**: `signature_hash` field (not needed for Rust)
+- **Rationale**: Rust doesn't support function overloading; line numbers provide uniqueness
+
+### 6. **Updated Test Cases**
+- **Added**: Separate tests for pure vs impure recursion
+- **Changed**: Adjusted expectations to match refined recursion handling
+
+### 7. **Enhanced Migration Strategy**
+- **Added**: 4-phase rollout plan with feature flag
+- **Added**: Explicit opt-in command line flag
+- **Added**: Backward compatibility guarantees
+- **Rationale**: Safe, gradual rollout minimizes risk
+
+### 8. **External Dependencies**
+- **Added**: `xxhash-rust` for fast cache validation hashing
+- **Clarified**: `bincode` already in dependencies
+
+### Implementation Complexity Reduction
+
+**Estimated LOC**: ~1100 new lines
+- PurityPropagator: ~300 LOC
+- PurityCache: ~200 LOC
+- Integration glue: ~150 LOC
+- Tests: ~400 LOC
+- Documentation: ~50 LOC
+
+**Complexity Level**: Medium (was High) due to infrastructure reuse
+
+**Implementation Time**: 3-5 days for experienced Rust developer (was 7-10 days)
