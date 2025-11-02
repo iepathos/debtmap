@@ -1259,7 +1259,10 @@ fn format_file_priority_item_with_verbosity(
         item.metrics.function_count,
         item.metrics.total_lines,
         item.metrics.god_object_type.as_ref(),
-        item.metrics.god_object_indicators.domain_diversity_metrics.as_ref(),
+        item.metrics
+            .god_object_indicators
+            .domain_diversity_metrics
+            .as_ref(),
     );
 
     writeln!(
@@ -2244,7 +2247,7 @@ mod tests {
                     struct_ratio: 0.0,
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
-                domain_diversity_metrics: None,
+                    domain_diversity_metrics: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,
