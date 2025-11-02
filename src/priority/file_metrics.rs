@@ -70,6 +70,9 @@ pub struct GodObjectIndicators {
     /// Domain diversity metrics with detailed distribution (spec 152)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub domain_diversity_metrics: Option<crate::organization::DomainDiversityMetrics>,
+    /// Type of god object detection (GodClass, GodFile, or GodModule) (spec 155)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection_type: Option<crate::organization::DetectionType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,6 +345,7 @@ impl Default for GodObjectIndicators {
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            detection_type: None,
         }
     }
 }
@@ -423,6 +427,7 @@ mod tests {
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                detection_type: None,
             },
             function_scores: vec![5.0; 60],
             god_object_type: None,
@@ -679,6 +684,7 @@ mod tests {
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                detection_type: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
@@ -727,6 +733,7 @@ mod tests {
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                detection_type: None,
             },
             god_object_type: Some(god_file_type),
             total_lines: 2000,
@@ -772,6 +779,7 @@ mod tests {
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                detection_type: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,

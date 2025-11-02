@@ -32,6 +32,7 @@ fn test_file_level_scoring_integration() {
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            detection_type: None,
         },
         function_scores: vec![],
         god_object_type: None,
@@ -101,6 +102,7 @@ fn test_file_scoring_with_god_object_detection() {
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            detection_type: None,
         },
         god_object_type: None,
         function_scores: vec![8.0; 80], // High scores for all functions
@@ -379,6 +381,7 @@ fn test_file_scoring_with_real_world_scenarios() {
             analysis_method: debtmap::priority::file_metrics::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            detection_type: None,
         },
         function_scores: vec![9.0; 70],
         god_object_type: None,

@@ -680,6 +680,7 @@ mod tests {
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
                     domain_diversity_metrics: None,
+                    detection_type: None,
                 },
                 function_scores: vec![],
                 god_object_type: None,
