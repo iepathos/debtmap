@@ -1,3 +1,4 @@
+pub mod evidence_formatter;
 pub mod formatters;
 pub mod json;
 pub mod markdown;
@@ -19,6 +20,7 @@ pub struct OutputConfig {
     pub formatting_config: FormattingConfig,
 }
 
+pub use evidence_formatter::*;
 pub use formatters::*;
 pub use json::*;
 pub use markdown::*;

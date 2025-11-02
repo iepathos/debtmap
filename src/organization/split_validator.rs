@@ -98,6 +98,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: split.classification_evidence.clone(),
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -116,6 +117,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: split.classification_evidence,
         },
     ]
 }
@@ -146,6 +148,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: split.classification_evidence.clone(),
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -164,6 +167,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: split.classification_evidence,
         },
     ]
 }
@@ -195,6 +199,7 @@ mod tests {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: None,
         }
     }
 
@@ -217,6 +222,7 @@ mod tests {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: None,
         };
 
         let validated = validate_and_refine_splits(vec![split]);

@@ -142,6 +142,7 @@ impl ValidationLimits {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: None,
         }];
 
         let enhanced =
@@ -183,6 +184,7 @@ impl ValidationLimits {
                 method: crate::organization::SplitAnalysisMethod::None,
                 severity: None,
                 interface_estimate: None,
+                classification_evidence: None,
             },
             ModuleSplit {
                 suggested_name: "validation".to_string(),
@@ -201,6 +203,7 @@ impl ValidationLimits {
                 method: crate::organization::SplitAnalysisMethod::None,
                 severity: None,
                 interface_estimate: None,
+                classification_evidence: None,
             },
         ];
 
@@ -236,6 +239,7 @@ impl ValidationLimits {
             method: crate::organization::SplitAnalysisMethod::None,
             severity: None,
             interface_estimate: None,
+            classification_evidence: None,
         }];
 
         let enhanced =

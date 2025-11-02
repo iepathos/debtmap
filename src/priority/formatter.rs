@@ -1,4 +1,5 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig};
+use crate::output::evidence_formatter::EvidenceFormatter;
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, Tier, UnifiedAnalysis,
     UnifiedAnalysisQueries, UnifiedDebtItem,
@@ -623,7 +624,7 @@ fn format_mixed_priority_item(
             );
         }
         priority::DebtItem::File(file_item) => {
-            format_file_priority_item(output, rank, file_item, config);
+            format_file_priority_item_with_verbosity(output, rank, file_item, config, verbosity);
         }
     }
 }
@@ -761,10 +762,22 @@ fn get_language_name(extension: &str) -> &str {
 }
 
 // Pure function to format implementation steps for god objects with detailed split recommendations
+// Kept for potential future use or backward compatibility
+#[allow(dead_code)]
 fn format_god_object_steps(
     output: &mut String,
     formatter: &ColoredFormatter,
     item: &priority::FileDebtItem,
+) {
+    format_god_object_steps_with_verbosity(output, formatter, item, 0)
+}
+
+// Internal implementation with verbosity support for evidence display
+fn format_god_object_steps_with_verbosity(
+    output: &mut String,
+    formatter: &ColoredFormatter,
+    item: &priority::FileDebtItem,
+    verbosity: u8,
 ) {
     let extension = get_file_extension(&item.metrics.path);
     let language = get_language_name(extension);
@@ -778,6 +791,9 @@ fn format_god_object_steps(
             indicators.recommended_splits.len()
         )
         .unwrap();
+
+        // Create evidence formatter for displaying classification evidence
+        let evidence_formatter = EvidenceFormatter::new(verbosity);
 
         for (idx, split) in indicators.recommended_splits.iter().enumerate() {
             let is_last = idx == indicators.recommended_splits.len() - 1;
@@ -803,6 +819,26 @@ fn format_god_object_steps(
                 priority_indicator
             )
             .unwrap();
+
+            // Display classification evidence if available and verbosity > 0
+            if verbosity > 0 {
+                if let Some(ref evidence) = split.classification_evidence {
+                    let formatted_evidence = evidence_formatter.format_evidence(evidence);
+                    // Indent evidence to align with split details
+                    for line in formatted_evidence.lines() {
+                        writeln!(output, "       {}", line).unwrap();
+                    }
+
+                    // Show alternatives warning if confidence is low
+                    if evidence.confidence < 0.80 && !evidence.alternatives.is_empty() {
+                        writeln!(
+                            output,
+                            "       ⚠  Low confidence classification - review recommended"
+                        )
+                        .unwrap();
+                    }
+                }
+            }
 
             // Show first few methods as examples
             if !split.methods_to_move.is_empty() {
@@ -1181,11 +1217,22 @@ fn format_scoring_and_dependencies(
     }
 }
 
+#[cfg(test)]
 fn format_file_priority_item(
     output: &mut String,
     rank: usize,
     item: &priority::FileDebtItem,
     config: FormattingConfig,
+) {
+    format_file_priority_item_with_verbosity(output, rank, item, config, 0)
+}
+
+fn format_file_priority_item_with_verbosity(
+    output: &mut String,
+    rank: usize,
+    item: &priority::FileDebtItem,
+    config: FormattingConfig,
+    verbosity: u8,
 ) {
     let formatter = ColoredFormatter::new(config);
     let severity = get_severity_label(item.score);
@@ -1239,7 +1286,7 @@ fn format_file_priority_item(
     .unwrap();
 
     if item.metrics.god_object_indicators.is_god_object {
-        format_god_object_steps(output, &formatter, item);
+        format_god_object_steps_with_verbosity(output, &formatter, item, verbosity);
     }
 
     let impact = calculate_impact_message(

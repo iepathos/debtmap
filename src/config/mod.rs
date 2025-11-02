@@ -50,7 +50,9 @@ pub use classification::{
 pub use languages::{EntropyConfig, LanguageFeatures, LanguagesConfig};
 
 // Re-export display types for backward compatibility
-pub use display::{DisplayConfig, GodObjectConfig, VerbosityLevel};
+pub use display::{
+    DisplayConfig, EvidenceVerbosity, GodObjectConfig, SignalFilterConfig, VerbosityLevel,
+};
 
 // Pure mapping pattern detection config (spec 118)
 pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;

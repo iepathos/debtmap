@@ -159,4 +159,13 @@ pub struct OutputConfig {
     /// Enable colored output (default: auto-detect based on TTY)
     #[serde(default)]
     pub use_color: Option<bool>,
+    /// Evidence verbosity level for multi-signal classification display (spec 148)
+    #[serde(default)]
+    pub evidence_verbosity: Option<super::display::EvidenceVerbosity>,
+    /// Minimum confidence for showing warning (0.0-1.0) (spec 148)
+    #[serde(default)]
+    pub min_confidence_warning: Option<f64>,
+    /// Signal filters for evidence display (spec 148)
+    #[serde(default)]
+    pub signal_filters: Option<super::display::SignalFilterConfig>,
 }
