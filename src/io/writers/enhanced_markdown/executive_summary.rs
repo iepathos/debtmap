@@ -755,6 +755,7 @@ mod tests {
             function_context: None,
             context_confidence: None,
             contextual_recommendation: None,
+            pattern_analysis: None,
         }
     }
 

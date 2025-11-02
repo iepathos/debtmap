@@ -2,6 +2,8 @@ pub mod evidence_formatter;
 pub mod formatters;
 pub mod json;
 pub mod markdown;
+pub mod pattern_analysis;
+pub mod pattern_formatter;
 pub mod terminal;
 pub mod unified;
 
@@ -24,6 +26,8 @@ pub use evidence_formatter::*;
 pub use formatters::*;
 pub use json::*;
 pub use markdown::*;
+pub use pattern_analysis::*;
+pub use pattern_formatter::*;
 pub use terminal::*;
 pub use unified::*;
 

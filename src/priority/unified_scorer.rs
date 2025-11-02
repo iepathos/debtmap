@@ -59,6 +59,19 @@ pub struct UnifiedDebtItem {
     pub function_context: Option<crate::analysis::FunctionContext>, // Detected context (spec 122)
     pub context_confidence: Option<f64>,         // Confidence in context detection (spec 122)
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
+}
+
+impl UnifiedDebtItem {
+    /// Builder method to attach pattern analysis to this debt item (spec 151)
+    pub fn with_pattern_analysis(
+        mut self,
+        pattern_analysis: crate::output::PatternAnalysis,
+    ) -> Self {
+        self.pattern_analysis = Some(pattern_analysis);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

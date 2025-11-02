@@ -61,6 +61,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         function_context: None,
         context_confidence: None,
         contextual_recommendation: None,
+        pattern_analysis: None,
     }
 }
 
