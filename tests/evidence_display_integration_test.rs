@@ -157,10 +157,7 @@ show_name_heuristics = false
 
     let output_config = config.output.unwrap();
     assert!(output_config.evidence_verbosity.is_some());
-    assert_eq!(
-        output_config.min_confidence_warning,
-        Some(0.75)
-    );
+    assert_eq!(output_config.min_confidence_warning, Some(0.75));
 }
 
 /// Test that evidence formatter handles empty evidence gracefully
