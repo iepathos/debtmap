@@ -102,25 +102,62 @@ This will provide actionable refactoring guidance beyond generic "split by respo
 
 ## Acceptance Criteria
 
-- [ ] Purity levels shown for each module split (% pure functions)
-- [ ] "Almost pure" functions highlighted with specific violations
-- [ ] Framework patterns displayed when detected (Axum handlers, tests, etc.)
-- [ ] Rust trait implementations listed (Display, From, etc.)
-- [ ] Async patterns shown (async fn count, tokio usage)
-- [ ] Builder pattern candidates identified
-- [ ] Refactoring opportunities presented with specific actions
-- [ ] Generic "Rust PATTERNS" advice replaced with actual detected patterns
-- [ ] Test suite includes pattern display formatting tests
-- [ ] Documentation explains how to interpret pattern indicators
+### Data Structures and Separation of Concerns
+- [ ] `PatternAnalysis` container holds all pattern data (purity, frameworks, Rust patterns)
+- [ ] All data structures implement `Serialize`/`Deserialize` for potential JSON output
+- [ ] All data structures provide `Default` implementations
+- [ ] Pure calculation methods separated from formatting (e.g., `purity_percentage()`)
+- [ ] All constants extracted and named (e.g., `REPETITIVE_TRAIT_THRESHOLD`)
+
+### Pattern Detection and Aggregation
+- [ ] Purity metrics aggregated correctly from function analyses
+- [ ] Framework patterns aggregated and sorted by frequency
+- [ ] Rust patterns aggregated (traits, async, error handling)
+- [ ] "Almost pure" functions identified (1-2 violations only)
+- [ ] Aggregation functions are pure (data in, metrics out)
+
+### Formatting Layer
+- [ ] `PatternFormatter` contains all formatting logic (no formatting in data structures)
+- [ ] Empty metrics produce no output (not "No patterns detected" messages)
+- [ ] Output format matches specification examples
+- [ ] Unicode in function names handled correctly
+- [ ] Empty example lists don't produce malformed output (e.g., "Examples: ,")
+
+### Integration
+- [ ] `PatternAnalysis` attached to recommendations as optional field
+- [ ] Integration uses simple builder pattern: `recommendation.with_pattern_analysis()`
+- [ ] Formatter checks for pattern presence before formatting
+- [ ] Generic "Rust PATTERNS" advice completely removed
+
+### Testing
+- [ ] Unit tests for pure calculations (purity percentage, total functions, etc.)
+- [ ] Property-based tests using `proptest` (percentage always 0.0-1.0, etc.)
+- [ ] Formatter tests validate output structure and content
+- [ ] Edge case tests (zero functions, Unicode, empty examples)
+- [ ] Integration tests verify end-to-end pattern flow
+- [ ] Tests verify generic advice is NOT in output
+
+### Performance
+- [ ] No premature optimization (no `OnceCell` or lazy evaluation)
+- [ ] Aggregation is O(n) over functions (single pass where possible)
+- [ ] No redundant analysis (leverages existing Specs 143, 144, 146)
+
+### Documentation
+- [ ] User documentation explains how to interpret each pattern type
+- [ ] Code examples show before/after output
+- [ ] API documentation for public types and methods
+- [ ] Configuration options documented (if added)
 
 ## Technical Details
 
 ### Implementation Approach
 
-**Phase 1: Purity Display**
+**Phase 1: Core Data Structures (Pure Data)**
 
 ```rust
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurityMetrics {
     pub strictly_pure: usize,
     pub locally_pure: usize,
@@ -129,7 +166,7 @@ pub struct PurityMetrics {
     pub almost_pure: Vec<AlmostPureFunction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlmostPureFunction {
     pub name: String,
     pub violations: Vec<PurityViolation>,
@@ -137,62 +174,50 @@ pub struct AlmostPureFunction {
 }
 
 impl PurityMetrics {
+    /// Pure calculation - no formatting or side effects
+    pub fn total_functions(&self) -> usize {
+        self.strictly_pure + self.locally_pure + self.read_only + self.impure
+    }
+
+    /// Returns purity percentage as a value between 0.0 and 1.0
     pub fn purity_percentage(&self) -> f64 {
-        let total = self.strictly_pure + self.locally_pure + self.read_only + self.impure;
+        let total = self.total_functions();
         if total == 0 {
-            return 0.0;
+            0.0
+        } else {
+            (self.strictly_pure + self.locally_pure) as f64 / total as f64
         }
-        (self.strictly_pure + self.locally_pure) as f64 / total as f64
     }
 
-    pub fn format_for_output(&self) -> String {
-        format!(
-            "PURITY ANALYSIS:\n\
-             - Strictly Pure: {} functions ({:.0}%)\n\
-             - Locally Pure: {} functions\n\
-             - Read-Only: {} functions\n\
-             - Impure: {} functions\n\
-             \n\
-             REFACTORING OPPORTUNITIES:\n\
-             {}",
-            self.strictly_pure,
-            self.purity_percentage() * 100.0,
-            self.locally_pure,
-            self.read_only,
-            self.impure,
-            self.format_almost_pure_functions()
-        )
+    /// Returns the top N almost-pure functions by refactoring impact
+    pub fn top_refactoring_opportunities(&self, limit: usize) -> &[AlmostPureFunction] {
+        let end = self.almost_pure.len().min(limit);
+        &self.almost_pure[..end]
     }
+}
 
-    fn format_almost_pure_functions(&self) -> String {
-        if self.almost_pure.is_empty() {
-            return "  - No extraction opportunities detected".into();
+impl Default for PurityMetrics {
+    fn default() -> Self {
+        Self {
+            strictly_pure: 0,
+            locally_pure: 0,
+            read_only: 0,
+            impure: 0,
+            almost_pure: vec![],
         }
-
-        self.almost_pure.iter()
-            .take(5)  // Show top 5
-            .map(|func| format!(
-                "  - {} (1 violation): {}\n\
-                     → Suggestion: {}",
-                func.name,
-                func.violations[0],
-                func.refactoring_suggestion
-            ))
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 }
 ```
 
-**Phase 2: Framework Pattern Display**
+**Phase 2: Framework Pattern Data Structures**
 
 ```rust
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrameworkPatternMetrics {
     pub patterns: Vec<DetectedPattern>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectedPattern {
     pub framework: String,
     pub pattern_type: String,
@@ -202,74 +227,81 @@ pub struct DetectedPattern {
 }
 
 impl FrameworkPatternMetrics {
-    pub fn format_for_output(&self) -> String {
-        if self.patterns.is_empty() {
-            return String::new();
-        }
+    /// Returns patterns sorted by count (most frequent first)
+    pub fn sorted_by_frequency(&self) -> Vec<&DetectedPattern> {
+        let mut sorted: Vec<_> = self.patterns.iter().collect();
+        sorted.sort_by(|a, b| b.count.cmp(&a.count));
+        sorted
+    }
 
-        let mut output = String::from("FRAMEWORK PATTERNS DETECTED:\n");
-
-        for pattern in &self.patterns {
-            output.push_str(&format!(
-                "  - {} {} ({}x detected)\n\
-                     Examples: {}\n\
-                     Recommendation: {}\n",
-                pattern.framework,
-                pattern.pattern_type,
-                pattern.count,
-                pattern.examples.join(", "),
-                pattern.recommendation
-            ));
-        }
-
-        output
+    /// Returns true if any framework patterns were detected
+    pub fn has_patterns(&self) -> bool {
+        !self.patterns.is_empty()
     }
 }
 
-// Example usage
-fn detect_framework_patterns(functions: &[FunctionAnalysis]) -> FrameworkPatternMetrics {
-    let mut patterns = Vec::new();
-
-    // Detect Axum handlers
-    let axum_handlers: Vec<_> = functions.iter()
-        .filter(|f| is_axum_handler(f))
-        .map(|f| f.name.clone())
-        .collect();
-
-    if !axum_handlers.is_empty() {
-        patterns.push(DetectedPattern {
-            framework: "Axum".into(),
-            pattern_type: "HTTP Request Handlers".into(),
-            count: axum_handlers.len(),
-            examples: axum_handlers.iter().take(3).cloned().collect(),
-            recommendation: "Consider grouping handlers by resource (users/, posts/, etc.)".into(),
-        });
+impl Default for FrameworkPatternMetrics {
+    fn default() -> Self {
+        Self { patterns: vec![] }
     }
+}
 
-    // Detect test functions
-    let test_functions: Vec<_> = functions.iter()
-        .filter(|f| is_test_function(f))
-        .map(|f| f.name.clone())
-        .collect();
+/// Aggregates framework patterns from function analyses (Spec 144)
+/// This assumes pattern detection already happened during classification
+fn aggregate_framework_patterns(functions: &[FunctionAnalysis]) -> FrameworkPatternMetrics {
+    use std::collections::HashMap;
 
-    if !test_functions.is_empty() {
-        patterns.push(DetectedPattern {
-            framework: "Rust Testing".into(),
-            pattern_type: "Test Functions".into(),
-            count: test_functions.len(),
-            examples: test_functions.iter().take(3).cloned().collect(),
-            recommendation: "Tests already well-organized with #[test] attributes".into(),
+    let grouped: HashMap<(String, String), Vec<String>> = functions
+        .iter()
+        .filter_map(|f| f.framework_pattern.as_ref().map(|p| (f, p)))
+        .fold(HashMap::new(), |mut acc, (func, pattern)| {
+            let key = (pattern.framework.clone(), pattern.pattern_type.clone());
+            acc.entry(key)
+                .or_insert_with(Vec::new)
+                .push(func.name.clone());
+            acc
         });
-    }
+
+    let patterns = grouped
+        .into_iter()
+        .map(|((framework, pattern_type), examples)| {
+            let count = examples.len();
+            let recommendation = generate_framework_recommendation(&framework, &pattern_type);
+            DetectedPattern {
+                framework,
+                pattern_type,
+                count,
+                examples: examples.into_iter().take(3).collect(),
+                recommendation,
+            }
+        })
+        .collect();
 
     FrameworkPatternMetrics { patterns }
 }
+
+/// Pure function to generate framework-specific recommendations
+fn generate_framework_recommendation(framework: &str, pattern_type: &str) -> String {
+    match (framework, pattern_type) {
+        ("Axum", "HTTP Request Handlers") => {
+            "Consider grouping handlers by resource (users/, posts/, etc.)".into()
+        }
+        ("Rust Testing", "Test Functions") => {
+            "Tests already well-organized with #[test] attributes".into()
+        }
+        _ => format!("Review {} {} organization", framework, pattern_type),
+    }
+}
 ```
 
-**Phase 3: Rust Pattern Display**
+**Phase 3: Rust Pattern Data Structures**
 
 ```rust
-#[derive(Debug, Clone)]
+// Constants for thresholds (configurable via settings)
+const REPETITIVE_TRAIT_THRESHOLD: usize = 5;
+const MAX_DISPLAYED_EXAMPLES: usize = 3;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustPatternMetrics {
     pub trait_impls: Vec<TraitImplementation>,
     pub async_patterns: AsyncPatternSummary,
@@ -277,14 +309,14 @@ pub struct RustPatternMetrics {
     pub builder_candidates: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraitImplementation {
     pub trait_name: String,
     pub count: usize,
     pub types: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsyncPatternSummary {
     pub async_functions: usize,
     pub spawn_calls: usize,
@@ -292,7 +324,7 @@ pub struct AsyncPatternSummary {
     pub mutex_usage: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorHandlingSummary {
     pub question_mark_density: f64,  // Avg ? operators per function
     pub custom_error_types: Vec<String>,
@@ -300,129 +332,483 @@ pub struct ErrorHandlingSummary {
 }
 
 impl RustPatternMetrics {
-    pub fn format_for_output(&self) -> String {
-        let mut output = String::from("RUST-SPECIFIC PATTERNS:\n");
+    /// Returns trait implementations that appear repetitively
+    pub fn repetitive_traits(&self) -> Vec<&TraitImplementation> {
+        self.trait_impls
+            .iter()
+            .filter(|t| t.count >= REPETITIVE_TRAIT_THRESHOLD)
+            .collect()
+    }
 
-        // Trait implementations
-        if !self.trait_impls.is_empty() {
-            output.push_str("  Trait Implementations:\n");
-            for trait_impl in &self.trait_impls {
-                output.push_str(&format!(
-                    "    - {}: {} implementations ({})\n",
-                    trait_impl.trait_name,
-                    trait_impl.count,
-                    trait_impl.types.join(", ")
-                ));
-            }
+    /// Returns true if async patterns are present
+    pub fn has_async_patterns(&self) -> bool {
+        self.async_patterns.async_functions > 0
+    }
 
-            // Suggest macros if repetitive
-            let repetitive_traits: Vec<_> = self.trait_impls.iter()
-                .filter(|t| t.count >= 5)
-                .collect();
+    /// Returns true if error handling patterns are present
+    pub fn has_error_handling(&self) -> bool {
+        self.error_handling.question_mark_density > 0.0
+    }
 
-            if !repetitive_traits.is_empty() {
-                output.push_str("    → Consider using macros for repetitive implementations\n");
-            }
+    /// Returns true if builder patterns are present
+    pub fn has_builder_candidates(&self) -> bool {
+        !self.builder_candidates.is_empty()
+    }
+}
+
+impl Default for RustPatternMetrics {
+    fn default() -> Self {
+        Self {
+            trait_impls: vec![],
+            async_patterns: AsyncPatternSummary::default(),
+            error_handling: ErrorHandlingSummary::default(),
+            builder_candidates: vec![],
+        }
+    }
+}
+
+impl Default for AsyncPatternSummary {
+    fn default() -> Self {
+        Self {
+            async_functions: 0,
+            spawn_calls: 0,
+            channel_usage: false,
+            mutex_usage: false,
+        }
+    }
+}
+
+impl Default for ErrorHandlingSummary {
+    fn default() -> Self {
+        Self {
+            question_mark_density: 0.0,
+            custom_error_types: vec![],
+            unwrap_count: 0,
+        }
+    }
+}
+```
+
+**Phase 4: Pattern Analysis Container**
+
+```rust
+/// Container for all pattern analysis results
+/// Attached to recommendations for display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatternAnalysis {
+    pub purity: PurityMetrics,
+    pub frameworks: FrameworkPatternMetrics,
+    pub rust_patterns: RustPatternMetrics,
+}
+
+impl PatternAnalysis {
+    /// Creates pattern analysis from a collection of function analyses
+    pub fn from_functions(functions: &[FunctionAnalysis]) -> Self {
+        Self {
+            purity: aggregate_purity_metrics(functions),
+            frameworks: aggregate_framework_patterns(functions),
+            rust_patterns: aggregate_rust_patterns(functions),
+        }
+    }
+
+    /// Returns true if any patterns were detected
+    pub fn has_patterns(&self) -> bool {
+        self.purity.total_functions() > 0
+            || self.frameworks.has_patterns()
+            || self.rust_patterns.has_async_patterns()
+            || self.rust_patterns.has_error_handling()
+    }
+}
+
+impl Default for PatternAnalysis {
+    fn default() -> Self {
+        Self {
+            purity: PurityMetrics::default(),
+            frameworks: FrameworkPatternMetrics::default(),
+            rust_patterns: RustPatternMetrics::default(),
+        }
+    }
+}
+
+/// Aggregates purity metrics from function analyses (Spec 143)
+fn aggregate_purity_metrics(functions: &[FunctionAnalysis]) -> PurityMetrics {
+    let mut strictly_pure = 0;
+    let mut locally_pure = 0;
+    let mut read_only = 0;
+    let mut impure = 0;
+    let mut almost_pure = Vec::new();
+
+    for func in functions {
+        match func.purity_classification {
+            PurityLevel::StrictlyPure => strictly_pure += 1,
+            PurityLevel::LocallyPure => locally_pure += 1,
+            PurityLevel::ReadOnly => read_only += 1,
+            PurityLevel::Impure => impure += 1,
         }
 
-        // Async patterns
-        if self.async_patterns.async_functions > 0 {
+        // Identify "almost pure" functions (1-2 violations)
+        if func.purity_violations.len() <= 2 && func.purity_violations.len() > 0 {
+            almost_pure.push(AlmostPureFunction {
+                name: func.name.clone(),
+                violations: func.purity_violations.clone(),
+                refactoring_suggestion: suggest_purity_refactoring(&func.purity_violations),
+            });
+        }
+    }
+
+    PurityMetrics {
+        strictly_pure,
+        locally_pure,
+        read_only,
+        impure,
+        almost_pure,
+    }
+}
+
+/// Pure function to generate purity refactoring suggestions
+fn suggest_purity_refactoring(violations: &[PurityViolation]) -> String {
+    if violations.is_empty() {
+        return "Already pure".into();
+    }
+
+    match &violations[0] {
+        PurityViolation::ConsoleOutput { .. } => {
+            "Extract println!/eprintln! to caller, make core logic pure".into()
+        }
+        PurityViolation::FileIO { .. } => {
+            "Separate file I/O from computation - pass data as parameters".into()
+        }
+        PurityViolation::GlobalStateMutation { .. } => {
+            "Return new state instead of mutating global state".into()
+        }
+        PurityViolation::NonDeterministic { .. } => {
+            "Inject time/random source as parameter for testability".into()
+        }
+        _ => "Separate side effects from pure computation".into(),
+    }
+}
+
+/// Aggregates Rust pattern metrics from function analyses (Spec 146)
+fn aggregate_rust_patterns(functions: &[FunctionAnalysis]) -> RustPatternMetrics {
+    use std::collections::HashMap;
+
+    // Aggregate trait implementations
+    let mut trait_counts: HashMap<String, Vec<String>> = HashMap::new();
+    for func in functions {
+        if let Some(trait_impl) = &func.trait_implementation {
+            trait_counts
+                .entry(trait_impl.trait_name.clone())
+                .or_insert_with(Vec::new)
+                .push(trait_impl.type_name.clone());
+        }
+    }
+
+    let trait_impls = trait_counts
+        .into_iter()
+        .map(|(trait_name, types)| TraitImplementation {
+            trait_name,
+            count: types.len(),
+            types: types.into_iter().take(MAX_DISPLAYED_EXAMPLES).collect(),
+        })
+        .collect();
+
+    // Aggregate async patterns
+    let async_functions = functions.iter().filter(|f| f.is_async).count();
+    let spawn_calls = functions
+        .iter()
+        .map(|f| f.spawn_call_count.unwrap_or(0))
+        .sum();
+    let channel_usage = functions.iter().any(|f| f.uses_channels);
+    let mutex_usage = functions.iter().any(|f| f.uses_mutex);
+
+    // Aggregate error handling
+    let total_question_marks: usize = functions
+        .iter()
+        .map(|f| f.question_mark_count.unwrap_or(0))
+        .sum();
+    let question_mark_density = if functions.is_empty() {
+        0.0
+    } else {
+        total_question_marks as f64 / functions.len() as f64
+    };
+    let unwrap_count = functions.iter().map(|f| f.unwrap_count.unwrap_or(0)).sum();
+
+    // Identify builder candidates
+    let builder_candidates = functions
+        .iter()
+        .filter(|f| f.is_builder_candidate)
+        .map(|f| f.name.clone())
+        .collect();
+
+    RustPatternMetrics {
+        trait_impls,
+        async_patterns: AsyncPatternSummary {
+            async_functions,
+            spawn_calls,
+            channel_usage,
+            mutex_usage,
+        },
+        error_handling: ErrorHandlingSummary {
+            question_mark_density,
+            custom_error_types: vec![], // TODO: Extract from analysis
+            unwrap_count,
+        },
+        builder_candidates,
+    }
+}
+```
+
+**Phase 5: Formatting Layer (Separate from Data)**
+
+```rust
+/// Formatter for pattern analysis - pure display logic only
+pub struct PatternFormatter;
+
+impl PatternFormatter {
+    /// Formats complete pattern analysis for output
+    pub fn format(analysis: &PatternAnalysis) -> String {
+        if !analysis.has_patterns() {
+            return String::new();
+        }
+
+        [
+            Self::format_purity(&analysis.purity),
+            Self::format_frameworks(&analysis.frameworks),
+            Self::format_rust_patterns(&analysis.rust_patterns),
+        ]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+    }
+
+    fn format_purity(metrics: &PurityMetrics) -> String {
+        if metrics.total_functions() == 0 {
+            return String::new();
+        }
+
+        let mut sections = vec![
+            format!(
+                "PURITY ANALYSIS:\n\
+                 - Strictly Pure: {} functions ({:.0}%)\n\
+                 - Locally Pure: {} functions\n\
+                 - Read-Only: {} functions\n\
+                 - Impure: {} functions",
+                metrics.strictly_pure,
+                metrics.purity_percentage() * 100.0,
+                metrics.locally_pure,
+                metrics.read_only,
+                metrics.impure
+            ),
+        ];
+
+        let opportunities = Self::format_refactoring_opportunities(metrics);
+        if !opportunities.is_empty() {
+            sections.push(opportunities);
+        }
+
+        sections.join("\n\n")
+    }
+
+    fn format_refactoring_opportunities(metrics: &PurityMetrics) -> String {
+        let opportunities = metrics.top_refactoring_opportunities(5);
+        if opportunities.is_empty() {
+            return String::new();
+        }
+
+        let mut output = String::from("REFACTORING OPPORTUNITIES:");
+        for func in opportunities {
             output.push_str(&format!(
-                "  Async/Concurrency:\n\
-                   - Async functions: {}\n\
-                   - Spawn calls: {}\n\
-                   - Channels: {}\n\
-                   - Mutex usage: {}\n",
-                self.async_patterns.async_functions,
-                self.async_patterns.spawn_calls,
-                if self.async_patterns.channel_usage { "Yes" } else { "No" },
-                if self.async_patterns.mutex_usage { "Yes" } else { "No" }
+                "\n  - {} ({} violation{}): {}\n    → Suggestion: {}",
+                func.name,
+                func.violations.len(),
+                if func.violations.len() == 1 { "" } else { "s" },
+                func.violations[0],
+                func.refactoring_suggestion
             ));
+        }
+        output
+    }
 
-            if self.async_patterns.spawn_calls > 0 {
-                output.push_str("    → Concurrency management detected - group spawn logic\n");
-            }
+    fn format_frameworks(metrics: &FrameworkPatternMetrics) -> String {
+        if !metrics.has_patterns() {
+            return String::new();
         }
 
-        // Error handling
-        if self.error_handling.question_mark_density > 0.0 {
+        let mut output = String::from("FRAMEWORK PATTERNS DETECTED:");
+        for pattern in metrics.sorted_by_frequency() {
             output.push_str(&format!(
-                "  Error Handling:\n\
-                   - Average ? operators per function: {:.1}\n",
-                self.error_handling.question_mark_density
+                "\n  - {} {} ({}x detected)\n    Examples: {}\n    Recommendation: {}",
+                pattern.framework,
+                pattern.pattern_type,
+                pattern.count,
+                pattern.examples.join(", "),
+                pattern.recommendation
             ));
+        }
+        output
+    }
 
-            if self.error_handling.unwrap_count > 0 {
-                output.push_str(&format!(
-                    "    ⚠ {} unwrap() calls detected - replace with proper error handling\n",
-                    self.error_handling.unwrap_count
-                ));
-            }
+    fn format_rust_patterns(metrics: &RustPatternMetrics) -> String {
+        let sections = [
+            Self::format_trait_implementations(metrics),
+            Self::format_async_patterns(metrics),
+            Self::format_error_handling(metrics),
+            Self::format_builder_candidates(metrics),
+        ];
+
+        let non_empty: Vec<_> = sections.into_iter().filter(|s| !s.is_empty()).collect();
+
+        if non_empty.is_empty() {
+            return String::new();
         }
 
-        // Builder candidates
-        if !self.builder_candidates.is_empty() {
+        format!("RUST-SPECIFIC PATTERNS:\n{}", non_empty.join("\n"))
+    }
+
+    fn format_trait_implementations(metrics: &RustPatternMetrics) -> String {
+        if metrics.trait_impls.is_empty() {
+            return String::new();
+        }
+
+        let mut output = String::from("  Trait Implementations:");
+        for trait_impl in &metrics.trait_impls {
             output.push_str(&format!(
-                "  Builder Patterns:\n\
-                   - Candidates: {}\n\
-                   → Extract builder logic into separate module\n",
-                self.builder_candidates.join(", ")
+                "\n    - {}: {} implementations ({})",
+                trait_impl.trait_name,
+                trait_impl.count,
+                trait_impl.types.join(", ")
+            ));
+        }
+
+        let repetitive = metrics.repetitive_traits();
+        if !repetitive.is_empty() {
+            output.push_str("\n    → Consider using macros for repetitive implementations");
+        }
+
+        output
+    }
+
+    fn format_async_patterns(metrics: &RustPatternMetrics) -> String {
+        if !metrics.has_async_patterns() {
+            return String::new();
+        }
+
+        let async_pat = &metrics.async_patterns;
+        let mut output = format!(
+            "  Async/Concurrency:\n\
+               - Async functions: {}\n\
+               - Spawn calls: {}\n\
+               - Channels: {}\n\
+               - Mutex usage: {}",
+            async_pat.async_functions,
+            async_pat.spawn_calls,
+            if async_pat.channel_usage { "Yes" } else { "No" },
+            if async_pat.mutex_usage { "Yes" } else { "No" }
+        );
+
+        if async_pat.spawn_calls > 0 {
+            output.push_str("\n    → Concurrency management detected - group spawn logic");
+        }
+
+        output
+    }
+
+    fn format_error_handling(metrics: &RustPatternMetrics) -> String {
+        if !metrics.has_error_handling() {
+            return String::new();
+        }
+
+        let mut output = format!(
+            "  Error Handling:\n    - Average ? operators per function: {:.1}",
+            metrics.error_handling.question_mark_density
+        );
+
+        if metrics.error_handling.unwrap_count > 0 {
+            output.push_str(&format!(
+                "\n    ⚠ {} unwrap() calls detected - replace with proper error handling",
+                metrics.error_handling.unwrap_count
             ));
         }
 
         output
     }
+
+    fn format_builder_candidates(metrics: &RustPatternMetrics) -> String {
+        if !metrics.has_builder_candidates() {
+            return String::new();
+        }
+
+        format!(
+            "  Builder Patterns:\n\
+               - Candidates: {}\n\
+               → Extract builder logic into separate module",
+            metrics.builder_candidates.join(", ")
+        )
+    }
 }
 ```
 
-**Phase 4: Integration with Recommendation Output**
+**Phase 6: Integration with Recommendations**
 
 ```rust
+// In src/organization/god_object_detector.rs or similar
+
+/// Attach pattern analysis to recommendations
+pub struct ModuleSplitRecommendation {
+    // ... existing fields ...
+    pub pattern_analysis: Option<PatternAnalysis>,
+}
+
+impl ModuleSplitRecommendation {
+    pub fn with_pattern_analysis(
+        mut self,
+        functions: &[FunctionAnalysis],
+    ) -> Self {
+        self.pattern_analysis = Some(PatternAnalysis::from_functions(functions));
+        self
+    }
+}
+
 // In src/priority/formatter.rs
 
 impl RecommendationFormatter {
-    pub fn format_recommendation_with_patterns(
-        &self,
-        recommendation: &ModuleSplitRecommendation,
-        purity_metrics: &PurityMetrics,
-        framework_patterns: &FrameworkPatternMetrics,
-        rust_patterns: &RustPatternMetrics,
-    ) -> String {
-        let mut output = String::new();
+    pub fn format(&self, recommendation: &ModuleSplitRecommendation) -> String {
+        let mut sections = vec![
+            self.format_header(recommendation),
+            self.format_splits(recommendation),
+        ];
 
-        // Existing recommendation format
-        output.push_str(&self.format_basic_recommendation(recommendation));
+        // Add pattern analysis if available
+        if let Some(patterns) = &recommendation.pattern_analysis {
+            sections.push(PatternFormatter::format(patterns));
+        }
 
-        // NEW: Add pattern analysis
-        output.push_str("\n");
-        output.push_str(&purity_metrics.format_for_output());
-        output.push_str("\n");
-        output.push_str(&framework_patterns.format_for_output());
-        output.push_str("\n");
-        output.push_str(&rust_patterns.format_for_output());
-
-        output
+        sections.join("\n\n")
     }
 }
 ```
 
 ### Architecture Changes
 
-**New Module**: `src/output/pattern_display.rs`
-- Purity metrics formatting
-- Framework pattern formatting
-- Rust pattern formatting
-- Refactoring opportunity display
+**New Module**: `src/output/pattern_analysis.rs`
+- `PatternAnalysis` - container for all pattern data
+- `PurityMetrics`, `FrameworkPatternMetrics`, `RustPatternMetrics` - data structures
+- Aggregation functions: `aggregate_purity_metrics()`, `aggregate_framework_patterns()`, `aggregate_rust_patterns()`
 
-**Modified Module**: `src/priority/formatter.rs`
-- Integrate pattern displays into recommendations
-- Replace generic "Rust PATTERNS" section with actual detected patterns
-- Add pattern-specific refactoring advice
+**New Module**: `src/output/pattern_formatter.rs`
+- `PatternFormatter` - pure formatting logic separated from data
+- All `format_*()` functions are pure (data in, string out)
+- No formatting logic mixed with data structures
 
-**Modified Module**: `src/organization/god_object_detector.rs`
-- Collect purity, framework, and Rust pattern data during analysis
-- Attach pattern metrics to recommendations
-- Pass pattern data to formatter
+**Modified**: `src/organization/god_object_detector.rs`
+- Attach `PatternAnalysis` to recommendations via `with_pattern_analysis()`
+- Pattern data flows as part of recommendation structure
+
+**Modified**: `src/priority/formatter.rs`
+- Use `PatternFormatter::format()` to display patterns
+- Remove generic "Rust PATTERNS" section
+- Simple integration: just call formatter if patterns exist
 
 ## Dependencies
 
@@ -440,9 +826,147 @@ impl RecommendationFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use pretty_assertions::assert_eq;
+
+    // Data structure tests (pure functions)
+    #[test]
+    fn purity_percentage_calculation() {
+        let metrics = PurityMetrics {
+            strictly_pure: 15,
+            locally_pure: 10,
+            read_only: 5,
+            impure: 20,
+            almost_pure: vec![],
+        };
+
+        assert_eq!(metrics.total_functions(), 50);
+        assert_eq!(metrics.purity_percentage(), 0.5); // (15 + 10) / 50
+    }
 
     #[test]
-    fn format_purity_metrics() {
+    fn purity_percentage_zero_functions() {
+        let metrics = PurityMetrics::default();
+        assert_eq!(metrics.total_functions(), 0);
+        assert_eq!(metrics.purity_percentage(), 0.0);
+    }
+
+    #[test]
+    fn top_refactoring_opportunities_limits() {
+        let almost_pure = (0..10)
+            .map(|i| AlmostPureFunction {
+                name: format!("func_{}", i),
+                violations: vec![],
+                refactoring_suggestion: "test".into(),
+            })
+            .collect();
+
+        let metrics = PurityMetrics {
+            strictly_pure: 0,
+            locally_pure: 0,
+            read_only: 0,
+            impure: 0,
+            almost_pure,
+        };
+
+        assert_eq!(metrics.top_refactoring_opportunities(5).len(), 5);
+        assert_eq!(metrics.top_refactoring_opportunities(20).len(), 10);
+    }
+
+    #[test]
+    fn framework_patterns_sorted_by_frequency() {
+        let metrics = FrameworkPatternMetrics {
+            patterns: vec![
+                DetectedPattern {
+                    framework: "Axum".into(),
+                    pattern_type: "Handlers".into(),
+                    count: 5,
+                    examples: vec![],
+                    recommendation: "".into(),
+                },
+                DetectedPattern {
+                    framework: "Pytest".into(),
+                    pattern_type: "Fixtures".into(),
+                    count: 15,
+                    examples: vec![],
+                    recommendation: "".into(),
+                },
+            ],
+        };
+
+        let sorted = metrics.sorted_by_frequency();
+        assert_eq!(sorted[0].count, 15); // Pytest first
+        assert_eq!(sorted[1].count, 5);  // Axum second
+    }
+
+    #[test]
+    fn rust_patterns_repetitive_traits() {
+        let metrics = RustPatternMetrics {
+            trait_impls: vec![
+                TraitImplementation {
+                    trait_name: "Display".into(),
+                    count: 8,
+                    types: vec![],
+                },
+                TraitImplementation {
+                    trait_name: "From".into(),
+                    count: 3,
+                    types: vec![],
+                },
+            ],
+            async_patterns: AsyncPatternSummary::default(),
+            error_handling: ErrorHandlingSummary::default(),
+            builder_candidates: vec![],
+        };
+
+        let repetitive = metrics.repetitive_traits();
+        assert_eq!(repetitive.len(), 1);
+        assert_eq!(repetitive[0].trait_name, "Display");
+    }
+
+    // Property-based tests
+    proptest! {
+        #[test]
+        fn purity_percentage_always_valid(
+            pure in 0..1000usize,
+            locally in 0..1000usize,
+            readonly in 0..1000usize,
+            impure in 0..1000usize
+        ) {
+            let metrics = PurityMetrics {
+                strictly_pure: pure,
+                locally_pure: locally,
+                read_only: readonly,
+                impure,
+                almost_pure: vec![],
+            };
+
+            let pct = metrics.purity_percentage();
+            prop_assert!(pct >= 0.0 && pct <= 1.0);
+        }
+
+        #[test]
+        fn total_functions_equals_sum(
+            a in 0..1000usize,
+            b in 0..1000usize,
+            c in 0..1000usize,
+            d in 0..1000usize
+        ) {
+            let metrics = PurityMetrics {
+                strictly_pure: a,
+                locally_pure: b,
+                read_only: c,
+                impure: d,
+                almost_pure: vec![],
+            };
+
+            prop_assert_eq!(metrics.total_functions(), a + b + c + d);
+        }
+    }
+
+    // Formatter tests (output validation)
+    #[test]
+    fn format_purity_contains_expected_sections() {
         let metrics = PurityMetrics {
             strictly_pure: 15,
             locally_pure: 10,
@@ -451,22 +975,30 @@ mod tests {
             almost_pure: vec![
                 AlmostPureFunction {
                     name: "calculate_with_logging".into(),
-                    violations: vec![PurityViolation::ConsoleOutput { .. }],
+                    violations: vec![],
                     refactoring_suggestion: "Extract println! to caller".into(),
                 },
             ],
         };
 
-        let output = metrics.format_for_output();
+        let output = PatternFormatter::format_purity(&metrics);
 
+        assert!(output.contains("PURITY ANALYSIS"));
         assert!(output.contains("Strictly Pure: 15"));
-        assert!(output.contains("30%"));  // (15 / 50) * 100
+        assert!(output.contains("50%")); // (15 + 10) / 50 * 100
         assert!(output.contains("REFACTORING OPPORTUNITIES"));
         assert!(output.contains("calculate_with_logging"));
     }
 
     #[test]
-    fn format_framework_patterns() {
+    fn format_purity_empty_metrics() {
+        let metrics = PurityMetrics::default();
+        let output = PatternFormatter::format_purity(&metrics);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn format_framework_patterns_sorted() {
         let metrics = FrameworkPatternMetrics {
             patterns: vec![
                 DetectedPattern {
@@ -479,15 +1011,16 @@ mod tests {
             ],
         };
 
-        let output = metrics.format_for_output();
+        let output = PatternFormatter::format_frameworks(&metrics);
 
+        assert!(output.contains("FRAMEWORK PATTERNS DETECTED"));
         assert!(output.contains("Axum"));
-        assert!(output.contains("HTTP Request Handlers"));
         assert!(output.contains("12x detected"));
+        assert!(output.contains("get_user, create_post"));
     }
 
     #[test]
-    fn format_rust_patterns() {
+    fn format_rust_patterns_with_warnings() {
         let metrics = RustPatternMetrics {
             trait_impls: vec![
                 TraitImplementation {
@@ -504,17 +1037,65 @@ mod tests {
             },
             error_handling: ErrorHandlingSummary {
                 question_mark_density: 2.5,
-                custom_error_types: vec!["AnalysisError".into()],
+                custom_error_types: vec![],
                 unwrap_count: 5,
             },
             builder_candidates: vec![],
         };
 
-        let output = metrics.format_for_output();
+        let output = PatternFormatter::format_rust_patterns(&metrics);
 
+        assert!(output.contains("RUST-SPECIFIC PATTERNS"));
         assert!(output.contains("Display: 8 implementations"));
         assert!(output.contains("Async functions: 15"));
-        assert!(output.contains("⚠ 5 unwrap() calls detected"));
+        assert!(output.contains("⚠"));
+        assert!(output.contains("5 unwrap() calls"));
+    }
+
+    #[test]
+    fn format_rust_patterns_empty() {
+        let metrics = RustPatternMetrics::default();
+        let output = PatternFormatter::format_rust_patterns(&metrics);
+        assert!(output.is_empty());
+    }
+
+    // Edge case tests
+    #[test]
+    fn format_handles_unicode_in_names() {
+        let metrics = PurityMetrics {
+            strictly_pure: 1,
+            locally_pure: 0,
+            read_only: 0,
+            impure: 0,
+            almost_pure: vec![
+                AlmostPureFunction {
+                    name: "calculer_π".into(),
+                    violations: vec![],
+                    refactoring_suggestion: "Extract side effects".into(),
+                },
+            ],
+        };
+
+        let output = PatternFormatter::format_purity(&metrics);
+        assert!(output.contains("calculer_π"));
+    }
+
+    #[test]
+    fn format_handles_empty_examples() {
+        let metrics = FrameworkPatternMetrics {
+            patterns: vec![
+                DetectedPattern {
+                    framework: "Test".into(),
+                    pattern_type: "Pattern".into(),
+                    count: 5,
+                    examples: vec![],
+                    recommendation: "Do something".into(),
+                },
+            ],
+        };
+
+        let output = PatternFormatter::format_frameworks(&metrics);
+        assert!(!output.contains("Examples: ,"));
     }
 }
 ```
@@ -523,20 +1104,92 @@ mod tests {
 
 ```rust
 #[test]
-fn patterns_in_full_output() {
-    let analysis = analyze_file("src/analyzers/rust.rs");
-    let formatted = format_recommendation(&analysis);
+fn patterns_attached_to_recommendations() {
+    // Create sample function analyses
+    let functions = vec![
+        create_test_function("pure_calc", PurityLevel::StrictlyPure),
+        create_test_function("impure_io", PurityLevel::Impure),
+    ];
 
-    // Should contain pattern sections
+    // Create recommendation with pattern analysis
+    let recommendation = ModuleSplitRecommendation::new(/* ... */)
+        .with_pattern_analysis(&functions);
+
+    assert!(recommendation.pattern_analysis.is_some());
+    let patterns = recommendation.pattern_analysis.unwrap();
+    assert_eq!(patterns.purity.strictly_pure, 1);
+    assert_eq!(patterns.purity.impure, 1);
+}
+
+#[test]
+fn full_output_contains_pattern_analysis() {
+    let functions = vec![
+        create_test_function_with_traits("impl_display", vec!["Display"]),
+        create_test_function_async("async_handler", true),
+    ];
+
+    let recommendation = ModuleSplitRecommendation::new(/* ... */)
+        .with_pattern_analysis(&functions);
+
+    let formatted = RecommendationFormatter::new().format(&recommendation);
+
+    // Should contain all pattern sections
     assert!(formatted.contains("PURITY ANALYSIS"));
     assert!(formatted.contains("RUST-SPECIFIC PATTERNS"));
+    assert!(formatted.contains("Trait Implementations"));
+    assert!(formatted.contains("Async/Concurrency"));
 
-    // Should have specific counts
-    assert!(formatted.contains("functions"));  // Purity counts
-    assert!(formatted.contains("implementations"));  // Trait impls
-
-    // Should not have generic advice
+    // Should NOT contain generic advice
     assert!(!formatted.contains("Extract traits for shared behavior"));
+    assert!(!formatted.contains("Use newtype pattern for domain types"));
+}
+
+#[test]
+fn empty_patterns_produce_no_output() {
+    let functions = vec![]; // No functions
+
+    let recommendation = ModuleSplitRecommendation::new(/* ... */)
+        .with_pattern_analysis(&functions);
+
+    let formatted = RecommendationFormatter::new().format(&recommendation);
+
+    // Pattern sections should be absent when no patterns detected
+    assert!(!formatted.contains("PURITY ANALYSIS"));
+    assert!(!formatted.contains("RUST-SPECIFIC PATTERNS"));
+}
+
+#[test]
+fn aggregation_correctness() {
+    // Test that aggregation functions correctly combine data
+    let functions = vec![
+        FunctionAnalysis {
+            name: "func1".into(),
+            purity_classification: PurityLevel::StrictlyPure,
+            purity_violations: vec![],
+            // ...
+        },
+        FunctionAnalysis {
+            name: "func2".into(),
+            purity_classification: PurityLevel::LocallyPure,
+            purity_violations: vec![],
+            // ...
+        },
+        FunctionAnalysis {
+            name: "func3".into(),
+            purity_classification: PurityLevel::Impure,
+            purity_violations: vec![
+                PurityViolation::ConsoleOutput { /* ... */ },
+            ],
+            // ...
+        },
+    ];
+
+    let pattern_analysis = PatternAnalysis::from_functions(&functions);
+
+    assert_eq!(pattern_analysis.purity.strictly_pure, 1);
+    assert_eq!(pattern_analysis.purity.locally_pure, 1);
+    assert_eq!(pattern_analysis.purity.impure, 1);
+    assert_eq!(pattern_analysis.purity.total_functions(), 3);
 }
 ```
 
@@ -711,10 +1364,68 @@ Error Handling:
 ## Success Metrics
 
 - [ ] 100% of recommendations include actual pattern analysis (not generic advice)
-- [ ] "Almost pure" functions identified and highlighted
+- [ ] "Almost pure" functions identified and highlighted with actionable suggestions
 - [ ] Framework patterns displayed when detected
-- [ ] Rust trait implementations listed
+- [ ] Rust trait implementations listed with repetition warnings
 - [ ] Async patterns shown with specific counts
 - [ ] Error handling anti-patterns flagged (unwrap usage)
-- [ ] User feedback: Pattern analysis is helpful for refactoring
 - [ ] Zero generic "Rust PATTERNS" advice in output
+- [ ] All tests pass (unit, property-based, integration, edge cases)
+- [ ] Code coverage >85% for pattern analysis and formatting modules
+- [ ] No performance regression (aggregation adds <5% to analysis time)
+- [ ] Clean separation: data structures have no formatting logic
+- [ ] User feedback: Pattern analysis is helpful for refactoring
+
+## Summary of Improvements
+
+This specification has been improved to follow functional programming principles and best practices:
+
+### 1. Strict Separation of Concerns
+**Before**: Data structures contained formatting methods mixed with calculations.
+**After**:
+- Data structures are pure data with `Serialize`/`Deserialize`
+- Calculation methods are pure functions (data in, value out)
+- Formatting is completely separate in `PatternFormatter`
+
+### 2. Simplified Integration
+**Before**: Formatters took 4+ parameters, making function signatures complex.
+**After**:
+- `PatternAnalysis` container wraps all pattern data
+- Attached to recommendations as an `Option<PatternAnalysis>` field
+- Simple builder pattern: `recommendation.with_pattern_analysis(functions)`
+- Formatter just checks if patterns exist and calls `PatternFormatter::format()`
+
+### 3. Removed Premature Optimization
+**Before**: Included `LazyPatternDisplay` with `OnceCell` for lazy formatting.
+**After**:
+- Removed entirely (YAGNI principle)
+- String formatting is cheap and not a bottleneck
+- Pattern data already computed during analysis
+- Simpler code, easier to maintain
+
+### 4. Comprehensive Testing Strategy
+**Before**: Basic unit tests for formatters only.
+**After**:
+- **Unit tests**: Pure calculation functions (percentages, totals, etc.)
+- **Property-based tests**: Using `proptest` for invariant verification
+- **Formatter tests**: Output structure and content validation
+- **Edge case tests**: Empty metrics, Unicode, zero functions
+- **Integration tests**: End-to-end pattern flow verification
+- **Anti-regression tests**: Verify generic advice is eliminated
+
+### Key Design Decisions
+
+1. **Data-first design**: Types are serializable, composable, and functional
+2. **Pure aggregation functions**: Take function analyses, return metrics
+3. **Formatter is stateless**: Pure static methods for display logic
+4. **Builder pattern for integration**: Clean, discoverable API
+5. **Constants for magic numbers**: `REPETITIVE_TRAIT_THRESHOLD`, `MAX_DISPLAYED_EXAMPLES`
+6. **Default implementations**: All types have sensible defaults
+7. **Helper methods for queries**: `has_patterns()`, `repetitive_traits()`, etc.
+
+### Implementation Complexity
+
+- **Reduced**: Simpler integration, no lazy evaluation complexity
+- **Maintained**: Same feature set, better structure
+- **Improved testability**: Pure functions are trivial to test
+- **Better maintainability**: Clear boundaries between modules
