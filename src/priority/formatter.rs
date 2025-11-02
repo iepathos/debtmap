@@ -762,6 +762,8 @@ fn get_language_name(extension: &str) -> &str {
 }
 
 // Pure function to format implementation steps for god objects with detailed split recommendations
+// Kept for potential future use or backward compatibility
+#[allow(dead_code)]
 fn format_god_object_steps(
     output: &mut String,
     formatter: &ColoredFormatter,
@@ -1215,6 +1217,7 @@ fn format_scoring_and_dependencies(
     }
 }
 
+#[cfg(test)]
 fn format_file_priority_item(
     output: &mut String,
     rank: usize,
