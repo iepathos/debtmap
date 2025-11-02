@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 469841011429adc748037474db8e9690666da43a73cd6c144f733922d8c709a1 # shrinks to struct_count = 11, domain_count = 11
+cc 30a80d5fcc4fffe2327b8c15b758ab0baf73bc891025c22d0f55ea9522294c08 # shrinks to struct_count = 13, domain_count = 13
+cc d0117bc7bd5bd9e7ecc8ddb19bc8110c10c882fffae070db07e71c8999d4c690 # shrinks to struct_count = 11, domain_count = 11
+cc 0f79486cdb201e7991f805238e16958aab3c21ddf732b97716cfe81385811ea5 # shrinks to struct_count = 65, domain_count = 13

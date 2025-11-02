@@ -657,22 +657,26 @@ fn determine_file_type_label(
     }
 }
 
-// Pure function to generate WHY explanation message with accurate terminology
-fn generate_why_message(
+// Parameters for generate_why_message function
+struct WhyMessageParams<'a> {
     is_god_object: bool,
     fields_count: usize,
     methods_count: usize,
     responsibilities: usize,
     function_count: usize,
     total_lines: usize,
-    god_object_type: Option<&crate::organization::GodObjectType>,
-) -> String {
+    god_object_type: Option<&'a crate::organization::GodObjectType>,
+    domain_diversity_metrics: Option<&'a crate::organization::DomainDiversityMetrics>,
+}
+
+// Pure function to generate WHY explanation message with accurate terminology
+fn generate_why_message(params: WhyMessageParams<'_>) -> String {
     // Check for boilerplate pattern first
     if let Some(crate::organization::GodObjectType::BoilerplatePattern {
         pattern,
         confidence,
         ..
-    }) = god_object_type
+    }) = params.god_object_type
     {
         let pattern_description = match pattern {
             crate::organization::boilerplate_detector::BoilerplatePattern::TraitImplementation {
@@ -705,35 +709,42 @@ fn generate_why_message(
         );
     }
 
-    if is_god_object {
-        // Distinguish between god class (single struct with many methods) vs god module (many functions/types)
-        if fields_count > 5 && methods_count > 20 {
+    if params.is_god_object {
+        // If we have domain diversity metrics, use those for more accurate analysis
+        if let Some(metrics) = params.domain_diversity_metrics {
+            format!(
+                "This module contains {} structs across {} distinct domains. Cross-domain mixing (Severity: {}) violates single responsibility principle and increases maintenance complexity.",
+                metrics.total_structs,
+                metrics.domain_count,
+                metrics.severity.as_str()
+            )
+        } else if params.fields_count > 5 && params.methods_count > 20 {
             // God class: single struct/class with many methods and fields
             format!(
                 "This struct violates single responsibility principle with {} methods and {} fields across {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
-                methods_count,
-                fields_count,
-                responsibilities
+                params.methods_count,
+                params.fields_count,
+                params.responsibilities
             )
-        } else if function_count > 50 {
+        } else if params.function_count > 50 {
             // God module: many module-level functions or multiple types
             format!(
                 "This module contains {} module functions across {} responsibilities. Large modules with many diverse functions are difficult to navigate, understand, and maintain.",
-                function_count,
-                responsibilities
+                params.function_count,
+                params.responsibilities
             )
         } else {
             // Default case for god object
             format!(
                 "This file contains {} functions with {} distinct responsibilities. Consider splitting by responsibility for better organization.",
-                function_count,
-                responsibilities
+                params.function_count,
+                params.responsibilities
             )
         }
-    } else if total_lines > 500 {
+    } else if params.total_lines > 500 {
         format!(
             "File exceeds recommended size with {} lines. Large files are harder to navigate, understand, and maintain. Consider breaking into smaller, focused modules.",
-            total_lines
+            params.total_lines
         )
     } else {
         "File exhibits high complexity that impacts maintainability and testability.".to_string()
@@ -1243,15 +1254,20 @@ fn format_file_priority_item_with_verbosity(
     )
     .unwrap();
 
-    let why_message = generate_why_message(
-        item.metrics.god_object_indicators.is_god_object,
-        item.metrics.god_object_indicators.fields_count,
-        item.metrics.god_object_indicators.methods_count,
-        item.metrics.god_object_indicators.responsibilities,
-        item.metrics.function_count,
-        item.metrics.total_lines,
-        item.metrics.god_object_type.as_ref(),
-    );
+    let why_message = generate_why_message(WhyMessageParams {
+        is_god_object: item.metrics.god_object_indicators.is_god_object,
+        fields_count: item.metrics.god_object_indicators.fields_count,
+        methods_count: item.metrics.god_object_indicators.methods_count,
+        responsibilities: item.metrics.god_object_indicators.responsibilities,
+        function_count: item.metrics.function_count,
+        total_lines: item.metrics.total_lines,
+        god_object_type: item.metrics.god_object_type.as_ref(),
+        domain_diversity_metrics: item
+            .metrics
+            .god_object_indicators
+            .domain_diversity_metrics
+            .as_ref(),
+    });
 
     writeln!(
         output,
@@ -1260,6 +1276,19 @@ fn format_file_priority_item_with_verbosity(
         why_message
     )
     .unwrap();
+
+    // Spec 152: Display domain diversity analysis if available
+    if let Some(ref metrics) = item.metrics.god_object_indicators.domain_diversity_metrics {
+        let formatted_output = metrics.format_for_output();
+        // Add proper indentation to match the formatter's style
+        for line in formatted_output.lines() {
+            if !line.is_empty() {
+                writeln!(output, "   {}", line).unwrap();
+            } else {
+                writeln!(output).unwrap();
+            }
+        }
+    }
 
     writeln!(
         output,
@@ -2222,6 +2251,7 @@ mod tests {
                     struct_ratio: 0.0,
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
+                    domain_diversity_metrics: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,

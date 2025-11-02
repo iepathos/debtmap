@@ -66,6 +66,7 @@ fn create_god_object_analysis(
         struct_ratio: 0.0,
         analysis_method: crate::organization::SplitAnalysisMethod::None,
         cross_domain_severity: None,
+        domain_diversity_metrics: None, // Spec 152: Added for struct-based analysis
     }
 }
 
