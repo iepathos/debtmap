@@ -1262,7 +1262,8 @@ fn format_file_priority_item_with_verbosity(
         function_count: item.metrics.function_count,
         total_lines: item.metrics.total_lines,
         god_object_type: item.metrics.god_object_type.as_ref(),
-        domain_diversity_metrics: item.metrics
+        domain_diversity_metrics: item
+            .metrics
             .god_object_indicators
             .domain_diversity_metrics
             .as_ref(),
