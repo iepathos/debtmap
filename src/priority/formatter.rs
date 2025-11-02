@@ -667,6 +667,7 @@ struct WhyMessageParams<'a> {
     total_lines: usize,
     god_object_type: Option<&'a crate::organization::GodObjectType>,
     domain_diversity_metrics: Option<&'a crate::organization::DomainDiversityMetrics>,
+    detection_type: Option<&'a crate::organization::DetectionType>,
 }
 
 // Pure function to generate WHY explanation message with accurate terminology
@@ -710,6 +711,16 @@ fn generate_why_message(params: WhyMessageParams<'_>) -> String {
     }
 
     if params.is_god_object {
+        // Determine detection type
+        let is_hybrid = matches!(
+            params.detection_type,
+            Some(crate::organization::DetectionType::GodModule)
+        );
+        let is_pure_functional = matches!(
+            params.detection_type,
+            Some(crate::organization::DetectionType::GodFile)
+        );
+
         // If we have domain diversity metrics, use those for more accurate analysis
         if let Some(metrics) = params.domain_diversity_metrics {
             format!(
@@ -718,23 +729,30 @@ fn generate_why_message(params: WhyMessageParams<'_>) -> String {
                 metrics.domain_count,
                 metrics.severity.as_str()
             )
-        } else if params.fields_count > 5 && params.methods_count > 20 {
-            // God class: single struct/class with many methods and fields
+        }
+        // God Class: Single struct with many impl methods
+        else if params.fields_count > 5
+            && params.methods_count > 20
+            && !is_hybrid
+            && !is_pure_functional
+        {
             format!(
                 "This struct violates single responsibility principle with {} methods and {} fields across {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
                 params.methods_count,
                 params.fields_count,
                 params.responsibilities
             )
-        } else if params.function_count > 50 {
-            // God module: many module-level functions or multiple types
+        }
+        // Hybrid/Functional: Many module functions
+        else if params.function_count > 50 || is_hybrid || is_pure_functional {
             format!(
                 "This module contains {} module functions across {} responsibilities. Large modules with many diverse functions are difficult to navigate, understand, and maintain.",
                 params.function_count,
                 params.responsibilities
             )
-        } else {
-            // Default case for god object
+        }
+        // Default case for god object
+        else {
             format!(
                 "This file contains {} functions with {} distinct responsibilities. Consider splitting by responsibility for better organization.",
                 params.function_count,
@@ -1267,6 +1285,7 @@ fn format_file_priority_item_with_verbosity(
             .god_object_indicators
             .domain_diversity_metrics
             .as_ref(),
+        detection_type: item.metrics.god_object_indicators.detection_type.as_ref(),
     });
 
     writeln!(
@@ -2252,6 +2271,7 @@ mod tests {
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
                     domain_diversity_metrics: None,
+                    detection_type: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,

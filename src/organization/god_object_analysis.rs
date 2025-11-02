@@ -4,11 +4,37 @@ use std::collections::HashMap;
 /// Type of god object detection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DetectionType {
-    /// Single struct with excessive methods (tests excluded from counts)
+    /// Single struct with excessive impl methods.
+    ///
+    /// Example: A `UserManager` struct with 40 impl methods across
+    /// multiple responsibilities (validation, persistence, formatting).
+    ///
+    /// Detection: Struct with >15 methods, tests excluded from counts.
     GodClass,
-    /// File with excessive functions or lines (tests included in counts)
+
+    /// File with excessive standalone functions and no structs.
+    ///
+    /// Example: A functional module with 80 top-level functions
+    /// for data processing, no struct definitions.
+    ///
+    /// Detection: File with no structs + >50 standalone functions, tests included.
     GodFile,
-    /// Alias for GodFile
+
+    /// Hybrid: File with both structs AND many standalone functions.
+    ///
+    /// Detected when standalone functions dominate (>50 functions and
+    /// >3x the impl method count). Common in modules following "data
+    /// > separate from behavior" patterns.
+    ///
+    /// Example: A formatter module with DTO structs (10 fields) and
+    /// 106 formatting functions.
+    ///
+    /// # Detection Criteria
+    ///
+    /// A file is classified as `GodModule` when:
+    /// - Contains at least one struct definition
+    /// - Has >50 standalone functions
+    /// - Standalone count > (impl method count * 3)
     GodModule,
 }
 

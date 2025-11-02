@@ -137,6 +137,7 @@ impl UnifiedFileAnalyzer {
                         .file_metrics
                         .domain_diversity_metrics
                         .clone(),
+                    detection_type: Some(enhanced_analysis.file_metrics.detection_type),
                 };
 
                 return (indicators, Some(enhanced_analysis.classification));
@@ -174,6 +175,7 @@ impl UnifiedFileAnalyzer {
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
                 domain_diversity_metrics: None,
+                detection_type: None,
             },
             None,
         )
@@ -306,6 +308,7 @@ impl UnifiedFileAnalyzer {
             analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
             cross_domain_severity: None,
             domain_diversity_metrics: None,
+            detection_type: None,
         }
     }
 }

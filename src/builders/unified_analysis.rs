@@ -1313,6 +1313,7 @@ fn create_empty_god_object_indicators() -> crate::priority::file_metrics::GodObj
         analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
         cross_domain_severity: None,
         domain_diversity_metrics: None,
+        detection_type: None,
     }
 }
 

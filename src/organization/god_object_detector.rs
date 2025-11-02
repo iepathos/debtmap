@@ -11,6 +11,25 @@ use std::collections::HashMap;
 use std::path::Path;
 use syn::{self, visit::Visit};
 
+/// Minimum standalone functions required to trigger hybrid detection.
+///
+/// Files with fewer standalone functions are assumed to have helper
+/// functions that complement the primary struct's impl methods.
+///
+/// Chosen based on analysis of Rust projects: 50+ functions typically
+/// indicates a functional module rather than helpers.
+const HYBRID_STANDALONE_THRESHOLD: usize = 50;
+
+/// Dominance ratio: standalone functions must exceed impl methods by this factor.
+///
+/// Prevents false positives for balanced OOP/functional modules. A ratio of 3:1
+/// ensures standalone functions truly dominate the file's purpose.
+///
+/// Examples:
+/// - 60 standalone, 15 impl → 60 > 45? Yes → Hybrid
+/// - 60 standalone, 25 impl → 60 > 75? No → God Class
+const HYBRID_DOMINANCE_RATIO: usize = 3;
+
 /// Parameters for god object classification
 struct GodObjectClassificationParams<'a> {
     per_struct_metrics: &'a [StructMetrics],
@@ -500,7 +519,7 @@ impl GodObjectDetector {
 
     /// Analyzes a file for god object patterns.
     ///
-    /// Determines whether the file contains a God Class or God File
+    /// Determines whether the file contains a God Class, God File, or God Module (hybrid)
     ///
     /// # Arguments
     /// * `primary_type` - The largest type in the file (if any)
@@ -509,16 +528,56 @@ impl GodObjectDetector {
     ///
     /// # Returns
     /// Tuple of (total_methods, total_fields, all_methods, total_complexity, detection_type)
+    ///
+    /// # Hybrid Detection Logic (Spec 155)
+    ///
+    /// A file is classified as hybrid (GodModule) when:
+    /// - At least one struct exists (`primary_type.is_some()`)
+    /// - Standalone count > [`HYBRID_STANDALONE_THRESHOLD`] (default: 50)
+    /// - Standalone count > impl method count * [`HYBRID_DOMINANCE_RATIO`] (default: 3)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// // God Class: 30 impl methods, 5 standalone
+    /// // → Analyze impl methods only
+    ///
+    /// // God File: 0 structs, 80 standalone
+    /// // → Analyze all standalone functions
+    ///
+    /// // Hybrid (God Module): 1 struct, 106 standalone
+    /// // → Analyze all standalone functions
+    /// ```
     fn determine_god_object_type(
         primary_type: Option<&TypeAnalysis>,
         visitor: &TypeVisitor,
         standalone_count: usize,
     ) -> (usize, usize, Vec<String>, u32, DetectionType) {
-        // Spec 118 & 130: Distinguish between God Class and God File
+        // Spec 118 & 130 & 155: Distinguish between God Class, God File, and God Module
         // - God Class: Struct with excessive methods (tests excluded)
-        // - God File: File with excessive functions/lines (tests included)
+        // - God File: File with excessive functions/lines (tests included), no structs
+        // - God Module: File with structs AND many standalone functions (hybrid)
         if let Some(type_info) = primary_type {
-            // God Class analysis: struct with impl methods
+            // Check if this is a hybrid module (Spec 155)
+            let standalone_dominates = standalone_count >= HYBRID_STANDALONE_THRESHOLD
+                && standalone_count > type_info.method_count * HYBRID_DOMINANCE_RATIO;
+
+            if standalone_dominates {
+                // HYBRID: Structs exist but standalone functions dominate
+                // This is primarily a functional module with helper types
+                let all_methods = visitor.standalone_functions.clone();
+                let total_complexity = Self::estimate_standalone_complexity(standalone_count);
+
+                return (
+                    standalone_count,
+                    type_info.field_count, // Keep field count for context
+                    all_methods,
+                    total_complexity,
+                    DetectionType::GodModule,
+                );
+            }
+
+            // TRUE GOD CLASS: Struct with many impl methods
             // Spec 130: Filter out test functions for god class detection
             let struct_method_names: std::collections::HashSet<_> =
                 type_info.methods.iter().collect();
@@ -550,10 +609,10 @@ impl GodObjectDetector {
                 DetectionType::GodClass,
             )
         } else {
-            // No struct/impl blocks found - God File analysis
+            // PURE GOD FILE: No structs, only standalone functions
             // Spec 130: Include ALL functions (production + tests) for file size concerns
             let all_methods = visitor.standalone_functions.clone();
-            let total_complexity = (standalone_count * 5) as u32;
+            let total_complexity = Self::estimate_standalone_complexity(standalone_count);
 
             (
                 standalone_count,
@@ -563,6 +622,12 @@ impl GodObjectDetector {
                 DetectionType::GodFile,
             )
         }
+    }
+
+    /// Estimate complexity for standalone functions
+    /// Heuristic: average 5 cyclomatic complexity per function
+    fn estimate_standalone_complexity(count: usize) -> u32 {
+        (count * 5) as u32
     }
 
     /// Analyzes cross-domain struct mixing and generates module split recommendations
