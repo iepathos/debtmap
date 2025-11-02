@@ -45,6 +45,26 @@ pub struct FunctionWeight {
     pub total_weight: f64,
 }
 
+/// Detailed information about a module-level function for multi-signal analysis
+#[derive(Debug, Clone)]
+pub struct ModuleFunctionInfo {
+    pub name: String,
+    pub body: String,
+    pub return_type: Option<String>,
+    pub parameters: Vec<FunctionParameter>,
+    pub line_count: usize,
+    pub is_public: bool,
+    pub is_async: bool,
+    pub is_test: bool,
+}
+
+/// Function parameter information
+#[derive(Debug, Clone)]
+pub struct FunctionParameter {
+    pub name: String,
+    pub type_name: String,
+}
+
 /// Visitor for collecting type information from Rust ASTs
 pub struct TypeVisitor {
     pub types: HashMap<String, TypeAnalysis>,
@@ -54,6 +74,8 @@ pub struct TypeVisitor {
     location_extractor: Option<UnifiedLocationExtractor>,
     /// Tracks visibility of impl methods (Spec 134 Phase 2)
     pub method_visibility: HashMap<String, syn::Visibility>,
+    /// Detailed module function information for multi-signal classification (Spec 149)
+    pub module_functions: Vec<ModuleFunctionInfo>,
 }
 
 impl TypeVisitor {
@@ -66,6 +88,7 @@ impl TypeVisitor {
             function_items: Vec::new(),
             location_extractor,
             method_visibility: HashMap::new(),
+            module_functions: Vec::new(),
         }
     }
 
@@ -183,6 +206,96 @@ impl TypeVisitor {
             }
         }
     }
+
+    /// Extract detailed function information for multi-signal analysis (Spec 149)
+    fn extract_module_function_info(&self, item_fn: &syn::ItemFn) -> ModuleFunctionInfo {
+        let name = item_fn.sig.ident.to_string();
+
+        // Convert function body to string for analysis
+        let body = quote::quote!(#item_fn).to_string();
+
+        // Extract return type
+        let return_type = Self::extract_return_type(&item_fn.sig.output);
+
+        // Extract parameters
+        let parameters = Self::extract_parameters(&item_fn.sig.inputs);
+
+        // Estimate line count
+        let line_count = Self::estimate_line_count(&item_fn.block);
+
+        // Check visibility
+        let is_public = matches!(item_fn.vis, syn::Visibility::Public(_));
+
+        // Check if async
+        let is_async = item_fn.sig.asyncness.is_some();
+
+        // Check if test
+        let is_test = item_fn.attrs.iter().any(|attr| {
+            attr.path().is_ident("test")
+                || attr.path().is_ident("cfg")
+                    && attr
+                        .meta
+                        .require_list()
+                        .ok()
+                        .map(|list| {
+                            list.tokens.to_string().contains("test")
+                                || list.tokens.to_string().contains("cfg(test)")
+                        })
+                        .unwrap_or(false)
+        });
+
+        ModuleFunctionInfo {
+            name,
+            body,
+            return_type,
+            parameters,
+            line_count,
+            is_public,
+            is_async,
+            is_test,
+        }
+    }
+
+    /// Extract return type from function signature
+    fn extract_return_type(output: &syn::ReturnType) -> Option<String> {
+        match output {
+            syn::ReturnType::Type(_, ty) => Some(quote::quote!(#ty).to_string()),
+            syn::ReturnType::Default => None,
+        }
+    }
+
+    /// Extract parameters from function signature
+    fn extract_parameters(
+        inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::token::Comma>,
+    ) -> Vec<FunctionParameter> {
+        inputs
+            .iter()
+            .filter_map(|arg| {
+                if let syn::FnArg::Typed(pat_type) = arg {
+                    Some(FunctionParameter {
+                        name: Self::extract_param_name(&pat_type.pat),
+                        type_name: quote::quote!(#pat_type.ty).to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Extract parameter name from pattern
+    fn extract_param_name(pat: &syn::Pat) -> String {
+        match pat {
+            syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
+            _ => "unknown".to_string(),
+        }
+    }
+
+    /// Estimate line count from block
+    fn estimate_line_count(block: &syn::Block) -> usize {
+        // Simple estimation: count statements + 2 for braces
+        block.stmts.len() + 2
+    }
 }
 
 impl<'ast> Visit<'ast> for TypeVisitor {
@@ -244,5 +357,9 @@ impl<'ast> Visit<'ast> for TypeVisitor {
 
         // Store the function item for purity analysis
         self.function_items.push(node.clone());
+
+        // Extract detailed module function information for multi-signal analysis (Spec 149)
+        let module_func_info = self.extract_module_function_info(node);
+        self.module_functions.push(module_func_info);
     }
 }

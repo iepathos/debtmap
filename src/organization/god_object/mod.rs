@@ -9,4 +9,7 @@
 pub mod ast_visitor;
 pub mod metrics;
 
-pub use ast_visitor::{FunctionWeight, Responsibility, TypeAnalysis, TypeVisitor};
+pub use ast_visitor::{
+    FunctionParameter, FunctionWeight, ModuleFunctionInfo, Responsibility, TypeAnalysis,
+    TypeVisitor,
+};
