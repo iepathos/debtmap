@@ -95,6 +95,10 @@ pub struct ModuleSplit {
     /// Severity of this recommendation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<RecommendationSeverity>,
+    /// Multi-signal classification evidence for this split (spec 148)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub classification_evidence:
+        Option<crate::analysis::multi_signal_aggregation::AggregatedClassification>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]

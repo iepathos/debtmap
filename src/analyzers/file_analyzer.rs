@@ -109,6 +109,7 @@ impl UnifiedFileAnalyzer {
                         rationale: split.rationale.clone(),
                         method: convert_split_analysis_method(split.method),
                         severity: split.severity.map(convert_recommendation_severity),
+                        classification_evidence: split.classification_evidence.clone(),
                     })
                     .collect();
 

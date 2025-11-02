@@ -214,7 +214,7 @@ impl EvidenceFormatter {
         }
     }
 
-    /// Format individual signal contribution
+    /// Format individual signal contribution (spec 148 - includes weight display)
     fn format_signal(&self, signal: &AggregatedSignalEvidence) -> String {
         let indicator = match signal.contribution {
             c if c > 0.15 => "✓",
@@ -222,13 +222,16 @@ impl EvidenceFormatter {
             _ => "-",
         };
 
+        // Explicitly format weight information for transparency (spec 148)
         format!(
-            "      {} {:?} ({:.0}% conf, {:.0}% weight) = {:.3} contribution\n\
+            "      {} {:?} (weight: {:.2})\n\
+             {}Confidence: {:.0}%, Contribution: {:.3}\n\
              {}Evidence: {}",
             indicator,
             signal.signal_type,
+            signal.weight,
+            " ".repeat(9),
             signal.confidence * 100.0,
-            signal.weight * 100.0,
             signal.contribution,
             " ".repeat(9), // Indent for evidence
             signal.description
