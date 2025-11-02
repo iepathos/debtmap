@@ -2,11 +2,12 @@
 //!
 //! Verifies that evidence formatting overhead is <2% as required by spec
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::analysis::multi_signal_aggregation::{
     AggregatedClassification, ResponsibilityCategory, SignalEvidence, SignalType,
 };
 use debtmap::output::evidence_formatter::EvidenceFormatter;
+use std::hint::black_box;
 
 /// Create sample evidence for benchmarking
 fn create_sample_evidence() -> AggregatedClassification {
@@ -95,7 +96,7 @@ fn bench_baseline_no_evidence(c: &mut Criterion) {
     c.bench_function("baseline_no_evidence", |b| {
         b.iter(|| {
             // Simulate minimal work that would be done without evidence formatting
-            let _s = format!("File I/O [85% confidence]");
+            let _s = "File I/O [85% confidence]".to_string();
         })
     });
 }
