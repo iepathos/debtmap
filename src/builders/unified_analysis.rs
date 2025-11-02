@@ -1401,6 +1401,7 @@ fn create_god_object_analysis(
             .god_object_indicators
             .cross_domain_severity
             .map(convert_to_org_severity),
+        domain_diversity_metrics: None, // Spec 152: Added for struct-based analysis
     })
 }
 

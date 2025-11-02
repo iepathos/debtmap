@@ -11,6 +11,7 @@ pub mod complexity_weighting;
 pub mod cycle_detector;
 pub mod dependency_analyzer;
 pub mod domain_classifier;
+pub mod domain_diversity;
 pub mod file_classifier;
 pub mod god_object;
 pub mod god_object_analysis;
@@ -28,16 +29,19 @@ pub mod struct_ownership;
 pub mod trait_pattern_analyzer;
 
 pub use god_object_analysis::{
-    calculate_god_object_score, calculate_god_object_score_weighted, calculate_struct_ratio,
-    count_distinct_domains, determine_confidence, determine_cross_domain_severity,
-    group_methods_by_responsibility, recommend_module_splits, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
-    GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
-    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StructMetrics,
-    StructWithMethods,
+    calculate_domain_diversity_from_structs, calculate_god_object_score,
+    calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
+    determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
+    recommend_module_splits, suggest_module_splits_by_domain, suggest_splits_by_struct_grouping,
+    DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence,
+    GodObjectThresholds, GodObjectType, ModuleSplit, Priority, PurityDistribution,
+    RecommendationSeverity, SplitAnalysisMethod, StructMetrics, StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;
+pub use domain_diversity::{
+    CrossDomainSeverity, DiversityScore, DomainDiversityMetrics, StructDomainClassification,
+};
 pub use split_validator::validate_and_refine_splits;
 pub use struct_ownership::StructOwnershipAnalyzer;
 

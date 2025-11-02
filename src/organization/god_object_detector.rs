@@ -861,6 +861,7 @@ impl GodObjectDetector {
             struct_ratio,
             analysis_method,
             cross_domain_severity,
+            domain_diversity_metrics: None, // Will be calculated separately if needed (spec 152)
         }
     }
 

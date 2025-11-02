@@ -60,6 +60,9 @@ pub struct GodObjectAnalysis {
     /// Severity of cross-domain mixing (if applicable) (spec 140)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_domain_severity: Option<RecommendationSeverity>,
+    /// Domain diversity metrics with detailed distribution (spec 152)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_diversity_metrics: Option<crate::organization::DomainDiversityMetrics>,
 }
 
 impl GodObjectAnalysis {
@@ -1191,6 +1194,28 @@ pub fn classify_struct_domain(struct_name: &str) -> String {
     }
 }
 
+/// Calculate domain diversity metrics from struct metrics (Spec 152).
+///
+/// Creates struct domain classifications and computes diversity metrics.
+pub fn calculate_domain_diversity_from_structs(
+    structs: &[StructMetrics],
+    is_god_object: bool,
+) -> Result<crate::organization::DomainDiversityMetrics, anyhow::Error> {
+    use crate::organization::{DomainDiversityMetrics, StructDomainClassification};
+
+    // Create classifications for each struct
+    let classifications: Vec<StructDomainClassification> = structs
+        .iter()
+        .map(|s| {
+            let domain = classify_struct_domain(&s.name);
+            StructDomainClassification::simple(s.name.clone(), domain)
+        })
+        .collect();
+
+    // Calculate metrics
+    DomainDiversityMetrics::from_struct_classifications(&classifications, is_god_object)
+}
+
 /// Data structure for grouping structs with their methods
 #[derive(Debug, Clone)]
 pub struct StructWithMethods {
@@ -1667,6 +1692,7 @@ mod tests {
             struct_ratio: 0.0,
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         };
 
         assert!(analysis.validate().is_ok());
@@ -1699,6 +1725,7 @@ mod tests {
             struct_ratio: 0.0,
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         };
 
         let result = analysis.validate();
@@ -1736,6 +1763,7 @@ mod tests {
             struct_ratio: 0.0,
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         };
 
         let result = analysis.validate();
@@ -1773,6 +1801,7 @@ mod tests {
             struct_ratio: 0.0,
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         };
 
         let result = analysis.validate();
