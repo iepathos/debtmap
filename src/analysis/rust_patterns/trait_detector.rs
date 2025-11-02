@@ -234,7 +234,8 @@ mod tests {
             fn test_function() {
                 println!("test");
             }
-            "#.to_string();
+            "#
+        .to_string();
         let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(&code).unwrap()));
         let file_path: &'static Path = Path::new("test.rs");
 
