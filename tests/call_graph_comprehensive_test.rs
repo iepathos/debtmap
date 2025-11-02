@@ -37,6 +37,8 @@ fn create_test_metrics(name: &str, file: PathBuf, line: usize) -> FunctionMetric
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 

@@ -58,6 +58,8 @@ end_of_record
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -125,6 +127,8 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,
@@ -193,6 +197,8 @@ fn test_analyze_risk_without_coverage() {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
             }],
             summary: ComplexitySummary {
                 total_functions: 1,

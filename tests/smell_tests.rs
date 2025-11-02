@@ -25,6 +25,8 @@ fn test_code_smell_long_parameter_list() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     // Test with 7 parameters (over threshold of 5)
@@ -67,6 +69,8 @@ fn test_code_smell_long_method() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     let smell = detect_long_method(&func);
@@ -109,6 +113,8 @@ fn test_code_smell_deep_nesting() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     let smell = detect_deep_nesting(&func);
@@ -151,6 +157,8 @@ fn test_code_smell_detection_multiple() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     let smells = analyze_function_smells(&func, 7);

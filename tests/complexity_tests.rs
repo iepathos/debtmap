@@ -26,6 +26,8 @@ fn test_complexity_metrics() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
         },
         FunctionMetrics {
             name: "complex".to_string(),
@@ -49,6 +51,8 @@ fn test_complexity_metrics() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
         },
         FunctionMetrics {
             name: "medium".to_string(),
@@ -72,6 +76,8 @@ fn test_complexity_metrics() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
         },
     ];
 
@@ -115,6 +121,8 @@ fn test_function_is_complex() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     assert!(
