@@ -889,8 +889,30 @@ fn format_god_object_steps_with_verbosity(
 
         format_language_specific_advice(output, formatter, language, extension);
     } else {
-        // Fallback to generic advice if no detailed splits available
-        format_generic_god_object_steps(output, formatter, item, extension);
+        // No detailed splits available - provide diagnostic message (Spec 149)
+        writeln!(output, "  - NO DETAILED SPLITS AVAILABLE:").unwrap();
+        writeln!(
+            output,
+            "  -  Analysis could not generate responsibility-based splits for this file."
+        )
+        .unwrap();
+        writeln!(output, "  -  This may indicate:").unwrap();
+        writeln!(
+            output,
+            "  -    • File has too few functions (< 3 per responsibility)"
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "  -    • Functions lack clear responsibility signals"
+        )
+        .unwrap();
+        writeln!(output, "  -    • File may be test-only or configuration").unwrap();
+        writeln!(
+            output,
+            "  -  Consider manual analysis or consult documentation."
+        )
+        .unwrap();
     }
 
     // Add enhanced module structure analysis if available
@@ -1065,47 +1087,6 @@ fn format_language_specific_advice(
             writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
         }
     }
-}
-
-// Fallback generic advice when detailed splits aren't available
-fn format_generic_god_object_steps(
-    output: &mut String,
-    _formatter: &ColoredFormatter,
-    item: &priority::FileDebtItem,
-    extension: &str,
-) {
-    let file_name = item
-        .metrics
-        .path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("module");
-
-    writeln!(
-        output,
-        "  {} SUGGESTED SPLIT (generic - no detailed analysis available):",
-        "-".yellow()
-    )
-    .unwrap();
-
-    writeln!(
-        output,
-        "  -  [1] {}_core.{} - Core business logic",
-        file_name, extension
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "  -  [2] {}_io.{} - Input/output operations",
-        file_name, extension
-    )
-    .unwrap();
-    writeln!(
-        output,
-        "  -  [3] {}_utils.{} - Helper functions",
-        file_name, extension
-    )
-    .unwrap();
 }
 
 // Pure function to calculate impact message

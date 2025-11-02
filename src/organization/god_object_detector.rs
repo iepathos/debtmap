@@ -74,6 +74,7 @@ impl GodObjectDetector {
             ownership.as_ref(),
             path,
             ast,
+            &visitor,
         );
 
         // Generate context-aware recommendation
@@ -97,6 +98,7 @@ impl GodObjectDetector {
         ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
         file_path: &Path,
         ast: &syn::File,
+        visitor: &super::god_object::TypeVisitor,
     ) -> GodObjectType {
         // First, check for boilerplate pattern before other classifications
         let boilerplate_detector =
@@ -206,7 +208,7 @@ impl GodObjectDetector {
                     line_span: (0, 0),
                 });
 
-            // Use enhanced struct ownership analysis if available
+            // Use enhanced struct ownership analysis if available, otherwise use module function classifier
             let suggested_splits = if ownership.is_some() {
                 crate::organization::suggest_splits_by_struct_grouping(
                     per_struct_metrics,
@@ -215,7 +217,9 @@ impl GodObjectDetector {
                     Some(ast),
                 )
             } else {
-                suggest_module_splits_by_domain(per_struct_metrics)
+                // Try module function classification first (Spec 149)
+                self.try_module_function_classification(visitor, file_path)
+                    .unwrap_or_else(|| suggest_module_splits_by_domain(per_struct_metrics))
             };
 
             return GodObjectType::GodModule {
@@ -426,6 +430,44 @@ impl GodObjectDetector {
                     }
                 }
             }
+        }
+    }
+
+    /// Try to classify module functions using multi-signal analysis (Spec 149)
+    fn try_module_function_classification(
+        &self,
+        visitor: &super::god_object::TypeVisitor,
+        file_path: &Path,
+    ) -> Option<Vec<ModuleSplit>> {
+        use crate::analysis::io_detection::Language;
+        use crate::organization::module_function_classifier::ModuleFunctionClassifier;
+
+        // Only proceed if we have module functions
+        if visitor.module_functions.is_empty() {
+            return None;
+        }
+
+        // Determine language from file extension
+        let language = match file_path.extension().and_then(|s| s.to_str()) {
+            Some("rs") => Language::Rust,
+            Some("py") => Language::Python,
+            Some("js") | Some("ts") => Language::JavaScript,
+            _ => return None,
+        };
+
+        // Create classifier and generate splits
+        let classifier = ModuleFunctionClassifier::new(language);
+        let splits = classifier.generate_splits(
+            &visitor.module_functions,
+            3,    // min_functions_for_split
+            0.30, // min_confidence
+        );
+
+        // Only return if we generated meaningful splits
+        if splits.is_empty() {
+            None
+        } else {
+            Some(splits)
         }
     }
 

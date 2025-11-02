@@ -18,6 +18,7 @@ pub mod god_object_metrics;
 pub mod javascript;
 pub mod language;
 pub mod macro_recommendations;
+pub mod module_function_classifier;
 pub mod parallel_execution_pattern;
 pub mod purity_analyzer;
 pub mod registry_pattern;
