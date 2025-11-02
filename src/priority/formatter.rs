@@ -1225,8 +1225,8 @@ fn format_file_priority_item(
     writeln!(
         output,
         "{} {}",
-        "└─ WHY:".bright_blue(),
-        why_message.bright_white()
+        "└─ WHY THIS MATTERS:".bright_blue(),
+        why_message
     )
     .unwrap();
 
@@ -2227,8 +2227,8 @@ mod tests {
         assert!(clean_output.contains("src/test_file.rs"));
         assert!(clean_output.contains("(1500 lines, 45 functions)"));
 
-        // Check WHY section
-        assert!(clean_output.contains("WHY:"));
+        // Check WHY THIS MATTERS section
+        assert!(clean_output.contains("WHY THIS MATTERS:"));
         assert!(clean_output.contains("45 methods"));
         assert!(clean_output.contains("12 fields"));
 

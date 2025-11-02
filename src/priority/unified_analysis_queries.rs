@@ -227,10 +227,11 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
 ///
 /// # Examples
 ///
-/// ```
-/// use debtmap::priority::{DebtItem, DebtCategory, DebtType, UnifiedDebtItem};
+/// ```no_run
+/// use debtmap::priority::{DebtItem, DebtCategory};
 ///
-/// let item = /* create a function debt item */;
+/// # fn categorize_debt_item(item: &DebtItem) -> DebtCategory { DebtCategory::CodeQuality }
+/// # let item: DebtItem = unimplemented!();
 /// let category = categorize_debt_item(&item);
 /// ```
 fn categorize_debt_item(item: &DebtItem) -> DebtCategory {
