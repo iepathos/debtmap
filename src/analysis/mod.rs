@@ -31,6 +31,7 @@ pub mod multi_pass;
 pub mod multi_signal_aggregation;
 pub mod patterns;
 pub mod purity_analysis;
+pub mod purity_propagation;
 pub mod python_call_graph;
 pub mod python_dead_code;
 pub mod python_dead_code_enhanced;
@@ -83,6 +84,9 @@ pub use patterns::{
 pub use purity_analysis::{
     EffortLevel, PurityAnalysis, PurityAnalyzer, PurityLevel, PurityRefactoringOpportunity,
     PurityViolation, RefactoringType,
+};
+pub use purity_propagation::{
+    PurityCache, PurityCallGraphAdapter, PurityPropagator, PurityReason, PurityResult,
 };
 pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
 pub use python_dead_code_enhanced::{

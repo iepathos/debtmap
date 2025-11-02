@@ -121,6 +121,8 @@ fn test_cross_module_associated_function_call_false_positive() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     // Test dead code detection - this should return FALSE but will return TRUE due to the bug

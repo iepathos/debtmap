@@ -36,6 +36,8 @@ fn create_test_func(name: &str, cyclomatic: u32, cognitive: u32, length: usize) 
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 

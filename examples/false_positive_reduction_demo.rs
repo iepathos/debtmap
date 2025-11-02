@@ -144,6 +144,8 @@ fn create_getter() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -170,6 +172,8 @@ fn create_setter() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -196,6 +200,8 @@ fn create_simple_validator() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -222,6 +228,8 @@ fn create_small_util() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -248,6 +256,8 @@ fn create_test_helper() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -274,6 +284,8 @@ fn create_complex_handler() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -300,6 +312,8 @@ fn create_nested_logic() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -326,6 +340,8 @@ fn create_long_switch() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }
 
@@ -352,5 +368,7 @@ fn create_moderate_complexity() -> FunctionMetrics {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     }
 }

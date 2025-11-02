@@ -408,10 +408,19 @@ fn perform_unified_analysis_computation(
     }
 
     // Populate call graph data into function metrics for better analysis
-    let enriched_metrics = call_graph_integration::populate_call_graph_data(
+    let mut enriched_metrics = call_graph_integration::populate_call_graph_data(
         results.complexity.metrics.clone(),
         &call_graph,
     );
+
+    // Run inter-procedural purity propagation (spec 156)
+    let purity_propagation_start = std::time::Instant::now();
+    enriched_metrics = run_purity_propagation(&enriched_metrics, &call_graph);
+    let purity_propagation_time = purity_propagation_start.elapsed();
+
+    if !quiet_mode {
+        eprintln!("Purity propagation: {:?}", purity_propagation_time);
+    }
 
     let result = create_unified_analysis_with_exclusions_and_timing(
         &enriched_metrics,
@@ -1491,4 +1500,63 @@ fn integrate_trait_resolution(
         resolved_calls: resolved_count,
         marked_implementations: trait_stats.total_implementations,
     })
+}
+
+/// Run inter-procedural purity propagation on function metrics (spec 156)
+fn run_purity_propagation(
+    metrics: &[FunctionMetrics],
+    call_graph: &priority::CallGraph,
+) -> Vec<FunctionMetrics> {
+    use crate::analysis::call_graph::{
+        CrossModuleTracker, FrameworkPatternDetector, FunctionPointerTracker, RustCallGraph,
+        TraitRegistry,
+    };
+    use crate::analysis::purity_analysis::PurityAnalyzer;
+    use crate::analysis::purity_propagation::{PurityCallGraphAdapter, PurityPropagator};
+
+    // Create RustCallGraph wrapper around the base call graph
+    let rust_graph = RustCallGraph {
+        base_graph: call_graph.clone(),
+        trait_registry: TraitRegistry::new(),
+        function_pointer_tracker: FunctionPointerTracker::new(),
+        framework_patterns: FrameworkPatternDetector::new(),
+        cross_module_tracker: CrossModuleTracker::new(),
+    };
+
+    // Create call graph adapter
+    let adapter = PurityCallGraphAdapter::from_rust_graph(rust_graph);
+
+    // Create purity analyzer and propagator
+    let purity_analyzer = PurityAnalyzer::new();
+    let mut propagator = PurityPropagator::new(adapter, purity_analyzer);
+
+    // Run propagation
+    if let Err(e) = propagator.propagate(metrics) {
+        log::warn!("Purity propagation failed: {}", e);
+        return metrics.to_vec();
+    }
+
+    // Apply results to metrics
+    metrics
+        .iter()
+        .map(|metric| {
+            let func_id = priority::call_graph::FunctionId::new(
+                metric.file.clone(),
+                metric.name.clone(),
+                metric.line,
+            );
+
+            if let Some(result) = propagator.get_result(&func_id) {
+                let mut updated = metric.clone();
+                updated.is_pure = Some(
+                    result.level == crate::analysis::purity_analysis::PurityLevel::StrictlyPure,
+                );
+                updated.purity_confidence = Some(result.confidence as f32);
+                updated.purity_reason = Some(format!("{:?}", result.reason));
+                updated
+            } else {
+                metric.clone()
+            }
+        })
+        .collect()
 }

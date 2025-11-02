@@ -79,6 +79,8 @@ fn test_threshold_filtering() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     let complex_func = FunctionMetrics {
@@ -103,6 +105,8 @@ fn test_threshold_filtering() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     // Simple function should not be flagged
@@ -134,6 +138,8 @@ fn test_threshold_filtering() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     // Test function with moderate complexity should not be flagged due to multiplier
@@ -201,6 +207,8 @@ fn test_enhanced_message_generation() {
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_reason: None,
+        call_dependencies: None,
     };
 
     let thresholds = ComplexityThresholds::from_preset(ThresholdPreset::Balanced);
@@ -327,6 +335,8 @@ fn test_false_positive_reduction() {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_reason: None,
+            call_dependencies: None,
         };
 
         assert!(
