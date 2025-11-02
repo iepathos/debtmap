@@ -219,3 +219,168 @@ impl Default for RustTraitDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::rust_patterns::context::ImplContext;
+    use std::path::Path;
+
+    fn create_test_context_with_trait(
+        trait_name: &str,
+        is_trait_impl: bool,
+    ) -> RustFunctionContext<'static> {
+        let code = format!(
+            r#"
+            fn test_function() {{
+                println!("test");
+            }}
+            "#
+        );
+        let item_fn: &'static syn::ItemFn =
+            Box::leak(Box::new(syn::parse_str(&code).unwrap()));
+        let file_path: &'static Path = Path::new("test.rs");
+
+        let impl_context = if is_trait_impl {
+            Some(ImplContext {
+                impl_type: "MyType".to_string(),
+                is_trait_impl: true,
+                trait_name: Some(trait_name.to_string()),
+            })
+        } else {
+            None
+        };
+
+        RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context,
+            file_path,
+        }
+    }
+
+    #[test]
+    fn test_detect_display_trait() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("Display", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "Display");
+        assert_eq!(
+            classification.standard_trait,
+            Some(StandardTrait::Display)
+        );
+        assert_eq!(classification.category, ResponsibilityCategory::Formatting);
+        assert_eq!(classification.confidence, 0.95);
+    }
+
+    #[test]
+    fn test_detect_from_trait() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("From", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "From");
+        assert_eq!(classification.standard_trait, Some(StandardTrait::From));
+        assert_eq!(
+            classification.category,
+            ResponsibilityCategory::Transformation
+        );
+    }
+
+    #[test]
+    fn test_detect_drop_trait() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("Drop", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "Drop");
+        assert_eq!(classification.standard_trait, Some(StandardTrait::Drop));
+        assert_eq!(
+            classification.category,
+            ResponsibilityCategory::SideEffects
+        );
+    }
+
+    #[test]
+    fn test_detect_iterator_trait() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("Iterator", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "Iterator");
+        assert_eq!(
+            classification.standard_trait,
+            Some(StandardTrait::Iterator)
+        );
+        assert_eq!(
+            classification.category,
+            ResponsibilityCategory::Transformation
+        );
+    }
+
+    #[test]
+    fn test_non_trait_method_returns_none() {
+        let detector = RustTraitDetector::new();
+        let code = r#"
+            fn regular_function() {
+                println!("test");
+            }
+        "#;
+        let item_fn: &'static syn::ItemFn =
+            Box::leak(Box::new(syn::parse_str(code).unwrap()));
+        let file_path: &'static Path = Path::new("test.rs");
+
+        let context = RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context: None,
+            file_path,
+        };
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_detect_qualified_trait_name() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("std::fmt::Display", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "std::fmt::Display");
+        assert_eq!(
+            classification.standard_trait,
+            Some(StandardTrait::Display)
+        );
+    }
+
+    #[test]
+    fn test_unknown_trait() {
+        let detector = RustTraitDetector::new();
+        let context = create_test_context_with_trait("CustomTrait", true);
+
+        let result = detector.detect_trait_impl(&context);
+        assert!(result.is_some());
+
+        let classification = result.unwrap();
+        assert_eq!(classification.trait_name, "CustomTrait");
+        assert_eq!(classification.standard_trait, None);
+        assert_eq!(classification.category, ResponsibilityCategory::Unknown);
+    }
+}

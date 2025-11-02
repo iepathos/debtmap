@@ -153,3 +153,73 @@ impl Default for RustBuilderDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn create_test_context(code: &str) -> RustFunctionContext<'static> {
+        let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(code).unwrap()));
+        RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context: None,
+            file_path: Path::new("test.rs"),
+        }
+    }
+
+    #[test]
+    fn test_detect_new_constructor() {
+        let detector = RustBuilderDetector::new();
+        let code = r#"
+            fn new() -> Self {
+                Self { field: 0 }
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_builder_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::Constructor));
+    }
+
+    #[test]
+    fn test_detect_with_methods() {
+        let detector = RustBuilderDetector::new();
+        let code = r#"
+            fn with_value(mut self, value: i32) -> Self {
+                self.value = value;
+                self
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_builder_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::WithMethod));
+    }
+
+    #[test]
+    fn test_detect_set_methods() {
+        let detector = RustBuilderDetector::new();
+        let code = r#"
+            fn set_value(mut self, value: i32) -> Self {
+                self.value = value;
+                self
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_builder_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::SetterMethod));
+    }
+
+    #[test]
+    fn test_detect_build_method() {
+        let detector = RustBuilderDetector::new();
+        let code = r#"
+            fn build(self) -> Target {
+                Target { value: self.value }
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_builder_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == BuilderPatternType::BuildFinalization));
+    }
+}

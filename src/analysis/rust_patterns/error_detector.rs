@@ -240,3 +240,72 @@ impl Default for RustErrorDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn create_test_context(code: &str) -> RustFunctionContext<'static> {
+        let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(code).unwrap()));
+        RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context: None,
+            file_path: Path::new("test.rs"),
+        }
+    }
+
+    #[test]
+    fn test_detect_question_mark_operator() {
+        let detector = RustErrorDetector::new();
+        let code = r#"
+            fn test() -> Result<(), Error> {
+                do_something()?;
+                Ok(())
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_error_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::QuestionMarkOperator));
+    }
+
+    #[test]
+    fn test_detect_unwrap() {
+        let detector = RustErrorDetector::new();
+        let code = r#"
+            fn test() {
+                let value = some_result.unwrap();
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_error_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::UnwrapUsage));
+    }
+
+    #[test]
+    fn test_detect_expect() {
+        let detector = RustErrorDetector::new();
+        let code = r#"
+            fn test() {
+                let value = some_result.expect("error");
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_error_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::ExpectUsage));
+    }
+
+    #[test]
+    fn test_detect_panic() {
+        let detector = RustErrorDetector::new();
+        let code = r#"
+            fn test() {
+                panic!("error");
+            }
+        "#;
+        let context = create_test_context(code);
+        let patterns = detector.detect_error_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == ErrorPatternType::PanicUsage));
+    }
+}

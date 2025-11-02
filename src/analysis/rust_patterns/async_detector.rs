@@ -186,3 +186,117 @@ impl Default for RustAsyncDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn create_test_context(code: &str) -> RustFunctionContext<'static> {
+        let item_fn: &'static syn::ItemFn = Box::leak(Box::new(syn::parse_str(code).unwrap()));
+        let file_path: &'static Path = Path::new("test.rs");
+
+        RustFunctionContext {
+            item_fn,
+            metrics: None,
+            impl_context: None,
+            file_path,
+        }
+    }
+
+    #[test]
+    fn test_detect_async_function() {
+        let detector = RustAsyncDetector::new();
+        let code = r#"
+            async fn async_function() {
+                println!("test");
+            }
+        "#;
+        let context = create_test_context(code);
+
+        let patterns = detector.detect_async_patterns(&context);
+        assert_eq!(patterns.len(), 1);
+        assert_eq!(patterns[0].pattern_type, AsyncPatternType::AsyncFunction);
+        assert_eq!(patterns[0].confidence, 1.0);
+    }
+
+    #[test]
+    fn test_detect_tokio_spawn() {
+        let detector = RustAsyncDetector::new();
+        let code = r#"
+            async fn spawn_task() {
+                tokio::spawn(async {
+                    println!("task");
+                });
+            }
+        "#;
+        let context = create_test_context(code);
+
+        let patterns = detector.detect_async_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::TaskSpawning));
+    }
+
+    #[test]
+    fn test_detect_channel_communication() {
+        let detector = RustAsyncDetector::new();
+        let code = r#"
+            fn use_channel(sender: Sender<i32>) {
+                sender.send(42);
+            }
+        "#;
+        let context = create_test_context(code);
+
+        let patterns = detector.detect_async_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::ChannelCommunication));
+    }
+
+    #[test]
+    fn test_detect_mutex_usage() {
+        let detector = RustAsyncDetector::new();
+        let code = r#"
+            fn use_mutex() {
+                let mutex = std::sync::Mutex::new(42);
+                let guard = mutex.lock();
+            }
+        "#;
+        let context = create_test_context(code);
+
+        let patterns = detector.detect_async_patterns(&context);
+        assert!(patterns.iter().any(|p| p.pattern_type == AsyncPatternType::MutexUsage));
+    }
+
+    #[test]
+    fn test_classify_task_spawning() {
+        let detector = RustAsyncDetector::new();
+        let patterns = vec![AsyncPattern {
+            pattern_type: AsyncPatternType::TaskSpawning,
+            confidence: 0.9,
+            evidence: "Spawns tasks".into(),
+        }];
+
+        let category = detector.classify_from_async_patterns(&patterns);
+        assert_eq!(category, Some(ResponsibilityCategory::Orchestration));
+    }
+
+    #[test]
+    fn test_classify_channel_communication() {
+        let detector = RustAsyncDetector::new();
+        let patterns = vec![AsyncPattern {
+            pattern_type: AsyncPatternType::ChannelCommunication,
+            confidence: 0.85,
+            evidence: "Uses channels".into(),
+        }];
+
+        let category = detector.classify_from_async_patterns(&patterns);
+        assert_eq!(category, Some(ResponsibilityCategory::Coordination));
+    }
+
+    #[test]
+    fn test_classify_empty_patterns() {
+        let detector = RustAsyncDetector::new();
+        let patterns = vec![];
+
+        let category = detector.classify_from_async_patterns(&patterns);
+        assert_eq!(category, None);
+    }
+}
