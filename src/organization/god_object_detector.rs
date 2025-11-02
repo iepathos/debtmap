@@ -11,6 +11,17 @@ use std::collections::HashMap;
 use std::path::Path;
 use syn::{self, visit::Visit};
 
+/// Parameters for god object classification
+struct GodObjectClassificationParams<'a> {
+    per_struct_metrics: &'a [StructMetrics],
+    total_methods: usize,
+    thresholds: &'a GodObjectThresholds,
+    ownership: Option<&'a crate::organization::struct_ownership::StructOwnershipAnalyzer>,
+    file_path: &'a Path,
+    ast: &'a syn::File,
+    visitor: &'a super::god_object::TypeVisitor,
+}
+
 pub struct GodObjectDetector {
     max_methods: usize,
     max_fields: usize,
@@ -67,15 +78,15 @@ impl GodObjectDetector {
         };
 
         // Classify as god class, god module, or not god object
-        let classification = self.classify_god_object(
-            &per_struct_metrics,
-            file_metrics.method_count,
-            &thresholds,
-            ownership.as_ref(),
-            path,
+        let classification = self.classify_god_object(&GodObjectClassificationParams {
+            per_struct_metrics: &per_struct_metrics,
+            total_methods: file_metrics.method_count,
+            thresholds: &thresholds,
+            ownership: ownership.as_ref(),
+            file_path: path,
             ast,
-            &visitor,
-        );
+            visitor: &visitor,
+        });
 
         // Generate context-aware recommendation
         let recommendation =
@@ -90,20 +101,11 @@ impl GodObjectDetector {
     }
 
     /// Classify whether this is a god class, god module, or neither
-    fn classify_god_object(
-        &self,
-        per_struct_metrics: &[StructMetrics],
-        total_methods: usize,
-        thresholds: &GodObjectThresholds,
-        ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
-        file_path: &Path,
-        ast: &syn::File,
-        visitor: &super::god_object::TypeVisitor,
-    ) -> GodObjectType {
+    fn classify_god_object(&self, params: &GodObjectClassificationParams) -> GodObjectType {
         // First, check for boilerplate pattern before other classifications
         let boilerplate_detector =
             crate::organization::boilerplate_detector::BoilerplateDetector::default();
-        let boilerplate_analysis = boilerplate_detector.detect(file_path, ast);
+        let boilerplate_analysis = boilerplate_detector.detect(params.file_path, params.ast);
 
         if boilerplate_analysis.is_boilerplate && boilerplate_analysis.confidence > 0.7 {
             return GodObjectType::BoilerplatePattern {
@@ -116,23 +118,25 @@ impl GodObjectDetector {
         // Second, check for registry pattern before classifying as god object
         if let Some(source_content) = &self.source_content {
             let registry_detector = crate::organization::RegistryPatternDetector::default();
-            if let Some(pattern) = registry_detector.detect(ast, source_content) {
+            if let Some(pattern) = registry_detector.detect(params.ast, source_content) {
                 let confidence = registry_detector.confidence(&pattern);
 
                 // Calculate what the god object score would have been
                 let original_score = calculate_god_object_score(
-                    total_methods,
-                    per_struct_metrics
+                    params.total_methods,
+                    params
+                        .per_struct_metrics
                         .iter()
                         .map(|s| s.field_count)
                         .max()
                         .unwrap_or(0),
-                    per_struct_metrics
+                    params
+                        .per_struct_metrics
                         .iter()
                         .flat_map(|s| &s.responsibilities)
                         .count(),
                     source_content.lines().count(),
-                    thresholds,
+                    params.thresholds,
                 );
 
                 let adjusted_score =
@@ -148,23 +152,25 @@ impl GodObjectDetector {
 
             // Second, check for builder pattern before classifying as god object
             let builder_detector = crate::organization::BuilderPatternDetector::default();
-            if let Some(pattern) = builder_detector.detect(ast, source_content) {
+            if let Some(pattern) = builder_detector.detect(params.ast, source_content) {
                 let confidence = builder_detector.confidence(&pattern);
 
                 // Calculate what the god object score would have been
                 let original_score = calculate_god_object_score(
-                    total_methods,
-                    per_struct_metrics
+                    params.total_methods,
+                    params
+                        .per_struct_metrics
                         .iter()
                         .map(|s| s.field_count)
                         .max()
                         .unwrap_or(0),
-                    per_struct_metrics
+                    params
+                        .per_struct_metrics
                         .iter()
                         .flat_map(|s| &s.responsibilities)
                         .count(),
                     source_content.lines().count(),
-                    thresholds,
+                    params.thresholds,
                 );
 
                 let adjusted_score =
@@ -180,10 +186,10 @@ impl GodObjectDetector {
         }
 
         // Check if any individual struct exceeds thresholds (god class)
-        for struct_metrics in per_struct_metrics {
-            if struct_metrics.method_count > thresholds.max_methods
-                || struct_metrics.field_count > thresholds.max_fields
-                || struct_metrics.responsibilities.len() > thresholds.max_traits
+        for struct_metrics in params.per_struct_metrics {
+            if struct_metrics.method_count > params.thresholds.max_methods
+                || struct_metrics.field_count > params.thresholds.max_fields
+                || struct_metrics.responsibilities.len() > params.thresholds.max_traits
             {
                 return GodObjectType::GodClass {
                     struct_name: struct_metrics.name.clone(),
@@ -195,8 +201,11 @@ impl GodObjectDetector {
         }
 
         // Check if module as a whole is large with many small structs (god module)
-        if per_struct_metrics.len() >= 5 && total_methods > thresholds.max_methods * 2 {
-            let largest_struct = per_struct_metrics
+        if params.per_struct_metrics.len() >= 5
+            && params.total_methods > params.thresholds.max_methods * 2
+        {
+            let largest_struct = params
+                .per_struct_metrics
                 .iter()
                 .max_by_key(|s| s.method_count)
                 .cloned()
@@ -209,22 +218,22 @@ impl GodObjectDetector {
                 });
 
             // Use enhanced struct ownership analysis if available, otherwise use module function classifier
-            let suggested_splits = if ownership.is_some() {
+            let suggested_splits = if params.ownership.is_some() {
                 crate::organization::suggest_splits_by_struct_grouping(
-                    per_struct_metrics,
-                    ownership,
-                    Some(file_path),
-                    Some(ast),
+                    params.per_struct_metrics,
+                    params.ownership,
+                    Some(params.file_path),
+                    Some(params.ast),
                 )
             } else {
                 // Try module function classification first (Spec 149)
-                self.try_module_function_classification(visitor, file_path)
-                    .unwrap_or_else(|| suggest_module_splits_by_domain(per_struct_metrics))
+                self.try_module_function_classification(params.visitor, params.file_path)
+                    .unwrap_or_else(|| suggest_module_splits_by_domain(params.per_struct_metrics))
             };
 
             return GodObjectType::GodModule {
-                total_structs: per_struct_metrics.len(),
-                total_methods,
+                total_structs: params.per_struct_metrics.len(),
+                total_methods: params.total_methods,
                 largest_struct,
                 suggested_splits,
             };

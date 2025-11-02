@@ -283,8 +283,7 @@ impl ModuleFunctionClassifier {
         responsibility
             .as_str()
             .to_lowercase()
-            .replace(' ', "_")
-            .replace('/', "_")
+            .replace([' ', '/'], "_")
     }
 }
 
