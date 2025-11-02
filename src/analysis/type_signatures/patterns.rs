@@ -1,12 +1,12 @@
 //! Type Pattern Library
 //!
 //! Defines common type patterns for responsibility classification:
-//! - Parser patterns (String → Result<T>)
-//! - Formatter patterns (T → String)
-//! - Validator patterns (T → Result<(), Error>)
+//! - Parser patterns (`String → Result<T>`)
+//! - Formatter patterns (`T → String`)
+//! - Validator patterns (`T → Result<(), Error>`)
 //! - I/O patterns (error types, trait bounds)
-//! - Builder patterns (Self → Self)
-//! - Query patterns (&T → Option<U>)
+//! - Builder patterns (`Self → Self`)
+//! - Query patterns (`&T → Option<U>`)
 
 use crate::analysis::multi_signal_aggregation::ResponsibilityCategory;
 use once_cell::sync::Lazy;

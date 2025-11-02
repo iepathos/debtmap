@@ -1,12 +1,12 @@
 //! Type Signature-Based Classification
 //!
 //! Classifies function responsibilities based on type signatures:
-//! - Parser patterns (String → Result<T>)
-//! - Formatter patterns (T → String)
-//! - Validator patterns (T → Result<(), Error>)
+//! - Parser patterns (`String → Result<T>`)
+//! - Formatter patterns (`T → String`)
+//! - Validator patterns (`T → Result<(), Error>`)
 //! - I/O patterns (error types, trait bounds)
-//! - Builder patterns (Self → Self)
-//! - Query patterns (&T → Option<U>)
+//! - Builder patterns (`Self → Self`)
+//! - Query patterns (`&T → Option<U>`)
 //!
 //! Spec 147: Type Signature-Based Classification
 
