@@ -65,7 +65,10 @@ pub struct UnifiedDebtItem {
 
 impl UnifiedDebtItem {
     /// Builder method to attach pattern analysis to this debt item (spec 151)
-    pub fn with_pattern_analysis(mut self, pattern_analysis: crate::output::PatternAnalysis) -> Self {
+    pub fn with_pattern_analysis(
+        mut self,
+        pattern_analysis: crate::output::PatternAnalysis,
+    ) -> Self {
         self.pattern_analysis = Some(pattern_analysis);
         self
     }

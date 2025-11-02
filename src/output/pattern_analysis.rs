@@ -228,9 +228,7 @@ impl PatternAnalysis {
 }
 
 /// Aggregate purity metrics from function analyses
-fn aggregate_purity_metrics(
-    functions: &[crate::priority::FunctionAnalysis],
-) -> PurityMetrics {
+fn aggregate_purity_metrics(functions: &[crate::priority::FunctionAnalysis]) -> PurityMetrics {
     let mut strictly_pure = 0;
     let mut locally_pure = 0;
     let mut read_only = 0;
@@ -282,9 +280,7 @@ fn aggregate_framework_patterns(
 }
 
 /// Aggregate Rust-specific patterns from function analyses
-fn aggregate_rust_patterns(
-    _functions: &[crate::priority::FunctionAnalysis],
-) -> RustPatternMetrics {
+fn aggregate_rust_patterns(_functions: &[crate::priority::FunctionAnalysis]) -> RustPatternMetrics {
     // Rust pattern detection would need additional analysis
     // For now, return empty metrics
     RustPatternMetrics::default()
@@ -328,26 +324,46 @@ pub fn generate_framework_recommendation(
 ) -> String {
     match (framework, pattern_type) {
         ("React", "hooks") => {
-            format!("Consider extracting {} hook usages into custom hooks for reusability", count)
+            format!(
+                "Consider extracting {} hook usages into custom hooks for reusability",
+                count
+            )
         }
         ("React", "component") => {
-            format!("Review {} components for proper memoization and render optimization", count)
+            format!(
+                "Review {} components for proper memoization and render optimization",
+                count
+            )
         }
         ("Tokio", "async") => {
-            format!("Verify {} async operations use proper error handling and cancellation", count)
+            format!(
+                "Verify {} async operations use proper error handling and cancellation",
+                count
+            )
         }
         ("Actix", "handler") => {
-            format!("Ensure {} handlers follow async best practices and proper error propagation", count)
+            format!(
+                "Ensure {} handlers follow async best practices and proper error propagation",
+                count
+            )
         }
         ("Django", "view") => {
-            format!("Review {} views for proper transaction handling and query optimization", count)
+            format!(
+                "Review {} views for proper transaction handling and query optimization",
+                count
+            )
         }
         ("Flask", "route") => {
-            format!("Consider adding validation and error handling to {} route handlers", count)
+            format!(
+                "Consider adding validation and error handling to {} route handlers",
+                count
+            )
         }
         _ => {
-            format!("Review {} instances of {} {} pattern for consistency and best practices",
-                    count, framework, pattern_type)
+            format!(
+                "Review {} instances of {} {} pattern for consistency and best practices",
+                count, framework, pattern_type
+            )
         }
     }
 }
@@ -496,7 +512,7 @@ mod tests {
         assert_eq!(sorted.len(), 3);
         assert_eq!(sorted[0].count, 15); // Vue (highest)
         assert_eq!(sorted[1].count, 10); // Angular
-        assert_eq!(sorted[2].count, 5);  // React (lowest)
+        assert_eq!(sorted[2].count, 5); // React (lowest)
     }
 
     #[test]

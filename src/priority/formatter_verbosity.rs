@@ -1059,11 +1059,7 @@ fn analyze_coverage_gaps(uncovered_lines: &[usize], item: &UnifiedDebtItem) -> V
 }
 
 /// Format pattern analysis section if available (spec 151)
-fn format_pattern_analysis(
-    output: &mut String,
-    item: &UnifiedDebtItem,
-    verbosity: u8,
-) {
+fn format_pattern_analysis(output: &mut String, item: &UnifiedDebtItem, verbosity: u8) {
     // Only show pattern analysis if verbosity >= 1 and patterns are available
     if verbosity < 1 {
         return;
@@ -1074,7 +1070,8 @@ fn format_pattern_analysis(
             writeln!(output, "├─ {}", "PATTERN ANALYSIS:".bright_blue()).unwrap();
 
             // Use PatternFormatter to format the analysis
-            let formatted = crate::output::pattern_formatter::PatternFormatter::format(pattern_analysis);
+            let formatted =
+                crate::output::pattern_formatter::PatternFormatter::format(pattern_analysis);
 
             // Indent each line for proper tree formatting
             for line in formatted.lines() {
