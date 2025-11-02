@@ -423,6 +423,7 @@ mod tests {
                     struct_ratio: 0.0,
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
+                    domain_diversity_metrics: None,
                 },
                 function_scores: vec![],
                 god_object_type: None,

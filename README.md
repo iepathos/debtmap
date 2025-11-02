@@ -287,6 +287,45 @@ Debtmap provides tailored recommendations based on your file's characteristics:
 - **Medium**: Proactive improvement opportunity (approaching thresholds)
 - **Low**: Informational suggestions (minor improvements)
 
+#### Domain Diversity Analysis
+
+For struct-heavy modules, debtmap performs domain diversity analysis to identify cross-domain mixing patterns that violate the single responsibility principle.
+
+**How It Works**:
+- Analyzes struct naming patterns to identify semantic domains (e.g., "Config", "Error", "Handler")
+- Calculates domain diversity scores based on struct distribution across domains
+- Assigns severity levels from OK to CRITICAL based on diversity
+
+**Severity Levels**:
+- **OK**: Single domain or closely related domains (diversity ≤ 0.4)
+- **MODERATE**: Some domain mixing (0.4 < diversity ≤ 0.6)
+- **HIGH**: Significant cross-domain concerns (0.6 < diversity ≤ 0.75)
+- **CRITICAL**: Severe domain mixing (diversity > 0.75)
+
+**Example Output**:
+```
+WHY THIS MATTERS: This module contains 12 structs across 4 distinct domains.
+Cross-domain mixing (Severity: CRITICAL) violates single responsibility
+principle and increases maintenance complexity.
+
+DOMAIN DIVERSITY ANALYSIS (Spec 140):
+Severity: CRITICAL - 12 structs across 4 domains
+
+Domain Distribution:
+  - Configuration: 5 structs (42%)
+    Examples: AppConfig, DatabaseConfig, CacheConfig
+  - Error Handling: 4 structs (33%)
+    Examples: ParseError, ValidationError, NetworkError
+  - Request Processing: 2 structs (17%)
+    Examples: HttpRequest, ApiResponse
+  - Caching: 1 structs (8%)
+    Examples: CacheEntry
+
+Recommendation: Split into domain-focused modules for better cohesion
+```
+
+This analysis helps you understand exactly why a module should be split and provides clear guidance on how to organize the extracted modules by domain.
+
 **Example recommendation output**:
 ```
 GOD OBJECT DETECTED: src/config.rs (10 structs across 3 domains)

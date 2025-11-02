@@ -133,6 +133,10 @@ impl UnifiedFileAnalyzer {
                         .file_metrics
                         .cross_domain_severity
                         .map(convert_recommendation_severity),
+                    domain_diversity_metrics: enhanced_analysis
+                        .file_metrics
+                        .domain_diversity_metrics
+                        .clone(),
                 };
 
                 return (indicators, Some(enhanced_analysis.classification));
@@ -169,6 +173,7 @@ impl UnifiedFileAnalyzer {
                 struct_ratio: 0.0,
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
+                domain_diversity_metrics: None,
             },
             None,
         )
@@ -300,6 +305,7 @@ impl UnifiedFileAnalyzer {
             struct_ratio: 0.0,
             analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         }
     }
 }

@@ -67,6 +67,9 @@ pub struct GodObjectIndicators {
     /// Severity of cross-domain mixing (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_domain_severity: Option<RecommendationSeverity>,
+    /// Domain diversity metrics with detailed distribution (spec 152)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain_diversity_metrics: Option<crate::organization::DomainDiversityMetrics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -338,6 +341,7 @@ impl Default for GodObjectIndicators {
             struct_ratio: 0.0,
             analysis_method: SplitAnalysisMethod::None,
             cross_domain_severity: None,
+            domain_diversity_metrics: None,
         }
     }
 }
@@ -418,6 +422,7 @@ mod tests {
                 struct_ratio: 0.0,
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
+            domain_diversity_metrics: None,
             },
             function_scores: vec![5.0; 60],
             god_object_type: None,
@@ -673,6 +678,7 @@ mod tests {
                 struct_ratio: 0.0,
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
+            domain_diversity_metrics: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 7775,
@@ -720,6 +726,7 @@ mod tests {
                 struct_ratio: 0.0,
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
+            domain_diversity_metrics: None,
             },
             god_object_type: Some(god_file_type),
             total_lines: 2000,
@@ -764,6 +771,7 @@ mod tests {
                 struct_ratio: 0.0,
                 analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                 cross_domain_severity: None,
+            domain_diversity_metrics: None,
             },
             god_object_type: Some(boilerplate_type),
             total_lines: 5000,

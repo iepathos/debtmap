@@ -666,6 +666,7 @@ fn generate_why_message(
     function_count: usize,
     total_lines: usize,
     god_object_type: Option<&crate::organization::GodObjectType>,
+    domain_diversity_metrics: Option<&crate::organization::DomainDiversityMetrics>,
 ) -> String {
     // Check for boilerplate pattern first
     if let Some(crate::organization::GodObjectType::BoilerplatePattern {
@@ -706,8 +707,15 @@ fn generate_why_message(
     }
 
     if is_god_object {
-        // Distinguish between god class (single struct with many methods) vs god module (many functions/types)
-        if fields_count > 5 && methods_count > 20 {
+        // If we have domain diversity metrics, use those for more accurate analysis
+        if let Some(metrics) = domain_diversity_metrics {
+            format!(
+                "This module contains {} structs across {} distinct domains. Cross-domain mixing (Severity: {}) violates single responsibility principle and increases maintenance complexity.",
+                metrics.total_structs,
+                metrics.domain_count,
+                metrics.severity.as_str()
+            )
+        } else if fields_count > 5 && methods_count > 20 {
             // God class: single struct/class with many methods and fields
             format!(
                 "This struct violates single responsibility principle with {} methods and {} fields across {} distinct responsibilities. High coupling and low cohesion make it difficult to maintain and test.",
@@ -1251,6 +1259,7 @@ fn format_file_priority_item_with_verbosity(
         item.metrics.function_count,
         item.metrics.total_lines,
         item.metrics.god_object_type.as_ref(),
+        item.metrics.god_object_indicators.domain_diversity_metrics.as_ref(),
     );
 
     writeln!(
@@ -1260,6 +1269,19 @@ fn format_file_priority_item_with_verbosity(
         why_message
     )
     .unwrap();
+
+    // Spec 152: Display domain diversity analysis if available
+    if let Some(ref metrics) = item.metrics.god_object_indicators.domain_diversity_metrics {
+        let formatted_output = metrics.format_for_output();
+        // Add proper indentation to match the formatter's style
+        for line in formatted_output.lines() {
+            if !line.is_empty() {
+                writeln!(output, "   {}", line).unwrap();
+            } else {
+                writeln!(output).unwrap();
+            }
+        }
+    }
 
     writeln!(
         output,
@@ -2222,6 +2244,7 @@ mod tests {
                     struct_ratio: 0.0,
                     analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
                     cross_domain_severity: None,
+                domain_diversity_metrics: None,
                 },
                 function_scores: vec![8.5, 7.2, 6.9, 5.8, 4.3],
                 god_object_type: None,
