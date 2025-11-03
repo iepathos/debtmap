@@ -82,14 +82,23 @@ impl PurityDetector {
             self.scope.add_parameter(arg);
 
             // Check function signature for mutable parameters
-            if let syn::FnArg::Typed(pat_type) = arg {
-                // Check if the type itself is a mutable reference
-                if self.type_has_mutable_reference(&pat_type.ty) {
-                    self.has_mutable_params = true;
+            match arg {
+                syn::FnArg::Receiver(receiver) => {
+                    // Check if receiver is &mut self
+                    if receiver.reference.is_some() && receiver.mutability.is_some() {
+                        self.has_mutable_params = true;
+                        self.modifies_external_state = true;
+                    }
                 }
-                // Also check if the pattern indicates mutability
-                if self.has_mutable_reference(&pat_type.pat) {
-                    self.has_mutable_params = true;
+                syn::FnArg::Typed(pat_type) => {
+                    // Check if the type itself is a mutable reference
+                    if self.type_has_mutable_reference(&pat_type.ty) {
+                        self.has_mutable_params = true;
+                    }
+                    // Also check if the pattern indicates mutability
+                    if self.has_mutable_reference(&pat_type.pat) {
+                        self.has_mutable_params = true;
+                    }
                 }
             }
         }
@@ -690,5 +699,17 @@ mod tests {
             "#,
         );
         assert_eq!(analysis.purity_level, PurityLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_external_mutation_is_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn increment(&mut self) {
+                self.count += 1;
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
 }
