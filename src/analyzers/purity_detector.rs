@@ -546,6 +546,60 @@ impl<'ast> Visit<'ast> for PurityDetector {
                 self.visit_expr_closure_internal(closure);
                 return; // Don't continue visiting (closure analyzer handles body)
             }
+            // Unsafe blocks are impure
+            Expr::Unsafe(_) => {
+                self.has_unsafe_blocks = true;
+                self.has_side_effects = true;
+            }
+            // Assignment expressions indicate mutation
+            Expr::Assign(assign) => {
+                let scope = self.determine_mutation_scope(&assign.left);
+                match scope {
+                    MutationScope::Local => {
+                        // Extract target name for tracking
+                        match &*assign.left {
+                            Expr::Path(path) => {
+                                if let Some(ident) = path.path.get_ident() {
+                                    self.local_mutations.push(LocalMutation {
+                                        target: ident.to_string(),
+                                    });
+                                }
+                            }
+                            Expr::Field(field) => {
+                                if let Expr::Path(path) = &*field.base {
+                                    if let Some(ident) = path.path.get_ident() {
+                                        self.local_mutations.push(LocalMutation {
+                                            target: format!("{}.{}", ident, quote::quote!(#field.member)),
+                                        });
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    MutationScope::Upvalue => {
+                        if let Expr::Path(path) = &*assign.left {
+                            if let Some(ident) = path.path.get_ident() {
+                                self.upvalue_mutations.push(UpvalueMutation {
+                                    captured_var: ident.to_string(),
+                                });
+                            }
+                        }
+                    }
+                    MutationScope::External => {
+                        self.modifies_external_state = true;
+                        self.has_side_effects = true;
+                    }
+                }
+            }
+            // Path expressions may access external state (constants, statics, etc.)
+            Expr::Path(path) => {
+                let path_str = quote::quote!(#path).to_string();
+                // Check if it's accessing a module path (like std::i32::MAX)
+                if path_str.contains("::") && !self.scope.is_local(&path_str) {
+                    self.accesses_external_state = true;
+                }
+            }
             // Function calls might have side effects
             Expr::Call(ExprCall { func, .. }) => {
                 if let Expr::Path(expr_path) = &**func {
