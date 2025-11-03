@@ -569,7 +569,11 @@ impl<'ast> Visit<'ast> for PurityDetector {
                                 if let Expr::Path(path) = &*field.base {
                                     if let Some(ident) = path.path.get_ident() {
                                         self.local_mutations.push(LocalMutation {
-                                            target: format!("{}.{}", ident, quote::quote!(#field.member)),
+                                            target: format!(
+                                                "{}.{}",
+                                                ident,
+                                                quote::quote!(#field.member)
+                                            ),
                                         });
                                     }
                                 }
