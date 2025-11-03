@@ -367,7 +367,7 @@ struct FunctionMetadata {
     is_test: bool,
     visibility: Option<String>,
     entropy_score: Option<crate::complexity::entropy_core::EntropyScore>,
-    purity_info: (Option<bool>, Option<f32>),
+    purity_info: (Option<bool>, Option<f32>, Option<crate::core::PurityLevel>),
 }
 
 struct ComplexityMetricsData {
@@ -728,7 +728,7 @@ impl FunctionVisitor {
             adjusted_complexity,
             composition_metrics,
             language_specific,
-            purity_level: None,
+            purity_level: metadata.purity_info.2,
         }
     }
 
@@ -854,10 +854,16 @@ impl FunctionVisitor {
         }
     }
 
-    fn detect_purity(item_fn: &syn::ItemFn) -> (Option<bool>, Option<f32>) {
+    fn detect_purity(
+        item_fn: &syn::ItemFn,
+    ) -> (Option<bool>, Option<f32>, Option<crate::core::PurityLevel>) {
         let mut detector = PurityDetector::new();
         let analysis = detector.is_pure_function(item_fn);
-        (Some(analysis.is_pure), Some(analysis.confidence))
+        (
+            Some(analysis.is_pure),
+            Some(analysis.confidence),
+            Some(analysis.purity_level),
+        )
     }
 
     fn calculate_cyclomatic_with_visitor(&self, block: &syn::Block, func: &syn::ItemFn) -> u32 {
@@ -1846,7 +1852,7 @@ mod tests {
                 a + b
             }
         };
-        let (is_pure, confidence) = FunctionVisitor::detect_purity(&item_fn);
+        let (is_pure, confidence, _purity_level) = FunctionVisitor::detect_purity(&item_fn);
         assert!(is_pure.is_some());
         assert!(confidence.is_some());
         // Pure functions should have high confidence
@@ -1864,7 +1870,7 @@ mod tests {
                 println!("Value: {}", x);
             }
         };
-        let (is_pure, confidence) = FunctionVisitor::detect_purity(&item_fn);
+        let (is_pure, confidence, _purity_level) = FunctionVisitor::detect_purity(&item_fn);
         assert!(is_pure.is_some());
         assert!(confidence.is_some());
         // Functions with side effects should be detected as impure
@@ -1880,7 +1886,7 @@ mod tests {
                 self.value += value;
             }
         };
-        let (is_pure, confidence) = FunctionVisitor::detect_purity(&item_fn);
+        let (is_pure, confidence, _purity_level) = FunctionVisitor::detect_purity(&item_fn);
         assert!(is_pure.is_some());
         assert!(confidence.is_some());
         // The purity detector might not always detect mutation through self
