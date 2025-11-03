@@ -1,19 +1,42 @@
 ---
 number: 157
-title: Local vs External Mutation Distinction
+title: Local vs External Mutation Distinction (PARENT SPEC)
 category: foundation
 priority: critical
 status: draft
 dependencies: []
 created: 2025-11-01
+updated: 2025-11-03
+implementation_strategy: staged
 ---
 
-# Specification 157: Local vs External Mutation Distinction
+# Specification 157: Local vs External Mutation Distinction (PARENT SPEC)
 
 **Category**: foundation
 **Priority**: critical
 **Status**: draft
 **Dependencies**: None
+**Implementation**: Staged approach (see sub-specs below)
+
+## IMPORTANT: Implementation Strategy
+
+This spec has been **broken into 4 focused stages** for easier implementation and review.
+Each stage can be implemented and committed independently.
+
+**DO NOT implement this spec directly. Use the staged specs below:**
+
+1. **Spec 157a**: Add PurityLevel Enum (Foundation) - ~30 min
+2. **Spec 157b**: Implement ScopeTracker Module - ~1-2 hours
+3. **Spec 157c**: Integrate Scope Tracking into PurityDetector - ~2-3 hours
+4. **Spec 157d**: Update Scoring to Use LocallyPure - ~1-2 hours
+
+**Total Estimated Time**: 5-8 hours (vs. 14-22 hours monolithic)
+
+Each stage:
+- Is fully backward compatible
+- Can be tested independently
+- Requires a commit before proceeding to next stage
+- Has clear acceptance criteria
 
 ## Context
 
@@ -1378,3 +1401,47 @@ impl<'de> Deserialize<'de> for FunctionMetrics {
 
 5. **Scoring changes cause regressions**: Unexpected behavior
    - Mitigation: A/B test on sample projects, verify scores only improve
+
+---
+
+## IMPLEMENTATION APPROACH - USE STAGED SPECS
+
+The detailed implementation plan above is for reference only. **The actual implementation uses a staged approach** with the following focused specs:
+
+### Stage 1: Foundation Types (Spec 157a)
+**File**: `specs/157a-add-purity-level-enum.md`
+**Time**: 20-30 minutes
+**Deliverable**: PurityLevel enum and optional field added (backward compatible)
+**Commit**: After this stage, commit with "feat: add PurityLevel enum for refined purity analysis"
+
+### Stage 2: Scope Tracking Module (Spec 157b)
+**File**: `specs/157b-implement-scope-tracker.md`
+**Time**: 1-2 hours
+**Deliverable**: Standalone ScopeTracker module with comprehensive tests
+**Commit**: After this stage, commit with "feat: add ScopeTracker for mutation analysis"
+
+### Stage 3: PurityDetector Integration (Spec 157c)
+**File**: `specs/157c-integrate-scope-tracking.md`
+**Time**: 2-3 hours
+**Deliverable**: PurityDetector uses ScopeTracker, populates purity_level
+**Commit**: After this stage, commit with "feat: integrate scope tracking into purity detection"
+
+### Stage 4: Scoring Updates (Spec 157d)
+**File**: `specs/157d-update-scoring-for-locally-pure.md`
+**Time**: 1-2 hours
+**Deliverable**: Scoring uses LocallyPure level with appropriate multipliers
+**Commit**: After this stage, commit with "feat: apply LocallyPure scoring adjustments"
+
+### Benefits of Staged Approach
+
+1. **Smaller, reviewable commits** - Each stage is <500 lines changed
+2. **Independent testing** - Each stage can be validated separately
+3. **Easy rollback** - Can revert individual stages if issues found
+4. **No breaking changes** - Each stage maintains backward compatibility
+5. **Faster iteration** - Can implement one stage per session
+6. **Clear progress tracking** - Know exactly what's done vs. pending
+
+### Total Effort: 5-8 hours
+vs. 14-22 hours for monolithic implementation
+
+**To implement this spec, start with Spec 157a and proceed sequentially through 157d.**
