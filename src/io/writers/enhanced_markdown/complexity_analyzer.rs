@@ -576,6 +576,7 @@ mod tests {
                         adjusted_complexity: None,
                         composition_metrics: None,
                         language_specific: None,
+                        purity_level: None,
                     },
                     FunctionMetrics {
                         name: "func2".to_string(),
@@ -601,6 +602,7 @@ mod tests {
                         adjusted_complexity: None,
                         composition_metrics: None,
                         language_specific: None,
+                        purity_level: None,
                     },
                     FunctionMetrics {
                         name: "func3".to_string(),
@@ -626,6 +628,7 @@ mod tests {
                         adjusted_complexity: None,
                         composition_metrics: None,
                         language_specific: None,
+                        purity_level: None,
                     },
                 ],
                 summary: ComplexitySummary {

@@ -104,6 +104,7 @@ impl EvidenceBasedRiskCalculator {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
 
         classify_function_role(&func_metrics, &func_id, call_graph)

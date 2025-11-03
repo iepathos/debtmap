@@ -49,6 +49,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             language_specific: None,
             purity_reason: None,
             call_dependencies: None,
+            purity_level: None,
         };
 
         // Add 100% coverage for these functions
@@ -93,6 +94,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
             language_specific: None,
             purity_reason: None,
             call_dependencies: None,
+            purity_level: None,
         };
 
         // No coverage for these functions (untested)
@@ -193,6 +195,7 @@ fn test_well_tested_simple_function_has_low_score() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
 
     let mut coverage_data = LcovData::default();

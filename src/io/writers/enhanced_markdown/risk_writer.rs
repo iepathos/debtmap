@@ -166,6 +166,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test2.rs"),
@@ -191,6 +192,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             },
             FunctionMetrics {
                 file: PathBuf::from("test3.rs"),
@@ -216,6 +218,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             },
         ];
 

@@ -171,6 +171,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         }];
 
         AnalysisResults {
@@ -352,6 +353,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
         assert_eq!(get_recommendation(&func), "Acceptable");
     }
@@ -382,6 +384,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
         assert_eq!(get_recommendation(&func), "Consider simplifying");
     }
@@ -412,6 +415,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
         assert_eq!(get_recommendation(&func), "Refactor recommended");
     }
@@ -442,6 +446,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
         assert_eq!(get_recommendation(&func), "Urgent refactoring needed");
     }
@@ -476,6 +481,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             });
         }
 
@@ -522,6 +528,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             },
             FunctionMetrics {
                 name: "func_2".to_string(),
@@ -547,6 +554,7 @@ mod tests {
                 adjusted_complexity: None,
                 composition_metrics: None,
                 language_specific: None,
+                purity_level: None,
             },
         ];
 

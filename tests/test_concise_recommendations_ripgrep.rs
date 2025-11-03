@@ -42,6 +42,7 @@ fn create_complex_metrics(
         adjusted_complexity: None,
         composition_metrics: None,
         language_specific: None,
+        purity_level: None,
     }
 }
 

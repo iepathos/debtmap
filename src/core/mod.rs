@@ -38,6 +38,27 @@ pub struct ComplexitySummary {
     pub high_complexity_count: usize,
 }
 
+/// Refined purity classification that distinguishes local from external mutations.
+///
+/// This enum provides more nuanced purity analysis than the simple boolean `is_pure` field.
+/// It enables better scoring for functions that use local mutations for efficiency but are
+/// functionally pure (referentially transparent).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PurityLevel {
+    /// No mutations whatsoever - pure mathematical functions
+    StrictlyPure,
+
+    /// Uses local mutations for efficiency but no external side effects
+    /// (builder patterns, accumulators, owned `mut self`)
+    LocallyPure,
+
+    /// Reads external state but doesn't modify it (constants, `&self` methods)
+    ReadOnly,
+
+    /// Modifies external state or performs I/O (`&mut self`, statics, I/O)
+    Impure,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct FunctionMetrics {
     pub name: String,
@@ -64,6 +85,10 @@ pub struct FunctionMetrics {
     pub adjusted_complexity: Option<f64>, // Adjusted complexity score after mapping pattern detection (spec 118)
     pub composition_metrics: Option<crate::analysis::CompositionMetrics>, // AST-based functional composition metrics (spec 111)
     pub language_specific: Option<LanguageSpecificData>, // Language-specific pattern detection results (spec 146)
+
+    // Refined purity classification (replaces is_pure eventually)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purity_level: Option<PurityLevel>,
 }
 
 /// Language-specific data to avoid memory overhead for non-applicable files
@@ -111,6 +136,7 @@ impl FunctionMetrics {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         }
     }
 

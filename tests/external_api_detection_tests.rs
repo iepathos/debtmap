@@ -31,6 +31,7 @@ fn create_function(name: &str, path: &str, visibility: Option<String>) -> Functi
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 

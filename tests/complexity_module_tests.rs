@@ -32,6 +32,7 @@ fn test_complexity_calculator_new() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(!calc.is_complex(&metrics));
 }
@@ -63,6 +64,7 @@ fn test_complexity_calculator_is_complex_cyclomatic() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -97,6 +99,7 @@ fn test_complexity_calculator_is_complex_cognitive() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -131,6 +134,7 @@ fn test_complexity_calculator_is_complex_both() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(
         calc.is_complex(&metrics),
@@ -165,6 +169,7 @@ fn test_complexity_calculator_is_not_complex() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(
         !calc.is_complex(&metrics),
@@ -199,6 +204,7 @@ fn test_complexity_calculator_calculate_score_low() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -234,6 +240,7 @@ fn test_complexity_calculator_calculate_score_medium() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -269,6 +276,7 @@ fn test_complexity_calculator_calculate_score_high() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(
@@ -304,6 +312,7 @@ fn test_complexity_calculator_calculate_score_zero() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score = calc.calculate_score(&metrics);
     assert_eq!(score, 0, "Score should be 0 when metrics are 0");
@@ -418,6 +427,7 @@ fn test_complexity_calculator_boundary_values() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(!calc.is_complex(&metrics_zero));
 
@@ -445,6 +455,7 @@ fn test_complexity_calculator_boundary_values() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(!calc.is_complex(&metrics_one));
 
@@ -472,6 +483,7 @@ fn test_complexity_calculator_boundary_values() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     assert!(calc.is_complex(&metrics_two));
 }
@@ -504,6 +516,7 @@ fn test_complexity_score_proportions() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score_cyclo = calc.calculate_score(&metrics_cyclo_only);
     assert_eq!(
@@ -535,6 +548,7 @@ fn test_complexity_score_proportions() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
     let score_cognitive = calc.calculate_score(&metrics_cognitive_only);
     assert_eq!(

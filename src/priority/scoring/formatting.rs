@@ -326,6 +326,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
 
         assert_eq!(determine_visibility(&pub_func), FunctionVisibility::Public);
@@ -389,6 +390,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[]);
@@ -421,6 +423,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
 
         let recommendations = analyze_uncovered_lines(&func, &[10, 11, 12, 15, 20, 21]);
