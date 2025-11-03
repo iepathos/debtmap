@@ -5,6 +5,7 @@ use std::path::Path;
 
 pub mod call_graph;
 pub mod call_graph_integration;
+pub mod closure_analyzer;
 pub mod context_aware;
 pub mod enhanced_analyzer;
 pub mod file_analyzer;

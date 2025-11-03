@@ -1,7 +1,9 @@
 use syn::{
-    visit::Visit, Block, Expr, ExprCall, ExprField, ExprMethodCall, ItemFn, Local, Pat, Stmt,
+    visit::Visit, Block, Expr, ExprCall, ExprClosure, ExprField, ExprMethodCall, ItemFn, Local,
+    Pat, Stmt,
 };
 
+use super::closure_analyzer::{ClosureAnalyzer, ClosurePurity};
 use super::scope_tracker::{ScopeTracker, SelfKind};
 use crate::core::PurityLevel;
 
@@ -18,6 +20,9 @@ pub struct PurityDetector {
     scope: ScopeTracker,
     local_mutations: Vec<LocalMutation>,
     upvalue_mutations: Vec<UpvalueMutation>,
+
+    // Analyzed closures (stored in order)
+    closure_results: Vec<ClosurePurity>,
 }
 
 /// A mutation of a local variable or owned parameter
@@ -61,6 +66,7 @@ impl PurityDetector {
             scope: ScopeTracker::new(),
             local_mutations: Vec::new(),
             upvalue_mutations: Vec::new(),
+            closure_results: Vec::new(),
         }
     }
 
@@ -76,6 +82,7 @@ impl PurityDetector {
         self.scope = ScopeTracker::new();
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
+        self.closure_results.clear();
 
         // Initialize scope with parameters
         for arg in &item_fn.sig.inputs {
@@ -132,6 +139,7 @@ impl PurityDetector {
         self.scope = ScopeTracker::new();
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
+        self.closure_results.clear();
 
         self.visit_block(block);
 
@@ -377,11 +385,167 @@ impl PurityDetector {
 
         confidence.clamp(0.5, 1.0)
     }
+
+    // Accessor methods for closure analyzer
+    pub fn scope_mut(&mut self) -> &mut ScopeTracker {
+        &mut self.scope
+    }
+
+    pub fn has_io_operations(&self) -> bool {
+        self.has_io_operations
+    }
+
+    pub fn has_unsafe_blocks(&self) -> bool {
+        self.has_unsafe_blocks
+    }
+
+    pub fn modifies_external_state(&self) -> bool {
+        self.modifies_external_state
+    }
+
+    pub fn accesses_external_state(&self) -> bool {
+        self.accesses_external_state
+    }
+
+    pub fn local_mutations(&self) -> &[LocalMutation] {
+        &self.local_mutations
+    }
+
+    fn visit_expr_closure_internal(&mut self, closure: &ExprClosure) {
+        // Use dedicated analyzer
+        let mut analyzer = ClosureAnalyzer::new(&self.scope);
+        let closure_purity = analyzer.analyze_closure(closure);
+
+        // Store result
+        self.closure_results.push(closure_purity.clone());
+
+        // Propagate impurity to parent function
+        match closure_purity.level {
+            PurityLevel::Impure => {
+                self.modifies_external_state = true;
+                self.has_side_effects = true;
+            }
+            PurityLevel::LocallyPure => {
+                // Local mutations in closure count toward function's local mutations
+                self.local_mutations.extend(
+                    closure_purity
+                        .captures
+                        .iter()
+                        .filter(|c| c.is_mutated && c.scope == MutationScope::Local)
+                        .map(|c| LocalMutation {
+                            target: c.var_name.clone(),
+                        }),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_expr_method_call_with_closures(&mut self, method: &ExprMethodCall) {
+        let method_name = method.method.to_string();
+
+        // Comprehensive iterator method list
+        const ITERATOR_METHODS: &[&str] = &[
+            // Consuming methods
+            "map",
+            "filter",
+            "filter_map",
+            "flat_map",
+            "flatten",
+            "fold",
+            "reduce",
+            "for_each",
+            "try_fold",
+            "try_for_each",
+            "scan",
+            "partition",
+            "find",
+            "find_map",
+            "position",
+            "any",
+            "all",
+            "collect",
+            "inspect",
+            // Result/Option adapters
+            "and_then",
+            "or_else",
+            "map_or",
+            "map_or_else",
+        ];
+
+        if ITERATOR_METHODS.contains(&method_name.as_str()) {
+            // Analyze closure arguments inline
+            for arg in &method.args {
+                if let Expr::Closure(closure) = arg {
+                    // Analyze closure and check its purity
+                    let mut analyzer = ClosureAnalyzer::new(&self.scope);
+                    let purity = analyzer.analyze_closure(closure);
+
+                    // Store result
+                    self.closure_results.push(purity.clone());
+
+                    // Propagate impurity
+                    if purity.level == PurityLevel::Impure {
+                        self.has_side_effects = true;
+                        self.modifies_external_state = true;
+                    }
+                }
+            }
+        }
+
+        // Check if it's a mutation method
+        if self.is_mutation_method(&method_name) {
+            let receiver = &method.receiver;
+            // Classify the mutation scope
+            let scope = self.determine_mutation_scope(receiver);
+            match scope {
+                MutationScope::Local => {
+                    if let Expr::Path(path) = &**receiver {
+                        if let Some(ident) = path.path.get_ident() {
+                            self.local_mutations.push(LocalMutation {
+                                target: ident.to_string(),
+                            });
+                        }
+                    }
+                }
+                MutationScope::Upvalue => {
+                    if let Expr::Path(path) = &**receiver {
+                        if let Some(ident) = path.path.get_ident() {
+                            self.upvalue_mutations.push(UpvalueMutation {
+                                captured_var: ident.to_string(),
+                            });
+                        }
+                    }
+                }
+                MutationScope::External => {
+                    self.modifies_external_state = true;
+                    self.has_side_effects = true;
+                }
+            }
+        }
+
+        // Check for I/O methods
+        if method_name.contains("write")
+            || method_name.contains("print")
+            || method_name.contains("flush")
+        {
+            self.has_io_operations = true;
+            self.has_side_effects = true;
+        }
+
+        // Continue with normal method call analysis
+        syn::visit::visit_expr_method_call(self, method);
+    }
 }
 
 impl<'ast> Visit<'ast> for PurityDetector {
     fn visit_expr(&mut self, expr: &'ast Expr) {
         match expr {
+            // Handle closure expressions
+            Expr::Closure(closure) => {
+                self.visit_expr_closure_internal(closure);
+                return; // Don't continue visiting (closure analyzer handles body)
+            }
             // Function calls might have side effects
             Expr::Call(ExprCall { func, .. }) => {
                 if let Expr::Path(expr_path) = &**func {
@@ -393,110 +557,9 @@ impl<'ast> Visit<'ast> for PurityDetector {
                 }
             }
             // Method calls might have side effects
-            Expr::MethodCall(ExprMethodCall {
-                method, receiver, ..
-            }) => {
-                let method_name = method.to_string();
-
-                // Check if it's a mutation method
-                if self.is_mutation_method(&method_name) {
-                    // Classify the mutation scope
-                    let scope = self.determine_mutation_scope(receiver);
-                    match scope {
-                        MutationScope::Local => {
-                            if let Expr::Path(path) = &**receiver {
-                                if let Some(ident) = path.path.get_ident() {
-                                    self.local_mutations.push(LocalMutation {
-                                        target: ident.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                        MutationScope::Upvalue => {
-                            if let Expr::Path(path) = &**receiver {
-                                if let Some(ident) = path.path.get_ident() {
-                                    self.upvalue_mutations.push(UpvalueMutation {
-                                        captured_var: ident.to_string(),
-                                    });
-                                }
-                            }
-                        }
-                        MutationScope::External => {
-                            self.modifies_external_state = true;
-                            self.has_side_effects = true;
-                        }
-                    }
-                }
-
-                // Check for I/O methods
-                if method_name.contains("write")
-                    || method_name.contains("print")
-                    || method_name.contains("flush")
-                {
-                    self.has_io_operations = true;
-                    self.has_side_effects = true;
-                }
-            }
-            // Unsafe blocks are impure by definition
-            Expr::Unsafe(_) => {
-                self.has_unsafe_blocks = true;
-                self.has_side_effects = true;
-            }
-            // Static variable access might be impure
-            Expr::Path(expr_path) => {
-                let path_str = quote::quote!(#expr_path).to_string();
-                // Check if accessing static or external state
-                if path_str.contains("::")
-                    && !path_str.starts_with("self")
-                    && !path_str.starts_with("Self")
-                {
-                    // This might be accessing external state
-                    self.accesses_external_state = true;
-                }
-            }
-            // Assignment to external state
-            Expr::Assign(assign) => {
-                let scope = self.determine_mutation_scope(&assign.left);
-                match scope {
-                    MutationScope::Local => {
-                        // Extract target name from the expression
-                        let target_name = match &*assign.left {
-                            Expr::Path(path) => path.path.get_ident().map(|i| i.to_string()),
-                            Expr::Field(field) => {
-                                // For field access like self.value, use "self.field"
-                                if let Expr::Path(path) = &*field.base {
-                                    path.path.get_ident().map(|i| {
-                                        if let syn::Member::Named(field_name) = &field.member {
-                                            format!("{}.{}", i, field_name)
-                                        } else {
-                                            i.to_string()
-                                        }
-                                    })
-                                } else {
-                                    Some("field".to_string())
-                                }
-                            }
-                            _ => Some("unknown".to_string()),
-                        };
-
-                        if let Some(target) = target_name {
-                            self.local_mutations.push(LocalMutation { target });
-                        }
-                    }
-                    MutationScope::Upvalue => {
-                        if let Expr::Path(path) = &*assign.left {
-                            if let Some(ident) = path.path.get_ident() {
-                                self.upvalue_mutations.push(UpvalueMutation {
-                                    captured_var: ident.to_string(),
-                                });
-                            }
-                        }
-                    }
-                    MutationScope::External => {
-                        self.modifies_external_state = true;
-                        self.has_side_effects = true;
-                    }
-                }
+            Expr::MethodCall(method_call) => {
+                self.visit_expr_method_call_with_closures(method_call);
+                return; // Already handled including continuation
             }
             _ => {}
         }
