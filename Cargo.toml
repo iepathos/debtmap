@@ -1,6 +1,6 @@
 [package]
 name = "debtmap"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 authors = ["Glen Baker <iepathos@gmail.com>"]
 description = "Code complexity and technical debt analyzer"
