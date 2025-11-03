@@ -1736,6 +1736,7 @@ mod tests {
             cognitive_complexity: 7,
             is_pure: None,
             purity_confidence: None,
+            purity_level: None,
             entropy_details: None,
             god_object_indicators: None,
             tier: None,

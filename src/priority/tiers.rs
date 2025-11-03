@@ -245,6 +245,7 @@ mod tests {
             entropy_details: None,
             is_pure: Some(false),
             purity_confidence: Some(0.0),
+            purity_level: None,
             god_object_indicators: None,
             tier: None,
             function_context: None,

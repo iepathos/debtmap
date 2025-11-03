@@ -55,6 +55,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
         cognitive_complexity: 20,
         is_pure: None,
         purity_confidence: None,
+        purity_level: None,
         entropy_details: None,
         god_object_indicators: None,
         tier: None,

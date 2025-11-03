@@ -425,6 +425,7 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         entropy_details: None,
         is_pure: Some(context.function_info.is_pure),
         purity_confidence: Some(context.function_info.purity_confidence),
+        purity_level: None,
         god_object_indicators: None,
         tier: None,
         function_context: None,

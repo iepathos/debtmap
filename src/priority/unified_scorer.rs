@@ -1,4 +1,4 @@
-use crate::core::FunctionMetrics;
+use crate::core::{FunctionMetrics, PurityLevel};
 use crate::organization::GodObjectAnalysis;
 use crate::priority::{
     call_graph::{CallGraph, FunctionId},
@@ -53,6 +53,8 @@ pub struct UnifiedDebtItem {
     pub entropy_details: Option<EntropyDetails>, // Store entropy information
     pub is_pure: Option<bool>,                   // Whether the function is pure
     pub purity_confidence: Option<f32>,          // Confidence in purity detection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purity_level: Option<PurityLevel>, // Refined purity classification (spec 157)
     pub god_object_indicators: Option<GodObjectAnalysis>, // God object detection results
     #[serde(skip)]
     pub tier: Option<crate::priority::RecommendationTier>, // Recommendation tier for prioritization
@@ -298,19 +300,50 @@ fn should_skip_as_non_debt(is_trivial: bool, has_coverage: bool) -> bool {
     is_trivial && has_coverage
 }
 
-/// Calculate the purity adjustment multiplier.
+/// Calculates purity-based complexity adjustment.
 ///
-/// Pure functions get a bonus (lower multiplier) because they're inherently less risky and easier to test.
+/// Pure functions are easier to test and less risky, so they get a complexity bonus.
+/// Now supports refined purity levels:
+/// - StrictlyPure: 0.70-0.80 (best)
+/// - LocallyPure: 0.75-0.85 (very good - uses local mutations)
+/// - ReadOnly: 0.90 (good - reads but doesn't modify)
+/// - Impure: 1.0 (no bonus)
 fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+    // Try new purity_level field first
+    if let Some(level) = func.purity_level {
+        let confidence = func.purity_confidence.unwrap_or(0.0);
+
+        return match level {
+            PurityLevel::StrictlyPure => {
+                if confidence > 0.8 {
+                    0.70 // High confidence: 30% reduction
+                } else {
+                    0.80 // Medium confidence: 20% reduction
+                }
+            }
+            PurityLevel::LocallyPure => {
+                // NEW: Functionally pure with local mutations
+                if confidence > 0.8 {
+                    0.75 // High confidence: 25% reduction
+                } else {
+                    0.85 // Medium confidence: 15% reduction
+                }
+            }
+            PurityLevel::ReadOnly => 0.90, // 10% reduction
+            PurityLevel::Impure => 1.0,    // No reduction
+        };
+    }
+
+    // Fallback to legacy is_pure field for backward compatibility
     if func.is_pure == Some(true) {
-        // High confidence pure functions get bigger bonus
+        // Old code path - treat as StrictlyPure
         if func.purity_confidence.unwrap_or(0.0) > 0.8 {
-            0.7 // 30% reduction in complexity perception
+            0.70
         } else {
-            0.85 // 15% reduction
+            0.85
         }
     } else {
-        1.0 // No reduction for impure functions
+        1.0 // Impure or unknown
     }
 }
 
