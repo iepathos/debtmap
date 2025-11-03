@@ -180,13 +180,13 @@ impl DomainDiversityMetrics {
             ));
 
             // Show first few struct names
-            let examples: Vec<_> = structs.iter().take(3).collect();
+            let examples: Vec<&String> = structs.iter().take(3).collect();
             output.push_str(&format!(
                 "    Examples: {}{}",
                 examples
                     .iter()
-                    .map(|s| s.as_ref())
-                    .collect::<Vec<_>>()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<&str>>()
                     .join(", "),
                 if structs.len() > 3 {
                     format!(", ... +{} more", structs.len() - 3)
