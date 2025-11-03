@@ -533,3 +533,162 @@ fn test_pure_logic_coverage_weight_unchanged() {
         score.role_multiplier
     );
 }
+
+// Tests for spec 157d: Purity level-based scoring
+
+#[test]
+fn test_purity_adjustment_strictly_pure_high_confidence() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
+    func.purity_confidence = Some(0.9);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.70,
+        "StrictlyPure with high confidence should get 0.70"
+    );
+}
+
+#[test]
+fn test_purity_adjustment_strictly_pure_medium_confidence() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
+    func.purity_confidence = Some(0.7);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.80,
+        "StrictlyPure with medium confidence should get 0.80"
+    );
+}
+
+#[test]
+fn test_purity_adjustment_locally_pure_high_confidence() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::LocallyPure);
+    func.purity_confidence = Some(0.9);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.75,
+        "LocallyPure with high confidence should get 0.75"
+    );
+}
+
+#[test]
+fn test_purity_adjustment_locally_pure_medium_confidence() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::LocallyPure);
+    func.purity_confidence = Some(0.7);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.85,
+        "LocallyPure with medium confidence should get 0.85"
+    );
+}
+
+#[test]
+fn test_purity_adjustment_read_only() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::ReadOnly);
+    func.purity_confidence = Some(0.9);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(adjustment, 0.90, "ReadOnly should get 0.90");
+}
+
+#[test]
+fn test_purity_adjustment_impure() {
+    let mut func = create_test_metrics();
+    func.purity_level = Some(crate::core::PurityLevel::Impure);
+    func.purity_confidence = Some(0.9);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(adjustment, 1.0, "Impure should get 1.0");
+}
+
+#[test]
+fn test_backward_compatibility_with_is_pure() {
+    let mut func = create_test_metrics();
+    func.purity_level = None; // Not set - old code path
+    func.is_pure = Some(true);
+    func.purity_confidence = Some(0.9);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.70,
+        "Old is_pure field with high confidence should still work"
+    );
+}
+
+#[test]
+fn test_backward_compatibility_with_is_pure_medium_confidence() {
+    let mut func = create_test_metrics();
+    func.purity_level = None; // Not set - old code path
+    func.is_pure = Some(true);
+    func.purity_confidence = Some(0.7);
+
+    let adjustment = calculate_purity_adjustment(&func);
+    assert_eq!(
+        adjustment, 0.85,
+        "Old is_pure field with medium confidence should still work"
+    );
+}
+
+#[test]
+fn test_locally_pure_scores_lower_than_impure() {
+    // Test that LocallyPure functions get lower scores than Impure functions
+    let mut func_locally_pure = create_test_metrics();
+    func_locally_pure.purity_level = Some(crate::core::PurityLevel::LocallyPure);
+    func_locally_pure.purity_confidence = Some(0.9);
+    func_locally_pure.cyclomatic = 10;
+    func_locally_pure.cognitive = 15;
+
+    let mut func_impure = create_test_metrics();
+    func_impure.purity_level = Some(crate::core::PurityLevel::Impure);
+    func_impure.purity_confidence = Some(0.9);
+    func_impure.cyclomatic = 10;
+    func_impure.cognitive = 15;
+
+    let call_graph = CallGraph::new();
+    let score_locally_pure =
+        calculate_unified_priority(&func_locally_pure, &call_graph, None, None);
+    let score_impure = calculate_unified_priority(&func_impure, &call_graph, None, None);
+
+    assert!(
+        score_locally_pure.final_score < score_impure.final_score,
+        "LocallyPure (score: {}) should score lower than Impure (score: {})",
+        score_locally_pure.final_score,
+        score_impure.final_score
+    );
+}
+
+#[test]
+fn test_locally_pure_scores_higher_than_strictly_pure() {
+    // Test that LocallyPure functions get slightly higher scores than StrictlyPure functions
+    let mut func_locally_pure = create_test_metrics();
+    func_locally_pure.purity_level = Some(crate::core::PurityLevel::LocallyPure);
+    func_locally_pure.purity_confidence = Some(0.9);
+    func_locally_pure.cyclomatic = 10;
+    func_locally_pure.cognitive = 15;
+
+    let mut func_strictly_pure = create_test_metrics();
+    func_strictly_pure.purity_level = Some(crate::core::PurityLevel::StrictlyPure);
+    func_strictly_pure.purity_confidence = Some(0.9);
+    func_strictly_pure.cyclomatic = 10;
+    func_strictly_pure.cognitive = 15;
+
+    let call_graph = CallGraph::new();
+    let score_locally_pure =
+        calculate_unified_priority(&func_locally_pure, &call_graph, None, None);
+    let score_strictly_pure =
+        calculate_unified_priority(&func_strictly_pure, &call_graph, None, None);
+
+    assert!(
+        score_locally_pure.final_score > score_strictly_pure.final_score,
+        "LocallyPure (score: {}) should score slightly higher than StrictlyPure (score: {})",
+        score_locally_pure.final_score,
+        score_strictly_pure.final_score
+    );
+}
