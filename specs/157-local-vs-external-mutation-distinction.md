@@ -111,20 +111,101 @@ This enables accurate classification of functionally pure functions that use loc
 
 ## Acceptance Criteria
 
+### Functional Correctness
+
 - [ ] Local variable mutations correctly classified as LocallyPure
 - [ ] External field mutations classified as Impure
 - [ ] Builder pattern (consuming `mut self`) classified as LocallyPure
 - [ ] `&mut self` methods classified as Impure
 - [ ] Iterator `.collect()` patterns classified as LocallyPure
-- [ ] Closure captures classified correctly (upvalue mutations)
+- [ ] Closure captures conservatively marked as Upvalue/External
 - [ ] Pointer dereference mutations conservatively marked External
-- [ ] LocallyPure functions receive 0.75x complexity multiplier
-- [ ] Risk calculation uses LocallyPure correctly (Low/Medium risk)
-- [ ] Test suite achieves <5% false negative rate on validation corpus
+- [ ] Parameter mutations (`mut x: T`) classified as LocallyPure
+
+### Integration Requirements
+
+- [ ] LocallyPure functions receive 0.75x complexity multiplier (high confidence) or 0.85x (medium confidence)
+- [ ] Risk calculation treats LocallyPure same as StrictlyPure for risk levels
+- [ ] `PurityAnalysis` includes both `is_pure` (deprecated) and `purity_level` fields
+- [ ] `calculate_purity_adjustment()` handles both old and new fields with fallback
+- [ ] Serialization/deserialization maintains backward compatibility
+
+### Quality Gates
+
+- [ ] **Baseline false negative rate measured** and documented
+- [ ] **Target <5% false negative rate** achieved on validation corpus
+- [ ] **Zero false positives**: No external mutations marked as local
+- [ ] All existing purity tests still pass
+- [ ] New test suite covers all four purity levels
+- [ ] Performance overhead <10% average, <20% worst-case
+- [ ] All clippy warnings resolved
+- [ ] Documentation updated with examples
+
+### Validation Corpus
+
+- [ ] Ground truth corpus created (50+ functions)
+- [ ] Manual classification by Rust expert completed
+- [ ] Baseline measurement test passes
+- [ ] Post-implementation validation shows improvement
+- [ ] False positive rate verified as 0%
 
 ## Technical Details
 
 ### Implementation Approach
+
+#### Integration with Existing PurityDetector
+
+**Current Structure** (src/analyzers/purity_detector.rs):
+```rust
+pub struct PurityDetector {
+    has_side_effects: bool,
+    has_mutable_params: bool,
+    has_io_operations: bool,
+    has_unsafe_blocks: bool,
+    accesses_external_state: bool,
+    modifies_external_state: bool,
+}
+```
+
+**Enhanced Structure** (adds scope tracking):
+```rust
+pub struct PurityDetector {
+    // Existing fields - keep for backward compatibility
+    has_side_effects: bool,
+    has_mutable_params: bool,
+    has_io_operations: bool,
+    has_unsafe_blocks: bool,
+    accesses_external_state: bool,
+    modifies_external_state: bool,
+
+    // NEW: Scope-aware mutation tracking
+    scope: ScopeTracker,
+    local_mutations: Vec<LocalMutation>,
+    upvalue_mutations: Vec<UpvalueMutation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalMutation {
+    pub location: proc_macro2::Span,
+    pub target: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpvalueMutation {
+    pub location: proc_macro2::Span,
+    pub captured_var: String,
+}
+```
+
+**Changes to `PurityAnalysis` return type**:
+```rust
+pub struct PurityAnalysis {
+    pub is_pure: bool,  // DEPRECATED: Keep for compatibility
+    pub purity_level: PurityLevel,  // NEW: Refined classification
+    pub reasons: Vec<ImpurityReason>,
+    pub confidence: f32,
+}
+```
 
 #### Step 1: Scope Analysis
 
@@ -552,11 +633,13 @@ fn calculate_risk_level(
 ## Dependencies
 
 - **Prerequisites**: None
+- **Related Specifications**:
+  - Spec 158 (Closure Analysis): Referenced but NOT a prerequisite. Upvalue mutations will be handled conservatively (marked as External) until spec 158 is implemented.
 - **Affected Components**:
-  - `src/analyzers/purity_detector.rs` - Add scope tracking
-  - `src/analysis/purity_analysis.rs` - Use new purity levels
-  - `src/priority/unified_scorer.rs` - Handle LocallyPure
-  - `src/data_flow.rs` - Update risk calculation
+  - `src/analyzers/purity_detector.rs` - Add scope tracking and integrate `ScopeTracker`
+  - `src/core/mod.rs` - Add `PurityLevel` enum and update `FunctionMetrics`
+  - `src/priority/unified_scorer.rs` - Update `calculate_purity_adjustment()` to handle `LocallyPure`
+  - (Optional) `src/data_flow.rs` - Update risk calculation if present
 - **External Dependencies**: None
 
 ## Testing Strategy
@@ -676,22 +759,90 @@ fn test_scoring_with_local_mutations() {
 
 ### Validation Corpus
 
-Create ground truth dataset:
+**CRITICAL: Establish Baseline Before Implementation**
+
+#### Step 1: Create Ground Truth Dataset
+
 ```
 tests/purity_validation/local_vs_external/
 ├── local_pure/
-│   ├── accumulator_pattern.rs
-│   ├── builder_pattern.rs
-│   ├── iterator_collect.rs
-│   └── mut_parameter.rs
+│   ├── accumulator_pattern.rs        # let mut vec; vec.push()
+│   ├── builder_pattern.rs            # mut self builder chains
+│   ├── iterator_collect.rs           # .map().collect()
+│   ├── mut_parameter.rs              # fn foo(mut x: T)
+│   └── owned_self_mutation.rs        # self.field = x with ownership
 ├── external_impure/
-│   ├── field_mutation.rs
-│   ├── static_mutation.rs
-│   └── mut_ref_self.rs
-└── validation_results.json
+│   ├── field_mutation.rs             # &mut self methods
+│   ├── static_mutation.rs            # static mut access
+│   ├── mut_ref_self.rs               # impl methods with &mut self
+│   └── global_state.rs               # thread_local!, lazy_static!
+├── strictly_pure/
+│   ├── pure_arithmetic.rs            # No mutations at all
+│   ├── pure_recursion.rs             # Recursive pure functions
+│   └── immutable_transforms.rs       # .map() without collect
+├── read_only/
+│   ├── const_access.rs               # Reading const values
+│   └── immutable_field_access.rs     # Reading &self fields
+└── ground_truth.json                 # Manual classifications
 ```
 
-Target: <5% false negative rate
+#### Step 2: Establish Baseline (REQUIRED)
+
+Before any implementation, run current purity detector on corpus:
+
+```rust
+// tests/baseline_measurement.rs
+#[test]
+fn measure_current_false_negative_rate() {
+    let ground_truth = load_ground_truth("tests/purity_validation/ground_truth.json");
+    let mut false_negatives = 0;
+    let mut total = 0;
+
+    for case in ground_truth {
+        let current_result = analyze_with_current_detector(&case.code);
+        let expected = case.expected_purity_level;
+
+        if current_result.is_pure && expected == PurityLevel::Impure {
+            false_negatives += 1;
+        }
+        total += 1;
+    }
+
+    let rate = (false_negatives as f64 / total as f64) * 100.0;
+    println!("Current false negative rate: {:.1}%", rate);
+    // Store baseline for comparison
+    std::fs::write("tests/baseline_rate.txt", format!("{:.1}", rate)).unwrap();
+}
+```
+
+#### Step 3: Ground Truth Collection
+
+Manual review by Rust expert to classify each test case:
+- **StrictlyPure**: No mutations, referentially transparent
+- **LocallyPure**: Local mutations only, functionally pure
+- **ReadOnly**: Reads external state, doesn't modify
+- **Impure**: External mutations or I/O
+
+Document reasoning in `ground_truth.json`:
+```json
+{
+  "test_cases": [
+    {
+      "file": "local_pure/accumulator_pattern.rs",
+      "function": "process_data",
+      "expected": "LocallyPure",
+      "reasoning": "Mutates only local Vec, no external side effects"
+    }
+  ]
+}
+```
+
+#### Validation Targets
+
+- **Baseline false negative rate**: Measure current (expected 20-30%)
+- **Target false negative rate**: <5%
+- **False positive rate**: 0% (never mark external mutation as local)
+- **Corpus size**: Minimum 50 functions (10-15 per category)
 
 ## Documentation Requirements
 
@@ -752,25 +903,478 @@ Modifies external state or performs I/O.
 
 ### Performance Considerations
 
-- `ScopeTracker` uses `HashSet` for O(1) lookups
-- Scope depth tracking minimal overhead
-- No impact on non-mutation analysis paths
+#### Computational Complexity
+
+- `ScopeTracker` uses `HashSet` for O(1) variable lookups
+- Scope depth tracking: O(1) increment/decrement per scope entry/exit
+- Mutation classification: O(1) per mutation site
+- No impact on non-mutation analysis paths (lazy evaluation)
+
+#### Performance Benchmarking (REQUIRED)
+
+**Target**: <10% overhead compared to current purity detection
+
+Create benchmark suite in `benches/purity_detection_bench.rs`:
+
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn benchmark_current_purity_detection(c: &mut Criterion) {
+    let code = load_test_corpus("benches/fixtures/large_function.rs");
+
+    c.bench_function("current_purity_detection", |b| {
+        b.iter(|| {
+            let mut detector = PurityDetector::new();
+            let ast = parse_code(black_box(&code));
+            detector.is_pure_function(&ast)
+        });
+    });
+}
+
+fn benchmark_scope_aware_purity_detection(c: &mut Criterion) {
+    let code = load_test_corpus("benches/fixtures/large_function.rs");
+
+    c.bench_function("scope_aware_purity_detection", |b| {
+        b.iter(|| {
+            let mut detector = PurityDetector::new_with_scope_tracking();
+            let ast = parse_code(black_box(&code));
+            detector.is_pure_function(&ast)
+        });
+    });
+}
+
+criterion_group!(
+    benches,
+    benchmark_current_purity_detection,
+    benchmark_scope_aware_purity_detection
+);
+criterion_main!(benches);
+```
+
+**Benchmark Scenarios**:
+1. Small pure function (5 lines, no mutations)
+2. Medium function with local mutations (20 lines, 5 mutations)
+3. Large function with mixed mutations (50 lines, 15 mutations)
+4. Deeply nested scopes (5 levels of nesting)
+5. Many local variables (50+ locals)
+
+**Acceptance Criteria**:
+- Average overhead: <10%
+- Worst-case overhead: <20%
+- Memory overhead: <5% per function
+
+**Optimization Strategies if Needed**:
+- Use `SmallVec` for `local_mutations` (most functions have <8 mutations)
+- Pool and reuse `ScopeTracker` instances
+- Skip scope tracking for functions with no assignments
 
 ## Migration and Compatibility
 
 ### Breaking Changes
 
-- New `PurityLevel::LocallyPure` enum variant
-- `FunctionMetrics` gains `local_mutations` field
+#### API Changes
+
+1. **New `PurityLevel` enum** in `src/core/mod.rs`:
+   ```rust
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub enum PurityLevel {
+       StrictlyPure,
+       LocallyPure,  // NEW
+       ReadOnly,
+       Impure,
+   }
+   ```
+
+2. **`FunctionMetrics` field additions** (src/core/mod.rs):
+   ```rust
+   pub struct FunctionMetrics {
+       // Existing fields...
+       pub is_pure: Option<bool>,  // DEPRECATED but kept for compatibility
+       pub purity_confidence: Option<f32>,
+
+       // NEW fields
+       pub purity_level: Option<PurityLevel>,  // Replaces is_pure
+       pub purity_reasons: Option<Vec<String>>, // Human-readable explanation
+   }
+   ```
+
+3. **`PurityDetector` internal changes** (src/analyzers/purity_detector.rs):
+   ```rust
+   pub struct PurityDetector {
+       // Existing fields remain...
+
+       // NEW fields
+       scope: ScopeTracker,
+       local_mutations: Vec<LocalMutation>,
+       upvalue_mutations: Vec<UpvalueMutation>,
+   }
+   ```
+
+4. **`unified_scorer.rs` function signature change**:
+   ```rust
+   // OLD
+   fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+       if func.is_pure == Some(true) { ... }
+   }
+
+   // NEW (supports both during transition)
+   fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+       // Try new field first, fall back to old
+       if let Some(level) = func.purity_level {
+           match level { ... }
+       } else if func.is_pure == Some(true) {
+           // Legacy path
+           0.7
+       } else {
+           1.0
+       }
+   }
+   ```
 
 ### Migration Strategy
 
-- Add new fields with defaults
-- Update all match statements to handle `LocallyPure`
-- Backward compatible: old analysis without scope tracking returns `StrictlyPure` or `Impure` only
+#### Phase 1: Additive Changes (Non-Breaking)
 
-### Compatibility Guarantees
+**Goal**: Add new functionality without breaking existing code.
 
-- Existing purity classifications unchanged (strict binary)
-- New classifications refine existing "impure" into "locally pure" vs "impure"
-- Scores only improve, never regress
+1. **Add `PurityLevel` enum** to `src/core/mod.rs`
+2. **Add `purity_level: Option<PurityLevel>` field** to `FunctionMetrics`
+3. **Keep `is_pure: Option<bool>`** field - mark as deprecated in docs
+4. **Extend `PurityDetector`** with scope tracking
+5. **Update `calculate_purity_adjustment()`** to check both fields (new first, then old)
+
+**Result**: Existing code continues to work. New code can use `purity_level`.
+
+#### Phase 2: Gradual Adoption
+
+**Goal**: Update analyzers to populate new field.
+
+1. **Update `RustAnalyzer`** to set both `is_pure` and `purity_level`:
+   ```rust
+   let analysis = detector.is_pure_function(func);
+   FunctionMetrics {
+       is_pure: Some(analysis.is_pure),  // Legacy
+       purity_level: Some(analysis.purity_level),  // New
+       purity_confidence: Some(analysis.confidence),
+       // ...
+   }
+   ```
+
+2. **Update all match statements** in codebase to handle `LocallyPure`
+3. **Add tests** for new purity levels
+4. **Validate** on test corpus
+
+**Result**: Both fields populated. Consumers can migrate at their own pace.
+
+#### Phase 3: Deprecation (Future Breaking Release)
+
+**Goal**: Remove `is_pure` field entirely.
+
+1. **Remove `is_pure` field** from `FunctionMetrics`
+2. **Make `purity_level` non-optional**: `pub purity_level: PurityLevel`
+3. **Update serialization** to migrate old data
+4. **Bump major version** (breaking change)
+
+**Timeline**: Not before 2-3 minor releases after Phase 2.
+
+### Backward Compatibility Guarantees
+
+#### Serialization Compatibility
+
+**Reading old data**:
+```rust
+// Handle deserialization of old format
+impl<'de> Deserialize<'de> for FunctionMetrics {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Custom deserialization logic
+        let mut metrics = /* ... */;
+
+        // Migrate old is_pure to purity_level if needed
+        if metrics.purity_level.is_none() && metrics.is_pure.is_some() {
+            metrics.purity_level = Some(if metrics.is_pure.unwrap() {
+                PurityLevel::StrictlyPure  // Conservative
+            } else {
+                PurityLevel::Impure
+            });
+        }
+
+        Ok(metrics)
+    }
+}
+```
+
+#### API Stability
+
+- **`is_pure` field**: Continues to work during Phases 1-2
+- **Scoring logic**: Fallback ensures old data scores correctly
+- **JSON output**: Both fields present for compatibility
+- **Classification refinement**: Only "impure" functions get reclassified as "locally pure"
+  - Pure functions remain pure
+  - Impure functions may upgrade to locally pure (better score)
+  - **No regressions**: Scores only improve, never worsen
+
+### Migration Checklist
+
+- [ ] Add `PurityLevel` enum to `src/core/mod.rs`
+- [ ] Add `purity_level` field to `FunctionMetrics` (optional)
+- [ ] Implement `ScopeTracker` in new module
+- [ ] Update `PurityDetector` with scope tracking
+- [ ] Update `calculate_purity_adjustment()` with fallback logic
+- [ ] Find all `match func.is_pure` statements and update
+- [ ] Add deserialization migration logic
+- [ ] Run validation corpus to verify no regressions
+- [ ] Update documentation with deprecation notice
+- [ ] Plan Phase 3 timeline for future release
+
+## Implementation Order
+
+**Recommended sequence to minimize risk and enable incremental progress.**
+
+### Stage 0: Preparation (2-3 hours)
+
+**Goal**: Establish baseline and infrastructure
+
+1. **Create validation corpus structure**:
+   ```bash
+   mkdir -p tests/purity_validation/{local_pure,external_impure,strictly_pure,read_only}
+   ```
+
+2. **Collect test cases** from real Rust projects:
+   - debtmap's own codebase
+   - Popular crates (itertools, rayon, serde)
+   - Target: 50+ functions
+
+3. **Manual classification** by Rust expert → `ground_truth.json`
+
+4. **Write baseline measurement test** (`tests/baseline_measurement.rs`)
+
+5. **Run baseline test** and record current false negative rate
+
+**Deliverable**: Documented baseline (e.g., "Current: 23.5% false negative rate")
+
+### Stage 1: Core Types (1-2 hours)
+
+**Goal**: Add new types without breaking existing code
+
+1. **Add `PurityLevel` enum** to `src/core/mod.rs`:
+   ```rust
+   #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+   pub enum PurityLevel {
+       StrictlyPure,
+       LocallyPure,
+       ReadOnly,
+       Impure,
+   }
+   ```
+
+2. **Add `purity_level` field** to `FunctionMetrics`:
+   ```rust
+   pub purity_level: Option<PurityLevel>,
+   ```
+
+3. **Update `FunctionMetrics::new()`** to initialize as `None`
+
+4. **Run tests**: `cargo test` - all should pass
+
+**Deliverable**: New types added, backward compatible
+
+### Stage 2: Scope Tracker (2-3 hours)
+
+**Goal**: Implement scope analysis in isolation
+
+1. **Create `src/analyzers/scope_tracker.rs`**
+
+2. **Implement `ScopeTracker` struct** with methods:
+   - `new()`
+   - `add_parameter()`
+   - `add_local_var()`
+   - `is_local()`, `is_self()`
+   - `enter_scope()`, `exit_scope()`
+
+3. **Add unit tests** for `ScopeTracker`:
+   - Parameter tracking
+   - Local variable tracking
+   - Self detection (all variants)
+   - Nested scopes
+
+4. **Run tests**: `cargo test scope_tracker`
+
+**Deliverable**: Fully tested `ScopeTracker` module
+
+### Stage 3: PurityDetector Integration (3-4 hours)
+
+**Goal**: Add scope tracking to purity detection
+
+1. **Add fields to `PurityDetector`**:
+   ```rust
+   scope: ScopeTracker,
+   local_mutations: Vec<LocalMutation>,
+   upvalue_mutations: Vec<UpvalueMutation>,
+   ```
+
+2. **Update `PurityDetector::new()`** to initialize new fields
+
+3. **Implement `determine_mutation_scope()` method**
+
+4. **Update visitor methods**:
+   - `visit_item_fn()` - initialize scope with parameters
+   - `visit_local()` - track local declarations
+   - `visit_expr_assign()` - classify mutation scope
+   - `visit_expr_method_call()` - classify mutating methods
+
+5. **Implement `determine_purity_level()` method**
+
+6. **Update `PurityAnalysis` struct** to include `purity_level`
+
+7. **Maintain backward compatibility**: Set both `is_pure` and `purity_level`
+
+8. **Run existing tests**: `cargo test purity_detector` - all should pass
+
+**Deliverable**: Enhanced `PurityDetector` with scope awareness
+
+### Stage 4: Test Suite (2-3 hours)
+
+**Goal**: Comprehensive test coverage for new classification
+
+1. **Update existing test**: `tests/purity_detection_test.rs:174-193`
+   - Currently has no assertions
+   - Add assertion for `LocallyPure`
+
+2. **Add new unit tests** (lines 566-647 in spec):
+   - `test_local_mutation_is_locally_pure()`
+   - `test_external_mutation_is_impure()`
+   - `test_builder_pattern_is_locally_pure()`
+   - `test_iterator_collect_is_locally_pure()`
+   - `test_static_mutation_is_impure()`
+
+3. **Run validation corpus**:
+   ```bash
+   cargo test --test purity_validation
+   ```
+
+4. **Measure new false negative rate** - should be <5%
+
+**Deliverable**: Test suite passing, validation targets met
+
+### Stage 5: Scoring Integration (1-2 hours)
+
+**Goal**: Update scoring to use new purity levels
+
+1. **Update `calculate_purity_adjustment()`** in `src/priority/unified_scorer.rs`:
+   ```rust
+   fn calculate_purity_adjustment(func: &FunctionMetrics) -> f64 {
+       if let Some(level) = func.purity_level {
+           match level {
+               PurityLevel::StrictlyPure => { /* 0.7 or 0.8 */ }
+               PurityLevel::LocallyPure => { /* 0.75 or 0.85 */ }
+               PurityLevel::ReadOnly => 0.9,
+               PurityLevel::Impure => 1.0,
+           }
+       } else if func.is_pure == Some(true) {
+           0.7  // Fallback to old logic
+       } else {
+           1.0
+       }
+   }
+   ```
+
+2. **Add integration test** for scoring (lines 651-675 in spec)
+
+3. **Run full test suite**: `cargo test`
+
+**Deliverable**: Scoring updated, all tests passing
+
+### Stage 6: Performance Validation (1-2 hours)
+
+**Goal**: Verify performance targets met
+
+1. **Create `benches/purity_detection_bench.rs`** with criterion benchmarks
+
+2. **Run benchmarks**:
+   ```bash
+   cargo bench --bench purity_detection_bench
+   ```
+
+3. **Verify**: Average overhead <10%, worst-case <20%
+
+4. **If overhead too high**: Apply optimization strategies from spec
+
+**Deliverable**: Performance validated
+
+### Stage 7: Documentation (1 hour)
+
+**Goal**: Update all documentation
+
+1. **Add doc comments** to `ScopeTracker`
+
+2. **Update `docs/purity-analysis.md`** with new levels (lines 708-738)
+
+3. **Add deprecation notice** to `is_pure` field
+
+4. **Update CHANGELOG.md**
+
+**Deliverable**: Documentation complete
+
+### Stage 8: Final Validation (1 hour)
+
+**Goal**: Ensure everything works end-to-end
+
+1. **Run full test suite**: `cargo test --all-features`
+
+2. **Run clippy**: `cargo clippy --all-targets --all-features`
+
+3. **Run fmt**: `cargo fmt --all -- --check`
+
+4. **Build docs**: `cargo doc --no-deps`
+
+5. **Compare validation metrics**:
+   - Baseline: X% false negatives
+   - Post-implementation: Y% false negatives (should be <5%)
+   - False positives: 0%
+
+6. **Update spec status** to `implemented`
+
+**Deliverable**: Production-ready implementation
+
+---
+
+## Estimated Total Effort
+
+- **Stage 0 (Preparation)**: 2-3 hours
+- **Stage 1 (Core Types)**: 1-2 hours
+- **Stage 2 (Scope Tracker)**: 2-3 hours
+- **Stage 3 (Integration)**: 3-4 hours
+- **Stage 4 (Tests)**: 2-3 hours
+- **Stage 5 (Scoring)**: 1-2 hours
+- **Stage 6 (Performance)**: 1-2 hours
+- **Stage 7 (Documentation)**: 1 hour
+- **Stage 8 (Validation)**: 1 hour
+
+**Total: 14-22 hours** (approximately 2-3 working days)
+
+---
+
+## Risk Mitigation
+
+### High Risk Items
+
+1. **Baseline measurement shows <20% false negatives**: Re-evaluate necessity
+   - Mitigation: Still implement, but adjust target and impact claims
+
+2. **Performance overhead >20%**: Optimization needed
+   - Mitigation: Apply optimization strategies from spec
+   - Fallback: Make scope tracking opt-in via feature flag
+
+3. **False positives detected**: Critical bug
+   - Mitigation: Be conservative - when in doubt, mark as External
+
+### Medium Risk Items
+
+4. **Deserialization migration breaks**: Backward compatibility issue
+   - Mitigation: Test with real production data before release
+
+5. **Scoring changes cause regressions**: Unexpected behavior
+   - Mitigation: A/B test on sample projects, verify scores only improve
