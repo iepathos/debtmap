@@ -429,24 +429,15 @@ impl ParallelUnifiedAnalysisBuilder {
         let timings = Arc::new(Mutex::new(self.timings.clone()));
 
         // Create progress spinners for Phase 1 tasks if progress manager is available
-        // Only show at verbosity >= 1 (sub-phase progress)
+        // Show initialization progress at all verbosity levels (these are key phases)
         let (df_progress, purity_progress, test_progress, debt_progress) =
             if let Some(pm) = ProgressManager::global() {
-                if pm.verbosity() >= 1 {
-                    (
-                        pm.create_spinner("Initializing data flow graph"),
-                        pm.create_spinner("Analyzing function purity"),
-                        pm.create_spinner("Detecting test functions"),
-                        pm.create_spinner("Aggregating debt items"),
-                    )
-                } else {
-                    (
-                        indicatif::ProgressBar::hidden(),
-                        indicatif::ProgressBar::hidden(),
-                        indicatif::ProgressBar::hidden(),
-                        indicatif::ProgressBar::hidden(),
-                    )
-                }
+                (
+                    pm.create_spinner("Initializing data flow graph"),
+                    pm.create_spinner("Analyzing function purity"),
+                    pm.create_spinner("Detecting test functions"),
+                    pm.create_spinner("Aggregating debt items"),
+                )
             } else {
                 (
                     indicatif::ProgressBar::hidden(),
@@ -755,16 +746,12 @@ impl ParallelUnifiedAnalysisBuilder {
         }
 
         // Create progress bar if global progress manager is available
-        // Only show at verbosity >= 1 (sub-phase progress)
+        // Show file analysis progress at all verbosity levels (it's a major phase)
         let progress = ProgressManager::global()
-            .and_then(|pm| {
-                if pm.verbosity() >= 1 {
-                    let pb = pm.create_bar(files_map.len() as u64, TEMPLATE_FILE_ANALYSIS);
-                    pb.set_message("Analyzing files");
-                    Some(pb)
-                } else {
-                    None
-                }
+            .map(|pm| {
+                let pb = pm.create_bar(files_map.len() as u64, TEMPLATE_FILE_ANALYSIS);
+                pb.set_message("Analyzing files (detecting god objects, calculating metrics)");
+                pb
             })
             .unwrap_or_else(indicatif::ProgressBar::hidden);
 
