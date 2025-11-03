@@ -538,15 +538,15 @@ impl GodObjectDetector {
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// // God Class: 30 impl methods, 5 standalone
-    /// // → Analyze impl methods only
+    /// ```text
+    /// God Class: 30 impl methods, 5 standalone
+    /// → Analyze impl methods only
     ///
-    /// // God File: 0 structs, 80 standalone
-    /// // → Analyze all standalone functions
+    /// God File: 0 structs, 80 standalone
+    /// → Analyze all standalone functions
     ///
-    /// // Hybrid (God Module): 1 struct, 106 standalone
-    /// // → Analyze all standalone functions
+    /// Hybrid (God Module): 1 struct, 106 standalone
+    /// → Analyze all standalone functions
     /// ```
     fn determine_god_object_type(
         primary_type: Option<&TypeAnalysis>,
