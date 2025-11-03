@@ -1,4 +1,9 @@
-use syn::{visit::Visit, Block, Expr, ExprCall, ExprMethodCall, ItemFn, Pat, Stmt};
+use syn::{
+    visit::Visit, Block, Expr, ExprCall, ExprField, ExprMethodCall, ItemFn, Local, Pat, Stmt,
+};
+
+use super::scope_tracker::{ScopeTracker, SelfKind};
+use crate::core::PurityLevel;
 
 /// Detects whether a function is pure through static analysis
 pub struct PurityDetector {
@@ -8,6 +13,34 @@ pub struct PurityDetector {
     has_unsafe_blocks: bool,
     accesses_external_state: bool,
     modifies_external_state: bool,
+
+    // Scope-aware mutation tracking
+    scope: ScopeTracker,
+    local_mutations: Vec<LocalMutation>,
+    upvalue_mutations: Vec<UpvalueMutation>,
+}
+
+/// A mutation of a local variable or owned parameter
+#[derive(Debug, Clone)]
+pub struct LocalMutation {
+    pub target: String,
+}
+
+/// A mutation of a closure-captured variable
+#[derive(Debug, Clone)]
+pub struct UpvalueMutation {
+    pub captured_var: String,
+}
+
+/// Classification of mutation scope
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationScope {
+    /// Mutation of local variable or owned parameter
+    Local,
+    /// Mutation of closure-captured variable
+    Upvalue,
+    /// Mutation of external state (fields, statics, etc.)
+    External,
 }
 
 impl Default for PurityDetector {
@@ -25,6 +58,9 @@ impl PurityDetector {
             has_unsafe_blocks: false,
             accesses_external_state: false,
             modifies_external_state: false,
+            scope: ScopeTracker::new(),
+            local_mutations: Vec::new(),
+            upvalue_mutations: Vec::new(),
         }
     }
 
@@ -37,17 +73,32 @@ impl PurityDetector {
         self.has_unsafe_blocks = false;
         self.accesses_external_state = false;
         self.modifies_external_state = false;
+        self.scope = ScopeTracker::new();
+        self.local_mutations.clear();
+        self.upvalue_mutations.clear();
 
-        // Check function signature for mutable parameters
+        // Initialize scope with parameters
         for arg in &item_fn.sig.inputs {
-            if let syn::FnArg::Typed(pat_type) = arg {
-                // Check if the type itself is a mutable reference
-                if self.type_has_mutable_reference(&pat_type.ty) {
-                    self.has_mutable_params = true;
+            self.scope.add_parameter(arg);
+
+            // Check function signature for mutable parameters
+            match arg {
+                syn::FnArg::Receiver(receiver) => {
+                    // Check if receiver is &mut self
+                    if receiver.reference.is_some() && receiver.mutability.is_some() {
+                        self.has_mutable_params = true;
+                        self.modifies_external_state = true;
+                    }
                 }
-                // Also check if the pattern indicates mutability
-                if self.has_mutable_reference(&pat_type.pat) {
-                    self.has_mutable_params = true;
+                syn::FnArg::Typed(pat_type) => {
+                    // Check if the type itself is a mutable reference
+                    if self.type_has_mutable_reference(&pat_type.ty) {
+                        self.has_mutable_params = true;
+                    }
+                    // Also check if the pattern indicates mutability
+                    if self.has_mutable_reference(&pat_type.pat) {
+                        self.has_mutable_params = true;
+                    }
                 }
             }
         }
@@ -55,14 +106,17 @@ impl PurityDetector {
         // Visit the function body
         self.visit_block(&item_fn.block);
 
+        let purity_level = self.determine_purity_level();
+
         PurityAnalysis {
             is_pure: !self.has_side_effects
                 && !self.has_mutable_params
                 && !self.has_io_operations
                 && !self.has_unsafe_blocks
                 && !self.modifies_external_state,
+            purity_level,
             reasons: self.collect_impurity_reasons(),
-            confidence: self.calculate_confidence(),
+            confidence: self.calculate_confidence_score(),
         }
     }
 
@@ -75,16 +129,22 @@ impl PurityDetector {
         self.has_unsafe_blocks = false;
         self.accesses_external_state = false;
         self.modifies_external_state = false;
+        self.scope = ScopeTracker::new();
+        self.local_mutations.clear();
+        self.upvalue_mutations.clear();
 
         self.visit_block(block);
+
+        let purity_level = self.determine_purity_level();
 
         PurityAnalysis {
             is_pure: !self.has_side_effects
                 && !self.has_io_operations
                 && !self.has_unsafe_blocks
                 && !self.modifies_external_state,
+            purity_level,
             reasons: self.collect_impurity_reasons(),
-            confidence: self.calculate_confidence(),
+            confidence: self.calculate_confidence_score(),
         }
     }
 
@@ -135,27 +195,6 @@ impl PurityDetector {
         reasons
     }
 
-    fn calculate_confidence(&self) -> f32 {
-        // Start with high confidence
-        let mut confidence = 1.0;
-
-        // Reduce confidence if we only access external state (might be reading constants)
-        if self.accesses_external_state && !self.modifies_external_state {
-            confidence *= 0.8;
-        }
-
-        // If no impurities detected, we're fairly confident
-        if !self.has_side_effects
-            && !self.has_io_operations
-            && !self.has_unsafe_blocks
-            && !self.modifies_external_state
-        {
-            confidence = 0.95; // High confidence but not 100% due to potential false negatives
-        }
-
-        confidence
-    }
-
     fn is_io_call(&self, path_str: &str) -> bool {
         const IO_PATTERNS: &[&str] = &[
             "print",
@@ -199,6 +238,145 @@ impl PurityDetector {
                 | "split_off"
         )
     }
+
+    fn determine_mutation_scope(&self, expr: &Expr) -> MutationScope {
+        match expr {
+            // Simple identifier: x = value
+            Expr::Path(path) => {
+                let ident = path
+                    .path
+                    .get_ident()
+                    .map(|i| i.to_string())
+                    .unwrap_or_default();
+
+                if self.scope.is_local(&ident) {
+                    MutationScope::Local
+                } else {
+                    // Conservative: assume external
+                    MutationScope::External
+                }
+            }
+
+            // Field access: obj.field = value
+            Expr::Field(field) => self.determine_field_mutation_scope(field),
+
+            // Index: arr[i] = value
+            Expr::Index(index) => {
+                if let Expr::Path(path) = &*index.expr {
+                    if let Some(ident) = path.path.get_ident() {
+                        if self.scope.is_local(&ident.to_string()) {
+                            return MutationScope::Local;
+                        }
+                    }
+                }
+                MutationScope::External
+            }
+
+            // Pointer dereference: *ptr = value
+            Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Deref(_)) => {
+                // Conservative: assume external
+                MutationScope::External
+            }
+
+            _ => MutationScope::External,
+        }
+    }
+
+    fn determine_field_mutation_scope(&self, field: &ExprField) -> MutationScope {
+        match &*field.base {
+            // self.field = value
+            Expr::Path(path)
+                if self.scope.is_self(
+                    &path
+                        .path
+                        .get_ident()
+                        .map(|i| i.to_string())
+                        .unwrap_or_default(),
+                ) =>
+            {
+                // Check self kind
+                if let Some(self_kind) = self.scope.get_self_kind() {
+                    match self_kind {
+                        SelfKind::MutRef => MutationScope::External, // &mut self
+                        SelfKind::Owned | SelfKind::MutOwned => {
+                            // mut self or self (owned) - local mutation
+                            MutationScope::Local
+                        }
+                        _ => MutationScope::External,
+                    }
+                } else {
+                    MutationScope::External
+                }
+            }
+
+            // local_var.field = value
+            Expr::Path(path) => {
+                let ident = path
+                    .path
+                    .get_ident()
+                    .map(|i| i.to_string())
+                    .unwrap_or_default();
+
+                if self.scope.is_local(&ident) {
+                    MutationScope::Local
+                } else {
+                    MutationScope::External
+                }
+            }
+
+            _ => MutationScope::External,
+        }
+    }
+
+    fn determine_purity_level(&self) -> PurityLevel {
+        // Has external side effects (I/O, external mutations)?
+        if self.modifies_external_state || self.has_io_operations || self.has_unsafe_blocks {
+            return PurityLevel::Impure;
+        }
+
+        // Has local mutations?
+        if !self.local_mutations.is_empty() || !self.upvalue_mutations.is_empty() {
+            return PurityLevel::LocallyPure;
+        }
+
+        // Only reads external state?
+        if self.accesses_external_state {
+            return PurityLevel::ReadOnly;
+        }
+
+        // No mutations or side effects at all
+        PurityLevel::StrictlyPure
+    }
+
+    fn calculate_confidence_score(&self) -> f32 {
+        let mut confidence: f32 = 1.0;
+
+        // Reduce confidence if we only access external state
+        if self.accesses_external_state && !self.modifies_external_state {
+            confidence *= 0.8;
+        }
+
+        // Reduce confidence for upvalue mutations (closures)
+        if !self.upvalue_mutations.is_empty() {
+            confidence *= 0.85;
+        }
+
+        // High confidence for simple local mutations
+        if !self.local_mutations.is_empty() && self.local_mutations.len() < 5 {
+            confidence *= 0.95;
+        }
+
+        // If no impurities detected, high confidence
+        if !self.has_side_effects
+            && !self.has_io_operations
+            && !self.has_unsafe_blocks
+            && !self.modifies_external_state
+        {
+            confidence = 0.95;
+        }
+
+        confidence.clamp(0.5, 1.0)
+    }
 }
 
 impl<'ast> Visit<'ast> for PurityDetector {
@@ -222,17 +400,31 @@ impl<'ast> Visit<'ast> for PurityDetector {
 
                 // Check if it's a mutation method
                 if self.is_mutation_method(&method_name) {
-                    // Check if we're mutating self or external data
-                    if let Expr::Path(path) = &**receiver {
-                        let path_str = quote::quote!(#path).to_string();
-                        if !path_str.starts_with("self") {
+                    // Classify the mutation scope
+                    let scope = self.determine_mutation_scope(receiver);
+                    match scope {
+                        MutationScope::Local => {
+                            if let Expr::Path(path) = &**receiver {
+                                if let Some(ident) = path.path.get_ident() {
+                                    self.local_mutations.push(LocalMutation {
+                                        target: ident.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                        MutationScope::Upvalue => {
+                            if let Expr::Path(path) = &**receiver {
+                                if let Some(ident) = path.path.get_ident() {
+                                    self.upvalue_mutations.push(UpvalueMutation {
+                                        captured_var: ident.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                        MutationScope::External => {
                             self.modifies_external_state = true;
                             self.has_side_effects = true;
                         }
-                    } else {
-                        // Conservative: assume it might modify external state
-                        self.modifies_external_state = true;
-                        self.has_side_effects = true;
                     }
                 }
 
@@ -264,9 +456,43 @@ impl<'ast> Visit<'ast> for PurityDetector {
             }
             // Assignment to external state
             Expr::Assign(assign) => {
-                if let Expr::Path(path) = &*assign.left {
-                    let path_str = quote::quote!(#path).to_string();
-                    if !path_str.starts_with("self") {
+                let scope = self.determine_mutation_scope(&assign.left);
+                match scope {
+                    MutationScope::Local => {
+                        // Extract target name from the expression
+                        let target_name = match &*assign.left {
+                            Expr::Path(path) => path.path.get_ident().map(|i| i.to_string()),
+                            Expr::Field(field) => {
+                                // For field access like self.value, use "self.field"
+                                if let Expr::Path(path) = &*field.base {
+                                    path.path.get_ident().map(|i| {
+                                        if let syn::Member::Named(field_name) = &field.member {
+                                            format!("{}.{}", i, field_name)
+                                        } else {
+                                            i.to_string()
+                                        }
+                                    })
+                                } else {
+                                    Some("field".to_string())
+                                }
+                            }
+                            _ => Some("unknown".to_string()),
+                        };
+
+                        if let Some(target) = target_name {
+                            self.local_mutations.push(LocalMutation { target });
+                        }
+                    }
+                    MutationScope::Upvalue => {
+                        if let Expr::Path(path) = &*assign.left {
+                            if let Some(ident) = path.path.get_ident() {
+                                self.upvalue_mutations.push(UpvalueMutation {
+                                    captured_var: ident.to_string(),
+                                });
+                            }
+                        }
+                    }
+                    MutationScope::External => {
                         self.modifies_external_state = true;
                         self.has_side_effects = true;
                     }
@@ -280,6 +506,11 @@ impl<'ast> Visit<'ast> for PurityDetector {
     }
 
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        // Track local variable declarations
+        if let Stmt::Local(local) = stmt {
+            self.visit_local(local);
+        }
+
         if let Stmt::Macro(stmt_macro) = stmt {
             let macro_path = stmt_macro.mac.path.to_token_stream().to_string();
             // Macros that typically have side effects
@@ -301,6 +532,14 @@ impl<'ast> Visit<'ast> for PurityDetector {
         syn::visit::visit_stmt(self, stmt);
     }
 
+    fn visit_local(&mut self, local: &'ast Local) {
+        // Extract variable name from pattern
+        if let Pat::Ident(pat_ident) = &local.pat {
+            self.scope.add_local_var(pat_ident.ident.to_string());
+        }
+        syn::visit::visit_local(self, local);
+    }
+
     fn visit_block(&mut self, block: &'ast Block) {
         for stmt in &block.stmts {
             self.visit_stmt(stmt);
@@ -311,6 +550,7 @@ impl<'ast> Visit<'ast> for PurityDetector {
 #[derive(Debug, Clone)]
 pub struct PurityAnalysis {
     pub is_pure: bool,
+    pub purity_level: PurityLevel,
     pub reasons: Vec<ImpurityReason>,
     pub confidence: f32,
 }
@@ -405,5 +645,71 @@ mod tests {
         );
         assert!(!analysis.is_pure);
         assert!(analysis.reasons.contains(&ImpurityReason::UnsafeCode));
+    }
+
+    #[test]
+    fn test_local_mutation_is_locally_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn process_data(input: Vec<i32>) -> Vec<i32> {
+                let mut result = Vec::new();
+                for item in input {
+                    result.push(item * 2);
+                }
+                result
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::LocallyPure);
+        assert!(analysis.confidence > 0.85);
+    }
+
+    #[test]
+    fn test_builder_pattern_is_locally_pure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn with_value(mut self, value: u32) -> Self {
+                self.value = value;
+                self
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::LocallyPure);
+    }
+
+    #[test]
+    fn test_strictly_pure_function() {
+        let analysis = analyze_function_str(
+            r#"
+            fn add(a: i32, b: i32) -> i32 {
+                a + b
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_read_only_function() {
+        let analysis = analyze_function_str(
+            r#"
+            fn is_valid(x: i32) -> bool {
+                x < std::i32::MAX
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_external_mutation_is_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn increment(&mut self) {
+                self.count += 1;
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
 }
