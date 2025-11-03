@@ -549,8 +549,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parallel_env_var_check() {
-        // Test that parallel detection works correctly
+    fn test_env_var_parsing() {
+        // Combined test for environment variable parsing to avoid race conditions
+        // when tests run in parallel. Tests must not interfere with each other.
+
+        // Test DEBTMAP_PARALLEL detection
 
         // Case 1: DEBTMAP_PARALLEL not set (default: sequential)
         std::env::remove_var("DEBTMAP_PARALLEL");
@@ -582,11 +585,8 @@ mod tests {
 
         // Clean up
         std::env::remove_var("DEBTMAP_PARALLEL");
-    }
 
-    #[test]
-    fn test_jobs_env_var_parsing() {
-        // Test that DEBTMAP_JOBS is parsed correctly
+        // Test DEBTMAP_JOBS parsing
 
         // Case 1: Valid number
         std::env::set_var("DEBTMAP_JOBS", "8");
