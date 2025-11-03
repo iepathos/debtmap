@@ -396,6 +396,7 @@ mod tests {
                     adjusted_complexity: None,
                     composition_metrics: None,
                     language_specific: None,
+                    purity_level: None,
                 }],
                 cyclomatic_complexity: 1,
                 cognitive_complexity: 1,
@@ -796,6 +797,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         });
 
         assert!(!metrics_equal(&metrics1, &metrics2));
@@ -890,6 +892,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         });
 
         inc.previous_state = inc

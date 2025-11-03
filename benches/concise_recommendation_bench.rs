@@ -35,6 +35,7 @@ fn create_test_metrics(name: &str, cyclomatic: u32, cognitive: u32) -> FunctionM
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 

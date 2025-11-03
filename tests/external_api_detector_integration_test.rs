@@ -34,6 +34,7 @@ fn create_test_function(name: &str, path: &str, visibility: Option<String>) -> F
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 

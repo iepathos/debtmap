@@ -228,6 +228,7 @@ fn test_complexity_metrics_from_function() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -274,6 +275,7 @@ fn test_complexity_metrics_from_function_zero_values() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -312,6 +314,7 @@ fn test_complexity_metrics_from_function_high_values() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);
@@ -353,6 +356,7 @@ fn test_complexity_metrics_from_function_preserves_path() {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     };
 
     let metrics = ComplexityMetrics::from_function(&func);

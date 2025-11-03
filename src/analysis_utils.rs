@@ -255,6 +255,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         }];
         let report = build_complexity_report(&functions, 10);
 
@@ -303,6 +304,7 @@ mod tests {
                         adjusted_complexity: None,
                         composition_metrics: None,
                         language_specific: None,
+                        purity_level: None,
                     }],
                     cyclomatic_complexity: 2,
                     cognitive_complexity: 3,
@@ -342,6 +344,7 @@ mod tests {
                             adjusted_complexity: None,
                             composition_metrics: None,
                             language_specific: None,
+                            purity_level: None,
                         },
                         FunctionMetrics {
                             name: "func_c".to_string(),
@@ -367,6 +370,7 @@ mod tests {
                             adjusted_complexity: None,
                             composition_metrics: None,
                             language_specific: None,
+                            purity_level: None,
                         },
                     ],
                     cyclomatic_complexity: 10,

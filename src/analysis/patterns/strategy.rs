@@ -289,6 +289,7 @@ mod tests {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
         };
 
         let result = recognizer.is_function_used_by_pattern(&function, &file_metrics);

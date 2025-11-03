@@ -328,5 +328,6 @@ fn create_test_function(
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }

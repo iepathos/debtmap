@@ -34,6 +34,7 @@ fn create_test_metrics(path: &str, cyclo: u32, cognitive: u32) -> FileMetrics {
                 language_specific: None,
                 purity_reason: None,
                 call_dependencies: None,
+                purity_level: None,
             }],
             cyclomatic_complexity: cyclo,
             cognitive_complexity: cognitive,

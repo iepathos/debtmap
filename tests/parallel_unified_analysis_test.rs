@@ -30,6 +30,7 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             adjusted_complexity: None,
             composition_metrics: None,
             language_specific: None,
+            purity_level: None,
             purity_reason: None,
             call_dependencies: None,
         })

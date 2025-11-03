@@ -544,6 +544,7 @@ fn extract_functions_from_stmts(
                     adjusted_complexity: adjusted_complexity_value,
                     composition_metrics: None, // Functional composition analysis not yet supported for Python (spec 111)
                     language_specific: None,
+                    purity_level: None,
                 });
 
                 // Recursively look for nested functions
@@ -639,6 +640,7 @@ fn extract_functions_from_stmts(
                     adjusted_complexity: adjusted_complexity_value,
                     composition_metrics: None, // Functional composition analysis not yet supported for Python (spec 111)
                     language_specific: None,
+                    purity_level: None,
                 });
 
                 // Recursively look for nested functions

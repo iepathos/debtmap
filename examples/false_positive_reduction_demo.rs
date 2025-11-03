@@ -146,6 +146,7 @@ fn create_getter() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -174,6 +175,7 @@ fn create_setter() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -202,6 +204,7 @@ fn create_simple_validator() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -230,6 +233,7 @@ fn create_small_util() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -258,6 +262,7 @@ fn create_test_helper() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -286,6 +291,7 @@ fn create_complex_handler() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -314,6 +320,7 @@ fn create_nested_logic() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -342,6 +349,7 @@ fn create_long_switch() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
 
@@ -370,5 +378,6 @@ fn create_moderate_complexity() -> FunctionMetrics {
         language_specific: None,
         purity_reason: None,
         call_dependencies: None,
+        purity_level: None,
     }
 }
