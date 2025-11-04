@@ -23,6 +23,9 @@ pub struct PurityDetector {
 
     // Analyzed closures (stored in order)
     closure_results: Vec<ClosurePurity>,
+
+    // Track unknown macros for confidence adjustment
+    unknown_macros_count: usize,
 }
 
 /// A mutation of a local variable or owned parameter
@@ -67,6 +70,7 @@ impl PurityDetector {
             local_mutations: Vec::new(),
             upvalue_mutations: Vec::new(),
             closure_results: Vec::new(),
+            unknown_macros_count: 0,
         }
     }
 
@@ -83,6 +87,7 @@ impl PurityDetector {
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
         self.closure_results.clear();
+        self.unknown_macros_count = 0;
 
         // Initialize scope with parameters
         for arg in &item_fn.sig.inputs {
@@ -140,6 +145,7 @@ impl PurityDetector {
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
         self.closure_results.clear();
+        self.unknown_macros_count = 0;
 
         self.visit_block(block);
 
@@ -378,6 +384,11 @@ impl PurityDetector {
             confidence *= 0.95;
         }
 
+        // Reduce confidence for unknown macros (conservative approach)
+        for _ in 0..self.unknown_macros_count {
+            confidence *= 0.95;
+        }
+
         // If no impurities detected, high confidence
         if !self.has_side_effects
             && !self.has_io_operations
@@ -579,7 +590,8 @@ impl PurityDetector {
 
             // Unknown macro - no effect on purity (conservative approach)
             _ => {
-                // Future: could track unknown macros for confidence adjustment
+                // Track unknown macros for confidence adjustment
+                self.unknown_macros_count += 1;
             }
         }
     }
