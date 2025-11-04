@@ -505,6 +505,7 @@ mod tests {
             file: "test.rs".to_string(),
             line: Some(42),
             function: Some("test_function".to_string()),
+            file_context_label: None,
         };
 
         let json = serde_json::to_string(&loc).unwrap();
@@ -519,6 +520,7 @@ mod tests {
             file: "test.rs".to_string(),
             line: None,
             function: None,
+            file_context_label: None,
         };
 
         let json = serde_json::to_string(&loc).unwrap();
