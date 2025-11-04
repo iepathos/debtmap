@@ -149,6 +149,7 @@ fn test_analysis_cache_uses_shared_backend() {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+        file_contexts: HashMap::new(),
             module_scope: None,
             classes: None,
         })
@@ -170,6 +171,7 @@ fn test_analysis_cache_uses_shared_backend() {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
+        file_contexts: HashMap::new(),
             module_scope: None,
             classes: None,
         })

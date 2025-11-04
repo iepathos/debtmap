@@ -42,6 +42,7 @@ fn create_test_metrics(path: &str, cyclo: u32, cognitive: u32) -> FileMetrics {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: None,
     }

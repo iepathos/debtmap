@@ -26,6 +26,7 @@ fn create_test_file_metrics() -> FileMetrics {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: Some(vec![
             // Observer pattern
@@ -270,6 +271,7 @@ fn test_dependency_injection_pattern_detection() {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: Some(vec![ClassDef {
             name: "DatabaseService".to_string(),

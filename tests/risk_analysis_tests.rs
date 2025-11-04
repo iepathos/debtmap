@@ -74,12 +74,16 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
     };
 
     // Test with coverage analysis
@@ -144,12 +148,16 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
     };
 
     // Should fail when LCOV file doesn't exist
@@ -215,12 +223,16 @@ fn test_analyze_risk_without_coverage() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
     };
 
     // Test without coverage
@@ -276,12 +288,16 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
     };
 
     let result =

@@ -235,12 +235,16 @@ mod tests {
                 by_type: HashMap::new(),
                 priorities: vec![],
                 duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
             },
             dependencies: DependencyReport {
                 modules: vec![],
                 circular: vec![],
             },
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
+        file_contexts: HashMap::new(),
         }
     }
 

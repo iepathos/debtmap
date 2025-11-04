@@ -274,6 +274,7 @@ fn test_pattern_matching_for_different_languages() {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: None,
     };

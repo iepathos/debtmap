@@ -191,12 +191,14 @@ mod tests {
                 by_type: HashMap::new(),
                 priorities: vec![Priority::Medium],
                 duplications: vec![],
+        file_contexts: HashMap::new(),
             },
             dependencies: DependencyReport {
                 modules: vec![],
                 circular: vec![],
             },
             duplications: vec![],
+        file_contexts: HashMap::new(),
         }
     }
 

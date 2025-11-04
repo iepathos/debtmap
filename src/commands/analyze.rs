@@ -293,6 +293,9 @@ pub fn analyze_project(
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
     let duplications = analysis_helpers::detect_duplications(&files, duplication_threshold);
 
+    // Extract file contexts for test file detection (spec 166)
+    let file_contexts = analysis_utils::extract_file_contexts(&file_metrics);
+
     let complexity_report =
         analysis_helpers::build_complexity_report(&all_functions, complexity_threshold);
     let technical_debt =
@@ -306,6 +309,7 @@ pub fn analyze_project(
         technical_debt,
         dependencies,
         duplications,
+        file_contexts,
     })
 }
 

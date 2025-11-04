@@ -47,6 +47,7 @@ fn create_test_metrics_simple() -> FileMetrics {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: None,
     }
@@ -117,6 +118,7 @@ fn create_test_metrics_complex() -> FileMetrics {
         debt_items: vec![],
         dependencies: vec![],
         duplications: vec![],
+        file_contexts: HashMap::new(),
         module_scope: None,
         classes: None,
     }

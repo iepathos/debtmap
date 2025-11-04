@@ -26,6 +26,7 @@ pub fn analyze_project(
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
     let duplications = detect_duplications(&files, duplication_threshold);
+    let file_contexts = analysis_utils::extract_file_contexts(&file_metrics);
 
     let complexity_report = build_complexity_report(&all_functions, complexity_threshold);
     let technical_debt = build_technical_debt_report(all_debt_items, duplications.clone());
@@ -38,6 +39,7 @@ pub fn analyze_project(
         technical_debt,
         dependencies,
         duplications,
+        file_contexts,
     })
 }
 
