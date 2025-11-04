@@ -122,6 +122,7 @@ pub fn calculate_weighted_metrics(
 /// * `purity_distribution` - Optional purity distribution
 /// * `has_complexity_data` - Whether complexity data is available
 /// * `thresholds` - God object thresholds
+/// * `module_structure` - Optional module structure for facade detection (Spec 170)
 ///
 /// # Returns
 /// Tuple of (god_object_score, is_god_object)
@@ -137,9 +138,10 @@ pub fn calculate_final_god_object_score(
     purity_distribution: &Option<PurityDistribution>,
     has_complexity_data: bool,
     thresholds: &GodObjectThresholds,
+    module_structure: Option<&crate::analysis::ModuleStructure>,
 ) -> (f64, bool) {
     // Use purity-weighted scoring if available, otherwise fall back to complexity weighting or raw count
-    let god_object_score = if purity_distribution.is_some() {
+    let mut god_object_score = if purity_distribution.is_some() {
         calculate_god_object_score_weighted(
             purity_weighted_count,
             total_fields,
@@ -166,6 +168,18 @@ pub fn calculate_final_god_object_score(
             thresholds,
         )
     };
+
+    // Apply facade scoring adjustment (Spec 170)
+    if let Some(structure) = module_structure {
+        if let Some(facade_info) = &structure.facade_info {
+            god_object_score = crate::priority::scoring::adjust_score_for_facade(
+                god_object_score,
+                facade_info,
+                total_methods,
+                lines_of_code,
+            );
+        }
+    }
 
     // With complexity weighting, use the god_object_score to determine if it's a god object
     // rather than just the confidence level (which still uses raw counts)

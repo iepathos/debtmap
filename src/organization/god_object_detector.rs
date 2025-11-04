@@ -852,7 +852,20 @@ impl GodObjectDetector {
         let (weighted_method_count, avg_complexity, purity_weighted_count, purity_distribution) =
             metrics::calculate_weighted_metrics(&visitor, &detection_type);
 
-        // Calculate the final god object score and determination
+        // Analyze module structure early for facade detection (Spec 170)
+        // This must happen before score calculation
+        let temp_is_god_object = true; // Temporary for module structure analysis
+        let (visibility_breakdown_temp, module_structure_temp) =
+            Self::analyze_module_structure_and_visibility(
+                path,
+                temp_is_god_object,
+                &visitor,
+                &all_methods,
+                total_methods,
+                &self.source_content,
+            );
+
+        // Calculate the final god object score with facade adjustment (Spec 170)
         let (god_object_score, is_god_object) = metrics::calculate_final_god_object_score(
             purity_weighted_count,
             weighted_method_count,
@@ -864,6 +877,7 @@ impl GodObjectDetector {
             &purity_distribution,
             !visitor.function_complexity.is_empty(),
             &thresholds,
+            module_structure_temp.as_ref(),
         );
 
         let confidence = determine_confidence(
@@ -895,16 +909,9 @@ impl GodObjectDetector {
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
-        // Analyze module structure and visibility for Rust files
-        let (visibility_breakdown, module_structure) =
-            Self::analyze_module_structure_and_visibility(
-                path,
-                is_god_object,
-                &visitor,
-                &all_methods,
-                total_methods,
-                &self.source_content,
-            );
+        // Use module structure and visibility computed earlier
+        let visibility_breakdown = visibility_breakdown_temp;
+        let module_structure = module_structure_temp;
 
         GodObjectAnalysis {
             is_god_object,

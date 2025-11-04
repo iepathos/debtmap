@@ -9,6 +9,7 @@ pub mod context_aware;
 pub mod coverage_expectations;
 pub mod coverage_scoring;
 pub mod debt_item;
+pub mod facade_scoring; // Spec 170: Module facade detection and scoring adjustment
 pub mod file_context_scoring; // Spec 166: Test file detection and context-aware scoring
 pub mod formatting;
 pub mod orchestration_adjustment;
@@ -63,5 +64,7 @@ pub use rebalanced::{DebtScore, ScoreComponents, ScoreWeights, ScoringRationale,
 pub use file_context_scoring::{
     apply_context_adjustments, context_label, context_reduction_factor, is_test_context,
 };
+
+pub use facade_scoring::adjust_score_for_facade;
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility
