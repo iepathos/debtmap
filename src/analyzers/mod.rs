@@ -12,6 +12,7 @@ pub mod file_analyzer;
 pub mod function_registry;
 pub mod implementations;
 pub mod javascript;
+pub mod macro_definition_collector;
 pub mod purity_detector;
 pub mod python;
 pub mod python_ast_extraction;
