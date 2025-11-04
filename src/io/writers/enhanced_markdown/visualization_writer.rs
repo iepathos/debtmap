@@ -241,6 +241,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
         }
     }
 

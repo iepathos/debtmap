@@ -175,6 +175,7 @@ mod tests {
             function_length: 80,
             function_role: FunctionRole::PureLogic,
             transitive_coverage: None,
+            file_context: None,
             upstream_callers: vec![],
             downstream_callees: vec![],
             entropy_details: None,
@@ -254,6 +255,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
         }
     }
 

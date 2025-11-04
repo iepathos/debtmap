@@ -792,13 +792,22 @@ fn format_priority_item_markdown(
     }
 
     // Location and type
+    // Add file context tag if present (spec 166)
+    let file_context_tag = if let Some(ref context) = item.file_context {
+        use crate::priority::scoring::file_context_scoring::context_label;
+        format!(" [{}]", context_label(context))
+    } else {
+        String::new()
+    };
+
     writeln!(
         output,
-        "**Type:** {} | **Location:** `{}:{} {}()`",
+        "**Type:** {} | **Location:** `{}:{} {}(){}`",
         format_debt_type(&item.debt_type),
         item.location.file.display(),
         item.location.line,
-        item.location.function
+        item.location.function,
+        file_context_tag
     )
     .unwrap();
 
@@ -1410,6 +1419,7 @@ mod tests {
                 propagated_from: vec![],
                 uncovered_lines: vec![101, 102, 103],
             }),
+            file_context: None,
             upstream_dependencies: 3,
             downstream_dependencies: 5,
             upstream_callers: vec![
@@ -2020,6 +2030,7 @@ mod tests {
                 lines_reduction: 500,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 0,
             downstream_dependencies: 20,
             upstream_callers: vec![],
@@ -2075,6 +2086,7 @@ mod tests {
                 lines_reduction: 100,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 2,
             downstream_dependencies: 5,
             upstream_callers: vec![],
@@ -2131,6 +2143,7 @@ mod tests {
                 lines_reduction: 0,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 1,
             downstream_dependencies: 2,
             upstream_callers: vec![],
@@ -2188,6 +2201,7 @@ mod tests {
                 lines_reduction: 30,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 0,
             downstream_dependencies: 0,
             upstream_callers: vec![],

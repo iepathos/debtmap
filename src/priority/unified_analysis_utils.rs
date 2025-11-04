@@ -39,6 +39,15 @@ pub trait UnifiedAnalysisUtils {
         func_id: FunctionId,
         variables: std::collections::HashSet<String>,
     );
+
+    /// Apply file context adjustments to all debt item scores (spec 166)
+    ///
+    /// Adjusts scores based on file context (test vs production).
+    /// Test files receive reduced scores to avoid false positives.
+    fn apply_file_context_adjustments(
+        &mut self,
+        file_contexts: &std::collections::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
+    );
 }
 
 impl UnifiedAnalysisUtils for UnifiedAnalysis {
@@ -176,5 +185,35 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
     ) {
         self.data_flow_graph
             .add_variable_dependencies(func_id, variables);
+    }
+
+    fn apply_file_context_adjustments(
+        &mut self,
+        file_contexts: &std::collections::HashMap<std::path::PathBuf, crate::analysis::FileContext>,
+    ) {
+        use crate::priority::scoring::file_context_scoring::apply_context_adjustments;
+
+        // Apply adjustments to all items
+        self.items = self
+            .items
+            .iter()
+            .map(|item| {
+                // Get the file context for this item
+                if let Some(context) = file_contexts.get(&item.location.file) {
+                    // Apply context adjustment to the final score
+                    let adjusted_score =
+                        apply_context_adjustments(item.unified_score.final_score, context);
+
+                    // Create a new item with the adjusted score and file context
+                    let mut adjusted_item = item.clone();
+                    adjusted_item.unified_score.final_score = adjusted_score;
+                    adjusted_item.file_context = Some(context.clone());
+                    adjusted_item
+                } else {
+                    // No context available, keep original item
+                    item.clone()
+                }
+            })
+            .collect();
     }
 }

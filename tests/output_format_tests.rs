@@ -66,6 +66,7 @@ fn test_output_json_format() {
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     let mut writer = create_writer(OutputFormat::Json);
@@ -98,6 +99,7 @@ fn test_output_markdown_format() {
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     let mut writer = create_writer(OutputFormat::Markdown);

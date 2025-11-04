@@ -4,6 +4,7 @@ use debtmap::core::{
     TechnicalDebtReport,
 };
 use debtmap::utils::risk_analyzer::{analyze_risk_with_coverage, analyze_risk_without_coverage};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -80,6 +81,7 @@ end_of_record
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     // Test with coverage analysis
@@ -150,6 +152,7 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     // Should fail when LCOV file doesn't exist
@@ -221,6 +224,7 @@ fn test_analyze_risk_without_coverage() {
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     // Test without coverage
@@ -282,6 +286,7 @@ end_of_record
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     };
 
     let result =

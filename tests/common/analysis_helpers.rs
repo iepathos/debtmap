@@ -105,6 +105,7 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
             circular: vec![],
         },
         duplications: vec![],
+        file_contexts: HashMap::new(),
     })
 }
 

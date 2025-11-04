@@ -197,6 +197,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
+            file_contexts: HashMap::new(),
         }
     }
 

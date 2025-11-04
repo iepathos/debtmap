@@ -101,6 +101,8 @@ pub struct UnifiedLocation {
     pub line: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_context_label: Option<String>, // "TEST FILE" or "PROBABLE TEST" for test files (spec 166)
 }
 
 /// File-level debt item in unified format
@@ -257,6 +259,7 @@ impl FileDebtItemOutput {
                 file: item.metrics.path.to_string_lossy().to_string(),
                 line: None,
                 function: None,
+                file_context_label: None, // File-level debt doesn't need test file tags
             },
             metrics: FileMetricsOutput {
                 lines: item.metrics.total_lines,
@@ -299,6 +302,10 @@ impl FunctionDebtItemOutput {
                 file: item.location.file.to_string_lossy().to_string(),
                 line: Some(item.location.line),
                 function: Some(item.location.function.clone()),
+                file_context_label: item.file_context.as_ref().map(|ctx| {
+                    use crate::priority::scoring::file_context_scoring::context_label;
+                    context_label(ctx).to_string()
+                }),
             },
             metrics: FunctionMetricsOutput {
                 cyclomatic_complexity: item.cyclomatic_complexity,
@@ -498,6 +505,7 @@ mod tests {
             file: "test.rs".to_string(),
             line: Some(42),
             function: Some("test_function".to_string()),
+            file_context_label: None,
         };
 
         let json = serde_json::to_string(&loc).unwrap();
@@ -512,6 +520,7 @@ mod tests {
             file: "test.rs".to_string(),
             line: None,
             function: None,
+            file_context_label: None,
         };
 
         let json = serde_json::to_string(&loc).unwrap();

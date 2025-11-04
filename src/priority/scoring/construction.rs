@@ -107,6 +107,7 @@ pub fn create_unified_debt_item_enhanced(
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
+        file_context: None,
     }
 }
 
@@ -278,6 +279,7 @@ fn build_unified_debt_item(
         recommendation: context.recommendation,
         expected_impact: context.expected_impact,
         transitive_coverage: context.transitive_coverage,
+        file_context: None,
         upstream_dependencies: deps.upstream_count,
         downstream_dependencies: deps.downstream_count,
         upstream_callers: deps.upstream_names,
@@ -451,6 +453,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
+        file_context: None,
     }
 }
 
@@ -554,5 +557,6 @@ pub fn create_unified_debt_item_with_data_flow(
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
+        file_context: None,
     }
 }

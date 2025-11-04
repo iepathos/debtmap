@@ -1,4 +1,5 @@
-use crate::core::FunctionMetrics;
+use crate::analysis::{FileContext, FileContextDetector};
+use crate::core::{FunctionMetrics, Language};
 use crate::organization::{GodObjectAnalysis, GodObjectDetector};
 use anyhow::Result;
 use std::path::Path;
@@ -111,6 +112,7 @@ pub struct AnalysisResult {
     pub functions: Vec<FunctionMetrics>,
     pub god_object: Option<GodObjectAnalysis>,
     pub file_metrics: FileMetrics,
+    pub file_context: FileContext,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -125,11 +127,13 @@ pub trait EnhancedAnalyzer {
         let functions = self.analyze_functions(path, content)?;
         let god_object = self.detect_god_object(path, content, &functions)?;
         let file_metrics = self.calculate_file_metrics(path, content, &functions);
+        let file_context = self.detect_file_context(path, &functions);
 
         Ok(AnalysisResult {
             functions,
             god_object,
             file_metrics,
+            file_context,
         })
     }
 
@@ -158,6 +162,12 @@ pub trait EnhancedAnalyzer {
             total_complexity: functions.iter().map(|f| f.cyclomatic).sum(),
             function_count: functions.len(),
         }
+    }
+
+    fn detect_file_context(&self, path: &Path, functions: &[FunctionMetrics]) -> FileContext {
+        let language = Language::from_path(path);
+        let detector = FileContextDetector::new(language);
+        detector.detect(path, functions)
     }
 }
 

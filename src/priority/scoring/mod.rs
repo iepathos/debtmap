@@ -9,6 +9,7 @@ pub mod context_aware;
 pub mod coverage_expectations;
 pub mod coverage_scoring;
 pub mod debt_item;
+pub mod file_context_scoring; // Spec 166: Test file detection and context-aware scoring
 pub mod formatting;
 pub mod orchestration_adjustment;
 pub mod rebalanced; // Spec 136: Rebalanced debt scoring algorithm
@@ -58,5 +59,9 @@ pub use context_aware::{
 };
 
 pub use rebalanced::{DebtScore, ScoreComponents, ScoreWeights, ScoringRationale, Severity};
+
+pub use file_context_scoring::{
+    apply_context_adjustments, context_label, context_reduction_factor, is_test_context,
+};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

@@ -22,6 +22,8 @@ pub struct AnalysisResults {
     pub technical_debt: TechnicalDebtReport,
     pub dependencies: DependencyReport,
     pub duplications: Vec<DuplicationBlock>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub file_contexts: HashMap<PathBuf, crate::analysis::FileContext>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

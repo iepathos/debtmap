@@ -193,6 +193,7 @@ Fail builds when quality thresholds are exceeded:
 - **Coverage-Risk Correlation** - Combines complexity with test coverage to prioritize genuinely risky code
 - **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive scoring
 - **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuine complexity from repetitive patterns (reduces false positives by up to 70%)
+- **Test File Detection** - Automatically identifies test files across languages and applies context-aware scoring adjustments
 - **Actionable Recommendations** - Specific guidance with quantified impact metrics
 - **Multi-language Support** - Full Rust support, partial Python/JavaScript/TypeScript
 - **Fast Performance** - 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
@@ -414,6 +415,47 @@ Pattern types available:
 - **Better Responsibility Classification**: Framework handlers are correctly categorized instead of being flagged as generic "I/O" operations
 - **Reduced False Positives**: Test functions and framework boilerplate are properly identified
 - **Context-Aware Analysis**: Understanding framework patterns helps debtmap provide more accurate complexity assessments
+
+### Test File Detection and Context-Aware Scoring
+
+Debtmap automatically identifies test files and test functions across multiple languages, then applies context-aware scoring adjustments to reduce false positives from test-specific patterns.
+
+**Multi-Language Test Detection:**
+
+Debtmap detects test files using language-specific patterns:
+
+- **Rust**: `#[test]`, `#[cfg(test)]`, files in `tests/` directory, `_test.rs` suffix
+- **Python**: `test_*.py`, `*_test.py`, `unittest`, `pytest` imports, `def test_*()` functions
+- **JavaScript/TypeScript**: `*.test.js`, `*.spec.ts`, Jest/Mocha imports, `describe()`/`it()` blocks
+- **General**: Files in `tests/`, `test/`, `__tests__/` directories
+
+**Context-Aware Scoring:**
+
+When debtmap identifies a test file or test function, it automatically:
+
+1. **Reduces complexity penalties** - Test code often has high cyclomatic complexity (many branches for edge cases) but is maintainable
+2. **Adjusts priority levels** - Test debt is scored lower priority than production code debt
+3. **Changes coverage expectations** - Test files don't need test coverage themselves
+4. **Provides test-specific recommendations** - Suggests test refactoring patterns instead of production refactoring patterns
+
+**Example Output:**
+
+```
+#7 SCORE: 4.2 [MEDIUM]
+├─ TEST CODE: ./tests/integration_test.rs:125 test_complex_workflow()
+├─ COMPLEXITY: cyclomatic=12, cognitive=8 (test-adjusted)
+├─ ACTION: Extract test helper functions for reusability
+└─ WHY: Test complexity is acceptable but helpers improve maintainability
+```
+
+**Benefits:**
+
+- **Fewer false positives** - Test code complexity doesn't dominate production priorities
+- **Better recommendations** - Test-specific refactoring guidance
+- **Language consistency** - Works across Rust, Python, JavaScript, and TypeScript
+- **Automatic detection** - No configuration needed for standard test patterns
+
+📖 **Read more:** [Testing Guide](https://iepathos.github.io/debtmap/testing-guide.html)
 
 ### Pattern Detection
 Automatically detects common design patterns (Observer, Factory, Singleton, Strategy, etc.) with configurable confidence thresholds.

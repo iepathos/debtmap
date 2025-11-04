@@ -234,6 +234,7 @@ mod tests {
                 lines_reduction: 0,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: deps,
             downstream_dependencies: deps,
             upstream_callers: vec![],

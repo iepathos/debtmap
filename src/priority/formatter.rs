@@ -1722,6 +1722,7 @@ mod tests {
                 risk_reduction: 3.5,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 2,
             downstream_dependencies: 3,
             upstream_callers: vec!["main".to_string(), "process_data".to_string()],

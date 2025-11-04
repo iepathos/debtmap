@@ -74,6 +74,7 @@ fn create_debt_item(
             propagated_from: vec![],
             uncovered_lines: vec![],
         }),
+        file_context: None,
         upstream_dependencies: dependencies,
         downstream_dependencies: 0,
         upstream_callers: vec![],
@@ -166,6 +167,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
                 risk_reduction: 0.0,
             },
             transitive_coverage: None, // No coverage
+            file_context: None,
             upstream_dependencies: dependencies,
             downstream_dependencies: 0,
             upstream_callers: vec![],

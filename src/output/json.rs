@@ -173,6 +173,7 @@ mod tests {
                 lines_reduction: 500,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 10,
             downstream_dependencies: 20,
             upstream_callers: vec![],

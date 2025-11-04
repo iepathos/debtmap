@@ -623,14 +623,22 @@ fn format_item_body(
     verbosity: u8,
     tree_pipe: &str,
 ) {
-    // Location section (spec 139: tree formatting)
+    // Location section (spec 139: tree formatting, spec 166: test file tags)
+    let file_context_tag = if let Some(ref context) = item.file_context {
+        use crate::priority::scoring::file_context_scoring::context_label;
+        format!(" [{}]", context_label(context))
+    } else {
+        String::new()
+    };
+
     writeln!(
         output,
-        "├─ {} {}:{} {}()",
+        "├─ {} {}:{} {}(){}",
         "LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
-        item.location.function.bright_green()
+        item.location.function.bright_green(),
+        file_context_tag.bright_magenta()
     )
     .unwrap();
 
@@ -1540,6 +1548,7 @@ mod tests {
                 risk_reduction: 2.0,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 0,
             downstream_dependencies: 0,
             upstream_callers: vec![],

@@ -81,6 +81,22 @@ pub fn extract_all_debt_items(file_metrics: &[FileMetrics]) -> Vec<DebtItem> {
         .collect()
 }
 
+/// Extract file contexts from file metrics for test file detection (spec 166)
+pub fn extract_file_contexts(
+    file_metrics: &[FileMetrics],
+) -> std::collections::HashMap<PathBuf, crate::analysis::FileContext> {
+    use crate::analysis::FileContextDetector;
+
+    file_metrics
+        .iter()
+        .map(|m| {
+            let detector = FileContextDetector::new(m.language);
+            let context = detector.detect(&m.path, &m.complexity.functions);
+            (m.path.clone(), context)
+        })
+        .collect()
+}
+
 pub fn build_complexity_report(
     all_functions: &[FunctionMetrics],
     complexity_threshold: u32,

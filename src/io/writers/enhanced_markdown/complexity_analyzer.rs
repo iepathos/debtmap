@@ -474,6 +474,7 @@ mod tests {
                 propagated_from: vec![],
                 uncovered_lines: vec![],
             }),
+            file_context: None,
             upstream_dependencies: 0,
             downstream_dependencies: 0,
             upstream_callers: vec![],
@@ -650,6 +651,7 @@ mod tests {
                 circular: vec![],
             },
             duplications: vec![],
+            file_contexts: std::collections::HashMap::new(),
         };
 
         let top_functions = get_top_complex_functions(&results, 2);
@@ -703,6 +705,7 @@ mod tests {
                 propagated_from: vec![],
                 uncovered_lines: vec![],
             }),
+            file_context: None,
             upstream_dependencies: 0,
             downstream_dependencies: 1,
             upstream_callers: vec![],
