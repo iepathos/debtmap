@@ -23,6 +23,9 @@ pub struct PurityDetector {
 
     // Analyzed closures (stored in order)
     closure_results: Vec<ClosurePurity>,
+
+    // Track unknown macros for confidence adjustment
+    unknown_macros_count: usize,
 }
 
 /// A mutation of a local variable or owned parameter
@@ -67,6 +70,7 @@ impl PurityDetector {
             local_mutations: Vec::new(),
             upvalue_mutations: Vec::new(),
             closure_results: Vec::new(),
+            unknown_macros_count: 0,
         }
     }
 
@@ -83,6 +87,7 @@ impl PurityDetector {
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
         self.closure_results.clear();
+        self.unknown_macros_count = 0;
 
         // Initialize scope with parameters
         for arg in &item_fn.sig.inputs {
@@ -140,6 +145,7 @@ impl PurityDetector {
         self.local_mutations.clear();
         self.upvalue_mutations.clear();
         self.closure_results.clear();
+        self.unknown_macros_count = 0;
 
         self.visit_block(block);
 
@@ -337,8 +343,12 @@ impl PurityDetector {
     }
 
     fn determine_purity_level(&self) -> PurityLevel {
-        // Has external side effects (I/O, external mutations)?
-        if self.modifies_external_state || self.has_io_operations || self.has_unsafe_blocks {
+        // Has external side effects (I/O, external mutations, panics)?
+        if self.modifies_external_state
+            || self.has_io_operations
+            || self.has_unsafe_blocks
+            || self.has_side_effects
+        {
             return PurityLevel::Impure;
         }
 
@@ -371,6 +381,11 @@ impl PurityDetector {
 
         // High confidence for simple local mutations
         if !self.local_mutations.is_empty() && self.local_mutations.len() < 5 {
+            confidence *= 0.95;
+        }
+
+        // Reduce confidence for unknown macros (conservative approach)
+        for _ in 0..self.unknown_macros_count {
             confidence *= 0.95;
         }
 
@@ -536,6 +551,50 @@ impl PurityDetector {
         // Continue with normal method call analysis
         syn::visit::visit_expr_method_call(self, method);
     }
+
+    /// Classify a macro and update purity state
+    fn handle_macro(&mut self, mac: &syn::Macro) {
+        let name = extract_macro_name(&mac.path);
+
+        match name.as_str() {
+            // Pure macros - no side effects
+            "vec" | "format" | "concat" | "stringify" | "matches" | "include_str"
+            | "include_bytes" | "env" | "option_env" => {
+                // No effect on purity
+            }
+
+            // I/O macros - always impure
+            "println" | "eprintln" | "print" | "eprint" | "dbg" | "write" | "writeln" => {
+                self.has_io_operations = true;
+                self.has_side_effects = true;
+            }
+
+            // Panic macros - always impure
+            "panic" | "unimplemented" | "unreachable" | "todo" => {
+                self.has_side_effects = true;
+            }
+
+            // Debug-only assertions - conditional purity
+            "debug_assert" | "debug_assert_eq" | "debug_assert_ne" => {
+                #[cfg(debug_assertions)]
+                {
+                    self.has_side_effects = true;
+                }
+                // In release builds, these are compiled out (pure)
+            }
+
+            // Regular assertions - always impure (panic on failure)
+            "assert" | "assert_eq" | "assert_ne" => {
+                self.has_side_effects = true;
+            }
+
+            // Unknown macro - no effect on purity (conservative approach)
+            _ => {
+                // Track unknown macros for confidence adjustment
+                self.unknown_macros_count += 1;
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for PurityDetector {
@@ -545,6 +604,10 @@ impl<'ast> Visit<'ast> for PurityDetector {
             Expr::Closure(closure) => {
                 self.visit_expr_closure_internal(closure);
                 return; // Don't continue visiting (closure analyzer handles body)
+            }
+            // Handle expression macros: let x = dbg!(value);
+            Expr::Macro(expr_macro) => {
+                self.handle_macro(&expr_macro.mac);
             }
             // Unsafe blocks are impure
             Expr::Unsafe(_) => {
@@ -632,22 +695,9 @@ impl<'ast> Visit<'ast> for PurityDetector {
             self.visit_local(local);
         }
 
+        // Handle statement macros: println!("test");
         if let Stmt::Macro(stmt_macro) = stmt {
-            let macro_path = stmt_macro.mac.path.to_token_stream().to_string();
-            // Macros that typically have side effects
-            if macro_path.contains("print")
-                || macro_path.contains("panic")
-                || macro_path.contains("assert")
-                || macro_path.contains("debug")
-                || macro_path.contains("log")
-                || macro_path.contains("trace")
-                || macro_path.contains("info")
-                || macro_path.contains("warn")
-                || macro_path.contains("error")
-            {
-                self.has_io_operations = true;
-                self.has_side_effects = true;
-            }
+            self.handle_macro(&stmt_macro.mac);
         }
 
         syn::visit::visit_stmt(self, stmt);
@@ -699,7 +749,14 @@ impl ImpurityReason {
     }
 }
 
-use quote::ToTokens;
+/// Extract the last segment of a macro path
+/// e.g., "std::println" -> "println", "assert_eq" -> "assert_eq"
+fn extract_macro_name(path: &syn::Path) -> String {
+    path.segments
+        .last()
+        .map(|seg| seg.ident.to_string())
+        .unwrap_or_default()
+}
 
 #[cfg(test)]
 mod tests {
@@ -828,6 +885,109 @@ mod tests {
             r#"
             fn increment(&mut self) {
                 self.count += 1;
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    // Tests for spec 160a: macro classification fix
+
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn test_debug_assert_pure_in_release() {
+        let analysis = analyze_function_str(
+            r#"
+            fn check_bounds(x: usize) -> bool {
+                debug_assert!(x < 100);
+                debug_assert_eq!(x, x);
+                x < 100
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn test_debug_assert_impure_in_debug() {
+        let analysis = analyze_function_str(
+            r#"
+            fn check_bounds(x: usize) -> bool {
+                debug_assert!(x < 100);
+                x < 100
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_io_macros_always_impure() {
+        let test_cases = vec![
+            r#"fn f() { println!("test"); }"#,
+            r#"fn f() { eprintln!("error"); }"#,
+            r#"fn f() { dbg!(42); }"#,
+            r#"fn f() { print!("no newline"); }"#,
+        ];
+
+        for code in test_cases {
+            let analysis = analyze_function_str(code);
+            assert_eq!(
+                analysis.purity_level,
+                PurityLevel::Impure,
+                "Failed for: {}",
+                code
+            );
+        }
+    }
+
+    #[test]
+    fn test_expression_macros() {
+        let analysis = analyze_function_str(
+            r#"
+            fn example() -> i32 {
+                let x = dbg!(42);
+                x
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_pure_macros() {
+        let analysis = analyze_function_str(
+            r#"
+            fn create_list() -> Vec<i32> {
+                vec![1, 2, 3]
+            }
+            "#,
+        );
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_no_substring_false_positives() {
+        let analysis = analyze_function_str(
+            r#"
+            fn example() -> i32 {
+                // Unknown macro with "debug" in name should not be marked impure
+                42
+            }
+            "#,
+        );
+        // Should not be marked impure just because of substring match
+        assert_ne!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_assert_always_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn validate(x: i32) -> i32 {
+                assert!(x > 0);
+                x
             }
             "#,
         );
