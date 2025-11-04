@@ -139,7 +139,6 @@ mod file_analysis {
     pub fn should_include_file(score: f64) -> bool {
         score > 50.0
     }
-
 }
 
 /// Options for parallel unified analysis
