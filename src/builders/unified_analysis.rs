@@ -12,7 +12,7 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         debt_aggregator::DebtAggregator,
         debt_aggregator::FunctionId as AggregatorFunctionId,
-        file_metrics::{FileDebtItem, FileDebtMetrics, FileImpact},
+        file_metrics::{FileDebtItem, FileDebtMetrics},
         scoring::debt_item,
         unified_scorer::Location,
         ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics, UnifiedAnalysis,
@@ -1174,7 +1174,7 @@ fn analyze_files_for_debt(
             process_single_file(file_path, functions, &file_analyzer, no_god_object, unified)
         })
         .filter_map(|result| result.ok())
-        .filter(|data| data.score > 50.0) // Filter significant files
+        .filter(|data| data.file_metrics.calculate_score() > 50.0) // Filter significant files
         .collect();
 
     // Apply results to unified analysis (I/O at edges)
@@ -1199,9 +1199,8 @@ fn group_functions_by_file(
 struct ProcessedFileData {
     file_path: PathBuf,
     file_metrics: FileDebtMetrics,
-    score: f64,
-    recommendation: String,
     god_analysis: Option<crate::organization::GodObjectAnalysis>,
+    file_context: crate::analysis::FileContext,
 }
 
 // Pure function to process a single file
@@ -1230,19 +1229,21 @@ fn process_single_file(
     let mut final_metrics = enhanced_metrics;
     final_metrics.function_scores = function_scores;
 
-    // Calculate overall file score
-    let score = final_metrics.calculate_score();
+    // Detect file context for scoring adjustments (spec 166/168)
+    use crate::analysis::FileContextDetector;
+    use crate::core::Language;
+    let language = Language::from_path(&file_path);
+    let detector = FileContextDetector::new(language);
+    let file_context = detector.detect(&file_path, &functions);
 
-    // Generate recommendation and god object analysis
-    let recommendation = final_metrics.generate_recommendation();
+    // Generate god object analysis
     let god_analysis = create_god_object_analysis(&final_metrics);
 
     Ok(ProcessedFileData {
         file_path,
         file_metrics: final_metrics,
-        score,
-        recommendation,
         god_analysis,
+        file_context,
     })
 }
 
@@ -1450,19 +1451,11 @@ fn update_function_god_indicators(
 
 // Pure function to create file debt item
 fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
-    FileDebtItem {
-        metrics: file_data.file_metrics.clone(),
-        score: file_data.score,
-        priority_rank: 0, // Will be set during sorting
-        recommendation: file_data.recommendation,
-        impact: FileImpact {
-            complexity_reduction: file_data.file_metrics.avg_complexity
-                * file_data.file_metrics.function_count as f64
-                * 0.2,
-            maintainability_improvement: file_data.score / 10.0,
-            test_effort: file_data.file_metrics.uncovered_lines as f64 * 0.1,
-        },
-    }
+    // Use from_metrics with file context for proper score adjustment (spec 168)
+    crate::priority::FileDebtItem::from_metrics(
+        file_data.file_metrics,
+        Some(&file_data.file_context),
+    )
 }
 
 /// Statistics about trait resolution

@@ -90,7 +90,7 @@ mod predicates {
 mod file_analysis {
     use super::*;
     use crate::analyzers::file_analyzer::UnifiedFileAnalyzer;
-    use crate::priority::file_metrics::{FileDebtMetrics, FileImpact, GodObjectIndicators};
+    use crate::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators};
 
     /// Pure function to aggregate function metrics into file metrics
     pub fn aggregate_file_metrics(
@@ -140,30 +140,6 @@ mod file_analysis {
         score > 50.0
     }
 
-    /// Pure function to calculate file impact
-    pub fn calculate_file_impact(file_metrics: &FileDebtMetrics, score: f64) -> FileImpact {
-        FileImpact {
-            complexity_reduction: file_metrics.avg_complexity
-                * file_metrics.function_count as f64
-                * 0.2,
-            maintainability_improvement: score / 10.0,
-            test_effort: file_metrics.uncovered_lines as f64 * 0.1,
-        }
-    }
-
-    /// Pure transformation: create FileDebtItem from metrics
-    pub fn create_file_debt_item(file_metrics: FileDebtMetrics, score: f64) -> FileDebtItem {
-        let recommendation = file_metrics.generate_recommendation();
-        let impact = calculate_file_impact(&file_metrics, score);
-
-        FileDebtItem {
-            metrics: file_metrics,
-            score,
-            priority_rank: 0,
-            recommendation,
-            impact,
-        }
-    }
 }
 
 /// Options for parallel unified analysis
@@ -827,11 +803,18 @@ impl ParallelUnifiedAnalysisBuilder {
         // where items are added after file analysis. This maintains functional purity.
         file_metrics.function_scores = Vec::new();
 
-        // Pure: calculate score and decide if to include
-        let score = file_metrics.calculate_score();
+        // Detect file context for scoring adjustments (spec 166/168)
+        use crate::analysis::FileContextDetector;
+        use crate::core::Language;
+        let language = Language::from_path(file_path);
+        let detector = FileContextDetector::new(language);
+        let file_context = detector.detect(file_path, &functions_owned);
 
-        if file_analysis::should_include_file(score) {
-            Some(file_analysis::create_file_debt_item(file_metrics, score))
+        // Create FileDebtItem with context-aware scoring
+        let item = crate::priority::FileDebtItem::from_metrics(file_metrics, Some(&file_context));
+
+        if file_analysis::should_include_file(item.score) {
+            Some(item)
         } else {
             None
         }
