@@ -65,8 +65,8 @@ pub struct ScoreDistribution {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum UnifiedDebtItemOutput {
-    File(FileDebtItemOutput),
-    Function(FunctionDebtItemOutput),
+    File(Box<FileDebtItemOutput>),
+    Function(Box<FunctionDebtItemOutput>),
 }
 
 /// Priority level based on score
@@ -238,12 +238,12 @@ pub struct FunctionScoringDetails {
 impl UnifiedDebtItemOutput {
     pub fn from_debt_item(item: &DebtItem, include_scoring_details: bool) -> Self {
         match item {
-            DebtItem::File(file_item) => UnifiedDebtItemOutput::File(
+            DebtItem::File(file_item) => UnifiedDebtItemOutput::File(Box::new(
                 FileDebtItemOutput::from_file_item(file_item, include_scoring_details),
-            ),
-            DebtItem::Function(func_item) => UnifiedDebtItemOutput::Function(
+            )),
+            DebtItem::Function(func_item) => UnifiedDebtItemOutput::Function(Box::new(
                 FunctionDebtItemOutput::from_function_item(func_item, include_scoring_details),
-            ),
+            )),
         }
     }
 }
