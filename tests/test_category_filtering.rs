@@ -42,7 +42,7 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
             risk_reduction: 20.0,
         },
         transitive_coverage: None,
-            file_context: None,
+        file_context: None,
         upstream_dependencies: 2,
         downstream_dependencies: 3,
         upstream_callers: vec![],

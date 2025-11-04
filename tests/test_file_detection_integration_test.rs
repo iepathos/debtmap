@@ -4,7 +4,6 @@
 /// 1. Test files are correctly detected based on naming patterns and content
 /// 2. Scores for test file debt items are reduced appropriately
 /// 3. File context information is preserved through the analysis pipeline
-
 use debtmap::{
     analysis::FileContext,
     core::AnalysisResults,

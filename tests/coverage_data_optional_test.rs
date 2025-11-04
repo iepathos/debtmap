@@ -48,7 +48,7 @@ fn create_untested_item() -> UnifiedDebtItem {
             risk_reduction: 50.0,
         },
         transitive_coverage: None, // No coverage data
-            file_context: None,
+        file_context: None,
         upstream_dependencies: 2,
         downstream_dependencies: 3,
         upstream_callers: vec![],
