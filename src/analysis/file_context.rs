@@ -200,7 +200,6 @@ impl FileContextDetector {
                     .filter(|f| f.is_test || f.in_test_module)
                     .count();
 
-                
                 test_funcs as f32 / functions.len() as f32
             }
             _ => 0.0,
