@@ -4,6 +4,7 @@ use debtmap::core::{
     TechnicalDebtReport,
 };
 use debtmap::utils::risk_analyzer::{analyze_risk_with_coverage, analyze_risk_without_coverage};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -74,15 +75,12 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 
@@ -148,15 +146,12 @@ fn test_analyze_risk_with_coverage_invalid_lcov_path() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 
@@ -223,15 +218,12 @@ fn test_analyze_risk_without_coverage() {
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 
@@ -288,15 +280,12 @@ end_of_record
             by_type: std::collections::HashMap::new(),
             priorities: vec![],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 

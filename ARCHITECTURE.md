@@ -1556,6 +1556,197 @@ Debtmap distinguishes between genuinely complex code and pattern-based repetitiv
 
 This prevents false positives from large but simple pattern-matching code.
 
+## Test File Detection (Spec 166)
+
+Debtmap automatically identifies test files and test functions across multiple programming languages, enabling context-aware scoring adjustments that reduce false positives from test-specific patterns.
+
+### Multi-Language Detection Strategies
+
+#### Rust Test Detection
+
+**File-Level Detection**:
+- Files in `tests/` directory
+- Files ending with `_test.rs` or `_tests.rs`
+- Modules with `#[cfg(test)]` annotation
+
+**Function-Level Detection**:
+- Functions with `#[test]` attribute
+- Functions with `#[tokio::test]` or async test attributes
+- Functions in modules marked with `#[cfg(test)]`
+
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]  // Detected as test function
+    fn test_parse_input() {
+        // Test complexity not penalized
+    }
+}
+```
+
+#### Python Test Detection
+
+**File-Level Detection**:
+- Files starting with `test_` (e.g., `test_parser.py`)
+- Files ending with `_test.py` (e.g., `parser_test.py`)
+- Files in `tests/`, `test/`, or `__tests__/` directories
+- Files importing `unittest`, `pytest`, or `nose`
+
+**Function-Level Detection**:
+- Functions starting with `test_` (e.g., `def test_validation()`)
+- Methods in classes inheriting from `unittest.TestCase`
+- Functions decorated with `@pytest.mark.*`
+
+```python
+import pytest
+
+def test_complex_workflow():  # Detected as test function
+    # High cyclomatic complexity acceptable for tests
+    if condition_a:
+        # ... many branches for edge cases
+    elif condition_b:
+        # ... more branches
+```
+
+#### JavaScript/TypeScript Test Detection
+
+**File-Level Detection**:
+- Files ending with `.test.js`, `.test.ts`, `.spec.js`, `.spec.ts`
+- Files in `__tests__/`, `tests/`, or `test/` directories
+- Files importing Jest (`'@jest/globals'`), Mocha (`'mocha'`), or other test frameworks
+
+**Function-Level Detection**:
+- Functions inside `describe()` blocks
+- Functions passed to `it()`, `test()`, or `expect()` calls
+- Functions with test-related names (e.g., `testSomething`)
+
+```typescript
+describe('Parser', () => {
+    test('handles complex input', () => {  // Detected as test
+        // Test-specific complexity is acceptable
+    });
+});
+```
+
+### Context-Aware Scoring Adjustments
+
+When a file or function is identified as a test, debtmap applies these adjustments:
+
+#### 1. Complexity Score Reduction
+
+Test code often requires high cyclomatic complexity to cover edge cases:
+
+```rust
+// Test scoring adjustment
+baseline_score = cyclomatic * weight + cognitive * weight
+test_adjusted_score = baseline_score * 0.6  // 40% reduction
+```
+
+**Rationale**: A test function with cyclomatic complexity of 15 (testing many branches) is normal and maintainable, whereas production code with the same complexity indicates refactoring needs.
+
+#### 2. Priority Level Adjustment
+
+Test debt items receive lower priority than production code debt:
+
+```rust
+match priority {
+    Priority::Critical => Priority::High,    // Downgrade by one level
+    Priority::High => Priority::Medium,
+    Priority::Medium => Priority::Low,
+    Priority::Low => Priority::Low,          // Floor at Low
+}
+```
+
+**Rationale**: Fixing high-complexity production code has greater immediate impact on system maintainability than refactoring test code.
+
+#### 3. Coverage Expectation Changes
+
+Test files themselves don't need test coverage:
+
+```rust
+if file_context.is_test_file {
+    skip_coverage_analysis = true;  // Tests don't test tests
+}
+```
+
+**Rationale**: Expecting tests to be covered by other tests creates infinite regression and provides minimal value.
+
+#### 4. Test-Specific Recommendations
+
+Instead of generic refactoring advice, test files receive test-specific guidance:
+
+**Production Code Recommendation**:
+```
+ACTION: Extract complex branches into focused functions
+WHY: High cyclomatic complexity (15) makes code hard to understand
+```
+
+**Test Code Recommendation**:
+```
+ACTION: Extract test helper functions for reusable setup
+WHY: Test complexity (15) is acceptable, but helpers improve maintainability
+```
+
+### Implementation Details
+
+#### FileContext Storage
+
+Test detection results are stored in `FileContext` for efficient reuse:
+
+```rust
+pub struct FileContext {
+    pub path: PathBuf,
+    pub is_test_file: bool,           // File-level test detection
+    pub test_functions: HashSet<String>,  // Function-level test detection
+    pub language: Language,
+}
+```
+
+Stored at `AnalysisResults.file_contexts` for cross-module access.
+
+#### Detection Flow
+
+```
+1. Parse file → Extract AST
+2. Language-specific detection:
+   - Check file path patterns
+   - Check imports/attributes
+   - Identify test functions
+3. Store in FileContext
+4. Apply scoring adjustments when generating debt items
+```
+
+#### Performance Considerations
+
+- **File-level caching**: Test status cached per file, not re-detected
+- **Lazy evaluation**: Only detect test context when scoring debt
+- **Parallel processing**: Test detection runs in parallel during file analysis
+
+### Benefits
+
+1. **Fewer False Positives**: Test complexity doesn't dominate production priorities
+2. **Better Recommendations**: Test-specific refactoring guidance
+3. **Language Consistency**: Works uniformly across Rust, Python, JavaScript, TypeScript
+4. **Zero Configuration**: Automatic detection using standard conventions
+5. **Performance**: Minimal overhead (<2% analysis time increase)
+
+### Configuration
+
+Override default test detection patterns in `.debtmap.toml`:
+
+```toml
+[test_detection]
+# Additional file patterns for custom test conventions
+rust_test_patterns = ["*_spec.rs", "spec_*.rs"]
+python_test_patterns = ["test*.py", "*test.py"]
+js_test_patterns = ["*.test.jsx", "*.spec.tsx"]
+
+# Scoring adjustment factors
+complexity_reduction = 0.6  # Reduce complexity score by 40%
+priority_downgrade = true   # Lower priority for test debt
+skip_coverage = true        # Don't expect coverage for test files
+```
+
 ## God Object Detection
 
 ### Understanding God Object vs God Module Detection

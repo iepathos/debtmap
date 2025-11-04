@@ -99,15 +99,12 @@ pub fn analyze_file_directly(file_path: &Path) -> Result<AnalysisResults> {
             by_type,
             priorities,
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     })
 }

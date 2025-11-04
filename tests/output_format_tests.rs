@@ -60,15 +60,12 @@ fn test_output_json_format() {
             },
             priorities: vec![Priority::Medium],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 
@@ -96,15 +93,12 @@ fn test_output_markdown_format() {
             by_type: HashMap::new(),
             priorities: vec![],
             duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         },
         dependencies: DependencyReport {
             modules: vec![],
             circular: vec![],
         },
         duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
         file_contexts: HashMap::new(),
     };
 
