@@ -204,9 +204,10 @@ impl UnifiedAnalysisUtils for UnifiedAnalysis {
                     let adjusted_score =
                         apply_context_adjustments(item.unified_score.final_score, context);
 
-                    // Create a new item with the adjusted score
+                    // Create a new item with the adjusted score and file context
                     let mut adjusted_item = item.clone();
                     adjusted_item.unified_score.final_score = adjusted_score;
+                    adjusted_item.file_context = Some(context.clone());
                     adjusted_item
                 } else {
                     // No context available, keep original item

@@ -287,7 +287,6 @@ mod tests {
             ],
             dependencies: Vec::new(),
             duplications: Vec::new(),
-        file_contexts: HashMap::new(),
             module_scope: None,
             classes: None,
         }

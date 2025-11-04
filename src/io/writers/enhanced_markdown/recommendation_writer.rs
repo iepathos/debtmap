@@ -144,6 +144,7 @@ mod tests {
             function_length: 80,
             function_role: FunctionRole::PureLogic,
             transitive_coverage: None,
+            file_context: None,
             upstream_callers: vec![],
             downstream_callees: vec![],
             entropy_details: None,
@@ -238,8 +239,6 @@ mod tests {
                 by_type: HashMap::new(),
                 priorities: vec![],
                 duplications: vec![],
-            file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
             },
             dependencies: DependencyReport {
                 modules: vec![],
@@ -247,7 +246,6 @@ mod tests {
             },
             duplications: vec![],
             file_contexts: std::collections::HashMap::new(),
-        file_contexts: HashMap::new(),
         }
     }
 

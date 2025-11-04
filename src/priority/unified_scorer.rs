@@ -63,6 +63,8 @@ pub struct UnifiedDebtItem {
     pub contextual_recommendation: Option<crate::priority::scoring::ContextualRecommendation>, // Context-aware recommendation (spec 122)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_context: Option<crate::analysis::FileContext>, // File context for test file detection (spec 166)
 }
 
 impl UnifiedDebtItem {

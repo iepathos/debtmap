@@ -745,6 +745,7 @@ mod tests {
             function_length: 50,
             function_role: FunctionRole::PureLogic,
             transitive_coverage: None,
+            file_context: None,
             upstream_callers: vec![],
             downstream_callees: vec![],
             entropy_details: None,

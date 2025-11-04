@@ -147,7 +147,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config._formatting_config,
     )?;
 
-    let unified_analysis = unified_analysis::perform_unified_analysis_with_options(
+    let mut unified_analysis = unified_analysis::perform_unified_analysis_with_options(
         unified_analysis::UnifiedAnalysisOptions {
             results: &results,
             coverage_file: config.coverage_file.as_ref(),
@@ -169,6 +169,10 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             _formatting_config: config._formatting_config,
         },
     )?;
+
+    // Apply file context adjustments for test file scoring (spec 166)
+    use crate::priority::UnifiedAnalysisUtils;
+    unified_analysis.apply_file_context_adjustments(&results.file_contexts);
 
     // Handle call graph debug and validation flags
     if config.debug_call_graph || config.validate_call_graph || config.call_graph_stats_only {

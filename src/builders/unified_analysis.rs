@@ -1033,6 +1033,7 @@ fn convert_error_swallowing_to_unified(
                     risk_reduction: 3.5,
                 },
                 transitive_coverage: None,
+            file_context: None,
                 upstream_dependencies: 0,
                 downstream_dependencies: 0,
                 upstream_callers: vec![],

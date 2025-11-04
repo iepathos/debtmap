@@ -277,6 +277,7 @@ mod tests {
                 risk_reduction: 0.2,
             },
             transitive_coverage: None,
+            file_context: None,
             upstream_dependencies: 1,
             downstream_dependencies: 2,
             upstream_callers: vec![],

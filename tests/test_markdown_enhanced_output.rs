@@ -45,6 +45,7 @@ fn create_sample_unified_item() -> UnifiedDebtItem {
             risk_reduction: 25.0,
         },
         transitive_coverage: None,
+            file_context: None,
         upstream_dependencies: 3,
         downstream_dependencies: 5,
         upstream_callers: vec![],

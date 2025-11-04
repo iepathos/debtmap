@@ -404,7 +404,6 @@ mod tests {
             debt_items: vec![],
             dependencies: vec![],
             duplications: vec![],
-        file_contexts: HashMap::new(),
             module_scope: None,
             classes: None,
         }
