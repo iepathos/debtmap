@@ -6,7 +6,7 @@
 //! Detection strategy:
 //! - File naming patterns (*_test.rs, *_tests.rs, test_*.py, etc.)
 //! - Directory location (tests/, *_tests/)
-//! - Test attributes and decorators (#[test], #[tokio::test], @pytest.fixture)
+//! - Test attributes and decorators (`#[test]`, `#[tokio::test]`, `@pytest.fixture`)
 //! - Test function naming (test_*, Test*)
 //! - Framework imports (proptest, pytest, jest, mocha)
 //!
@@ -93,13 +93,7 @@ impl FileContextDetector {
     pub fn detect(&self, path: &Path, functions: &[FunctionMetrics]) -> FileContext {
         let test_score = self.calculate_test_score(path, functions);
 
-        if test_score.overall_confidence > 0.8 {
-            FileContext::Test {
-                confidence: test_score.overall_confidence,
-                test_framework: self.detect_framework(functions),
-                test_count: self.count_tests(functions),
-            }
-        } else if test_score.overall_confidence > 0.5 {
+        if test_score.overall_confidence > 0.5 {
             FileContext::Test {
                 confidence: test_score.overall_confidence,
                 test_framework: self.detect_framework(functions),
@@ -144,9 +138,7 @@ impl FileContextDetector {
 
         match self.language {
             Language::Rust => {
-                if filename.ends_with("_tests.rs") {
-                    0.9
-                } else if filename.ends_with("_test.rs") {
+                if filename.ends_with("_tests.rs") || filename.ends_with("_test.rs") {
                     0.9
                 } else if filename == "tests.rs" {
                     0.8
@@ -157,9 +149,9 @@ impl FileContextDetector {
                 }
             }
             Language::Python => {
-                if filename.starts_with("test_") && filename.ends_with(".py") {
-                    0.9
-                } else if filename.ends_with("_test.py") {
+                if (filename.starts_with("test_") && filename.ends_with(".py"))
+                    || filename.ends_with("_test.py")
+                {
                     0.9
                 } else {
                     0.0
@@ -170,9 +162,7 @@ impl FileContextDetector {
                     || filename.ends_with(".test.ts")
                     || filename.ends_with(".test.jsx")
                     || filename.ends_with(".test.tsx")
-                {
-                    0.9
-                } else if filename.ends_with(".spec.js")
+                    || filename.ends_with(".spec.js")
                     || filename.ends_with(".spec.ts")
                     || filename.ends_with(".spec.jsx")
                     || filename.ends_with(".spec.tsx")
