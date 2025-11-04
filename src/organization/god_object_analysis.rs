@@ -226,6 +226,8 @@ pub enum GodObjectConfidence {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleSplit {
+    /// Suggested module name WITHOUT file extension (e.g., "config/misc", not "config/misc.rs").
+    /// The formatter will add the appropriate extension based on source file type.
     pub suggested_name: String,
     pub methods_to_move: Vec<String>,
     pub structs_to_move: Vec<String>,
@@ -287,6 +289,21 @@ impl PartialEq for ModuleSplit {
             && self.severity == other.severity
             && self.interface_estimate == other.interface_estimate
         // Skip classification_evidence in equality comparison
+    }
+}
+
+impl ModuleSplit {
+    /// Validates that the suggested name does not include a file extension.
+    /// Extensions should be added by the formatter based on the source file type.
+    fn validate_name(name: &str) {
+        debug_assert!(
+            !name.ends_with(".rs")
+                && !name.ends_with(".py")
+                && !name.ends_with(".js")
+                && !name.ends_with(".ts"),
+            "ModuleSplit::suggested_name should not include file extension: {}",
+            name
+        );
     }
 }
 
@@ -1170,8 +1187,10 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
         .map(|(domain, structs)| {
             let estimated_lines = line_estimates.get(&domain).copied().unwrap_or(0);
             let method_count = method_counts.get(&domain).copied().unwrap_or(0);
+            let suggested_name = format!("config/{}", domain);
+            ModuleSplit::validate_name(&suggested_name);
             ModuleSplit {
-                suggested_name: format!("config/{}.rs", domain),
+                suggested_name,
                 methods_to_move: vec![],
                 structs_to_move: structs,
                 responsibility: domain.clone(),
@@ -2232,5 +2251,37 @@ mod tests {
 
         let dominant = find_dominant_category(&categories);
         assert_eq!(dominant, Some(("Formatting & Output".to_string(), 5)));
+    }
+
+    #[test]
+    fn test_split_names_have_no_extensions() {
+        // Valid names without extensions should pass
+        ModuleSplit::validate_name("config/misc");
+        ModuleSplit::validate_name("module_name");
+        ModuleSplit::validate_name("some/path/to/module");
+    }
+
+    #[test]
+    #[should_panic(expected = "should not include file extension")]
+    fn test_split_name_validation_catches_rs_extension() {
+        ModuleSplit::validate_name("config/misc.rs");
+    }
+
+    #[test]
+    #[should_panic(expected = "should not include file extension")]
+    fn test_split_name_validation_catches_py_extension() {
+        ModuleSplit::validate_name("module.py");
+    }
+
+    #[test]
+    #[should_panic(expected = "should not include file extension")]
+    fn test_split_name_validation_catches_js_extension() {
+        ModuleSplit::validate_name("handler.js");
+    }
+
+    #[test]
+    #[should_panic(expected = "should not include file extension")]
+    fn test_split_name_validation_catches_ts_extension() {
+        ModuleSplit::validate_name("component.ts");
     }
 }
