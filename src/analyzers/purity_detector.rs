@@ -4,6 +4,7 @@ use syn::{
 };
 
 use super::closure_analyzer::{ClosureAnalyzer, ClosurePurity};
+use super::custom_macro_analyzer::{CustomMacroAnalyzer, MacroPurity};
 use super::macro_definition_collector::MacroDefinitions;
 use super::scope_tracker::{ScopeTracker, SelfKind};
 use crate::core::PurityLevel;
@@ -32,6 +33,9 @@ pub struct PurityDetector {
 
     // Macro definitions for custom macro classification
     macro_definitions: MacroDefinitions,
+
+    // Custom macro analyzer (Spec 160c)
+    macro_analyzer: CustomMacroAnalyzer,
 }
 
 /// A mutation of a local variable or owned parameter
@@ -84,6 +88,7 @@ impl PurityDetector {
             closure_results: Vec::new(),
             unknown_macros_count: 0,
             macro_definitions,
+            macro_analyzer: CustomMacroAnalyzer::new(),
         }
     }
 
@@ -569,60 +574,85 @@ impl PurityDetector {
     fn handle_macro(&mut self, mac: &syn::Macro) {
         let name = extract_macro_name(&mac.path);
 
-        // Check built-in macros first (from Spec 160a)
-        match name.as_str() {
+        // Step 1: Check built-in macros first (from Spec 160a)
+        if let Some(purity) = self.classify_builtin(&name) {
+            self.apply_purity(purity);
+            return;
+        }
+
+        // Step 2: Check custom macros (from Spec 160b + 160c)
+        let custom_macro_body = self
+            .macro_definitions
+            .get(&name)
+            .map(|def| def.body.clone());
+        if let Some(body) = custom_macro_body {
+            // Analyze the custom macro body (Spec 160c)
+            let purity = self.macro_analyzer.analyze(&body);
+            self.apply_purity(purity);
+            return;
+        }
+
+        // Step 3: Truly unknown macro
+        self.unknown_macros_count += 1;
+    }
+
+    /// Classify built-in macros
+    fn classify_builtin(&self, name: &str) -> Option<MacroPurity> {
+        match name {
             // Pure macros - no side effects
             "vec" | "format" | "concat" | "stringify" | "matches" | "include_str"
-            | "include_bytes" | "env" | "option_env" => {
-                // No effect on purity
-                return;
-            }
+            | "include_bytes" | "env" | "option_env" => Some(MacroPurity::Pure),
 
             // I/O macros - always impure
             "println" | "eprintln" | "print" | "eprint" | "dbg" | "write" | "writeln" => {
-                self.has_io_operations = true;
-                self.has_side_effects = true;
-                return;
+                Some(MacroPurity::Impure)
             }
 
             // Panic macros - always impure
-            "panic" | "unimplemented" | "unreachable" | "todo" => {
-                self.has_side_effects = true;
-                return;
-            }
+            "panic" | "unimplemented" | "unreachable" | "todo" => Some(MacroPurity::Impure),
 
             // Debug-only assertions - conditional purity
             "debug_assert" | "debug_assert_eq" | "debug_assert_ne" => {
-                #[cfg(debug_assertions)]
-                {
-                    self.has_side_effects = true;
-                }
-                // In release builds, these are compiled out (pure)
-                return;
+                Some(MacroPurity::Conditional {
+                    debug: Box::new(MacroPurity::Impure),
+                    release: Box::new(MacroPurity::Pure),
+                })
             }
 
             // Regular assertions - always impure (panic on failure)
-            "assert" | "assert_eq" | "assert_ne" => {
-                self.has_side_effects = true;
-                return;
-            }
+            "assert" | "assert_eq" | "assert_ne" => Some(MacroPurity::Impure),
 
-            _ => {
-                // Fall through to check custom macros
-            }
+            _ => None,
         }
+    }
 
-        // Check if this is a custom macro we collected (Spec 160b)
-        if self.macro_definitions.contains_key(&name) {
-            // We have the definition!
-            // For now (Spec 160b), just reduce confidence less than unknown
-            // Future (Spec 160c): analyze the macro body for purity
-            self.unknown_macros_count += 1;
-            // Use a smaller penalty (0.98 vs 0.95) since we have the definition
-            // This is handled in calculate_confidence_score
-        } else {
-            // Truly unknown macro - full confidence penalty
-            self.unknown_macros_count += 1;
+    /// Apply macro purity classification to the detector state
+    fn apply_purity(&mut self, purity: MacroPurity) {
+        match purity {
+            MacroPurity::Impure => {
+                self.has_side_effects = true;
+                self.has_io_operations = true;
+            }
+            MacroPurity::Conditional { debug, release } => {
+                // Apply purity based on build configuration
+                #[cfg(debug_assertions)]
+                {
+                    let _ = release; // Mark as used to avoid warnings
+                    self.apply_purity(*debug);
+                }
+                #[cfg(not(debug_assertions))]
+                {
+                    let _ = debug; // Mark as used to avoid warnings
+                    self.apply_purity(*release);
+                }
+            }
+            MacroPurity::Unknown { confidence: _ } => {
+                // Reduce confidence but don't mark as impure
+                self.unknown_macros_count += 1;
+            }
+            MacroPurity::Pure => {
+                // No effect on purity
+            }
         }
     }
 }
@@ -1063,9 +1093,8 @@ mod tests {
         let item_fn = syn::parse_str::<ItemFn>(func_code).unwrap();
         let analysis = detector.is_pure_function(&item_fn);
 
-        // Confidence should be reduced due to unknown macro analysis
-        // (actual macro body analysis is Spec 160c)
-        assert!(analysis.confidence < 1.0);
+        // With Spec 160c, we now analyze the macro body and detect eprintln!
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
 
     #[test]
@@ -1109,5 +1138,163 @@ mod tests {
         // (Spec 160c will differentiate based on macro body analysis)
         assert!(analysis_with_def.confidence < 1.0);
         assert!(analysis_without_def.confidence < 1.0);
+    }
+
+    // Tests for spec 160c: custom macro heuristic analysis
+
+    #[test]
+    fn test_end_to_end_custom_macro_analysis() {
+        use crate::analyzers::macro_definition_collector::*;
+        use dashmap::DashMap;
+        use std::sync::Arc;
+
+        let code = r#"
+            macro_rules! my_logger {
+                ($($arg:tt)*) => {
+                    eprintln!("[LOG] {}", format!($($arg)*));
+                };
+            }
+
+            fn process_data(data: &str) {
+                my_logger!("Processing: {}", data);
+            }
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+
+        // Collect definitions
+        let definitions = Arc::new(DashMap::new());
+        collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
+
+        // Analyze purity
+        let mut detector = PurityDetector::with_macro_definitions(definitions);
+
+        // Parse just the function
+        let func_code = r#"
+            fn process_data(data: &str) {
+                my_logger!("Processing: {}", data);
+            }
+        "#;
+        let item_fn = syn::parse_str::<ItemFn>(func_code).unwrap();
+        let analysis = detector.is_pure_function(&item_fn);
+
+        // Should detect my_logger! is impure (contains eprintln!)
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_custom_pure_macro_detection() {
+        use crate::analyzers::macro_definition_collector::*;
+        use dashmap::DashMap;
+        use std::sync::Arc;
+
+        let code = r#"
+            macro_rules! make_vec {
+                ($($elem:expr),*) => {
+                    vec![$($elem),*]
+                };
+            }
+
+            fn create_list() -> Vec<i32> {
+                make_vec![1, 2, 3]
+            }
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let definitions = Arc::new(DashMap::new());
+        collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
+
+        let mut detector = PurityDetector::with_macro_definitions(definitions);
+
+        let func_code = r#"
+            fn create_list() -> Vec<i32> {
+                make_vec![1, 2, 3]
+            }
+        "#;
+        let item_fn = syn::parse_str::<ItemFn>(func_code).unwrap();
+        let analysis = detector.is_pure_function(&item_fn);
+
+        // Should detect make_vec! is pure (only contains vec!)
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_conditional_custom_macro() {
+        use crate::analyzers::macro_definition_collector::*;
+        use dashmap::DashMap;
+        use std::sync::Arc;
+
+        let code = r#"
+            macro_rules! debug_check {
+                ($val:expr) => {
+                    debug_assert!($val > 0);
+                    $val
+                };
+            }
+
+            fn validate(x: i32) -> i32 {
+                debug_check!(x)
+            }
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let definitions = Arc::new(DashMap::new());
+        collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
+
+        let mut detector = PurityDetector::with_macro_definitions(definitions);
+
+        let func_code = r#"
+            fn validate(x: i32) -> i32 {
+                debug_check!(x)
+            }
+        "#;
+        let item_fn = syn::parse_str::<ItemFn>(func_code).unwrap();
+        let analysis = detector.is_pure_function(&item_fn);
+
+        // In debug builds, should be impure; in release builds, pure
+        #[cfg(debug_assertions)]
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+
+        #[cfg(not(debug_assertions))]
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+    }
+
+    #[test]
+    fn test_nested_custom_macros() {
+        use crate::analyzers::macro_definition_collector::*;
+        use dashmap::DashMap;
+        use std::sync::Arc;
+
+        let code = r#"
+            macro_rules! log_and_return {
+                ($val:expr) => {
+                    {
+                        println!("Returning: {}", $val);
+                        $val
+                    }
+                };
+            }
+
+            fn compute(x: i32) -> i32 {
+                log_and_return!(x * 2)
+            }
+        "#;
+
+        let ast = syn::parse_file(code).unwrap();
+        let definitions = Arc::new(DashMap::new());
+        collect_definitions(&ast, std::path::Path::new("test.rs"), definitions.clone());
+
+        let mut detector = PurityDetector::with_macro_definitions(definitions);
+
+        let func_code = r#"
+            fn compute(x: i32) -> i32 {
+                log_and_return!(x * 2)
+            }
+        "#;
+        let item_fn = syn::parse_str::<ItemFn>(func_code).unwrap();
+        let analysis = detector.is_pure_function(&item_fn);
+
+        // Should detect println! in the macro body
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
 }
