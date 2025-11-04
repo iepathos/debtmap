@@ -471,8 +471,47 @@ impl Default for GodObjectIndicators {
 
 // Extension to support legacy JSON format that only has metrics
 impl FileDebtItem {
-    pub fn from_metrics(metrics: FileDebtMetrics) -> Self {
-        let score = metrics.calculate_score();
+    /// Create a FileDebtItem from metrics with optional file context adjustments.
+    ///
+    /// # Arguments
+    ///
+    /// * `metrics` - File debt metrics containing raw calculations
+    /// * `context` - Optional file context for score adjustments
+    ///
+    /// # Context Adjustments
+    ///
+    /// - Test files (confidence >0.8): 80% reduction
+    /// - Probable test files (0.5-0.8): 40% reduction
+    /// - Generated files: 90% reduction
+    /// - Production files: No adjustment
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use debtmap::priority::{FileDebtItem, FileDebtMetrics};
+    /// use debtmap::analysis::FileContext;
+    /// use std::path::PathBuf;
+    ///
+    /// # let metrics = FileDebtMetrics::default();
+    /// # let context = FileContext::Production;
+    /// let item = FileDebtItem::from_metrics(metrics, Some(&context));
+    /// // item.score now includes context adjustment
+    /// ```
+    pub fn from_metrics(
+        metrics: FileDebtMetrics,
+        context: Option<&crate::analysis::FileContext>,
+    ) -> Self {
+        use crate::priority::scoring::file_context_scoring::apply_context_adjustments;
+
+        let base_score = metrics.calculate_score();
+
+        // Apply context-aware adjustments
+        let score = if let Some(ctx) = context {
+            apply_context_adjustments(base_score, ctx)
+        } else {
+            base_score
+        };
+
         let recommendation = metrics.generate_recommendation();
         let impact = FileImpact {
             complexity_reduction: metrics.avg_complexity * metrics.function_count as f64 * 0.2,
@@ -1067,5 +1106,103 @@ mod tests {
         metrics.god_object_indicators.god_object_score = 8.5;
         let factors = metrics.get_score_factors();
         assert_eq!(factors.god_object_multiplier, 10.5); // 2.0 + 8.5
+    }
+
+    // Tests for spec 168: File context-aware scoring
+
+    fn create_test_metrics() -> FileDebtMetrics {
+        FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 354,
+            function_count: 7,
+            class_count: 0,
+            avg_complexity: 12.3,
+            max_complexity: 45,
+            total_complexity: 86,
+            coverage_percent: 0.0,
+            uncovered_lines: 354,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+        }
+    }
+
+    #[test]
+    fn test_file_item_with_test_context_reduces_score() {
+        use crate::analysis::FileContext;
+
+        let metrics = create_test_metrics();
+        let base_score = metrics.calculate_score();
+
+        let test_context = FileContext::Test {
+            confidence: 0.95,
+            test_framework: Some("rust-std".to_string()),
+            test_count: 7,
+        };
+
+        let item = FileDebtItem::from_metrics(metrics, Some(&test_context));
+
+        // Should be reduced by 80% (multiplied by 0.2)
+        assert!(item.score < base_score * 0.25);
+        assert!(item.score > base_score * 0.15);
+        assert!(item.score < 20.0, "Test file score should be low");
+    }
+
+    #[test]
+    fn test_file_item_without_context_unchanged() {
+        let metrics = create_test_metrics();
+        let base_score = metrics.calculate_score();
+
+        let item = FileDebtItem::from_metrics(metrics, None);
+
+        assert_eq!(item.score, base_score);
+    }
+
+    #[test]
+    fn test_file_item_with_production_context_unchanged() {
+        use crate::analysis::FileContext;
+
+        let metrics = create_test_metrics();
+        let base_score = metrics.calculate_score();
+
+        let prod_context = FileContext::Production;
+        let item = FileDebtItem::from_metrics(metrics, Some(&prod_context));
+
+        assert_eq!(item.score, base_score);
+    }
+
+    #[test]
+    fn test_file_item_with_generated_context_reduces_90_percent() {
+        use crate::analysis::FileContext;
+
+        let metrics = create_test_metrics();
+        let base_score = metrics.calculate_score();
+
+        let gen_context = FileContext::Generated {
+            generator: "protoc".to_string(),
+        };
+        let item = FileDebtItem::from_metrics(metrics, Some(&gen_context));
+
+        // Should be reduced by 90% (multiplied by 0.1)
+        assert!((item.score - base_score * 0.1).abs() < 0.5);
+    }
+
+    #[test]
+    fn test_file_item_with_probable_test_context_40_percent_reduction() {
+        use crate::analysis::FileContext;
+
+        let metrics = create_test_metrics();
+        let base_score = metrics.calculate_score();
+
+        let probable_test_context = FileContext::Test {
+            confidence: 0.65, // Probable test file (0.5-0.8)
+            test_framework: None,
+            test_count: 5,
+        };
+        let item = FileDebtItem::from_metrics(metrics, Some(&probable_test_context));
+
+        // Should be reduced by 40% (multiplied by 0.6)
+        assert!((item.score - base_score * 0.6).abs() < 0.5);
     }
 }
