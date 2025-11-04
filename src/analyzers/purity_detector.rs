@@ -581,7 +581,10 @@ impl PurityDetector {
         }
 
         // Step 2: Check custom macros (from Spec 160b + 160c)
-        let custom_macro_body = self.macro_definitions.get(&name).map(|def| def.body.clone());
+        let custom_macro_body = self
+            .macro_definitions
+            .get(&name)
+            .map(|def| def.body.clone());
         if let Some(body) = custom_macro_body {
             // Analyze the custom macro body (Spec 160c)
             let purity = self.macro_analyzer.analyze(&body);
