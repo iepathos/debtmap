@@ -176,6 +176,50 @@ impl Default for FileImpact {
     }
 }
 
+/// Detailed breakdown of file score calculation factors.
+///
+/// This struct contains all the individual multiplicative factors used to calculate
+/// a file's technical debt score, along with the basis values used for each calculation.
+/// It enables transparent display of how a file's score was computed.
+#[derive(Debug, Clone)]
+pub struct FileScoreFactors {
+    /// Size impact factor: sqrt(lines / 100)
+    pub size_factor: f64,
+    /// Total lines of code in the file
+    pub size_basis: usize,
+
+    /// Complexity impact factor: (avg_complexity / 5.0) × sqrt(total_complexity / 50.0)
+    pub complexity_factor: f64,
+    /// Average cyclomatic complexity across functions
+    pub avg_complexity: f64,
+    /// Sum of all function complexities
+    pub total_complexity: u32,
+
+    /// Coverage gap factor: (1.0 - coverage) × 2.0 + 1.0
+    pub coverage_factor: f64,
+    /// Test coverage percentage (0.0 to 1.0)
+    pub coverage_percent: f64,
+    /// Coverage gap (1.0 - coverage_percent)
+    pub coverage_gap: f64,
+
+    /// Function density factor: 1.0 + (functions - 50) × 0.02 for >50 functions
+    pub density_factor: f64,
+    /// Number of functions in the file
+    pub function_count: usize,
+
+    /// God object penalty multiplier: 2.0 + god_object_score if flagged
+    pub god_object_multiplier: f64,
+    /// God object detection score
+    pub god_object_score: f64,
+    /// Whether file is flagged as a god object
+    pub is_god_object: bool,
+
+    /// Function score aggregate factor: max(sum / 10.0, 1.0)
+    pub function_factor: f64,
+    /// Sum of all individual function debt scores
+    pub function_score_sum: f64,
+}
+
 impl FileDebtMetrics {
     pub fn calculate_score(&self) -> f64 {
         // Size factor: larger files have higher impact
@@ -215,6 +259,81 @@ impl FileDebtMetrics {
             * density_factor
             * god_object_multiplier
             * function_factor
+    }
+
+    /// Extract individual scoring factors for display purposes.
+    ///
+    /// This method decomposes the opaque score calculation from `calculate_score()`
+    /// into individual factors that can be shown to users for transparency.
+    ///
+    /// # Returns
+    ///
+    /// `FileScoreFactors` containing:
+    /// - All 6 multiplicative factors (size, complexity, coverage, density, god object, function)
+    /// - Basis values used to calculate each factor
+    /// - Contextual information for display (e.g., whether flagged as god object)
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use debtmap::priority::file_metrics::{FileDebtMetrics, GodObjectIndicators};
+    /// # use std::path::PathBuf;
+    /// let mut metrics = FileDebtMetrics::default();
+    /// metrics.total_lines = 400;
+    /// metrics.coverage_percent = 0.75;
+    /// let factors = metrics.get_score_factors();
+    /// println!("Coverage factor: {:.2} ({:.0}% coverage)",
+    ///          factors.coverage_factor,
+    ///          factors.coverage_percent * 100.0);
+    /// ```
+    pub fn get_score_factors(&self) -> FileScoreFactors {
+        // Size factor: larger files have higher impact
+        let size_factor = (self.total_lines as f64 / 100.0).sqrt();
+
+        // Complexity factor: average and total complexity
+        let avg_complexity_factor = (self.avg_complexity / 5.0).min(3.0);
+        let total_complexity_factor = (self.total_complexity as f64 / 50.0).sqrt();
+        let complexity_factor = avg_complexity_factor * total_complexity_factor;
+
+        // Coverage factor: lower coverage = higher score
+        let coverage_gap = 1.0 - self.coverage_percent;
+        let coverage_factor = (coverage_gap * 2.0) + 1.0;
+
+        // Function density: too many functions = god object
+        let density_factor = if self.function_count > 50 {
+            1.0 + ((self.function_count - 50) as f64 * 0.02)
+        } else {
+            1.0
+        };
+
+        // God object multiplier
+        let god_object_multiplier = if self.god_object_indicators.is_god_object {
+            2.0 + self.god_object_indicators.god_object_score
+        } else {
+            1.0
+        };
+
+        // Aggregate function scores
+        let function_score_sum: f64 = self.function_scores.iter().sum();
+        let function_factor = (function_score_sum / 10.0).max(1.0);
+
+        FileScoreFactors {
+            size_factor,
+            size_basis: self.total_lines,
+            complexity_factor,
+            avg_complexity: self.avg_complexity,
+            total_complexity: self.total_complexity,
+            coverage_factor,
+            coverage_percent: self.coverage_percent,
+            coverage_gap,
+            density_factor,
+            function_count: self.function_count,
+            god_object_multiplier,
+            god_object_score: self.god_object_indicators.god_object_score,
+            is_god_object: self.god_object_indicators.is_god_object,
+            function_factor,
+            function_score_sum,
+        }
     }
 
     /// Generate a recommendation for addressing this file's technical debt.
@@ -793,5 +912,160 @@ mod tests {
         assert!(recommendation.contains("macro"));
         assert!(!recommendation.contains("Split"));
         assert!(!recommendation.contains("URGENT"));
+    }
+
+    #[test]
+    fn test_get_score_factors_extraction() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 354,
+            function_count: 7,
+            avg_complexity: 8.0,
+            total_complexity: 56,
+            coverage_percent: 0.0,
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                god_object_score: 7.0,
+                methods_count: 60,
+                fields_count: 30,
+                responsibilities: 10,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: SplitAnalysisMethod::None,
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+                detection_type: None,
+            },
+            function_scores: vec![1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+
+        assert!((factors.size_factor - 1.88).abs() < 0.01);
+        assert_eq!(factors.coverage_factor, 3.0);
+        assert_eq!(factors.god_object_multiplier, 9.0);
+        assert_eq!(factors.density_factor, 1.0);
+        assert_eq!(factors.function_count, 7);
+        assert!(factors.is_god_object);
+    }
+
+    #[test]
+    fn test_score_calculation_matches_factors() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 400,
+            function_count: 20,
+            avg_complexity: 10.0,
+            total_complexity: 200,
+            coverage_percent: 0.5,
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: true,
+                god_object_score: 3.0,
+                methods_count: 40,
+                fields_count: 20,
+                responsibilities: 5,
+                responsibility_names: Vec::new(),
+                recommended_splits: Vec::new(),
+                module_structure: None,
+                domain_count: 0,
+                domain_diversity: 0.0,
+                struct_ratio: 0.0,
+                analysis_method: SplitAnalysisMethod::None,
+                cross_domain_severity: None,
+                domain_diversity_metrics: None,
+                detection_type: None,
+            },
+            function_scores: vec![5.0; 20],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+        let actual_score = metrics.calculate_score();
+
+        let calculated = factors.size_factor
+            * factors.complexity_factor
+            * factors.coverage_factor
+            * factors.density_factor
+            * factors.god_object_multiplier
+            * factors.function_factor;
+
+        assert!((calculated - actual_score).abs() < 0.5);
+    }
+
+    #[test]
+    fn test_factors_coverage_details() {
+        let metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 200,
+            function_count: 10,
+            coverage_percent: 0.75,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+
+        assert_eq!(factors.coverage_percent, 0.75);
+        assert_eq!(factors.coverage_gap, 0.25);
+        assert_eq!(factors.coverage_factor, 1.5); // (0.25 * 2.0) + 1.0
+    }
+
+    #[test]
+    fn test_factors_density_threshold() {
+        let mut metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 200,
+            function_count: 45,
+            god_object_indicators: GodObjectIndicators::default(),
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+        assert_eq!(factors.density_factor, 1.0); // Below threshold
+
+        metrics.function_count = 60;
+        let factors = metrics.get_score_factors();
+        assert_eq!(factors.density_factor, 1.2); // 1.0 + (60 - 50) * 0.02
+    }
+
+    #[test]
+    fn test_factors_god_object_multiplier() {
+        let mut metrics = FileDebtMetrics {
+            path: PathBuf::from("test.rs"),
+            total_lines: 200,
+            function_count: 10,
+            god_object_indicators: GodObjectIndicators {
+                is_god_object: false,
+                god_object_score: 0.0,
+                ..Default::default()
+            },
+            function_scores: vec![],
+            god_object_type: None,
+            file_type: None,
+            ..Default::default()
+        };
+
+        let factors = metrics.get_score_factors();
+        assert_eq!(factors.god_object_multiplier, 1.0); // Not flagged
+
+        metrics.god_object_indicators.is_god_object = true;
+        metrics.god_object_indicators.god_object_score = 8.5;
+        let factors = metrics.get_score_factors();
+        assert_eq!(factors.god_object_multiplier, 10.5); // 2.0 + 8.5
     }
 }

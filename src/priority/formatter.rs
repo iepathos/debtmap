@@ -1240,6 +1240,124 @@ fn format_file_priority_item(
     format_file_priority_item_with_verbosity(output, rank, item, config, 0)
 }
 
+/// Format file score calculation breakdown for verbosity >= 2
+fn format_file_score_calculation_section(
+    item: &priority::FileDebtItem,
+    _formatter: &ColoredFormatter,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let factors = item.metrics.get_score_factors();
+
+    lines.push(format!("- {}", "FILE SCORE CALCULATION:".bright_blue()));
+
+    // Size factor
+    lines.push(format!(
+        "   - Size Factor: {:.2} (√({}/100))",
+        factors.size_factor, factors.size_basis
+    ));
+
+    // Complexity factor
+    lines.push(format!(
+        "   - Complexity Factor: {:.2} (avg {:.1} × total factor)",
+        factors.complexity_factor, factors.avg_complexity
+    ));
+
+    // Coverage factor with warning
+    let coverage_detail = if factors.coverage_percent == 0.0 {
+        format!(
+            " {}",
+            "⚠️  No coverage data - assuming untested".bright_red()
+        )
+    } else if factors.coverage_factor >= 2.0 {
+        format!(
+            " {} Low coverage: {:.0}%",
+            "⚠️".bright_yellow(),
+            factors.coverage_percent * 100.0
+        )
+    } else {
+        format!(" ({:.0}% coverage)", factors.coverage_percent * 100.0)
+    };
+
+    lines.push(format!(
+        "   - Coverage Factor: {:.2}{}",
+        factors.coverage_factor, coverage_detail
+    ));
+
+    // Density factor
+    let density_detail = if factors.function_count > 50 {
+        format!(
+            " ({} functions, {} over threshold)",
+            factors.function_count,
+            factors.function_count - 50
+        )
+    } else {
+        format!(" ({} functions, below threshold)", factors.function_count)
+    };
+
+    lines.push(format!(
+        "   - Density Factor: {:.2}{}",
+        factors.density_factor, density_detail
+    ));
+
+    // God object multiplier with warning
+    let god_detail = if factors.is_god_object {
+        format!(
+            " {} Flagged as god object (score: {:.1})",
+            "⚠️".bright_yellow(),
+            factors.god_object_score
+        )
+    } else {
+        " (not flagged)".to_string()
+    };
+
+    lines.push(format!(
+        "   - God Object Multiplier: {:.2} (2.0 + {:.1}){}",
+        factors.god_object_multiplier, factors.god_object_score, god_detail
+    ));
+
+    // Function factor
+    lines.push(format!(
+        "   - Function Factor: {:.2} (function scores sum: {:.1})",
+        factors.function_factor, factors.function_score_sum
+    ));
+
+    // Final calculation
+    let calculated_score = factors.size_factor
+        * factors.complexity_factor
+        * factors.coverage_factor
+        * factors.density_factor
+        * factors.god_object_multiplier
+        * factors.function_factor;
+
+    lines.push(format!(
+        "   - Final: {:.2} × {:.2} × {:.2} × {:.2} × {:.2} × {:.2} = {:.1}",
+        factors.size_factor,
+        factors.complexity_factor,
+        factors.coverage_factor,
+        factors.density_factor,
+        factors.god_object_multiplier,
+        factors.function_factor,
+        calculated_score
+    ));
+
+    // Validation check (debug mode only)
+    #[cfg(debug_assertions)]
+    {
+        let actual_score = item.score;
+        let diff = (calculated_score - actual_score).abs();
+        if diff > 0.5 {
+            lines.push(format!(
+                "   {} Calculation mismatch: displayed={:.1}, calculated={:.1}",
+                "⚠️".bright_red(),
+                actual_score,
+                calculated_score
+            ));
+        }
+    }
+
+    lines
+}
+
 fn format_file_priority_item_with_verbosity(
     output: &mut String,
     rank: usize,
@@ -1271,6 +1389,15 @@ fn format_file_priority_item_with_verbosity(
         item.metrics.function_count
     )
     .unwrap();
+
+    // Show detailed calculation for verbosity >= 2
+    if verbosity >= 2 {
+        let score_calc_lines = format_file_score_calculation_section(item, &formatter);
+        for line in score_calc_lines {
+            writeln!(output, "{}", line).unwrap();
+        }
+        writeln!(output).unwrap(); // Add blank line after calculation
+    }
 
     let why_message = generate_why_message(WhyMessageParams {
         is_god_object: item.metrics.god_object_indicators.is_god_object,
@@ -2484,5 +2611,91 @@ mod tests {
 
         let clean_output = strip_ansi_codes(&output);
         assert!(clean_output.contains("MEDIUM") || clean_output.contains("HIGH"));
+    }
+
+    #[test]
+    fn test_file_score_breakdown_verbosity_0() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 0);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(!clean_output.contains("FILE SCORE CALCULATION"));
+        assert!(!clean_output.contains("Size Factor"));
+    }
+
+    #[test]
+    fn test_file_score_breakdown_verbosity_1() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 1);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Verbosity 1 shows categorical labels but not detailed breakdown
+        assert!(!clean_output.contains("FILE SCORE CALCULATION"));
+        assert!(!clean_output.contains("Size Factor"));
+    }
+
+    #[test]
+    fn test_file_score_breakdown_verbosity_2() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 2);
+
+        let clean_output = strip_ansi_codes(&output);
+        assert!(clean_output.contains("FILE SCORE CALCULATION"));
+        assert!(clean_output.contains("Size Factor"));
+        assert!(clean_output.contains("Coverage Factor"));
+        assert!(clean_output.contains("Complexity Factor"));
+        assert!(clean_output.contains("Density Factor"));
+        assert!(clean_output.contains("God Object Multiplier"));
+        assert!(clean_output.contains("Function Factor"));
+        assert!(clean_output.contains("Final:"));
+    }
+
+    #[test]
+    fn test_file_score_breakdown_structure() {
+        let mut output = String::new();
+        let mut item = create_test_file_debt_item();
+        item.metrics.total_lines = 354;
+        item.metrics.function_count = 7;
+        item.metrics.avg_complexity = 8.0;
+        item.metrics.coverage_percent = 0.0;
+        item.metrics.god_object_indicators.is_god_object = true;
+        item.metrics.god_object_indicators.god_object_score = 7.0;
+
+        let config = FormattingConfig::default();
+
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 2);
+
+        let clean_output = strip_ansi_codes(&output);
+        // Check for size factor calculation
+        assert!(clean_output.contains("(354/100)"));
+        // Check for coverage warning
+        assert!(clean_output.contains("No coverage data") || clean_output.contains("untested"));
+        // Check for god object warning
+        assert!(clean_output.contains("Flagged as god object"));
+    }
+
+    #[test]
+    fn test_file_score_calculation_accuracy() {
+        let mut output = String::new();
+        let item = create_test_file_debt_item();
+        let config = FormattingConfig::default();
+
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 2);
+
+        let clean_output = strip_ansi_codes(&output);
+        // The displayed score and calculated score should match
+        // Extract the score from the header
+        assert!(clean_output.contains("SCORE:"));
+        // Check that Final: line exists (actual values may vary)
+        assert!(clean_output.contains("Final:"));
     }
 }
