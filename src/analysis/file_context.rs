@@ -3,14 +3,17 @@
 //! This module implements intelligent test file detection using multiple heuristics
 //! to avoid false positives where test files are treated as production code debt.
 //!
-//! Detection strategy:
-//! - File naming patterns (*_test.rs, *_tests.rs, test_*.py, etc.)
-//! - Directory location (tests/, *_tests/)
-//! - Test attributes and decorators (`#[test]`, `#[tokio::test]`, `@pytest.fixture`)
-//! - Test function naming (test_*, Test*)
-//! - Framework imports (proptest, pytest, jest, mocha)
+//! Detection strategy (weighted by reliability):
+//! - Test attributes and decorators (35%): `#[test]`, `#[tokio::test]`, `@pytest.fixture`
+//! - File naming patterns (25%): *_test.rs, *_tests.rs, test_*.py, etc.
+//! - Directory location (20%): tests/, *_tests/
+//! - Test function naming (15%): test_*, Test*
+//! - Framework imports (5%): proptest, pytest, jest, mocha
+//!
+//! Strong signals boost: Files with 3+ strong signals (>0.7) achieve high confidence (>0.85)
 //!
 //! Spec 166: Test File Detection and Context-Aware Scoring
+//! Spec 169: Improve Test File Confidence Detection for Component Tests
 
 use crate::core::{FunctionMetrics, Language};
 use serde::{Deserialize, Serialize};
@@ -92,10 +95,25 @@ impl FileContextDetector {
     /// Detect the file context using all available heuristics
     pub fn detect(&self, path: &Path, functions: &[FunctionMetrics]) -> FileContext {
         let test_score = self.calculate_test_score(path, functions);
+        let mut confidence = test_score.overall_confidence;
 
-        if test_score.overall_confidence > 0.5 {
+        // Boost confidence if multiple strong signals (spec 169)
+        let strong_signals = [
+            test_score.naming_match >= 0.7,
+            test_score.attribute_density >= 0.7,
+            test_score.test_function_ratio >= 0.7,
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+
+        if strong_signals >= 3 {
+            confidence = confidence.max(0.85);
+        }
+
+        if confidence > 0.5 {
             FileContext::Test {
-                confidence: test_score.overall_confidence,
+                confidence,
                 test_framework: self.detect_framework(functions),
                 test_count: self.count_tests(functions),
             }
@@ -139,11 +157,11 @@ impl FileContextDetector {
         match self.language {
             Language::Rust => {
                 if filename.ends_with("_tests.rs") || filename.ends_with("_test.rs") {
-                    0.9
+                    1.0 // Perfect score for test files (spec 169)
                 } else if filename == "tests.rs" {
-                    0.8
+                    0.9 // High score for consolidated tests
                 } else if filename.starts_with("test_") {
-                    0.7
+                    0.8
                 } else {
                     0.0
                 }
@@ -240,14 +258,24 @@ impl FileContextDetector {
         0.0
     }
 
-    /// Calculate weighted average of all signals
+    /// Calculate weighted average confidence from individual detection signals.
     ///
-    /// Weights are based on signal reliability:
-    /// - Directory location: 40% (strongest signal)
-    /// - Test attributes: 30% (strong for Rust)
-    /// - File naming: 15%
-    /// - Function naming: 10%
-    /// - Imports: 5%
+    /// # Weighting Strategy (Spec 169)
+    ///
+    /// The weights are carefully balanced to handle component tests (in src/)
+    /// without requiring tests/ directory location:
+    ///
+    /// - **Attributes (35%)**: Strongest signal - #[test] is unambiguous
+    /// - **Naming (25%)**: Strong signal - *_test.rs is conventional
+    /// - **Directory (20%)**: Reduced from 40% to avoid false negatives on component tests
+    /// - **Functions (15%)**: test_* prefix is conventional
+    /// - **Imports (5%)**: Weakest signal - many utils import test frameworks
+    ///
+    /// # Example Scores
+    ///
+    /// - Component test (src/foo_tests.rs): 0.80-0.90 (high confidence)
+    /// - Integration test (tests/foo.rs): 0.95-1.0 (perfect confidence)
+    /// - Production file: 0.0-0.3 (not a test)
     fn weighted_average(
         &self,
         naming: f32,
@@ -256,7 +284,7 @@ impl FileContextDetector {
         imports: f32,
         directory: f32,
     ) -> f32 {
-        directory * 0.40 + attributes * 0.30 + naming * 0.15 + functions * 0.10 + imports * 0.05
+        directory * 0.20 + attributes * 0.35 + naming * 0.25 + functions * 0.15 + imports * 0.05
     }
 
     /// Detect which test framework is being used
@@ -297,7 +325,7 @@ mod tests {
         let detector = FileContextDetector::new(Language::Rust);
         let path = Path::new("src/foo_tests.rs");
         let score = detector.score_naming(path);
-        assert!(score >= 0.9, "Expected score >= 0.9, got {}", score);
+        assert_eq!(score, 1.0, "Expected perfect score of 1.0, got {}", score);
     }
 
     #[test]
@@ -424,13 +452,13 @@ mod tests {
         let avg = detector.weighted_average(1.0, 1.0, 1.0, 1.0, 1.0);
         assert_eq!(avg, 1.0);
 
-        // Only directory signal
+        // Only directory signal (spec 169: reduced to 20%)
         let avg = detector.weighted_average(0.0, 0.0, 0.0, 0.0, 1.0);
-        assert_eq!(avg, 0.40);
+        assert_eq!(avg, 0.20);
 
-        // Only attributes signal
+        // Only attributes signal (spec 169: increased to 35%)
         let avg = detector.weighted_average(0.0, 1.0, 0.0, 0.0, 0.0);
-        assert_eq!(avg, 0.30);
+        assert_eq!(avg, 0.35);
     }
 
     #[test]
@@ -450,5 +478,165 @@ mod tests {
         assert!(!prod_ctx.is_test());
         assert!(!prod_ctx.is_probable_test());
         assert_eq!(prod_ctx.test_confidence(), None);
+    }
+
+    // Spec 169: Component test detection tests
+    #[test]
+    fn test_component_test_achieves_high_confidence() {
+        let detector = FileContextDetector::new(Language::Rust);
+        let path = Path::new("src/cook/workflow/git_context_diff_tests.rs");
+
+        // Create test file with strong signals: 7 tests, all with #[test] attribute
+        let mut functions = Vec::new();
+        for i in 0..7 {
+            let mut func = FunctionMetrics::new(
+                format!("test_feature_{}", i),
+                PathBuf::from("git_context_diff_tests.rs"),
+                i * 10,
+            );
+            func.is_test = true;
+            functions.push(func);
+        }
+
+        let context = detector.detect(path, &functions);
+
+        match context {
+            FileContext::Test { confidence, .. } => {
+                assert!(
+                    confidence > 0.8,
+                    "Component test should have >0.8 confidence, got {}",
+                    confidence
+                );
+            }
+            _ => panic!("Should be detected as test file"),
+        }
+    }
+
+    #[test]
+    fn test_rebalanced_weights() {
+        let detector = FileContextDetector::new(Language::Rust);
+
+        // Component test: strong attributes/naming, no directory
+        let confidence = detector.weighted_average(
+            1.0, // naming (_tests.rs)
+            1.0, // attributes (100% #[test])
+            1.0, // functions (100% test_)
+            1.0, // imports
+            0.0, // directory (not in tests/)
+        );
+
+        assert!(
+            confidence >= 0.80,
+            "Should achieve at least 0.80 confidence, got {}",
+            confidence
+        );
+    }
+
+    #[test]
+    fn test_strong_signals_boost() {
+        let detector = FileContextDetector::new(Language::Rust);
+        let path = Path::new("src/foo_tests.rs");
+
+        // Create file with 3 strong signals
+        let mut functions = Vec::new();
+        for i in 0..5 {
+            let mut func = FunctionMetrics::new(
+                format!("test_case_{}", i),
+                PathBuf::from("foo_tests.rs"),
+                i * 10,
+            );
+            func.is_test = true;
+            functions.push(func);
+        }
+
+        let context = detector.detect(path, &functions);
+
+        match context {
+            FileContext::Test { confidence, .. } => {
+                assert!(
+                    confidence >= 0.85,
+                    "Strong signals should boost to at least 0.85, got {}",
+                    confidence
+                );
+            }
+            _ => panic!("Should be detected as test file"),
+        }
+    }
+
+    #[test]
+    fn test_production_file_unchanged() {
+        let detector = FileContextDetector::new(Language::Rust);
+        let path = Path::new("src/cook/workflow/executor.rs");
+
+        // Production file: no test signals
+        let func1 = FunctionMetrics::new("execute".to_string(), PathBuf::from("executor.rs"), 1);
+        let func2 =
+            FunctionMetrics::new("run_command".to_string(), PathBuf::from("executor.rs"), 50);
+
+        let functions = vec![func1, func2];
+        let context = detector.detect(path, &functions);
+
+        match context {
+            FileContext::Production => {} // Expected
+            FileContext::Test { confidence, .. } => {
+                panic!(
+                    "Production file misclassified as test with confidence {}",
+                    confidence
+                )
+            }
+            _ => panic!("Unexpected context"),
+        }
+    }
+
+    #[test]
+    fn test_integration_test_still_perfect() {
+        let detector = FileContextDetector::new(Language::Rust);
+        let path = Path::new("tests/integration_test.rs");
+
+        // Integration test: all signals strong
+        let mut functions = Vec::new();
+        for i in 0..10 {
+            let mut func = FunctionMetrics::new(
+                format!("test_integration_{}", i),
+                PathBuf::from("integration_test.rs"),
+                i * 10,
+            );
+            func.is_test = true;
+            functions.push(func);
+        }
+
+        let context = detector.detect(path, &functions);
+
+        match context {
+            FileContext::Test { confidence, .. } => {
+                assert!(
+                    confidence >= 0.95,
+                    "Integration test should have ~1.0 confidence, got {}",
+                    confidence
+                );
+            }
+            _ => panic!("Should be detected as test file"),
+        }
+    }
+
+    #[test]
+    fn test_naming_perfect_scores() {
+        let detector = FileContextDetector::new(Language::Rust);
+
+        // _tests.rs suffix should get 1.0
+        let path1 = Path::new("git_context_diff_tests.rs");
+        assert_eq!(
+            detector.score_naming(path1),
+            1.0,
+            "_tests.rs should score 1.0"
+        );
+
+        // _test.rs suffix should get 1.0
+        let path2 = Path::new("component_test.rs");
+        assert_eq!(
+            detector.score_naming(path2),
+            1.0,
+            "_test.rs should score 1.0"
+        );
     }
 }
