@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
-use crate::risk::lcov::parse_lcov_file;
 use crate::risk::coverage_index::CoverageIndex;
+use crate::risk::lcov::parse_lcov_file;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DebugFormat {
@@ -45,8 +45,7 @@ struct ExplainCoverageResult {
 /// Explain how coverage detection works for a specific function
 pub fn explain_coverage(config: ExplainCoverageConfig) -> Result<()> {
     // Parse LCOV data
-    let lcov_data = parse_lcov_file(&config.coverage_file)
-        .context("Failed to parse LCOV file")?;
+    let lcov_data = parse_lcov_file(&config.coverage_file).context("Failed to parse LCOV file")?;
 
     // Build coverage index
     let coverage_index = CoverageIndex::from_coverage(&lcov_data);
@@ -66,7 +65,9 @@ pub fn explain_coverage(config: ExplainCoverageConfig) -> Result<()> {
     for (file, functions) in lcov_data.functions.iter() {
         result.available_files.push(file.display().to_string());
         for func in functions.iter() {
-            result.available_functions.push(format!("{}::{}", file.display(), func.name));
+            result
+                .available_functions
+                .push(format!("{}::{}", file.display(), func.name));
         }
     }
 
@@ -86,7 +87,12 @@ pub fn explain_coverage(config: ExplainCoverageConfig) -> Result<()> {
 
         // Try path matching strategies
         if !result.coverage_found && config.verbose {
-            let attempts = try_path_strategies(&coverage_index, file_path, &config.function_name, &lcov_data);
+            let attempts = try_path_strategies(
+                &coverage_index,
+                file_path,
+                &config.function_name,
+                &lcov_data,
+            );
             for attempt in attempts {
                 let success = attempt.success;
                 result.attempts.push(attempt);
@@ -128,7 +134,7 @@ pub fn explain_coverage(config: ExplainCoverageConfig) -> Result<()> {
 
 fn try_exact_match(
     coverage_index: &CoverageIndex,
-    file_path: &PathBuf,
+    file_path: &Path,
     function_name: &str,
 ) -> StrategyAttempt {
     let coverage = coverage_index.get_function_coverage(file_path, function_name);
@@ -136,8 +142,16 @@ fn try_exact_match(
     StrategyAttempt {
         strategy: "exact_match".to_string(),
         success: coverage.is_some(),
-        matched_function: if coverage.is_some() { Some(function_name.to_string()) } else { None },
-        matched_file: if coverage.is_some() { Some(file_path.display().to_string()) } else { None },
+        matched_function: if coverage.is_some() {
+            Some(function_name.to_string())
+        } else {
+            None
+        },
+        matched_file: if coverage.is_some() {
+            Some(file_path.display().to_string())
+        } else {
+            None
+        },
         coverage_percentage: coverage,
     }
 }
@@ -270,8 +284,14 @@ fn output_text_format(result: &ExplainCoverageResult, verbose: bool) {
 
     if result.coverage_found {
         println!("✓ Coverage Found!");
-        println!("  Strategy: {}", result.matched_by_strategy.as_ref().unwrap());
-        println!("  Coverage: {:.1}%", result.coverage_percentage.unwrap() * 100.0);
+        println!(
+            "  Strategy: {}",
+            result.matched_by_strategy.as_ref().unwrap()
+        );
+        println!(
+            "  Coverage: {:.1}%",
+            result.coverage_percentage.unwrap() * 100.0
+        );
         println!();
     } else {
         println!("✗ Coverage Not Found");
@@ -300,7 +320,10 @@ fn output_text_format(result: &ExplainCoverageResult, verbose: bool) {
     }
 
     if !result.coverage_found {
-        println!("Available Files in LCOV ({} total):", result.available_files.len());
+        println!(
+            "Available Files in LCOV ({} total):",
+            result.available_files.len()
+        );
         println!("----------------------------------");
         for (i, file) in result.available_files.iter().take(10).enumerate() {
             println!("  {}. {}", i + 1, file);
@@ -310,12 +333,20 @@ fn output_text_format(result: &ExplainCoverageResult, verbose: bool) {
         }
         println!();
 
-        println!("Available Functions in LCOV ({} total):", result.available_functions.len());
+        println!(
+            "Available Functions in LCOV ({} total):",
+            result.available_functions.len()
+        );
         println!("--------------------------------------");
 
         // Show functions that partially match the query
-        let matching_functions: Vec<_> = result.available_functions.iter()
-            .filter(|f| f.to_lowercase().contains(&result.function_name.to_lowercase()))
+        let matching_functions: Vec<_> = result
+            .available_functions
+            .iter()
+            .filter(|f| {
+                f.to_lowercase()
+                    .contains(&result.function_name.to_lowercase())
+            })
             .collect();
 
         if !matching_functions.is_empty() {

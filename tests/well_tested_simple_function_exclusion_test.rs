@@ -63,7 +63,7 @@ fn test_well_tested_simple_functions_excluded_from_top_10() {
                 execution_count: 20,
                 coverage_percentage: 100.0,
                 uncovered_lines: vec![],
-             normalized: debtmap::risk::lcov::NormalizedFunctionName::simple(&func.name),
+                normalized: debtmap::risk::lcov::NormalizedFunctionName::simple(&func.name),
             });
 
         functions.push(func);
@@ -208,7 +208,7 @@ fn test_well_tested_simple_function_has_low_score() {
             execution_count: 15,
             coverage_percentage: 100.0,
             uncovered_lines: vec![],
-         normalized: debtmap::risk::lcov::NormalizedFunctionName::simple(&func.name),
+            normalized: debtmap::risk::lcov::NormalizedFunctionName::simple(&func.name),
         }],
     );
 
