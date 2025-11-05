@@ -81,14 +81,28 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
         return None;
     }
 
-    Some(format!(
-        "{} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
-        "├─ COMPLEXITY:".bright_blue(),
-        format!("{}", context.complexity_info.cyclomatic).yellow(),
-        format!("{}", context.complexity_info.branch_count).yellow(),
-        format!("{}", context.complexity_info.cognitive).yellow(),
-        format!("{}", context.complexity_info.nesting).yellow()
-    ))
+    if let Some(ref entropy) = context.complexity_info.entropy_details {
+        Some(format!(
+            "{} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+            "├─ COMPLEXITY:".bright_blue(),
+            format!("{}", context.complexity_info.cyclomatic).yellow(),
+            format!("{}", entropy.adjusted_complexity).yellow(),
+            entropy.dampening_factor,
+            format!("{}", context.complexity_info.branch_count).yellow(),
+            format!("{}", context.complexity_info.cognitive).yellow(),
+            format!("{}", context.complexity_info.nesting).yellow(),
+            entropy.entropy_score
+        ))
+    } else {
+        Some(format!(
+            "{} cyclomatic={}, est_branches={}, cognitive={}, nesting={}",
+            "├─ COMPLEXITY:".bright_blue(),
+            format!("{}", context.complexity_info.cyclomatic).yellow(),
+            format!("{}", context.complexity_info.branch_count).yellow(),
+            format!("{}", context.complexity_info.cognitive).yellow(),
+            format!("{}", context.complexity_info.nesting).yellow()
+        ))
+    }
 }
 
 // Pure function to format evidence section (metrics only, no rationale)

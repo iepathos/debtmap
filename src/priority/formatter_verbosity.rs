@@ -729,10 +729,11 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "├─ {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "├─ {} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
+                entropy.dampening_factor,
                 branch_count.to_string().yellow(),
                 cognitive.to_string().yellow(),
                 nesting.to_string().yellow(),
@@ -1327,7 +1328,7 @@ mod tests {
             dampening_factor: 0.8,
         });
         format_complexity_summary(&mut output, &item, &formatter);
-        assert!(output.contains("(adj:15)"));
+        assert!(output.contains("(dampened: 15, factor: 0.80)"));
         assert!(output.contains("entropy=0.75"));
     }
 

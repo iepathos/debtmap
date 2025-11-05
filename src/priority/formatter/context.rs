@@ -1,3 +1,4 @@
+use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{DebtType, FunctionVisibility, UnifiedDebtItem};
 
 // Pure function to create formatting context
@@ -66,6 +67,7 @@ pub(crate) struct ComplexityInfo {
     pub branch_count: u32,
     pub nesting: u32,
     pub has_complexity: bool,
+    pub entropy_details: Option<EntropyDetails>,
 }
 
 impl ComplexityInfo {
@@ -78,6 +80,7 @@ impl ComplexityInfo {
             branch_count,
             nesting,
             has_complexity: cyclomatic > 0 || cognitive > 0,
+            entropy_details: item.entropy_details.clone(),
         }
     }
 }
