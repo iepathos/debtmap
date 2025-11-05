@@ -425,6 +425,7 @@ mod tests {
             execution_count: 5,
             coverage_percentage: 50.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
         coverage.build_index(); // Rebuild index after modifying functions
@@ -515,6 +516,7 @@ mod tests {
             execution_count: 1,
             coverage_percentage: 25.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage
             .functions
@@ -537,6 +539,7 @@ mod tests {
             execution_count: 1,
             coverage_percentage: 50.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage
             .functions
@@ -558,6 +561,7 @@ mod tests {
             execution_count: 1,
             coverage_percentage: 75.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage
             .functions
@@ -579,6 +583,7 @@ mod tests {
             execution_count: 1,
             coverage_percentage: 90.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage
             .functions
@@ -599,6 +604,7 @@ mod tests {
             execution_count: 1,
             coverage_percentage: 100.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("test_func"),
         }];
         coverage
             .functions
@@ -660,6 +666,7 @@ mod tests {
             execution_count: 10,
             coverage_percentage: 90.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("c"),
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
         coverage.build_index();
@@ -709,6 +716,7 @@ mod tests {
             execution_count: 10,
             coverage_percentage: 95.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("c2"),
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
         coverage.build_index();
@@ -763,6 +771,7 @@ mod tests {
             execution_count: 10,
             coverage_percentage: 100.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("c4"),
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
         coverage.build_index();
@@ -792,6 +801,7 @@ mod tests {
             execution_count: 10,
             coverage_percentage: 85.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple("f"),
         }];
         coverage.functions.insert(PathBuf::from("test.rs"), funcs);
         coverage.build_index();

@@ -7,6 +7,30 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+/// Normalized function name with multiple matching variants
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NormalizedFunctionName {
+    /// Full normalized path: "module::Struct::method"
+    pub full_path: String,
+
+    /// Just the method name: "method"
+    pub method_name: String,
+
+    /// Original demangled name (for debugging)
+    pub original: String,
+}
+
+impl NormalizedFunctionName {
+    /// Create a simple NormalizedFunctionName for testing
+    pub fn simple(name: &str) -> Self {
+        Self {
+            full_path: name.to_string(),
+            method_name: name.to_string(),
+            original: name.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FunctionCoverage {
     pub name: String,
@@ -14,6 +38,8 @@ pub struct FunctionCoverage {
     pub execution_count: u64,
     pub coverage_percentage: f64,
     pub uncovered_lines: Vec<usize>,
+    /// Normalized name variants for matching (not serialized)
+    pub normalized: NormalizedFunctionName,
 }
 
 #[derive(Debug, Clone)]
@@ -75,11 +101,13 @@ fn demangle_function_name(name: &str) -> String {
 ///
 /// Removes generic type parameters and crate hash IDs to
 /// group multiple monomorphizations of the same function.
+/// Also extracts the method name for flexible matching.
 ///
 /// For example:
-/// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> `debtmap::Foo::bar`
-/// - `std::collections::HashMap<K,V>::insert` -> `std::collections::HashMap::insert`
-fn normalize_demangled_name(demangled: &str) -> String {
+/// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> full_path: `debtmap::Foo::bar`, method_name: `bar`
+/// - `std::collections::HashMap<K,V>::insert` -> full_path: `std::collections::HashMap::insert`, method_name: `insert`
+/// - `<Struct as Trait>::method` -> full_path: `Struct as Trait::method`, method_name: `method`
+fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
     // Remove crate hash from names like <debtmap[hash]::...>::method
     // Pattern: <crate[hash]::rest>::method -> crate::rest::method
     let without_hash = if demangled.starts_with('<') {
@@ -132,7 +160,14 @@ fn normalize_demangled_name(demangled: &str) -> String {
         }
     }
 
-    result
+    // Extract method name (final segment after last ::)
+    let method_name = result.rsplit("::").next().unwrap_or(&result).to_string();
+
+    NormalizedFunctionName {
+        full_path: result,
+        method_name,
+        original: demangled.to_string(),
+    }
 }
 
 pub fn parse_lcov_file(path: &Path) -> Result<LcovData> {
@@ -179,16 +214,17 @@ pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Res
                 let demangled = demangle_function_name(&name);
                 let normalized = normalize_demangled_name(&demangled);
 
-                // Use normalized name as key to consolidate duplicates
+                // Use normalized full_path as key to consolidate duplicates
                 // If the entry already exists, keep the existing one (same line, same function)
                 file_functions
-                    .entry(normalized.clone())
+                    .entry(normalized.full_path.clone())
                     .or_insert_with(|| FunctionCoverage {
-                        name: normalized,
+                        name: normalized.full_path.clone(),
                         start_line: start_line as usize,
                         execution_count: 0,
                         coverage_percentage: 0.0,
                         uncovered_lines: Vec::new(),
+                        normalized,
                     });
             }
 
@@ -197,7 +233,7 @@ pub fn parse_lcov_file_with_progress(path: &Path, progress: &ProgressBar) -> Res
                 let demangled = demangle_function_name(&name);
                 let normalized = normalize_demangled_name(&demangled);
 
-                if let Some(func) = file_functions.get_mut(&normalized) {
+                if let Some(func) = file_functions.get_mut(&normalized.full_path) {
                     // Keep the maximum execution count when consolidating
                     func.execution_count = func.execution_count.max(count);
                     // If no line data is available, use execution count to determine coverage
@@ -827,33 +863,45 @@ mod tests {
 
         #[test]
         fn test_normalize_removes_generics() {
-            assert_eq!(
-                normalize_demangled_name("HashMap<String, i32>::insert"),
-                "HashMap::insert"
-            );
+            let result = normalize_demangled_name("HashMap<String, i32>::insert");
+            assert_eq!(result.full_path, "HashMap::insert");
+            assert_eq!(result.method_name, "insert");
 
-            assert_eq!(normalize_demangled_name("Vec<T>::push"), "Vec::push");
+            let result = normalize_demangled_name("Vec<T>::push");
+            assert_eq!(result.full_path, "Vec::push");
+            assert_eq!(result.method_name, "push");
 
-            assert_eq!(
-                normalize_demangled_name("simple_function"),
-                "simple_function"
-            );
+            let result = normalize_demangled_name("simple_function");
+            assert_eq!(result.full_path, "simple_function");
+            assert_eq!(result.method_name, "simple_function");
         }
 
         #[test]
         fn test_normalize_preserves_module_path() {
-            assert_eq!(
-                normalize_demangled_name("std::collections::HashMap<K,V>::insert"),
-                "std::collections::HashMap::insert"
-            );
+            let result = normalize_demangled_name("std::collections::HashMap<K,V>::insert");
+            assert_eq!(result.full_path, "std::collections::HashMap::insert");
+            assert_eq!(result.method_name, "insert");
         }
 
         #[test]
         fn test_normalize_removes_crate_hash() {
+            let result = normalize_demangled_name("<debtmap[71f4b4990cdcf1ab]::Foo>::bar");
+            assert_eq!(result.full_path, "debtmap::Foo::bar");
+            assert_eq!(result.method_name, "bar");
+        }
+
+        #[test]
+        fn test_normalize_extracts_method_name() {
+            let result =
+                normalize_demangled_name("prodigy::cook::CommitTracker::create_auto_commit");
             assert_eq!(
-                normalize_demangled_name("<debtmap[71f4b4990cdcf1ab]::Foo>::bar"),
-                "debtmap::Foo::bar"
+                result.full_path,
+                "prodigy::cook::CommitTracker::create_auto_commit"
             );
+            assert_eq!(result.method_name, "create_auto_commit");
+
+            let result = normalize_demangled_name("<Foo as Bar>::method");
+            assert_eq!(result.method_name, "method");
         }
     }
 
@@ -1086,6 +1134,11 @@ end_of_record
                 execution_count: 5,
                 coverage_percentage: 60.0,
                 uncovered_lines: vec![12, 13],
+                normalized: NormalizedFunctionName {
+                    full_path: name.to_string(),
+                    method_name: name.to_string(),
+                    original: name.to_string(),
+                },
             }]
         }
 
@@ -1463,14 +1516,20 @@ end_of_record
                 let mut functions = HashMap::new();
 
                 for i in 0..count {
+                    let func_name = format!("func_{}", i);
                     functions.insert(
                         PathBuf::from(format!("src/file_{}.rs", i)),
                         vec![FunctionCoverage {
-                            name: format!("func_{}", i),
+                            name: func_name.clone(),
                             start_line: 10,
                             execution_count: 5,
                             coverage_percentage: 60.0,
                             uncovered_lines: vec![12, 13],
+                            normalized: NormalizedFunctionName {
+                                full_path: func_name.clone(),
+                                method_name: func_name.clone(),
+                                original: func_name.clone(),
+                            },
                         }],
                     );
                 }
