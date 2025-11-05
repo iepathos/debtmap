@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 /// Normalize a path by removing leading ./
-fn normalize_path(path: &Path) -> PathBuf {
+pub fn normalize_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
     let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
     PathBuf::from(cleaned)
@@ -145,12 +145,24 @@ impl CoverageIndex {
     /// This is the primary lookup method and should be used when the exact
     /// function name is known. Also tries path normalization strategies.
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
+        log::debug!(
+            "Looking up coverage for function '{}' in file '{}'",
+            function_name,
+            file.display()
+        );
+
         // O(1) exact match: file lookup + function lookup
         if let Some(file_functions) = self.by_file.get(file) {
             if let Some(f) = file_functions.get(function_name) {
+                log::debug!(
+                    "✓ Found via exact match: {}% coverage",
+                    f.coverage_percentage
+                );
                 return Some(f.coverage_percentage / 100.0);
             }
         }
+
+        log::debug!("Exact match failed, trying path strategies...");
 
         // O(files) fallback strategies - much faster than O(functions)
         self.find_by_path_strategies(file, function_name)
@@ -174,61 +186,101 @@ impl CoverageIndex {
     ) -> Option<&FunctionCoverage> {
         let normalized_query = normalize_path(query_path);
 
+        log::debug!("Strategy 1: Suffix matching (query.ends_with(lcov_file))");
         // Strategy 1: Suffix matching - iterate over FILES not functions
         for file_path in &self.file_paths {
             if query_path.ends_with(file_path) {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 // O(1) lookup once we find the file
                 if let Some(file_functions) = self.by_file.get(file_path) {
                     // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {
                         if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
                             return Some(func);
                         }
                     }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("Strategy 2: Reverse suffix matching (lcov_file.ends_with(query))");
         // Strategy 2: Reverse suffix matching - iterate over FILES
         for file_path in &self.file_paths {
             if file_path.ends_with(&normalized_query) {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
                     // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {
                         if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
                             return Some(func);
                         }
                     }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("Strategy 3: Normalized path equality");
         // Strategy 3: Normalized equality - iterate over FILES
         for file_path in &self.file_paths {
             if normalize_path(file_path) == normalized_query {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
                     // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {
                         if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
                             return Some(func);
                         }
                     }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("✗ All path strategies failed");
         None
     }
 

@@ -457,6 +457,32 @@ pub enum Commands {
         #[arg(long, short = 'q')]
         quiet: bool,
     },
+
+    /// Explain coverage detection for a specific function (debugging tool)
+    ExplainCoverage {
+        /// Path to the codebase to analyze
+        path: PathBuf,
+
+        /// LCOV coverage file
+        #[arg(long = "coverage-file", visible_alias = "lcov")]
+        coverage_file: PathBuf,
+
+        /// Function name to explain (e.g., "create_auto_commit")
+        #[arg(long = "function")]
+        function_name: String,
+
+        /// File path containing the function (optional, helps narrow search)
+        #[arg(long = "file")]
+        file_path: Option<PathBuf>,
+
+        /// Show all attempted matching strategies
+        #[arg(long = "verbose", short = 'v')]
+        verbose: bool,
+
+        /// Output format
+        #[arg(short = 'f', long = "format", value_enum, default_value = "text")]
+        format: DebugFormatArg,
+    },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]

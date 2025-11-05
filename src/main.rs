@@ -546,6 +546,32 @@ fn main() -> Result<()> {
             debtmap::commands::validate_improvement::validate_improvement(config)?;
             Ok(())
         }
+        Commands::ExplainCoverage {
+            path,
+            coverage_file,
+            function_name,
+            file_path,
+            verbose,
+            format,
+        } => {
+            let config = debtmap::commands::explain_coverage::ExplainCoverageConfig {
+                path,
+                coverage_file,
+                function_name,
+                file_path,
+                verbose,
+                format: match format {
+                    debtmap::cli::DebugFormatArg::Text => {
+                        debtmap::commands::explain_coverage::DebugFormat::Text
+                    }
+                    debtmap::cli::DebugFormatArg::Json => {
+                        debtmap::commands::explain_coverage::DebugFormat::Json
+                    }
+                },
+            };
+            debtmap::commands::explain_coverage::explain_coverage(config)?;
+            Ok(())
+        }
     }
 }
 
