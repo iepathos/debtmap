@@ -1095,6 +1095,38 @@ max_combined_reduction = 0.3
 
 This reduces false positives for repetitive code patterns.
 
+**Understanding entropy-adjusted output:**
+
+When entropy analysis detects repetitive patterns, detailed output (`-vv`) shows both original and adjusted complexity:
+
+```bash
+debtmap analyze . -vv --top 5
+```
+
+**Example output for repetitive validation function:**
+```
+#15 SCORE: 68.2 [HIGH]
+├─ COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+```
+
+**Interpreting the adjustment:**
+- `cyclomatic=20`: Original complexity before entropy adjustment
+- `dampened: 14`: Adjusted complexity (20 × 0.70 = 14)
+- `factor: 0.70`: Dampening factor (30% reduction applied)
+- `entropy: 0.30`: Low entropy indicates repetitive patterns
+- `repetition: 95%`: High pattern repetition detected
+
+**When no dampening is applied:**
+```
+#5 SCORE: 85.5 [CRITICAL]
+├─ COMPLEXITY: cyclomatic=15, est_branches=30, cognitive=22, nesting=4
+```
+
+No "dampened" indicator means the function has diverse logic without repetitive patterns, so the full complexity is used for scoring.
+
+See [Entropy Analysis](entropy-analysis.md#interpreting-entropy-adjusted-output) for more details.
+
 ### Custom Scoring Weights
 
 ```toml

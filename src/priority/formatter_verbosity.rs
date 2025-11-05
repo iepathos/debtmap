@@ -729,10 +729,11 @@ fn format_complexity_summary(
         if let Some(ref entropy) = item.entropy_details {
             writeln!(
                 output,
-                "├─ {} cyclomatic={} (adj:{}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+                "├─ {} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
                 "COMPLEXITY:".bright_blue(),
                 cyclomatic.to_string().yellow(),
                 entropy.adjusted_complexity.to_string().yellow(),
+                entropy.dampening_factor,
                 branch_count.to_string().yellow(),
                 cognitive.to_string().yellow(),
                 nesting.to_string().yellow(),
@@ -1327,7 +1328,7 @@ mod tests {
             dampening_factor: 0.8,
         });
         format_complexity_summary(&mut output, &item, &formatter);
-        assert!(output.contains("(adj:15)"));
+        assert!(output.contains("(dampened: 15, factor: 0.80)"));
         assert!(output.contains("entropy=0.75"));
     }
 
@@ -1509,6 +1510,156 @@ mod tests {
                 "Should show dead code warning when function has 0 callers but has callees"
             );
         }
+    }
+
+    #[test]
+    fn test_entropy_dampening_factor_present_when_entropy_data_exists() {
+        // Spec 166: Verify dampening factor is present when entropy data exists
+        let mut item = create_test_item();
+        item.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.65,
+            pattern_repetition: 0.35,
+            original_complexity: 20,
+            adjusted_complexity: 16,
+            dampening_factor: 0.8,
+        });
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
+
+        // Should show dampening factor in entropy impact line
+        assert!(
+            output.contains("20% dampening"),
+            "Output should contain dampening percentage when entropy data exists"
+        );
+        assert!(
+            output.contains("entropy: 0.65"),
+            "Output should contain entropy score when entropy data exists"
+        );
+        assert!(
+            output.contains("repetition: 35%"),
+            "Output should contain pattern repetition when entropy data exists"
+        );
+    }
+
+    #[test]
+    fn test_entropy_format_allows_calculation_reconstruction() {
+        // Spec 166: Verify format allows reconstruction of calculation
+        let mut item = create_test_item();
+        item.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.75,
+            pattern_repetition: 0.25,
+            original_complexity: 20,
+            adjusted_complexity: 15,
+            dampening_factor: 0.75,
+        });
+        item.cyclomatic_complexity = 20;
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
+
+        // Should show both original and dampened complexity
+        assert!(
+            output.contains("cyclomatic=20"),
+            "Output should show original complexity for reconstruction"
+        );
+        assert!(
+            output.contains("dampened: 15"),
+            "Output should show adjusted complexity for reconstruction"
+        );
+        assert!(
+            output.contains("factor: 0.75"),
+            "Output should show dampening factor for reconstruction"
+        );
+
+        // Verify calculation can be reconstructed: 20 * 0.75 = 15
+        let original = 20.0;
+        let factor = 0.75;
+        let expected_adjusted = (original * factor) as u32;
+        assert_eq!(
+            expected_adjusted, 15,
+            "Calculation should be reconstructable from displayed values"
+        );
+    }
+
+    #[test]
+    fn test_entropy_format_degrades_gracefully_without_data() {
+        // Spec 166: Verify format degrades gracefully when no entropy data available
+        let mut item = create_test_item();
+        item.entropy_details = None;
+        item.cyclomatic_complexity = 20;
+        item.cognitive_complexity = 30;
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
+
+        // Should show basic complexity without entropy information
+        assert!(
+            output.contains("cyclomatic=20"),
+            "Output should show cyclomatic complexity even without entropy data"
+        );
+        assert!(
+            output.contains("cognitive=30"),
+            "Output should show cognitive complexity even without entropy data"
+        );
+
+        // Should NOT show entropy-specific fields when no entropy data
+        assert!(
+            !output.contains("dampened:"),
+            "Output should not show 'dampened:' when no entropy data exists"
+        );
+        assert!(
+            !output.contains("dampening"),
+            "Output should not show 'dampening' when no entropy data exists"
+        );
+        assert!(
+            !output.contains("Entropy Impact:"),
+            "Output should not show 'Entropy Impact:' section when no entropy data exists"
+        );
+    }
+
+    #[test]
+    fn test_entropy_adjustment_explanation_clarity() {
+        // Spec 166: Verify users can understand the adjustment from the output
+        let mut item = create_test_item();
+        item.entropy_details = Some(EntropyDetails {
+            entropy_score: 0.6,
+            pattern_repetition: 0.4,
+            original_complexity: 25,
+            adjusted_complexity: 20,
+            dampening_factor: 0.8,
+        });
+        item.cyclomatic_complexity = 25;
+
+        let mut output = String::new();
+        format_priority_item_with_verbosity(&mut output, 1, &item, 2);
+
+        // The output should clearly explain the adjustment
+        // User should be able to understand:
+        // 1. Original complexity was 25
+        // 2. It was dampened to 20
+        // 3. The dampening factor was 0.8 (20% reduction)
+        // 4. This was due to pattern repetition (40%)
+
+        assert!(
+            output.contains("cyclomatic=25") && output.contains("dampened: 20"),
+            "User should see both original and adjusted values for clarity"
+        );
+
+        // Check entropy impact section explains the reduction
+        let has_entropy_explanation = output.contains("20% dampening")
+            && output.contains("entropy: 0.60")
+            && output.contains("repetition: 40%");
+        assert!(
+            has_entropy_explanation,
+            "Output should explain the dampening with entropy and repetition details"
+        );
+
+        // Verify the explanation is human-readable
+        assert!(
+            output.contains("Entropy Impact:"),
+            "Output should have clear section header for entropy impact"
+        );
     }
 
     // Helper function to create a test UnifiedDebtItem
