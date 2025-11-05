@@ -348,6 +348,73 @@ debtmap analyze . --semantic-off
 
 **Note**: The `--semantic-off` flag disables all semantic analysis features, including entropy-based complexity adjustments. This is useful when you want raw cyclomatic complexity without any dampening.
 
+## Interpreting Entropy-Adjusted Output
+
+When entropy analysis detects repetitive patterns, debtmap displays both the original and adjusted complexity values to help you understand the adjustment. This transparency allows you to verify the analysis and understand why certain code receives lower priority.
+
+### Output Format
+
+When viewing detailed output (verbosity level 2 with `-vv`), entropy-adjusted complexity is shown in the **COMPLEXITY** section:
+
+```
+COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+```
+
+And in the **Entropy Impact** scoring section:
+
+```
+  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+```
+
+### Understanding the Values
+
+**cyclomatic=20**: Original cyclomatic complexity before adjustment
+**dampened: 14**: Adjusted complexity after entropy analysis (20 × 0.70 = 14)
+**factor: 0.70**: The dampening factor applied (0.70 = 30% reduction)
+**entropy=0.30**: Shannon entropy score (0.0-1.0, lower = more repetitive)
+**repetition: 95%**: Pattern repetition score (higher = more repetitive)
+
+### Reconstructing the Calculation
+
+You can verify the adjustment by multiplying:
+```
+original_complexity × dampening_factor = adjusted_complexity
+20 × 0.70 = 14
+```
+
+The dampening percentage shown in the Entropy Impact section is:
+```
+dampening_percentage = (1.0 - dampening_factor) × 100%
+(1.0 - 0.70) × 100% = 30%
+```
+
+### When Entropy Data is Unavailable
+
+If a function is too small for entropy analysis (< 20 tokens) or entropy is disabled, the output shows complexity without dampening:
+
+```
+COMPLEXITY: cyclomatic=5, est_branches=10, cognitive=8, nesting=2
+```
+
+No "dampened" or "factor" values are shown, indicating the raw complexity is used for scoring.
+
+### Example Output Comparison
+
+**Before entropy-adjustment:**
+```
+#1 SCORE: 95.5 [CRITICAL]
+├─ COMPLEXITY: cyclomatic=20, est_branches=40, cognitive=25, nesting=3
+```
+
+**After entropy-adjustment:**
+```
+#15 SCORE: 68.2 [HIGH]
+├─ COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+```
+
+The item dropped from rank #1 to #15 because entropy analysis detected the high complexity was primarily due to repetitive validation patterns rather than genuine cognitive complexity.
+
 ## Understanding the Impact
 
 ### Measuring False Positive Reduction
