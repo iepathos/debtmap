@@ -57,6 +57,42 @@ fn format_default_with_verbosity(
     format_default_with_config(analysis, limit, verbosity, FormattingConfig::default())
 }
 
+// Pure function to generate output legend explaining header tags
+// Displayed once at the start of recommendations when verbosity >= 1
+fn generate_legend(verbosity: u8, has_coverage_data: bool) -> String {
+    if verbosity == 0 || !has_coverage_data {
+        return String::new();
+    }
+
+    let mut legend = String::new();
+    writeln!(legend, "{}", "Legend:".bright_white().bold()).unwrap();
+    writeln!(
+        legend,
+        "  {} Numeric priority (higher = more important)",
+        "SCORE:".bright_yellow()
+    )
+    .unwrap();
+
+    if has_coverage_data {
+        writeln!(
+            legend,
+            "  {} Coverage status (how well tested)",
+            "[ERROR/WARN/INFO/OK]:".bright_cyan()
+        )
+        .unwrap();
+    }
+
+    writeln!(
+        legend,
+        "  {} Item severity (fix urgency)",
+        "[CRITICAL/HIGH/MEDIUM/LOW]:".bright_magenta()
+    )
+    .unwrap();
+    writeln!(legend).unwrap();
+
+    legend
+}
+
 fn format_default_with_config(
     analysis: &UnifiedAnalysis,
     limit: usize,
@@ -92,6 +128,12 @@ fn format_default_with_config(
     )
     .unwrap();
     writeln!(output).unwrap();
+
+    // Add legend if verbosity >= 1 and coverage data is available
+    let legend = generate_legend(verbosity, analysis.has_coverage_data);
+    if !legend.is_empty() {
+        output.push_str(&legend);
+    }
 
     for (idx, item) in top_items.iter().enumerate() {
         format_mixed_priority_item(
@@ -547,7 +589,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
             break;
         }
         let rank = total_items - bottom_items.len() + idx + 1;
-        format_priority_item(&mut output, rank, item);
+        format_priority_item(&mut output, rank, item, analysis.has_coverage_data);
         writeln!(output).unwrap();
     }
 
@@ -1494,9 +1536,14 @@ fn format_truncated_list(items: &[String], max_display: usize) -> String {
     }
 }
 
-pub fn format_priority_item(output: &mut String, rank: usize, item: &UnifiedDebtItem) {
+pub fn format_priority_item(
+    output: &mut String,
+    rank: usize,
+    item: &UnifiedDebtItem,
+    has_coverage_data: bool,
+) {
     // Use functional composition to format different sections
-    let format_context = create_format_context(rank, item);
+    let format_context = create_format_context(rank, item, has_coverage_data);
 
     // Format each section using pure functions composed together
     let formatted_sections = generate_formatted_sections(&format_context);
@@ -1951,7 +1998,7 @@ mod tests {
     fn test_format_priority_item_basic() {
         let mut output = String::new();
         let item = create_test_item(5.0);
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("#1 SCORE: 5.0"));
         assert!(plain.contains("test_func()"));
@@ -1964,7 +2011,7 @@ mod tests {
         let mut item = create_test_item(8.0);
         item.cyclomatic_complexity = 15;
         item.cognitive_complexity = 20;
-        format_priority_item(&mut output, 2, &item);
+        format_priority_item(&mut output, 2, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("COMPLEXITY:"));
         assert!(plain.contains("cyclomatic=15"));
@@ -1977,7 +2024,7 @@ mod tests {
         item.upstream_dependencies = 3;
         item.downstream_dependencies = 2;
         item.upstream_callers = vec!["caller1".to_string()];
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("DEPENDENCIES:"));
         // New format shows count in parentheses
@@ -1990,7 +2037,7 @@ mod tests {
         let mut item = create_test_item(6.0);
         item.upstream_callers = vec!["caller1".to_string(), "caller2".to_string()];
         item.upstream_dependencies = 2;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         // New format shows "Called by" with count
         assert!(plain.contains("Called by") || plain.contains("caller1"));
@@ -2012,7 +2059,7 @@ mod tests {
             "c7".to_string(),
         ];
         item.upstream_dependencies = 7;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         // New format shows "showing 5 of 7"
         assert!(plain.contains("showing 5 of 7"));
@@ -2024,7 +2071,7 @@ mod tests {
         let mut item = create_test_item(7.5);
         item.downstream_callees = vec!["func1".to_string(), "func2".to_string()];
         item.downstream_dependencies = 2;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         // New format shows "Calls" with count
         assert!(plain.contains("Calls") || plain.contains("func1"));
@@ -2041,7 +2088,7 @@ mod tests {
         item.downstream_callees = vec![];
         item.upstream_dependencies = 0;
         item.downstream_dependencies = 0;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
 
         // Must show DEPENDENCIES section
@@ -2072,7 +2119,7 @@ mod tests {
         item.downstream_callees = vec!["some_function".to_string()];
         item.upstream_dependencies = 0;
         item.downstream_dependencies = 1;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
 
         assert!(plain.contains("DEPENDENCIES:"));
@@ -2089,7 +2136,7 @@ mod tests {
         item.downstream_callees = vec![];
         item.upstream_dependencies = 1;
         item.downstream_dependencies = 0;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
 
         assert!(plain.contains("DEPENDENCIES:"));
@@ -2107,7 +2154,7 @@ mod tests {
             cognitive: 7,
             usage_hints: vec!["Consider removing".to_string()],
         };
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("VISIBILITY:"));
         assert!(plain.contains("Consider removing"));
@@ -2117,7 +2164,7 @@ mod tests {
     fn test_format_priority_item_critical_severity() {
         let mut output = String::new();
         let item = create_test_item(9.5);
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("[CRITICAL]"));
     }
@@ -2126,7 +2173,7 @@ mod tests {
     fn test_format_priority_item_low_severity() {
         let mut output = String::new();
         let item = create_test_item(2.0);
-        format_priority_item(&mut output, 3, &item);
+        format_priority_item(&mut output, 3, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(plain.contains("[LOW]"));
     }
@@ -2137,7 +2184,7 @@ mod tests {
         let mut item = create_test_item(3.0);
         item.cyclomatic_complexity = 0;
         item.cognitive_complexity = 0;
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         assert!(!plain.contains("COMPLEXITY:"));
     }
@@ -2151,7 +2198,7 @@ mod tests {
         // Clear the caller/callee lists too
         item.upstream_callers = vec![];
         item.downstream_callees = vec![];
-        format_priority_item(&mut output, 1, &item);
+        format_priority_item(&mut output, 1, &item, false);
         let plain = strip_ansi_codes(&output);
         // Per spec 117: DEPENDENCIES section should ALWAYS appear
         assert!(
@@ -2278,7 +2325,7 @@ mod tests {
         ];
         item.downstream_callees = vec!["callee1".to_string()];
 
-        let context = create_format_context(1, &item);
+        let context = create_format_context(1, &item, false);
         // Use explicit formatting config to ensure deterministic behavior in tests
         let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
@@ -2297,7 +2344,7 @@ mod tests {
         item.upstream_callers = vec![];
         item.downstream_callees = vec!["callee1".to_string(), "callee2".to_string()];
 
-        let context = create_format_context(1, &item);
+        let context = create_format_context(1, &item, false);
         // Use explicit formatting config to ensure deterministic behavior in tests
         let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
@@ -2318,7 +2365,7 @@ mod tests {
             "my_function".to_string(),
         ];
 
-        let context = create_format_context(1, &item);
+        let context = create_format_context(1, &item, false);
         // Use explicit formatting config to ensure deterministic behavior in tests
         let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
@@ -2349,7 +2396,7 @@ mod tests {
             "caller7".to_string(),
         ];
 
-        let context = create_format_context(1, &item);
+        let context = create_format_context(1, &item, false);
         // Use explicit formatting config to ensure deterministic behavior in tests
         let formatting_config = FormattingConfig::new(ColorMode::Never);
         let section = format_dependencies_section_with_config(&context, formatting_config);
@@ -2697,5 +2744,189 @@ mod tests {
         assert!(clean_output.contains("SCORE:"));
         // Check that Final: line exists (actual values may vary)
         assert!(clean_output.contains("Final:"));
+    }
+
+    // ============================================================================
+    // Header Format and Legend Tests (Spec 169)
+    // ============================================================================
+
+    #[test]
+    fn test_header_visual_separation() {
+        let mut output = String::new();
+        let mut item = create_test_item(7.5);
+        item.transitive_coverage = Some(crate::priority::TransitiveCoverage {
+            direct: 0.0,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        format_priority_item(&mut output, 1, &item, true);
+        let plain = strip_ansi_codes(&output);
+
+        // Check that header contains score
+        assert!(plain.contains("SCORE:"));
+        // Check for visual separator (bullet)
+        assert!(plain.contains("•"));
+    }
+
+    #[test]
+    fn test_header_coverage_tag_with_data() {
+        let mut output = String::new();
+        let mut item = create_test_item(8.0);
+        item.transitive_coverage = Some(crate::priority::TransitiveCoverage {
+            direct: 0.0,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+
+        format_priority_item(&mut output, 1, &item, true);
+        let plain = strip_ansi_codes(&output);
+
+        // Should show ERROR UNTESTED tag for 0% coverage
+        assert!(plain.contains("[ERROR UNTESTED]"));
+    }
+
+    #[test]
+    fn test_header_coverage_tag_without_data() {
+        let mut output = String::new();
+        let item = create_test_item(8.0);
+
+        format_priority_item(&mut output, 1, &item, false);
+        let plain = strip_ansi_codes(&output);
+
+        // Should not show coverage tag when has_coverage_data is false
+        assert!(!plain.contains("[ERROR UNTESTED]"));
+        assert!(!plain.contains("[WARN"));
+        assert!(!plain.contains("[OK"));
+    }
+
+    #[test]
+    fn test_header_tag_ordering() {
+        let mut output = String::new();
+        let mut item = create_test_item(9.0);
+        item.transitive_coverage = Some(crate::priority::TransitiveCoverage {
+            direct: 0.15,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+
+        format_priority_item(&mut output, 1, &item, true);
+        let plain = strip_ansi_codes(&output);
+
+        // Find positions of each component
+        let score_pos = plain.find("SCORE").unwrap();
+        let coverage_pos = plain
+            .find("[WARN LOW]")
+            .or_else(|| plain.find("[ERROR"))
+            .unwrap();
+        let severity_pos = plain
+            .find("[CRITICAL]")
+            .or_else(|| plain.find("[HIGH]"))
+            .unwrap();
+
+        // Verify ordering: SCORE < COVERAGE < SEVERITY
+        assert!(score_pos < coverage_pos);
+        assert!(coverage_pos < severity_pos);
+    }
+
+    #[test]
+    fn test_legend_generation_with_coverage() {
+        let legend = generate_legend(1, true);
+
+        assert!(legend.contains("Legend:"));
+        assert!(legend.contains("SCORE:"));
+        assert!(legend.contains("Numeric priority"));
+        assert!(legend.contains("[ERROR/WARN/INFO/OK]:"));
+        assert!(legend.contains("Coverage status"));
+        assert!(legend.contains("[CRITICAL/HIGH/MEDIUM/LOW]:"));
+        assert!(legend.contains("Item severity"));
+    }
+
+    #[test]
+    fn test_legend_generation_without_coverage() {
+        let legend = generate_legend(1, false);
+
+        // Should be empty when no coverage data
+        assert!(legend.is_empty());
+    }
+
+    #[test]
+    fn test_legend_generation_verbosity_zero() {
+        let legend = generate_legend(0, true);
+
+        // Should be empty when verbosity is 0
+        assert!(legend.is_empty());
+    }
+
+    #[test]
+    fn test_coverage_info_classification() {
+        use crate::priority::TransitiveCoverage;
+
+        // Test 0% coverage
+        let mut item = create_test_item(5.0);
+        item.transitive_coverage = Some(TransitiveCoverage {
+            direct: 0.0,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let context = create_format_context(1, &item, true);
+        assert!(context.coverage_info.is_some());
+        let coverage = context.coverage_info.unwrap();
+        assert!(coverage.tag.contains("[ERROR UNTESTED]"));
+
+        // Test low coverage (15%)
+        let mut item = create_test_item(5.0);
+        item.transitive_coverage = Some(TransitiveCoverage {
+            direct: 0.15,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let context = create_format_context(1, &item, true);
+        assert!(context.coverage_info.is_some());
+        let coverage = context.coverage_info.unwrap();
+        assert!(coverage.tag.contains("[WARN LOW]"));
+
+        // Test partial coverage (35%)
+        let mut item = create_test_item(5.0);
+        item.transitive_coverage = Some(TransitiveCoverage {
+            direct: 0.35,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let context = create_format_context(1, &item, true);
+        assert!(context.coverage_info.is_some());
+        let coverage = context.coverage_info.unwrap();
+        assert!(coverage.tag.contains("[WARN PARTIAL]"));
+
+        // Test good coverage (85%)
+        let mut item = create_test_item(5.0);
+        item.transitive_coverage = Some(TransitiveCoverage {
+            direct: 0.85,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let context = create_format_context(1, &item, true);
+        assert!(context.coverage_info.is_some());
+        let coverage = context.coverage_info.unwrap();
+        assert!(coverage.tag.contains("[OK GOOD]"));
+
+        // Test excellent coverage (98%)
+        let mut item = create_test_item(5.0);
+        item.transitive_coverage = Some(TransitiveCoverage {
+            direct: 0.98,
+            transitive: 0.0,
+            propagated_from: vec![],
+            uncovered_lines: vec![],
+        });
+        let context = create_format_context(1, &item, true);
+        assert!(context.coverage_info.is_some());
+        let coverage = context.coverage_info.unwrap();
+        assert!(coverage.tag.contains("[OK EXCELLENT]"));
     }
 }

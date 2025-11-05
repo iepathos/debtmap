@@ -2,7 +2,11 @@ use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{DebtType, FunctionVisibility, UnifiedDebtItem};
 
 // Pure function to create formatting context
-pub(crate) fn create_format_context(rank: usize, item: &UnifiedDebtItem) -> FormatContext {
+pub(crate) fn create_format_context(
+    rank: usize,
+    item: &UnifiedDebtItem,
+    has_coverage_data: bool,
+) -> FormatContext {
     FormatContext {
         rank,
         score: item.unified_score.final_score,
@@ -13,6 +17,7 @@ pub(crate) fn create_format_context(rank: usize, item: &UnifiedDebtItem) -> Form
         complexity_info: ComplexityInfo::from_item(item),
         dependency_info: DependencyInfo::from_item(item),
         debt_specific_info: DebtSpecificInfo::from_item(item),
+        coverage_info: CoverageInfo::from_item(item, has_coverage_data),
         rationale: item.recommendation.rationale.clone(),
     }
 }
@@ -28,6 +33,7 @@ pub(crate) struct FormatContext {
     pub complexity_info: ComplexityInfo,
     pub dependency_info: DependencyInfo,
     pub debt_specific_info: DebtSpecificInfo,
+    pub coverage_info: Option<CoverageInfo>,
     pub rationale: String,
 }
 
@@ -138,5 +144,59 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
         FunctionVisibility::Private => "private",
         FunctionVisibility::Crate => "crate-public",
         FunctionVisibility::Public => "public",
+    }
+}
+
+pub(crate) struct CoverageInfo {
+    pub tag: String,
+    pub color: colored::Color,
+}
+
+impl CoverageInfo {
+    fn from_item(item: &UnifiedDebtItem, has_coverage_data: bool) -> Option<Self> {
+        if !has_coverage_data {
+            return None;
+        }
+
+        if let Some(ref trans_cov) = item.transitive_coverage {
+            let coverage_pct = trans_cov.direct * 100.0;
+            Some(Self::from_coverage_percentage(coverage_pct))
+        } else if item.unified_score.coverage_factor >= 10.0 {
+            Some(Self {
+                tag: "[ERROR UNTESTED]".to_string(),
+                color: colored::Color::BrightRed,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn from_coverage_percentage(coverage_pct: f64) -> Self {
+        match coverage_pct {
+            0.0 => Self {
+                tag: "[ERROR UNTESTED]".to_string(),
+                color: colored::Color::BrightRed,
+            },
+            c if c < 20.0 => Self {
+                tag: "[WARN LOW]".to_string(),
+                color: colored::Color::Yellow,
+            },
+            c if c < 50.0 => Self {
+                tag: "[WARN PARTIAL]".to_string(),
+                color: colored::Color::Yellow,
+            },
+            c if c < 80.0 => Self {
+                tag: "[INFO MODERATE]".to_string(),
+                color: colored::Color::Cyan,
+            },
+            c if c < 95.0 => Self {
+                tag: "[OK GOOD]".to_string(),
+                color: colored::Color::Green,
+            },
+            _ => Self {
+                tag: "[OK EXCELLENT]".to_string(),
+                color: colored::Color::BrightGreen,
+            },
+        }
     }
 }

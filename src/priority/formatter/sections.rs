@@ -32,12 +32,32 @@ pub(crate) fn generate_formatted_sections(context: &FormatContext) -> FormattedS
     }
 }
 
-// Pure function to format header section
+// Pure function to format header section with visual separators
+// Tag order: SCORE → COVERAGE → SEVERITY
 fn format_header_section(context: &FormatContext) -> String {
+    let separator = " • ".dimmed();
+
+    // Build coverage tag if available
+    let (coverage_tag, severity_separator) = if let Some(ref coverage_info) = context.coverage_info
+    {
+        (
+            format!(
+                "{}{}",
+                separator,
+                coverage_info.tag.color(coverage_info.color).bold()
+            ),
+            format!("{}", separator),
+        )
+    } else {
+        (String::new(), " ".to_string())
+    };
+
     format!(
-        "#{} {} [{}]",
+        "#{} {}{}{}[{}]",
         context.rank,
         format!("SCORE: {}", score_formatter::format_score(context.score)).bright_yellow(),
+        coverage_tag,
+        severity_separator,
         context
             .severity_info
             .label
