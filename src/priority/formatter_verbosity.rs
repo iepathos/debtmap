@@ -77,10 +77,10 @@ fn format_coverage_factor_description(
 // Pure function to get gap severity indicator based on gap percentage
 fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
     match gap_percentage {
-        p if p <= 25.0 => "[WARN] LOW",
-        p if p <= 50.0 => "[WARN] MODERATE",
-        p if p <= 75.0 => "[ERROR] HIGH",
-        _ => "[CRITICAL] CRITICAL",
+        p if p <= 25.0 => "[WARN LOW]",
+        p if p <= 50.0 => "[WARN MODERATE]",
+        p if p <= 75.0 => "[ERROR HIGH]",
+        _ => "[CRITICAL]",
     }
 }
 
@@ -1101,24 +1101,48 @@ mod tests {
     #[test]
     fn test_get_gap_severity_indicator() {
         // LOW: 1-25%
-        assert_eq!(get_gap_severity_indicator(0.0), "[WARN] LOW");
-        assert_eq!(get_gap_severity_indicator(10.0), "[WARN] LOW");
-        assert_eq!(get_gap_severity_indicator(25.0), "[WARN] LOW");
+        assert_eq!(get_gap_severity_indicator(0.0), "[WARN LOW]");
+        assert_eq!(get_gap_severity_indicator(10.0), "[WARN LOW]");
+        assert_eq!(get_gap_severity_indicator(25.0), "[WARN LOW]");
 
         // MODERATE: 26-50%
-        assert_eq!(get_gap_severity_indicator(26.0), "[WARN] MODERATE");
-        assert_eq!(get_gap_severity_indicator(40.0), "[WARN] MODERATE");
-        assert_eq!(get_gap_severity_indicator(50.0), "[WARN] MODERATE");
+        assert_eq!(get_gap_severity_indicator(26.0), "[WARN MODERATE]");
+        assert_eq!(get_gap_severity_indicator(40.0), "[WARN MODERATE]");
+        assert_eq!(get_gap_severity_indicator(50.0), "[WARN MODERATE]");
 
         // HIGH: 51-75%
-        assert_eq!(get_gap_severity_indicator(51.0), "[ERROR] HIGH");
-        assert_eq!(get_gap_severity_indicator(65.0), "[ERROR] HIGH");
-        assert_eq!(get_gap_severity_indicator(75.0), "[ERROR] HIGH");
+        assert_eq!(get_gap_severity_indicator(51.0), "[ERROR HIGH]");
+        assert_eq!(get_gap_severity_indicator(65.0), "[ERROR HIGH]");
+        assert_eq!(get_gap_severity_indicator(75.0), "[ERROR HIGH]");
 
         // CRITICAL: 76-100%
-        assert_eq!(get_gap_severity_indicator(76.0), "[CRITICAL] CRITICAL");
-        assert_eq!(get_gap_severity_indicator(90.0), "[CRITICAL] CRITICAL");
-        assert_eq!(get_gap_severity_indicator(100.0), "[CRITICAL] CRITICAL");
+        assert_eq!(get_gap_severity_indicator(76.0), "[CRITICAL]");
+        assert_eq!(get_gap_severity_indicator(90.0), "[CRITICAL]");
+        assert_eq!(get_gap_severity_indicator(100.0), "[CRITICAL]");
+    }
+
+    #[test]
+    fn test_no_redundant_severity_labels() {
+        use std::collections::HashSet;
+
+        // Ensure no severity indicator contains duplicate words
+        for gap in [0.0, 10.0, 30.0, 60.0, 90.0, 100.0] {
+            let indicator = get_gap_severity_indicator(gap);
+            let parts: Vec<&str> = indicator
+                .trim_matches(|c| c == '[' || c == ']')
+                .split_whitespace()
+                .collect();
+
+            // Check for duplicates
+            let unique_parts: HashSet<&str> = parts.iter().copied().collect();
+            assert_eq!(
+                parts.len(),
+                unique_parts.len(),
+                "Duplicate words in severity indicator at {}%: {}",
+                gap,
+                indicator
+            );
+        }
     }
 
     #[test]
