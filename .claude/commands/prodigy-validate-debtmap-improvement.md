@@ -2,8 +2,6 @@
 
 Validates that technical debt improvements have been made by analyzing the compact comparison output from `debtmap compare`.
 
-This command is a wrapper that calls the `debtmap validate-improvement` subcommand.
-
 Arguments: $ARGUMENTS
 
 ## Usage
@@ -490,14 +488,6 @@ This command is designed to work with Prodigy workflows:
 
 ## Important Implementation Notes
 
-**THIS COMMAND NOW CALLS THE DEBTMAP SUBCOMMAND**
-
-Instead of implementing validation logic directly, this slash command should simply call:
-```bash
-debtmap validate-improvement $ARGUMENTS
-```
-
-The `debtmap validate-improvement` subcommand handles all the validation logic described above:
 1. **Parse arguments correctly** - Extract comparison and output paths from $ARGUMENTS
 2. **Read compact comparison.json** - Much smaller than before/after files (10KB vs 40MB)
 3. **Extract improvement metrics** - Use pre-calculated values from comparison
