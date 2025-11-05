@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 /// Normalize a path by removing leading ./
-fn normalize_path(path: &Path) -> PathBuf {
+pub fn normalize_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
     let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
     PathBuf::from(cleaned)
@@ -145,12 +145,24 @@ impl CoverageIndex {
     /// This is the primary lookup method and should be used when the exact
     /// function name is known. Also tries path normalization strategies.
     pub fn get_function_coverage(&self, file: &Path, function_name: &str) -> Option<f64> {
+        log::debug!(
+            "Looking up coverage for function '{}' in file '{}'",
+            function_name,
+            file.display()
+        );
+
         // O(1) exact match: file lookup + function lookup
         if let Some(file_functions) = self.by_file.get(file) {
             if let Some(f) = file_functions.get(function_name) {
+                log::debug!(
+                    "✓ Found via exact match: {}% coverage",
+                    f.coverage_percentage
+                );
                 return Some(f.coverage_percentage / 100.0);
             }
         }
+
+        log::debug!("Exact match failed, trying path strategies...");
 
         // O(files) fallback strategies - much faster than O(functions)
         self.find_by_path_strategies(file, function_name)
@@ -162,6 +174,11 @@ impl CoverageIndex {
     /// This method iterates over FILES (not functions), providing O(files) complexity
     /// instead of O(functions). For 375 files with ~4 functions each, this is
     /// 375 iterations vs 1,500, a 4x speedup.
+    ///
+    /// Matching strategies in order:
+    /// 1. Exact name match (query path matches file path)
+    /// 2. Method name match (for Rust methods, match just the final segment)
+    /// 3. Suffix/path matching strategies
     fn find_by_path_strategies(
         &self,
         query_path: &Path,
@@ -169,40 +186,101 @@ impl CoverageIndex {
     ) -> Option<&FunctionCoverage> {
         let normalized_query = normalize_path(query_path);
 
+        log::debug!("Strategy 1: Suffix matching (query.ends_with(lcov_file))");
         // Strategy 1: Suffix matching - iterate over FILES not functions
         for file_path in &self.file_paths {
             if query_path.ends_with(file_path) {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 // O(1) lookup once we find the file
                 if let Some(file_functions) = self.by_file.get(file_path) {
+                    // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
+                    // Try method name match (for Rust methods)
+                    for func in file_functions.values() {
+                        if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
+                    }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("Strategy 2: Reverse suffix matching (lcov_file.ends_with(query))");
         // Strategy 2: Reverse suffix matching - iterate over FILES
         for file_path in &self.file_paths {
             if file_path.ends_with(&normalized_query) {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
+                    // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
+                    // Try method name match (for Rust methods)
+                    for func in file_functions.values() {
+                        if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
+                    }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("Strategy 3: Normalized path equality");
         // Strategy 3: Normalized equality - iterate over FILES
         for file_path in &self.file_paths {
             if normalize_path(file_path) == normalized_query {
+                log::debug!("  Found path match: '{}'", file_path.display());
                 if let Some(file_functions) = self.by_file.get(file_path) {
+                    // Try exact match first
                     if let Some(coverage) = file_functions.get(function_name) {
+                        log::debug!(
+                            "  ✓ Matched function name exactly: {}%",
+                            coverage.coverage_percentage
+                        );
                         return Some(coverage);
                     }
+                    // Try method name match (for Rust methods)
+                    for func in file_functions.values() {
+                        if func.normalized.method_name == function_name {
+                            log::debug!(
+                                "  ✓ Matched method name '{}' -> '{}': {}%",
+                                func.name,
+                                func.normalized.method_name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
+                    }
+                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
 
+        log::debug!("✗ All path strategies failed");
         None
     }
 
@@ -292,32 +370,36 @@ impl CoverageIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::risk::lcov::NormalizedFunctionName;
+
+    fn create_test_function_coverage(
+        name: &str,
+        start_line: usize,
+        execution_count: u64,
+        coverage_percentage: f64,
+        uncovered_lines: Vec<usize>,
+    ) -> FunctionCoverage {
+        FunctionCoverage {
+            name: name.to_string(),
+            start_line,
+            execution_count,
+            coverage_percentage,
+            uncovered_lines,
+            normalized: NormalizedFunctionName {
+                full_path: name.to_string(),
+                method_name: name.to_string(),
+                original: name.to_string(),
+            },
+        }
+    }
 
     fn create_test_coverage() -> LcovData {
         let mut coverage = LcovData::default();
 
         let test_functions = vec![
-            FunctionCoverage {
-                name: "func_a".to_string(),
-                start_line: 10,
-                execution_count: 5,
-                coverage_percentage: 100.0,
-                uncovered_lines: vec![],
-            },
-            FunctionCoverage {
-                name: "func_b".to_string(),
-                start_line: 20,
-                execution_count: 3,
-                coverage_percentage: 75.0,
-                uncovered_lines: vec![22, 24],
-            },
-            FunctionCoverage {
-                name: "func_c".to_string(),
-                start_line: 30,
-                execution_count: 0,
-                coverage_percentage: 0.0,
-                uncovered_lines: vec![30, 31, 32, 33],
-            },
+            create_test_function_coverage("func_a", 10, 5, 100.0, vec![]),
+            create_test_function_coverage("func_b", 20, 3, 75.0, vec![22, 24]),
+            create_test_function_coverage("func_c", 30, 0, 0.0, vec![30, 31, 32, 33]),
         ];
 
         coverage
@@ -433,24 +515,18 @@ mod tests {
 
         coverage.functions.insert(
             PathBuf::from("file1.rs"),
-            vec![FunctionCoverage {
-                name: "func1".to_string(),
-                start_line: 5,
-                execution_count: 10,
-                coverage_percentage: 100.0,
-                uncovered_lines: vec![],
-            }],
+            vec![create_test_function_coverage("func1", 5, 10, 100.0, vec![])],
         );
 
         coverage.functions.insert(
             PathBuf::from("file2.rs"),
-            vec![FunctionCoverage {
-                name: "func2".to_string(),
-                start_line: 15,
-                execution_count: 0,
-                coverage_percentage: 0.0,
-                uncovered_lines: vec![15, 16],
-            }],
+            vec![create_test_function_coverage(
+                "func2",
+                15,
+                0,
+                0.0,
+                vec![15, 16],
+            )],
         );
 
         let index = CoverageIndex::from_coverage(&coverage);

@@ -506,6 +506,7 @@ mod tests {
                 execution_count: 10,
                 coverage_percentage: 80.0,
                 uncovered_lines: vec![2, 3],
+                normalized: crate::risk::lcov::NormalizedFunctionName::simple("func1"),
             },
             FunctionCoverage {
                 name: "func2".to_string(),
@@ -513,6 +514,7 @@ mod tests {
                 execution_count: 0,
                 coverage_percentage: 0.0,
                 uncovered_lines: vec![10, 11, 12, 13, 14],
+                normalized: crate::risk::lcov::NormalizedFunctionName::simple("func2"),
             },
             FunctionCoverage {
                 name: "func3".to_string(),
@@ -520,6 +522,7 @@ mod tests {
                 execution_count: 5,
                 coverage_percentage: 50.0,
                 uncovered_lines: vec![21, 22],
+                normalized: crate::risk::lcov::NormalizedFunctionName::simple("func3"),
             },
         ];
         functions.insert(PathBuf::from("test.rs"), function_coverages);

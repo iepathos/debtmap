@@ -65,6 +65,7 @@ fn create_full_coverage_data(func: &FunctionMetrics) -> LcovData {
             execution_count: 18,
             coverage_percentage: 100.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple(&func.name),
         }],
     );
     lcov.build_index(); // Rebuild index after modifying functions
@@ -148,6 +149,7 @@ fn create_coverage_function(
             execution_count,
             coverage_percentage,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple(&func.name),
         }],
     );
     lcov.build_index(); // Rebuild index after modifying functions
@@ -305,6 +307,7 @@ fn create_zero_coverage_data(func: &FunctionMetrics) -> LcovData {
             execution_count: 0,
             coverage_percentage: 0.0,
             uncovered_lines: vec![func.line],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple(&func.name),
         }],
     );
     lcov.build_index();
@@ -368,6 +371,7 @@ fn test_entry_point_with_coverage_not_overly_penalized() {
             execution_count: 5,
             coverage_percentage: 50.0,
             uncovered_lines: vec![],
+            normalized: crate::risk::lcov::NormalizedFunctionName::simple(&entry_point.name),
         }],
     );
     partial_lcov.build_index();
