@@ -15,6 +15,42 @@ Entropy analysis uses information theory to distinguish between these cases.
 
 Debtmap's entropy analysis is **language-agnostic**, working across Rust, Python, JavaScript, and TypeScript codebases using a universal token classification approach. This ensures consistent complexity assessment regardless of the programming language used.
 
+### Language-Agnostic Analysis
+
+The same entropy concepts apply consistently across all supported languages. Here's how a validation function would be analyzed in different languages:
+
+**Rust:**
+```rust
+fn validate_config(config: &Config) -> Result<()> {
+    if config.output_dir.is_none() { return Err(anyhow!("output_dir required")); }
+    if config.max_workers.is_none() { return Err(anyhow!("max_workers required")); }
+    if config.timeout_secs.is_none() { return Err(anyhow!("timeout_secs required")); }
+    Ok(())
+}
+// Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+```
+
+**Python:**
+```python
+def validate_config(config: Config) -> None:
+    if config.output_dir is None: raise ValueError("output_dir required")
+    if config.max_workers is None: raise ValueError("max_workers required")
+    if config.timeout_secs is None: raise ValueError("timeout_secs required")
+# Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+```
+
+**JavaScript/TypeScript:**
+```typescript
+function validateConfig(config: Config): void {
+    if (!config.outputDir) throw new Error("outputDir required");
+    if (!config.maxWorkers) throw new Error("maxWorkers required");
+    if (!config.timeoutSecs) throw new Error("timeoutSecs required");
+}
+// Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+```
+
+All three receive similar entropy scores because they share the same repetitive validation pattern, demonstrating how Debtmap's analysis transcends language syntax to identify underlying code structure patterns.
+
 ### Shannon Entropy
 
 Shannon entropy measures the variety and unpredictability of code patterns:
@@ -32,7 +68,7 @@ Where:
 
 Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the `use_classification` configuration option.
 
-**When enabled** (disabled by default for backward compatibility), tokens are weighted by importance:
+**When enabled** (`use_classification = false` by default for backward compatibility), tokens are weighted by importance:
 
 **High importance (weight: 1.0):**
 - Control flow keywords (`if`, `match`, `for`, `while`)
@@ -131,12 +167,14 @@ Dampening is applied based on multiple thresholds:
 Each factor is dampened individually using a graduated calculation:
 
 ```rust
-// Simplified version - actual implementation in src/complexity/entropy.rs:185-195
+// Conceptual pseudocode showing the three-factor approach
+// Actual implementation in src/complexity/entropy.rs:185-195 and :429-439
 fn calculate_dampening_factor(
     repetition: f64,     // 0.0-1.0
     entropy: f64,        // 0.0-1.0
     branch_similarity: f64  // 0.0-1.0
 ) -> f64 {
+    // Each factor uses calculate_graduated_dampening with its own threshold/range
     let repetition_factor = graduated_dampening(repetition, threshold=1.0, max_reduction=0.20);
     let entropy_factor = graduated_dampening(entropy, threshold=0.4, max_reduction=0.15);
     let branch_factor = graduated_dampening(branch_similarity, threshold=0.8, max_reduction=0.25);
@@ -145,11 +183,11 @@ fn calculate_dampening_factor(
 }
 ```
 
-**Key Parameters** (hardcoded in implementation):
-- **Repetition**: Threshold 1.0, max 20% reduction
-- **Entropy**: Threshold 0.4, max 15% reduction
-- **Branch Similarity**: Threshold 0.8, max 25% reduction
-- **Combined Floor**: Minimum 70% of original complexity preserved
+**Key Parameters:**
+- **Repetition**: Threshold 1.0, max 20% reduction (configurable via `max_repetition_reduction`)
+- **Entropy**: Threshold 0.4 (hardcoded), max 15% reduction (configurable via `max_entropy_reduction`)
+- **Branch Similarity**: Threshold 0.8 (configurable via `branch_threshold`), max 25% reduction (configurable via `max_branch_reduction`)
+- **Combined Floor**: Minimum 70% of original complexity preserved (configurable via `max_combined_reduction`)
 
 #### Example: Repetitive Validation Function
 
@@ -262,7 +300,7 @@ fn reconcile_state(current: &State, desired: &State) -> Vec<Action> {
 
 ## Configuration
 
-Configure entropy analysis in `.debtmap.toml`:
+Configure entropy analysis in `.debtmap.toml` or disable via the `--semantic-off` CLI flag.
 
 ```toml
 [entropy]
@@ -296,10 +334,10 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 
 **Important Notes:**
 
-1. **Graduated dampening thresholds are hardcoded** in the implementation (`src/complexity/entropy.rs:185-195`):
-   - Entropy threshold: 0.4 (not configurable via `entropy_threshold`)
-   - Branch threshold: 0.8 (configured via `branch_threshold`)
-   - Repetition threshold: 1.0 (via `pattern_threshold`)
+1. **Dampening thresholds** - Some are configurable, some are hardcoded (`src/complexity/entropy.rs:185-195`):
+   - **Entropy factor threshold: 0.4** - Hardcoded internally (not configurable)
+   - **Branch threshold: 0.8** - Configurable via `branch_threshold` in config file
+   - **Pattern threshold: 0.7/1.0** - Configurable via `pattern_threshold` in config file
 
 2. **The `weight` parameter** affects how entropy scores contribute to overall complexity scoring, but does not change the dampening thresholds or reductions.
 
