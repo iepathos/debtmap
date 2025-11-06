@@ -124,7 +124,9 @@ You can suppress the following debt types by name in bracket notation:
 
 **Auto-Detected Types** (cannot be suppressed by name):
 
-The following debt types are detected by code analysis rather than comment scanning. These types **cannot** be suppressed using bracket notation like `[error_swallowing]`. To suppress them, use the general `debtmap:ignore` marker without brackets:
+The following debt types are detected by code analysis rather than comment scanning. These types **cannot** be suppressed using bracket notation like `[error_swallowing]` because they are not included in the suppression parser's type mapping.
+
+**Why bracket notation doesn't work**: The suppression parser only recognizes specific type names in its internal mapping (`DEBT_TYPE_MAP`): `todo`, `fixme`, `smell`/`codesmell`, `complexity`, `duplication`/`duplicate`, and `dependency`. Types detected through AST analysis (like error swallowing and resource management) don't have string identifiers in the parser. To suppress these, use the general `debtmap:ignore` marker without brackets:
 
 - `error_swallowing` - Error handling issues (empty catch blocks, ignored errors)
 - `resource_management` - Resource cleanup issues (file handles, connections)
@@ -309,6 +311,9 @@ Debtmap automatically uses the correct comment syntax for each language:
 | JavaScript | `//` | `// debtmap:ignore` |
 | TypeScript | `//` | `// debtmap:ignore` |
 | Python | `#` | `# debtmap:ignore` |
+| Other languages | `//` | `// debtmap:ignore` |
+
+**Note**: Languages not explicitly listed use `//` as the default comment prefix.
 
 You don't need to configure this—Debtmap detects the language and uses the appropriate syntax.
 
@@ -335,7 +340,7 @@ Debtmap internally tracks suppression usage during analysis:
 - **Suppressions by type**: How many of each debt type are suppressed
 - **Unclosed blocks**: Detection of `ignore-start` without matching `ignore-end`
 
-**Current Status**: These statistics are tracked internally but not yet exposed through the CLI. Future releases may add a dedicated command to view suppression metrics.
+**Current Status**: These statistics are computed during analysis (via the `SuppressionContext::get_stats()` method) but are not currently displayed in any output format. The `SuppressionStats` struct exists and tracks all metrics, but there is no user-facing command or report format that exposes them. Future releases may add a dedicated command to view suppression metrics.
 
 **Auditing Suppressions Now**: You can audit your suppressions using standard tools:
 
