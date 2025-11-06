@@ -73,14 +73,6 @@ class EventManager:
 
 **Confidence**: High (0.8-0.9) when abstract base class, implementations, and registration/notification methods are present. Lower confidence (0.5-0.7) for partial implementations.
 
-**Configuration**:
-```toml
-[patterns.observer]
-interface_markers = ["ABC", "Protocol", "Interface"]
-registration_methods = ["add_observer", "register", "subscribe"]
-method_prefixes = ["on_", "handle_", "notify_"]
-```
-
 ### Singleton Pattern
 
 Singleton pattern detection identifies three common Python implementations: module-level singletons, `__new__` override, and decorator-based patterns.
@@ -140,13 +132,6 @@ class Logger:
 
 **Confidence**: Very High (0.9-0.95) for `__new__` override and decorator patterns. High (0.85) for module-level singletons with clear naming.
 
-**Configuration**:
-```toml
-[patterns.singleton]
-# No user-configurable options currently
-# Detection is based on implementation patterns
-```
-
 ### Factory Pattern
 
 Factory pattern detection identifies factory functions, factory classes, and factory registries based on naming conventions and structural patterns.
@@ -201,13 +186,6 @@ class DocumentFactory:
 
 **Confidence**: Medium-High (0.75-0.85) for functions with factory naming patterns. Lower confidence (0.6-0.7) for registry patterns without factory names.
 
-**Configuration**:
-```toml
-[patterns.factory]
-function_patterns = ["create_", "make_", "build_", "_factory"]
-min_implementations = 2  # Minimum branches/types to consider it a factory
-```
-
 ### Strategy Pattern
 
 Strategy pattern detection identifies interfaces with multiple implementations representing interchangeable algorithms.
@@ -249,12 +227,6 @@ class FileCompressor:
 ```
 
 **Confidence**: Medium (0.7-0.8) based on interface structure and implementation count.
-
-**Configuration**:
-```toml
-[patterns.strategy]
-min_implementations = 2  # Minimum concrete strategies
-```
 
 ### Callback Pattern
 
@@ -304,15 +276,6 @@ def handle_order_placed(order):
 ```
 
 **Confidence**: High (0.8-0.9) for framework decorator patterns. Medium (0.6-0.7) for custom callback implementations.
-
-**Configuration**:
-```toml
-[patterns.callback]
-decorator_patterns = [
-    "route", "handler", "app.", "on", "callback",
-    "post", "get", "put", "delete", "patch"
-]
-```
 
 ### Template Method Pattern
 
@@ -368,13 +331,6 @@ class CSVProcessor(DataProcessor):
 
 **Confidence**: Medium (0.7-0.8) based on combination of abstract and concrete methods in base class.
 
-**Configuration**:
-```toml
-[patterns.template_method]
-# Detection based on abstract method patterns
-# No user-configurable options currently
-```
-
 ### Dependency Injection Pattern
 
 Dependency injection pattern detection identifies classes that receive dependencies through constructors or setters rather than creating them internally.
@@ -422,13 +378,6 @@ class ReportGenerator:
 ```
 
 **Confidence**: Medium (0.65-0.75) based on constructor signatures and absence of direct instantiation.
-
-**Configuration**:
-```toml
-[patterns.dependency_injection]
-# Detection based on constructor patterns
-# No user-configurable options currently
-```
 
 ## Internal Pattern Detection
 
@@ -539,89 +488,43 @@ debtmap analyze --show-pattern-warnings
 
 **Note**: Builder and Visitor patterns are detected internally but are **not available** via the `--patterns` flag. See [Internal Pattern Detection](#internal-pattern-detection) for details.
 
-### Configuration File
+### Pattern Detection Output
 
-Configure pattern detection in `.debtmap.toml`:
+Pattern detection results are integrated into debtmap's output in different formats:
 
-```toml
-[patterns]
-# Enable/disable pattern recognition globally
-enabled = true
-
-# Minimum confidence threshold for pattern detection (0.0 - 1.0)
-confidence_threshold = 0.7
-
-# Observer pattern configuration
-[patterns.observer]
-interface_markers = ["ABC", "Protocol", "Interface"]
-registration_methods = ["add_observer", "register", "subscribe"]
-method_prefixes = ["on_", "handle_", "notify_"]
-
-# Singleton pattern configuration
-[patterns.singleton]
-# Detection is automatic based on implementation patterns
-
-# Factory pattern configuration
-[patterns.factory]
-function_patterns = ["create_", "make_", "build_", "_factory"]
-min_implementations = 2
-
-# Strategy pattern configuration
-[patterns.strategy]
-min_implementations = 2
-
-# Callback pattern configuration
-[patterns.callback]
-decorator_patterns = [
-    "route", "handler", "app.", "on", "callback",
-    "post", "get", "put", "delete", "patch"
-]
-
-# Template method pattern configuration
-[patterns.template_method]
-# Detection is automatic based on abstract methods
-
-# Custom pattern rules (see next section)
-[[patterns.custom_rules]]
-name = "Repository Pattern"
-method_pattern = "^(find|save|update|delete)_"
-confidence = 0.75
+**Terminal Format**: Detected patterns are shown in a dedicated section of the analysis output:
+```
+Design Patterns Detected:
+  Observer Pattern (confidence: 0.88)
+    Interface: EventListener (event_system.py:4)
+    Implementations: AuditLogger, SessionManager
 ```
 
-### Custom Pattern Rules
-
-Define project-specific patterns using custom rules:
-
-```toml
-[[patterns.custom_rules]]
-name = "Repository Pattern"
-description = "Data access layer pattern"
-method_pattern = "^(find|save|update|delete|get)_.*"
-class_pattern = ".*Repository$"
-confidence = 0.75
-
-[[patterns.custom_rules]]
-name = "Service Layer"
-description = "Business logic service pattern"
-class_pattern = ".*Service$"
-method_pattern = "^(execute|process|handle)_"
-confidence = 0.7
-
-[[patterns.custom_rules]]
-name = "Command Pattern"
-description = "Command objects with execute method"
-class_pattern = ".*Command$"
-method_pattern = "^execute$"
-confidence = 0.8
+**JSON Format**: Pattern results are included in the `pattern_instances` field:
+```json
+{
+  "pattern_instances": [
+    {
+      "pattern_type": "Observer",
+      "confidence": 0.88,
+      "location": "event_system.py:4",
+      "implementations": ["AuditLogger", "SessionManager"]
+    }
+  ]
+}
 ```
 
-Custom rule fields:
-- `name`: Pattern name for reporting
-- `description`: Optional description
-- `method_pattern`: Regular expression for method names
-- `class_pattern`: Regular expression for class names
-- `decorator_pattern`: Regular expression for decorator names
-- `confidence`: Confidence score (0.0-1.0) when pattern matches
+**Markdown Format**: Patterns are documented in a dedicated section with cross-references to source files.
+
+**Using `--show-pattern-warnings`**: This flag reveals low-confidence detections (below the threshold) that might indicate:
+- Incomplete pattern implementations
+- Patterns in development
+- False positives to review
+
+Use this flag during initial analysis to understand what patterns debtmap sees:
+```bash
+debtmap analyze --show-pattern-warnings --pattern-threshold 0.7
+```
 
 ## Confidence Scoring
 
@@ -646,19 +549,21 @@ debtmap analyze --pattern-threshold 0.6 --show-pattern-warnings
 
 **How Confidence is Calculated**:
 
-Each pattern detector calculates confidence based on:
+Each pattern detector calculates confidence holistically based on multiple factors:
+
 1. **Structural completeness**: Are all expected elements present?
 2. **Naming conventions**: Do names match expected patterns?
 3. **Implementation count**: Are there enough implementations to confirm the pattern?
 4. **Cross-validation**: Do different detection heuristics agree?
 
-Example confidence calculation for Observer pattern:
-- Base class with `ABC` marker: +0.3
-- Abstract methods present: +0.2
-- Concrete implementations found: +0.2
-- Registration methods detected: +0.15
-- Notification methods detected: +0.15
-- **Total**: 0.8 (High confidence)
+For example, Observer pattern confidence is calculated holistically based on:
+- Presence of abstract base class with appropriate markers (`ABC`, `Protocol`, etc.)
+- Number of concrete implementations found
+- Detection of registration methods (`add_observer`, `register`, `subscribe`)
+- Detection of notification methods (`notify`, `notify_all`, `trigger`, `emit`)
+- Naming conventions matching observer patterns
+
+Higher confidence requires more structural elements to be present. The calculation is not a simple sum of individual weights but rather a holistic assessment of pattern completeness.
 
 ## Cross-File Pattern Detection
 
@@ -743,46 +648,51 @@ pub trait Observer {
 
 ## Integration with Complexity Analysis
 
-Pattern detection directly affects complexity scoring through **pattern-based adjustments**:
+Debtmap has two separate but complementary systems for patterns:
 
-### Role Multipliers
+### 1. Design Pattern Detection (This Feature)
 
-Functions identified as part of design patterns receive adjusted complexity scores:
+The 7 user-facing design patterns documented in this chapter (Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection) are **detected and reported** to users. These patterns appear in the output to document architectural choices but do not directly adjust complexity scores.
 
-| Role | Multiplier | Reasoning |
-|------|-----------|-----------|
-| Pattern Implementation | 0.6 | Boilerplate pattern code is less concerning |
-| Factory Method | 0.7 | Expected to have branching logic |
-| Observer Notification | 0.5 | Simple iteration over observers |
-| Template Method | 0.8 | Framework method with expected complexity |
+**Purpose**: Architectural documentation and pattern identification
 
-### Pattern Dampening
+**Output**: Pattern instances with confidence scores in terminal, JSON, and markdown formats
 
-Recognized patterns reduce effective complexity:
+### 2. Complexity Pattern Adjustments (Internal System)
 
-```
-effective_complexity = base_complexity * pattern_multiplier
-```
+Debtmap has a separate internal system in `src/complexity/python_pattern_adjustments.rs` that detects specific complexity patterns and applies multipliers. These are **different patterns** from the user-facing design patterns:
 
-Example:
-- Observer implementation method with cognitive complexity 15
-- Pattern multiplier: 0.6
-- Effective complexity: 15 * 0.6 = 9
+**Internal complexity patterns include**:
+- Dictionary Dispatch (0.5x multiplier)
+- Strategy Pattern detection via conditionals (0.6x multiplier)
+- Comprehension patterns (0.8x multiplier)
+- Other Python-specific complexity patterns
+
+**Purpose**: Adjust complexity scores to avoid penalizing idiomatic code
+
+**Output**: Applied automatically during complexity calculation, not reported separately
+
+### Relationship Between the Systems
+
+Currently, these are **independent systems**:
+- Design pattern detection focuses on architectural patterns
+- Complexity adjustments focus on implementation patterns
+
+The design pattern detection results are primarily for documentation and architectural insights. The complexity scoring uses its own pattern recognition to apply appropriate adjustments.
 
 ### Visitor Pattern Special Case
 
-Debtmap internally detects visitor-like patterns (exhaustive matching) and applies **logarithmic scaling** instead of linear complexity:
+The Visitor pattern (internal-only) is used for complexity analysis. When exhaustive pattern matching is detected, debtmap applies **logarithmic scaling**:
 
 ```
 visitor_complexity = log2(match_arms) * average_arm_complexity
 ```
 
-This prevents exhaustive pattern matching from being flagged as overly complex. Note that this is an internal complexity adjustment mechanism, not a user-visible design pattern detection feature. See [Visitor Pattern (Internal Use Only)](#visitor-pattern-internal-use-only) for more details.
+This prevents exhaustive pattern matching from being flagged as overly complex. See [Visitor Pattern (Internal Use Only)](#visitor-pattern-internal-use-only) for more details.
 
 **See Also**:
-- [Entropy Analysis](./entropy-analysis.md) - Pattern dampening in entropy calculations
-- [Scoring Strategies](./scoring-strategies.md) - Role multipliers and complexity adjustments
-- [Configuration](./configuration.md) - Configuring pattern detection in `.debtmap.toml`
+- [Complexity Analysis](./complexity-metrics.md) - How complexity is calculated
+- [Scoring Strategies](./scoring-strategies.md) - Complexity adjustments and multipliers
 
 ## Practical Examples
 
@@ -857,52 +767,6 @@ Design Patterns:
     Notification: notify_login (event_system.py:24)
 ```
 
-### Example 3: Custom Repository Pattern
-
-Defining and detecting a custom Repository pattern:
-
-`.debtmap.toml`:
-```toml
-[[patterns.custom_rules]]
-name = "Repository Pattern"
-description = "Data access layer"
-class_pattern = ".*Repository$"
-method_pattern = "^(find|get|save|update|delete)_"
-confidence = 0.75
-```
-
-Code:
-```python
-class UserRepository:
-    def find_by_id(self, user_id):
-        return db.query(User).get(user_id)
-
-    def find_by_email(self, email):
-        return db.query(User).filter_by(email=email).first()
-
-    def save(self, user):
-        db.session.add(user)
-        db.session.commit()
-
-    def delete_by_id(self, user_id):
-        user = self.find_by_id(user_id)
-        db.session.delete(user)
-        db.session.commit()
-```
-
-Analysis:
-```bash
-debtmap analyze --show-pattern-warnings
-```
-
-Output:
-```
-Custom Patterns Detected:
-  Repository Pattern (confidence: 0.75)
-    - UserRepository (models.py:10)
-      Methods: find_by_id, find_by_email, save, delete_by_id
-```
-
 ## Use Cases
 
 ### 1. False Positive Reduction
@@ -920,7 +784,7 @@ debtmap analyze --patterns factory --pattern-threshold 0.7
 **Solution**: Run pattern detection to automatically identify architectural patterns
 
 ```bash
-debtmap analyze --patterns all --show-pattern-warnings > architecture-report.txt
+debtmap analyze --show-pattern-warnings > architecture-report.txt
 ```
 
 ### 3. Pattern Consistency Validation
