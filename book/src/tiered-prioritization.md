@@ -158,6 +158,13 @@ t3_complexity_threshold = 15
 ```
 For legacy codebases or gradual technical debt reduction. Focuses on the most critical issues first.
 
+**Programmatic Access**: These presets are also available as methods when using Debtmap as a library:
+- `TierConfig::balanced()` - Equivalent to the balanced preset above
+- `TierConfig::strict()` - Equivalent to the strict preset above
+- `TierConfig::lenient()` - Equivalent to the lenient preset above
+
+These methods can be used in Rust code to configure tier settings programmatically without manual TOML configuration.
+
 ### Customizing Tier Thresholds
 
 You can also create custom threshold configurations tailored to your project:
