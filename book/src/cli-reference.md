@@ -24,7 +24,7 @@ debtmap validate . --config debtmap.toml
 
 ## Commands
 
-Debtmap provides five main commands:
+Debtmap provides six main commands: five for analysis and validation, plus one debugging tool.
 
 ### `analyze`
 
@@ -190,6 +190,45 @@ debtmap validate-improvement \
   --threshold 80.0
 ```
 
+### `explain-coverage` (Debugging)
+
+Explain coverage detection for a specific function.
+
+**Usage:**
+```bash
+debtmap explain-coverage <PATH> --coverage-file <FILE> --function <NAME> [OPTIONS]
+```
+
+**Arguments:**
+- `<PATH>` - Path to the codebase to analyze
+
+**Required Options:**
+- `--coverage-file <FILE>` / `--lcov <FILE>` - LCOV coverage file
+- `--function <NAME>` - Function name to explain (e.g., "create_auto_commit")
+
+**Optional Options:**
+- `--file <PATH>` - File path containing the function (helps narrow search)
+- `-v, --verbose` - Show all attempted matching strategies
+- `-f, --format <FORMAT>` - Output format: text or json (default: text)
+
+**Description:**
+Debugging tool that explains how coverage detection works for a specific function. Shows all attempted matching strategies and helps diagnose coverage mapping issues. This command is particularly useful when:
+- Coverage appears incorrect for specific functions
+- You need to understand why a function isn't matched in coverage data
+- Debugging LCOV line mapping issues
+
+**Example:**
+```bash
+# Explain coverage for a specific function
+debtmap explain-coverage src/ --coverage-file coverage.lcov --function "process_file"
+
+# Narrow search to specific file with verbose output
+debtmap explain-coverage . --lcov lcov.info --function "analyze_complexity" --file "src/analyzer.rs" -v
+
+# JSON output for automation
+debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function" --format json
+```
+
 ## Options
 
 Options are organized by category for clarity. Most options apply to the `analyze` command, with a subset available for `validate`.
@@ -210,7 +249,7 @@ Control how analysis results are formatted and displayed.
 - `--top <N>` / `--head <N>` - Show only top N priority items
 - `--tail <N>` - Show only bottom N priority items (lowest priority)
 - `-s, --summary` - Use summary format with tiered priority display (compact output)
-- `--compact` - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv)
+- `-c, --compact` - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv). Only available in `analyze` command (note: `validate` uses `-c` for `--config`)
 - `--min-priority <PRIORITY>` - Minimum priority to display: low, medium, high, critical
 - `--filter <CATEGORIES>` - Filter by debt categories (comma-separated)
 - `--aggregate-only` - Show only aggregated file-level scores
@@ -735,38 +774,40 @@ debtmap analyze . --explain-metrics -v
 
 ## Command Compatibility Matrix
 
-| Option | analyze | validate | compare | init |
-|--------|---------|----------|---------|------|
-| `<PATH>` argument | ✓ | ✓ | ✗ | ✗ |
-| `--format` | ✓ | ✓ | ✓ | ✗ |
-| `--output` | ✓ | ✓ | ✓ | ✗ |
-| `--coverage-file` | ✓ | ✓ | ✗ | ✗ |
-| `--context` | ✓ | ✓ | ✗ | ✗ |
-| `--threshold-*` | ✓ | ✗ | ✗ | ✗ |
-| `--top / --tail` | ✓ | ✓ | ✗ | ✗ |
-| `--cache-*` | ✓ | ✗ | ✗ | ✗ |
-| `--jobs` | ✓ | ✓ | ✗ | ✗ |
-| `--no-parallel` | ✓ | ✓ | ✗ | ✗ |
-| `--verbose` | ✓ | ✓ | ✗ | ✗ |
-| `--explain-metrics` | ✓ | ✗ | ✗ | ✗ |
-| `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ |
-| `--trace-function` | ✓ | ✗ | ✗ | ✗ |
-| `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ |
-| `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ |
-| `--debug-format` | ✓ | ✗ | ✗ | ✗ |
-| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ |
-| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ |
-| `--max-callers` | ✓ | ✗ | ✗ | ✗ |
-| `--max-callees` | ✓ | ✗ | ✗ | ✗ |
-| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ |
-| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ |
-| `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ |
-| `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ |
-| `--config` | ✗ | ✓ | ✗ | ✗ |
-| `--before / --after` | ✗ | ✗ | ✓ | ✗ |
-| `--force` | ✗ | ✗ | ✗ | ✓ |
+| Option | analyze | validate | compare | init | explain-coverage |
+|--------|---------|----------|---------|------|------------------|
+| `<PATH>` argument | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `--format` | ✓ | ✓ | ✓ | ✗ | ✓ |
+| `--output` | ✓ | ✓ | ✓ | ✗ | ✗ |
+| `--coverage-file` | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `--context` | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `--threshold-*` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--top / --tail` | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `--cache-*` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--jobs` | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `--no-parallel` | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `--verbose` | ✓ | ✓ | ✗ | ✗ | ✓ |
+| `--explain-metrics` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--debug-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--trace-function` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--call-graph-stats` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--validate-call-graph` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--debug-format` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--show-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--no-dependencies` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--max-callers` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--max-callees` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--show-external-calls` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--show-std-lib-calls` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--ast-functional-analysis` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--functional-analysis-profile` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `--function` | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `--file` | ✗ | ✗ | ✗ | ✗ | ✓ |
+| `--config` | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `--before / --after` | ✗ | ✗ | ✓ | ✗ | ✗ |
+| `--force` | ✗ | ✗ | ✗ | ✓ | ✗ |
 
-**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), performance control (`--jobs`, `--no-parallel`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the `analyze` command.
+**Note:** The `validate` command supports output control (`--format`, `--output`), coverage integration (`--coverage-file`), context-aware analysis (`--context`), display filtering (`--top`, `--tail`, `--summary`), performance control (`--jobs`, `--no-parallel`), and verbosity options (`--verbose`) from the `analyze` command. Analysis thresholds (`--threshold-complexity`, `--threshold-duplication`, `--threshold-preset`) are configured via the `--config` file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the `analyze` command. The `explain-coverage` command is a specialized debugging tool for diagnosing coverage detection issues and has its own unique options (`--function`, `--file`).
 
 ## Troubleshooting
 

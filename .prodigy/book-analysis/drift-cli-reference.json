@@ -2,70 +2,106 @@
   "chapter_id": "cli-reference",
   "chapter_title": "CLI Reference",
   "chapter_file": "book/src/cli-reference.md",
-  "drift_detected": false,
-  "severity": "low",
-  "quality_assessment": "Excellent - Chapter is comprehensive, accurate, and well-organized with only minor omissions",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Comprehensive and accurate documentation with excellent organization, but missing one entire command (explain-coverage) and the --compact flag",
   "issues": [
     {
       "type": "missing_content",
-      "severity": "low",
+      "severity": "high",
+      "section": "Commands",
+      "description": "Chapter does not document the 'explain-coverage' command that exists in the CLI",
+      "should_add": "### `explain-coverage`\n\nExplain coverage detection for a specific function (debugging tool).\n\n**Usage:**\n```bash\ndebtmap explain-coverage <PATH> --coverage-file <FILE> --function <NAME> [OPTIONS]\n```\n\n**Arguments:**\n- `<PATH>` - Path to the codebase to analyze\n\n**Required Options:**\n- `--coverage-file <FILE>` / `--lcov <FILE>` - LCOV coverage file\n- `--function <NAME>` - Function name to explain (e.g., \"create_auto_commit\")\n\n**Optional Options:**\n- `--file <PATH>` - File path containing the function (helps narrow search)\n- `-v, --verbose` - Show all attempted matching strategies\n- `-f, --format <FORMAT>` - Output format: text or json (default: text)\n\n**Description:**\nDebugging tool that explains how coverage detection works for a specific function. Shows all attempted matching strategies and helps diagnose coverage mapping issues.",
+      "fix_suggestion": "Add a new section under 'Commands' for the explain-coverage command. Consider creating a 'Debugging Commands' subsection to separate it from main analysis commands.",
+      "source_reference": "src/cli.rs:461-485"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
       "section": "Analyze Command - Output Control",
-      "description": "Chapter doesn't document the -c/--compact flag",
-      "should_add": "Add documentation for --compact flag: 'Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags.'",
-      "fix_suggestion": "Add to Output Control section under Display Filtering. Note that it conflicts with -v/--verbose",
+      "description": "Chapter doesn't document the -c/--compact flag in the options section",
+      "current_content": "Chapter shows --compact in examples section but doesn't document it in the Options reference",
+      "should_add": "- `-c, --compact` - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv). Only available in analyze command.",
+      "fix_suggestion": "Add to Output Control section under Display Filtering. Note the short flag -c is only for analyze command since validate uses -c for --config",
       "source_reference": "src/cli.rs:121-122"
     },
     {
       "type": "incomplete_explanation",
       "severity": "low",
-      "section": "Common Workflows - Performance Tuning",
-      "description": "Chapter mentions DEBTMAP_JOBS environment variable but doesn't show it in environment variables section clearly enough",
-      "current_content": "Environment Variables section mentions DEBTMAP_JOBS but doesn't emphasize it's alternative to --jobs",
-      "should_be": "Clarify that DEBTMAP_JOBS provides same functionality as --jobs/-j flag",
-      "fix_suggestion": "In Environment Variables section, add example: 'export DEBTMAP_JOBS=8  # Same as --jobs 8'",
+      "section": "Environment Variables",
+      "description": "Chapter mentions DEBTMAP_JOBS but doesn't explicitly state it's equivalent to --jobs flag",
+      "current_content": "- `DEBTMAP_JOBS` - Number of threads for parallel processing (same as `--jobs` / `-j` flag)\n  - Example: `export DEBTMAP_JOBS=8  # Same as --jobs 8`\n  - Use `0` to utilize all available CPU cores\n  - Controls thread pool size for parallel call graph construction",
+      "should_be": "Actually, after reviewing, this IS well documented in the chapter. No change needed.",
+      "fix_suggestion": "No change needed - documentation is accurate and comprehensive",
       "source_reference": "src/cli.rs:161, 397"
     },
     {
-      "type": "missing_content",
+      "type": "incomplete_explanation",
       "severity": "low",
       "section": "Environment Variables",
-      "description": "Chapter doesn't mention that DEBTMAP_CACHE_DIR is the environment variable form of --cache-location",
-      "current_content": "Lists DEBTMAP_CACHE_DIR but doesn't make clear connection to --cache-location flag",
-      "should_be": "Explicitly state: 'DEBTMAP_CACHE_DIR - Cache location (same as --cache-location)'",
-      "fix_suggestion": "Add clarifying note that this env var maps directly to the --cache-location CLI flag",
+      "description": "Chapter mentions DEBTMAP_CACHE_DIR but could be clearer about mapping to --cache-location",
+      "current_content": "- `DEBTMAP_CACHE_DIR` - Cache location (same as `--cache-location` flag)\n  - Example: `export DEBTMAP_CACHE_DIR=/shared/team/cache`\n  - Affects where analysis results are cached for faster subsequent runs",
+      "should_be": "Actually well documented. Could add note that this is set via env attribute in clap.",
+      "fix_suggestion": "Minor: Add note that environment variable is automatically read by CLI via clap's env attribute",
       "source_reference": "src/cli.rs:189"
+    },
+    {
+      "type": "minor_inconsistency",
+      "severity": "low",
+      "section": "Options - Debugging",
+      "description": "Chapter references '--trace-functions' in some places but the actual CLI flag is '--trace-function' (singular)",
+      "current_content": "Best practices section mentions 'Use --trace-functions to track specific functions'",
+      "should_be": "Use --trace-function to track specific functions (comma-separated)",
+      "fix_suggestion": "Ensure consistent use of '--trace-function' (singular) throughout the chapter",
+      "source_reference": "src/cli.rs:265"
+    },
+    {
+      "type": "missing_detail",
+      "severity": "low",
+      "section": "Command Compatibility Matrix",
+      "description": "The compatibility matrix doesn't include the explain-coverage command",
+      "should_add": "Add row for explain-coverage command showing its supported options",
+      "fix_suggestion": "Add explain-coverage to the matrix with checkmarks for: <PATH>, --coverage-file, --function, --file, --verbose, --format",
+      "source_reference": "src/cli.rs:461-485"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of all five commands (analyze, init, validate, compare, validate-improvement)",
     "Excellent organization with clear sections (Quick Start, Commands, Options, Common Workflows, Examples)",
-    "Accurate documentation of all major flags and options",
+    "Comprehensive coverage of five main commands (analyze, init, validate, compare, validate-improvement)",
+    "Accurate documentation of nearly all flags with correct default values",
     "Helpful Command Compatibility Matrix showing which options work with which commands",
-    "Great inclusion of Troubleshooting and Best Practices sections",
-    "Deprecated options are clearly marked and migration guidance provided",
-    "Context-aware analysis and coverage integration well explained",
-    "Option aliases properly documented (e.g., --lcov for --coverage-file)",
-    "Detailed examples for common use cases",
-    "Good explanation of option conflicts (e.g., --plan vs --target-location)",
-    "Proper documentation of default values",
-    "Clear explanation of verbosity levels (-v, -vv, -vvv)",
+    "Great Troubleshooting and Best Practices sections with actionable guidance",
+    "Deprecated options clearly marked with migration guidance (--cache, --explain-score)",
+    "Context-aware analysis and coverage integration thoroughly explained",
+    "Option aliases properly documented (--lcov for --coverage-file, --head for --top, etc.)",
+    "Detailed examples for common use cases covering all major workflows",
+    "Good explanation of option conflicts (e.g., --plan vs --target-location, --show-dependencies vs --no-dependencies)",
+    "Proper documentation of default values for all options",
+    "Clear explanation of verbosity levels (-v, -vv, -vvv) with specific meanings",
     "Excellent coverage of advanced features (call graph debugging, functional analysis, pattern detection)",
-    "Complete documentation of god object detection and aggregation options"
+    "Complete documentation of god object detection and aggregation options",
+    "Environment variables section with practical examples",
+    "Well-structured option categorization by purpose (Output, Analysis, Context, Performance, Debugging, Aggregation)"
   ],
   "improvement_suggestions": [
-    "Add --compact flag to Output Control section",
-    "Clarify environment variable mappings to CLI flags more explicitly",
-    "Consider adding a 'Quick Reference' table at the top for most common flags",
-    "Add note about typical use of --jobs on different system sizes (e.g., laptops vs servers)",
-    "Consider adding more real-world CI/CD pipeline examples"
+    "Add documentation for the explain-coverage command - this is a debugging tool that helps diagnose coverage detection issues",
+    "Add --compact flag to the Options reference section (it's used in examples but not documented in options)",
+    "Consider creating a 'Debugging Commands' subsection to group explain-coverage separately from main analysis commands",
+    "Update Command Compatibility Matrix to include the explain-coverage command",
+    "Ensure consistent use of '--trace-function' (singular) throughout the chapter",
+    "Consider adding a 'Quick Reference' table at the top with most frequently used flags",
+    "Add more examples showing explain-coverage in troubleshooting coverage mapping issues",
+    "Consider adding flowchart showing when to use which command (analyze vs validate vs explain-coverage)",
+    "Add note about typical --jobs values for different system sizes (laptops: 4-8, servers: 16-32)",
+    "Include common error messages from explain-coverage and their interpretations"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-30",
+    "analyzed_at": "2025-11-06",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
-      "Commands (analyze, init, validate, compare, validate-improvement)",
+      "Commands (analyze, init, validate, compare, validate-improvement, MISSING: explain-coverage)",
       "Arguments and path specifications",
-      "All CLI options organized by category",
+      "CLI options organized by category",
       "Configuration file usage",
       "Environment variables",
       "Common workflows and examples",
@@ -78,19 +114,19 @@
         "total_flags_in_code": 67,
         "documented_in_chapter": 66,
         "missing_from_chapter": 1,
-        "details": "Missing --compact flag only"
+        "details": "Missing --compact flag documentation in options section (appears in examples only)"
       },
       "validate": {
         "total_flags_in_code": 14,
         "documented_in_chapter": 14,
         "missing_from_chapter": 0,
-        "details": "All flags documented"
+        "details": "All flags fully documented"
       },
       "compare": {
         "total_flags_in_code": 6,
         "documented_in_chapter": 6,
         "missing_from_chapter": 0,
-        "details": "All flags documented including conflicts"
+        "details": "All flags documented including conflict rules"
       },
       "init": {
         "total_flags_in_code": 1,
@@ -103,14 +139,31 @@
         "documented_in_chapter": 5,
         "missing_from_chapter": 0,
         "details": "All flags documented"
+      },
+      "explain_coverage": {
+        "total_flags_in_code": 5,
+        "documented_in_chapter": 0,
+        "missing_from_chapter": 5,
+        "details": "ENTIRE COMMAND NOT DOCUMENTED - debugging tool for coverage detection issues"
       }
     },
+    "cli_commands_found": 6,
+    "cli_commands_documented": 5,
+    "missing_commands": [
+      "explain-coverage"
+    ],
     "accuracy_metrics": {
-      "option_coverage": "98.9%",
+      "command_coverage": "83.3%",
+      "option_coverage_per_documented_command": "99.0%",
+      "overall_option_coverage": "97.8%",
       "description_accuracy": "100%",
       "default_value_accuracy": "100%",
       "example_validity": "100%",
       "alias_documentation": "100%"
-    }
+    },
+    "total_issues": 6,
+    "high_severity_issues": 1,
+    "medium_severity_issues": 1,
+    "low_severity_issues": 4
   }
 }
