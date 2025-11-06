@@ -16,21 +16,12 @@
       "source_reference": "src/cache/cache_location.rs:7-12"
     },
     {
-      "type": "minor_clarity",
-      "severity": "low",
-      "section": "Cache Scope",
-      "description": "DEBTMAP_CACHE_SCOPE is documented in the environment variables table and with an example, but the feature's purpose could be clearer",
-      "current_content": "| `DEBTMAP_CACHE_SCOPE` | Branch-specific cache scope | None | `feature-branch` |\n\n# Branch-specific caching\nexport DEBTMAP_CACHE_SCOPE=\"$(git branch --show-current)\"",
-      "improvement_suggestion": "Add a sentence explaining that this creates isolated cache namespaces for different branches, useful when switching between branches with different code states",
-      "source_reference": "src/cache/cache_location.rs:172-174"
-    },
-    {
       "type": "technical_accuracy",
       "severity": "low",
       "section": "Pruning Strategies - Age Strategy",
-      "description": "Documentation states age-based strategy 'Does not prune based on size or entry count limits' which could be misinterpreted",
-      "current_content": "### Age-Based Only\n\nOnly removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits.",
-      "improvement_suggestion": "Clarify that age-based pruning ONLY removes old entries and ignores size/count thresholds entirely. This means cache can grow unbounded if all entries are recent.",
+      "description": "Documentation accurately states age-based strategy behavior but could be even clearer",
+      "current_content": "### Age-Based Only\n\nOnly removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits - this means the cache can grow unbounded if all entries are recent.",
+      "improvement_suggestion": "Documentation already clarifies this correctly in line 152-154. No changes needed.",
       "source_reference": "src/cache/auto_pruner.rs:294-308"
     },
     {
@@ -70,15 +61,13 @@
     "Examples are practical and ready to copy-paste"
   ],
   "improvement_suggestions": [
-    "Add a note about cache scope creating isolated namespaces for different branches",
-    "Clarify that age-based-only strategy can allow unbounded cache growth if entries are recent",
     "Consider adding a decision flowchart for choosing the right pruning strategy",
     "Add example output from --cache-stats command to show users what to expect",
     "Consider adding a 'Quick Start' section at the beginning with common configurations",
-    "Add note that --cache-location CLI flag sets DEBTMAP_CACHE_DIR for that specific run"
+    "Add visual diagram of cache directory structure for better understanding"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-30",
+    "analyzed_at": "2025-11-06",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Cache location and configuration",
