@@ -106,7 +106,7 @@ Debtmap uses [Rayon](https://docs.rs/rayon), a data parallelism library for Rust
 The global Rayon thread pool is configured at startup based on the `--jobs` parameter:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:46-52
+// From src/builders/parallel_call_graph.rs:48-53
 if self.config.num_threads > 0 {
     rayon::ThreadPoolBuilder::new()
         .num_threads(self.config.num_threads)
@@ -122,7 +122,7 @@ This configures Rayon to use a specific number of worker threads for all paralle
 The `get_worker_count()` function determines how many threads to use:
 
 ```rust
-// From src/main.rs:750-758
+// From src/main.rs:828-836
 fn get_worker_count(jobs: usize) -> usize {
     if jobs == 0 {
         std::thread::available_parallelism()
@@ -151,7 +151,7 @@ fn get_worker_count(jobs: usize) -> usize {
 Files are parsed concurrently using Rayon's parallel iterators:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:98-128
+// From src/builders/parallel_call_graph.rs (parallel_parse_files method)
 let parsed_files: Vec<_> = rust_files
     .par_iter()  // Convert to parallel iterator
     .filter_map(|file_path| {
@@ -175,7 +175,7 @@ Key features:
 Files are grouped into chunks for optimal parallelization:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:130-161
+// From src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)
 let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
 
 parsed_files.par_chunks(chunk_size).for_each(|chunk| {
@@ -300,7 +300,7 @@ map.insert(key, value);
 The `ParallelCallGraph` uses DashMap for all concurrent data structures:
 
 ```rust
-// From src/priority/parallel_call_graph.rs:49-56
+// From src/priority/parallel_call_graph.rs:50-56
 pub struct ParallelCallGraph {
     nodes: Arc<DashMap<FunctionId, NodeInfo>>,      // Functions
     edges: Arc<DashSet<FunctionCall>>,              // Calls
@@ -325,7 +325,7 @@ pub struct ParallelCallGraph {
 Multiple analyzer threads can add functions simultaneously:
 
 ```rust
-// From src/priority/parallel_call_graph.rs:78-96
+// From src/priority/parallel_call_graph.rs:79-96
 pub fn add_function(
     &self,
     id: FunctionId,
@@ -356,7 +356,7 @@ pub fn add_function(
 Function calls are added with automatic deduplication:
 
 ```rust
-// From src/priority/parallel_call_graph.rs:98-117
+// From src/priority/parallel_call_graph.rs:99-117
 pub fn add_call(&self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
     let call = FunctionCall {
         caller: caller.clone(),
@@ -413,7 +413,7 @@ Debtmap tracks parallel processing progress using atomic counters that can be sa
 ### ParallelStats Structure
 
 ```rust
-// From src/priority/parallel_call_graph.rs:7-47
+// From src/priority/parallel_call_graph.rs:7-14
 pub struct ParallelStats {
     pub total_nodes: AtomicUsize,      // Functions processed
     pub total_edges: AtomicUsize,      // Calls discovered
@@ -467,7 +467,7 @@ if let Some(ref callback) = self.config.progress_callback {
 After analysis completes, debtmap reports final statistics:
 
 ```rust
-// From src/builders/parallel_call_graph.rs:84-92
+// From src/builders/parallel_call_graph.rs:85-93
 log::info!(
     "Parallel call graph complete: {} nodes, {} edges, {} files processed",
     stats.total_nodes.load(std::sync::atomic::Ordering::Relaxed),
@@ -645,7 +645,7 @@ The `merge_concurrent()` method combines call graphs from different analysis pha
 ### Implementation
 
 ```rust
-// From src/priority/parallel_call_graph.rs:119-138
+// From src/priority/parallel_call_graph.rs:120-138
 pub fn merge_concurrent(&self, other: CallGraph) {
     // Parallelize node merging
     let nodes_vec: Vec<_> = other.get_all_functions().collect();
@@ -683,7 +683,7 @@ Debtmap uses two call graph representations:
 Conversion happens at phase boundaries:
 
 ```rust
-// From src/priority/parallel_call_graph.rs:140-162
+// From src/priority/parallel_call_graph.rs:141-162
 pub fn to_call_graph(&self) -> CallGraph {
     let mut call_graph = CallGraph::new();
 
