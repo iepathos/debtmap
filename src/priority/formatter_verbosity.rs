@@ -504,13 +504,25 @@ fn format_complexity_details_section(
 
     lines.push(format!("{} {}", "-", "COMPLEXITY DETAILS:".bright_blue()));
 
-    lines.push(format!(
-        "{}  {} Cyclomatic Complexity: {}",
-        tree_pipe, "-", item.cyclomatic_complexity
-    ));
+    // Format cyclomatic complexity with entropy dampening if available
+    if let Some(ref entropy) = item.entropy_details {
+        lines.push(format!(
+            "{}  {} cyclomatic={} (dampened: {}, factor: {:.2})",
+            tree_pipe,
+            "-",
+            item.cyclomatic_complexity,
+            entropy.adjusted_complexity,
+            entropy.dampening_factor
+        ));
+    } else {
+        lines.push(format!(
+            "{}  {} cyclomatic={}",
+            tree_pipe, "-", item.cyclomatic_complexity
+        ));
+    }
 
     lines.push(format!(
-        "{}  {} Cognitive Complexity: {}",
+        "{}  {} cognitive={}",
         tree_pipe, "-", item.cognitive_complexity
     ));
 
@@ -1303,10 +1315,8 @@ mod tests {
         let lines = format_complexity_details_section(&item, &formatter);
 
         assert!(lines.iter().any(|l| l.contains("COMPLEXITY DETAILS:")));
-        assert!(lines
-            .iter()
-            .any(|l| l.contains("Cyclomatic Complexity: 15")));
-        assert!(lines.iter().any(|l| l.contains("Cognitive Complexity: 25")));
+        assert!(lines.iter().any(|l| l.contains("cyclomatic=15")));
+        assert!(lines.iter().any(|l| l.contains("cognitive=25")));
         assert!(lines
             .iter()
             .any(|l| l.contains("Function Length: 150 lines")));
