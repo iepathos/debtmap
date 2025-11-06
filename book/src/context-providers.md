@@ -47,6 +47,8 @@ The provider automatically detects entry points based on function names and file
 | Event Handler | 5.0 | `on_*`, `*_listener`, contains `event` | No |
 | Test Entry | 2.0 | `test_*`, in `test/` paths | No |
 
+**Note on API Endpoint detection:** Detection requires BOTH conditions: (1) path contains `api/`, `handler/`, or `route/` AND (2) function starts with `handle_*`, `get_*`, `post_*`, `put_*`, `delete_*` or ends with `*_handler`. This combined matching ensures accurate classification of HTTP endpoint handlers.
+
 **What it detects:**
 - Entry points (main functions, CLI handlers, API endpoints)
 - Error handling paths
@@ -60,12 +62,22 @@ Functions on critical paths receive contribution scores based on:
 - **Path weight**: The maximum entry point weight leading to the function
 - **User-facing flag**: Doubles contribution for user-facing paths
 
-```rust
-// Example: Function on main entry path (weight 10.0, user-facing)
-contribution = (10.0 / 10.0) × 2.0 = 2.0
+The contribution formula consists of two steps:
 
-// Example: Function on event handler path (weight 5.0, non-user-facing)
-contribution = (5.0 / 10.0) × 1.0 = 0.5
+```rust
+// Step 1: Calculate base contribution (normalized 0-1)
+base_contribution = path_weight / max_weight
+
+// Step 2: Apply user-facing multiplier
+final_contribution = base_contribution × user_facing_multiplier
+
+// Example: main entry path (weight 10.0, user-facing)
+base = 10.0 / 10.0 = 1.0
+final = 1.0 × 2.0 = 2.0
+
+// Example: event handler path (weight 5.0, non-user-facing)
+base = 5.0 / 10.0 = 0.5
+final = 0.5 × 1.0 = 0.5
 ```
 
 **Impact on scoring:**
@@ -113,6 +125,8 @@ The provider builds a dependency graph where:
 - **Edges** represent dependencies with coupling strength (0.0-1.0)
 - **Risk propagation** flows through dependencies using iterative refinement
 
+**Convergence Parameters:** The risk propagation algorithm uses iterative convergence with a maximum of 10 iterations. Convergence is reached when the maximum risk change between iterations falls below 0.01. This ensures risk stabilizes throughout the dependency graph.
+
 **What it detects:**
 - Upstream dependencies (functions this function calls)
 - Downstream dependencies (functions that call this function)
@@ -126,19 +140,23 @@ The blast radius represents how many modules would be affected by changes to a f
 | Blast Radius | Contribution | Impact Level |
 |--------------|--------------|--------------|
 | > 10 modules | 1.5 | Critical dependency affecting many modules |
-| 6-10 modules | 1.0 | Important dependency with moderate impact |
-| 3-5 modules | 0.5 | Limited dependency impact |
+| > 5 modules | 1.0 | Important dependency with moderate impact |
+| > 2 modules | 0.5 | Medium impact |
 | ≤ 2 modules | 0.2 | Minimal or isolated component |
 
 ### Risk Propagation Formula
 
+Risk propagation uses an iterative convergence algorithm to stabilize risk scores throughout the dependency graph:
+
 ```rust
-propagated_risk = base_risk × criticality_factor + dependency_risk
+propagated_risk = base_risk × criticality_factor + Σ(caller.risk × 0.3)
 
 where:
   criticality_factor = 1.0 + min(0.5, dependents.len() × 0.1)
-  dependency_risk = Σ(dependency.risk × coupling_strength × 0.3)
+  The 0.3 factor dampens risk propagation from callers
 ```
+
+**Iterative Convergence:** The algorithm runs with a maximum of 10 iterations and converges when the maximum risk change between iterations falls below 0.01. This ensures risk stabilizes throughout the dependency graph without requiring manual tuning.
 
 **Note**: The constants (0.5, 0.1, 0.3) are currently hard-coded based on empirical analysis. Future versions may make these configurable.
 
@@ -233,6 +251,20 @@ where:
   bug_factor = 1.0 - (bug_fixes / total_commits)
   age_factor = min(1.0, age_days / 365.0)
 ```
+
+### Stability Status Classifications
+
+The provider internally classifies files into stability statuses based on the calculated metrics:
+
+| Status | Criteria | Explanation |
+|--------|----------|-------------|
+| HighlyUnstable | freq > 5.0 AND bug_density > 0.3 | Extremely high churn combined with many bug fixes |
+| FrequentlyChanged | freq > 2.0 | High change rate regardless of bug density |
+| BugProne | bug_density > 0.2 | High proportion of bug fix commits |
+| MatureStable | age > 365 days | Code older than one year (unless unstable) |
+| RelativelyStable | (default) | Moderate activity, typical stability |
+
+These classifications are used internally for contribution calculations and appear in verbose output.
 
 **Impact on scoring:**
 - High-churn functions get higher priority
@@ -593,6 +625,8 @@ function: process_payment
 
 ## Configuration
 
+> ⚠️ **Configuration Limitation**: Provider-specific TOML configuration sections shown below are planned features not yet implemented. Currently, all provider settings use hard-coded defaults from the implementation. Use CLI flags (`--context`, `--context-providers`, `--disable-context`) to control providers. See the CLI examples throughout this chapter for working configurations.
+
 Configure context providers in `.debtmap.toml`:
 
 ```toml
@@ -605,11 +639,6 @@ context_providers = ["critical_path", "dependency", "git_history"]
 
 # Disable specific providers (use CLI flag --disable-context instead)
 # disable_context = ["git_history"]  # Not yet implemented in config
-
-# Note: The provider-specific TOML sections below are planned features.
-# Currently, all provider settings use hard-coded defaults from the implementation.
-# Use CLI flags (--context, --context-providers, --disable-context) to control providers.
-# See the CLI examples throughout this chapter for working configurations.
 
 [context.git_history]
 # Commits to analyze (default: 100) - PLANNED
@@ -811,7 +840,9 @@ Each function shows:
 
 ### Architecture Exploration
 
-The `ContextAggregator` caches context by `file:function` key to avoid redundant analysis during a single run. The cache is in-memory per `ContextAggregator` instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run:
+The `ContextAggregator` caches context by `file:function` key to avoid redundant analysis during a single run.
+
+**Cache Lifetime:** The cache is in-memory per `ContextAggregator` instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run without requiring external cache management:
 
 ```rust
 let mut aggregator = ContextAggregator::new()

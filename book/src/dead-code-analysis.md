@@ -14,7 +14,7 @@ The dead code analyzer combines several detection techniques:
 - **Coverage integration** - Uses test coverage data when available to identify live code
 - **Public API detection** - Uses heuristics to identify external API functions
 
-This multi-layered approach achieves a target false positive rate of less than 10%, compared to 30-40% for naive call graph analysis.
+This multi-layered approach significantly reduces false positives compared to naive call graph analysis, with the goal of achieving a target false positive rate of less than 10% (see Spec 116 for confidence scoring validation).
 
 ## Confidence Scoring
 
@@ -293,11 +293,11 @@ let result = analyzer.analyze_function(&func, &call_graph);
 
 ### Accuracy Improvement
 
-Coverage integration typically provides:
-- **60-70% reduction** in false positives for complex codebases
-- **Near-zero false positives** for functions with test coverage
-- **Confidence in removal** for uncovered code
-- **Detection of dynamic calls** that static analysis misses
+Coverage integration substantially improves accuracy by:
+- **Significantly reducing false positives** - Eliminates most false positives in complex codebases
+- **High accuracy for covered functions** - Functions with test coverage are correctly identified as live
+- **Clear removal candidates** - Uncovered code with no static callers is more confidently dead
+- **Dynamic call detection** - Catches functions called via `getattr()`, plugins, or other dynamic mechanisms that static analysis misses
 
 **Coverage data format**: Debtmap uses the standard `coverage.json` format produced by `coverage.py` and `pytest-cov`. The file should be in your project root and contain executed line numbers for each source file.
 
@@ -330,17 +330,19 @@ api_files = [
 
 ### Programmatic Configuration (Rust API)
 
-Confidence thresholds and analysis behavior are configured programmatically:
+**Note**: Confidence thresholds and analysis behavior are configured programmatically via the Rust API. These settings are **not available** in `.debtmap.toml` - only the `detect_external_api` and API detection settings can be configured via TOML (see above).
+
+For Rust API users, you can customize thresholds:
 
 ```rust
 use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
 
 let config = AnalysisConfig {
-    // Confidence thresholds
+    // Confidence thresholds (Rust API only - not in .debtmap.toml)
     high_confidence_threshold: 0.8,       // Default: 0.8 (80%)
     medium_confidence_threshold: 0.5,     // Default: 0.5 (50%)
 
-    // Analysis options
+    // Analysis options (Rust API only)
     respect_suppression_comments: true,   // Honor # debtmap: not-dead (default: true)
     include_private_api: true,            // Analyze private functions (default: true)
     enable_public_api_detection: true,    // Use public API heuristics (default: true)
@@ -449,18 +451,22 @@ Is the function flagged as dead?
 - `is_dead: false` → **Always keep (function is live)**
 - `is_dead: true` + `confidence: LOW` → **Keep (too uncertain to remove)**
 
-### CLI Filtering by Confidence
+### Filtering Results by Confidence
+
+To filter dead code results by confidence level, you can process the JSON output:
 
 ```bash
-# Show only high confidence dead code
-debtmap analyze --min-confidence=0.8
+# Analyze and output JSON
+debtmap analyze --format=json > results.json
 
-# Show high and medium confidence
-debtmap analyze --min-confidence=0.5
+# Filter for high confidence dead code using jq
+jq '.dead_code | map(select(.confidence >= 0.8))' results.json
 
-# Show all results (including low confidence)
-debtmap analyze --min-confidence=0.0
+# Filter for high and medium confidence
+jq '.dead_code | map(select(.confidence >= 0.5))' results.json
 ```
+
+Note: CLI filtering by confidence threshold (e.g., `--min-confidence`) is planned for a future release (see Spec 116). Currently, filtering must be done via JSON post-processing.
 
 See [CLI Reference](cli-reference.md) for complete command options.
 

@@ -443,7 +443,7 @@ minimum_risk_score = 15.0
 minimum_cyclomatic_complexity = 5
 ```
 
-**Important**: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: `Final Score = Base Score × (1.0 - coverage_pct)`. These weights only apply when coverage data is **not** available. See `src/priority/scoring/calculation.rs:68-82` and `src/config.rs:122-132` for the implementation.
+**Important**: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: `Final Score = Base Score × (1.0 - coverage_pct)`. These weights only apply when coverage data is **not** available. See `src/priority/scoring/calculation.rs:68-82` for the coverage dampening calculation and `src/priority/scoring/calculation.rs:119-129` for the fallback weighted sum mode.
 
 See [Configuration](configuration.md) for complete options.
 

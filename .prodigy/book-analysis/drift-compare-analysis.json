@@ -4,127 +4,150 @@
   "chapter_file": "book/src/compare-analysis.md",
   "drift_detected": true,
   "severity": "critical",
-  "quality_assessment": "Chapter documents comprehensive comparison features that don't fully match the current implementation. The actual implementation is validation-focused rather than full-featured comparison. Types exist but implementation incomplete.",
+  "quality_assessment": "Chapter contains severe outdated information - claims core features are 'planned' when they are fully implemented. This will confuse users and prevent them from using available functionality.",
   "issues": [
     {
-      "type": "incomplete_implementation",
+      "type": "outdated_information",
       "severity": "critical",
-      "section": "Compare Command Implementation",
-      "description": "Chapter documents comprehensive comparison features (target tracking, fuzzy matching, improvements tracking), but actual implementation in compare_debtmap.rs is validation-focused with simpler logic",
-      "current_content": "compare_debtmap.rs implements basic validation (resolved items, improved items, new items, unchanged critical) without target location tracking, fuzzy matching, or detailed improvement metrics",
-      "should_be": "Full comparison implementation matching ComparisonResult type with target tracking, match strategies (Exact, FuzzyFunction, FuzzyFile), and detailed improvement metrics",
-      "fix_suggestion": "Either: (1) Update chapter to accurately reflect current validation-focused implementation, OR (2) Implement full comparison features documented in chapter using types defined in src/comparison/types.rs",
-      "source_reference": "src/commands/compare_debtmap.rs vs src/comparison/types.rs"
-    },
-    {
-      "type": "missing_feature",
-      "severity": "high",
-      "section": "Target Location Tracking",
-      "description": "Chapter extensively documents target location tracking with fuzzy matching (Exact, FuzzyFunction, FuzzyFile), but implementation doesn't support target locations or matching strategies",
-      "should_add": "Target location parsing, fuzzy matching logic, match confidence scoring as documented in lines 41-104 of chapter",
-      "fix_suggestion": "Implement target location tracking using ComparisonResult::target_item or document that this feature is planned/not yet available",
-      "source_reference": "src/comparison/types.rs:TargetComparison (defined but unused)"
-    },
-    {
-      "type": "missing_feature",
-      "severity": "high",
-      "section": "Matching Strategies",
-      "description": "Chapter documents three matching strategies (Exact 1.0, FuzzyFunction 0.8-0.95, FuzzyFile 0.6-0.8) with confidence scores, but no matching logic exists",
-      "should_add": "Implement fuzzy matching for renamed/moved functions with confidence scoring",
-      "fix_suggestion": "Add fuzzy matching module or document as future feature with clear roadmap",
-      "source_reference": "Chapter lines 94-104 vs src/commands/compare_debtmap.rs (no matching logic)"
+      "section": "Implementation Status (lines 5-24)",
+      "description": "Chapter claims target location tracking, fuzzy matching, improvement percentages, and markdown/terminal output are 'Planned Features (Coming Soon)' when they are FULLY IMPLEMENTED",
+      "current_content": "**Planned Features (Coming Soon)**:\n- 🚧 Target location tracking with fuzzy matching\n- 🚧 Detailed improvement percentage calculations (per-item)\n- 🚧 Markdown and terminal output formats\n- 🚧 Implementation plan parsing for target extraction\n- 🚧 Match strategies (Exact, FuzzyFunction, FuzzyFile)",
+      "should_be": "All these features are implemented and available now. The CLI accepts --plan, --target-location, and --format options. ComparisonResult type includes all planned fields.",
+      "fix_suggestion": "Move all 'planned' features to 'Current Implementation' section. Remove all warning boxes claiming features are under development. Update examples to show actual usage.",
+      "source_reference": "src/cli.rs:401-427 (Compare command with all options), src/comparison/types.rs (ComparisonResult with all fields), src/comparison/location_matcher.rs (MatchStrategy enum with Exact, FunctionLevel, ApproximateName, FileLevel)"
     },
     {
       "type": "outdated_information",
+      "severity": "critical",
+      "section": "Target Location Tracking (lines 62-139)",
+      "description": "Entire section marked as 'Planned Feature' with warning box, but target location tracking is fully implemented",
+      "current_content": "> **⚠️ Planned Feature**: Target location tracking with fuzzy matching is currently under development.",
+      "should_be": "Target location tracking is fully implemented. Users can specify --plan or --target-location and get TargetComparison results with match strategy and confidence.",
+      "fix_suggestion": "Remove warning box. Update section to show it's a current feature. Correct match strategy names to match implementation (Exact, FunctionLevel, ApproximateName, FileLevel).",
+      "source_reference": "src/comparison/location_matcher.rs:pub enum MatchStrategy"
+    },
+    {
+      "type": "incorrect_example",
       "severity": "high",
-      "section": "Critical Score Threshold",
-      "description": "Chapter states critical items have score >= 60 throughout examples and documentation",
-      "current_content": "critical_items: Items with score >= 60 (lines 91, 154, 170, 177)",
-      "should_be": "critical_items: Items with score >= 8.0 (actual CRITICAL_SCORE_THRESHOLD in code)",
-      "fix_suggestion": "Update all references to critical threshold from 60 to 8.0 throughout chapter",
-      "source_reference": "src/commands/compare_debtmap.rs:429 (CRITICAL_SCORE_THRESHOLD = 8.0)"
+      "section": "Matching Strategies table (lines 118-127)",
+      "description": "Match strategy names don't match implementation. Chapter shows 'Exact, FuzzyFunction, FuzzyFile' but code has 'Exact, FunctionLevel, ApproximateName, FileLevel'",
+      "current_content": "| Strategy | When Used | Confidence |\n|----------|-----------|------------|\n| **Exact** | Location matches exactly | 1.0 |\n| **FuzzyFunction** | Function moved but name unchanged | 0.8 - 0.95 |\n| **FuzzyFile** | File changed but function exists | 0.6 - 0.8 |",
+      "should_be": "| Strategy | When Used | Confidence |\n|----------|-----------|------------|\n| **Exact** | file:function:line matches exactly | 1.0 |\n| **FunctionLevel** | file:function matches (any line) | 0.8 |\n| **ApproximateName** | Fuzzy name matching | 0.6 |\n| **FileLevel** | All items in file | 0.4 |",
+      "fix_suggestion": "Update table to match actual MatchStrategy enum variants and their confidence scores from the implementation.",
+      "source_reference": "src/comparison/location_matcher.rs:13-18 (MatchStrategy enum), src/comparison/location_matcher.rs:42-47 (confidence scoring)"
     },
     {
-      "type": "missing_feature",
+      "type": "outdated_information",
+      "severity": "critical",
+      "section": "Before/After Metrics (lines 327-399)",
+      "description": "Section claims detailed target metrics are 'Planned Feature' when TargetMetrics and ImprovementMetrics are fully implemented",
+      "current_content": "> **⚠️ Planned Feature**: Detailed target item tracking with before/after metrics is under development.\n\n### Planned: Target Metrics Structure\n\nFuture versions will support detailed target item comparison:",
+      "should_be": "This is a current feature. TargetComparison includes before/after TargetMetrics with score, cyclomatic_complexity, cognitive_complexity, coverage, function_length, nesting_depth plus ImprovementMetrics with percentage calculations.",
+      "fix_suggestion": "Remove 'Planned' prefix and warning box. Show this as current functionality. The exact JSON structure shown is already returned by the compare command.",
+      "source_reference": "src/comparison/types.rs:32-62 (TargetComparison, TargetMetrics, ImprovementMetrics structs)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "critical",
+      "section": "Output Formats - Markdown (lines 469-484)",
+      "description": "Claims markdown format is 'Coming Soon' when it's fully implemented in OutputFormat enum and used by compare command",
+      "current_content": "> **🚧 Coming Soon**: Markdown output format for human-readable reports.\n\nPlanned for pull request comments and documentation:",
+      "should_be": "Markdown output format is available now via --format markdown option.",
+      "fix_suggestion": "Remove 'Coming Soon' warning. Show actual usage with real markdown output examples. The CLI accepts markdown as a format option.",
+      "source_reference": "src/cli.rs:421-422 (format: OutputFormat enum with Json, Markdown, Terminal variants)"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Command-Line Options table (lines 48-60)",
+      "description": "Table lists --plan, --target-location, and --format options as 'Planned Options (not yet implemented)' when they are implemented and documented in CLI",
+      "current_content": "**Planned Options** (not yet implemented):\n- `--plan FILE` - Implementation plan to extract target location\n- `--target-location LOCATION` - Manual target location\n- `--format FORMAT` - Output format (markdown, terminal)",
+      "should_be": "All these options are implemented. Should be in main options table, not in 'Planned' section.",
+      "fix_suggestion": "Move these options to the main 'Command-Line Options' table. Add them as available options with proper descriptions. Remove 'not yet implemented' disclaimer.",
+      "source_reference": "src/cli.rs:411-426 (plan, target_location, format, output options all present)"
+    },
+    {
+      "type": "missing_content",
       "severity": "medium",
-      "section": "Improvement Percentage Calculations",
-      "description": "Chapter documents detailed improvement percentage calculations (score_reduction_pct, complexity_reduction_pct, coverage_improvement_pct) with specific examples",
-      "current_content": "Implementation only calculates basic complexity_reduction as average across improved items",
-      "should_be": "Per-item improvement percentages as shown in chapter examples (lines 221-237, 287-295)",
-      "fix_suggestion": "Enhance identify_improved_items to return per-item improvement metrics or clarify chapter shows aspirational API",
-      "source_reference": "src/commands/compare_debtmap.rs:303-369 vs chapter examples"
+      "section": "Matching Strategies",
+      "description": "Chapter doesn't document all four match strategies - missing FunctionLevel and ApproximateName",
+      "should_add": "Document all four MatchStrategy variants: Exact (1.0 confidence), FunctionLevel (0.8), ApproximateName (0.6), FileLevel (0.4). Explain when each is used.",
+      "fix_suggestion": "Add complete documentation of all match strategies with examples of each. Explain the matching algorithm and confidence scoring.",
+      "source_reference": "src/comparison/location_matcher.rs:13-18 (MatchStrategy enum with all variants)"
     },
     {
-      "type": "missing_feature",
+      "type": "incorrect_example",
       "severity": "medium",
-      "section": "Regression Detection with Description",
-      "description": "Chapter shows regressions include location, score, debt_type, and description fields",
-      "current_content": "Implementation identifies new critical items but doesn't populate RegressionItem structure with debt_type or description",
-      "should_be": "Full RegressionItem struct as defined in types.rs with debt_type and description populated",
-      "fix_suggestion": "Enhance regression detection to extract debt type and generate descriptions, or output simpler format",
-      "source_reference": "src/comparison/types.rs:104-110 vs src/commands/compare_debtmap.rs:383-421"
+      "section": "Regression Detection (lines 192-236)",
+      "description": "Chapter shows two different output structures - ValidationResult and ComparisonResult - but compare command only returns ComparisonResult",
+      "current_content": "**Current Output Structure** (ValidationResult):\n...\n\n**Planned Output Structure** (ComparisonResult):",
+      "should_be": "The compare command returns ComparisonResult (not ValidationResult). ValidationResult is from the separate 'validate' command.",
+      "fix_suggestion": "Clarify that compare command returns ComparisonResult. If showing ValidationResult, note it's from a different command. Don't label ComparisonResult as 'planned' - it's the actual current output.",
+      "source_reference": "src/comparison/types.rs:4-22 (ComparisonResult struct), src/comparison/types.rs:105-110 (RegressionItem with location, score, debt_type, description)"
     },
     {
-      "type": "missing_feature",
+      "type": "incorrect_example",
       "severity": "medium",
-      "section": "Output Formats (Markdown, Terminal)",
-      "description": "Chapter documents markdown and terminal output formats in addition to JSON",
-      "current_content": "CLI accepts format parameter but implementation only outputs validation JSON",
-      "should_be": "Markdown formatter for PR comments and terminal formatter for human-readable output",
-      "fix_suggestion": "Implement markdown/terminal formatters or remove format options from CLI until implemented",
-      "source_reference": "src/cli.rs:421-422 vs src/commands/compare_debtmap.rs (only JSON output)"
+      "section": "Improvement Tracking (lines 263-326)",
+      "description": "Chapter shows ValidationResult format with string improvements array, but ComparisonResult uses ImprovementItem struct array",
+      "current_content": "The current implementation provides improvements as human-readable strings in the ValidationResult:\n\n```json\n{\n  \"improvements\": [\n    \"2 high priority items resolved\",\n    \"Average complexity reduction: 35%\"\n  ]\n}\n```\n\n### Planned: Detailed Improvement Metrics",
+      "should_be": "ComparisonResult.improvements is Vec<ImprovementItem> with location, before_score, after_score, and improvement_type fields. This is the current structure, not planned.",
+      "fix_suggestion": "Remove 'Planned' section. Show actual ImprovementItem structure as current. Update examples to match ComparisonResult schema.",
+      "source_reference": "src/comparison/types.rs:112-126 (ImprovementItem and ImprovementType)"
     },
     {
-      "type": "inconsistent_structure",
+      "type": "missing_content",
       "severity": "medium",
-      "section": "Output Structure",
-      "description": "Chapter shows ComparisonResult structure with metadata, target_item, project_health, regressions, improvements, summary",
-      "current_content": "Implementation outputs ValidationResult with different fields: completion_percentage, status, improvements (strings), remaining_issues, gaps, before_summary, after_summary",
-      "should_be": "ComparisonResult matching documented structure in chapter examples",
-      "fix_suggestion": "Either refactor implementation to use ComparisonResult type, or update chapter to document ValidationResult structure",
-      "source_reference": "src/comparison/types.rs:4-22 vs src/commands/compare_debtmap.rs:9-17"
-    },
-    {
-      "type": "missing_feature",
-      "severity": "low",
-      "section": "Improvement Types Enum",
-      "description": "Chapter shows improvement_type with Resolved and ScoreReduced values",
-      "current_content": "types.rs defines ImprovementType enum with Resolved, ScoreReduced, ComplexityReduced, CoverageImproved but not used in implementation",
-      "should_be": "ImprovementType populated in improvement items",
-      "fix_suggestion": "Use ImprovementType enum or simplify chapter documentation to match simpler implementation",
-      "source_reference": "src/comparison/types.rs:120-126 (unused enum)"
+      "section": "Critical Debt Threshold",
+      "description": "Chapter states critical items have score >= 8.0, but implementation uses >= 60.0",
+      "current_content": "Items with score ≥ 8.0 (critical threshold)",
+      "should_be": "Items with score >= 60.0 (critical threshold according to ProjectMetrics)",
+      "fix_suggestion": "Update all references to critical threshold from 8.0 to 60.0. Also document high_priority_items threshold as >= 40.0.",
+      "source_reference": "src/comparison/types.rs:91-92 (critical_items: score >= 60, high_priority_items: score >= 40)"
     },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Plan File Parsing",
-      "description": "Chapter documents extracting target location from IMPLEMENTATION_PLAN.md with specific format",
-      "should_add": "Implementation to parse plan files and extract 'Location:' field as documented in lines 58-81",
-      "fix_suggestion": "Add plan parsing logic or clarify that --plan is not yet functional",
-      "source_reference": "src/cli.rs:412 (plan option exists) but no parsing code in compare_debtmap.rs"
+      "section": "Plan Parser Format",
+      "description": "Chapter shows example implementation plan with target location, but doesn't document the exact parsing pattern",
+      "should_add": "Document that plan parser looks for pattern '**Location**: file:function:line' in markdown files. Show exact format required.",
+      "fix_suggestion": "Add subsection explaining plan parser implementation and the exact markdown pattern it matches.",
+      "source_reference": "src/comparison/plan_parser.rs (extracts target location from implementation plan markdown)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Improvement Threshold",
+      "description": "Chapter mentions 30% improvement threshold but doesn't clearly state this is configurable or hardcoded",
+      "should_add": "Clarify that 30% score reduction is the hardcoded threshold for 'Improved' status. Items with less improvement are classified as 'Unchanged'.",
+      "fix_suggestion": "Add note about improvement threshold and when items are classified as Improved vs Unchanged.",
+      "source_reference": "src/comparison/comparator.rs (uses 30% threshold for improvement detection)"
     }
   ],
   "positive_aspects": [
-    "Chapter is comprehensive and well-organized with clear examples",
-    "CLI argument structure matches documented interface exactly",
-    "Type definitions in src/comparison/types.rs align perfectly with chapter documentation",
-    "CI/CD integration examples are practical and complete",
-    "Troubleshooting section covers common scenarios",
-    "Progressive disclosure from basic to advanced usage",
-    "Good coverage of all documented topics"
+    "Comprehensive examples showing CI/CD integration",
+    "Good progression from basic to advanced usage",
+    "Helpful troubleshooting section",
+    "Clear explanations of concepts like debt trends and regression detection",
+    "Well-structured with good use of tables and code examples",
+    "Practical bash script examples (Example 5, 6)"
   ],
   "improvement_suggestions": [
-    "Add clear 'Implementation Status' section noting which features are implemented vs planned",
-    "Either complete the full ComparisonResult implementation or update chapter to document ValidationResult",
-    "Correct critical threshold from 60 to 8.0 throughout all examples",
-    "Add examples using actual ValidationResult output structure users will see",
-    "Include note about comparison vs validation distinction",
-    "Consider splitting into 'Compare Command (Planned)' and 'Validation (Current)' chapters",
-    "Add version compatibility notes for when full comparison features will be available"
+    "Update entire chapter to reflect that ALL features are implemented and available",
+    "Remove all 'Planned Feature' and 'Coming Soon' warnings",
+    "Correct match strategy names to match implementation (Exact, FunctionLevel, ApproximateName, FileLevel)",
+    "Fix critical threshold from 8.0 to 60.0 throughout",
+    "Clarify difference between compare command (returns ComparisonResult) and validate command (returns ValidationResult)",
+    "Add high_priority_items threshold documentation (>= 40.0)",
+    "Show actual ComparisonResult JSON structure, not ValidationResult",
+    "Update command-line options table to include all implemented options",
+    "Add real examples of markdown and terminal format output",
+    "Document plan parser markdown pattern requirements",
+    "Add section on ImprovementType enum values and their meanings"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-30",
-    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "analyzed_at": "2025-11-06",
+    "feature_inventory": "Derived from source code analysis (src/cli.rs, src/comparison/*.rs)",
     "topics_covered": [
       "Compare command usage",
       "Target location tracking",

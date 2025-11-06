@@ -317,7 +317,7 @@ Debtmap detects code duplication using **hash-based chunk comparison**:
 4. **Match duplicates** - Find chunks with identical hashes
 5. **Merge adjacent** - Consolidate consecutive duplicate blocks
 
-**Note:** The minimum chunk size is configurable via the `--threshold-duplication` flag (default: 50 lines).
+**Note:** The minimum chunk size is configurable via the `--threshold-duplication` flag or in `.debtmap.toml` (default: 50 lines).
 
 **Implementation:** `src/debt/duplication.rs:6-44` (detect_duplication)
 
@@ -558,12 +558,15 @@ Architectural analysis results are integrated with debtmap's debt categorization
 
 ### Debt Type Mapping
 
-- **CircularDependency** - Circular dependency cycles detected
-- **HighCoupling** - Modules exceeding coupling threshold
-- **Duplication** - Duplicated code blocks found
-- **ArchitecturalViolation** - SDP violations, zone issues
+Architectural issues are mapped to existing DebtType enum variants:
 
-**Reference:** See `src/core/mod.rs` for debt type definitions
+- **Duplication** - Duplicated code blocks found
+- **Dependency** - Used for circular dependencies and coupling issues
+- **CodeOrganization** - May be used for architectural violations (SDP, zone issues)
+
+**Note:** The DebtType enum does not have dedicated variants for CircularDependency, HighCoupling, or ArchitecturalViolation. Architectural issues are mapped to existing general-purpose debt types.
+
+**Reference:** `src/core/mod.rs:220-236` for actual DebtType enum definition
 
 ### Tiered Prioritization
 
@@ -639,9 +642,9 @@ See [Configuration](configuration.md) for complete options.
 
 ### "Too many coupling warnings"
 
-**Cause:** Default threshold may be too strict for your codebase.
+**Cause:** Default threshold of 5 may be too strict for your codebase.
 
-**Solution:** Adjust `coupling_threshold` in `.debtmap.toml` to match your architecture.
+**Solution:** The coupling threshold is currently hardcoded at 5 in the implementation (`src/debt/coupling.rs:62`). To adjust it, you would need to modify the source code. Consider using suppression patterns to exclude specific modules if needed. See [Suppression Patterns](suppression-patterns.md).
 
 ### "Duplication detected in generated code"
 

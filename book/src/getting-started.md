@@ -141,6 +141,7 @@ debtmap init
 debtmap validate ./src --max-debt-density 5.0
 
 # Validate using config file settings
+# Note: CLI flags override config file values when both are specified
 debtmap validate . --config .debtmap.toml --max-debt-density 5.0
 
 # Compare before/after to track improvements
@@ -315,7 +316,7 @@ Core features available:
 
 ## Example Output
 
-When you run `debtmap analyze .`, you'll see output like this:
+When you run `debtmap analyze .`, you'll see output similar to this:
 
 ```
 ════════════════════════════════════════════

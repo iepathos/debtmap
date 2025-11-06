@@ -1,154 +1,156 @@
 {
-  "project_info": {
-    "name": "Debtmap",
-    "description": "Code complexity and technical debt analyzer for Rust, Python, JavaScript, and TypeScript",
-    "analyzed_version": "0.2.0+",
-    "analysis_date": "2025-10-25"
-  },
   "cli_commands": {
     "analyze": {
       "description": "Analyze code for complexity and technical debt",
-      "primary_options": {
-        "path": "Directory or file to analyze",
-        "format": "Output format (json, markdown, terminal)",
-        "threshold_complexity": "Cyclomatic complexity threshold (default: 10)",
-        "coverage_file": "LCOV coverage file for risk analysis and score dampening"
-      },
-      "filtering_options": {
-        "languages": "Analyze specific languages (rust, python, javascript, typescript)",
-        "top": "Show only top N priority items",
-        "tail": "Show only bottom N priority items",
-        "min_priority": "Filter by priority (low, medium, high, critical)",
-        "filter_categories": "Filter by debt categories",
-        "max_files": "Limit number of files to analyze"
-      },
-      "output_control": {
-        "summary": "Use summary format with tiered priority display",
-        "group_by_category": "Group output by debt category",
-        "detail_level": "Diagnostic detail level (summary, standard, comprehensive, debug)",
-        "plain": "Plain output mode (ASCII-only, no colors, machine-parseable)",
-        "verbosity": "Increase verbosity (-v, -vv, -vvv)"
-      },
-      "analysis_modes": {
-        "context": "Enable context-aware risk analysis",
-        "context_providers": "Select providers (critical_path, dependency, git_history)",
-        "multi_pass": "Enable multi-pass analysis with attribution",
-        "show_attribution": "Show complexity attribution details",
-        "semantic_off": "Disable semantic analysis (fallback mode)"
-      },
-      "threshold_presets": {
-        "strict": "High code quality standards",
-        "balanced": "Typical projects (default)",
-        "lenient": "Legacy or complex domains"
-      },
-      "performance_options": {
-        "no_parallel": "Disable parallel processing",
-        "jobs": "Number of threads (0 = all cores)",
-        "use_cache": "Enable caching (default: on)",
-        "clear_cache": "Clear cache before analysis",
-        "cache_location": "Cache location strategy (local, shared, or path)"
-      },
-      "advanced_features": {
-        "debug_call_graph": "Enable call graph debugging",
-        "trace_functions": "Trace specific functions during resolution",
-        "validate_call_graph": "Validate call graph structure",
-        "show_dependencies": "Show caller/callee information",
-        "ast_functional_analysis": "AST-based functional composition analysis",
-        "explain_metrics": "Explain metric definitions and formulas"
-      },
-      "god_object_detection": {
-        "no_god_object": "Disable god object detection",
-        "aggregate_only": "Show only aggregated file-level scores",
-        "no_aggregation": "Disable file-level aggregation",
-        "aggregation_method": "Method (sum, weighted_sum, logarithmic_sum, max_plus_average)",
-        "min_problematic": "Minimum problematic functions for aggregation"
-      },
-      "pattern_detection": {
-        "no_pattern_detection": "Disable pattern recognition",
-        "patterns": "Enable specific patterns (observer, singleton, factory, strategy, callback, template_method)",
-        "pattern_threshold": "Pattern confidence threshold (0.0-1.0, default: 0.7)",
-        "show_pattern_warnings": "Show uncertain detection warnings"
-      },
-      "dead_code_analysis": {
-        "no_public_api_detection": "Disable public API heuristics",
-        "public_api_threshold": "Public API confidence threshold (default: 0.7)"
-      }
-    },
-    "validate": {
-      "description": "Validate code against quality thresholds",
-      "options": {
-        "path": "Directory or file to validate",
-        "config": "Configuration file path",
-        "coverage_file": "LCOV coverage file",
-        "max_debt_density": "Maximum debt density per 1000 LOC",
-        "format": "Output format",
-        "verbosity": "Verbosity level",
-        "no_parallel": "Disable parallel processing",
-        "jobs": "Number of threads"
-      }
-    },
-    "compare": {
-      "description": "Compare two analysis results and generate diff",
-      "options": {
-        "before": "Path to 'before' analysis JSON",
-        "after": "Path to 'after' analysis JSON",
-        "plan": "Path to implementation plan (for target location)",
-        "target_location": "Target location (file:function:line)",
-        "format": "Output format (json, markdown, terminal)",
-        "output": "Output file path"
-      },
-      "comparison_features": {
-        "target_tracking": "Track specific item improvements",
-        "project_health": "Overall debt trend analysis",
-        "regression_detection": "Identify new critical items",
-        "metrics_comparison": "Before/after metric comparison",
-        "improvement_percentage": "Calculate reduction percentages"
-      }
+      "common_options": [
+        "path",
+        "format (json/markdown/terminal)",
+        "output",
+        "threshold-complexity",
+        "threshold-duplication",
+        "languages",
+        "coverage-file (lcov)",
+        "top/tail filtering",
+        "summary mode",
+        "verbosity levels (-v, -vv, -vvv)",
+        "compact mode",
+        "plain mode (ASCII-only)"
+      ],
+      "advanced_options": [
+        "enable-context",
+        "context-providers",
+        "disable-context",
+        "semantic-off",
+        "group-by-category",
+        "min-priority",
+        "filter-categories",
+        "no-context-aware",
+        "threshold-preset (strict/balanced/lenient)"
+      ],
+      "parallel_processing": [
+        "no-parallel",
+        "jobs (thread count)"
+      ],
+      "caching": [
+        "cache (enabled by default)",
+        "no-cache",
+        "clear-cache",
+        "force-cache-rebuild",
+        "cache-stats",
+        "migrate-cache",
+        "cache-location"
+      ],
+      "advanced_analysis": [
+        "multi-pass",
+        "show-attribution",
+        "detail-level (summary/standard/comprehensive/debug)",
+        "aggregate-only",
+        "no-aggregation",
+        "aggregation-method",
+        "min-problematic",
+        "no-god-object",
+        "max-files",
+        "validate-loc",
+        "no-public-api-detection",
+        "public-api-threshold",
+        "no-pattern-detection",
+        "patterns",
+        "pattern-threshold",
+        "show-pattern-warnings"
+      ],
+      "call_graph": [
+        "debug-call-graph",
+        "trace-functions",
+        "call-graph-stats-only",
+        "debug-format (text/json)",
+        "validate-call-graph",
+        "show-dependencies",
+        "no-dependencies",
+        "max-callers",
+        "max-callees",
+        "show-external",
+        "show-std-lib"
+      ],
+      "functional_analysis": [
+        "ast-functional-analysis",
+        "functional-analysis-profile (strict/balanced/lenient)"
+      ],
+      "use_cases": [
+        "Code quality assessment",
+        "Technical debt tracking",
+        "Complexity hotspot identification",
+        "Coverage gap analysis",
+        "Priority-based refactoring planning",
+        "CI/CD quality gates"
+      ]
     },
     "init": {
-      "description": "Initialize configuration file",
-      "options": {
-        "force": "Overwrite existing config"
-      }
+      "description": "Initialize debtmap configuration file",
+      "options": ["force"],
+      "use_cases": ["Project setup", "Configuration management"]
+    },
+    "validate": {
+      "description": "Validate project against technical debt thresholds",
+      "options": [
+        "path",
+        "config",
+        "coverage-file",
+        "format",
+        "output",
+        "enable-context",
+        "context-providers",
+        "disable-context",
+        "max-debt-density",
+        "top",
+        "tail",
+        "semantic-off",
+        "verbosity",
+        "no-parallel",
+        "jobs"
+      ],
+      "use_cases": [
+        "Quality gate enforcement",
+        "CI/CD integration",
+        "Regression prevention",
+        "Debt density monitoring"
+      ]
+    },
+    "compare": {
+      "description": "Compare technical debt between two analysis results",
+      "options": [
+        "before (JSON file path)",
+        "after (JSON file path)",
+        "plan (optional)",
+        "target-location",
+        "format",
+        "output"
+      ],
+      "use_cases": [
+        "Refactoring validation",
+        "Progress tracking",
+        "Impact assessment",
+        "Before/after analysis"
+      ]
+    },
+    "validate-improvement": {
+      "description": "Validate that a refactoring improved code quality",
+      "options": [
+        "comparison (comparison JSON)",
+        "output",
+        "previous-validation",
+        "threshold",
+        "format",
+        "quiet"
+      ],
+      "use_cases": [
+        "Automated validation workflows",
+        "Quality improvement verification",
+        "Regression detection",
+        "CI/CD quality checks"
+      ]
     }
   },
   "core_analysis": {
-    "supported_languages": {
-      "rust": {
-        "parser": "tree-sitter-rust",
-        "features": ["Call graph", "Trait resolution", "Macro expansion", "Ownership analysis"],
-        "thresholds": {
-          "max_methods": 20,
-          "max_fields": 15,
-          "max_complexity": 200,
-          "max_lines": 1000
-        }
-      },
-      "python": {
-        "parser": "tree-sitter-python",
-        "features": ["Call graph", "Import tracking", "Async patterns", "Exception flow"],
-        "thresholds": {
-          "max_methods": 15,
-          "max_fields": 10,
-          "max_complexity": 150,
-          "max_lines": 500
-        }
-      },
-      "javascript": {
-        "parser": "tree-sitter-javascript",
-        "features": ["Callback patterns", "Observer patterns", "Dependency tracking"],
-        "thresholds": {
-          "max_methods": 15,
-          "max_fields": 20,
-          "max_complexity": 150,
-          "max_lines": 500
-        }
-      },
-      "typescript": {
-        "parser": "tree-sitter-typescript",
-        "features": ["Type tracking", "Interface analysis", "Dependency injection"]
-      }
-    },
     "complexity_metrics": {
       "measured_metrics": {
         "cyclomatic_complexity": "Count of decision points (if, match, while, etc.)",
@@ -165,541 +167,576 @@
           "note": "This is an ESTIMATE, not a count from the AST"
         }
       },
-      "aggregation_methods": {
-        "sum": "Simple sum of all function scores",
-        "weighted_sum": "Weighted by function importance",
-        "logarithmic_sum": "Logarithmic scaling to prevent explosion",
-        "max_plus_average": "Maximum score + average of others"
+      "terminology_notes": [
+        "Measured metrics are precise, repeatable, suitable for thresholds",
+        "Estimated metrics are approximate, useful for prioritization and heuristics",
+        "Use cyclomatic_complexity for code quality gates",
+        "Use est_branches for estimating testing effort"
+      ]
+    },
+    "language_support": {
+      "rust": {
+        "parser": "tree-sitter-rust",
+        "features": [
+          "Full AST analysis",
+          "Macro expansion tracking",
+          "Trait implementation analysis",
+          "Type registry",
+          "Call graph construction",
+          "Data flow analysis",
+          "Purity detection",
+          "Error handling patterns"
+        ]
+      },
+      "python": {
+        "parser": "tree-sitter-python",
+        "features": [
+          "Full AST analysis",
+          "Import tracking",
+          "Cross-module analysis",
+          "Async pattern detection",
+          "Exception flow analysis",
+          "Type inference",
+          "Call graph construction",
+          "Dead code detection"
+        ]
+      },
+      "javascript": {
+        "parser": "tree-sitter-javascript",
+        "features": [
+          "Full AST analysis",
+          "Dependency tracking",
+          "Framework pattern detection",
+          "Test detection",
+          "Complexity calculation"
+        ]
+      },
+      "typescript": {
+        "parser": "tree-sitter-typescript",
+        "features": [
+          "Full AST analysis",
+          "Type-aware analysis",
+          "Dependency tracking",
+          "Framework pattern detection",
+          "Test detection"
+        ]
       }
     },
-    "analyzers": {
+    "analysis_algorithms": {
       "call_graph": {
-        "capabilities": ["Cross-module resolution", "Trait implementation tracking", "Macro expansion", "Function pointer handling"],
-        "validation": "DFS cycle detection, orphan node detection",
-        "debugging": "Trace specific functions, resolution statistics"
+        "capabilities": [
+          "Cross-module call tracking",
+          "Trait resolution",
+          "Macro expansion",
+          "Function pointer handling",
+          "Framework pattern recognition",
+          "Centrality metrics",
+          "Clustering coefficient",
+          "Dependency analysis"
+        ],
+        "use_cases": [
+          "Understanding code dependencies",
+          "Impact analysis",
+          "Refactoring planning",
+          "Architecture validation"
+        ]
       },
       "data_flow": {
-        "capabilities": ["Variable tracking", "Dependency analysis", "Impact propagation"],
-        "use_cases": ["Understand code impact", "Identify cascading changes"]
+        "capabilities": [
+          "Variable tracking",
+          "Type flow analysis",
+          "Purity detection",
+          "Side effect analysis"
+        ]
       },
-      "functional_composition": {
-        "profiles": ["strict", "balanced", "lenient"],
-        "detects": ["Pure functions", "Side effects", "Composition patterns"],
-        "scoring": "Purity distribution analysis"
+      "pattern_detection": {
+        "design_patterns": [
+          "Factory",
+          "Strategy",
+          "Observer",
+          "Singleton",
+          "Dependency Injection",
+          "Template Method",
+          "Callback"
+        ],
+        "framework_patterns": [
+          "CLI patterns",
+          "Database patterns",
+          "Web patterns",
+          "Testing patterns"
+        ]
       }
     }
   },
   "debt_detection": {
-    "code_markers": {
-      "TODO": {
-        "severity": "Medium",
-        "category": "Todo",
-        "recommendation": "Create issue and schedule work"
-      },
-      "FIXME": {
-        "severity": "High",
-        "category": "Fixme",
-        "recommendation": "Address before release"
-      },
-      "HACK": {
-        "severity": "High",
-        "category": "CodeSmell",
-        "recommendation": "Refactor to proper solution"
-      },
-      "BUG": {
-        "severity": "High",
-        "category": "Fixme",
-        "recommendation": "Fix immediately"
-      },
-      "XXX": {
-        "severity": "High",
-        "category": "CodeSmell",
-        "recommendation": "Review and address"
-      },
-      "OPTIMIZE": {
-        "severity": "Low",
-        "category": "CodeSmell",
-        "recommendation": "Profile before optimizing"
-      },
-      "REFACTOR": {
-        "severity": "Medium",
-        "category": "CodeSmell",
-        "recommendation": "Schedule refactoring work"
-      }
-    },
-    "code_smells": {
-      "long_lines": {
-        "threshold": "120 characters",
-        "severity": "Low",
-        "recommendation": "Break lines for readability"
-      },
-      "deep_nesting": {
-        "threshold": "4+ levels (16+ spaces)",
-        "severity": "Medium",
-        "recommendation": "Extract to functions, use early returns"
-      },
-      "long_parameter_lists": {
-        "threshold": "5+ parameters",
-        "severity": "Medium-High (based on count)",
-        "recommendation": "Use parameter objects or builder pattern"
-      },
-      "large_modules": {
-        "threshold": "300+ lines",
-        "severity": "Medium-High (based on size)",
-        "recommendation": "Split into smaller modules"
-      },
-      "long_methods": {
-        "threshold": "50+ lines",
-        "severity": "Medium-High (based on length)",
-        "recommendation": "Break into smaller functions"
-      },
-      "feature_envy": {
-        "threshold": "3+ calls to same external object",
-        "severity": "Low-Medium",
-        "recommendation": "Move method to appropriate class"
-      },
-      "data_clumps": {
-        "detection": "Functions with similar large sizes in same file",
-        "severity": "Low",
-        "recommendation": "Extract to shared struct"
-      }
-    },
-    "error_handling": {
-      "error_swallowing": {
-        "patterns": [
-          "if let Ok(...) without else",
-          "if let Ok(...) else {}",
-          "let _ = result",
-          ".ok() discard",
-          "match with empty Err(_) => {}",
-          "unwrap_or/unwrap_or_default without logging"
-        ],
-        "severity": "Medium-High",
-        "recommendation": "Add error handling or logging"
-      },
-      "error_propagation": {
-        "patterns": [
-          "Box<dyn Error> type erasure",
-          "String as error type",
-          "anyhow::Error without context",
-          "Overly broad error conversion"
-        ],
-        "severity": "Low-Medium",
-        "recommendation": "Use specific error types with context"
-      },
-      "panic_patterns": {
-        "patterns": [
-          ".unwrap() on Result/Option",
-          ".expect() with generic message",
-          "panic!() macro",
-          "unreachable!()",
-          "todo!/unimplemented!()"
-        ],
-        "severity": "High-Critical (production), Low (tests)",
-        "recommendation": "Return Result or handle gracefully"
-      },
-      "python_error_handling": {
-        "patterns": [
-          "Bare except clauses",
-          "Generic Exception catching",
-          "Silent exception handling"
-        ],
-        "severity": "Medium-High",
-        "recommendation": "Catch specific exceptions, add logging"
-      }
-    },
-    "architectural_patterns": {
-      "circular_dependencies": {
-        "detection": "DFS cycle detection in module graph",
-        "severity": "High",
-        "recommendation": "Refactor boundaries, use dependency injection"
-      },
-      "coupling_issues": {
-        "high_afferent_coupling": {
-          "threshold": ">5 dependent modules",
-          "severity": "Medium",
-          "recommendation": "Simplify public API"
-        },
-        "high_efferent_coupling": {
-          "threshold": ">5 dependencies",
-          "severity": "Medium",
-          "recommendation": "Reduce external dependencies"
-        },
-        "bidirectional_dependencies": {
-          "detection": "A depends on B AND B depends on A",
-          "severity": "High",
-          "recommendation": "Create mediator module"
-        },
-        "stable_dependencies_violation": {
-          "formula": "Instability = Efferent / (Afferent + Efferent)",
-          "threshold": "Instability >0.8 AND >2 dependents",
-          "severity": "Medium",
-          "recommendation": "Increase abstractness, reduce dependencies"
-        },
-        "zone_of_pain": {
-          "criteria": "Low abstractness (<0.2) AND low instability (<0.2) AND >3 dependents",
-          "severity": "Medium",
-          "recommendation": "Introduce abstractions, create interfaces"
-        },
-        "zone_of_uselessness": {
-          "criteria": "High abstractness (>0.8) AND high instability (>0.8)",
-          "severity": "Low",
-          "recommendation": "Simplify abstractions, consolidate modules"
-        }
+    "debt_categories": {
+      "complexity": {
+        "weight": 5,
+        "detection": "High cyclomatic or cognitive complexity",
+        "thresholds": "Configurable via CLI or presets"
       },
       "duplication": {
-        "detection": "SHA256 hash matching of normalized code blocks",
-        "minimum_chunk_size": "5-10 lines (configurable)",
-        "threshold": "Appears in 2+ locations",
-        "severity": "Medium",
-        "recommendation": "Extract to shared function"
-      }
-    }
-  },
-  "responsibility_analysis": {
-    "god_object_detection": {
-      "classification_types": {
-        "GodClass": {
-          "criteria": "Single struct exceeding thresholds",
-          "metrics": ["method_count", "field_count", "responsibility_count"],
-          "confidence_levels": ["Definite (5 violations)", "Probable (3-4)", "Possible (1-2)", "NotGodObject (0)"]
-        },
-        "GodModule": {
-          "criteria": "Multiple structs collectively overloaded",
-          "provides": "Domain-based split recommendations with priority"
-        },
-        "Registry": {
-          "detection": "Intentional trait implementation catalog",
-          "adjustment": "Score reduction (up to 76%)",
-          "recommendation": "No refactoring needed (intentional pattern)"
-        },
-        "Builder": {
-          "detection": "Fluent setter API pattern",
-          "adjustment": "Score reduction (up to 70%)",
-          "recommendation": "No refactoring needed (intentional pattern)"
-        }
+        "weight": 4,
+        "detection": "Code clone detection",
+        "thresholds": "Line-based similarity"
       },
-      "responsibility_categories": {
-        "formatting_output": "format_*, render_*, write_*, print_*",
-        "parsing_input": "parse_*, read_*, extract_*",
-        "filtering_selection": "filter_*, select_*, find_*",
-        "transformation": "transform_*, convert_*, map_*, apply_*",
-        "data_access": "get_*, set_*",
-        "validation": "validate_*, check_*, verify_*, is_*",
-        "computation": "calculate_*, compute_*",
-        "construction": "create_*, build_*, new_*",
-        "persistence": "save_*, load_*, store_*",
-        "processing": "process_*, handle_*",
-        "communication": "send_*, receive_*",
-        "utilities": "Other methods not matching patterns"
+      "error_handling": {
+        "weight": 4,
+        "patterns": [
+          "Error swallowing",
+          "Panic patterns",
+          "Missing context",
+          "Improper propagation",
+          "Async error handling"
+        ]
       },
-      "detection_metrics": {
-        "method_count": "Total impl methods per struct",
-        "field_count": "Named fields per struct",
-        "responsibility_count": "Distinct responsibility categories",
-        "lines_of_code": "Estimated from method/field count",
-        "cyclomatic_complexity": "Sum of method complexities"
+      "code_smells": {
+        "weight": 3,
+        "patterns": [
+          "Long functions",
+          "Too many parameters",
+          "Deep nesting",
+          "God objects",
+          "Circular dependencies",
+          "Tight coupling"
+        ]
       },
-      "scoring_formula": {
-        "base_score": "method_factor × field_factor × responsibility_factor × size_factor",
-        "method_factor": "min(method_count / max_methods, 3.0)",
-        "field_factor": "min(field_count / max_fields, 3.0)",
-        "responsibility_factor": "min(responsibility_count / 3.0, 3.0)",
-        "size_factor": "min(lines_of_code / max_lines, 3.0)",
-        "final_score": "base_score × 50.0 × violation_count (minimum 100 if violations > 0)",
-        "threshold": "Score >= 70.0 indicates definite god object"
+      "testing": {
+        "weight": 2,
+        "patterns": [
+          "Test complexity",
+          "Test duplication",
+          "Missing tests",
+          "Poor test quality"
+        ]
       },
-      "refactoring_recommendations": {
-        "god_class": "Extract methods into focused structs or traits",
-        "god_module": "Split by domain with priority-ranked recommendations",
-        "domain_grouping": "scoring, thresholds, detection, core_config, data, misc"
+      "documentation": {
+        "weight": 1,
+        "patterns": ["TODOs", "FIXMEs", "Missing docs"]
+      },
+      "organization": {
+        "weight": 3,
+        "patterns": [
+          "God objects/files",
+          "Poor module structure",
+          "Mixed responsibilities"
+        ]
+      },
+      "performance": {
+        "weight": 3,
+        "patterns": ["Resource management issues", "Inefficient algorithms"]
+      },
+      "security": {
+        "weight": 5,
+        "patterns": ["Unsafe code", "Input validation", "Resource leaks"]
       }
     },
-    "srp_detection": {
-      "thresholds_by_language": {
-        "rust": {
-          "max_methods": 20,
-          "max_fields": 15,
-          "max_traits": 5,
-          "max_lines": 1000,
-          "max_complexity": 200
-        },
-        "python": {
-          "max_methods": 15,
-          "max_fields": 10,
-          "max_traits": 3,
-          "max_lines": 500,
-          "max_complexity": 150
-        },
-        "javascript": {
-          "max_methods": 15,
-          "max_fields": 20,
-          "max_traits": 3,
-          "max_lines": 500,
-          "max_complexity": 150
-        }
-      }
+    "detection_rules": {
+      "context_aware": "Enabled by default, reduces false positives",
+      "semantic_analysis": "Tree-sitter based AST analysis",
+      "multi_pass": "Optional deeper analysis with attribution",
+      "pattern_matching": "Configurable pattern detection thresholds"
+    },
+    "priority_system": {
+      "levels": ["Critical", "High", "Medium", "Low"],
+      "factors": [
+        "Severity (weight: 0.5)",
+        "Category (weight: 0.3)",
+        "Effort (weight: 0.2)",
+        "Coverage (dampening factor)",
+        "Contextual risk"
+      ],
+      "scoring": "Priority weight × Type weight"
     }
   },
   "risk_assessment": {
-    "risk_categories": {
-      "Critical": "High complexity (>15), low coverage (<30%)",
-      "High": "High complexity (>10), moderate coverage (<60%)",
-      "Medium": "Moderate complexity (>5), low coverage (<50%)",
-      "Low": "Low complexity or high coverage",
-      "WellTested": "High complexity with high coverage (good examples)"
-    },
-    "difficulty_levels": {
-      "Trivial": "Cognitive < 5",
-      "Simple": "Cognitive 5-10",
-      "Moderate": "Cognitive 10-20",
-      "Complex": "Cognitive 20-40",
-      "VeryComplex": "Cognitive > 40"
-    },
     "risk_scoring": {
-      "factors": [
-        "Cyclomatic complexity",
-        "Cognitive complexity",
-        "Coverage percentage",
-        "Test effort estimation",
-        "Dependency count",
-        "Call graph position"
-      ],
-      "dampening": "Coverage data dampens debt scores (multiplier = 1.0 - coverage)",
-      "purpose": "Surface untested complex functions"
-    },
-    "context_providers": {
-      "critical_path": "Identify functions on critical execution paths",
-      "dependency": "Analyze dependency impact and cascade effects",
-      "git_history": "Track change frequency and churn"
-    },
-    "prioritization_pipeline": {
-      "stages": [
-        "ZeroCoverageStage - Untested critical functions",
-        "ComplexityRiskStage - High complexity with low coverage",
-        "CriticalPathStage - Functions on critical paths",
-        "DependencyImpactStage - High impact on dependents",
-        "EffortOptimizationStage - Best ROI opportunities"
-      ],
-      "module_detection": "Core, utility, feature, integration, test, configuration",
-      "roi_calculation": {
-        "components": ["Direct impact", "Cascade impact", "Effort estimation", "Learning curve"],
-        "formula": "ROI = (risk_reduction + cascade_impact) / effort"
-      }
-    },
-    "testing_recommendations": {
-      "includes": [
-        "Current risk score",
-        "Potential risk reduction",
-        "Test effort estimate",
-        "Complexity level",
-        "Test approach suggestions",
-        "Dependencies and dependents",
-        "ROI breakdown"
+      "formula": "Combines complexity, coverage, and debt factors",
+      "categories": [
+        "Critical: High complexity (>15), low coverage (<30%)",
+        "High: High complexity (>10), moderate coverage (<60%)",
+        "Medium: Moderate complexity (>5), low coverage (<50%)",
+        "Low: Low complexity or high coverage",
+        "WellTested: High complexity with high coverage"
       ]
     },
-    "insights": {
-      "top_risks": "Highest risk functions",
-      "risk_reduction_opportunities": "Best testing targets",
-      "codebase_risk_score": "Overall project risk",
-      "complexity_coverage_correlation": "Statistical relationship",
-      "risk_distribution": "Count by category"
+    "test_effort_estimation": {
+      "difficulty_levels": [
+        "Trivial: Cognitive < 5",
+        "Simple: Cognitive 5-10",
+        "Moderate: Cognitive 10-20",
+        "Complex: Cognitive 20-40",
+        "VeryComplex: Cognitive > 40"
+      ],
+      "factors": [
+        "Cognitive load",
+        "Branch count",
+        "Recommended test cases",
+        "Estimated difficulty"
+      ]
+    },
+    "risk_reduction": {
+      "calculation": "Target coverage vs current risk",
+      "recommendations": [
+        "Testing recommendations with ROI",
+        "Priority-ordered improvements",
+        "Effort estimation",
+        "Impact analysis"
+      ]
+    },
+    "contextual_analysis": {
+      "providers": [
+        "critical_path: Identify critical execution paths",
+        "dependency: Analyze function dependencies and impact",
+        "git_history: Change frequency and bug correlation"
+      ],
+      "aggregation": "Multi-signal risk aggregation",
+      "insights": "Actionable recommendations based on context"
     }
   },
   "output_formats": {
     "json": {
-      "formats": {
+      "variants": {
         "legacy": "Current format with {File: {...}} and {Function: {...}} wrappers",
-        "unified": "New format with consistent structure and 'type' field (spec 108)"
+        "unified": "New format with consistent structure and 'type' field"
       },
-      "includes": [
-        "Debt items (function and file level)",
-        "Total impact and debt score",
-        "Debt density per 1000 LOC",
-        "Overall coverage percentage",
-        "Call graph structure",
-        "Data flow graph"
+      "structure": [
+        "items (functions and files)",
+        "total_impact",
+        "total_debt_score",
+        "debt_density",
+        "total_lines_of_code",
+        "overall_coverage",
+        "has_coverage_data"
+      ],
+      "use_cases": [
+        "CI/CD integration",
+        "Programmatic analysis",
+        "Comparison workflows",
+        "Data processing"
       ]
     },
     "markdown": {
       "sections": [
-        "Executive summary",
-        "Health metrics",
+        "Summary statistics",
+        "Technical debt items",
+        "Priority-ordered recommendations",
         "Risk analysis",
-        "Debt items by category",
-        "Recommendations",
-        "Complexity analysis",
-        "Visualizations",
-        "Table of contents"
+        "Coverage gaps"
       ],
-      "detail_levels": ["summary", "standard", "comprehensive", "debug"]
+      "use_cases": ["Documentation", "Reports", "Pull request comments"]
     },
     "terminal": {
       "features": [
         "Color-coded output",
-        "Emoji indicators",
-        "Tiered priority display",
-        "Summary statistics",
-        "Severity counts",
-        "Plain mode (ASCII-only, no colors)"
+        "ASCII art for visual hierarchy",
+        "Summary tables",
+        "Status indicators",
+        "Progress bars",
+        "Interactive feedback"
+      ],
+      "modes": [
+        "summary: Compact overview",
+        "standard: Full details",
+        "compact: Minimal output",
+        "plain: ASCII-only, no colors"
       ]
     }
   },
   "configuration": {
     "config_file": {
-      "location": ".debtmap.toml or debtmap.toml",
-      "sections": ["thresholds", "analysis", "output", "cache", "exclusions"]
+      "format": "TOML/JSON/YAML",
+      "init_command": "debtmap init",
+      "sections": [
+        "thresholds",
+        "languages",
+        "exclusions",
+        "context_providers",
+        "output_preferences"
+      ]
     },
     "threshold_presets": {
-      "strict": "Low tolerance for complexity",
-      "balanced": "Typical project standards",
-      "lenient": "Legacy code allowances"
+      "strict": "High code quality standards",
+      "balanced": "Typical projects (default)",
+      "lenient": "Legacy or complex domains"
     },
-    "environment_variables": {
-      "DEBTMAP_CACHE_DIR": "Override cache location",
-      "DEBTMAP_JOBS": "Set parallel thread count",
-      "DEBTMAP_CONTEXT_AWARE": "Enable context-aware analysis"
+    "environment_variables": [
+      "DEBTMAP_CACHE_DIR: Cache location",
+      "DEBTMAP_CONTEXT_AWARE: Enable context awareness",
+      "DEBTMAP_FUNCTIONAL_ANALYSIS: Enable functional analysis",
+      "PRODIGY_AUTOMATION: Automation mode flag",
+      "PRODIGY_VALIDATION: Validation mode flag"
+    ],
+    "defaults": {
+      "complexity_threshold": 10,
+      "duplication_threshold": 50,
+      "parallel_processing": true,
+      "caching": true,
+      "context_aware": true
     }
   },
   "architecture": {
-    "data_flow": {
-      "pipeline": [
-        "Parser Layer - Language-specific AST generation",
-        "Analysis Layer - Metric computation and pattern detection",
-        "Aggregation Layer - Combine results across files",
-        "Output Layer - Format and emit results"
+    "analysis_pipeline": {
+      "phases": [
+        "1. Discovery: Find files to analyze",
+        "2. Parsing: Language-specific AST generation",
+        "3. Analysis: Metric computation and pattern detection",
+        "4. Aggregation: Combine results across files",
+        "5. Prioritization: Score and rank issues",
+        "6. Output: Format and emit results"
+      ],
+      "functional_design": [
+        "Pure computation cores",
+        "I/O at boundaries",
+        "Immutable data structures (im crate)",
+        "Parallel processing (rayon)",
+        "Error handling with Result chains"
       ]
     },
     "dependency_injection": {
-      "container": "AppContainer with all analysis components",
-      "adapters": ["RustAnalyzerAdapter", "PythonAnalyzerAdapter", "JavaScriptAnalyzerAdapter", "TypeScriptAnalyzerAdapter"],
-      "plugins": ["DebtScorer", "PriorityCalculator", "Formatters", "Cache", "ConfigProvider"]
+      "components": [
+        "Analyzers (language-specific)",
+        "Scorers (debt scoring)",
+        "Cache (analysis caching)",
+        "Config providers",
+        "Priority calculators",
+        "Formatters (output)"
+      ],
+      "container": "AppContainer with builder pattern"
     },
-    "caching": {
-      "strategies": ["local", "shared", "custom path"],
-      "operations": ["stats", "migrate", "clear", "force rebuild"],
-      "benefits": "Faster re-analysis, incremental updates"
-    },
-    "parallel_processing": {
-      "default": "Enabled for multi-core systems",
-      "improvement": "70-90% performance gain",
-      "controls": ["--no-parallel", "--jobs N"]
+    "caching_strategy": {
+      "levels": ["Project-local", "User-shared", "Custom path"],
+      "granularity": "File-level with content hashing",
+      "invalidation": "Content-based, manual, or forced",
+      "migration": "Automatic migration support"
     }
   },
-  "design_patterns_detected": {
-    "observer": "Event listener registrations, callback patterns",
-    "singleton": "Static instance management",
-    "factory": "Object creation methods",
-    "strategy": "Algorithm selection via traits/interfaces",
-    "callback": "Function passing and invocation",
-    "template_method": "Abstract methods with concrete implementations",
-    "dependency_injection": "Constructor injection, service locators",
-    "builder": "Fluent API construction patterns"
+  "responsibility_analysis": {
+    "god_object_detection": {
+      "types": {
+        "god_class": "Single struct with excessive methods (tests excluded)",
+        "god_file": "File with excessive functions or lines (tests included)",
+        "god_module": "Alias for god_file"
+      },
+      "metrics": [
+        "method_count",
+        "field_count",
+        "responsibility_count",
+        "lines_of_code",
+        "complexity_sum",
+        "god_object_score"
+      ],
+      "analysis": [
+        "responsibility_count: Number of distinct responsibilities",
+        "responsibilities: Named responsibility categories",
+        "domain_count: Distinct semantic domains (spec 140)",
+        "domain_diversity: Domain diversity score (0.0 to 1.0)",
+        "struct_ratio: Ratio of structs to total functions",
+        "cross_domain_severity: Severity of domain mixing"
+      ],
+      "recommendations": {
+        "module_splits": "Suggested module boundaries",
+        "confidence": "Detection confidence level",
+        "analysis_method": "Method used (spec 140: hybrid, semantic, structural)"
+      },
+      "validation": [
+        "Visibility breakdown consistency",
+        "Responsibility count matching",
+        "Metric consistency checks"
+      ]
+    },
+    "method_categorization": {
+      "categories": [
+        "Constructors",
+        "Accessors/Getters",
+        "Mutators/Setters",
+        "Business logic",
+        "I/O operations",
+        "Utilities"
+      ],
+      "inference": "Semantic analysis of method purpose"
+    },
+    "refactoring_recommendations": {
+      "split_strategies": [
+        "By responsibility domain",
+        "By semantic grouping",
+        "By structural patterns"
+      ],
+      "priority": "Based on god_object_score and confidence"
+    }
+  },
+  "boilerplate_detection": {
+    "pattern_detection": {
+      "trait_patterns": {
+        "detection": "Repetitive trait implementations",
+        "thresholds": [
+          "min_impl_blocks: 20",
+          "method_uniformity_threshold: 0.7",
+          "max_avg_complexity: 2.0",
+          "confidence_threshold: 0.7"
+        ]
+      },
+      "signals": [
+        "High impl block count",
+        "Uniform method signatures",
+        "Low complexity",
+        "Repetitive patterns"
+      ]
+    },
+    "trait_analysis": {
+      "metrics": [
+        "impl_block_count",
+        "shared_method_percentage",
+        "average_complexity",
+        "pattern_uniformity"
+      ],
+      "classification": "Boilerplate vs complex code"
+    },
+    "macro_recommendations": {
+      "patterns": [
+        "Derive macros",
+        "Declarative macros",
+        "Procedural macros",
+        "Code generation"
+      ],
+      "confidence": "Pattern-based confidence scoring",
+      "examples": "Concrete macro implementation suggestions"
+    },
+    "boilerplate_scoring": {
+      "factors": [
+        "Implementation count",
+        "Method uniformity",
+        "Complexity level",
+        "Pattern consistency"
+      ],
+      "threshold": "Configurable minimum confidence"
+    }
   },
   "best_practices": {
     "analysis_workflow": [
-      "Start with --summary for overview",
-      "Use --top N to focus on priorities",
-      "Enable --context for risk analysis",
-      "Provide --coverage-file for testing insights",
-      "Use --compare to track improvements"
+      "Start with debtmap init to create config",
+      "Run initial analysis with default settings",
+      "Use --coverage-file for coverage-aware analysis",
+      "Filter with --top N to focus on high-priority items",
+      "Use --summary for quick overview",
+      "Enable --enable-context for deeper insights",
+      "Use presets (--threshold-preset) for consistency",
+      "Compare results with compare command"
     ],
-    "threshold_tuning": [
-      "Begin with --threshold-preset balanced",
-      "Adjust based on team standards",
-      "Use --threshold-complexity for gates",
-      "Consider project maturity and domain"
-    ],
-    "continuous_integration": [
+    "ci_cd_integration": [
       "Use validate command for quality gates",
-      "Set --max-debt-density thresholds",
-      "Track improvements with compare",
-      "Integrate with coverage tools",
-      "Monitor trend over time"
+      "Set max-debt-density thresholds",
+      "Output to JSON for programmatic checks",
+      "Use --quiet for automation mode",
+      "Compare before/after for PRs",
+      "Track debt trends over time"
     ],
-    "refactoring_prioritization": [
-      "Focus on Critical risk items first",
-      "Use ROI calculations for ordering",
-      "Address god objects early",
-      "Fix circular dependencies",
-      "Improve test coverage on complex code"
+    "performance_optimization": [
+      "Enable caching for repeated analysis",
+      "Use --jobs to control parallelism",
+      "Filter by language with --languages",
+      "Set --max-files for large codebases",
+      "Use --no-pattern-detection if not needed"
+    ],
+    "debugging": [
+      "Use -v, -vv, -vvv for increasing verbosity",
+      "Enable --debug-call-graph for call graph issues",
+      "Use --trace-functions to track specific functions",
+      "Check --cache-stats for cache performance",
+      "Use --validate-call-graph for correctness",
+      "Enable --show-pattern-warnings for pattern detection"
     ]
   },
   "common_patterns": [
     {
-      "name": "Find highest risk untested code",
-      "command": "debtmap analyze . --coverage-file coverage.lcov --top 10 --summary",
-      "use_case": "Identify critical testing gaps"
+      "name": "Basic Analysis",
+      "command": "debtmap analyze . --format terminal",
+      "use_case": "Quick code quality check"
     },
     {
-      "name": "Track refactoring progress",
-      "command": "debtmap compare --before before.json --after after.json --plan plan.md --format markdown",
-      "use_case": "Validate technical debt reduction"
+      "name": "Coverage-Aware Analysis",
+      "command": "debtmap analyze . --coverage-file coverage.info --top 20",
+      "use_case": "Identify untested complex code"
     },
     {
-      "name": "Enforce quality gates",
-      "command": "debtmap validate . --config .debtmap.toml --max-debt-density 50.0",
-      "use_case": "CI/CD pipeline quality checks"
+      "name": "CI/CD Quality Gate",
+      "command": "debtmap validate . --max-debt-density 0.05 --format json",
+      "use_case": "Automated quality enforcement"
     },
     {
-      "name": "Detect god objects",
-      "command": "debtmap analyze . --group-by-category --filter Organization",
-      "use_case": "Find SRP violations for refactoring"
+      "name": "Refactoring Validation",
+      "command": "debtmap compare --before before.json --after after.json --target src/module.rs:123",
+      "use_case": "Verify refactoring improvements"
     },
     {
-      "name": "Debug call graph issues",
-      "command": "debtmap analyze . --debug-call-graph --trace-function my_function",
-      "use_case": "Troubleshoot resolution failures"
+      "name": "Deep Analysis",
+      "command": "debtmap analyze . --multi-pass --enable-context --show-attribution",
+      "use_case": "Comprehensive codebase assessment"
+    },
+    {
+      "name": "God Object Detection",
+      "command": "debtmap analyze . --no-god-object=false --aggregate-only",
+      "use_case": "Find architectural issues"
     }
   ],
   "troubleshooting": {
     "common_issues": [
       {
+        "issue": "Slow analysis performance",
+        "solutions": [
+          "Enable caching with default settings",
+          "Reduce parallelism with --jobs",
+          "Disable pattern detection with --no-pattern-detection",
+          "Set --max-files to limit scope",
+          "Use --no-aggregation if not needed"
+        ]
+      },
+      {
+        "issue": "Inaccurate complexity scores",
+        "solutions": [
+          "Check language support for file type",
+          "Enable semantic analysis (default)",
+          "Use --multi-pass for deeper analysis",
+          "Verify coverage file format (LCOV)",
+          "Check threshold preset (--threshold-preset)"
+        ]
+      },
+      {
         "issue": "High false positive rate",
-        "solution": "Enable --context flag for context-aware reduction"
+        "solutions": [
+          "Enable context-aware analysis (default)",
+          "Adjust pattern threshold (--pattern-threshold)",
+          "Use threshold presets (lenient for legacy code)",
+          "Configure exclusions in config file",
+          "Disable specific pattern detection"
+        ]
       },
       {
-        "issue": "Slow analysis on large codebases",
-        "solution": "Use --jobs N to control parallelism, enable caching"
+        "issue": "Cache problems",
+        "solutions": [
+          "Clear cache with --clear-cache",
+          "Check cache location with --cache-stats",
+          "Migrate cache with --migrate-cache",
+          "Disable cache temporarily with --no-cache",
+          "Set custom location with --cache-location"
+        ]
       },
       {
-        "issue": "Call graph resolution failures",
-        "solution": "Check --debug-call-graph output, verify imports"
-      },
-      {
-        "issue": "Coverage data not matching",
-        "solution": "Ensure LCOV file paths match analyzed directory"
-      },
-      {
-        "issue": "God object false positives",
-        "solution": "Registry and Builder patterns auto-detected with score adjustment"
-      },
-      {
-        "issue": "Metric discrepancies",
-        "solution": "Use --explain-metrics to understand measured vs estimated"
+        "issue": "Missing or incorrect call graph",
+        "solutions": [
+          "Enable validation with --validate-call-graph",
+          "Use --debug-call-graph for diagnostics",
+          "Trace specific functions with --trace-functions",
+          "Check parallel processing (try --no-parallel)",
+          "Verify language support for constructs"
+        ]
       }
-    ],
-    "performance_tips": [
-      "Use --max-files to limit scope during development",
-      "Enable caching with --cache (default on)",
-      "Use --no-context if context providers are slow",
-      "Limit --jobs on memory-constrained systems",
-      "Use --aggregate-only for quick file-level overview"
     ]
   },
   "version_info": {
-    "analyzed_version": "0.2.0+",
-    "analysis_date": "2025-10-25",
-    "config_source": ".prodigy/book-config.json",
-    "areas_analyzed": [
-      "cli_commands",
-      "core_analysis",
-      "debt_detection",
-      "risk_assessment",
-      "output_formats",
-      "configuration",
-      "architecture",
-      "responsibility_analysis"
-    ]
+    "analyzed_from": "Source code analysis",
+    "analysis_date": "2025-01-30",
+    "project": "Debtmap",
+    "configuration_source": ".prodigy/book-config.json"
   }
 }

@@ -3,153 +3,104 @@
   "chapter_title": "Dead Code Analysis",
   "chapter_file": "book/src/dead-code-analysis.md",
   "drift_detected": true,
-  "severity": "critical",
-  "quality_assessment": "Chapter does not exist - needs to be created from existing documentation. Excellent source material exists in docs/python-dead-code-detection.md and docs/migration-dead-code-detection.md, which can be adapted for the book.",
+  "severity": "low",
+  "quality_assessment": "Excellent chapter - comprehensive, accurate, and well-structured. The chapter covers all major features with clear examples and best practices. Only minor issues exist: missing CLI --min-confidence flag documentation and a few accuracy improvement claims that need verification.",
   "issues": [
     {
       "type": "missing_content",
-      "severity": "critical",
-      "section": "Chapter File",
-      "description": "Chapter file book/src/dead-code-analysis.md does not exist",
-      "should_add": "Create chapter based on existing documentation in docs/python-dead-code-detection.md and docs/migration-dead-code-detection.md",
-      "fix_suggestion": "Consolidate the two existing documentation files into a cohesive book chapter that explains dead code detection feature, confidence scoring, and configuration options",
-      "source_reference": "docs/python-dead-code-detection.md and docs/migration-dead-code-detection.md contain comprehensive content"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Public API Detection Heuristics",
-      "description": "Need to document the public API detection system introduced in Spec 113",
-      "should_add": "Explain how debtmap detects external APIs using heuristics: public visibility, file location patterns, naming conventions, decorator patterns, and explicit configuration",
-      "fix_suggestion": "Add section explaining PublicApiDetector with examples of api_functions and api_files configuration in .debtmap.toml",
-      "source_reference": "src/priority/external_api_detector.rs:ExternalApiConfig, src/debt/public_api_detector.rs"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Confidence Thresholds",
-      "description": "Need to document configurable confidence thresholds for dead code analysis",
-      "should_add": "Document AnalysisConfig with high_confidence_threshold (default: 0.8), medium_confidence_threshold (default: 0.5), and how to customize these values",
-      "fix_suggestion": "Add section on tuning confidence thresholds based on project tolerance for false positives vs false negatives",
-      "source_reference": "src/analysis/python_dead_code_enhanced.rs:AnalysisConfig (lines 293-310)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "high",
-      "section": "Configuration Options",
-      "description": "Need comprehensive documentation of all dead code analysis configuration options",
-      "should_add": "Document external_api section in .debtmap.toml with detect_external_api, api_functions, and api_files fields including glob pattern support",
-      "fix_suggestion": "Add configuration reference section with complete .debtmap.toml examples showing all available options and their defaults",
-      "source_reference": "src/config.rs:1019 (external_api config), src/priority/external_api_detector.rs:ExternalApiConfig"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Best Practices",
-      "description": "Best practices section exists in docs but needs to be adapted for book format",
-      "should_add": "Consolidate best practices from both documentation files with emphasis on: starting with high confidence items, using suppression comments, running with coverage data, and incremental removal workflow",
-      "fix_suggestion": "Create dedicated best practices section with workflow recommendations and common pitfall warnings",
-      "source_reference": "docs/python-dead-code-detection.md:219-235 has excellent best practices content"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Framework Pattern Support",
-      "description": "Need to document comprehensive framework support beyond what's shown in examples",
-      "should_add": "Document all supported frameworks: Flask, Django, FastAPI (web), Click, argparse (CLI), pytest, unittest (testing), Qt/PyQt, Tkinter (events)",
-      "fix_suggestion": "Add framework support matrix showing which decorators and patterns are recognized for each framework",
-      "source_reference": "docs/python-dead-code-detection.md:102-122, src/analysis/framework_patterns.rs"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Suppression Comment Formats",
-      "description": "Need to document all supported suppression comment formats",
-      "should_add": "Document supported formats: 'debtmap: not-dead', 'debtmap:not-dead', 'noqa: dead-code', 'noqa:dead-code' and placement rules (above, same line, below function)",
-      "fix_suggestion": "Add suppression reference subsection with examples for each supported format and language-specific variations",
-      "source_reference": "docs/python-dead-code-detection.md:76-100, src/analysis/python_dead_code_enhanced.rs (suppression detection)"
-    },
-    {
-      "type": "missing_content",
-      "severity": "medium",
-      "section": "Coverage Integration",
-      "description": "Need to document how coverage data improves dead code detection accuracy",
-      "should_add": "Explain how pytest-cov and coverage.py data is used, how to generate coverage.json, and how covered functions are automatically marked as live",
-      "fix_suggestion": "Add coverage integration section with step-by-step setup instructions and explanation of accuracy improvements",
-      "source_reference": "docs/python-dead-code-detection.md:123-136, src/analysis/python_dead_code_enhanced.rs:CoverageData"
-    },
-    {
-      "type": "missing_content",
       "severity": "low",
-      "section": "Limitations Documentation",
-      "description": "Need to clearly document what dead code analyzer can and cannot detect",
-      "should_add": "Document limitations: cannot detect eval/exec usage, getattr with dynamic names, reflection-based calls, C extension calls, plugin systems with string-based loading",
-      "fix_suggestion": "Add limitations section with mitigation strategies (use suppression comments)",
-      "source_reference": "docs/python-dead-code-detection.md:236-253"
+      "section": "CLI Filtering by Confidence",
+      "description": "Chapter documents --min-confidence flag (lines 454-463) but this CLI flag does not exist in src/cli.rs",
+      "current_content": "# Show only high confidence dead code\ndebtmap analyze --min-confidence=0.8",
+      "should_be": "Remove or update CLI examples to reflect actual available flags. Dead code analysis is enabled by default with languages.python.detect_dead_code in config",
+      "fix_suggestion": "Either implement --min-confidence flag in CLI, or remove these examples and document that filtering must be done via output processing or config file",
+      "source_reference": "src/cli.rs does not contain min-confidence flag. Dead code analysis is configured via .debtmap.toml [languages.python] section"
     },
     {
-      "type": "missing_content",
+      "type": "unclear_content",
       "severity": "low",
-      "section": "Troubleshooting Guide",
-      "description": "Existing troubleshooting content needs to be included in book chapter",
-      "should_add": "Include troubleshooting for common issues: false positives, undetected dead code, low confidence on obvious dead code",
-      "fix_suggestion": "Add troubleshooting section adapted from existing docs with solutions for each common problem",
-      "source_reference": "docs/python-dead-code-detection.md:255-276"
+      "section": "Coverage Integration Accuracy Claims",
+      "description": "Chapter claims '60-70% reduction in false positives' and 'Near-zero false positives for functions with test coverage' (lines 295-300) without citing source",
+      "current_content": "Coverage integration typically provides:\n- **60-70% reduction** in false positives for complex codebases\n- **Near-zero false positives** for functions with test coverage",
+      "should_be": "Either cite the source of these metrics (tests, specs, empirical studies) or use more conservative language like 'significantly reduces' or 'substantially improves'",
+      "fix_suggestion": "Add source reference or use more conservative phrasing. Check if these numbers come from test results or empirical validation",
+      "source_reference": "No apparent source in specs/ or tests/ for these specific percentage claims"
     },
     {
-      "type": "missing_content",
+      "type": "unclear_content",
       "severity": "low",
-      "section": "Examples",
-      "description": "Rich examples exist in docs that should be included in book",
-      "should_add": "Include practical examples: Flask application, test files, public APIs with different confidence scenarios",
-      "fix_suggestion": "Add examples section showing real-world scenarios with expected confidence levels and explanations",
-      "source_reference": "docs/python-dead-code-detection.md:313-360 has excellent examples"
+      "section": "False Positive Rate Comparison",
+      "description": "Chapter claims target false positive rate of '<10%' vs '30-40% for naive call graph analysis' (line 17) without citation",
+      "current_content": "This multi-layered approach achieves a target false positive rate of less than 10%, compared to 30-40% for naive call graph analysis.",
+      "should_be": "Either cite the spec/test that validates these numbers or use language like 'significantly lower false positive rate'",
+      "fix_suggestion": "Check if Spec 113 or integration tests validate these specific percentages, otherwise use more general improvement language",
+      "source_reference": "specs/113-public-api-detection-heuristics.md may contain validation data"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration Reference - Programmatic API",
+      "description": "Chapter shows Rust programmatic API for AnalysisConfig (lines 335-354) but doesn't clarify that these are NOT settable via .debtmap.toml",
+      "current_content": "```rust\nlet config = AnalysisConfig {\n    high_confidence_threshold: 0.8,\n    ...\n};\n```",
+      "should_be": "Add note that AnalysisConfig thresholds are programmatic only (Rust API), not available in .debtmap.toml config file",
+      "fix_suggestion": "Add clarifying note: 'Note: Confidence thresholds are configured programmatically via the Rust API and are not exposed in .debtmap.toml. The TOML file only controls external_api detection settings.'",
+      "source_reference": "src/config/core.rs:DebtmapConfig and src/config/languages.rs show no confidence threshold fields in TOML structure"
     }
   ],
   "positive_aspects": [
-    "Excellent source documentation already exists in docs/ directory",
-    "Documentation is comprehensive and covers all major features",
-    "Real-world examples are practical and well-explained",
-    "Implementation in codebase matches documentation accurately",
-    "Clear progression from basic to advanced concepts in existing docs",
-    "Good balance of API reference and user guidance",
-    "Troubleshooting section addresses common user pain points"
+    "Comprehensive coverage of all dead code detection features",
+    "Accurate documentation of PublicApiDetector heuristics matching src/debt/public_api_detector.rs implementation",
+    "Excellent public API configuration examples with glob patterns (lines 101-122) match ExternalApiConfig implementation",
+    "Framework support matrix (lines 153-172) is accurate and well-organized",
+    "Confidence scoring explanation (lines 19-82) matches AnalysisConfig thresholds (0.8/0.5 defaults)",
+    "Suppression comment formats (lines 213-245) are accurately documented and match implementation",
+    "Coverage integration section (lines 246-303) explains CoverageData usage correctly",
+    "Best practices section (lines 518-563) provides actionable workflow recommendations",
+    "Limitations section (lines 565-600) honestly describes what cannot be detected",
+    "Troubleshooting guide (lines 602-655) addresses real user pain points",
+    "Practical examples (lines 657-754) show realistic scenarios with expected confidence scores",
+    "Decision tree (lines 411-450) helps users interpret results effectively",
+    "TOML configuration examples match ExternalApiConfig struct exactly",
+    "Clear progression from basic concepts to advanced usage",
+    "Good balance of reference material and practical guidance"
   ],
   "improvement_suggestions": [
-    "Consolidate migration guide content into main chapter where relevant (avoid duplication)",
-    "Add decision tree or flowchart for interpreting confidence levels",
-    "Include CLI examples showing how to filter by confidence level",
-    "Add section on integration with CI/CD pipelines for automated dead code removal",
-    "Consider adding performance characteristics (analysis speed for different codebase sizes)",
-    "Add comparison table showing when to use different suppression comment formats",
-    "Include metrics on false positive reduction compared to naive call graph analysis",
-    "Add example .debtmap.toml showing recommended configuration for different project types (library vs application)",
-    "Consider adding visual examples of how framework patterns are detected",
-    "Add links to related chapters (coverage integration, configuration, CLI reference)"
+    "Verify or soften accuracy improvement percentage claims (60-70%, <10%, etc.)",
+    "Clarify which configuration options are TOML vs Rust API only",
+    "Consider implementing --min-confidence CLI flag to match documentation, or remove examples",
+    "Add example showing how to filter dead code results by confidence in post-processing",
+    "Consider adding performance benchmarks (analysis time for X KLOC)",
+    "Add example integration test that validates the <10% false positive claim",
+    "Link to specific Spec 113 sections for public API detection validation",
+    "Add note about dead code detection being Python-only currently (per features.json)",
+    "Consider adding mermaid diagram showing the multi-layered detection system",
+    "Add example showing diff between legacy vs unified JSON output for dead code results"
   ],
   "metadata": {
-    "analyzed_at": "2025-10-26",
+    "analyzed_at": "2025-11-06",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
-      "Dead code detection",
-      "Confidence scoring system",
       "Public API detection heuristics",
-      "Framework pattern recognition",
-      "Suppression comments",
-      "Coverage integration",
+      "Confidence thresholds",
+      "Dead code identification",
       "Configuration options",
       "Best practices",
-      "Limitations and troubleshooting"
+      "Framework support",
+      "Suppression comments",
+      "Coverage integration",
+      "Limitations",
+      "Troubleshooting",
+      "Examples"
     ],
     "validation_focus": "Check that dead code analysis and public API detection are documented",
-    "source_files_analyzed": [
-      "docs/python-dead-code-detection.md",
-      "docs/migration-dead-code-detection.md",
+    "implementation_files_verified": [
       "src/analysis/python_dead_code_enhanced.rs",
-      "src/priority/external_api_detector.rs",
       "src/debt/public_api_detector.rs",
-      "src/config.rs"
+      "src/priority/external_api_detector.rs",
+      "src/cli.rs",
+      "src/config/core.rs",
+      "src/config/languages.rs"
     ],
-    "implementation_status": "Feature fully implemented with comprehensive documentation in docs/ that needs to be adapted for book format"
+    "drift_status": "Chapter is excellent with only minor documentation/CLI inconsistencies"
   }
 }

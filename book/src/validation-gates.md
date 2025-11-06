@@ -214,6 +214,8 @@ High ceilings to catch extreme cases:
 
 ### Metric Priority
 
+**Validation uses AND logic:** All primary metrics must pass for validation to succeed. If any check fails, the entire validation fails with a non-zero exit code.
+
 When validation fails, fix issues in this order:
 
 1. **Critical:** `max_debt_density` violations (core quality metric)
@@ -221,6 +223,8 @@ When validation fails, fix issues in this order:
 3. **High:** `max_codebase_risk_score` violations (overall risk)
 4. **Medium:** `min_coverage_percentage` violations (test coverage)
 5. **Low:** `max_total_debt_score` violations (extreme cases only)
+
+The priority list above is for remediation order when validation fails, not for which checks are enforced. All configured thresholds are enforced equally.
 
 ## Exit Codes and CI Integration
 
@@ -291,6 +295,38 @@ Metrics:
 
 Failed checks: 2
 ```
+
+### Summary Output Format
+
+For compact output suitable for CI logs, use the `--summary` or `-s` flag:
+
+```bash
+debtmap validate . --summary
+# or
+debtmap validate . -s
+```
+
+**Summary format output:**
+```
+✅ Validation PASSED
+
+Priority Tiers:
+  P0 (Critical): 2 items
+  P1 (High): 8 items
+  P2 (Medium): 15 items
+  P3 (Low): 23 items
+
+Top Issues:
+  1. Complex authentication logic (complexity: 28)
+  2. Database connection pool (risk: 9.2)
+  3. Untested error handler (coverage: 0%)
+```
+
+The summary format provides:
+- Tiered priority counts instead of individual item details
+- Top violating functions for quick triage
+- Compact format ideal for CI/CD logs
+- Same pass/fail determination as standard format
 
 ## Coverage Integration
 
@@ -711,11 +747,24 @@ debtmap validate . --enable-context --disable-context git_history
 ```
 
 **Issue: Semantic analysis causing errors or unexpected behavior**
+
+Debtmap uses semantic analysis by default, powered by tree-sitter for deep AST (Abstract Syntax Tree) analysis. This provides accurate understanding of code structure, control flow, and complexity patterns.
+
+However, semantic analysis may encounter issues with:
+- Unsupported or experimental language features
+- Malformed or incomplete syntax
+- Complex macro expansions
+- Very large files that timeout during parsing
+
 ```bash
 # Solution: Disable semantic analysis with fallback mode
 debtmap validate . --semantic-off
 ```
-This disables advanced semantic features and uses basic syntax analysis only. Useful for debugging or working with unsupported language constructs.
+
+When semantic analysis is disabled with `--semantic-off`, debtmap falls back to basic syntax analysis, which is faster but less accurate for complexity calculations. Use this flag if:
+- Encountering parsing errors or timeouts
+- Working with bleeding-edge language features
+- Need faster validation at the cost of precision
 
 ### Validation Report Generation
 
