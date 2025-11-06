@@ -413,7 +413,9 @@ Generate and use coverage data in workflows. See [Coverage Integration](./covera
 
 ## Claude Slash Commands
 
-> **Important**: The slash commands documented below are custom commands provided in Debtmap's `.claude/commands/` directory as examples. They are not built into Prodigy or Debtmap. You can use them as-is from the Debtmap repository or create your own based on these patterns.
+> **Important**: The slash commands documented below are custom commands provided in Debtmap's `.claude/commands/` directory. They are included in the Debtmap repository as working examples. You can use them as-is or create your own based on these patterns.
+>
+> **Note on workflow styles**: The sequential workflow (workflows/debtmap.yml) uses `shell:` commands directly, while the MapReduce workflow (workflows/debtmap-reduce.yml) uses `claude:` wrapper commands for some operations like `validate-improvement`. Both approaches are valid - use whichever fits your workflow style.
 
 Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:
 
