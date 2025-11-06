@@ -36,10 +36,10 @@ All examples are copy-paste ready and tested against the current Debtmap impleme
 Start with a simple analysis of your Rust project:
 
 ```bash
-# Analyze current directory (path defaults to '.')
+# Analyze current directory (path defaults to '.' - both commands are identical)
 debtmap analyze
 
-# Same as above (explicit current directory)
+# Same as above with explicit path
 debtmap analyze .
 
 # Analyze specific directory
@@ -691,6 +691,8 @@ debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
 Great for documentation or PR comments.
 
 ### Understanding Output Formats
+
+> **Note**: `--format` selects the output type (json/markdown/terminal), while `--output-format` selects the JSON structure variant (unified/legacy). They serve different purposes and can be used together.
 
 ```bash
 # JSON output (default is legacy format)
