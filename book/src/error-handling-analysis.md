@@ -127,16 +127,79 @@ fn load_multiple_configs(paths: &[PathBuf]) -> Result<Vec<Config>> {
 
 ### Error Swallowing in Rust
 
+Debtmap detects seven distinct patterns of error swallowing in Rust, where errors are silently ignored without logging or propagation:
+
+#### 1. IfLetOkNoElse - Missing else branch
+
 ```rust
-// ❌ Silent error swallowing
-fn try_parse(s: &str) -> Option<i32> {
-    match s.parse::<i32>() {
-        Ok(v) => Some(v),
-        Err(_) => None,  // Detected: Error swallowed without logging
+// ❌ Detected: if let Ok without else branch
+fn try_update(value: &str) {
+    if let Ok(parsed) = value.parse::<i32>() {
+        update_value(parsed);
+    }
+    // Error case silently ignored - no logging or handling
+}
+
+// ✅ GOOD: Handle both cases
+fn try_update(value: &str) -> Result<()> {
+    if let Ok(parsed) = value.parse::<i32>() {
+        update_value(parsed);
+        Ok(())
+    } else {
+        Err(anyhow!("Failed to parse value: {}", value))
+    }
+}
+```
+
+#### 2. IfLetOkEmptyElse - Empty else branch
+
+```rust
+// ❌ Detected: if let Ok with empty else
+fn process_result(result: Result<Data, Error>) {
+    if let Ok(data) = result {
+        process(data);
+    } else {
+        // Empty else - error silently swallowed
     }
 }
 
 // ✅ GOOD: Log the error
+fn process_result(result: Result<Data, Error>) {
+    if let Ok(data) = result {
+        process(data);
+    } else {
+        log::error!("Failed to process: {:?}", result);
+    }
+}
+```
+
+#### 3. LetUnderscoreResult - Discarding Result with let _
+
+```rust
+// ❌ Detected: Result discarded with let _
+fn save_data(data: &Data) {
+    let _ = fs::write("data.json", serde_json::to_string(data).unwrap());
+    // Write failure silently ignored
+}
+
+// ✅ GOOD: Handle or propagate the error
+fn save_data(data: &Data) -> Result<()> {
+    fs::write("data.json", serde_json::to_string(data)?)
+        .context("Failed to save data")?;
+    Ok(())
+}
+```
+
+#### 4. OkMethodDiscard - Calling .ok() and discarding
+
+```rust
+// ❌ Detected: .ok() called but result discarded
+fn try_parse(s: &str) -> Option<i32> {
+    s.parse::<i32>().ok();  // Result immediately discarded
+    None
+}
+
+// ✅ GOOD: Use the Ok value or log the error
 fn try_parse(s: &str) -> Option<i32> {
     match s.parse::<i32>() {
         Ok(v) => Some(v),
@@ -147,6 +210,87 @@ fn try_parse(s: &str) -> Option<i32> {
     }
 }
 ```
+
+#### 5. MatchIgnoredErr - Match with ignored error variant
+
+```rust
+// ❌ Detected: match with _ in Err branch
+fn try_load(path: &Path) -> Option<String> {
+    match fs::read_to_string(path) {
+        Ok(content) => Some(content),
+        Err(_) => None,  // Error details ignored
+    }
+}
+
+// ✅ GOOD: Log the error with context
+fn try_load(path: &Path) -> Option<String> {
+    match fs::read_to_string(path) {
+        Ok(content) => Some(content),
+        Err(e) => {
+            log::error!("Failed to read {}: {}", path.display(), e);
+            None
+        }
+    }
+}
+```
+
+#### 6. UnwrapOrNoLog - .unwrap_or() without logging
+
+```rust
+// ❌ Detected: unwrap_or without logging
+fn get_config_value(key: &str) -> String {
+    load_config()
+        .and_then(|c| c.get(key))
+        .unwrap_or_else(|| "default".to_string())
+    // Error silently replaced with default
+}
+
+// ✅ GOOD: Log before falling back to default
+fn get_config_value(key: &str) -> String {
+    match load_config().and_then(|c| c.get(key)) {
+        Ok(value) => value,
+        Err(e) => {
+            log::warn!("Config key '{}' not found: {}. Using default.", key, e);
+            "default".to_string()
+        }
+    }
+}
+```
+
+#### 7. UnwrapOrDefaultNoLog - .unwrap_or_default() without logging
+
+```rust
+// ❌ Detected: unwrap_or_default without logging
+fn load_settings() -> Settings {
+    read_settings_file().unwrap_or_default()
+    // Error silently replaced with default settings
+}
+
+// ✅ GOOD: Log the fallback to defaults
+fn load_settings() -> Settings {
+    match read_settings_file() {
+        Ok(settings) => settings,
+        Err(e) => {
+            log::warn!("Failed to load settings: {}. Using defaults.", e);
+            Settings::default()
+        }
+    }
+}
+```
+
+**Summary of Error Swallowing Patterns:**
+
+| Pattern | Description | Common Cause |
+|---------|-------------|--------------|
+| IfLetOkNoElse | `if let Ok(..)` without else | Quick prototyping, forgotten error path |
+| IfLetOkEmptyElse | `if let Ok(..)` with empty else | Incomplete implementation |
+| LetUnderscoreResult | `let _ = result` | Intentional ignore without thought |
+| OkMethodDiscard | `.ok()` result not used | Misunderstanding of .ok() semantics |
+| MatchIgnoredErr | `Err(_) => ...` with no logging | Generic error handling |
+| UnwrapOrNoLog | `.unwrap_or()` without logging | Convenience over observability |
+| UnwrapOrDefaultNoLog | `.unwrap_or_default()` without logging | Default fallback without visibility |
+
+All these patterns are detected at **Medium to High priority** depending on context, as they represent lost error information that makes debugging difficult.
 
 ## Python Error Handling Analysis
 
@@ -219,6 +363,50 @@ def get_user_age(user_id):
         raise  # Re-raise for caller to handle
 ```
 
+### Contextlib Suppress Detection
+
+Python's `contextlib.suppress()` intentionally silences exceptions, which can hide errors:
+
+```python
+from contextlib import suppress
+
+# ❌ MEDIUM: contextlib.suppress hides errors
+def cleanup_temp_files(paths):
+    for path in paths:
+        with suppress(FileNotFoundError, PermissionError):
+            os.remove(path)  # Detected: ContextlibSuppress
+            # Errors silently suppressed - no visibility into failures
+
+# ✅ GOOD: Log suppressed errors
+def cleanup_temp_files(paths):
+    for path in paths:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            logger.debug(f"File already deleted: {path}")
+        except PermissionError as e:
+            logger.warning(f"Permission denied removing {path}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error removing {path}: {e}")
+
+# ✅ ACCEPTABLE: Use suppress only for truly ignorable cases
+def best_effort_cleanup(paths):
+    """Best-effort cleanup - failures are expected and acceptable."""
+    for path in paths:
+        with suppress(OSError):  # OK if documented and intentional
+            os.remove(path)
+```
+
+**When contextlib.suppress is acceptable:**
+- Cleanup operations where failures are genuinely unimportant
+- Operations explicitly documented as "best effort"
+- Code where logging would create noise without value
+
+**When to avoid contextlib.suppress:**
+- Production code where error visibility matters
+- Operations where partial failure should be noticed
+- Any case where debugging might be needed later
+
 ### Exception Flow Analysis
 
 Debtmap tracks exception propagation through Python codebases to identify functions that can raise exceptions without proper handling. This analysis helps ensure that exceptions are either caught at appropriate levels or documented in the function's interface.
@@ -256,7 +444,24 @@ def process_batch(items):
 
 ### Unhandled Promise Rejections (JavaScript/TypeScript)
 
-**Note:** JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code. Enhanced JavaScript/TypeScript async error detection is planned for future releases.
+**Note:** JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code.
+
+**Current Language Support Comparison:**
+
+| Feature | Rust | Python | JavaScript/TypeScript |
+|---------|------|--------|----------------------|
+| Basic error swallowing | ✅ Full | ✅ Full | ✅ Basic |
+| Panic/exception patterns | ✅ Full | ✅ Full | ⚠️ Limited |
+| Async error detection | ✅ Full | N/A | ⚠️ Limited |
+| Error propagation analysis | ✅ Full | ✅ Basic | ❌ Not yet |
+| Context loss detection | ✅ Full | ⚠️ Limited | ❌ Not yet |
+
+Current JavaScript/TypeScript detection includes:
+- Basic try/catch without error handling
+- Some promise rejection patterns
+- Complexity analysis
+
+Enhanced JavaScript/TypeScript async error detection is planned for future releases.
 
 ```javascript
 // ❌ CRITICAL: Unhandled promise rejection
@@ -306,6 +511,10 @@ async function saveAndNotify(data) {
 
 ### Async Rust Error Handling
 
+Debtmap detects five async-specific error handling patterns in Rust:
+
+#### 1. DroppedFuture - Future dropped without awaiting
+
 ```rust
 // ❌ HIGH: Dropped future without error handling
 async fn process_requests(requests: Vec<Request>) {
@@ -332,7 +541,31 @@ async fn process_requests(requests: Vec<Request>) -> Result<()> {
     }
     Ok(())
 }
+```
 
+#### 2. UnhandledJoinHandle - Spawned task without join
+
+```rust
+// ❌ HIGH: Task spawned but handle never checked
+async fn background_sync() {
+    tokio::spawn(async {
+        sync_to_database().await  // Detected: UnhandledJoinHandle
+    });
+    // Handle dropped - can't detect if task panicked or failed
+}
+
+// ✅ GOOD: Store and check join handle
+async fn background_sync() -> Result<()> {
+    let handle = tokio::spawn(async {
+        sync_to_database().await
+    });
+    handle.await?  // Wait for completion and check for panic
+}
+```
+
+#### 3. SilentTaskPanic - Task panic without monitoring
+
+```rust
 // ❌ HIGH: Task panic silently ignored
 tokio::spawn(async {
     panic!("task failed");  // Detected: SilentTaskPanic
@@ -349,6 +582,72 @@ match handle.await {
     Err(e) => eprintln!("Task panicked: {}", e),
 }
 ```
+
+#### 4. SpawnWithoutJoin - Spawning without storing handle
+
+```rust
+// ❌ MEDIUM: Spawn without storing handle
+async fn fire_and_forget_tasks(items: Vec<Item>) {
+    for item in items {
+        tokio::spawn(process_item(item));  // Detected: SpawnWithoutJoin
+        // No way to check task completion or errors
+    }
+}
+
+// ✅ GOOD: Collect handles for later checking
+async fn process_tasks_with_monitoring(items: Vec<Item>) -> Result<()> {
+    let handles: Vec<_> = items.into_iter()
+        .map(|item| tokio::spawn(process_item(item)))
+        .collect();
+
+    for handle in handles {
+        handle.await??;
+    }
+    Ok(())
+}
+```
+
+#### 5. SelectBranchIgnored - Select branch without error handling
+
+```rust
+// ❌ MEDIUM: tokio::select! branch error ignored
+async fn process_with_timeout(data: Data) {
+    tokio::select! {
+        result = process_data(data) => {
+            // Detected: SelectBranchIgnored
+            // result could be Err but not checked
+        }
+        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            println!("Timeout");
+        }
+    }
+}
+
+// ✅ GOOD: Handle errors in select branches
+async fn process_with_timeout(data: Data) -> Result<()> {
+    tokio::select! {
+        result = process_data(data) => {
+            result?;  // Propagate error
+            Ok(())
+        }
+        _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            Err(anyhow!("Processing timeout after 5s"))
+        }
+    }
+}
+```
+
+**Async Error Pattern Summary:**
+
+| Pattern | Severity | Description | Common in |
+|---------|----------|-------------|-----------|
+| DroppedFuture | High | Future result ignored | Fire-and-forget spawns |
+| UnhandledJoinHandle | High | JoinHandle never checked | Background tasks |
+| SilentTaskPanic | High | Task panic not monitored | Unmonitored spawns |
+| SpawnWithoutJoin | Medium | Handle not stored | Quick prototypes |
+| SelectBranchIgnored | Medium | select! branch error ignored | Concurrent operations |
+
+All async error patterns emphasize the importance of properly handling errors in concurrent Rust code, where failures can easily go unnoticed.
 
 ## Severity Levels and Prioritization
 
@@ -416,11 +715,13 @@ This function would be flagged as **Priority 1** in Debtmap's output due to:
 
 ### Error Handling Configuration Options
 
+**By default, all error handling detection is fully enabled.** The configuration options below are primarily used to selectively disable specific patterns during gradual adoption or for specific project needs.
+
 Configure error handling analysis in `.debtmap.toml`:
 
 ```toml
 [error_handling]
-# Enable/disable specific detection patterns (all enabled by default)
+# All detection patterns are enabled by default (all default to true)
 detect_panic_patterns = true     # Rust unwrap/expect/panic detection
 detect_swallowing = true         # Silent exception handling
 detect_async_errors = true       # Unhandled promises, dropped futures
@@ -431,7 +732,7 @@ detect_propagation = true        # Error propagation analysis
 # detect_async_errors = false
 ```
 
-**Note:** The `[error_handling]` configuration is currently in development. Most error handling patterns are detected by default with `ErrorSwallowing` debt category (weight 4). Per-pattern severity customization is planned for future releases.
+All error handling patterns are detected by default with the `ErrorSwallowing` debt category (weight 4). The configuration is fully implemented and functional - use it primarily to disable specific patterns when needed.
 
 ## Detection Examples
 
