@@ -99,7 +99,7 @@ A **god module** is a file with excessive standalone functions (no dominant stru
 - `GodFile` - File with excessive functions or lines of code
 - `GodModule` - Alias for `GodFile` (both represent the same detection type)
 
-The `GodModule` variant is provided for clarity when discussing files with many standalone functions, but internally it's the same as `GodFile`.
+The `GodModule` variant is provided for clarity when discussing files with many standalone functions, but internally it's the same as `GodFile`. Both terms exist to help distinguish between "file is large" (GodFile) and "file has many functions" (GodModule) conceptually in documentation and error messages, even though they're implemented identically in the detection logic.
 
 **Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module (using the `GodFile`/`GodModule` detection type).
 
@@ -246,7 +246,7 @@ Responsibilities are inferred from method names using common prefixes. Debtmap r
 | `send`, `receive` | Communication |
 | *(no prefix match)* | Utilities |
 
-**Note:** `Utilities` serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, `Utilities` is included in `RESPONSIBILITY_CATEGORIES` with an empty prefixes array, making it the catch-all category returned by `infer_responsibility_from_method` when no other category matches.
+**Note:** `Utilities` serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, `Utilities` is included in `RESPONSIBILITY_CATEGORIES` with an empty prefixes array (`prefixes: &[]`), making it the catch-all category returned by `infer_responsibility_from_method` when no other category matches.
 
 **Distinct Responsibility Counting:** Debtmap counts the number of **unique** responsibility categories used by a struct/module's methods. A high responsibility count (e.g., >5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.
 
@@ -587,6 +587,18 @@ See `src/organization/god_object_metrics.rs:1-228`.
 1. Check the violation count - 5 violations means severe issues
 2. Review each metric - are method count, field count, responsibilities, LOC, and complexity all high?
 3. Consider if the score accurately reflects maintainability burden
+
+### "Why does my test file show as a god object?"
+
+**Answer:** Test files often have many test functions, which can trigger god module detection. However, this is usually expected for comprehensive test suites.
+
+**Solutions:**
+1. **Accept the finding**: Large test files (100+ test functions) can be difficult to navigate and maintain
+2. **Split by feature**: Organize tests into smaller files grouped by the feature they test (e.g., `user_auth_tests.rs`, `user_profile_tests.rs`)
+3. **Adjust thresholds**: If your project standards accept large test files, increase `max_methods` in `.debtmap.toml`
+4. **Use test organization**: Group related tests in modules within the test file for better structure
+
+**Note:** Debtmap does not automatically exclude test files from god object detection. Consider the trade-offs between comprehensive test coverage in one file versus better organization across multiple test files.
 
 ### "Can I disable god object detection for specific files?"
 
