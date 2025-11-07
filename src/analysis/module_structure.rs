@@ -140,9 +140,9 @@ impl ModuleComponent {
 pub struct ModuleFacadeInfo {
     /// Whether this file qualifies as a module facade
     pub is_facade: bool,
-    /// Number of submodules (both #[path] and inline)
+    /// Number of submodules (both #\[path\] and inline)
     pub submodule_count: usize,
-    /// List of #[path] declarations
+    /// List of #\[path\] declarations
     pub path_declarations: Vec<PathDeclaration>,
     /// Facade quality score (0.0-1.0)
     pub facade_score: f64,
@@ -714,7 +714,7 @@ impl ModuleStructureAnalyzer {
     /// Detect if a Rust file is a module facade (Spec 170)
     ///
     /// A module facade is a file that primarily organizes submodules through
-    /// #[path] declarations and re-exports, with minimal implementation code.
+    /// #\[path\] declarations and re-exports, with minimal implementation code.
     fn detect_module_facade(&self, ast: &syn::File) -> ModuleFacadeInfo {
         let mut path_declarations = Vec::new();
         let mut inline_modules = 0;
