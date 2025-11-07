@@ -579,13 +579,16 @@ Memory used: 12.3 MB
 Overhead: 121.7% vs single-pass (145ms baseline)
 ⚠️  Warning: Overhead exceeds 25% target
 </code></pre>
+<blockquote>
+<p><strong>Note</strong>: Memory usage values are estimates based on parallelism level, not precise heap measurements.</p>
+</blockquote>
 <p><strong>Tracked Metrics:</strong></p>
 <ul>
 <li><strong>Raw analysis time</strong> - Time to analyze original code</li>
 <li><strong>Normalized analysis time</strong> - Time to analyze normalized code</li>
 <li><strong>Attribution time</strong> - Time to compute attribution breakdown</li>
 <li><strong>Total time</strong> - Complete multi-pass analysis duration</li>
-<li><strong>Memory used</strong> - Additional memory for two-pass analysis</li>
+<li><strong>Memory used</strong> - Estimated additional memory for two-pass analysis</li>
 </ul>
 <h3 id="performance-overhead"><a class="header" href="#performance-overhead">Performance Overhead</a></h3>
 <p><strong>Target Overhead</strong>: ≤25% compared to single-pass analysis</p>

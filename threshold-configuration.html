@@ -197,6 +197,10 @@
 <tr><td>Function Length (lines)</td><td>15</td><td>20</td><td>50</td></tr>
 <tr><td>Match Arms</td><td>3</td><td>4</td><td>8</td></tr>
 <tr><td>If-Else Chain</td><td>2</td><td>3</td><td>5</td></tr>
+<tr><td><strong>Role Multipliers</strong></td><td></td><td></td><td></td></tr>
+<tr><td>Entry Point Multiplier</td><td>1.2x</td><td>1.5x</td><td>2.0x</td></tr>
+<tr><td>Utility Multiplier</td><td>0.6x</td><td>0.8x</td><td>1.0x</td></tr>
+<tr><td>Test Function Multiplier</td><td>3.0x</td><td>2.0x</td><td>3.0x</td></tr>
 </tbody></table>
 </div>
 <h3 id="when-to-use-each-preset"><a class="header" href="#when-to-use-each-preset">When to Use Each Preset</a></h3>
@@ -286,7 +290,7 @@
 <h2 id="role-based-multipliers"><a class="header" href="#role-based-multipliers">Role-Based Multipliers</a></h2>
 <p>Debtmap automatically adjusts thresholds based on function role, recognizing that different types of functions have different complexity expectations:</p>
 <div class="table-wrapper"><table><thead><tr><th>Function Role</th><th>Multiplier</th><th>Effect</th><th>Examples</th></tr></thead><tbody>
-<tr><td>Entry Points</td><td>1.5x</td><td>More lenient</td><td><code>main()</code>, HTTP handlers, CLI commands</td></tr>
+<tr><td>Entry Points</td><td>1.2x - 2.0x (preset-specific)</td><td>More lenient</td><td><code>main()</code>, HTTP handlers, CLI commands</td></tr>
 <tr><td>Core Logic</td><td>1.0x</td><td>Standard</td><td>Business logic, algorithms</td></tr>
 <tr><td>Utility Functions</td><td>0.6x - 1.0x (preset-specific)</td><td>Stricter</td><td>Getters, setters, simple helpers</td></tr>
 <tr><td>Test Functions</td><td>2.0x - 3.0x (preset-specific)</td><td>Most lenient</td><td>Unit tests, integration tests</td></tr>
@@ -295,12 +299,13 @@
 </div>
 <p><strong>Note</strong>: Some multipliers vary by preset:</p>
 <ul>
+<li><strong>Entry Points</strong>: Strict=1.2x, Balanced=1.5x, Lenient=2.0x</li>
 <li><strong>Utility Functions</strong>: Strict=0.6x, Balanced=0.8x, Lenient=1.0x</li>
 <li><strong>Test Functions</strong>: Strict=3.0x, Balanced=2.0x, Lenient=3.0x</li>
 </ul>
 <p><strong>How multipliers work:</strong></p>
-<p>A higher multiplier makes thresholds more lenient by adjusting ALL thresholds. For example, an entry point function with the balanced preset would have these adjusted thresholds:</p>
-<p><strong>Balanced Preset Entry Point (multiplier = 1.5x):</strong></p>
+<p>A higher multiplier makes thresholds more lenient by adjusting ALL thresholds. The multiplier values vary by preset - for example, entry point functions use 1.2x (strict), 1.5x (balanced), or 2.0x (lenient).</p>
+<p><strong>Example: Entry Point function with Balanced preset (multiplier = 1.5x):</strong></p>
 <ul>
 <li>Cyclomatic threshold: 7.5 (5 × 1.5)</li>
 <li>Cognitive threshold: 15 (10 × 1.5)</li>
@@ -314,7 +319,7 @@
 <li>Function length &gt;= 30 lines AND</li>
 <li>Total complexity (cyclomatic + cognitive) &gt;= 12</li>
 </ul>
-<p><strong>Comparison across roles (balanced preset):</strong></p>
+<p><strong>Comparison across roles (Balanced preset):</strong></p>
 <div class="table-wrapper"><table><thead><tr><th>Role</th><th>Cyclomatic</th><th>Cognitive</th><th>Total</th><th>Length</th><th>Flagged When</th></tr></thead><tbody>
 <tr><td>Entry Point (1.5x)</td><td>7.5</td><td>15</td><td>12</td><td>30</td><td>ALL conditions met</td></tr>
 <tr><td>Core Logic (1.0x)</td><td>5</td><td>10</td><td>8</td><td>20</td><td>ALL conditions met</td></tr>
@@ -322,6 +327,7 @@
 <tr><td>Test (2.0x)</td><td>10</td><td>20</td><td>16</td><td>40</td><td>ALL conditions met</td></tr>
 </tbody></table>
 </div>
+<p><strong>Note</strong>: Entry point multipliers differ by preset. With the strict preset, entry points use 1.2x (cyclomatic=3.6, cognitive=8.4), while the lenient preset uses 2.0x (cyclomatic=20, cognitive=40).</p>
 <p>This allows test functions and entry points to be more complex without false positives, while keeping utility functions clean and simple.</p>
 <h2 id="cli-threshold-flags"><a class="header" href="#cli-threshold-flags">CLI Threshold Flags</a></h2>
 <p>Override thresholds for a single analysis run using command-line flags:</p>
@@ -350,8 +356,8 @@ debtmap analyze . --threshold-complexity 15 --threshold-duplication 30
 <p><strong>Note</strong>:</p>
 <ul>
 <li><code>--threshold-preset</code> provides the most comprehensive threshold configuration (includes all complexity metrics and role multipliers)</li>
-<li>Individual flags like <code>--threshold-complexity</code> are legacy flags with limited scope</li>
-<li>For full control, use the <code>.debtmap.toml</code> configuration file</li>
+<li>Individual flags like <code>--threshold-complexity</code> are legacy flags that only set a single cyclomatic complexity threshold, without configuring cognitive complexity, total complexity, function length, or role multipliers</li>
+<li>For full control over all complexity metrics and role-based multipliers, use the <code>.debtmap.toml</code> configuration file</li>
 <li>CLI flags override configuration file settings for that run only</li>
 </ul>
 <h2 id="configuration-file"><a class="header" href="#configuration-file">Configuration File</a></h2>
@@ -376,11 +382,13 @@ utility_multiplier = 0.8            # Getters, setters, helpers
 test_function_multiplier = 2.0      # Unit tests, integration tests
 </code></pre>
 <p><strong>Note</strong>: The multipliers are applied to thresholds before comparison. For example, with <code>entry_point_multiplier = 1.5</code> and <code>minimum_cyclomatic_complexity = 5</code>, an entry point function would be flagged at cyclomatic complexity 7.5 (5 × 1.5).</p>
+<p><strong>Validation</strong>: All threshold values must be positive (&gt; 0). Zero or negative values will cause validation errors and Debtmap will use default values instead. This ensures that thresholds are always meaningful and prevents misconfiguration.</p>
 <h3 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h3>
-<pre><code class="language-toml"># Complexity thresholds for flagging functions
+<pre><code class="language-toml"># Legacy threshold settings (simple configuration)
+# Note: For comprehensive control, use [complexity_thresholds] instead
 [thresholds]
-complexity = 15                # Cyclomatic complexity threshold
-cognitive = 20                 # Cognitive complexity threshold
+complexity = 15                # Cyclomatic complexity threshold (legacy)
+cognitive = 20                 # Cognitive complexity threshold (legacy)
 max_file_length = 500         # Maximum file length in lines
 
 # Validation thresholds for CI/CD
@@ -419,6 +427,12 @@ max_traits = 3
 max_lines = 500
 max_complexity = 150
 </code></pre>
+<p><strong>Configuration Section Notes:</strong></p>
+<ul>
+<li><strong><code>[thresholds]</code></strong>: Legacy/simple threshold configuration. Sets basic complexity thresholds without role multipliers or comprehensive metric control.</li>
+<li><strong><code>[complexity_thresholds]</code></strong>: Modern/comprehensive threshold configuration. Provides fine-grained control over all complexity metrics, structural thresholds, and role-based multipliers. Use this for full control.</li>
+<li><strong>Recommendation</strong>: For new projects, use <code>[complexity_thresholds]</code> for comprehensive configuration. The <code>[thresholds]</code> section is maintained for backward compatibility.</li>
+</ul>
 <h3 id="using-configuration-file"><a class="header" href="#using-configuration-file">Using Configuration File</a></h3>
 <pre><code class="language-bash"># Initialize with default configuration
 debtmap init

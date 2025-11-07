@@ -255,7 +255,7 @@ debtmap analyze . --aggregate-only --top 10
 <li>Prioritizing architectural improvements</li>
 <li>Allocating team resources</li>
 </ul>
-<p><strong>Note</strong>: File-level scoring is enabled with the <code>--aggregate-only</code> flag, which changes output to show only file-level metrics instead of function-level details.</p>
+<p><strong>Note</strong>: File-level scoring is enabled with the <code>--aggregate-only</code> flag (a boolean flag—no value needed), which changes output to show only file-level metrics instead of function-level details.</p>
 <p><strong>2. Identifying Architectural Issues</strong></p>
 <p>File-level scoring excels at finding:</p>
 <ul>
@@ -338,6 +338,9 @@ method = "max_plus_average"
 </div>
 <p><strong>Performance Note</strong>: All aggregation methods have O(n) complexity where n = number of functions. Performance differences are negligible for typical codebases (&lt;100k functions). Choose based on prioritization strategy, not performance concerns.</p>
 <h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
+<blockquote>
+<p><strong>IMPORTANT</strong>: The configuration file must be named <strong><code>.debtmap.toml</code></strong> (not <code>debtmap.yml</code> or other variants) and placed in your project root directory.</p>
+</blockquote>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
 min_problematic = 3              # Need 3+ problematic functions for file-level score
@@ -367,8 +370,7 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 <li><strong>Coverage Multiplier</strong>: 1.0 - coverage_percent (0% coverage = 1.0, 100% coverage = 0.0)</li>
 <li><strong>Final Score</strong>: Base Score × Coverage Multiplier × Role Multiplier</li>
 </ol>
-<p><strong>Note</strong>: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. The weights (0.50 for complexity, 0.25 for dependencies) are hard-coded in the implementation to ensure consistent scoring across environments. Role multipliers and coverage weights remain configurable to allow customization while maintaining stable base calculations.</p>
-<p><strong>Why Hard-Coded Weights?</strong> These base weights are intentionally not configurable to:</p>
+<p><strong>Why Hard-Coded Weights?</strong> The base weights (0.50 for complexity, 0.25 for dependencies) are intentionally not configurable to:</p>
 <ul>
 <li><strong>Ensure consistency</strong>: Scores remain comparable across projects and teams</li>
 <li><strong>Prevent instability</strong>: Avoid extreme configurations that break prioritization</li>
@@ -376,6 +378,7 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 <li><strong>Maintain calibration</strong>: Weights are empirically tuned based on analysis of real codebases</li>
 </ul>
 <p>You can still customize prioritization significantly through configurable <code>role_multipliers</code>, <code>coverage_weights</code>, and normalization settings.</p>
+<p><strong>Note</strong>: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. Role multipliers and coverage weights remain configurable to allow customization while maintaining stable base calculations.</p>
 <p><strong>Migration Note</strong>: Earlier versions used an additive model with weights (Complexity × 0.35) + (Coverage × 0.50) + (Dependency × 0.15). The current model (spec 122) uses coverage as a multiplicative dampener, which better reflects that testing gaps amplify existing complexity rather than adding to it.</p>
 <h3 id="metrics"><a class="header" href="#metrics">Metrics</a></h3>
 <p><strong>Cyclomatic Complexity</strong></p>
@@ -982,7 +985,9 @@ minimum_debt_score = 3.0
 <h2 id="rebalanced-debt-scoring-spec-136"><a class="header" href="#rebalanced-debt-scoring-spec-136">Rebalanced Debt Scoring (Spec 136)</a></h2>
 <p>Debtmap now includes an advanced <strong>rebalanced scoring algorithm</strong> that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.</p>
 <h3 id="enabling-rebalanced-scoring"><a class="header" href="#enabling-rebalanced-scoring">Enabling Rebalanced Scoring</a></h3>
-<p><strong>Configuration-Based Activation</strong>: Rebalanced scoring is enabled through your <code>.debtmap.toml</code> configuration file, not via CLI flags.</p>
+<blockquote>
+<p><strong>IMPORTANT</strong>: Rebalanced scoring is enabled through your <code>.debtmap.toml</code> configuration file, <strong>not via CLI flags</strong>. Add the <code>[scoring_rebalanced]</code> section to activate it.</p>
+</blockquote>
 <p><strong>Default Behavior</strong>: By default, debtmap uses the standard scoring algorithm described earlier in this chapter. To use rebalanced scoring, add the <code>[scoring_rebalanced]</code> section to your config:</p>
 <pre><code class="language-toml"># .debtmap.toml
 [scoring_rebalanced]

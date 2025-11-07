@@ -189,6 +189,35 @@
 <p>Entropy analysis uses information theory to distinguish between these cases.</p>
 <h2 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h2>
 <p>Debtmap’s entropy analysis is <strong>language-agnostic</strong>, working across Rust, Python, JavaScript, and TypeScript codebases using a universal token classification approach. This ensures consistent complexity assessment regardless of the programming language used.</p>
+<h3 id="language-agnostic-analysis"><a class="header" href="#language-agnostic-analysis">Language-Agnostic Analysis</a></h3>
+<p>The same entropy concepts apply consistently across all supported languages. Here’s how a validation function would be analyzed in different languages:</p>
+<p><strong>Rust:</strong></p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn validate_config(config: &amp;Config) -&gt; Result&lt;()&gt; {
+    if config.output_dir.is_none() { return Err(anyhow!("output_dir required")); }
+    if config.max_workers.is_none() { return Err(anyhow!("max_workers required")); }
+    if config.timeout_secs.is_none() { return Err(anyhow!("timeout_secs required")); }
+    Ok(())
+}
+// Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+<span class="boring">}</span></code></pre></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">def validate_config(config: Config) -&gt; None:
+    if config.output_dir is None: raise ValueError("output_dir required")
+    if config.max_workers is None: raise ValueError("max_workers required")
+    if config.timeout_secs is None: raise ValueError("timeout_secs required")
+# Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+</code></pre>
+<p><strong>JavaScript/TypeScript:</strong></p>
+<pre><code class="language-typescript">function validateConfig(config: Config): void {
+    if (!config.outputDir) throw new Error("outputDir required");
+    if (!config.maxWorkers) throw new Error("maxWorkers required");
+    if (!config.timeoutSecs) throw new Error("timeoutSecs required");
+}
+// Entropy: ~0.3, Pattern Repetition: 0.9, Effective Complexity: ~5
+</code></pre>
+<p>All three receive similar entropy scores because they share the same repetitive validation pattern, demonstrating how Debtmap’s analysis transcends language syntax to identify underlying code structure patterns.</p>
 <h3 id="shannon-entropy"><a class="header" href="#shannon-entropy">Shannon Entropy</a></h3>
 <p>Shannon entropy measures the variety and unpredictability of code patterns:</p>
 <pre><code>H(X) = -Σ p(x) × log₂(p(x))
@@ -201,7 +230,7 @@
 </ul>
 <h3 id="token-classification"><a class="header" href="#token-classification">Token Classification</a></h3>
 <p>Debtmap can classify tokens by importance to give more weight to semantically significant tokens in entropy calculations. This is controlled by the <code>use_classification</code> configuration option.</p>
-<p><strong>When enabled</strong> (disabled by default for backward compatibility), tokens are weighted by importance:</p>
+<p><strong>When enabled</strong> (<code>use_classification = false</code> by default for backward compatibility), tokens are weighted by importance:</p>
 <p><strong>High importance (weight: 1.0):</strong></p>
 <ul>
 <li>Control flow keywords (<code>if</code>, <code>match</code>, <code>for</code>, <code>while</code>)</li>
@@ -286,12 +315,14 @@ effective_complexity = raw_complexity × dampening_factor
 <p>Each factor is dampened individually using a graduated calculation:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Simplified version - actual implementation in src/complexity/entropy.rs:185-195
+</span>// Conceptual pseudocode showing the three-factor approach
+// Actual implementation in src/complexity/entropy.rs:185-195 and :429-439
 fn calculate_dampening_factor(
     repetition: f64,     // 0.0-1.0
     entropy: f64,        // 0.0-1.0
     branch_similarity: f64  // 0.0-1.0
 ) -&gt; f64 {
+    // Each factor uses calculate_graduated_dampening with its own threshold/range
     let repetition_factor = graduated_dampening(repetition, threshold=1.0, max_reduction=0.20);
     let entropy_factor = graduated_dampening(entropy, threshold=0.4, max_reduction=0.15);
     let branch_factor = graduated_dampening(branch_similarity, threshold=0.8, max_reduction=0.25);
@@ -299,12 +330,12 @@ fn calculate_dampening_factor(
     (repetition_factor * entropy_factor * branch_factor).max(0.7)  // Never reduce below 70%
 }
 <span class="boring">}</span></code></pre></pre>
-<p><strong>Key Parameters</strong> (hardcoded in implementation):</p>
+<p><strong>Key Parameters:</strong></p>
 <ul>
-<li><strong>Repetition</strong>: Threshold 1.0, max 20% reduction</li>
-<li><strong>Entropy</strong>: Threshold 0.4, max 15% reduction</li>
-<li><strong>Branch Similarity</strong>: Threshold 0.8, max 25% reduction</li>
-<li><strong>Combined Floor</strong>: Minimum 70% of original complexity preserved</li>
+<li><strong>Repetition</strong>: Threshold 1.0, max 20% reduction (configurable via <code>max_repetition_reduction</code>)</li>
+<li><strong>Entropy</strong>: Threshold 0.4 (hardcoded), max 15% reduction (configurable via <code>max_entropy_reduction</code>)</li>
+<li><strong>Branch Similarity</strong>: Threshold 0.8 (configurable via <code>branch_threshold</code>), max 25% reduction (configurable via <code>max_branch_reduction</code>)</li>
+<li><strong>Combined Floor</strong>: Minimum 70% of original complexity preserved (configurable via <code>max_combined_reduction</code>)</li>
 </ul>
 <h4 id="example-repetitive-validation-function"><a class="header" href="#example-repetitive-validation-function">Example: Repetitive Validation Function</a></h4>
 <pre><code>Raw Complexity: 20
@@ -411,7 +442,7 @@ Result: 0% reduction (complexity preserved)
 <li>Assessment: HIGH PRIORITY</li>
 </ul>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
-<p>Configure entropy analysis in <code>.debtmap.toml</code>:</p>
+<p>Configure entropy analysis in <code>.debtmap.toml</code> or disable via the <code>--semantic-off</code> CLI flag.</p>
 <pre><code class="language-toml">[entropy]
 # Enable entropy analysis (default: true)
 enabled = true
@@ -443,11 +474,11 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 <p><strong>Important Notes:</strong></p>
 <ol>
 <li>
-<p><strong>Graduated dampening thresholds are hardcoded</strong> in the implementation (<code>src/complexity/entropy.rs:185-195</code>):</p>
+<p><strong>Dampening thresholds</strong> - Some are configurable, some are hardcoded (<code>src/complexity/entropy.rs:185-195</code>):</p>
 <ul>
-<li>Entropy threshold: 0.4 (not configurable via <code>entropy_threshold</code>)</li>
-<li>Branch threshold: 0.8 (configured via <code>branch_threshold</code>)</li>
-<li>Repetition threshold: 1.0 (via <code>pattern_threshold</code>)</li>
+<li><strong>Entropy factor threshold: 0.4</strong> - Hardcoded internally (not configurable)</li>
+<li><strong>Branch threshold: 0.8</strong> - Configurable via <code>branch_threshold</code> in config file</li>
+<li><strong>Pattern threshold: 0.7/1.0</strong> - Configurable via <code>pattern_threshold</code> in config file</li>
 </ul>
 </li>
 <li>
@@ -488,6 +519,46 @@ enabled = false
 debtmap analyze . --semantic-off
 </code></pre>
 <p><strong>Note</strong>: The <code>--semantic-off</code> flag disables all semantic analysis features, including entropy-based complexity adjustments. This is useful when you want raw cyclomatic complexity without any dampening.</p>
+<h2 id="interpreting-entropy-adjusted-output"><a class="header" href="#interpreting-entropy-adjusted-output">Interpreting Entropy-Adjusted Output</a></h2>
+<p>When entropy analysis detects repetitive patterns, debtmap displays both the original and adjusted complexity values to help you understand the adjustment. This transparency allows you to verify the analysis and understand why certain code receives lower priority.</p>
+<h3 id="output-format"><a class="header" href="#output-format">Output Format</a></h3>
+<p>When viewing detailed output (verbosity level 2 with <code>-vv</code>), entropy-adjusted complexity is shown in the <strong>COMPLEXITY</strong> section:</p>
+<pre><code>COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+</code></pre>
+<p>And in the <strong>Entropy Impact</strong> scoring section:</p>
+<pre><code>  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+</code></pre>
+<h3 id="understanding-the-values"><a class="header" href="#understanding-the-values">Understanding the Values</a></h3>
+<p><strong>cyclomatic=20</strong>: Original cyclomatic complexity before adjustment
+<strong>dampened: 14</strong>: Adjusted complexity after entropy analysis (20 × 0.70 = 14)
+<strong>factor: 0.70</strong>: The dampening factor applied (0.70 = 30% reduction)
+<strong>entropy=0.30</strong>: Shannon entropy score (0.0-1.0, lower = more repetitive)
+<strong>repetition: 95%</strong>: Pattern repetition score (higher = more repetitive)</p>
+<h3 id="reconstructing-the-calculation"><a class="header" href="#reconstructing-the-calculation">Reconstructing the Calculation</a></h3>
+<p>You can verify the adjustment by multiplying:</p>
+<pre><code>original_complexity × dampening_factor = adjusted_complexity
+20 × 0.70 = 14
+</code></pre>
+<p>The dampening percentage shown in the Entropy Impact section is:</p>
+<pre><code>dampening_percentage = (1.0 - dampening_factor) × 100%
+(1.0 - 0.70) × 100% = 30%
+</code></pre>
+<h3 id="when-entropy-data-is-unavailable"><a class="header" href="#when-entropy-data-is-unavailable">When Entropy Data is Unavailable</a></h3>
+<p>If a function is too small for entropy analysis (&lt; 20 tokens) or entropy is disabled, the output shows complexity without dampening:</p>
+<pre><code>COMPLEXITY: cyclomatic=5, est_branches=10, cognitive=8, nesting=2
+</code></pre>
+<p>No “dampened” or “factor” values are shown, indicating the raw complexity is used for scoring.</p>
+<h3 id="example-output-comparison"><a class="header" href="#example-output-comparison">Example Output Comparison</a></h3>
+<p><strong>Before entropy-adjustment:</strong></p>
+<pre><code>#1 SCORE: 95.5 [CRITICAL]
+├─ COMPLEXITY: cyclomatic=20, est_branches=40, cognitive=25, nesting=3
+</code></pre>
+<p><strong>After entropy-adjustment:</strong></p>
+<pre><code>#15 SCORE: 68.2 [HIGH]
+├─ COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+</code></pre>
+<p>The item dropped from rank #1 to #15 because entropy analysis detected the high complexity was primarily due to repetitive validation patterns rather than genuine cognitive complexity.</p>
 <h2 id="understanding-the-impact"><a class="header" href="#understanding-the-impact">Understanding the Impact</a></h2>
 <h3 id="measuring-false-positive-reduction"><a class="header" href="#measuring-false-positive-reduction">Measuring False Positive Reduction</a></h3>
 <p>Run analysis with and without entropy:</p>

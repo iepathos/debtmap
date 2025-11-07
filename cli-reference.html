@@ -198,7 +198,7 @@ debtmap init
 debtmap validate . --config debtmap.toml
 </code></pre>
 <h2 id="commands"><a class="header" href="#commands">Commands</a></h2>
-<p>Debtmap provides five main commands:</p>
+<p>Debtmap provides six main commands: five for analysis and validation, plus one debugging tool.</p>
 <h3 id="analyze"><a class="header" href="#analyze"><code>analyze</code></a></h3>
 <p>Analyze code for complexity and technical debt.</p>
 <p><strong>Usage:</strong></p>
@@ -350,6 +350,43 @@ debtmap validate-improvement \
   --output .prodigy/validation.json \
   --threshold 80.0
 </code></pre>
+<h3 id="explain-coverage-debugging"><a class="header" href="#explain-coverage-debugging"><code>explain-coverage</code> (Debugging)</a></h3>
+<p>Explain coverage detection for a specific function.</p>
+<p><strong>Usage:</strong></p>
+<pre><code class="language-bash">debtmap explain-coverage &lt;PATH&gt; --coverage-file &lt;FILE&gt; --function &lt;NAME&gt; [OPTIONS]
+</code></pre>
+<p><strong>Arguments:</strong></p>
+<ul>
+<li><code>&lt;PATH&gt;</code> - Path to the codebase to analyze</li>
+</ul>
+<p><strong>Required Options:</strong></p>
+<ul>
+<li><code>--coverage-file &lt;FILE&gt;</code> / <code>--lcov &lt;FILE&gt;</code> - LCOV coverage file</li>
+<li><code>--function &lt;NAME&gt;</code> - Function name to explain (e.g., “create_auto_commit”)</li>
+</ul>
+<p><strong>Optional Options:</strong></p>
+<ul>
+<li><code>--file &lt;PATH&gt;</code> - File path containing the function (helps narrow search)</li>
+<li><code>-v, --verbose</code> - Show all attempted matching strategies</li>
+<li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: text or json (default: text)</li>
+</ul>
+<p><strong>Description:</strong>
+Debugging tool that explains how coverage detection works for a specific function. Shows all attempted matching strategies and helps diagnose coverage mapping issues. This command is particularly useful when:</p>
+<ul>
+<li>Coverage appears incorrect for specific functions</li>
+<li>You need to understand why a function isn’t matched in coverage data</li>
+<li>Debugging LCOV line mapping issues</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Explain coverage for a specific function
+debtmap explain-coverage src/ --coverage-file coverage.lcov --function "process_file"
+
+# Narrow search to specific file with verbose output
+debtmap explain-coverage . --lcov lcov.info --function "analyze_complexity" --file "src/analyzer.rs" -v
+
+# JSON output for automation
+debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function" --format json
+</code></pre>
 <h2 id="options"><a class="header" href="#options">Options</a></h2>
 <p>Options are organized by category for clarity. Most options apply to the <code>analyze</code> command, with a subset available for <code>validate</code>.</p>
 <h3 id="output-control"><a class="header" href="#output-control">Output Control</a></h3>
@@ -371,7 +408,7 @@ debtmap validate-improvement \
 <li><code>--top &lt;N&gt;</code> / <code>--head &lt;N&gt;</code> - Show only top N priority items</li>
 <li><code>--tail &lt;N&gt;</code> - Show only bottom N priority items (lowest priority)</li>
 <li><code>-s, --summary</code> - Use summary format with tiered priority display (compact output)</li>
-<li><code>--compact</code> - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv)</li>
+<li><code>-c, --compact</code> - Use compact output format (minimal details, top metrics only). Conflicts with verbosity flags (-v, -vv, -vvv). Only available in <code>analyze</code> command (note: <code>validate</code> uses <code>-c</code> for <code>--config</code>)</li>
 <li><code>--min-priority &lt;PRIORITY&gt;</code> - Minimum priority to display: low, medium, high, critical</li>
 <li><code>--filter &lt;CATEGORIES&gt;</code> - Filter by debt categories (comma-separated)</li>
 <li><code>--aggregate-only</code> - Show only aggregated file-level scores</li>
@@ -866,38 +903,40 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile strict
 debtmap analyze . --explain-metrics -v
 </code></pre>
 <h2 id="command-compatibility-matrix"><a class="header" href="#command-compatibility-matrix">Command Compatibility Matrix</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>Option</th><th>analyze</th><th>validate</th><th>compare</th><th>init</th></tr></thead><tbody>
-<tr><td><code>&lt;PATH&gt;</code> argument</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--format</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td></tr>
-<tr><td><code>--output</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td></tr>
-<tr><td><code>--coverage-file</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--context</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--cache-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
-<tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td></tr>
-<tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<div class="table-wrapper"><table><thead><tr><th>Option</th><th>analyze</th><th>validate</th><th>compare</th><th>init</th><th>explain-coverage</th></tr></thead><tbody>
+<tr><td><code>&lt;PATH&gt;</code> argument</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--format</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--output</code></td><td>✓</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--coverage-file</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--context</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--threshold-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--top / --tail</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--cache-*</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--jobs</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-parallel</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--verbose</code></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--explain-metrics</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--trace-function</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--call-graph-stats</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--validate-call-graph</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--debug-format</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--no-dependencies</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callers</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--max-callees</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-external-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--show-std-lib-calls</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--ast-functional-analysis</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--functional-analysis-profile</code></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--function</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--file</code></td><td>✗</td><td>✗</td><td>✗</td><td>✗</td><td>✓</td></tr>
+<tr><td><code>--config</code></td><td>✗</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--before / --after</code></td><td>✗</td><td>✗</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td><code>--force</code></td><td>✗</td><td>✗</td><td>✗</td><td>✓</td><td>✗</td></tr>
 </tbody></table>
 </div>
-<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), performance control (<code>--jobs</code>, <code>--no-parallel</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the <code>analyze</code> command.</p>
+<p><strong>Note:</strong> The <code>validate</code> command supports output control (<code>--format</code>, <code>--output</code>), coverage integration (<code>--coverage-file</code>), context-aware analysis (<code>--context</code>), display filtering (<code>--top</code>, <code>--tail</code>, <code>--summary</code>), performance control (<code>--jobs</code>, <code>--no-parallel</code>), and verbosity options (<code>--verbose</code>) from the <code>analyze</code> command. Analysis thresholds (<code>--threshold-complexity</code>, <code>--threshold-duplication</code>, <code>--threshold-preset</code>) are configured via the <code>--config</code> file rather than as command-line options. Debugging features like call graph debugging and functional analysis are specific to the <code>analyze</code> command. The <code>explain-coverage</code> command is a specialized debugging tool for diagnosing coverage detection issues and has its own unique options (<code>--function</code>, <code>--file</code>).</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="performance-issues"><a class="header" href="#performance-issues">Performance Issues</a></h3>
 <p><strong>Problem:</strong> Analysis is slow on large codebases</p>

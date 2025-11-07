@@ -262,7 +262,7 @@ debtmap analyze  # Parallel processing enabled (also accepts '1')
 <p>The global Rayon thread pool is configured at startup based on the <code>--jobs</code> parameter:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs:46-52
+</span>// From src/builders/parallel_call_graph.rs:48-53
 if self.config.num_threads &gt; 0 {
     rayon::ThreadPoolBuilder::new()
         .num_threads(self.config.num_threads)
@@ -275,7 +275,7 @@ if self.config.num_threads &gt; 0 {
 <p>The <code>get_worker_count()</code> function determines how many threads to use:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/main.rs:750-758
+</span>// From src/main.rs:828-836
 fn get_worker_count(jobs: usize) -&gt; usize {
     if jobs == 0 {
         std::thread::available_parallelism()
@@ -303,7 +303,7 @@ fn get_worker_count(jobs: usize) -&gt; usize {
 <p>Files are parsed concurrently using Rayon’s parallel iterators:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs:98-128
+</span>// From src/builders/parallel_call_graph.rs (parallel_parse_files method)
 let parsed_files: Vec&lt;_&gt; = rust_files
     .par_iter()  // Convert to parallel iterator
     .filter_map(|file_path| {
@@ -326,7 +326,7 @@ let parsed_files: Vec&lt;_&gt; = rust_files
 <p>Files are grouped into chunks for optimal parallelization:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs:130-161
+</span>// From src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)
 let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
 
 parsed_files.par_chunks(chunk_size).for_each(|chunk| {
@@ -442,7 +442,7 @@ map.insert(key, value);
 <p>The <code>ParallelCallGraph</code> uses DashMap for all concurrent data structures:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:49-56
+</span>// From src/priority/parallel_call_graph.rs:50-56
 pub struct ParallelCallGraph {
     nodes: Arc&lt;DashMap&lt;FunctionId, NodeInfo&gt;&gt;,      // Functions
     edges: Arc&lt;DashSet&lt;FunctionCall&gt;&gt;,              // Calls
@@ -464,7 +464,7 @@ pub struct ParallelCallGraph {
 <p>Multiple analyzer threads can add functions simultaneously:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:78-96
+</span>// From src/priority/parallel_call_graph.rs:79-96
 pub fn add_function(
     &amp;self,
     id: FunctionId,
@@ -494,7 +494,7 @@ pub fn add_function(
 <p>Function calls are added with automatic deduplication:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:98-117
+</span>// From src/priority/parallel_call_graph.rs:99-117
 pub fn add_call(&amp;self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
     let call = FunctionCall {
         caller: caller.clone(),
@@ -545,7 +545,7 @@ files.par_iter()
 <h3 id="parallelstats-structure"><a class="header" href="#parallelstats-structure">ParallelStats Structure</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:7-47
+</span>// From src/priority/parallel_call_graph.rs:7-14
 pub struct ParallelStats {
     pub total_nodes: AtomicUsize,      // Functions processed
     pub total_edges: AtomicUsize,      // Calls discovered
@@ -595,7 +595,7 @@ if let Some(ref callback) = self.config.progress_callback {
 <p>After analysis completes, debtmap reports final statistics:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs:84-92
+</span>// From src/builders/parallel_call_graph.rs:85-93
 log::info!(
     "Parallel call graph complete: {} nodes, {} edges, {} files processed",
     stats.total_nodes.load(std::sync::atomic::Ordering::Relaxed),
@@ -741,7 +741,7 @@ time debtmap analyze . --no-parallel
 <h3 id="implementation"><a class="header" href="#implementation">Implementation</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:119-138
+</span>// From src/priority/parallel_call_graph.rs:120-138
 pub fn merge_concurrent(&amp;self, other: CallGraph) {
     // Parallelize node merging
     let nodes_vec: Vec&lt;_&gt; = other.get_all_functions().collect();
@@ -778,7 +778,7 @@ pub fn merge_concurrent(&amp;self, other: CallGraph) {
 <p>Conversion happens at phase boundaries:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/priority/parallel_call_graph.rs:140-162
+</span>// From src/priority/parallel_call_graph.rs:141-162
 pub fn to_call_graph(&amp;self) -&gt; CallGraph {
     let mut call_graph = CallGraph::new();
 

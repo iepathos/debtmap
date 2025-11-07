@@ -536,7 +536,7 @@ minimum_risk_score = 15.0
 # Skip simple functions even if uncovered
 minimum_cyclomatic_complexity = 5
 </code></pre>
-<p><strong>Important</strong>: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: <code>Final Score = Base Score × (1.0 - coverage_pct)</code>. These weights only apply when coverage data is <strong>not</strong> available. See <code>src/priority/scoring/calculation.rs:68-82</code> and <code>src/config.rs:122-132</code> for the implementation.</p>
+<p><strong>Important</strong>: These weights are from the deprecated additive scoring model. The current implementation (spec 122) calculates a base score from complexity (50%) and dependency (25%) factors, then applies coverage as a dampening multiplier: <code>Final Score = Base Score × (1.0 - coverage_pct)</code>. These weights only apply when coverage data is <strong>not</strong> available. See <code>src/priority/scoring/calculation.rs:68-82</code> for the coverage dampening calculation and <code>src/priority/scoring/calculation.rs:119-129</code> for the fallback weighted sum mode.</p>
 <p>See <a href="configuration.html">Configuration</a> for complete options.</p>
 <h3 id="ci-integration"><a class="header" href="#ci-integration">CI Integration</a></h3>
 <p><strong>Example GitHub Actions Workflow</strong>:</p>

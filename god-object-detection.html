@@ -266,7 +266,7 @@
 <li><code>GodFile</code> - File with excessive functions or lines of code</li>
 <li><code>GodModule</code> - Alias for <code>GodFile</code> (both represent the same detection type)</li>
 </ul>
-<p>The <code>GodModule</code> variant is provided for clarity when discussing files with many standalone functions, but internally it’s the same as <code>GodFile</code>.</p>
+<p>The <code>GodModule</code> variant is provided for clarity when discussing files with many standalone functions, but internally it’s the same as <code>GodFile</code>. Both terms exist to help distinguish between “file is large” (GodFile) and “file has many functions” (GodModule) conceptually in documentation and error messages, even though they’re implemented identically in the detection logic.</p>
 <p><strong>Example:</strong> A file like <code>rust_call_graph.rs</code> with 270 standalone functions would be flagged as a god module (using the <code>GodFile</code>/<code>GodModule</code> detection type).</p>
 <h3 id="why-separate-analysis"><a class="header" href="#why-separate-analysis">Why Separate Analysis?</a></h3>
 <p>Previously, Debtmap combined standalone functions with struct methods, causing <strong>false positives</strong> for functional/procedural modules. The current implementation analyzes them separately to:</p>
@@ -402,7 +402,7 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 <tr><td><em>(no prefix match)</em></td><td>Utilities</td></tr>
 </tbody></table>
 </div>
-<p><strong>Note:</strong> <code>Utilities</code> serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, <code>Utilities</code> is included in <code>RESPONSIBILITY_CATEGORIES</code> with an empty prefixes array, making it the catch-all category returned by <code>infer_responsibility_from_method</code> when no other category matches.</p>
+<p><strong>Note:</strong> <code>Utilities</code> serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, <code>Utilities</code> is included in <code>RESPONSIBILITY_CATEGORIES</code> with an empty prefixes array (<code>prefixes: &amp;[]</code>), making it the catch-all category returned by <code>infer_responsibility_from_method</code> when no other category matches.</p>
 <p><strong>Distinct Responsibility Counting:</strong> Debtmap counts the number of <strong>unique</strong> responsibility categories used by a struct/module’s methods. A high responsibility count (e.g., &gt;5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.</p>
 <p>Responsibility count directly affects:</p>
 <ul>
@@ -675,6 +675,16 @@ Score: 1350 (Confidence: Definite)
 <li>Review each metric - are method count, field count, responsibilities, LOC, and complexity all high?</li>
 <li>Consider if the score accurately reflects maintainability burden</li>
 </ol>
+<h3 id="why-does-my-test-file-show-as-a-god-object"><a class="header" href="#why-does-my-test-file-show-as-a-god-object">“Why does my test file show as a god object?”</a></h3>
+<p><strong>Answer:</strong> Test files often have many test functions, which can trigger god module detection. However, this is usually expected for comprehensive test suites.</p>
+<p><strong>Solutions:</strong></p>
+<ol>
+<li><strong>Accept the finding</strong>: Large test files (100+ test functions) can be difficult to navigate and maintain</li>
+<li><strong>Split by feature</strong>: Organize tests into smaller files grouped by the feature they test (e.g., <code>user_auth_tests.rs</code>, <code>user_profile_tests.rs</code>)</li>
+<li><strong>Adjust thresholds</strong>: If your project standards accept large test files, increase <code>max_methods</code> in <code>.debtmap.toml</code></li>
+<li><strong>Use test organization</strong>: Group related tests in modules within the test file for better structure</li>
+</ol>
+<p><strong>Note:</strong> Debtmap does not automatically exclude test files from god object detection. Consider the trade-offs between comprehensive test coverage in one file versus better organization across multiple test files.</p>
 <h3 id="can-i-disable-god-object-detection-for-specific-files"><a class="header" href="#can-i-disable-god-object-detection-for-specific-files">“Can I disable god object detection for specific files?”</a></h3>
 <p><strong>Answer:</strong> Currently, god object detection is global. However, you can:</p>
 <ol>

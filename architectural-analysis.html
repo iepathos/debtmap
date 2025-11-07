@@ -435,7 +435,7 @@ concrete value. It changes often, breaking implementations.
 <li><strong>Match duplicates</strong> - Find chunks with identical hashes</li>
 <li><strong>Merge adjacent</strong> - Consolidate consecutive duplicate blocks</li>
 </ol>
-<p><strong>Note:</strong> The minimum chunk size is configurable via the <code>--threshold-duplication</code> flag (default: 50 lines).</p>
+<p><strong>Note:</strong> The minimum chunk size is configurable via the <code>--threshold-duplication</code> flag or in <code>.debtmap.toml</code> (default: 50 lines).</p>
 <p><strong>Implementation:</strong> <code>src/debt/duplication.rs:6-44</code> (detect_duplication)</p>
 <h3 id="algorithm-details"><a class="header" href="#algorithm-details">Algorithm Details</a></h3>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -658,13 +658,14 @@ Is there significant duplication?
 <h2 id="integration-with-debt-categories"><a class="header" href="#integration-with-debt-categories">Integration with Debt Categories</a></h2>
 <p>Architectural analysis results are integrated with debtmap’s debt categorization system:</p>
 <h3 id="debt-type-mapping"><a class="header" href="#debt-type-mapping">Debt Type Mapping</a></h3>
+<p>Architectural issues are mapped to existing DebtType enum variants:</p>
 <ul>
-<li><strong>CircularDependency</strong> - Circular dependency cycles detected</li>
-<li><strong>HighCoupling</strong> - Modules exceeding coupling threshold</li>
 <li><strong>Duplication</strong> - Duplicated code blocks found</li>
-<li><strong>ArchitecturalViolation</strong> - SDP violations, zone issues</li>
+<li><strong>Dependency</strong> - Used for circular dependencies and coupling issues</li>
+<li><strong>CodeOrganization</strong> - May be used for architectural violations (SDP, zone issues)</li>
 </ul>
-<p><strong>Reference:</strong> See <code>src/core/mod.rs</code> for debt type definitions</p>
+<p><strong>Note:</strong> The DebtType enum does not have dedicated variants for CircularDependency, HighCoupling, or ArchitecturalViolation. Architectural issues are mapped to existing general-purpose debt types.</p>
+<p><strong>Reference:</strong> <code>src/core/mod.rs:220-236</code> for actual DebtType enum definition</p>
 <h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
 <p>Architectural issues are assigned priority tiers:</p>
 <ul>
@@ -722,8 +723,8 @@ threshold_duplication = 50  # Default value
 <p><strong>Cause:</strong> Circular dependencies at the package/crate level, not module level.</p>
 <p><strong>Solution:</strong> Use <code>cargo tree</code> to analyze package-level dependencies.</p>
 <h3 id="too-many-coupling-warnings"><a class="header" href="#too-many-coupling-warnings">“Too many coupling warnings”</a></h3>
-<p><strong>Cause:</strong> Default threshold may be too strict for your codebase.</p>
-<p><strong>Solution:</strong> Adjust <code>coupling_threshold</code> in <code>.debtmap.toml</code> to match your architecture.</p>
+<p><strong>Cause:</strong> Default threshold of 5 may be too strict for your codebase.</p>
+<p><strong>Solution:</strong> The coupling threshold is currently hardcoded at 5 in the implementation (<code>src/debt/coupling.rs:62</code>). To adjust it, you would need to modify the source code. Consider using suppression patterns to exclude specific modules if needed. See <a href="suppression-patterns.html">Suppression Patterns</a>.</p>
 <h3 id="duplication-detected-in-generated-code"><a class="header" href="#duplication-detected-in-generated-code">“Duplication detected in generated code”</a></h3>
 <p><strong>Cause:</strong> Code generation tools create similar patterns.</p>
 <p><strong>Solution:</strong> Use suppression patterns to exclude generated files. See <a href="suppression-patterns.html">Suppression Patterns</a>.</p>

@@ -214,6 +214,7 @@
 <tr><td>Test Entry</td><td>2.0</td><td><code>test_*</code>, in <code>test/</code> paths</td><td>No</td></tr>
 </tbody></table>
 </div>
+<p><strong>Note on API Endpoint detection:</strong> Detection requires BOTH conditions: (1) path contains <code>api/</code>, <code>handler/</code>, or <code>route/</code> AND (2) function starts with <code>handle_*</code>, <code>get_*</code>, <code>post_*</code>, <code>put_*</code>, <code>delete_*</code> or ends with <code>*_handler</code>. This combined matching ensures accurate classification of HTTP endpoint handlers.</p>
 <p><strong>What it detects:</strong></p>
 <ul>
 <li>Entry points (main functions, CLI handlers, API endpoints)</li>
@@ -227,13 +228,22 @@
 <li><strong>Path weight</strong>: The maximum entry point weight leading to the function</li>
 <li><strong>User-facing flag</strong>: Doubles contribution for user-facing paths</li>
 </ul>
+<p>The contribution formula consists of two steps:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Example: Function on main entry path (weight 10.0, user-facing)
-contribution = (10.0 / 10.0) × 2.0 = 2.0
+</span>// Step 1: Calculate base contribution (normalized 0-1)
+base_contribution = path_weight / max_weight
 
-// Example: Function on event handler path (weight 5.0, non-user-facing)
-contribution = (5.0 / 10.0) × 1.0 = 0.5
+// Step 2: Apply user-facing multiplier
+final_contribution = base_contribution × user_facing_multiplier
+
+// Example: main entry path (weight 10.0, user-facing)
+base = 10.0 / 10.0 = 1.0
+final = 1.0 × 2.0 = 2.0
+
+// Example: event handler path (weight 5.0, non-user-facing)
+base = 5.0 / 10.0 = 0.5
+final = 0.5 × 1.0 = 0.5
 <span class="boring">}</span></code></pre></pre>
 <p><strong>Impact on scoring:</strong></p>
 <ul>
@@ -273,6 +283,7 @@ business_logic_multiplier = 1.2
 <li><strong>Edges</strong> represent dependencies with coupling strength (0.0-1.0)</li>
 <li><strong>Risk propagation</strong> flows through dependencies using iterative refinement</li>
 </ul>
+<p><strong>Convergence Parameters:</strong> The risk propagation algorithm uses iterative convergence with a maximum of 10 iterations. Convergence is reached when the maximum risk change between iterations falls below 0.01. This ensures risk stabilizes throughout the dependency graph.</p>
 <p><strong>What it detects:</strong></p>
 <ul>
 <li>Upstream dependencies (functions this function calls)</li>
@@ -284,20 +295,22 @@ business_logic_multiplier = 1.2
 <p>The blast radius represents how many modules would be affected by changes to a function. It counts unique modules reachable through transitive dependencies by traversing the dependency graph edges.</p>
 <div class="table-wrapper"><table><thead><tr><th>Blast Radius</th><th>Contribution</th><th>Impact Level</th></tr></thead><tbody>
 <tr><td>&gt; 10 modules</td><td>1.5</td><td>Critical dependency affecting many modules</td></tr>
-<tr><td>6-10 modules</td><td>1.0</td><td>Important dependency with moderate impact</td></tr>
-<tr><td>3-5 modules</td><td>0.5</td><td>Limited dependency impact</td></tr>
+<tr><td>&gt; 5 modules</td><td>1.0</td><td>Important dependency with moderate impact</td></tr>
+<tr><td>&gt; 2 modules</td><td>0.5</td><td>Medium impact</td></tr>
 <tr><td>≤ 2 modules</td><td>0.2</td><td>Minimal or isolated component</td></tr>
 </tbody></table>
 </div>
 <h3 id="risk-propagation-formula"><a class="header" href="#risk-propagation-formula">Risk Propagation Formula</a></h3>
+<p>Risk propagation uses an iterative convergence algorithm to stabilize risk scores throughout the dependency graph:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>propagated_risk = base_risk × criticality_factor + dependency_risk
+</span>propagated_risk = base_risk × criticality_factor + Σ(caller.risk × 0.3)
 
 where:
   criticality_factor = 1.0 + min(0.5, dependents.len() × 0.1)
-  dependency_risk = Σ(dependency.risk × coupling_strength × 0.3)
+  The 0.3 factor dampens risk propagation from callers
 <span class="boring">}</span></code></pre></pre>
+<p><strong>Iterative Convergence:</strong> The algorithm runs with a maximum of 10 iterations and converges when the maximum risk change between iterations falls below 0.01. This ensures risk stabilizes throughout the dependency graph without requiring manual tuning.</p>
 <p><strong>Note</strong>: The constants (0.5, 0.1, 0.3) are currently hard-coded based on empirical analysis. Future versions may make these configurable.</p>
 <p><strong>Impact on scoring:</strong></p>
 <pre><code>dependency_factor = normalized_to_0_10(upstream + downstream)
@@ -375,6 +388,17 @@ where:
   bug_factor = 1.0 - (bug_fixes / total_commits)
   age_factor = min(1.0, age_days / 365.0)
 <span class="boring">}</span></code></pre></pre>
+<h3 id="stability-status-classifications"><a class="header" href="#stability-status-classifications">Stability Status Classifications</a></h3>
+<p>The provider internally classifies files into stability statuses based on the calculated metrics:</p>
+<div class="table-wrapper"><table><thead><tr><th>Status</th><th>Criteria</th><th>Explanation</th></tr></thead><tbody>
+<tr><td>HighlyUnstable</td><td>freq &gt; 5.0 AND bug_density &gt; 0.3</td><td>Extremely high churn combined with many bug fixes</td></tr>
+<tr><td>FrequentlyChanged</td><td>freq &gt; 2.0</td><td>High change rate regardless of bug density</td></tr>
+<tr><td>BugProne</td><td>bug_density &gt; 0.2</td><td>High proportion of bug fix commits</td></tr>
+<tr><td>MatureStable</td><td>age &gt; 365 days</td><td>Code older than one year (unless unstable)</td></tr>
+<tr><td>RelativelyStable</td><td>(default)</td><td>Moderate activity, typical stability</td></tr>
+</tbody></table>
+</div>
+<p>These classifications are used internally for contribution calculations and appear in verbose output.</p>
 <p><strong>Impact on scoring:</strong></p>
 <ul>
 <li>High-churn functions get higher priority</li>
@@ -642,6 +666,9 @@ Final Score: 2.8 [LOW]
   contextual_risk: 26.0
 </code></pre>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
+<blockquote>
+<p>⚠️ <strong>Configuration Limitation</strong>: Provider-specific TOML configuration sections shown below are planned features not yet implemented. Currently, all provider settings use hard-coded defaults from the implementation. Use CLI flags (<code>--context</code>, <code>--context-providers</code>, <code>--disable-context</code>) to control providers. See the CLI examples throughout this chapter for working configurations.</p>
+</blockquote>
 <p>Configure context providers in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[analysis]
 # Enable context-aware analysis (default: false)
@@ -652,11 +679,6 @@ context_providers = ["critical_path", "dependency", "git_history"]
 
 # Disable specific providers (use CLI flag --disable-context instead)
 # disable_context = ["git_history"]  # Not yet implemented in config
-
-# Note: The provider-specific TOML sections below are planned features.
-# Currently, all provider settings use hard-coded defaults from the implementation.
-# Use CLI flags (--context, --context-providers, --disable-context) to control providers.
-# See the CLI examples throughout this chapter for working configurations.
 
 [context.git_history]
 # Commits to analyze (default: 100) - PLANNED
@@ -801,7 +823,8 @@ debtmap analyze --context -vvv
 <li>Provider-specific explanations</li>
 </ul>
 <h3 id="architecture-exploration"><a class="header" href="#architecture-exploration">Architecture Exploration</a></h3>
-<p>The <code>ContextAggregator</code> caches context by <code>file:function</code> key to avoid redundant analysis during a single run. The cache is in-memory per <code>ContextAggregator</code> instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run:</p>
+<p>The <code>ContextAggregator</code> caches context by <code>file:function</code> key to avoid redundant analysis during a single run.</p>
+<p><strong>Cache Lifetime:</strong> The cache is in-memory per <code>ContextAggregator</code> instance and is cleared when a new instance is created or when analyzing a different codebase. This enables efficient re-analysis within the same run without requiring external cache management:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let mut aggregator = ContextAggregator::new()

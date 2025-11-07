@@ -293,6 +293,13 @@ t2_dependency_threshold = 15
 t3_complexity_threshold = 15
 </code></pre>
 <p>For legacy codebases or gradual technical debt reduction. Focuses on the most critical issues first.</p>
+<p><strong>Programmatic Access</strong>: These presets are also available as methods when using Debtmap as a library:</p>
+<ul>
+<li><code>TierConfig::balanced()</code> - Equivalent to the balanced preset above</li>
+<li><code>TierConfig::strict()</code> - Equivalent to the strict preset above</li>
+<li><code>TierConfig::lenient()</code> - Equivalent to the lenient preset above</li>
+</ul>
+<p>These methods can be used in Rust code to configure tier settings programmatically without manual TOML configuration.</p>
 <h3 id="customizing-tier-thresholds"><a class="header" href="#customizing-tier-thresholds">Customizing Tier Thresholds</a></h3>
 <p>You can also create custom threshold configurations tailored to your project:</p>
 <pre><code class="language-toml"># Custom thresholds for specific project needs

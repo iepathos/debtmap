@@ -552,8 +552,9 @@ debtmap
 debtmap --migrate-cache
 </code></pre>
 <h3 id="cache-pruning-configuration"><a class="header" href="#cache-pruning-configuration">Cache Pruning Configuration</a></h3>
-<p>Debtmap automatically manages cache size and age to prevent unbounded growth:</p>
-<p><strong>Environment Variables</strong>:</p>
+<p>Debtmap automatically manages cache size and age to prevent unbounded growth.</p>
+<p>See the <a href="#environment-variables">Environment Variables</a> section for a complete list of cache-related configuration options.</p>
+<p><strong>Cache Environment Variables</strong>:</p>
 <pre><code class="language-bash"># Enable/disable automatic cache pruning (default: true)
 export DEBTMAP_CACHE_AUTO_PRUNE=true
 
@@ -606,6 +607,87 @@ debtmap --validate-loc
 
 # Force fresh analysis
 debtmap --no-cache
+</code></pre>
+<h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
+<p>Debtmap supports various environment variables for configuring behavior without command-line flags.</p>
+<h3 id="cache-environment-variables"><a class="header" href="#cache-environment-variables">Cache Environment Variables</a></h3>
+<p>See <a href="#cache-pruning-configuration">Cache Pruning Configuration</a> for detailed descriptions of cache-related variables:</p>
+<pre><code class="language-bash"># Cache location
+export DEBTMAP_CACHE_DIR=~/.cache/debtmap
+
+# Automatic cache management
+export DEBTMAP_CACHE_AUTO_PRUNE=true
+export DEBTMAP_CACHE_MAX_SIZE=1073741824     # 1GB in bytes
+export DEBTMAP_CACHE_MAX_AGE_DAYS=30
+export DEBTMAP_CACHE_MAX_ENTRIES=10000
+export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25   # Remove 25% when pruning
+export DEBTMAP_CACHE_STRATEGY=lru            # lru, lfu, fifo, age_based
+</code></pre>
+<h3 id="analysis-feature-flags"><a class="header" href="#analysis-feature-flags">Analysis Feature Flags</a></h3>
+<pre><code class="language-bash"># Enable context-aware analysis by default
+export DEBTMAP_CONTEXT_AWARE=true
+
+# Enable functional analysis by default
+export DEBTMAP_FUNCTIONAL_ANALYSIS=true
+</code></pre>
+<h3 id="automation-and-cicd-variables"><a class="header" href="#automation-and-cicd-variables">Automation and CI/CD Variables</a></h3>
+<pre><code class="language-bash"># Enable automation-friendly output (used by Prodigy)
+export PRODIGY_AUTOMATION=true
+
+# Enable validation mode (stricter checks)
+export PRODIGY_VALIDATION=true
+</code></pre>
+<h3 id="output-customization"><a class="header" href="#output-customization">Output Customization</a></h3>
+<pre><code class="language-bash"># Disable emoji in output
+export NO_EMOJI=1
+
+# Force plain text output (no colors)
+export NO_COLOR=1
+</code></pre>
+<h3 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h3>
+<pre><code class="language-bash"># Set cache location permanently in shell profile
+echo 'export DEBTMAP_CACHE_DIR=~/.cache/debtmap' &gt;&gt; ~/.bashrc
+
+# Enable context-aware analysis by default
+echo 'export DEBTMAP_CONTEXT_AWARE=true' &gt;&gt; ~/.bashrc
+
+# CI/CD environment setup
+export DEBTMAP_CACHE_DIR=/tmp/debtmap-cache
+export NO_EMOJI=1
+export NO_COLOR=1
+export PRODIGY_AUTOMATION=true
+
+# Run analysis with environment settings
+debtmap
+
+# Override environment with flags
+DEBTMAP_CONTEXT_AWARE=false debtmap --context  # Flag takes precedence
+</code></pre>
+<h3 id="precedence-rules"><a class="header" href="#precedence-rules">Precedence Rules</a></h3>
+<p>When both environment variables and CLI flags are present:</p>
+<ol>
+<li><strong>CLI flags take precedence</strong> over environment variables</li>
+<li><strong>Environment variables override</strong> config file defaults</li>
+<li><strong>Config file settings override</strong> built-in defaults</li>
+</ol>
+<pre><code class="language-bash"># Example: CLI flag wins
+export DEBTMAP_CACHE_DIR=~/.cache/debtmap
+debtmap --cache-location /tmp/cache  # Uses /tmp/cache, not ~/.cache/debtmap
+</code></pre>
+<h3 id="troubleshooting-environment-variables"><a class="header" href="#troubleshooting-environment-variables">Troubleshooting Environment Variables</a></h3>
+<pre><code class="language-bash"># Check if environment variable is set
+echo $DEBTMAP_CACHE_DIR
+
+# Temporarily unset for testing
+unset DEBTMAP_CACHE_DIR
+debtmap  # Uses default cache location
+
+# Test with specific environment
+env DEBTMAP_CONTEXT_AWARE=true debtmap -v
+
+# See all debtmap-related environment variables
+env | grep -i debtmap
+env | grep -i prodigy
 </code></pre>
 <h3 id="cache-size-monitoring"><a class="header" href="#cache-size-monitoring">Cache Size Monitoring</a></h3>
 <pre><code class="language-bash"># Check cache size
@@ -737,13 +819,13 @@ debtmap --multi-pass
 <li>When single-pass results seem incomplete</li>
 </ul>
 <h3 id="attribution-output"><a class="header" href="#attribution-output">Attribution Output</a></h3>
-<p><strong>Flag</strong>: <code>--attribution</code></p>
+<p><strong>Flag</strong>: <code>--show-attribution</code></p>
 <p>Shows attribution information for detected issues.</p>
 <pre><code class="language-bash"># Enable attribution output
-debtmap --attribution
+debtmap --show-attribution
 
 # Combine with verbosity for details
-debtmap --attribution -v
+debtmap --show-attribution -v
 </code></pre>
 <p><strong>Troubleshooting</strong>:</p>
 <ul>
@@ -787,18 +869,85 @@ debtmap --min-problematic 5
 <h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
 <p><strong>Flag</strong>: <code>--no-god-object</code></p>
 <p>Disables god object (large class/module) detection.</p>
-<pre><code class="language-bash"># Disable god object detection
+<p><strong>God Object Types</strong>:</p>
+<p>Debtmap distinguishes three types of god objects:</p>
+<ol>
+<li>
+<p><strong>god_class</strong>: Files with excessive complexity excluding test functions</p>
+<ul>
+<li>Focuses on production code complexity</li>
+<li>Ignores test helper functions and test cases</li>
+<li>Best indicator of production code quality issues</li>
+</ul>
+</li>
+<li>
+<p><strong>god_file</strong>: Files with excessive complexity including all functions</p>
+<ul>
+<li>Considers both production and test code</li>
+<li>Useful for understanding total file complexity</li>
+<li>Alias: <code>god_module</code> (same as god_file)</li>
+</ul>
+</li>
+<li>
+<p><strong>god_module</strong>: Alias for god_file</p>
+<ul>
+<li>Module-level view of complexity</li>
+<li>Includes all functions regardless of purpose</li>
+</ul>
+</li>
+</ol>
+<p><strong>Responsibility Analysis Metrics</strong> (Spec 140):</p>
+<p>Modern god object detection includes domain responsibility analysis:</p>
+<pre><code class="language-bash"># See detailed god object metrics
+debtmap -vv 2&gt;&amp;1 | grep "god_object\|domain"
+</code></pre>
+<p><strong>Additional Metrics</strong>:</p>
+<ul>
+<li><strong>domain_count</strong>: Number of distinct responsibility domains in file</li>
+<li><strong>domain_diversity</strong>: Measure of how varied the responsibilities are (0.0-1.0)</li>
+<li><strong>struct_ratio</strong>: Ratio of structs to total file size</li>
+<li><strong>cross_domain_severity</strong>: How badly domains are mixed (0.0-1.0)</li>
+<li><strong>module_splits</strong>: Suggested number of modules to split into</li>
+</ul>
+<p><strong>Configuration</strong>:</p>
+<pre><code class="language-toml"># In .debtmap.toml
+[god_object]
+# Thresholds for god object detection
+complexity_threshold = 100
+loc_threshold = 500
+function_count_threshold = 20
+
+# Responsibility analysis thresholds
+domain_diversity_threshold = 0.7  # High diversity = mixed responsibilities
+cross_domain_threshold = 0.6       # High value = poor separation
+</code></pre>
+<p><strong>Usage</strong>:</p>
+<pre><code class="language-bash"># Disable god object detection entirely
 debtmap --no-god-object
 
-# Useful if false positives on legitimately large modules
-# Or if your architecture uses centralized classes
+# See god object analysis with responsibility metrics
+debtmap -vv
+
+# Check specific file for god object patterns
+debtmap path/to/large/file.rs -vv
 </code></pre>
 <p><strong>When to use</strong>:</p>
 <ul>
 <li>False positives on framework files</li>
 <li>Intentional large aggregator classes</li>
 <li>Reducing noise in results</li>
+<li>Files that are legitimately large due to generated code</li>
 </ul>
+<p><strong>Understanding the Metrics</strong>:</p>
+<pre><code class="language-bash"># Example output interpretation:
+# domain_count = 5          → File handles 5 different concerns
+# domain_diversity = 0.8    → Very mixed responsibilities (bad)
+# cross_domain_severity = 0.7 → Poor separation of concerns
+# module_splits = 3         → Suggest splitting into 3 modules
+
+# High domain_diversity + high cross_domain_severity = strong god object
+# Recommended: refactor into separate modules per domain
+</code></pre>
 <h3 id="detail-level-control"><a class="header" href="#detail-level-control">Detail Level Control</a></h3>
 <p><strong>Flag</strong>: <code>--detail-level &lt;level&gt;</code></p>
 <p>Controls the level of detail in analysis output.</p>
@@ -832,6 +981,81 @@ debtmap
 <li><code>--aggregate-only</code>: Focus on file-level technical debt</li>
 <li><code>--no-aggregation</code>: See individual functions/classes only</li>
 <li>Default: Full picture with both levels</li>
+</ul>
+<h3 id="call-graph-debugging"><a class="header" href="#call-graph-debugging">Call Graph Debugging</a></h3>
+<p><strong>Overview</strong>: Debug call graph generation and analysis for dependency tracking.</p>
+<p><strong>Available Flags</strong>:</p>
+<pre><code class="language-bash"># Enable call graph debug output
+debtmap --debug-call-graph
+
+# Trace specific functions through call graph
+debtmap --trace-functions "function_name,another_function"
+
+# Show only call graph statistics (no detailed graph)
+debtmap --call-graph-stats-only
+
+# Control debug output format (text or json)
+debtmap --debug-call-graph --debug-format text
+debtmap --debug-call-graph --debug-format json
+
+# Validate call graph consistency
+debtmap --validate-call-graph
+</code></pre>
+<p><strong>Dependency Control Flags</strong>:</p>
+<pre><code class="language-bash"># Show dependency information in results
+debtmap --show-dependencies
+
+# Hide dependency information (default in some contexts)
+debtmap --no-dependencies
+
+# Limit number of callers shown per function
+debtmap --max-callers 10
+
+# Limit number of callees shown per function
+debtmap --max-callees 10
+
+# Include external crate calls in call graph
+debtmap --show-external
+
+# Include standard library calls in call graph
+debtmap --show-std-lib
+</code></pre>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Call graph shows incomplete or missing relationships?</strong></p>
+<p>A: Try these debugging steps:</p>
+<pre><code class="language-bash"># Enable debug output to see graph construction
+debtmap --debug-call-graph -vv
+
+# Validate the call graph consistency
+debtmap --validate-call-graph
+
+# Include external dependencies if relevant
+debtmap --show-external --show-std-lib
+
+# Trace specific functions to see their relationships
+debtmap --trace-functions "my_function" -vv
+</code></pre>
+<p><strong>Q: Call graph output is overwhelming?</strong></p>
+<p>A: Use filtering options:</p>
+<pre><code class="language-bash"># Show only statistics, not the full graph
+debtmap --call-graph-stats-only
+
+# Limit callers and callees shown
+debtmap --max-callers 5 --max-callees 5
+
+# Hide dependencies from main output
+debtmap --no-dependencies
+
+# Export to JSON for external processing
+debtmap --debug-call-graph --debug-format json --output call-graph.json
+</code></pre>
+<p><strong>When to use call graph debugging</strong>:</p>
+<ul>
+<li>Investigating missing critical path detection</li>
+<li>Understanding dependency relationships</li>
+<li>Debugging context provider issues</li>
+<li>Analyzing architectural coupling</li>
+<li>Validating function relationship detection</li>
 </ul>
 <h3 id="tiered-prioritization-issues"><a class="header" href="#tiered-prioritization-issues">Tiered Prioritization Issues</a></h3>
 <p><strong>Overview</strong>: Debtmap uses a 4-tier system to classify and <strong>sort</strong> technical debt items by architectural importance. Tiers affect result ordering but do not multiply scores.</p>
@@ -928,6 +1152,163 @@ debtmap path/to/file.rs -vv
 # Disable god object detection if false positive
 debtmap --no-god-object path/to/file.rs
 </code></pre>
+<h3 id="functional-analysis-issues"><a class="header" href="#functional-analysis-issues">Functional Analysis Issues</a></h3>
+<p><strong>Overview</strong>: Functional analysis detects violations of functional programming principles like impure functions, excessive mutation, and side effects.</p>
+<p><strong>Enable Functional Analysis</strong>:</p>
+<pre><code class="language-bash"># Enable AST-based functional analysis
+debtmap --ast-functional-analysis
+
+# Use different strictness profiles
+debtmap --ast-functional-analysis --functional-analysis-profile strict
+debtmap --ast-functional-analysis --functional-analysis-profile balanced  # (default)
+debtmap --ast-functional-analysis --functional-analysis-profile lenient
+</code></pre>
+<p><strong>Analysis Profiles</strong>:</p>
+<ul>
+<li><strong>strict</strong>: Flag most functional violations, enforce pure functions</li>
+<li><strong>balanced</strong>: Default, reasonable middle ground for mixed codebases</li>
+<li><strong>lenient</strong>: Allow more pragmatic deviations from pure functional style</li>
+</ul>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Too many false positives for legitimate imperative code?</strong></p>
+<p>A: Adjust the profile or disable for specific areas:</p>
+<pre><code class="language-bash"># Use lenient profile for pragmatic codebases
+debtmap --ast-functional-analysis --functional-analysis-profile lenient
+
+# Disable functional analysis if not using FP style
+debtmap  # (functional analysis is opt-in via --ast-functional-analysis)
+</code></pre>
+<p><strong>Q: What violations does functional analysis detect?</strong></p>
+<p>A: Functional analysis flags:</p>
+<ul>
+<li>Mutation of variables (reassignment)</li>
+<li>Side effects in functions (I/O, global state)</li>
+<li>Impure functions (non-deterministic behavior)</li>
+<li>Excessive mutable state</li>
+<li>Missing const/immutability annotations</li>
+</ul>
+<pre><code class="language-bash"># See detailed functional analysis results
+debtmap --ast-functional-analysis -vv
+
+# Focus on functional purity issues
+debtmap --ast-functional-analysis --filter "functional"
+</code></pre>
+<p><strong>When to use functional analysis</strong>:</p>
+<ul>
+<li>Projects following functional programming principles</li>
+<li>Codebases using immutable data structures</li>
+<li>When refactoring to reduce side effects</li>
+<li>For detecting hidden mutation bugs</li>
+<li>In functional-first languages (Rust with functional style)</li>
+</ul>
+<p><strong>When to disable</strong>:</p>
+<ul>
+<li>Imperative codebases where mutation is expected</li>
+<li>Performance-critical code requiring in-place updates</li>
+<li>When false positives overwhelm actual issues</li>
+</ul>
+<h3 id="pattern-detection-issues"><a class="header" href="#pattern-detection-issues">Pattern Detection Issues</a></h3>
+<p><strong>Overview</strong>: Pattern detection identifies repetitive code structures, anti-patterns, and common debt patterns.</p>
+<p><strong>Control Pattern Detection</strong>:</p>
+<pre><code class="language-bash"># Disable pattern detection entirely
+debtmap --no-pattern-detection
+
+# Specify specific patterns to detect
+debtmap --patterns "god_object,long_function,complex_conditional"
+
+# Adjust pattern detection sensitivity
+debtmap --pattern-threshold 0.8  # Higher = stricter matching (0.0-1.0)
+
+# Show pattern detection warnings
+debtmap --show-pattern-warnings
+</code></pre>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Pattern detection causes too many false positives?</strong></p>
+<p>A: Adjust threshold or disable specific patterns:</p>
+<pre><code class="language-bash"># Increase threshold for stricter matching (fewer false positives)
+debtmap --pattern-threshold 0.9
+
+# Disable pattern detection for exploratory analysis
+debtmap --no-pattern-detection
+
+# See which patterns are triggering with warnings
+debtmap --show-pattern-warnings -v
+</code></pre>
+<p><strong>Q: Missing patterns I expect to see?</strong></p>
+<p>A: Lower threshold or check pattern names:</p>
+<pre><code class="language-bash"># Lower threshold to catch more patterns
+debtmap --pattern-threshold 0.6
+
+# Specify patterns explicitly
+debtmap --patterns "god_object,long_function,deep_nesting"
+
+# Use verbosity to see pattern detection process
+debtmap --show-pattern-warnings -vv
+</code></pre>
+<p><strong>Detected Patterns</strong>:</p>
+<ul>
+<li><code>god_object</code>: Classes/modules with too many responsibilities</li>
+<li><code>long_function</code>: Functions exceeding length thresholds</li>
+<li><code>complex_conditional</code>: Nested or complex branching logic</li>
+<li><code>deep_nesting</code>: Excessive indentation depth</li>
+<li><code>parameter_overload</code>: Too many function parameters</li>
+<li><code>duplicate_code</code>: Repetitive code structures</li>
+</ul>
+<p><strong>When to adjust pattern threshold</strong>:</p>
+<ul>
+<li><strong>Higher (0.8-1.0)</strong>: Reduce noise, only flag clear violations</li>
+<li><strong>Lower (0.5-0.7)</strong>: Catch subtle patterns, more comprehensive detection</li>
+<li><strong>Default (0.7)</strong>: Balanced detection for most codebases</li>
+</ul>
+<h3 id="public-api-detection-issues"><a class="header" href="#public-api-detection-issues">Public API Detection Issues</a></h3>
+<p><strong>Overview</strong>: Public API detection identifies functions and types that form your crate’s public interface, affecting scoring and priority.</p>
+<p><strong>Control Public API Detection</strong>:</p>
+<pre><code class="language-bash"># Disable public API detection
+debtmap --no-public-api-detection
+
+# Adjust public API detection threshold
+debtmap --public-api-threshold 0.5  # Lower = more items marked as public (0.0-1.0)
+</code></pre>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Private functions being marked as public API?</strong></p>
+<p>A: Increase the threshold for stricter detection:</p>
+<pre><code class="language-bash"># Higher threshold = only clearly public items
+debtmap --public-api-threshold 0.8
+
+# Disable public API detection if not useful
+debtmap --no-public-api-detection
+
+# See what's being detected as public
+debtmap -vv 2&gt;&amp;1 | grep "public API"
+</code></pre>
+<p><strong>Q: Public functions not being detected?</strong></p>
+<p>A: Lower the threshold or check visibility:</p>
+<pre><code class="language-bash"># Lower threshold to detect more public items
+debtmap --public-api-threshold 0.3
+
+# Verify function is actually public (pub keyword in Rust)
+debtmap path/to/file.rs -vv
+</code></pre>
+<p><strong>How Public API Detection Works</strong>:</p>
+<ul>
+<li>Checks for <code>pub</code> visibility in Rust</li>
+<li>Identifies exported functions in Python (<code>__all__</code>)</li>
+<li>Detects exported symbols in JavaScript/TypeScript</li>
+<li>Considers call graph entry points</li>
+<li>Factors in documentation presence</li>
+</ul>
+<p><strong>Impact on Scoring</strong>:</p>
+<ul>
+<li>Public API items get higher priority scores (1.1× multiplier)</li>
+<li>Entry point detection uses public API information</li>
+<li>Critical path analysis considers public boundaries</li>
+</ul>
+<p><strong>When to disable</strong>:</p>
+<ul>
+<li>Internal tools or scripts (no public API)</li>
+<li>When API detection causes confusion</li>
+<li>Libraries where everything is intentionally public</li>
+</ul>
 <h3 id="combining-advanced-flags"><a class="header" href="#combining-advanced-flags">Combining Advanced Flags</a></h3>
 <pre><code class="language-bash"># Comprehensive analysis with all features
 debtmap --multi-pass --attribution --context -vv
@@ -1141,6 +1522,71 @@ debtmap
 <li>Use <code>--semantic-off</code> for basic analysis</li>
 <li>Exclude problematic files if needed</li>
 <li>Report unsupported patterns as feature requests</li>
+</ul>
+<h3 id="boilerplate-detection-issues"><a class="header" href="#boilerplate-detection-issues">Boilerplate Detection Issues</a></h3>
+<p><strong>Overview</strong>: Boilerplate detection identifies repetitive code patterns that are necessary but contribute to complexity scores, such as trait implementations, error handling, and validation logic.</p>
+<p><strong>How Boilerplate Detection Works</strong>:</p>
+<p>Debtmap automatically detects common boilerplate patterns:</p>
+<ul>
+<li><strong>Trait implementations</strong>: Standard trait method implementations (Debug, Display, From, etc.)</li>
+<li><strong>Error handling</strong>: Repetitive error conversion and propagation code</li>
+<li><strong>Validation functions</strong>: Similar validation logic across multiple functions</li>
+<li><strong>Macro-generated code</strong>: Repetitive patterns from macro expansions</li>
+<li><strong>Builder patterns</strong>: Setter methods and builder implementations</li>
+</ul>
+<p><strong>Impact on Scoring</strong>:</p>
+<p>Detected boilerplate receives dampened complexity scores to avoid inflating technical debt for necessary repetitive code.</p>
+<p><strong>Common Issues</strong>:</p>
+<p><strong>Q: Legitimate complex code being marked as boilerplate?</strong></p>
+<p>A: Boilerplate detection uses pattern similarity thresholds. If unique logic is being incorrectly dampened:</p>
+<pre><code class="language-bash"># See what's being detected as boilerplate
+debtmap -vv 2&gt;&amp;1 | grep "boilerplate"
+
+# Check entropy analysis settings (used for boilerplate detection)
+# In .debtmap.toml:
+# [entropy]
+# pattern_threshold = 0.8  # Increase for stricter matching
+</code></pre>
+<p><strong>Q: Boilerplate code still showing high scores?</strong></p>
+<p>A: Some boilerplate patterns may not be recognized. Common cases:</p>
+<pre><code class="language-bash"># Trait implementations should be automatically detected
+# If not dampened, check that code follows standard patterns
+
+# For custom validation patterns, ensure similarity is high enough
+# In .debtmap.toml:
+# [entropy]
+# pattern_threshold = 0.7  # Lower to catch more patterns
+# enabled = true
+</code></pre>
+<p><strong>Q: How to identify what debtmap considers boilerplate?</strong></p>
+<p>A: Use verbose output:</p>
+<pre><code class="language-bash"># See boilerplate detection in action
+debtmap -vv 2&gt;&amp;1 | grep -i "boilerplate\|pattern\|entropy"
+
+# Check specific file
+debtmap path/to/file.rs -vv
+</code></pre>
+<p><strong>Boilerplate Reduction Strategies</strong>:</p>
+<pre><code class="language-toml"># In .debtmap.toml
+[entropy]
+enabled = true                    # Enable pattern-based dampening
+pattern_threshold = 0.7           # Similarity threshold (0.0-1.0)
+weight = 0.3                      # Impact on complexity adjustment
+min_tokens = 50                   # Minimum size for pattern analysis
+</code></pre>
+<p><strong>When boilerplate detection helps</strong>:</p>
+<ul>
+<li>Codebases with many trait implementations</li>
+<li>Projects with extensive validation logic</li>
+<li>Macro-heavy code (derives, procedural macros)</li>
+<li>Builder pattern implementations</li>
+<li>Error handling boilerplate</li>
+</ul>
+<p><strong>When to adjust thresholds</strong>:</p>
+<ul>
+<li><strong>Increase <code>pattern_threshold</code></strong> (0.8-0.9): If unique code is being dampened</li>
+<li><strong>Decrease <code>pattern_threshold</code></strong> (0.5-0.6): If obvious boilerplate isn’t being detected</li>
+<li><strong>Disable entropy</strong> (<code>enabled = false</code>): If causing too many false dampening</li>
 </ul>
 <h3 id="false-positives"><a class="header" href="#false-positives">False Positives</a></h3>
 <p>Reduce false positives for validation functions and repetitive code patterns using entropy analysis:</p>
@@ -1429,6 +1875,157 @@ debtmap validate . --max-debt-density 10.0 --format json --output validation.jso
 <li>Track debt density trends across releases</li>
 <li>Set different thresholds for different parts of codebase</li>
 </ul>
+<h2 id="validate-improvement-command-issues"><a class="header" href="#validate-improvement-command-issues">Validate-Improvement Command Issues</a></h2>
+<p>The <code>validate-improvement</code> command verifies that code changes actually reduced technical debt, useful for validating refactoring efforts.</p>
+<h3 id="basic-usage-1"><a class="header" href="#basic-usage-1">Basic Usage</a></h3>
+<pre><code class="language-bash"># Validate that changes improved the codebase
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --output improvement-report.json
+
+# Set minimum acceptable improvement threshold
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 5.0 \
+  --output improvement-report.json
+</code></pre>
+<h3 id="command-flags"><a class="header" href="#command-flags">Command Flags</a></h3>
+<pre><code class="language-bash"># Specify comparison file from 'debtmap compare' output
+debtmap validate-improvement --comparison comparison.json
+
+# Set output file for validation results
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --output improvement-report.json
+
+# Use previous validation for trend analysis
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --previous-validation previous-report.json
+
+# Set minimum improvement threshold (percentage)
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 10.0  # Require 10% improvement
+
+# Control output format (json, text, markdown)
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --format json
+
+# Quiet mode (exit code only, no output)
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --quiet
+</code></pre>
+<h3 id="typical-workflow"><a class="header" href="#typical-workflow">Typical Workflow</a></h3>
+<pre><code class="language-bash"># Step 1: Save baseline before refactoring
+debtmap --format json --output before.json
+
+# Step 2: Make code changes...
+
+# Step 3: Analyze after changes
+debtmap --format json --output after.json
+
+# Step 4: Compare results
+debtmap compare --before before.json --after after.json \
+  --format json --output comparison.json
+
+# Step 5: Validate improvement
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 5.0 \
+  --output validation.json
+
+# Exit code 0 if improvement meets threshold, non-zero otherwise
+</code></pre>
+<h3 id="common-issues-1"><a class="header" href="#common-issues-1">Common Issues</a></h3>
+<p><strong>Q: Validation fails but I fixed issues - why?</strong></p>
+<p>A: Check what the validation is measuring:</p>
+<pre><code class="language-bash"># See detailed validation results (without --quiet)
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --format text
+
+# Common reasons for failure:
+# - Added new complexity elsewhere while fixing issues
+# - Threshold too strict for the changes made
+# - Comparison file doesn't reflect latest changes
+# - File-level scores increased despite function improvements
+</code></pre>
+<p><strong>Q: How is improvement calculated?</strong></p>
+<p>A: Improvement is measured as percentage reduction in total debt score:</p>
+<pre><code class="language-bash"># Formula: improvement = ((before_score - after_score) / before_score) × 100
+#
+# Example:
+# - Before: total score = 100
+# - After: total score = 80
+# - Improvement: ((100 - 80) / 100) × 100 = 20%
+
+# See detailed breakdown
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --format text -v
+</code></pre>
+<p><strong>Q: Can I track improvement over multiple refactorings?</strong></p>
+<p>A: Yes, use <code>--previous-validation</code> for trend analysis:</p>
+<pre><code class="language-bash"># First validation
+debtmap validate-improvement \
+  --comparison refactor1-comparison.json \
+  --output validation1.json
+
+# Second validation references first
+debtmap validate-improvement \
+  --comparison refactor2-comparison.json \
+  --previous-validation validation1.json \
+  --output validation2.json
+
+# Shows cumulative improvement trend
+</code></pre>
+<h3 id="cicd-integration-1"><a class="header" href="#cicd-integration-1">CI/CD Integration</a></h3>
+<pre><code class="language-bash"># In CI pipeline: enforce minimum improvement for refactoring PRs
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 5.0 \
+  --quiet || exit 1
+
+# With output for CI reporting
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 5.0 \
+  --format json \
+  --output improvement-report.json
+
+# Archive validation reports for tracking
+</code></pre>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li>Verify refactoring PRs actually reduce debt</li>
+<li>Enforce improvement thresholds in code review</li>
+<li>Track debt reduction trends over time</li>
+<li>Validate that tech debt fixes are effective</li>
+<li>Generate improvement metrics for reporting</li>
+</ul>
+<h3 id="troubleshooting-validation-failures"><a class="header" href="#troubleshooting-validation-failures">Troubleshooting Validation Failures</a></h3>
+<pre><code class="language-bash"># Check the comparison file is valid
+jq . comparison.json
+
+# Verify before/after files were generated correctly
+debtmap --format json --output before.json -v
+# ... make changes ...
+debtmap --format json --output after.json -v
+
+# Lower threshold if being too strict
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --threshold 1.0  # Accept any improvement
+
+# See detailed improvement breakdown
+debtmap validate-improvement \
+  --comparison comparison.json \
+  --format markdown \
+  --output improvement.md
+</code></pre>
 <h2 id="faq"><a class="header" href="#faq">FAQ</a></h2>
 <h3 id="general-questions"><a class="header" href="#general-questions">General Questions</a></h3>
 <p><strong>Q: Why is my analysis slow?</strong></p>
@@ -1591,6 +2188,49 @@ debtmap --coverage-file coverage.info -v
 debtmap --coverage-file coverage.info -vv
 </code></pre>
 <p>See the FAQ entry “How is the 0-10 priority score calculated?” for complete scoring formula details.</p>
+<p><strong>Q: What’s the difference between measured and estimated metrics?</strong></p>
+<p>A: Debtmap provides both directly measured metrics and formula-based estimates:</p>
+<p><strong>Measured Metrics</strong> (from AST analysis):</p>
+<ul>
+<li><code>cyclomatic_complexity</code>: Actual count of decision points in code</li>
+<li><code>cognitive_complexity</code>: Weighted measure of code understandability</li>
+<li><code>nesting_depth</code>: Maximum level of nested blocks</li>
+<li><code>loc</code> (lines of code): Actual line count</li>
+<li><code>parameters</code>: Number of function parameters</li>
+<li><code>return_points</code>: Number of return statements</li>
+</ul>
+<p><strong>Estimated Metrics</strong> (formula-based):</p>
+<ul>
+<li><code>est_branches</code>: Estimated branch count for testing effort
+<ul>
+<li>Formula: <code>max(nesting_depth, 1) × cyclomatic_complexity ÷ 3</code></li>
+<li>Not an actual count of branches in the AST</li>
+<li>Represents estimated testing complexity/effort</li>
+<li>Useful for understanding test coverage needs</li>
+</ul>
+</li>
+</ul>
+<pre><code class="language-bash"># See all metrics including estimates
+debtmap -vv
+
+# Example output:
+# cyclomatic_complexity: 15    (measured from AST)
+# cognitive_complexity: 20     (measured from AST)
+# nesting_depth: 4             (measured from AST)
+# est_branches: 20             (estimated: max(4,1) × 15 ÷ 3 = 20)
+</code></pre>
+<p><strong>When to trust estimated metrics</strong>:</p>
+<ul>
+<li>Comparing relative complexity between functions</li>
+<li>Estimating testing effort</li>
+<li>Understanding potential branching scenarios</li>
+</ul>
+<p><strong>When to rely on measured metrics</strong>:</p>
+<ul>
+<li>Precise complexity analysis</li>
+<li>Setting hard thresholds</li>
+<li>Exact cyclomatic/cognitive complexity values</li>
+</ul>
 <h3 id="context-and-analysis"><a class="header" href="#context-and-analysis">Context and Analysis</a></h3>
 <p><strong>Q: What are context providers?</strong></p>
 <p>A: Additional analysis for prioritization:</p>

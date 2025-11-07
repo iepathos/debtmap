@@ -534,7 +534,8 @@ prodigy clean
 </code></pre>
 <h2 id="claude-slash-commands"><a class="header" href="#claude-slash-commands">Claude Slash Commands</a></h2>
 <blockquote>
-<p><strong>Important</strong>: The slash commands documented below are custom commands provided in Debtmap’s <code>.claude/commands/</code> directory as examples. They are not built into Prodigy or Debtmap. You can use them as-is from the Debtmap repository or create your own based on these patterns.</p>
+<p><strong>Important</strong>: The slash commands documented below are custom commands provided in Debtmap’s <code>.claude/commands/</code> directory. They are included in the Debtmap repository as working examples. You can use them as-is or create your own based on these patterns.</p>
+<p><strong>Note on workflow styles</strong>: The sequential workflow (workflows/debtmap.yml) uses <code>shell:</code> commands directly, while the MapReduce workflow (workflows/debtmap-reduce.yml) uses <code>claude:</code> wrapper commands for some operations like <code>validate-improvement</code>. Both approaches are valid - use whichever fits your workflow style.</p>
 </blockquote>
 <p>Prodigy workflows use Claude Code slash commands to perform analysis, planning, and implementation. The key commands used in the debtmap workflow are:</p>
 <h3 id="planning-commands"><a class="header" href="#planning-commands">Planning Commands</a></h3>

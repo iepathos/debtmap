@@ -302,6 +302,7 @@ debtmap init
 debtmap validate ./src --max-debt-density 5.0
 
 # Validate using config file settings
+# Note: CLI flags override config file values when both are specified
 debtmap validate . --config .debtmap.toml --max-debt-density 5.0
 
 # Compare before/after to track improvements
@@ -454,7 +455,7 @@ Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
 <p><strong>Not yet available</strong>: Purity analysis, detailed call graphs</p>
 <p><strong>Note</strong>: All languages benefit from coverage integration for accurate risk assessment. The core analysis workflow (complexity → debt patterns → prioritization) works consistently across all supported languages.</p>
 <h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
-<p>When you run <code>debtmap analyze .</code>, you’ll see output like this:</p>
+<p>When you run <code>debtmap analyze .</code>, you’ll see output similar to this:</p>
 <pre><code>════════════════════════════════════════════
     PRIORITY TECHNICAL DEBT FIXES
 ════════════════════════════════════════════

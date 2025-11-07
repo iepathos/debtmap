@@ -278,7 +278,8 @@ def mock_api_responses():
 <li><code>*</code> - All types (wildcard)</li>
 </ul>
 <p><strong>Auto-Detected Types</strong> (cannot be suppressed by name):</p>
-<p>The following debt types are detected by code analysis rather than comment scanning. These types <strong>cannot</strong> be suppressed using bracket notation like <code>[error_swallowing]</code>. To suppress them, use the general <code>debtmap:ignore</code> marker without brackets:</p>
+<p>The following debt types are detected by code analysis rather than comment scanning. These types <strong>cannot</strong> be suppressed using bracket notation like <code>[error_swallowing]</code> because they are not included in the suppression parser’s type mapping.</p>
+<p><strong>Why bracket notation doesn’t work</strong>: The suppression parser only recognizes specific type names in its internal mapping (<code>DEBT_TYPE_MAP</code>): <code>todo</code>, <code>fixme</code>, <code>smell</code>/<code>codesmell</code>, <code>complexity</code>, <code>duplication</code>/<code>duplicate</code>, and <code>dependency</code>. Types detected through AST analysis (like error swallowing and resource management) don’t have string identifiers in the parser. To suppress these, use the general <code>debtmap:ignore</code> marker without brackets:</p>
 <ul>
 <li><code>error_swallowing</code> - Error handling issues (empty catch blocks, ignored errors)</li>
 <li><code>resource_management</code> - Resource cleanup issues (file handles, connections)</li>
@@ -437,8 +438,10 @@ patterns = [
 <tr><td>JavaScript</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
 <tr><td>TypeScript</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
 <tr><td>Python</td><td><code>#</code></td><td><code># debtmap:ignore</code></td></tr>
+<tr><td>Other languages</td><td><code>//</code></td><td><code>// debtmap:ignore</code></td></tr>
 </tbody></table>
 </div>
+<p><strong>Note</strong>: Languages not explicitly listed use <code>//</code> as the default comment prefix.</p>
 <p>You don’t need to configure this—Debtmap detects the language and uses the appropriate syntax.</p>
 <h2 id="explicitly-specified-files"><a class="header" href="#explicitly-specified-files">Explicitly Specified Files</a></h2>
 <p><strong>Important behavior</strong>: When you analyze a specific file directly, ignore patterns are bypassed:</p>
@@ -457,7 +460,7 @@ debtmap analyze src/test_helper.rs
 <li><strong>Suppressions by type</strong>: How many of each debt type are suppressed</li>
 <li><strong>Unclosed blocks</strong>: Detection of <code>ignore-start</code> without matching <code>ignore-end</code></li>
 </ul>
-<p><strong>Current Status</strong>: These statistics are tracked internally but not yet exposed through the CLI. Future releases may add a dedicated command to view suppression metrics.</p>
+<p><strong>Current Status</strong>: These statistics are computed during analysis (via the <code>SuppressionContext::get_stats()</code> method) but are not currently displayed in any output format. The <code>SuppressionStats</code> struct exists and tracks all metrics, but there is no user-facing command or report format that exposes them. Future releases may add a dedicated command to view suppression metrics.</p>
 <p><strong>Auditing Suppressions Now</strong>: You can audit your suppressions using standard tools:</p>
 <pre><code class="language-bash"># Find all suppressions in Rust code
 rg "debtmap:ignore" --type rust

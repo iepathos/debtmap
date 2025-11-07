@@ -211,10 +211,10 @@
 <h2 id="analyzing-rust-projects"><a class="header" href="#analyzing-rust-projects">Analyzing Rust Projects</a></h2>
 <h3 id="basic-rust-analysis"><a class="header" href="#basic-rust-analysis">Basic Rust Analysis</a></h3>
 <p>Start with a simple analysis of your Rust project:</p>
-<pre><code class="language-bash"># Analyze current directory (path defaults to '.')
+<pre><code class="language-bash"># Analyze current directory (path defaults to '.' - both commands are identical)
 debtmap analyze
 
-# Same as above (explicit current directory)
+# Same as above with explicit path
 debtmap analyze .
 
 # Analyze specific directory
@@ -760,6 +760,9 @@ debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
 </ul>
 <p>Great for documentation or PR comments.</p>
 <h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
+<blockquote>
+<p><strong>Note</strong>: <code>--format</code> selects the output type (json/markdown/terminal), while <code>--output-format</code> selects the JSON structure variant (unified/legacy). They serve different purposes and can be used together.</p>
+</blockquote>
 <pre><code class="language-bash"># JSON output (default is legacy format)
 debtmap analyze . --format json
 
@@ -1109,6 +1112,29 @@ branch_threshold = 0.8
 max_combined_reduction = 0.3
 </code></pre>
 <p>This reduces false positives for repetitive code patterns.</p>
+<p><strong>Understanding entropy-adjusted output:</strong></p>
+<p>When entropy analysis detects repetitive patterns, detailed output (<code>-vv</code>) shows both original and adjusted complexity:</p>
+<pre><code class="language-bash">debtmap analyze . -vv --top 5
+</code></pre>
+<p><strong>Example output for repetitive validation function:</strong></p>
+<pre><code>#15 SCORE: 68.2 [HIGH]
+├─ COMPLEXITY: cyclomatic=20 (dampened: 14, factor: 0.70), est_branches=40, cognitive=25, nesting=3, entropy=0.30
+  - Entropy Impact: 30% dampening (entropy: 0.30, repetition: 95%)
+</code></pre>
+<p><strong>Interpreting the adjustment:</strong></p>
+<ul>
+<li><code>cyclomatic=20</code>: Original complexity before entropy adjustment</li>
+<li><code>dampened: 14</code>: Adjusted complexity (20 × 0.70 = 14)</li>
+<li><code>factor: 0.70</code>: Dampening factor (30% reduction applied)</li>
+<li><code>entropy: 0.30</code>: Low entropy indicates repetitive patterns</li>
+<li><code>repetition: 95%</code>: High pattern repetition detected</li>
+</ul>
+<p><strong>When no dampening is applied:</strong></p>
+<pre><code>#5 SCORE: 85.5 [CRITICAL]
+├─ COMPLEXITY: cyclomatic=15, est_branches=30, cognitive=22, nesting=4
+</code></pre>
+<p>No “dampened” indicator means the function has diverse logic without repetitive patterns, so the full complexity is used for scoring.</p>
+<p>See <a href="entropy-analysis.html#interpreting-entropy-adjusted-output">Entropy Analysis</a> for more details.</p>
 <h3 id="custom-scoring-weights"><a class="header" href="#custom-scoring-weights">Custom Scoring Weights</a></h3>
 <pre><code class="language-toml">[scoring]
 coverage = 0.40      # Test coverage gaps

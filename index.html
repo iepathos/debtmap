@@ -194,7 +194,7 @@
 <ul>
 <li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
 <li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
-<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
+<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70% compared to traditional complexity-only analyzers. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
 <li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
 <li><strong>Performance</strong>: Significantly faster than Java/Python-based competitors (written in Rust with parallel processing)</li>
 </ul>
@@ -212,8 +212,7 @@
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
 <li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
-<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction)</li>
-<li><strong>Token classification system</strong> - Advanced token categorization with weighted entropy for accurate complexity assessment</li>
+<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction compared to traditional analyzers)</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>
 <li><strong>Security vulnerability detection</strong> - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns</li>
@@ -243,7 +242,7 @@
 <h3 id="configuration--customization"><a class="header" href="#configuration--customization">Configuration &amp; Customization</a></h3>
 <ul>
 <li><strong>Flexible suppression</strong> - Inline comment-based suppression for specific code sections</li>
-<li><strong>Configuration file</strong> - <code>.debtmap.toml</code> or <code>debtmap.toml</code> for project-specific settings</li>
+<li><strong>Configuration file</strong> - <code>.debtmap.toml</code> or <code>debtmap.toml</code> (TOML/JSON/YAML formats supported) for project-specific settings</li>
 <li><strong>Test-friendly</strong> - Easily exclude test fixtures and example code from debt analysis</li>
 <li><strong>Macro expansion support</strong> - Handles Rust macro expansions with configurable warnings</li>
 </ul>
@@ -251,6 +250,7 @@
 <ul>
 <li><strong><code>analyze</code></strong> - Comprehensive debt analysis with unified prioritization</li>
 <li><strong><code>validate</code></strong> - Enforce quality thresholds in CI/CD pipelines</li>
+<li><strong><code>validate-improvement</code></strong> - Validate refactoring improvements against quality thresholds (automates verification that changes actually improved code quality)</li>
 <li><strong><code>compare</code></strong> - Track improvements over time and verify refactoring goals</li>
 <li><strong><code>init</code></strong> - Generate configuration file with sensible defaults (–force to overwrite)</li>
 </ul>
@@ -260,6 +260,7 @@
 <li><strong>Development teams</strong> - Get concrete metrics for planning sprints. Know exactly which refactoring will reduce complexity by 60% or which function needs 6 unit tests for full coverage.</li>
 <li><strong>Engineering managers</strong> - Track quality trends over time with the <code>compare</code> command. Monitor whether refactoring efforts are actually improving codebase health.</li>
 <li><strong>Code reviewers</strong> - Focus reviews on high-risk areas identified by Debtmap. Prioritize reviewing untested complex code over simple utility functions.</li>
+<li><strong>CI/CD engineers</strong> - Enforce quality gates with <code>validate</code> command. Automate refactoring verification with <code>validate-improvement</code> for continuous quality monitoring in pipelines.</li>
 <li><strong>Developers refactoring legacy codebases</strong> - Receive actionable guidance like “extract nested conditions”, “split this 80-line function into 3 smaller functions”, or “add error handling for this catch block”.</li>
 </ul>
 <h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
@@ -269,7 +270,7 @@
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding the metrics and output</li>
 <li><a href="./output-formats.html">Output Formats</a> - JSON, Markdown, and terminal formats</li>
 </ul>
-<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview of your codebase health before diving into detailed analysis.</p>
+<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview, or use <code>--top 10</code> to focus on highest-priority items. Consider <code>--threshold-preset balanced</code> for typical projects or <code>strict</code> for high-quality standards.</p>
 
                     </main>
 

@@ -369,6 +369,7 @@ debtmap validate . --max-debt-density 40.0
 </li>
 </ol>
 <h3 id="metric-priority"><a class="header" href="#metric-priority">Metric Priority</a></h3>
+<p><strong>Validation uses AND logic:</strong> All primary metrics must pass for validation to succeed. If any check fails, the entire validation fails with a non-zero exit code.</p>
 <p>When validation fails, fix issues in this order:</p>
 <ol>
 <li><strong>Critical:</strong> <code>max_debt_density</code> violations (core quality metric)</li>
@@ -377,6 +378,7 @@ debtmap validate . --max-debt-density 40.0
 <li><strong>Medium:</strong> <code>min_coverage_percentage</code> violations (test coverage)</li>
 <li><strong>Low:</strong> <code>max_total_debt_score</code> violations (extreme cases only)</li>
 </ol>
+<p>The priority list above is for remediation order when validation fails, not for which checks are enforced. All configured thresholds are enforced equally.</p>
 <h2 id="exit-codes-and-ci-integration"><a class="header" href="#exit-codes-and-ci-integration">Exit Codes and CI Integration</a></h2>
 <p>The <code>validate</code> command uses exit codes to signal success or failure:</p>
 <h3 id="exit-code-behavior"><a class="header" href="#exit-code-behavior">Exit Code Behavior</a></h3>
@@ -430,6 +432,33 @@ Metrics:
 
 Failed checks: 2
 </code></pre>
+<h3 id="summary-output-format"><a class="header" href="#summary-output-format">Summary Output Format</a></h3>
+<p>For compact output suitable for CI logs, use the <code>--summary</code> or <code>-s</code> flag:</p>
+<pre><code class="language-bash">debtmap validate . --summary
+# or
+debtmap validate . -s
+</code></pre>
+<p><strong>Summary format output:</strong></p>
+<pre><code>✅ Validation PASSED
+
+Priority Tiers:
+  P0 (Critical): 2 items
+  P1 (High): 8 items
+  P2 (Medium): 15 items
+  P3 (Low): 23 items
+
+Top Issues:
+  1. Complex authentication logic (complexity: 28)
+  2. Database connection pool (risk: 9.2)
+  3. Untested error handler (coverage: 0%)
+</code></pre>
+<p>The summary format provides:</p>
+<ul>
+<li>Tiered priority counts instead of individual item details</li>
+<li>Top violating functions for quick triage</li>
+<li>Compact format ideal for CI/CD logs</li>
+<li>Same pass/fail determination as standard format</li>
+</ul>
 <h2 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h2>
 <p>Integrate test coverage data to enable risk-based validation:</p>
 <h3 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h3>
@@ -775,10 +804,23 @@ ls -lh coverage/lcov.info
 debtmap validate . --enable-context --disable-context git_history
 </code></pre>
 <p><strong>Issue: Semantic analysis causing errors or unexpected behavior</strong></p>
+<p>Debtmap uses semantic analysis by default, powered by tree-sitter for deep AST (Abstract Syntax Tree) analysis. This provides accurate understanding of code structure, control flow, and complexity patterns.</p>
+<p>However, semantic analysis may encounter issues with:</p>
+<ul>
+<li>Unsupported or experimental language features</li>
+<li>Malformed or incomplete syntax</li>
+<li>Complex macro expansions</li>
+<li>Very large files that timeout during parsing</li>
+</ul>
 <pre><code class="language-bash"># Solution: Disable semantic analysis with fallback mode
 debtmap validate . --semantic-off
 </code></pre>
-<p>This disables advanced semantic features and uses basic syntax analysis only. Useful for debugging or working with unsupported language constructs.</p>
+<p>When semantic analysis is disabled with <code>--semantic-off</code>, debtmap falls back to basic syntax analysis, which is faster but less accurate for complexity calculations. Use this flag if:</p>
+<ul>
+<li>Encountering parsing errors or timeouts</li>
+<li>Working with bleeding-edge language features</li>
+<li>Need faster validation at the cost of precision</li>
+</ul>
 <h3 id="validation-report-generation"><a class="header" href="#validation-report-generation">Validation Report Generation</a></h3>
 <p>Generate detailed reports for debugging:</p>
 <p><strong>JSON format for programmatic analysis:</strong></p>

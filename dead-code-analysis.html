@@ -191,7 +191,7 @@
 <li><strong>Coverage integration</strong> - Uses test coverage data when available to identify live code</li>
 <li><strong>Public API detection</strong> - Uses heuristics to identify external API functions</li>
 </ul>
-<p>This multi-layered approach achieves a target false positive rate of less than 10%, compared to 30-40% for naive call graph analysis.</p>
+<p>This multi-layered approach significantly reduces false positives compared to naive call graph analysis, with the goal of achieving a target false positive rate of less than 10% (see Spec 116 for confidence scoring validation).</p>
 <h2 id="confidence-scoring"><a class="header" href="#confidence-scoring">Confidence Scoring</a></h2>
 <p>Every analysis result includes a confidence score to help you prioritize code removal:</p>
 <h3 id="high-confidence-08-10"><a class="header" href="#high-confidence-08-10">High Confidence (0.8-1.0)</a></h3>
@@ -432,12 +432,12 @@ let analyzer = EnhancedDeadCodeAnalyzer::new()
 let result = analyzer.analyze_function(&amp;func, &amp;call_graph);
 <span class="boring">}</span></code></pre></pre>
 <h3 id="accuracy-improvement"><a class="header" href="#accuracy-improvement">Accuracy Improvement</a></h3>
-<p>Coverage integration typically provides:</p>
+<p>Coverage integration substantially improves accuracy by:</p>
 <ul>
-<li><strong>60-70% reduction</strong> in false positives for complex codebases</li>
-<li><strong>Near-zero false positives</strong> for functions with test coverage</li>
-<li><strong>Confidence in removal</strong> for uncovered code</li>
-<li><strong>Detection of dynamic calls</strong> that static analysis misses</li>
+<li><strong>Significantly reducing false positives</strong> - Eliminates most false positives in complex codebases</li>
+<li><strong>High accuracy for covered functions</strong> - Functions with test coverage are correctly identified as live</li>
+<li><strong>Clear removal candidates</strong> - Uncovered code with no static callers is more confidently dead</li>
+<li><strong>Dynamic call detection</strong> - Catches functions called via <code>getattr()</code>, plugins, or other dynamic mechanisms that static analysis misses</li>
 </ul>
 <p><strong>Coverage data format</strong>: Debtmap uses the standard <code>coverage.json</code> format produced by <code>coverage.py</code> and <code>pytest-cov</code>. The file should be in your project root and contain executed line numbers for each source file.</p>
 <h2 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h2>
@@ -463,17 +463,18 @@ api_files = [
 ]
 </code></pre>
 <h3 id="programmatic-configuration-rust-api"><a class="header" href="#programmatic-configuration-rust-api">Programmatic Configuration (Rust API)</a></h3>
-<p>Confidence thresholds and analysis behavior are configured programmatically:</p>
+<p><strong>Note</strong>: Confidence thresholds and analysis behavior are configured programmatically via the Rust API. These settings are <strong>not available</strong> in <code>.debtmap.toml</code> - only the <code>detect_external_api</code> and API detection settings can be configured via TOML (see above).</p>
+<p>For Rust API users, you can customize thresholds:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use debtmap::analysis::python_dead_code_enhanced::AnalysisConfig;
 
 let config = AnalysisConfig {
-    // Confidence thresholds
+    // Confidence thresholds (Rust API only - not in .debtmap.toml)
     high_confidence_threshold: 0.8,       // Default: 0.8 (80%)
     medium_confidence_threshold: 0.5,     // Default: 0.5 (50%)
 
-    // Analysis options
+    // Analysis options (Rust API only)
     respect_suppression_comments: true,   // Honor # debtmap: not-dead (default: true)
     include_private_api: true,            // Analyze private functions (default: true)
     enable_public_api_detection: true,    // Use public API heuristics (default: true)
@@ -572,16 +573,18 @@ let analyzer = EnhancedDeadCodeAnalyzer::new()
 <li><code>is_dead: false</code> → <strong>Always keep (function is live)</strong></li>
 <li><code>is_dead: true</code> + <code>confidence: LOW</code> → <strong>Keep (too uncertain to remove)</strong></li>
 </ul>
-<h3 id="cli-filtering-by-confidence"><a class="header" href="#cli-filtering-by-confidence">CLI Filtering by Confidence</a></h3>
-<pre><code class="language-bash"># Show only high confidence dead code
-debtmap analyze --min-confidence=0.8
+<h3 id="filtering-results-by-confidence"><a class="header" href="#filtering-results-by-confidence">Filtering Results by Confidence</a></h3>
+<p>To filter dead code results by confidence level, you can process the JSON output:</p>
+<pre><code class="language-bash"># Analyze and output JSON
+debtmap analyze --format=json &gt; results.json
 
-# Show high and medium confidence
-debtmap analyze --min-confidence=0.5
+# Filter for high confidence dead code using jq
+jq '.dead_code | map(select(.confidence &gt;= 0.8))' results.json
 
-# Show all results (including low confidence)
-debtmap analyze --min-confidence=0.0
+# Filter for high and medium confidence
+jq '.dead_code | map(select(.confidence &gt;= 0.5))' results.json
 </code></pre>
+<p>Note: CLI filtering by confidence threshold (e.g., <code>--min-confidence</code>) is planned for a future release (see Spec 116). Currently, filtering must be done via JSON post-processing.</p>
 <p>See <a href="cli-reference.html">CLI Reference</a> for complete command options.</p>
 <h2 id="common-patterns"><a class="header" href="#common-patterns">Common Patterns</a></h2>
 <h3 id="false-positives-and-how-to-handle-them"><a class="header" href="#false-positives-and-how-to-handle-them">False Positives (and How to Handle Them)</a></h3>
