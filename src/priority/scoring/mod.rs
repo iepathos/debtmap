@@ -18,6 +18,7 @@ pub mod recommendation;
 pub mod recommendation_extended;
 pub mod recommendation_helpers;
 pub mod rust_recommendations;
+pub mod scaling; // Spec 171: Exponential scaling and risk boosting
 pub mod test_calculation;
 pub mod validation;
 
@@ -66,5 +67,7 @@ pub use file_context_scoring::{
 };
 
 pub use facade_scoring::adjust_score_for_facade;
+
+pub use scaling::{calculate_final_score, ScalingConfig};
 
 // Note: debt_item functions are re-exported from unified_scorer.rs for backward compatibility

@@ -25,7 +25,13 @@ pub struct UnifiedScore {
     pub coverage_factor: f64,   // 0-10, configurable weight (default 40%)
     pub dependency_factor: f64, // 0-10, configurable weight (default 20%)
     pub role_multiplier: f64,   // 0.1-1.5x based on function role
-    pub final_score: f64,       // Computed composite score
+    pub final_score: f64,       // Computed composite score (with scaling applied)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_score: Option<f64>, // Score before exponential scaling (spec 171)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exponential_factor: Option<f64>, // Exponent applied for scaling (1.0 = none, spec 171)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub risk_boost: Option<f64>, // Risk boost multiplier (1.0 = none, spec 171)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_adjustment_score: Option<f64>, // Score before orchestration adjustment (spec 110)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -145,6 +151,9 @@ pub fn calculate_unified_score_with_patterns(
         dependency_factor: base_score.dependency_factor,
         role_multiplier: base_score.role_multiplier,
         final_score: base_score.final_score * god_object_multiplier,
+        base_score: base_score.base_score,
+        exponential_factor: base_score.exponential_factor,
+        risk_boost: base_score.risk_boost,
         pre_adjustment_score: base_score.pre_adjustment_score,
         adjustment_applied: base_score.adjustment_applied,
     }
@@ -180,6 +189,9 @@ pub fn calculate_unified_priority_with_debt(
             dependency_factor: 0.0,
             role_multiplier: 1.0,
             final_score: 0.0,
+            base_score: Some(0.0),
+            exponential_factor: Some(1.0),
+            risk_boost: Some(1.0),
             pre_adjustment_score: None,
             adjustment_applied: None,
         };
@@ -262,6 +274,9 @@ pub fn calculate_unified_priority_with_debt(
         dependency_factor,
         role_multiplier,
         final_score: final_normalized_score,
+        base_score: None,         // Set later in debt item construction (spec 171)
+        exponential_factor: None, // Set later in debt item construction (spec 171)
+        risk_boost: None,         // Set later in debt item construction (spec 171)
         pre_adjustment_score: pre_adjustment,
         adjustment_applied: adjustment,
     }

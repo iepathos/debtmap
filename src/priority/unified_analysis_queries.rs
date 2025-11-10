@@ -8,7 +8,7 @@ use super::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
     DisplayGroup, ImpactLevel, Tier, TieredDisplay, UnifiedAnalysis, UnifiedDebtItem,
 };
-use crate::priority::tiers::{classify_tier, RecommendationTier, TierConfig};
+use crate::priority::tiers::{classify_tier, TierConfig};
 use im::Vector;
 use std::collections::{BTreeMap, HashMap};
 
@@ -66,28 +66,12 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
             all_items.push(DebtItem::File(Box::new(item.clone())));
         }
 
-        // Sort by tier first (T1 > T2 > T3 > T4), then by score within tier
+        // Sort by score (highest first) - spec 171: pure score-based ranking
+        // Exponential scaling and risk boosting ensure architectural issues naturally rank higher
         all_items.sort_by(|a, b| {
-            // Get tier for comparison
-            let tier_a = match a {
-                DebtItem::Function(f) => f.tier.unwrap_or(RecommendationTier::T4Maintenance),
-                DebtItem::File(_) => RecommendationTier::T1CriticalArchitecture, // Files are architectural
-            };
-            let tier_b = match b {
-                DebtItem::Function(f) => f.tier.unwrap_or(RecommendationTier::T4Maintenance),
-                DebtItem::File(_) => RecommendationTier::T1CriticalArchitecture,
-            };
-
-            // Primary sort: by tier (lower enum value = higher priority)
-            match tier_a.cmp(&tier_b) {
-                std::cmp::Ordering::Equal => {
-                    // Secondary sort: by score within tier (higher score = higher priority)
-                    b.score()
-                        .partial_cmp(&a.score())
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                }
-                other => other,
-            }
+            b.score()
+                .partial_cmp(&a.score())
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Return top n items
@@ -489,4 +473,152 @@ fn identify_cross_category_dependencies(
     }
 
     dependencies
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::priority::unified_scorer::{Location, UnifiedScore};
+    use crate::priority::{ActionableRecommendation, ImpactMetrics};
+    use std::path::PathBuf;
+
+    /// Test that sorting logic works correctly (higher scores rank higher)
+    #[test]
+    fn test_score_based_sorting() {
+        // Test the sorting logic directly with DebtItems
+        use crate::priority::semantic_classifier::FunctionRole;
+
+        let item1 = DebtItem::Function(Box::new(UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "high_score".to_string(),
+                line: 1,
+            },
+            debt_type: DebtType::ComplexityHotspot {
+                cyclomatic: 40,
+                cognitive: 50,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 5.0,
+                coverage_factor: 5.0,
+                dependency_factor: 5.0,
+                role_multiplier: 1.0,
+                final_score: 50.0,
+                base_score: Some(50.0),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 10,
+            cyclomatic_complexity: 10,
+            cognitive_complexity: 10,
+            entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+        }));
+
+        let item2 = DebtItem::Function(Box::new(UnifiedDebtItem {
+            location: Location {
+                file: PathBuf::from("test.rs"),
+                function: "low_score".to_string(),
+                line: 10,
+            },
+            debt_type: DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 5,
+                cognitive: 5,
+            },
+            unified_score: UnifiedScore {
+                complexity_factor: 2.0,
+                coverage_factor: 2.0,
+                dependency_factor: 2.0,
+                role_multiplier: 1.0,
+                final_score: 10.0,
+                base_score: Some(10.0),
+                exponential_factor: Some(1.0),
+                risk_boost: Some(1.0),
+                pre_adjustment_score: None,
+                adjustment_applied: None,
+            },
+            function_role: FunctionRole::PureLogic,
+            recommendation: ActionableRecommendation {
+                primary_action: "Test".to_string(),
+                rationale: "Test".to_string(),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: None,
+                estimated_effort_hours: None,
+            },
+            expected_impact: ImpactMetrics {
+                coverage_improvement: 0.0,
+                lines_reduction: 0,
+                complexity_reduction: 0.0,
+                risk_reduction: 0.0,
+            },
+            transitive_coverage: None,
+            upstream_dependencies: 0,
+            downstream_dependencies: 0,
+            upstream_callers: vec![],
+            downstream_callees: vec![],
+            nesting_depth: 1,
+            function_length: 5,
+            cyclomatic_complexity: 5,
+            cognitive_complexity: 5,
+            entropy_details: None,
+            is_pure: None,
+            purity_confidence: None,
+            purity_level: None,
+            god_object_indicators: None,
+            tier: None,
+            function_context: None,
+            context_confidence: None,
+            contextual_recommendation: None,
+            pattern_analysis: None,
+            file_context: None,
+        }));
+
+        let mut items = [item2.clone(), item1.clone()]; // Start with low score first
+
+        // Sort using the same logic as get_top_mixed_priorities
+        items.sort_by(|a, b| {
+            b.score()
+                .partial_cmp(&a.score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Verify higher score is first
+        assert!(items[0].score() > items[1].score());
+        assert_eq!(items[0].score(), 50.0);
+        assert_eq!(items[1].score(), 10.0);
+    }
 }

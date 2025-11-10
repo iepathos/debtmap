@@ -77,7 +77,7 @@ pub fn create_unified_debt_item_enhanced(
         None
     };
 
-    UnifiedDebtItem {
+    let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
             function: func.name.clone(),
@@ -108,7 +108,10 @@ pub fn create_unified_debt_item_enhanced(
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
         file_context: None,
-    }
+    };
+
+    // Apply exponential scaling and risk boosting (spec 171)
+    apply_score_scaling(item)
 }
 
 pub fn create_unified_debt_item_with_aggregator(
@@ -244,6 +247,26 @@ fn extract_dependency_metrics(func_id: &FunctionId, call_graph: &CallGraph) -> D
     }
 }
 
+// Apply exponential scaling and risk boosting to a debt item (spec 171)
+fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
+    use crate::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
+
+    let config = ScalingConfig::default();
+    let base_score = item.unified_score.final_score;
+
+    // Calculate final score with scaling
+    let (final_score, exponent, boost) =
+        calculate_final_score(base_score, &item.debt_type, &item, &config);
+
+    // Update the unified score with scaling information
+    item.unified_score.base_score = Some(base_score);
+    item.unified_score.exponential_factor = Some(exponent);
+    item.unified_score.risk_boost = Some(boost);
+    item.unified_score.final_score = final_score;
+
+    item
+}
+
 // Pure function: Build unified debt item from components
 fn build_unified_debt_item(
     func: &FunctionMetrics,
@@ -330,7 +353,10 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     let deps = extract_dependency_metrics(&func_id, call_graph);
 
     // Step 4: Build final item (pure)
-    build_unified_debt_item(func, context, deps)
+    let item = build_unified_debt_item(func, context, deps);
+
+    // Step 5: Apply exponential scaling and risk boosting (spec 171)
+    apply_score_scaling(item)
 }
 
 pub fn create_unified_debt_item_with_exclusions(

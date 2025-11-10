@@ -995,6 +995,9 @@ fn convert_error_swallowing_to_unified(
                 dependency_factor: 4.0,
                 role_multiplier: 1.2,
                 final_score: 5.5,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
                 pre_adjustment_score: None,
                 adjustment_applied: None,
             };

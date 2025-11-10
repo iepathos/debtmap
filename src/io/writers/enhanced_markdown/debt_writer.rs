@@ -160,6 +160,9 @@ mod tests {
             },
             unified_score: UnifiedScore {
                 final_score: 8.5,
+                base_score: None,
+                exponential_factor: None,
+                risk_boost: None,
                 pre_adjustment_score: None,
                 adjustment_applied: None,
                 coverage_factor: 1.0,
