@@ -3,7 +3,7 @@
 //! Validates that score-based sorting has acceptable performance
 //! (target: within 5% of previous tier-based implementation).
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::data_flow::DataFlowGraph;
 use debtmap::priority::call_graph::CallGraph;
 use debtmap::priority::scoring::scaling::{calculate_final_score, ScalingConfig};
@@ -13,6 +13,7 @@ use debtmap::priority::unified_scorer::{Location, UnifiedScore};
 use debtmap::priority::{
     ActionableRecommendation, DebtType, ImpactMetrics, UnifiedAnalysis, UnifiedDebtItem,
 };
+use std::hint::black_box;
 use std::path::PathBuf;
 
 fn create_test_item(
