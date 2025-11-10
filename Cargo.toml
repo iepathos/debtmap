@@ -187,3 +187,7 @@ harness = false
 [[bench]]
 name = "coverage_scoring"
 harness = false
+
+[[bench]]
+name = "score_based_sorting_bench"
+harness = false

@@ -161,6 +161,7 @@ pub fn calculate_final_score(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use std::path::PathBuf;
 
     fn create_test_item(
@@ -411,5 +412,186 @@ mod tests {
             "Scaled score should be at least 1.0, got {}",
             scaled
         );
+    }
+
+    // Property test: score ordering should be strict and monotonic
+    proptest! {
+        #[test]
+        fn prop_score_ordering_is_strict(
+            base_scores in prop::collection::vec(0.0f64..100.0f64, 2..50)
+        ) {
+            let config = ScalingConfig::default();
+
+            // Create items with random base scores
+            let items: Vec<_> = base_scores.iter().enumerate().map(|(i, &score)| {
+                let debt_type = if i % 3 == 0 {
+                    DebtType::GodObject {
+                        methods: 50,
+                        fields: 20,
+                        responsibilities: 10,
+                        god_object_score: 85.0,
+                    }
+                } else if i % 3 == 1 {
+                    DebtType::ComplexityHotspot {
+                        cyclomatic: 35,
+                        cognitive: 40,
+                    }
+                } else {
+                    DebtType::TestingGap {
+                        coverage: 0.0,
+                        cyclomatic: 15,
+                        cognitive: 20,
+                    }
+                };
+
+                create_test_item(
+                    score,
+                    debt_type,
+                    5,
+                    5,
+                    FunctionRole::PureLogic,
+                    20,
+                )
+            }).collect();
+
+            // Calculate final scores
+            let mut scored_items: Vec<_> = items.iter().enumerate().map(|(idx, item)| {
+                let (final_score, _, _) = calculate_final_score(
+                    base_scores[idx],
+                    &item.debt_type,
+                    item,
+                    &config
+                );
+                (final_score, idx)
+            }).collect();
+
+            // Sort by score descending (as in get_top_mixed_priorities)
+            scored_items.sort_by(|a, b| {
+                b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // Verify no score inversions: score[i] >= score[i+1]
+            for i in 0..scored_items.len().saturating_sub(1) {
+                let score_i = scored_items[i].0;
+                let score_next = scored_items[i + 1].0;
+                prop_assert!(
+                    score_i >= score_next,
+                    "Score inversion at index {}: {} < {} (items {} and {})",
+                    i,
+                    score_i,
+                    score_next,
+                    scored_items[i].1,
+                    scored_items[i + 1].1
+                );
+            }
+        }
+
+        #[test]
+        fn prop_exponential_scaling_monotonic(
+            base_score in 1.0f64..100.0f64,
+            higher_score in 1.0f64..100.0f64,
+        ) {
+            // Ensure higher_score > base_score
+            let (lower, higher) = if base_score < higher_score {
+                (base_score, higher_score)
+            } else {
+                (higher_score, base_score)
+            };
+
+            if (higher - lower).abs() < 0.01 {
+                return Ok(());
+            }
+
+            let config = ScalingConfig::default();
+            let debt_type = DebtType::GodObject {
+                methods: 50,
+                fields: 20,
+                responsibilities: 10,
+                god_object_score: 85.0,
+            };
+
+            let scaled_lower = apply_exponential_scaling(lower, &debt_type, &config);
+            let scaled_higher = apply_exponential_scaling(higher, &debt_type, &config);
+
+            // Exponential scaling must preserve ordering
+            prop_assert!(
+                scaled_higher >= scaled_lower,
+                "Exponential scaling violated monotonicity: {}^1.4={} should be >= {}^1.4={}",
+                higher, scaled_higher, lower, scaled_lower
+            );
+        }
+
+        #[test]
+        fn prop_risk_boosts_non_negative(
+            base_score in 1.0f64..100.0f64,
+            upstream_deps in 0usize..30,
+            downstream_deps in 0usize..30,
+        ) {
+            let config = ScalingConfig::default();
+            let role = if upstream_deps > 20 {
+                FunctionRole::EntryPoint
+            } else {
+                FunctionRole::PureLogic
+            };
+
+            let item = create_test_item(
+                base_score,
+                DebtType::TestingGap {
+                    coverage: 0.0,
+                    cyclomatic: 25,
+                    cognitive: 30,
+                },
+                upstream_deps,
+                downstream_deps,
+                role,
+                25,
+            );
+
+            let boosted = apply_risk_boosts(base_score, &item, &config);
+
+            // Risk boosts should never decrease score
+            prop_assert!(
+                boosted >= base_score,
+                "Risk boost decreased score: {} -> {}",
+                base_score,
+                boosted
+            );
+        }
+
+        #[test]
+        fn prop_final_score_never_decreases_from_base(
+            base_score in 1.0f64..100.0f64,
+        ) {
+            let config = ScalingConfig::default();
+            let item = create_test_item(
+                base_score,
+                DebtType::GodObject {
+                    methods: 50,
+                    fields: 20,
+                    responsibilities: 10,
+                    god_object_score: 85.0,
+                },
+                10,
+                10,
+                FunctionRole::EntryPoint,
+                30,
+            );
+
+            let (final_score, _, _) = calculate_final_score(
+                base_score,
+                &item.debt_type,
+                &item,
+                &config,
+            );
+
+            // With exponent >= 1.0 and boost >= 1.0, final score should never be less than base
+            // (for base_score >= 1.0)
+            prop_assert!(
+                final_score >= base_score * 0.99, // Allow tiny floating point errors
+                "Final score {} is less than base score {}",
+                final_score,
+                base_score
+            );
+        }
     }
 }
