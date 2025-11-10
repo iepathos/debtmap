@@ -1556,6 +1556,138 @@ Debtmap distinguishes between genuinely complex code and pattern-based repetitiv
 
 This prevents false positives from large but simple pattern-matching code.
 
+## Score-Based Prioritization System (Spec 171)
+
+DebtMap uses a pure score-based ranking system to prioritize technical debt items. This system replaces traditional tier-based ranking (Critical/High/Medium/Low) with continuous numerical scores that provide finer-grained prioritization and better separation between items of different severities.
+
+### Design Philosophy
+
+**Pure Score-Based Ranking**: Items are ranked by their final calculated score without bucketing into discrete priority tiers. This provides:
+- **Finer granularity**: Distinguishes between items that would otherwise share the same tier
+- **Natural ordering**: Scores reflect actual severity without artificial boundaries
+- **Better separation**: High-severity items stand out more clearly from medium-severity ones
+
+**Two-Stage Amplification**: The system uses a two-stage approach to amplify scores for high-severity items:
+1. **Exponential scaling** based on pattern type
+2. **Risk boosting** based on architectural position
+
+### Exponential Scaling
+
+Exponential scaling amplifies high scores more than low scores, creating better visual separation in the priority list. Unlike linear multipliers, exponential scaling grows the gap between high and low severity items.
+
+**Implementation** (src/priority/scoring/scaling.rs):
+
+```rust
+pub struct ScalingConfig {
+    pub god_object: ScalingParams,      // Default: exponent 1.4
+    pub long_function: ScalingParams,   // Default: exponent 1.3
+    pub complex_function: ScalingParams,
+    // ... other patterns
+}
+
+pub struct ScalingParams {
+    pub exponent: f64,          // Exponential scaling factor
+    pub min_threshold: f64,     // Minimum score to apply scaling
+    pub max_threshold: f64,     // Maximum score to cap at
+}
+
+// Scaling formula
+scaled_score = base_score.powf(exponent)
+```
+
+**Example - God Object Scaling (exponent = 1.4)**:
+- Score 10 → 10^1.4 = 25.1 (2.5x amplification)
+- Score 50 → 50^1.4 = 279.5 (5.6x amplification)
+- Score 100 → 100^1.4 = 1000 (10x amplification)
+
+**Why Exponential vs Linear**:
+- Linear multiplier (e.g., 2x): Creates uniform gaps (score 50 becomes 100, score 100 becomes 200)
+- Exponential scaling (e.g., ^1.4): Creates growing gaps that make critical issues stand out
+- High-severity items get much higher scores, making them impossible to miss
+- Low-severity items remain low, preventing clutter at the top
+
+**Pattern-Specific Exponents**:
+- **God Objects (1.4)**: Highest amplification - architectural issues deserve top priority
+- **Long Functions (1.3)**: High amplification - major refactoring candidates
+- **Complex Functions (1.2)**: Moderate amplification - complexity issues
+- **Primitive Obsession (1.1)**: Light amplification - design smell but lower urgency
+
+### Risk Boosting
+
+After exponential scaling, risk factors provide additional boosts based on architectural position:
+
+**Risk Multipliers**:
+```rust
+// Applied multiplicatively to scaled score
+let risk_boosted = scaled_score * risk_multiplier;
+
+// Risk factors:
+- High dependency count (10+ callers): 1.2x boost
+- Entry point (main, CLI handlers): 1.15x boost
+- Low test coverage (<30%): 1.1x boost
+```
+
+**Rationale**:
+- Entry points affect all downstream code - failures cascade
+- High-dependency functions are harder to refactor safely
+- Untested code is riskier to modify
+
+### Complete Scoring Pipeline
+
+```
+1. Base Score Calculation
+   ↓ (weighted sum of coverage, complexity, dependencies)
+2. Exponential Scaling
+   ↓ (pattern-specific exponent applied)
+3. Risk Boosting
+   ↓ (architectural position multipliers)
+4. Final Score
+   ↓ (used for ranking without tier bucketing)
+5. Sort by Score
+   ↓ (descending order for output)
+```
+
+### Configuration
+
+Override default scaling parameters in `.debtmap.toml`:
+
+```toml
+[priority.scaling.god_object]
+exponent = 1.5              # Increase amplification for God Objects
+min_threshold = 30.0        # Only scale scores above 30
+max_threshold = 500.0       # Cap scaled scores at 500
+
+[priority.scaling.long_function]
+exponent = 1.3              # Default amplification
+min_threshold = 0.0         # No minimum threshold
+max_threshold = 1000.0      # High cap for extreme cases
+```
+
+### Benefits
+
+1. **Clear Priority Separation**: Critical items have dramatically higher scores than medium items
+2. **No Arbitrary Thresholds**: Score-based ranking eliminates debate about tier boundaries
+3. **Natural Clustering**: Similar-severity items cluster together in the ranked list
+4. **Actionable Ordering**: Work through the list from top to bottom
+5. **Configurable Amplification**: Tune exponents to match project priorities
+
+### Implementation Location
+
+- **Core implementation**: `src/priority/scoring/scaling.rs`
+- **Pattern configs**: `src/priority/scoring/mod.rs`
+- **Risk boosting**: `src/priority/scoring/risk.rs`
+- **Integration**: Applied in `src/priority/prioritizer.rs` before output
+
+### Migration from Tier-Based Ranking
+
+For compatibility with tools expecting Priority enums, scores can be mapped to tiers:
+- Score ≥ 200: Critical
+- Score ≥ 100: High
+- Score ≥ 50: Medium
+- Score < 50: Low
+
+However, the primary output uses raw scores for better granularity.
+
 ## Test File Detection (Spec 166)
 
 Debtmap automatically identifies test files and test functions across multiple programming languages, enabling context-aware scoring adjustments that reduce false positives from test-specific patterns.
