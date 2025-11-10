@@ -1239,12 +1239,262 @@ smell_weight = 0.6
 <li>Parallel processing compatible</li>
 <li>Adds ~5% to analysis time for rationale generation</li>
 </ul>
+<h2 id="score-based-prioritization-with-exponential-scaling-spec-171"><a class="header" href="#score-based-prioritization-with-exponential-scaling-spec-171">Score-Based Prioritization with Exponential Scaling (Spec 171)</a></h2>
+<p>DebtMap uses exponential scaling and risk boosting to amplify high-severity technical debt items, ensuring critical issues stand out clearly in priority lists. This section explains how these mechanisms work and how to configure them for your project.</p>
+<h3 id="why-exponential-scaling"><a class="header" href="#why-exponential-scaling">Why Exponential Scaling?</a></h3>
+<p>Traditional linear multipliers create uniform gaps between scores:</p>
+<ul>
+<li>Linear 2x multiplier: Score 50 → 100, Score 100 → 200 (uniform +50 and +100 gaps)</li>
+</ul>
+<p>Exponential scaling creates growing gaps that make critical issues impossible to miss:</p>
+<ul>
+<li>Exponential scaling (^1.4): Score 50 → 279, Score 100 → 1000 (gaps grow dramatically)</li>
+</ul>
+<p><strong>Key Benefits</strong>:</p>
+<ul>
+<li><strong>Visual Separation</strong>: Critical items have dramatically higher scores than medium items</li>
+<li><strong>Natural Clustering</strong>: Similar-severity items cluster together in ranked lists</li>
+<li><strong>Actionable Ordering</strong>: Work through the list from top to bottom with confidence</li>
+<li><strong>No Arbitrary Thresholds</strong>: Pure score-based ranking eliminates debates about tier boundaries</li>
+</ul>
+<h3 id="how-exponential-scaling-works"><a class="header" href="#how-exponential-scaling-works">How Exponential Scaling Works</a></h3>
+<p>After calculating the base score (complexity + coverage + dependencies), DebtMap applies pattern-specific exponential scaling:</p>
+<p><strong>Formula</strong>:</p>
+<pre><code>scaled_score = base_score ^ exponent
+</code></pre>
+<p><strong>Pattern-Specific Exponents</strong> (configurable in <code>.debtmap.toml</code>):</p>
+<div class="table-wrapper"><table><thead><tr><th>Pattern Type</th><th>Default Exponent</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>God Objects</td><td>1.4</td><td>Highest amplification - architectural issues deserve top priority</td></tr>
+<tr><td>Long Functions</td><td>1.3</td><td>High amplification - major refactoring candidates</td></tr>
+<tr><td>Complex Functions</td><td>1.2</td><td>Moderate amplification - complexity issues</td></tr>
+<tr><td>Primitive Obsession</td><td>1.1</td><td>Light amplification - design smell but lower urgency</td></tr>
+</tbody></table>
+</div>
+<h3 id="example-god-object-scaling-exponent--14"><a class="header" href="#example-god-object-scaling-exponent--14">Example: God Object Scaling (exponent = 1.4)</a></h3>
+<p>Comparing three God Objects with different base scores:</p>
+<div class="table-wrapper"><table><thead><tr><th>Base Score</th><th>Calculation</th><th>Scaled Score</th><th>Amplification</th></tr></thead><tbody>
+<tr><td>10</td><td>10^1.4</td><td>25.1</td><td>2.5x</td></tr>
+<tr><td>50</td><td>50^1.4</td><td>279.5</td><td>5.6x</td></tr>
+<tr><td>100</td><td>100^1.4</td><td>1000.0</td><td>10x</td></tr>
+</tbody></table>
+</div>
+<p><strong>Result</strong>: The highest-severity God Object (score 100) gets 10x amplification, while a minor issue (score 10) only gets 2.5x. This creates clear visual separation in your priority list.</p>
+<h3 id="risk-boosting"><a class="header" href="#risk-boosting">Risk Boosting</a></h3>
+<p>After exponential scaling, DebtMap applies additional risk multipliers based on architectural position:</p>
+<p><strong>Risk Multipliers</strong> (applied multiplicatively):</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>final_score = scaled_score × risk_multiplier
+<span class="boring">}</span></code></pre></pre>
+<div class="table-wrapper"><table><thead><tr><th>Risk Factor</th><th>Multiplier</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>High dependency count (10+ callers)</td><td>1.2x</td><td>Harder to refactor safely, affects more code</td></tr>
+<tr><td>Entry point (main, CLI handlers, routes)</td><td>1.15x</td><td>Failures cascade to all downstream code</td></tr>
+<tr><td>Low test coverage (&lt;30%)</td><td>1.1x</td><td>Riskier to modify without tests</td></tr>
+</tbody></table>
+</div>
+<p><strong>Example</strong>:</p>
+<pre><code>Function: process_payment (God Object)
+  Base Score: 85.0
+  Exponentially Scaled: 85^1.4 = 554.3
+  Risk Factors:
+    - Entry point: ×1.15
+    - Low coverage (15%): ×1.1
+  Final Score: 554.3 × 1.15 × 1.1 = 701.7
+</code></pre>
+<h3 id="complete-scoring-pipeline"><a class="header" href="#complete-scoring-pipeline">Complete Scoring Pipeline</a></h3>
+<p>DebtMap processes scores through multiple stages:</p>
+<pre><code>1. Base Score Calculation
+   ↓
+   Weighted sum of:
+   - Coverage factor (40% weight)
+   - Complexity factor (40% weight)
+   - Dependency factor (20% weight)
+
+2. Exponential Scaling
+   ↓
+   Pattern-specific exponent applied:
+   - God Objects: ^1.4
+   - Long Functions: ^1.3
+   - etc.
+
+3. Risk Boosting
+   ↓
+   Architectural position multipliers:
+   - High dependencies: ×1.2
+   - Entry points: ×1.15
+   - Low coverage: ×1.1
+
+4. Final Score
+   ↓
+   Used for ranking (no tier bucketing)
+
+5. Output
+   ↓
+   Sorted descending by final score
+</code></pre>
+<h3 id="configuration-3"><a class="header" href="#configuration-3">Configuration</a></h3>
+<p>You can customize exponential scaling parameters in <code>.debtmap.toml</code>:</p>
+<pre><code class="language-toml">[priority.scaling.god_object]
+exponent = 1.5              # Increase amplification for God Objects
+min_threshold = 30.0        # Only scale scores above 30
+max_threshold = 500.0       # Cap scaled scores at 500
+
+[priority.scaling.long_function]
+exponent = 1.3              # Default amplification
+min_threshold = 0.0         # No minimum threshold
+max_threshold = 1000.0      # High cap for extreme cases
+
+[priority.scaling.complex_function]
+exponent = 1.2              # Moderate amplification
+min_threshold = 20.0        # Scale scores above 20
+max_threshold = 800.0       # Cap at 800
+</code></pre>
+<p><strong>Configuration Parameters</strong>:</p>
+<ul>
+<li><strong>exponent</strong>: The exponential scaling factor (higher = more amplification)</li>
+<li><strong>min_threshold</strong>: Minimum base score to apply scaling (prevents amplifying trivial issues)</li>
+<li><strong>max_threshold</strong>: Maximum scaled score (prevents extreme outliers)</li>
+</ul>
+<h3 id="tuning-guidelines"><a class="header" href="#tuning-guidelines">Tuning Guidelines</a></h3>
+<p><strong>Increase amplification when</strong>:</p>
+<ul>
+<li>Critical issues aren’t standing out enough in your priority list</li>
+<li>Team needs stronger signal about what to tackle first</li>
+<li>You have many medium-severity items obscuring high-severity ones</li>
+</ul>
+<p><strong>Decrease amplification when</strong>:</p>
+<ul>
+<li>Priority list feels too top-heavy (too many “critical” items)</li>
+<li>Scores are getting too large (e.g., thousands)</li>
+<li>You want more gradual transitions between severity levels</li>
+</ul>
+<p><strong>Example: More Aggressive God Object Detection</strong></p>
+<pre><code class="language-toml">[priority.scaling.god_object]
+exponent = 1.6              # Higher amplification
+min_threshold = 20.0        # Start scaling earlier
+max_threshold = 2000.0      # Allow higher caps
+</code></pre>
+<h3 id="comparing-with-vs-without-exponential-scaling"><a class="header" href="#comparing-with-vs-without-exponential-scaling">Comparing With vs Without Exponential Scaling</a></h3>
+<p><strong>Without Exponential Scaling (Linear Multipliers)</strong>:</p>
+<pre><code>Priority List:
+1. God Object (base: 85) → final: 170 (2x multiplier)
+2. Long Function (base: 80) → final: 160 (2x multiplier)
+3. Complex Function (base: 75) → final: 150 (2x multiplier)
+4. Medium Issue (base: 70) → final: 140 (2x multiplier)
+</code></pre>
+<p><strong>Problem</strong>: Gaps are uniform (10 points). Hard to distinguish critical from medium issues.</p>
+<p><strong>With Exponential Scaling</strong>:</p>
+<pre><code>Priority List:
+1. God Object (base: 85) → scaled: 554 → with risk: 701
+2. Long Function (base: 80) → scaled: 447 → with risk: 492
+3. Complex Function (base: 75) → scaled: 357 → with risk: 357
+4. Medium Issue (base: 70) → scaled: 282 → with risk: 282
+</code></pre>
+<p><strong>Result</strong>: Clear separation. God Object stands out as 2.5x higher than medium issues.</p>
+<h3 id="score-based-ranking-vs-tier-based-ranking"><a class="header" href="#score-based-ranking-vs-tier-based-ranking">Score-Based Ranking vs Tier-Based Ranking</a></h3>
+<p>DebtMap uses pure score-based ranking (not tier-based) for finer granularity:</p>
+<p><strong>Traditional Tier-Based Ranking</strong>:</p>
+<pre><code>Critical: Items with score ≥ 200
+High: Items with score 100-199
+Medium: Items with score 50-99
+Low: Items with score &lt; 50
+</code></pre>
+<p><strong>Problem</strong>: All “Critical” items look equally important, even if one has score 201 and another has score 1000.</p>
+<p><strong>Score-Based Ranking</strong>:</p>
+<pre><code>1. process_payment - Score: 1247.3
+2. UserService.authenticate - Score: 891.2
+3. calculate_tax - Score: 654.1
+...
+</code></pre>
+<p><strong>Benefits</strong>:</p>
+<ul>
+<li>Every item has a unique priority position</li>
+<li>Natural ordering - work from highest to lowest</li>
+<li>No arbitrary boundaries or threshold debates</li>
+<li>Finer-grained decision making</li>
+</ul>
+<p><strong>Compatibility Note</strong>: For tools expecting Priority enums, scores can be mapped to tiers:</p>
+<ul>
+<li>Score ≥ 200: Critical</li>
+<li>Score ≥ 100: High</li>
+<li>Score ≥ 50: Medium</li>
+<li>Score &lt; 50: Low</li>
+</ul>
+<p>However, the primary output uses raw scores for maximum granularity.</p>
+<h3 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h3>
+<p><strong>Example 1: Identifying Architectural Hot Spots</strong></p>
+<pre><code class="language-bash">debtmap analyze . --top 10
+</code></pre>
+<p><strong>Output</strong>:</p>
+<pre><code>Top 10 Technical Debt Items (Sorted by Score)
+
+1. src/services/user_service.rs:45 - UserService::authenticate
+   Score: 1247.3 | Pattern: God Object | Coverage: 12%
+   → 45 methods, 892 lines, high complexity
+   → Risk factors: Entry point (×1.15), High dependencies (×1.2)
+
+2. src/payment/processor.rs:142 - process_payment
+   Score: 891.2 | Pattern: Complex Function | Coverage: 8%
+   → Cyclomatic: 42, Cognitive: 77
+   → Risk factors: Entry point (×1.15), Low coverage (×1.1)
+
+3. src/reporting/generator.rs:234 - generate_monthly_report
+   Score: 654.1 | Pattern: Long Function | Coverage: 45%
+   → 287 lines, moderate complexity
+   → Risk factors: High dependencies (×1.2)
+</code></pre>
+<p><strong>Action</strong>: Focus on top 3 items first - they have dramatically higher scores than items 4-10.</p>
+<p><strong>Example 2: Monitoring Exponential Scaling Impact</strong></p>
+<pre><code class="language-bash"># Analyze with verbose output to see scaling details
+debtmap analyze . --verbose --top 5
+</code></pre>
+<p><strong>Verbose Output</strong>:</p>
+<pre><code>Function: src/services/user_service.rs:45 - UserService::authenticate
+  Base Score: 85.0
+  Pattern: God Object
+  Exponential Scaling (^1.4): 85.0^1.4 = 554.3
+  Risk Boosting:
+    - Entry point: ×1.15 → 637.4
+    - High dependencies (15 callers): ×1.2 → 764.9
+    - Low coverage (12%): ×1.1 → 841.4
+  Final Score: 841.4
+</code></pre>
+<p><strong>Insight</strong>: Base score of 85 amplified to 841 through exponential scaling and risk boosting - a 9.9x total amplification.</p>
+<h3 id="when-to-use-exponential-scaling"><a class="header" href="#when-to-use-exponential-scaling">When to Use Exponential Scaling</a></h3>
+<p>✅ <strong>Use exponential scaling when</strong>:</p>
+<ul>
+<li>You need clear visual separation between critical and medium issues</li>
+<li>Your priority list has too many “high priority” items</li>
+<li>You want top issues to stand out dramatically</li>
+<li>You prefer score-based ranking over tier-based bucketing</li>
+</ul>
+<p>✅ <strong>Adjust exponents when</strong>:</p>
+<ul>
+<li>Default amplification doesn’t match your team’s priorities</li>
+<li>Certain patterns (e.g., God Objects) deserve more/less emphasis</li>
+<li>You’re tuning the balance between different debt types</li>
+</ul>
+<p>✅ <strong>Tune thresholds when</strong>:</p>
+<ul>
+<li>Scores are getting too large (increase max_threshold)</li>
+<li>Trivial issues are being amplified (increase min_threshold)</li>
+<li>You want to cap extreme outliers (adjust max_threshold)</li>
+</ul>
+<h3 id="performance-impact"><a class="header" href="#performance-impact">Performance Impact</a></h3>
+<p>Exponential scaling has negligible performance impact:</p>
+<ul>
+<li><strong>Computation</strong>: Simple <code>powf()</code> operation per item</li>
+<li><strong>Overhead</strong>: &lt;1% additional analysis time</li>
+<li><strong>Scalability</strong>: Works with parallel processing (no synchronization needed)</li>
+<li><strong>Memory</strong>: No additional data structures required</li>
+</ul>
 <h3 id="see-also"><a class="header" href="#see-also">See Also</a></h3>
 <ul>
 <li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - Understanding tier-based classification</li>
 <li><a href="./configuration.html">Configuration</a> - Scoring and aggregation configuration</li>
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
 <li><a href="./file-classification.html">File Classification</a> - Context-aware file size thresholds (Spec 135)</li>
+<li><a href="../ARCHITECTURE.html">ARCHITECTURE.md</a> - Technical details of exponential scaling implementation</li>
 </ul>
 
                     </main>
