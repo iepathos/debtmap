@@ -140,11 +140,7 @@ Fixed ${TOTAL_ISSUES} drift issues (${CRITICAL_COUNT} critical, ${HIGH_COUNT} hi
 Key updates:
 - <list 3-5 most important fixes>
 
-All examples verified against current implementation.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
+All examples verified against current implementation."
 ```
 
 ### Phase 7: Validation

@@ -7,29 +7,40 @@ Arguments: $ARGUMENTS
 ## Usage
 
 ```
-/prodigy-merge-worktree <branch-name>
+/prodigy-merge-worktree <source-branch> [target-branch]
 ```
 
+Arguments:
+- `source-branch`: Branch to merge FROM (required)
+- `target-branch`: Branch to merge TO (optional, defaults to current branch or main/master)
+
 Examples:
-- `/prodigy-merge-worktree prodigy-performance-1234567890`
-- `/prodigy-merge-worktree prodigy-security-1234567891`
+- `/prodigy-merge-worktree prodigy-performance-1234567890` (uses current branch)
+- `/prodigy-merge-worktree prodigy-performance-1234567890 feature/my-feature` (explicit target)
+- `/prodigy-merge-worktree prodigy-security-1234567891 main` (explicit main)
 
 ## Execute
 
-1. **Get Branch Name**
-   - The branch name is provided as: $ARGUMENTS
-   - If no branch name provided (empty $ARGUMENTS), fail with: "Error: Branch name is required. Usage: /prodigy-merge-worktree <branch-name>"
+1. **Parse Arguments**
+   - Split $ARGUMENTS on whitespace to extract source and optional target branch
+   - First argument: source_branch (required)
+   - Second argument: target_branch (optional)
+   - If no source branch provided, fail with: "Error: Branch name is required. Usage: /prodigy-merge-worktree <source-branch> [target-branch]"
 
 2. **Determine Target Branch**
-   - Get the current branch using `git rev-parse --abbrev-ref HEAD`
-   - If the current branch is a valid branch name (not HEAD), use it as the target
-   - Otherwise, fall back to the default branch:
-     - Check if 'main' branch exists using `git rev-parse --verify refs/heads/main`
-     - If main exists, use 'main', otherwise use 'master'
+   - If target_branch argument provided (second argument exists):
+     - Verify target branch exists using `git rev-parse --verify refs/heads/$target_branch`
+     - If exists, use it; otherwise fail with: "Error: Target branch '$target_branch' does not exist"
+   - Otherwise (for backward compatibility):
+     - Get the current branch using `git rev-parse --abbrev-ref HEAD`
+     - If the current branch is a valid branch name (not HEAD), use it as the target
+     - Otherwise, fall back to the default branch:
+       - Check if 'main' branch exists using `git rev-parse --verify refs/heads/main`
+       - If main exists, use 'main', otherwise use 'master'
    - Switch to the target branch if not already on it
 
 3. **Attempt Standard Merge**
-   - Execute `git merge --no-ff $ARGUMENTS` to preserve commit history
+   - Execute `git merge --no-ff <source-branch>` to preserve commit history (use first argument)
    - If successful (no conflicts), the merge commit is automatically created - verify with `git status` and exit
    - If conflicts occur, proceed to step 4
 
@@ -87,7 +98,7 @@ Examples:
 ## Merge Commit Format
 
 ```
-Merge worktree '$ARGUMENTS' into <target-branch>
+Merge worktree '<source-branch>' into <target-branch>
 
 Successfully merged with <N> conflicts resolved:
 

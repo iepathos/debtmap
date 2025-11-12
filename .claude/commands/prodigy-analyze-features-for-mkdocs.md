@@ -1,29 +1,30 @@
-# /prodigy-analyze-features-for-book
+# /prodigy-analyze-features-for-mkdocs
 
-Perform comprehensive analysis of a codebase to identify features and capabilities that should be documented in the book.
+Perform comprehensive analysis of a codebase to identify features and capabilities that should be documented in MkDocs Material documentation.
 
 ## Variables
 
-- `--project <name>` - Project name (e.g., "Prodigy", "Debtmap")
-- `--config <path>` - Path to book configuration JSON (e.g., ".prodigy/book-config.json")
+- `--project <name>` - Project name (e.g., "Prodigy")
+- `--config <path>` - Path to MkDocs configuration JSON (e.g., ".prodigy/mkdocs-config.json")
 
 ## Execute
 
 ### Phase 1: Understand Context
 
-You are analyzing a codebase to create a comprehensive feature inventory for the documentation book. This will be used to detect drift between the book documentation and actual implementation.
+You are analyzing a codebase to create a comprehensive feature inventory for MkDocs Material documentation. This will be used to detect drift between the docs and actual implementation.
 
 **Parse Parameters:**
 Extract the project name and configuration path from the command arguments:
 - `--project`: The project name (used in output messages and file paths)
-- `--config`: Path to the book configuration JSON file
+- `--config`: Path to the MkDocs configuration JSON file
 
 **Load Configuration:**
 Read the configuration file specified by `--config` to get:
 - `project_name`: Display name of the project
 - `analysis_targets`: Areas to analyze with source files and feature categories
-- `book_dir`, `book_src`: Book directory paths
-- `chapter_file`: Path to chapter definitions
+- `docs_dir`: Documentation directory path (typically "docs")
+- `mkdocs_config`: Path to mkdocs.yml
+- `chapters_file`: Path to MkDocs chapter/page definitions
 - `custom_analysis`: Options for examples, best practices, troubleshooting
 
 ### Phase 2: Analyze Core Features
@@ -47,7 +48,7 @@ The configuration defines which areas to analyze (e.g., workflow_basics, mapredu
 
 **Generic Feature Extraction:**
 
-Instead of hardcoding "Prodigy workflow" or "Prodigy features":
+Instead of hardcoding project-specific terms:
 - Use "codebase features" or "project capabilities"
 - Reference the project name from `--project` parameter in output
 - Extract features based on code structure, not assumptions
@@ -59,9 +60,9 @@ Instead of hardcoding "Prodigy workflow" or "Prodigy features":
 
 **Determine Output Path:**
 Based on the project configuration:
-- Extract `book_dir` from config (defaults to "book")
-- Create analysis directory adjacent to book: `.{project_lowercase}/book-analysis/`
-- Pattern: `.prodigy/book-analysis/features.json`
+- Extract `docs_dir` from config (defaults to "docs")
+- Create analysis directory: `.prodigy/mkdocs-analysis/`
+- Write to: `.prodigy/mkdocs-analysis/features.json`
 
 **Action Required:**
 Analyze the codebase to discover its features, then create a JSON file at the determined path with a hierarchical structure.
@@ -75,7 +76,7 @@ Analyze the codebase to discover its features, then create a JSON file at the de
 
 **Discovery Process:**
 
-1. Read the `analysis_targets` from book-config.json
+1. Read the `analysis_targets` from mkdocs-config.json
 2. For each analysis target:
    - Read the source files specified
    - Identify the main user-facing capabilities
@@ -84,8 +85,8 @@ Analyze the codebase to discover its features, then create a JSON file at the de
 
 3. Create feature hierarchy:
    - **Major features**: Core capabilities users interact with directly
-   - **Nested capabilities**: Sub-features that belong under a major feature (5+ items → consider subsections)
-   - **Meta-content**: Best practices, troubleshooting, examples (never create chapters)
+   - **Nested capabilities**: Sub-features that belong under a major feature
+   - **Meta-content**: Best practices, troubleshooting, examples (reference sections)
 
 **Example Structure** (adapt based on what you discover in the codebase):
 
@@ -121,7 +122,7 @@ Analyze the codebase to discover its features, then create a JSON file at the de
   },
   "meta_content": {
     "type": "meta",
-    "description": "Cross-cutting content embedded in feature chapters",
+    "description": "Cross-cutting content for reference section",
     "best_practices": {
       "category_1": ["practice1", "practice2"],
       "category_2": ["practice1", "practice2"]
@@ -174,7 +175,7 @@ Analyze the codebase to discover its features, then create a JSON file at the de
 - Include practical use cases for each feature
 - Note common pitfalls and solutions
 - Provide realistic examples
-- Keep language accessible for book audience
+- Keep language accessible for documentation audience
 - Use project name from `--project` parameter in output messages
 - Adapt analysis based on `custom_analysis` configuration
 
@@ -198,7 +199,7 @@ After creating the features.json file:
 1. Stage the features.json file for commit
 2. Create a commit with this descriptive message format:
    ```
-   chore: analyze {project_name} features for book documentation
+   chore: analyze {project_name} features for MkDocs documentation
 
    Generated comprehensive feature inventory covering:
    - [List the major feature areas you analyzed, e.g., "workflow_basics, mapreduce, command_types"]

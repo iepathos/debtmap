@@ -49,37 +49,59 @@ Create normalized versions of all documented topics:
 
 This helps match feature categories against documented topics accurately.
 
-### Phase 3: Identify Documentation Gaps
+### Phase 3: Identify Documentation Gaps Using Hierarchy
 
-**Compare Features Against Documentation:**
+**Compare Features Against Documentation Using Type and Structure:**
 
 For each feature area in features.json:
-1. Extract the feature category name (e.g., "mapreduce", "command_types", "environment")
-2. Check if ANY existing chapter covers this feature area
-3. Look for both exact matches and partial matches in:
-   - Chapter IDs
-   - Chapter titles
-   - Chapter topics list
-   - Section headings in markdown files
 
-**Classify Gaps by Severity:**
+**Step 1: Check Feature Type**
+1. Read the `type` field from the feature
+2. If `type: "meta"` → **SKIP** - Meta-content should not have chapters
+3. If `type: "major_feature"` → Continue to step 2
+4. If no type field → Assume major_feature for backward compatibility
 
-**High Severity (Missing Chapter):**
-- Feature area exists in features.json
-- No corresponding chapter found in documentation
-- Major user-facing capability with no guidance
-- Example: "agent_merge" feature exists but no chapter documents it
+**Step 2: Check for Existing Chapter**
+1. Extract the feature category name (the JSON key, e.g., "authentication", "data_processing", "api_endpoints")
+2. Normalize the name (lowercase, remove underscores/hyphens)
+3. Check if ANY existing chapter matches:
+   - Chapter ID matches (e.g., "authentication" chapter for authentication feature)
+   - Chapter title contains feature name (fuzzy match)
+   - Chapter topics include feature name
 
-**Medium Severity (Incomplete Chapter):**
-- Chapter exists for the feature area
-- But specific sub-capabilities are missing
-- Chapter topics list doesn't cover all feature categories
-- Example: "retry_configuration" chapter exists but doesn't document "jitter" or "retry_budget"
+**Step 3: Determine Gap Type**
+- If no chapter found → **High severity gap** (missing chapter)
+- If chapter found → Check for subsection gaps (step 4)
 
-**Low Severity (Minor Gap):**
-- Edge cases or advanced features not documented
-- Internal APIs exposed to users
-- Less common use cases
+**Step 4: Check for Subsection Gaps (Only for Multi-Subsection Chapters)**
+1. Count second-level items in the feature structure
+   - Example: If feature has nested objects like `phases` and `core_capabilities`, count total items across all nested groups
+2. If feature has 5+ second-level items AND chapter exists as `type: "multi-subsection"`:
+   - For each second-level item, check if corresponding subsection exists
+   - If subsection missing → **Medium severity gap** (missing subsection)
+3. If feature has < 5 second-level items → No subsection gaps (document in single-file)
+4. If chapter is `type: "single-file"` → No subsection gaps (preserve structure)
+
+**Use Hierarchy and Type to Classify Gaps:**
+
+**High Severity (Missing Major Feature Chapter):**
+- Feature has `type: "major_feature"` in features.json
+- No corresponding chapter found in chapters.json
+- Should create a new single-file chapter
+- Example: "authentication" is major_feature but no chapter exists
+
+**Medium Severity (Missing Subsection in Multi-Subsection Chapter):**
+- Parent feature is documented with multi-subsection chapter
+- Parent has 5+ second-level capabilities in features.json
+- Specific second-level capability is not documented as subsection
+- Should create new subsection
+- Example: "data_processing" chapter exists with subsections, but "batch_operations" subsection missing
+
+**Low Severity (Content Gap - Not a Structure Issue):**
+- Chapter exists but may have outdated content
+- Will be handled by drift detection in map phase
+- Don't create new chapters/subsections for this
+- Example: "api_endpoints" chapter exists but missing new "pagination" feature details
 
 **Generate Gap Report:**
 
@@ -88,17 +110,19 @@ Create a structured JSON report documenting all gaps found:
 {
   "analysis_date": "<current-timestamp>",
   "features_analyzed": <total-feature-areas>,
-  "documented_topics": <count-of-chapters>,
+  "documented_topics": <count-of-chapters-and-subsections>,
   "gaps_found": <count-of-gaps>,
   "gaps": [
     {
       "severity": "high|medium|low",
-      "type": "missing_chapter|incomplete_chapter",
+      "type": "missing_chapter|missing_subsection|incomplete_chapter|incomplete_subsection",
       "feature_category": "<feature-area-name>",
       "feature_description": "<brief-description>",
       "recommended_chapter_id": "<chapter-id>",
       "recommended_title": "<chapter-title>",
-      "recommended_location": "<file-path>"
+      "recommended_location": "<file-path>",
+      "parent_chapter_id": "<parent-id-if-subsection>",
+      "is_subsection": true|false
     }
   ],
   "actions_taken": []
@@ -151,42 +175,181 @@ Create a structured JSON report documenting all gaps found:
 }
 ```
 
-### Phase 5: Update Chapter Definitions File
+### Phase 4a: Determine Subsection Creation Using Hierarchy
+
+**For Each Medium Severity Gap (Missing Subsection in Existing Chapter):**
+
+Use the hierarchical features.json structure to determine if a subsection should be created.
+
+**STEP 1: Check Feature Type - Skip Meta Content**
+
+1. Read the feature from features.json
+2. Check if `type: "meta"` → **SKIP entirely, never create chapters/subsections**
+3. If `type: "major_feature"` → Continue evaluation
+
+**STEP 2: Evaluate Subsection Necessity Using Structure**
+
+Count second-level capabilities under the major feature:
+
+**For features with nested structure:**
+- Count total second-level items across all nested groups
+- Example: If feature has nested objects like `phases` (3 items) and `core_capabilities` (3 items) = 6 total second-level items
+
+**Subsection Creation Rules:**
+- **5+ second-level capabilities** → Consider multi-subsection structure
+- **3-4 second-level capabilities** → Keep as single-file chapter with H2 sections
+- **1-2 second-level capabilities** → Definitely single-file, document inline
+
+**STEP 3: Check Existing Chapter Structure**
+
+Before creating subsections:
+1. Check if chapter already exists in chapters.json
+2. If exists and is `type: "single-file"` → **Preserve it**, don't fragment
+3. If exists and is `type: "multi-subsection"` → OK to add subsections
+4. If doesn't exist → Create as single-file by default
+
+**STEP 4: Prevent Meta-Subsection Creation**
+
+**NEVER create these as separate subsections:**
+- "Best Practices"
+- "Troubleshooting"
+- "Common Patterns"
+- "Examples"
+
+These should be H2 sections within chapter files, not separate subsections.
+
+**Rationale:**
+- Meta-content applies across features, not isolated to one area
+- Creates navigation confusion (mixes "what" with "how")
+- Better as sections in parent chapter or root-level guides
+
+**STEP 5: Conservative Subsection Creation**
+
+Only create subsections when ALL conditions met:
+1. Parent feature has `type: "major_feature"`
+2. Parent has 5+ second-level capabilities
+3. Subsection represents a distinct capability (e.g., "checkpoint_resume", "dlq")
+4. Subsection is NOT meta-content
+5. Parent chapter is already `type: "multi-subsection"` OR doesn't exist yet
+
+**STEP 6: Generate Subsection Definition**
+
+Only if all conditions in STEP 5 are met:
+
+1. **Generate Subsection ID:**
+   - Convert feature category to kebab-case
+   - Example: "batch_operations" → "batch-operations"
+   - Example: "rate_limiting" → "rate-limiting"
+   - Ensure uniqueness within chapter's subsections
+
+2. **Generate Subsection Title:**
+   - Convert to title case with spaces
+   - Example: "batch_operations" → "Batch Operations"
+   - Example: "rate_limiting" → "Rate Limiting"
+
+3. **Determine Subsection File Path:**
+   - Use pattern: `${book_src}/${parent_chapter_id}/${subsection_id}.md`
+   - Example: `${book_src}/data-processing/batch-operations.md`
+   - Ensure parent directory exists
+
+4. **Extract Topics from Feature Description:**
+   - Look at the feature's description and capabilities in features.json
+   - Convert to topic names relevant to subsection
+   - Example: For "batch_operations" with features ["parallel_processing", "error_recovery"]
+   - Topics: ["Parallel processing", "Error recovery", "Status tracking"]
+
+5. **Define Feature Mapping:**
+   - List specific feature paths this subsection should document
+   - Use the JSON path from features.json
+   - Example: `["data_processing.core_capabilities.batch_operations"]`
+   - This enables focused drift detection in map phase
+
+6. **Define Validation Criteria:**
+   - Create validation string based on subsection focus
+   - Example: "Check that batch operations and error recovery are documented with examples"
+   - Reference the feature's capabilities
+
+7. **Create Subsection Definition Structure:**
+```json
+{
+  "id": "<subsection-id>",
+  "title": "<subsection-title>",
+  "file": "<subsection-file-path>",
+  "topics": ["<topic-1>", "<topic-2>", ...],
+  "validation": "<validation-criteria>",
+  "feature_mapping": ["<feature-path-1>", "<feature-path-2>", ...],
+  "auto_generated": true,
+  "source_feature": "<feature-category>"
+}
+```
+
+### Phase 5: Update Chapter Definitions File and Generate Flattened Output
 
 **Read Existing Chapters:**
-Load the current contents of the chapters JSON file (e.g., workflows/data/prodigy-chapters.json)
+Load the current contents of the chapters JSON file specified by `--chapters` parameter
+
+**For New Chapters:**
 
 **Check for Duplicates:**
-For each new chapter definition:
 - Verify the chapter ID doesn't already exist
 - Check that the file path isn't already in use
 - Normalize and compare titles to avoid near-duplicates
 
 **Append New Chapters:**
-Add new chapter definitions to the chapters array
-
-**Write Updated File:**
-Write the complete chapters JSON back to disk with proper formatting:
-- Use 2-space indentation
-- Maintain JSON structure
-- Preserve existing chapters
+- Add new chapter definitions to the chapters array
 
 **Record Action:**
-Add to actions_taken in gap report:
 ```json
 {
   "action": "created_chapter_definition",
   "chapter_id": "<chapter-id>",
-  "file_path": "workflows/data/prodigy-chapters.json"
+  "file_path": "<chapters-file-path from --chapters parameter>"
 }
 ```
 
+**For New Subsections:**
+
+**Find Target Chapter:**
+- Locate the parent chapter by ID in chapters array
+- Verify chapter type is "multi-subsection"
+- If chapter is "single-file", log warning and skip (requires migration first)
+
+**Check for Duplicate Subsections:**
+- Check if subsection ID already exists in chapter's subsections array
+- Verify file path is unique within chapter
+- Compare titles to avoid near-duplicates
+
+**Append Subsection to Chapter:**
+- Add subsection definition to chapter's subsections array
+- Maintain array order (alphabetical or logical)
+
+**Record Action:**
+```json
+{
+  "action": "created_subsection_definition",
+  "chapter_id": "<parent-chapter-id>",
+  "subsection_id": "<subsection-id>",
+  "file_path": "<chapters-file-path from --chapters parameter>"
+}
+```
+
+**Write Updated Chapter Definitions:**
+Write the complete chapters JSON back to disk with proper formatting (if any gaps were found):
+- Use 2-space indentation
+- Maintain JSON structure
+- Preserve existing chapters and subsections
+- Keep subsection order within chapters
+
+**Note**: The flattened-items.json generation has moved to Phase 8 to ensure it always executes.
+
 ### Phase 6: Create Stub Markdown Files
 
-**For Each New Chapter:**
+**For Each New Chapter and Subsection:**
+
+**For New Chapters:**
 
 1. **Determine Stub Content:**
-   Generate markdown following this template structure:
+   Generate markdown following this minimal template structure:
 
 ```markdown
 # {Chapter Title}
@@ -205,36 +368,16 @@ Add to actions_taken in gap report:
 # Example configuration
 ```
 
-## Use Cases
+## Usage
 
-### {Use Case 1 Name}
-
-{Description and example}
-
-## Examples
-
-### Basic Example
-
-```yaml
-# Example workflow
-```
-
-## Best Practices
-
-- {Best practice 1}
-- {Best practice 2}
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: {Common problem}
-**Solution**: {How to fix}
+{Basic usage examples}
 
 ## See Also
 
 - [Related documentation](link)
 ```
+
+**Note**: Do NOT include Prerequisites, Installation, Best Practices, or Troubleshooting sections in chapter stubs. These belong in dedicated files or the chapter index.md only
 
 2. **Customize Content for Feature:**
    - Use chapter title from definition
@@ -256,7 +399,68 @@ Add to actions_taken in gap report:
 ```json
 {
   "action": "created_stub_file",
-  "file_path": "<file-path>"
+  "file_path": "<file-path>",
+  "type": "chapter"
+}
+```
+
+**For New Subsections:**
+
+1. **Determine Stub Content:**
+   Generate markdown following this minimal subsection template:
+
+```markdown
+# {Subsection Title}
+
+{Brief introduction explaining this specific aspect of the parent chapter}
+
+## Overview
+
+{Focused description of what this subsection covers within the chapter context}
+
+## Configuration
+
+{If applicable, specific configuration options for this feature}
+
+```yaml
+# Example configuration
+```
+
+## Usage
+
+{Simple examples demonstrating the core functionality}
+
+## Related Subsections
+
+- [Related Subsection](../related-subsection.md)
+```
+
+**Note**: Do NOT include Prerequisites, Installation, Best Practices, or Troubleshooting sections in subsection stubs. These belong in the parent chapter index.md or dedicated files
+
+2. **Customize Content for Subsection:**
+   - Use subsection title from definition
+   - Reference feature_mapping features from features.json
+   - Include subsection-specific topics
+   - Add cross-references to related subsections
+   - Keep content focused on subsection scope
+
+3. **Create Subsection File:**
+   - Write stub markdown to subsection file path
+   - Ensure parent chapter directory exists (e.g., book/src/{parent-chapter-id}/)
+   - Use proper markdown formatting
+
+4. **Validate Markdown:**
+   - Ensure valid markdown syntax
+   - Check won't break mdbook build
+   - Verify cross-references use correct relative paths
+
+5. **Record Action:**
+```json
+{
+  "action": "created_stub_file",
+  "file_path": "<subsection-file-path>",
+  "type": "subsection",
+  "parent_chapter_id": "<parent-chapter-id>"
 }
 ```
 
@@ -272,23 +476,41 @@ Identify sections:
 - Advanced Topics (complex features)
 - Reference (examples, troubleshooting)
 
-**Classify New Chapters:**
-For each new chapter, determine appropriate section:
-- Basic workflow features → User Guide
-- Advanced features (retry, error handling, composition) → Advanced Topics
-- Examples and troubleshooting → Reference
+**For New Chapters:**
 
-**Determine Insertion Point:**
-Within the appropriate section:
-- Maintain alphabetical order by title
-- Or maintain logical order based on dependencies
-- Insert after similar topics
+1. **Classify New Chapters:**
+   - Basic workflow features → User Guide
+   - Advanced features (retry, error handling, composition) → Advanced Topics
+   - Examples and troubleshooting → Reference
 
-**Insert Chapter Entries:**
-Add entries in markdown list format:
-```markdown
-- [Chapter Title](chapter-file.md)
-```
+2. **Determine Insertion Point:**
+   - Maintain alphabetical order by title
+   - Or maintain logical order based on dependencies
+   - Insert after similar topics
+
+3. **Insert Chapter Entries:**
+   Add entries in markdown list format:
+   ```markdown
+   - [Chapter Title](chapter-file.md)
+   ```
+
+**For New Subsections:**
+
+1. **Locate Parent Chapter:**
+   - Find the parent chapter entry in SUMMARY.md
+   - Check if chapter already has nested subsections
+
+2. **Add Subsection as Nested List Item:**
+   ```markdown
+   - [Parent Chapter](parent/index.md)
+     - [Subsection 1](parent/subsection-1.md)
+     - [New Subsection](parent/new-subsection.md)
+   ```
+
+3. **Maintain Subsection Order:**
+   - Keep alphabetical or logical ordering within chapter
+   - Ensure indentation is correct (2-4 spaces)
+   - Follow existing subsection format in SUMMARY.md
 
 **Write Updated SUMMARY.md:**
 Write the modified SUMMARY.md back to disk
@@ -297,19 +519,129 @@ Write the modified SUMMARY.md back to disk
 ```json
 {
   "action": "updated_summary",
-  "file_path": "book/src/SUMMARY.md"
+  "file_path": "book/src/SUMMARY.md",
+  "items_added": [
+    {"type": "chapter", "id": "..."},
+    {"type": "subsection", "parent": "...", "id": "..."}
+  ]
 }
 ```
 
-### Phase 8: Save Gap Report and Commit Changes
+### Phase 7.5: Validate and Sync Chapter Structure with Reality (MANDATORY)
 
-**Write Gap Report:**
+**CRITICAL: Ensure chapters.json accurately reflects the actual file structure.**
+
+Before generating flattened-items.json, validate that all chapter definitions match reality.
+
+**Step 1: Scan for Multi-Subsection Directories**
+
+1. Find all directories under `${BOOK_DIR}/src/` that contain an `index.md` file
+2. For each directory found:
+   - Count how many `.md` files exist (excluding `index.md`)
+   - If count > 0, this is a multi-subsection chapter
+   - Record the chapter ID (directory name) in a list of discovered multi-subsection chapters
+
+**Step 2: Compare Against chapters.json Definitions**
+
+For each discovered multi-subsection chapter:
+1. Look up how it's defined in `$CHAPTERS_FILE`
+2. Check if `type` field is "multi-subsection" or "single-file"
+3. **If type is "single-file" or missing**: This is a MISMATCH - add to mismatches list
+4. **If type is "multi-subsection"**: Count subsections in chapters.json and compare to actual file count
+   - If counts don't match, add to mismatches list
+
+**Step 3: Check for Orphaned Single-File Definitions**
+
+For each chapter in chapters.json that has `type: "single-file"`:
+1. Check if the expected file (e.g., `book/src/chapter-id.md`) exists
+2. Check if a directory with that name exists (e.g., `book/src/chapter-id/`)
+3. **If file doesn't exist but directory does**: Add to mismatches list
+
+**Step 4: Auto-Migrate Mismatched Chapters**
+
+For each chapter in the mismatches list:
+1. Scan the chapter directory to discover all subsection files
+2. For each subsection `.md` file (excluding `index.md`):
+   - Extract subsection ID from filename (remove `.md` extension)
+   - Read the file and extract title from first H1 or H2 heading
+   - If no heading found, convert filename to Title Case
+   - Extract topics from section headings (H2/H3) in the file
+   - Create subsection definition object with: id, title, file path, topics, validation
+3. Build complete subsections array from all discovered subsections
+4. Update the chapter in chapters.json:
+   - Change `type` to "multi-subsection"
+   - Change `file` to `index_file` pointing to `book/src/{chapter-id}/index.md`
+   - Add `subsections` array with all discovered subsections
+   - Preserve existing `topics` and `validation` fields
+5. Write updated chapters.json to disk
+6. Record this migration in MIGRATION_ACTIONS list
+
+**Step 5: Add Structure Validation to Gap Report**
+
+Add a `structure_validation` section to the gap report JSON:
+- `mismatches_found`: Count of chapters that needed migration
+- `mismatched_chapters`: Array of chapter IDs that were migrated
+- `migrations_performed`: Array of migration actions taken
+- `validation_timestamp`: Current timestamp
+
+**Step 6: Commit Structure Fixes (if any)**
+
+If any structure mismatches were found and fixed:
+1. Stage the updated chapters.json file
+2. Create a commit with message:
+   - Title: "docs: sync chapters.json with actual file structure"
+   - Body: List of migrated chapters and explanation
+3. This commit must happen BEFORE generating flattened-items.json
+
+### Phase 8: Save Gap Report, Generate Flattened Items, and Commit Changes
+
+**STEP 1: Generate Flattened Items for Map Phase (MANDATORY)**
+
+This step MUST execute regardless of whether gaps were found:
+
+1. Read the chapters file from `--chapters` parameter
+2. Process each chapter to create flattened array:
+   - For `type == "multi-subsection"`: Extract each subsection with parent metadata
+   - For `type == "single-file"`: Include chapter with type marker
+3. Determine output path from config:
+   - Extract `book_dir` from `--config` parameter
+   - Create analysis directory: `.{project_lowercase}/book-analysis/`
+   - Write to `${analysis_dir}/flattened-items.json`
+
+Example structure:
+```json
+[
+  {
+    "id": "authentication",
+    "title": "Authentication",
+    "file": "book/src/authentication.md",
+    "topics": [...],
+    "validation": "...",
+    "type": "single-file"
+  },
+  {
+    "id": "batch-operations",
+    "title": "Batch Operations",
+    "file": "book/src/data-processing/batch-operations.md",
+    "parent_chapter_id": "data-processing",
+    "parent_chapter_title": "Data Processing",
+    "type": "subsection",
+    "topics": [...],
+    "feature_mapping": [...]
+  }
+]
+```
+
+**STEP 2: Write Gap Report**
+
 Save the gap report to disk for auditing:
-- Path: `.prodigy/book-analysis/gap-report.json` (or equivalent for project)
+- Use same analysis directory as flattened-items.json
+- Path: `${analysis_dir}/gap-report.json`
 - Include all gaps found and actions taken
 - Use proper JSON formatting
 
-**Display Summary to User:**
+**STEP 3: Display Summary to User**
+
 Print a formatted summary:
 ```
 📊 Documentation Gap Analysis
@@ -326,26 +658,42 @@ Gaps Found: {count}
   • {chapter_id} - Missing: {missing_topics}
 
 ✅ Actions Taken:
-  ✓ Created {count} chapter definitions
-  ✓ Created {count} stub files
-  ✓ Updated SUMMARY.md
+  ✓ Generated flattened-items.json for map phase
+  ✓ Created {count} chapter definitions (if gaps found)
+  ✓ Created {count} stub files (if gaps found)
+  ✓ Updated SUMMARY.md (if gaps found)
 
 📝 Next Steps:
-  The map phase will now process these new chapters to populate content.
+  The map phase will now process these chapters to detect drift.
 ```
 
 **Stage and Commit Changes:**
+
+**CRITICAL**: The flattened-items.json file MUST be committed, as the map phase depends on it.
+
 If running in automation mode (PRODIGY_AUTOMATION=true):
+
+**If gaps were found:**
 1. Stage all modified files:
-   - Updated prodigy-chapters.json
+   - Updated chapters.json file (from --chapters parameter)
    - New stub markdown files
    - Updated SUMMARY.md
    - Gap report
+   - **flattened-items.json (REQUIRED)**
 
 2. Create commit with message:
    - Format: "docs: auto-discover missing chapters for [feature names]"
-   - Example: "docs: auto-discover missing chapters for agent-merge-workflows, circuit-breaker"
+   - Example: "docs: auto-discover missing chapters for authentication, rate-limiting"
    - Include brief summary of actions taken
+
+**If NO gaps were found (still need to commit flattened-items.json):**
+1. Stage generated files:
+   - flattened-items.json (REQUIRED for map phase)
+   - Gap report (shows 0 gaps found)
+
+2. Create commit with message:
+   - Format: "docs: regenerate flattened-items.json for drift detection (no gaps found)"
+   - Include count of chapters/subsections to be processed
 
 ### Phase 9: Validation and Quality Checks
 
@@ -388,8 +736,11 @@ Gap detection should be idempotent:
 **Validation:**
 If gap detection runs and finds no gaps:
 - Print message: "✅ No documentation gaps found - all features are documented"
-- Do not modify any files
+- Do not modify chapter definitions file
+- **IMPORTANT**: Still generate flattened-items.json from existing chapters for map phase
 - Exit successfully
+
+**CRITICAL**: The flattened-items.json file must ALWAYS be generated, even when no gaps are found. This file is required by the map phase to process all chapters for drift detection. Generate it from the existing chapters.json file in Phase 5, regardless of whether gaps were detected.
 
 ### Error Handling
 
@@ -482,6 +833,7 @@ Gap detection is successful when:
 - Book builds without errors
 - No duplicate chapters created
 - Changes are committed cleanly
+- **`.prodigy/book-analysis/flattened-items.json` file is created** (REQUIRED)
 
 ### Output Format
 
@@ -495,22 +847,22 @@ The command should output progress and results clearly:
    ✓ Parsed SUMMARY.md structure
 
 📊 Comparing features against documentation...
-   ✓ Analyzed workflow_basics: documented ✓
-   ✓ Analyzed mapreduce: documented ✓
-   ⚠ Analyzed agent_merge: not documented (gap detected)
-   ✓ Analyzed command_types: documented ✓
-   ⚠ Analyzed circuit_breaker: not documented (gap detected)
+   ✓ Analyzed authentication: documented ✓
+   ✓ Analyzed data_processing: documented ✓
+   ⚠ Analyzed rate_limiting: not documented (gap detected)
+   ✓ Analyzed api_endpoints: documented ✓
+   ⚠ Analyzed caching: not documented (gap detected)
 
 📝 Creating missing chapters...
-   ✓ Generated definition: agent-merge-workflows
-   ✓ Created stub: book/src/agent-merge-workflows.md
-   ✓ Generated definition: circuit-breaker
-   ✓ Created stub: book/src/circuit-breaker.md
+   ✓ Generated definition: rate-limiting
+   ✓ Created stub: book/src/rate-limiting.md
+   ✓ Generated definition: caching
+   ✓ Created stub: book/src/caching.md
    ✓ Updated SUMMARY.md
 
 💾 Committing changes...
    ✓ Staged 4 files
-   ✓ Committed: docs: auto-discover missing chapters for agent-merge-workflows, circuit-breaker
+   ✓ Committed: docs: auto-discover missing chapters for rate-limiting, caching
 ```
 
 **Final Summary:**
@@ -523,11 +875,11 @@ Documented Topics: 10
 Gaps Found: 2
 
 🔴 High Severity Gaps (Missing Chapters): 2
-  • agent_merge - Custom merge workflows for map agents
-  • circuit_breaker - Workflow error circuit breaking
+  • rate_limiting - Request rate limiting and throttling
+  • caching - Response caching strategies
 
 ✅ Actions Taken:
-  ✓ Created 2 chapter definitions in workflows/data/prodigy-chapters.json
+  ✓ Created 2 chapter definitions in chapters file
   ✓ Created 2 stub files in book/src/
   ✓ Updated book/src/SUMMARY.md
   ✓ Committed changes
@@ -536,3 +888,16 @@ Gaps Found: 2
   The map phase will now process these new chapters to populate content.
   Review the generated stubs and customize as needed.
 ```
+
+## FINAL CHECKLIST
+
+Before completing this command, verify:
+
+1. ✅ Gap report saved to `${analysis_dir}/gap-report.json`
+2. ✅ **`${analysis_dir}/flattened-items.json` created (MANDATORY - even if no gaps found)**
+3. ✅ Chapter definitions updated in chapters file (if gaps found)
+4. ✅ Stub files created in book/src/ (if gaps found)
+5. ✅ SUMMARY.md updated (if gaps found)
+6. ✅ Changes committed (if any files modified)
+
+**CRITICAL**: Step 2 (flattened-items.json) is REQUIRED for the workflow to proceed to the map phase. This file must contain all chapters and subsections in a flat array format, ready for parallel processing.
