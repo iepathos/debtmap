@@ -28,23 +28,33 @@ setup:
   # Note: May not commit if features haven't changed since last analysis
   - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
 
-  # Step 2: Detect documentation gaps and create missing chapters
+  # Step 2: Detect documentation gaps and create missing chapters/subsections
+  # Also generates flattened-items.json for map phase (single-file chapters + subsections with parent metadata)
   # Note: May not commit if no gaps found, which is a successful outcome
   - claude: "/prodigy-detect-documentation-gaps --project $PROJECT_NAME --config $PROJECT_CONFIG --features $FEATURES_PATH --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
 
-# Map phase: Analyze and fix each book chapter for drift
+# Map phase: Analyze and fix each book chapter/subsection for drift
 map:
-  input: "${CHAPTERS_FILE}"
-  json_path: "$.chapters[*]"
+  input: "${ANALYSIS_DIR}/flattened-items.json"
+  json_path: "$[*]"
 
   agent_template:
-    # Step 1: Analyze the chapter for drift
-    - claude: "/prodigy-analyze-book-chapter-drift --project $PROJECT_NAME --json '${item}' --features $FEATURES_PATH"
+    # Step 1: Analyze the chapter/subsection for drift (subsection-aware command)
+    - claude: "/prodigy-analyze-subsection-drift --project $PROJECT_NAME --json '${item}' --features $FEATURES_PATH"
       commit_required: true
 
-    # Step 2: Fix the drift in this chapter
-    - claude: "/prodigy-fix-chapter-drift --project $PROJECT_NAME --chapter-id ${item.id}"
+    # Step 2: Fix the drift in this chapter/subsection (subsection-aware command)
+    - claude: "/prodigy-fix-subsection-drift --project $PROJECT_NAME --json '${item}'"
       commit_required: true
+      validate:
+        claude: "/prodigy-validate-doc-fix --project $PROJECT_NAME --json '${item}' --output .prodigy/validation-result.json"
+        result_file: ".prodigy/validation-result.json"
+        threshold: 100  # Documentation must meet 100% quality standards
+        on_incomplete:
+          claude: "/prodigy-complete-doc-fix --project $PROJECT_NAME --json '${item}' --gaps ${validation.gaps}"
+          max_attempts: 3
+          fail_workflow: false  # Continue even if we can't reach 100%
+          commit_required: true  # Require commit to verify improvements were made
 
   max_parallel: ${MAX_PARALLEL}
 
@@ -57,8 +67,16 @@ reduce:
       claude: "/prodigy-fix-book-build-errors --project $PROJECT_NAME"
       commit_required: true
 
-  # Clean up temporary analysis files
-  - shell: "rm -rf ${ANALYSIS_DIR}"
+  # Holistic validation - detect cross-cutting issues map phase can't see
+  - claude: "/prodigy-validate-book-holistically --project $PROJECT_NAME --book-dir $BOOK_DIR --output $ANALYSIS_DIR/validation.json --auto-fix true"
+    commit_required: true
+
+  # If you need to organize a large chapter into subsections:
+  # - Use /prodigy-migrate-chapter-to-subsections manually
+  # - Or let /prodigy-detect-documentation-gaps create properly validated subsections
+
+  # Clean up temporary analysis files (keep validation report for review)
+  - shell: "rm -rf ${ANALYSIS_DIR}/features.json ${ANALYSIS_DIR}/flattened-items.json ${ANALYSIS_DIR}/drift-*.json"
   - shell: "git add -A && git commit -m 'chore: remove temporary book analysis files for ${PROJECT_NAME}' || true"
  
 
@@ -68,13 +86,3 @@ error_policy:
   continue_on_failure: true
   max_failures: 2
   error_collection: aggregate
-
-# Custom merge workflow - cleanup and validation before merging
-merge:
-  commands:
-    # Step 3: Fetch latest changes and merge master into worktree
-    - shell: "git fetch origin"
-    - claude: "/prodigy-merge-master --project ${PROJECT_NAME}"
-
-    # Step 4: Merge worktree back to master
-    - claude: "/prodigy-merge-worktree ${merge.source_branch}"
