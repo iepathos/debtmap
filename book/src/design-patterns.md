@@ -691,7 +691,7 @@ visitor_complexity = log2(match_arms) * average_arm_complexity
 This prevents exhaustive pattern matching from being flagged as overly complex. See [Visitor Pattern (Internal Use Only)](#visitor-pattern-internal-use-only) for more details.
 
 **See Also**:
-- [Boilerplate vs Complexity](./boilerplate-vs-complexity.md) - How complexity is calculated
+- [Complexity Analysis](./complexity-metrics.md) - How complexity is calculated
 - [Scoring Strategies](./scoring-strategies.md) - Complexity adjustments and multipliers
 
 ## Practical Examples
@@ -815,9 +815,9 @@ debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 1. Confidence below threshold
    - Solution: Lower `--pattern-threshold` or use `--show-pattern-warnings`
 2. Pattern disabled
-   - Solution: Check `--patterns` flag (only enabled patterns will be detected)
+   - Solution: Check `--patterns` flag and `.debtmap.toml` config
 3. Implementation doesn't match detection criteria
-   - Solution: Review pattern-specific criteria above
+   - Solution: Review pattern-specific criteria above or add custom rule
 
 ### Builder or Visitor Pattern Not Available via CLI
 
@@ -839,7 +839,7 @@ debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 1. Naming collision (e.g., `create_` function that isn't a factory)
    - Solution: Increase `--pattern-threshold` to require stronger evidence
 2. Coincidental structural match
-   - Solution: Increase `--pattern-threshold` to reduce false positives
+   - Solution: Add exclusion rules in configuration (if supported)
 
 ### Incomplete Cross-File Detection
 
@@ -855,8 +855,8 @@ debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
 
 1. **Start with defaults**: The default 0.7 threshold works well for most projects
 2. **Use `--show-pattern-warnings`** during initial analysis to see borderline detections
-3. **Enable relevant patterns**: Use `--patterns` to focus on patterns most relevant to your codebase
-4. **Adjust thresholds**: Increase `--pattern-threshold` to reduce false positives, or lower it to detect incomplete implementations
+3. **Configure per-pattern**: Adjust detection criteria for patterns most relevant to your project
+4. **Define custom rules**: Add project-specific patterns to reduce false positives
 5. **Combine with complexity analysis**: Use pattern detection to understand complexity adjustments
 6. **Review low-confidence detections**: They may indicate incomplete implementations worth refactoring
 
@@ -866,8 +866,9 @@ Debtmap's design pattern detection provides:
 - **7 user-facing patterns** covering common OOP and functional patterns (Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection)
 - **2 internal patterns** (Builder, Visitor) used for god object detection and complexity normalization
 - **Configurable confidence thresholds** for precision vs. recall tradeoff
+- **Custom pattern rules** for project-specific patterns
 - **Cross-file detection** for patterns spanning multiple modules
 - **Rust trait support** for idiomatic Rust pattern detection
-- **Separate from complexity adjustments** - patterns are detected for documentation, not scoring
+- **Complexity integration** to reduce false positives in analysis
 
 Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments. Internal pattern detection helps prevent false positives in god object and complexity analyses without exposing implementation details to users.

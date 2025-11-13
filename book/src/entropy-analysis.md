@@ -87,16 +87,6 @@ Debtmap can classify tokens by importance to give more weight to semantically si
 
 **When disabled** (`use_classification = false`), all tokens are treated equally, which may be useful for debugging or when you want unweighted entropy scores.
 
-**How token classification affects Shannon entropy** (`entropy.rs:134-142`, `entropy_core.rs:166-198`):
-
-When `use_classification` is enabled, the Shannon entropy calculation uses weighted token frequencies instead of equal weights. The algorithm:
-1. Extracts tokens and classifies them by importance (control flow × 1.0, operators × 0.7, identifiers × 0.3)
-2. Calculates weighted frequency: `frequency_map[category] += token.weight()`
-3. Computes probability: `probability = weighted_frequency / total_weight`
-4. Applies Shannon formula: `entropy = -Σ probability × log₂(probability)`
-
-This gives more importance to structural complexity (control flow patterns) over identifier variety. For example, a function with many different variable names but simple control flow will have lower entropy than a function with complex branching logic, which better reflects cognitive complexity.
-
 ### Pattern Repetition Detection
 
 Detects repetitive structures in the AST:
@@ -327,10 +317,6 @@ min_tokens = 20
 # Pattern similarity threshold for repetition detection (0.0-1.0, default: 0.7)
 pattern_threshold = 0.7
 
-# Entropy threshold for low entropy detection (0.0-1.0, default: 0.4)
-# Used for detecting low entropy patterns in code
-entropy_threshold = 0.4
-
 # Enable advanced token classification (default: false for backward compatibility)
 # When true, weights tokens by semantic importance (control flow > operators > identifiers)
 use_classification = false
@@ -349,12 +335,11 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 **Important Notes:**
 
 1. **Dampening thresholds** - Some are configurable, some are hardcoded (`src/complexity/entropy.rs:185-195`):
-   - **Entropy dampening threshold: 0.4** - Hardcoded in the graduated_dampening call (`entropy.rs:192`). This threshold controls when entropy-based dampening is applied during the dampening factor calculation.
-   - **Configurable `entropy_threshold` field: 0.4** - Separate config field (`config/languages.rs:82-84`) used for low entropy detection during analysis. This serves a different purpose than the hardcoded dampening threshold.
+   - **Entropy factor threshold: 0.4** - Hardcoded internally (not configurable)
    - **Branch threshold: 0.8** - Configurable via `branch_threshold` in config file
    - **Pattern threshold: 0.7/1.0** - Configurable via `pattern_threshold` in config file
 
-2. **The `weight` parameter** controls how entropy-adjusted complexity contributes to the final priority score calculation in the scoring pipeline (`priority/scoring/computation.rs`). A weight of 1.0 means full contribution, 0.5 means half contribution. This parameter does not affect the dampening factor calculation itself—it only influences how the entropy-adjusted complexity is weighted when computing the final priority score.
+2. **The `weight` parameter** affects how entropy scores contribute to overall complexity scoring, but does not change the dampening thresholds or reductions.
 
 3. **Token classification** defaults to `false` (disabled) for backward compatibility, even though it provides more accurate entropy analysis when enabled.
 

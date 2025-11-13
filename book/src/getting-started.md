@@ -469,8 +469,8 @@ debtmap analyze . --format markdown --output report.md
 
 Now that you've run your first analysis, explore these topics:
 
-- **[Analysis Guide](analysis-guide.md)** - Deep dive into complexity metrics, debt patterns, and risk scoring
-- **[Output Formats](output-formats.md)** - Detailed guide to JSON schema and integration options
+- **[Analysis Guide](./analysis-guide.md)** - Deep dive into complexity metrics, debt patterns, and risk scoring
+- **[Output Formats](./output-formats.md)** - Detailed guide to JSON schema and integration options
 - **Configuration** - Customize thresholds and filters with `.debtmap.toml`
 - **CI/CD Integration** - Use the `validate` command to enforce quality gates
 

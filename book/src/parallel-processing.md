@@ -253,16 +253,13 @@ The third phase analyzes trait dispatch, function pointers, and framework patter
 
 ### Parallel Architecture
 
-At a high level, debtmap processes files in parallel using Rayon's parallel iterators:
+Debtmap processes files in parallel using Rayon's parallel iterators:
 
 ```rust
-// Conceptual example - actual implementation uses the three-phase approach
 files.par_iter()
     .map(|file| analyze_file(file))
     .collect()
 ```
-
-**Note**: This is a simplified conceptual example. The actual implementation uses the three-phase pipeline described above (Phases 1-3) with chunking optimization and concurrent merging. See the [Parallel File Processing](#parallel-file-processing) section for the real implementation details.
 
 Each file is:
 1. Parsed independently
@@ -492,27 +489,7 @@ INFO - Parallel call graph complete: 8942 nodes, 23451 edges, 1247 files process
 
 ## Cross-File Call Resolution
 
-After the three-phase parallel pipeline completes (parse → extract → analyze), debtmap resolves cross-file function calls using a two-phase parallel approach. This post-processing step (called at `src/builders/parallel_call_graph.rs:82`) achieves an additional 10-15% speedup on multi-core systems.
-
-### Integration with Pipeline
-
-Cross-file resolution happens as part of the standard analysis pipeline:
-
-```
-Phase 1: Parallel File Parsing
-    ↓
-Phase 2: Parallel Multi-File Extraction
-    ↓
-Phase 3: Parallel Enhanced Analysis
-    ↓
-Convert ParallelCallGraph → CallGraph
-    ↓
-[Post-Processing] Parallel Cross-File Resolution ← You are here
-    ├─ Phase 1: Parallel resolution → collect resolutions
-    └─ Phase 2: Sequential updates → apply to graph
-    ↓
-Call Graph Complete
-```
+Debtmap uses a two-phase parallel resolution approach for resolving cross-file function calls, achieving 10-15% faster call graph construction on multi-core systems.
 
 ### Two-Phase Architecture
 
@@ -599,6 +576,24 @@ The sequential update phase requires no synchronization since it runs single-thr
 Total Memory = Base Graph + Resolutions Vector
              ≈ 5-10MB + 0.2-0.4MB
              ≈ 5-10MB (negligible overhead)
+```
+
+### Integration with Call Graph Construction
+
+The two-phase resolution integrates seamlessly into the existing call graph construction pipeline:
+
+```
+File Parsing (Parallel)
+    ↓
+Function Extraction (Parallel)
+    ↓
+Build Initial Call Graph
+    ↓
+[NEW] Parallel Cross-File Resolution
+    ├─ Phase 1: Parallel resolution → collect resolutions
+    └─ Phase 2: Sequential updates → apply to graph
+    ↓
+Call Graph Complete
 ```
 
 ### Configuration

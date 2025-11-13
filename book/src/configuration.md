@@ -77,115 +77,6 @@ complexity = 0.55
 dependency = 0.15
 ```
 
-### Scoring Presets (Rebalanced Scoring)
-
-The **`[scoring_rebalanced]`** section provides preset scoring configurations optimized for different project types and priorities. This is an alternative to manually configuring individual scoring weights.
-
-**Configuration:**
-
-```toml
-[scoring_rebalanced]
-preset = "balanced"              # Use a preset: balanced, quality-focused, size-focused, test-coverage
-
-# Optional: Override specific weights within the preset
-complexity_weight = 1.2          # Increase complexity emphasis
-coverage_weight = 0.9            # Slightly reduce coverage emphasis
-```
-
-**Available Presets:**
-
-| Preset | Complexity | Coverage | Structural | Size | Smell | Use Case |
-|--------|-----------|----------|------------|------|-------|----------|
-| **balanced** | 1.0 | 1.0 | 0.8 | 0.3 | 0.6 | General-purpose projects (default) |
-| **quality-focused** | 1.2 | 1.1 | 0.9 | 0.2 | 0.7 | High-quality codebases, libraries |
-| **size-focused** | 0.5 | 0.4 | 0.6 | 1.5 | 0.3 | Large legacy codebases |
-| **test-coverage** | 0.8 | 1.3 | 0.6 | 0.2 | 0.5 | Projects improving test coverage |
-
-**Weight Descriptions:**
-
-- **complexity_weight**: Emphasis on cyclomatic/cognitive complexity
-- **coverage_weight**: Emphasis on test coverage gaps
-- **structural_weight**: Emphasis on architectural issues (dependencies, coupling)
-- **size_weight**: Emphasis on code size (lines, file length)
-- **smell_weight**: Emphasis on code smells and anti-patterns
-
-**Preset Details:**
-
-**1. Balanced (Default)**
-```toml
-[scoring_rebalanced]
-preset = "balanced"
-# complexity=1.0, coverage=1.0, structural=0.8, size=0.3, smell=0.6
-```
-- Standard distribution for most projects
-- Equal weight on complexity and coverage
-- Moderate emphasis on structure and smells
-- Low emphasis on size (size alone rarely indicates debt)
-
-**Use when:** Starting a new project, general-purpose analysis, no specific priorities
-
-**2. Quality-Focused**
-```toml
-[scoring_rebalanced]
-preset = "quality-focused"
-# complexity=1.2, coverage=1.1, structural=0.9, size=0.2, smell=0.7
-```
-- Higher emphasis on complexity and coverage
-- Strong structural analysis
-- High smell detection
-- Minimal size consideration
-
-**Use when:** Building libraries, high-quality standards, public APIs, strict code review
-
-**3. Size-Focused**
-```toml
-[scoring_rebalanced]
-preset = "size-focused"
-# complexity=0.5, coverage=0.4, structural=0.6, size=1.5, smell=0.3
-```
-- Prioritizes large files and functions
-- Reduced complexity/coverage emphasis
-- Useful for identifying architectural problems in large codebases
-- Lower smell sensitivity
-
-**Use when:** Legacy codebases with large files, refactoring for modularity, initial cleanup
-
-**4. Test Coverage**
-```toml
-[scoring_rebalanced]
-preset = "test-coverage"
-# complexity=0.8, coverage=1.3, structural=0.6, size=0.2, smell=0.5
-```
-- Heavy emphasis on coverage gaps
-- Moderate complexity consideration
-- Moderate structural analysis
-- Low size/smell emphasis
-
-**Use when:** Improving test coverage, preparing for production, increasing quality metrics
-
-**Customizing Presets:**
-
-You can override individual weights within a preset:
-
-```toml
-[scoring_rebalanced]
-preset = "balanced"              # Start with balanced preset
-complexity_weight = 1.5          # But emphasize complexity more
-coverage_weight = 0.8            # And reduce coverage slightly
-```
-
-This allows fine-tuning without configuring all weights from scratch.
-
-**Relationship with Base Scoring Configuration:**
-
-`scoring_rebalanced` is an alternative to the basic `[scoring]` section:
-- **Use `[scoring]`**: For simple weighted sum model (coverage, complexity, dependency)
-- **Use `[scoring_rebalanced]`**: For multi-dimensional scoring with presets
-
-Do not use both in the same configuration file.
-
-**Source:** Configuration type defined in `src/config/scoring.rs:383-407`, presets implemented in `src/priority/scoring/rebalanced.rs:59-128`
-
 ### Role Multipliers
 
 Role multipliers adjust complexity scores based on a function's semantic role:
@@ -396,114 +287,6 @@ debtmap analyze . --verbose
 
 For more details on how role-based adjustments reduce false positives, see the [Role-Based Adjustments](./scoring-strategies.md#role-based-adjustments) section in the Scoring Strategies guide.
 
-### Coverage Expectations
-
-The **`[coverage_expectations]`** section defines target coverage levels for different function categories. This configuration works alongside `role_coverage_weights` but serves a different purpose:
-
-- **`role_coverage_weights`**: Adjusts penalty weights when coverage is low (affects scoring)
-- **`coverage_expectations`**: Defines what "acceptable" coverage looks like per category (sets targets)
-
-**Configuration:**
-
-```toml
-[coverage_expectations]
-# Pure computation functions
-pure.min = 0.90              # Pure functions should have 90-100% coverage
-pure.target = 1.00
-
-# Business logic functions
-business_logic.min = 0.80    # Business logic needs 80-95% coverage
-business_logic.target = 0.95
-
-# State management functions
-state_management.min = 0.75  # State management needs 75-90% coverage
-state_management.target = 0.90
-
-# I/O operations
-io_operations.min = 0.60     # I/O often tested via integration tests (60-80%)
-io_operations.target = 0.80
-
-# Validation functions
-validation.min = 0.85        # Validation should be well-tested (85-98%)
-validation.target = 0.98
-
-# Error handling
-error_handling.min = 0.70    # Error paths need coverage (70-90%)
-error_handling.target = 0.90
-
-# Configuration loaders
-configuration.min = 0.60     # Config loading (60-80%)
-configuration.target = 0.80
-
-# Initialization functions
-initialization.min = 0.50    # Setup functions (50-75%)
-initialization.target = 0.75
-
-# Orchestration functions
-orchestration.min = 0.65     # Coordination functions (65-85%)
-orchestration.target = 0.85
-
-# Utility functions
-utilities.min = 0.75         # Helper utilities (75-95%)
-utilities.target = 0.95
-
-# Debug functions
-debug.min = 0.20             # Debug/diagnostic functions (20-40%)
-debug.target = 0.40
-
-# Performance-critical functions
-performance.min = 0.40       # Performance code (40-60%)
-performance.target = 0.60
-```
-
-**Coverage Categories:**
-
-| Category | Min | Target | Rationale |
-|----------|-----|--------|-----------|
-| **Pure Functions** | 90% | 100% | Easiest to test, no excuses for low coverage |
-| **Business Logic** | 80% | 95% | Core functionality should be thoroughly tested |
-| **State Management** | 75% | 90% | Stateful operations need careful testing |
-| **I/O Operations** | 60% | 80% | Often covered by integration tests |
-| **Validation** | 85% | 98% | Input validation critical for security |
-| **Error Handling** | 70% | 90% | Error paths need explicit testing |
-| **Configuration** | 60% | 80% | Config loading often integration tested |
-| **Initialization** | 50% | 75% | Setup code may rely on integration tests |
-| **Orchestration** | 65% | 85% | Coordination tested at higher levels |
-| **Utilities** | 75% | 95% | Reusable helpers should be well-tested |
-| **Debug** | 20% | 40% | Diagnostic code has low testing priority |
-| **Performance** | 40% | 60% | Perf code may prioritize benchmarks over tests |
-
-**How It Works:**
-
-Coverage expectations define ranges for what constitutes acceptable coverage for each function category. When Debtmap analyzes a function:
-
-1. Function is classified into a category (pure, business_logic, etc.)
-2. Current coverage is compared against the category's expectations
-3. Coverage penalty is calculated based on distance from target
-4. `role_coverage_weights` then adjusts the penalty's impact on final score
-
-**Example Workflow:**
-
-```
-Function: validate_email() - classified as "validation"
-Current coverage: 75%
-Expectations: min=85%, target=98%
-
-Coverage gap: (98% - 75%) / (98% - 85%) = 23% / 13% = 1.77x below target
-Base penalty: 1.77 (for being 77% below target)
-Role weight adjustment: 1.0 (validation functions have standard penalty)
-Final coverage penalty: 1.77
-```
-
-**Why Separate from Role Coverage Weights?**
-
-This separation allows flexible configuration:
-- **Expectations** define absolute standards per category
-- **Weights** control how much penalties affect final scores
-- Projects can have different standards (strict vs lenient) while maintaining consistent relative weights
-
-**Source:** Configuration type defined in `src/priority/scoring/coverage_expectations.rs:108-133`
-
 ## Thresholds Configuration
 
 ### Basic Thresholds
@@ -671,119 +454,6 @@ This can be overridden with the `--format` CLI flag:
 debtmap analyze --format json      # JSON output
 debtmap analyze --format markdown  # Markdown output
 ```
-
-### Evidence Display Configuration
-
-The **`[output]`** section also controls how detection evidence is displayed in analysis results. This is useful for understanding why Debtmap flagged specific functions and for debugging false positives.
-
-**Configuration:**
-
-```toml
-[output]
-default_format = "terminal"
-evidence_verbosity = "Standard"      # Options: Minimal, Standard, Verbose, VeryVerbose
-min_confidence_warning = 0.80        # Flag detections below this confidence (default: 0.80)
-
-# Optional: Filter which signals appear in evidence
-[output.signal_filters]
-min_signal_weight = 0.1              # Hide signals with weight < 0.1
-exclude_categories = []               # Exclude specific signal categories
-```
-
-**Evidence Verbosity Levels:**
-
-| Level | Value | What It Shows | Use Case |
-|-------|-------|---------------|----------|
-| **Minimal** | 0 | Category and confidence only | Production reports, high-level overview |
-| **Standard** | 1 | Signal summary (default) | Regular development workflow |
-| **Verbose** | 2 | Detailed signal breakdown | Investigating specific issues |
-| **VeryVerbose** | 3 | All signals including low-weight | Debugging false positives |
-
-**Example Output by Verbosity Level:**
-
-**Minimal:**
-```
-Function: process_order
-Detection: Orchestrator (confidence: 0.85)
-```
-
-**Standard (default):**
-```
-Function: process_order
-Detection: Orchestrator (confidence: 0.85)
-Evidence:
-  - High delegation ratio (0.75)
-  - Multiple function calls (8 callees)
-```
-
-**Verbose:**
-```
-Function: process_order
-Detection: Orchestrator (confidence: 0.85)
-Evidence:
-  - Delegation ratio: 0.75 (weight: 0.35)
-  - Function calls: 8 callees (weight: 0.30)
-  - Low cyclomatic: 4 (weight: 0.20)
-  - Cognitive complexity: 3 (weight: 0.15)
-```
-
-**VeryVerbose:**
-```
-Function: process_order
-Detection: Orchestrator (confidence: 0.85)
-Evidence:
-  - Delegation ratio: 0.75 (weight: 0.35, contribution: 0.263)
-  - Function calls: 8 callees (weight: 0.30, contribution: 0.255)
-  - Low cyclomatic: 4 (weight: 0.20, contribution: 0.170)
-  - Cognitive complexity: 3 (weight: 0.15, contribution: 0.128)
-  - No async operations (weight: 0.05, contribution: 0.043)
-  - Few conditionals: 1 (weight: 0.03, contribution: 0.026)
-```
-
-**Confidence Threshold:**
-
-The `min_confidence_warning` setting flags detections with low confidence scores:
-
-```toml
-[output]
-min_confidence_warning = 0.80        # Warn if confidence < 80%
-```
-
-Detections below this threshold will be marked with a warning indicator in output:
-```
-Function: unclear_function
-Detection: Orchestrator (confidence: 0.72) ⚠️  LOW CONFIDENCE
-```
-
-**Use cases:**
-- **0.90+**: Very strict, only high-confidence detections
-- **0.80** (default): Balanced, flags uncertain classifications
-- **0.70**: More permissive, accepts moderate confidence
-- **0.60 or lower**: Permissive, shows most detections
-
-**Signal Filtering:**
-
-Filter which signals appear in evidence display:
-
-```toml
-[output.signal_filters]
-min_signal_weight = 0.1              # Hide signals contributing < 10%
-exclude_categories = ["performance", "style"]  # Exclude specific categories
-```
-
-This helps focus on the most important evidence when debugging or presenting analysis results.
-
-**When to Adjust Verbosity:**
-
-| Scenario | Recommended Setting |
-|----------|-------------------|
-| Daily development | `Standard` (default) |
-| CI/CD reports | `Minimal` |
-| Investigating false positives | `Verbose` or `VeryVerbose` |
-| Debugging detection logic | `VeryVerbose` with low `min_signal_weight` |
-| Performance analysis | `Standard` with `signal_filters` |
-
-**Source:** Configuration types defined in `src/config/display.rs:20-30` (EvidenceVerbosity enum) and `src/config/display.rs:123-135` (OutputConfig)
 
 ## Normalization Configuration
 
@@ -1100,140 +770,43 @@ show_t4_in_main_report = true     # Include low-priority items
 
 #### Enhanced Complexity Thresholds
 
-The **`[complexity_thresholds]`** section provides more granular control over complexity detection, supplementing the basic `[thresholds]` section with additional filters for flagging functions.
+The **`[complexity_thresholds]`** section provides more granular control over complexity detection:
 
-**Configuration:**
+This supplements the basic `[thresholds]` section with minimum total, cyclomatic, and cognitive complexity thresholds for flagging functions.
+
+These options are advanced features with sensible defaults. Most users won't need to configure them explicitly.
+
+#### Orchestration Adjustment
+
+The **`[orchestration_adjustment]`** section configures complexity reduction for orchestrator functions that primarily delegate to other functions:
 
 ```toml
-[complexity_thresholds]
-minimum_total_complexity = 5         # Minimum combined complexity (default: 5)
-minimum_cyclomatic_complexity = 3    # Minimum cyclomatic complexity (default: 3)
-minimum_cognitive_complexity = 5     # Minimum cognitive complexity (default: 5)
-minimum_match_arms = 4               # Minimum match arms (default: 4)
-minimum_if_else_chain = 3            # Minimum if-else chain length (default: 3)
-minimum_function_length = 10         # Minimum function length in lines (default: 10)
-entry_point_multiplier = 0.8         # Multiplier for entry points (default: 0.8)
+[orchestration_adjustment]
+enabled = true                        # Enable orchestration detection (default: true)
+min_delegation_ratio = 0.6            # Minimum ratio of delegated calls (default: 0.6)
+complexity_reduction = 0.25           # Reduce complexity by 25% (default: 0.25)
 ```
 
 **Configuration Options:**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `minimum_total_complexity` | 5 | Ignore functions with total complexity below this |
-| `minimum_cyclomatic_complexity` | 3 | Ignore functions with cyclomatic complexity below this |
-| `minimum_cognitive_complexity` | 5 | Ignore functions with cognitive complexity below this |
-| `minimum_match_arms` | 4 | Minimum match arms to consider complex |
-| `minimum_if_else_chain` | 3 | Minimum if-else chain length to flag |
-| `minimum_function_length` | 10 | Ignore short functions (lines) |
-| `entry_point_multiplier` | 0.8 | Adjust thresholds for entry points (main, CLI handlers) |
+| `enabled` | true | Enable orchestration pattern detection |
+| `min_delegation_ratio` | 0.6 | Minimum % of function that delegates to be considered orchestrator |
+| `complexity_reduction` | 0.25 | Percentage to reduce complexity score (0.0-1.0) |
 
-**Difference from Basic Thresholds:**
-
-The basic `[thresholds]` section sets when to flag code as debt:
-```toml
-[thresholds]
-complexity = 10                      # Flag functions with cyclomatic >= 10
-max_function_length = 50             # Flag functions with >= 50 lines
-```
-
-The `[complexity_thresholds]` section adds **minimum filters** to ignore trivial functions:
-```toml
-[complexity_thresholds]
-minimum_cyclomatic_complexity = 3    # Ignore functions with cyclomatic < 3
-minimum_function_length = 10         # Ignore functions with < 10 lines
-```
-
-**Use Case:**
-
-Enhanced thresholds help filter noise from simple functions that technically exceed basic thresholds but aren't true debt:
-
-```rust
-// Function with cyclomatic=1 (very simple)
-fn get_name(&self) -> &str {
-    &self.name
-}
-// Ignored by minimum_cyclomatic_complexity = 3
-
-// Function with cyclomatic=8, length=12 lines
-fn process_order(order: Order) -> Result<()> {
-    // Contains multiple branches and error handling
-}
-// Flagged because it exceeds both minimum thresholds
-```
-
-**Entry Point Multiplier:**
-
-The `entry_point_multiplier` relaxes thresholds for entry points (main functions, CLI handlers, HTTP routes) that naturally have higher complexity:
-
-```toml
-[complexity_thresholds]
-minimum_cyclomatic_complexity = 5    # Standard minimum
-entry_point_multiplier = 0.8         # Entry points: 5 * 0.8 = 4 minimum
-```
-
-This recognizes that entry points coordinate multiple operations and shouldn't be held to the same standards as pure logic functions.
-
-**When to Adjust:**
-
-- **Increase minimums** if you're getting too many trivial functions flagged
-- **Decrease minimums** if you want to catch smaller issues early
-- **Adjust entry_point_multiplier** to be more/less strict on entry points
-
-Most users won't need to configure this section explicitly as defaults work well for typical projects.
-
-**Source:** Configuration type defined in `src/complexity/threshold_manager.rs:17-46`
-
-#### Orchestration Adjustment
-
-The **`[orchestration_adjustment]`** section configures complexity reduction for orchestrator functions that primarily delegate to other functions. This works in conjunction with **orchestrator detection** to identify and appropriately score coordination functions.
-
-**How It Works:**
-
-Orchestration handling is a two-stage process:
-
-1. **Detection** (`OrchestratorDetectionConfig` in `src/config/detection.rs:5-25`) - Identifies functions as orchestrators based on:
-   - `max_cyclomatic`: Maximum cyclomatic complexity threshold (default: 5)
-   - `min_delegation_ratio`: Minimum ratio of delegated calls (default: 0.2)
-   - `min_meaningful_callees`: Minimum number of meaningful function calls (default: 2)
-   - `cognitive_weight`: Weight for cognitive complexity consideration (default: 0.7)
-
-2. **Adjustment** (`OrchestrationAdjustmentConfig` in `src/priority/scoring/orchestration_adjustment.rs:95-115`) - Applies score reductions to detected orchestrators:
-   - `base_orchestrator_reduction`: Base complexity reduction (default: 0.20)
-   - `max_quality_bonus`: Additional reduction for high-quality composition (default: 0.10)
-   - `max_total_reduction`: Maximum combined reduction cap (default: 0.31)
-
-**Configuration:**
-
-```toml
-[orchestration_adjustment]
-enabled = true                        # Enable orchestration scoring adjustments (default: true)
-base_orchestrator_reduction = 0.20    # Base reduction for detected orchestrators (default: 0.20)
-max_quality_bonus = 0.10              # Additional reduction for well-structured delegation (default: 0.10)
-max_total_reduction = 0.31            # Maximum combined reduction (default: 0.31)
-```
-
-**Rationale:**
-
-Orchestrator functions coordinate multiple operations but don't contain complex logic themselves. They naturally have higher cyclomatic complexity due to multiple call sites, but this doesn't represent true technical debt. The detection stage identifies these patterns, and the adjustment stage reduces their complexity scores to prevent over-penalization.
-
-**Source:** Configuration types defined in `src/config/detection.rs` and `src/priority/scoring/orchestration_adjustment.rs`
+Orchestrator functions coordinate multiple operations but don't contain complex logic themselves. This adjustment prevents them from being over-penalized.
 
 #### Boilerplate Detection
 
-The **`[boilerplate_detection]`** section identifies and reduces penalties for boilerplate code patterns. Boilerplate code often inflates complexity metrics without representing true technical debt—it's necessary, repetitive code that doesn't warrant the same scrutiny as business logic.
-
-**Configuration:**
+The **`[boilerplate_detection]`** section identifies and reduces penalties for boilerplate code patterns:
 
 ```toml
 [boilerplate_detection]
 enabled = true                        # Enable boilerplate detection (default: true)
 detect_constructors = true            # Detect constructor boilerplate (default: true)
 detect_error_conversions = true       # Detect error conversion boilerplate (default: true)
-detect_trait_impls = true             # Detect trait implementation boilerplate (default: true)
-detect_builders = true                # Detect builder pattern boilerplate (default: true)
-detect_test_boilerplate = true        # Detect test setup boilerplate (default: true)
 complexity_reduction = 0.20           # Reduce complexity by 20% (default: 0.20)
-min_impl_blocks = 20                  # Minimum impl blocks to consider boilerplate (default: 20)
 ```
 
 **Configuration Options:**
@@ -1243,209 +816,13 @@ min_impl_blocks = 20                  # Minimum impl blocks to consider boilerpl
 | `enabled` | true | Enable boilerplate pattern detection |
 | `detect_constructors` | true | Identify constructor initialization boilerplate |
 | `detect_error_conversions` | true | Identify error type conversion boilerplate |
-| `detect_trait_impls` | true | Identify standard trait implementations |
-| `detect_builders` | true | Identify builder pattern methods |
-| `detect_test_boilerplate` | true | Identify test setup and fixtures |
-| `complexity_reduction` | 0.20 | Percentage to reduce complexity for detected boilerplate (0.0-1.0) |
-| `min_impl_blocks` | 20 | Minimum impl blocks before considering type boilerplate-heavy |
+| `complexity_reduction` | 0.20 | Percentage to reduce complexity for boilerplate (0.0-1.0) |
 
-**What Boilerplate Patterns Are Detected:**
-
-**1. Constructor Boilerplate** (`detect_constructors`)
-
-Repetitive struct initialization code:
-
-```rust
-// Constructor boilerplate - gets 20% complexity reduction
-impl Config {
-    pub fn new(
-        host: String,
-        port: u16,
-        timeout: Duration,
-        retries: u32,
-        enable_logging: bool,
-        max_connections: usize,
-    ) -> Self {
-        Self {
-            host,
-            port,
-            timeout,
-            retries,
-            enable_logging,
-            max_connections,
-        }
-    }
-}
-```
-
-This has high cyclomatic complexity due to many fields, but it's simple field assignment—not genuine complexity.
-
-**2. Error Conversion Boilerplate** (`detect_error_conversions`)
-
-Standard error type conversions using `From` and `Into` traits:
-
-```rust
-// Error conversion boilerplate - gets 20% complexity reduction
-impl From<std::io::Error> for AppError {
-    fn from(err: std::io::Error) -> Self {
-        AppError::Io(err)
-    }
-}
-
-impl From<serde_json::Error> for AppError {
-    fn from(err: serde_json::Error) -> Self {
-        AppError::Json(err)
-    }
-}
-
-// Display trait implementation
-impl std::fmt::Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            AppError::Io(e) => write!(f, "IO error: {}", e),
-            AppError::Json(e) => write!(f, "JSON error: {}", e),
-            AppError::Network(e) => write!(f, "Network error: {}", e),
-        }
-    }
-}
-```
-
-These trait implementations are necessary but contain no business logic—they're mechanical transformations.
-
-**3. Trait Implementation Boilerplate** (`detect_trait_impls`)
-
-Standard trait implementations like `Debug`, `Clone`, `PartialEq`, `Default`:
-
-```rust
-// Trait boilerplate - gets 20% complexity reduction
-impl std::fmt::Debug for CustomType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("CustomType")
-            .field("id", &self.id)
-            .field("name", &self.name)
-            .field("status", &self.status)
-            .field("data", &self.data)
-            .finish()
-    }
-}
-
-impl Clone for CustomType {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            status: self.status,
-            data: self.data.clone(),
-        }
-    }
-}
-```
-
-**4. Builder Pattern Boilerplate** (`detect_builders`)
-
-Builder pattern methods with many setters:
-
-```rust
-// Builder boilerplate - gets 20% complexity reduction
-impl ConfigBuilder {
-    pub fn host(mut self, host: String) -> Self {
-        self.host = Some(host);
-        self
-    }
-
-    pub fn port(mut self, port: u16) -> Self {
-        self.port = Some(port);
-        self
-    }
-
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
-        self
-    }
-
-    // ... many more setter methods
-}
-```
-
-Builder methods are repetitive by design—each setter follows the same pattern.
-
-**5. Test Boilerplate** (`detect_test_boilerplate`)
-
-Test setup, fixtures, and helper functions:
-
-```rust
-// Test boilerplate - gets 20% complexity reduction
-#[cfg(test)]
-mod tests {
-    fn setup_test_db() -> TestDatabase {
-        TestDatabase::new()
-            .with_schema("test_schema")
-            .with_migrations()
-            .build()
-    }
-
-    fn create_test_user() -> User {
-        User {
-            id: 1,
-            name: "Test User".to_string(),
-            email: "test@example.com".to_string(),
-            role: Role::User,
-        }
-    }
-
-    // Many similar fixture creation functions...
-}
-```
-
-**When Boilerplate Reduction Applies:**
-
-The complexity reduction (default 20%) is applied when:
-1. Pattern is detected (e.g., constructor, trait impl)
-2. Function fits boilerplate characteristics:
-   - Uniform structure across multiple similar functions
-   - Low average complexity per function
-   - High number of impl blocks (> `min_impl_blocks`)
-
-**Example Impact:**
-
-```
-Function: Config::new (constructor)
-  Raw Complexity: 15 (many parameters)
-  Boilerplate Detected: Yes (constructor pattern)
-  Adjusted Complexity: 15 × (1 - 0.20) = 12
-  Result: Lower priority in debt report
-```
-
-**When to Adjust:**
-
-```toml
-# Stricter detection - only reduce obvious boilerplate
-[boilerplate_detection]
-complexity_reduction = 0.10          # Only 10% reduction
-min_impl_blocks = 30                 # Require many impl blocks
-
-# More aggressive - reduce more boilerplate
-[boilerplate_detection]
-complexity_reduction = 0.30          # 30% reduction
-min_impl_blocks = 10                 # Lower threshold
-
-# Disable specific patterns
-[boilerplate_detection]
-detect_constructors = true           # Keep constructor detection
-detect_error_conversions = false     # But disable error conversion detection
-```
-
-**Why This Matters:**
-
-Without boilerplate detection, constructor-heavy code and trait implementations dominate debt reports, obscuring genuine complexity issues in business logic. The 20% reduction helps focus attention on code that actually needs refactoring.
-
-**Source:** Configuration type defined in `src/organization/boilerplate_detector.rs:257-274`
+Boilerplate code often inflates complexity metrics without representing true technical debt. This detection reduces false positives from necessary but repetitive code.
 
 #### Functional Analysis
 
-The **`[functional_analysis]`** section configures detection of functional programming patterns. Pure functions and immutable patterns typically represent well-designed, maintainable code that should receive favorable scoring treatment.
-
-**Configuration:**
+The **`[functional_analysis]`** section configures detection of functional programming patterns:
 
 ```toml
 [functional_analysis]
@@ -1460,95 +837,11 @@ detect_immutable_patterns = true      # Detect immutable data patterns (default:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | true | Enable functional programming analysis |
-| `detect_pure_functions` | true | Identify functions without side effects or I/O |
-| `detect_higher_order` | true | Identify functions that accept/return functions as parameters |
+| `detect_pure_functions` | true | Identify functions without side effects |
+| `detect_higher_order` | true | Identify functions that take/return functions |
 | `detect_immutable_patterns` | true | Identify immutable data structure usage |
 
-**What Each Detection Identifies:**
-
-**1. Pure Functions** (`detect_pure_functions`)
-
-Pure functions have no side effects and always return the same output for the same input. Debtmap looks for:
-- No I/O operations (file access, network calls, console output)
-- No mutable state modifications
-- No external dependencies beyond parameters
-- Deterministic return values
-
-**Example patterns detected:**
-```rust
-// Pure function - simple transformation
-fn calculate_total(items: &[Item]) -> f64 {
-    items.iter().map(|item| item.price).sum()
-}
-
-// Pure function - data transformation
-fn normalize_scores(scores: &[f64], max: f64) -> Vec<f64> {
-    scores.iter().map(|s| s / max).collect()
-}
-```
-
-**2. Higher-Order Functions** (`detect_higher_order`)
-
-Higher-order functions accept functions as parameters or return functions as results. These are architectural patterns indicating functional composition:
-
-**Example patterns detected:**
-```rust
-// Accepts function as parameter
-fn apply_transform<F>(data: Vec<i32>, transform: F) -> Vec<i32>
-where F: Fn(i32) -> i32 {
-    data.into_iter().map(transform).collect()
-}
-
-// Returns function
-fn make_multiplier(factor: i32) -> impl Fn(i32) -> i32 {
-    move |x| x * factor
-}
-```
-
-**3. Immutable Patterns** (`detect_immutable_patterns`)
-
-Immutable patterns use persistent data structures and avoid mutation. Debtmap recognizes:
-- Iterator chains (`.map().filter().collect()`)
-- Functional transformations without mutation
-- Copy-on-write patterns (`Cow<'_, T>`)
-- Builder patterns that consume and return new instances
-
-**Example patterns detected:**
-```rust
-// Iterator chain transformation
-fn process_items(items: Vec<Item>) -> Vec<ProcessedItem> {
-    items
-        .into_iter()
-        .filter(|item| item.is_valid())
-        .map(|item| item.process())
-        .collect()
-}
-
-// Immutable update pattern
-fn update_config(config: Config, new_timeout: u64) -> Config {
-    Config { timeout: new_timeout, ..config }
-}
-```
-
-**Scoring Impact:**
-
-Functions exhibiting functional patterns receive favorable treatment:
-- **Pure functions**: Reduced coverage penalties (easier to test, fewer edge cases)
-- **Higher-order functions**: Recognized as architectural patterns, not accidental complexity
-- **Immutable patterns**: Lower risk scores due to predictable behavior
-
-**Tuning Configuration:**
-
-The underlying `FunctionalAnalysisConfig` (defined in `src/analysis/functional_composition.rs:17-28`) provides additional tuning parameters with preset modes:
-
-```rust
-// Preset modes available (not directly configurable via TOML)
-FunctionalAnalysisConfig::balanced()  // Default preset
-FunctionalAnalysisConfig::strict()    // Stricter purity requirements
-FunctionalAnalysisConfig::lenient()   // More permissive detection
-```
-
-**Source:** Configuration type defined in `src/analysis/functional_composition.rs:17-28`
+Functional patterns often lead to cleaner, more testable code. This analysis helps Debtmap recognize and appropriately score functional programming idioms.
 
 ## CLI Integration
 

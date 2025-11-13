@@ -14,7 +14,7 @@ The dead code analyzer combines several detection techniques:
 - **Coverage integration** - Uses test coverage data when available to identify live code
 - **Public API detection** - Uses heuristics to identify external API functions
 
-This multi-layered approach significantly reduces false positives compared to naive call graph analysis (see Spec 116 for confidence scoring validation).
+This multi-layered approach significantly reduces false positives compared to naive call graph analysis, with the goal of achieving a target false positive rate of less than 10% (see Spec 116 for confidence scoring validation).
 
 ## Confidence Scoring
 
@@ -294,9 +294,9 @@ let result = analyzer.analyze_function(&func, &call_graph);
 ### Accuracy Improvement
 
 Coverage integration substantially improves accuracy by:
-- **Significantly reducing false positives** - Coverage data eliminates many false positives in complex codebases where functions are called dynamically
-- **High accuracy for covered functions** - Functions with test coverage are correctly identified as live code
-- **Clear removal candidates** - Uncovered code with no static callers is more confidently identified as dead
+- **Significantly reducing false positives** - Eliminates most false positives in complex codebases
+- **High accuracy for covered functions** - Functions with test coverage are correctly identified as live
+- **Clear removal candidates** - Uncovered code with no static callers is more confidently dead
 - **Dynamic call detection** - Catches functions called via `getattr()`, plugins, or other dynamic mechanisms that static analysis misses
 
 **Coverage data format**: Debtmap uses the standard `coverage.json` format produced by `coverage.py` and `pytest-cov`. The file should be in your project root and contain executed line numbers for each source file.
@@ -453,7 +453,7 @@ Is the function flagged as dead?
 
 ### Filtering Results by Confidence
 
-To filter dead code results by confidence level, process the JSON output using tools like `jq`:
+To filter dead code results by confidence level, you can process the JSON output:
 
 ```bash
 # Analyze and output JSON
@@ -464,12 +464,9 @@ jq '.dead_code | map(select(.confidence >= 0.8))' results.json
 
 # Filter for high and medium confidence
 jq '.dead_code | map(select(.confidence >= 0.5))' results.json
-
-# Count high-confidence dead code items
-jq '.dead_code | map(select(.confidence >= 0.8)) | length' results.json
 ```
 
-**Note**: Dead code analysis is enabled by default via the `languages.python.detect_dead_code` configuration option in `.debtmap.toml`. Filtering by confidence threshold must be done via JSON post-processing as shown above.
+Note: CLI filtering by confidence threshold (e.g., `--min-confidence`) is planned for a future release (see Spec 116). Currently, filtering must be done via JSON post-processing.
 
 See [CLI Reference](cli-reference.md) for complete command options.
 
@@ -562,12 +559,11 @@ Prevent dead code from accumulating by integrating into your CI pipeline:
 # .github/workflows/dead-code.yml
 - name: Check for dead code
   run: |
-    debtmap analyze --format=json > dead-code.json
-    # Filter for high-confidence dead code and fail if found
-    HIGH_CONF_COUNT=$(jq '.dead_code | map(select(.confidence >= 0.8)) | length' dead-code.json)
-    if [ "$HIGH_CONF_COUNT" -gt 0 ]; then
-      echo "High-confidence dead code detected! ($HIGH_CONF_COUNT items)"
-      jq '.dead_code[] | select(.confidence >= 0.8) | "\(.file):\(.line) - \(.function) (confidence: \(.confidence))"' dead-code.json
+    debtmap analyze --min-confidence=0.8 --format=json > dead-code.json
+    # Fail if high-confidence dead code is found
+    if [ $(jq '.dead_code | length' dead-code.json) -gt 0 ]; then
+      echo "High-confidence dead code detected!"
+      jq '.dead_code[] | "\(.file):\(.line) - \(.function)"' dead-code.json
       exit 1
     fi
 ```

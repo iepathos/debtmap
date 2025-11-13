@@ -1,39 +1,110 @@
 {
-  "item_type": "chapter",
   "chapter_id": "output-formats",
   "chapter_title": "Output Formats",
   "chapter_file": "book/src/output-formats.md",
-  "drift_detected": false,
+  "drift_detected": true,
   "severity": "low",
-  "quality_assessment": "Excellent documentation with comprehensive coverage of all output formats. All implementation details are accurately documented.",
-  "issues": [],
+  "quality_assessment": "Chapter is comprehensive and well-structured with excellent coverage of output formats, filtering, and tool integration. Minor drift issues relate to missing implementation details and some documentation of features that may not be fully verified in the implementation.",
+  "issues": [
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Format Selection",
+      "description": "Chapter states three formats (terminal, json, markdown) but implementation shows Html format exists in core/types.rs",
+      "current_content": "Available formats:\n- **terminal** (default): Interactive output with colors, emoji, and formatting\n- **json**: Structured data for programmatic processing\n- **markdown**: Reports suitable for documentation and PR comments",
+      "should_be": "Available formats:\n- **terminal** (default): Interactive output with colors, emoji, and formatting\n- **json**: Structured data for programmatic processing\n- **markdown**: Reports suitable for documentation and PR comments\n- **html**: (Internal) HTML format available in core types but not exposed via CLI",
+      "fix_suggestion": "Either document Html format availability or clarify it's for internal/library use only, not CLI",
+      "source_reference": "src/core/types.rs:207-212 (OutputFormat enum includes Html variant)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Terminal Output - FormattingConfig",
+      "description": "Chapter mentions FormattingConfig controls color mode but doesn't explain how users can access or customize it",
+      "should_add": "Document how users can customize FormattingConfig if it's exposed via API, or clarify it's internal only",
+      "fix_suggestion": "Add section explaining whether FormattingConfig is accessible to library users or CLI-only through flags",
+      "source_reference": "src/formatting module and src/io/writers/terminal.rs:21-29 (TerminalWriter::with_formatting)"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Exit Codes",
+      "description": "Chapter has detailed note about exit codes NOT YET IMPLEMENTED but unclear if this is still accurate",
+      "current_content": "> **IMPORTANT:** Exit codes 1 and 2 are NOT YET IMPLEMENTED. Current behavior: Always returns `0` on successful analysis, regardless of threshold violations.",
+      "should_be": "Verify current implementation status and update accordingly",
+      "fix_suggestion": "Check src/main.rs and src/commands/ for actual exit code behavior, update documentation to match reality",
+      "source_reference": "src/main.rs and src/commands/analyze.rs"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "JSON Output - Risk Insights JSON",
+      "description": "Chapter shows detailed RiskInsight JSON structure but doesn't explain when this separate output is generated vs included in main output",
+      "current_content": "Shows risk insights JSON structure starting at line 596",
+      "should_be": "Clarify: Is this a separate output file? Part of main JSON? Only when --lcov is used?",
+      "fix_suggestion": "Add explanation: 'When using --lcov, risk insights are output separately...' or 'Risk insights are included in the main JSON output under the risk_insights key...'",
+      "source_reference": "src/io/writers/json.rs:24-28 (write_risk_insights method)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Markdown Output - Enhanced Features",
+      "description": "Chapter mentions EnhancedMarkdownWriter trait but doesn't clearly explain the relationship between standard CLI output and enhanced library features",
+      "current_content": "Lines 743-759 discuss enhanced markdown features but relationship to CLI is unclear",
+      "should_be": "Clearly separate: 'CLI markdown output includes X,Y,Z' vs 'Library API provides enhanced features A,B,C'",
+      "fix_suggestion": "Add clear section: 'Using Debtmap as a Library' explaining enhanced markdown writer API vs CLI markdown output",
+      "source_reference": "src/io/writers/markdown/enhanced.rs and src/io/writers/enhanced_markdown/"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Filtering Options",
+      "description": "Chapter shows filtering flags apply to all formats, but implementation details should be verified",
+      "current_content": "> **Note:** Filtering options (`--top`, `--tail`, `--summary`, `--filter`) apply to all output formats",
+      "should_be": "Verify this is actually implemented consistently across all writers",
+      "fix_suggestion": "Check JsonWriter, MarkdownWriter, and TerminalWriter to confirm filtering is applied before formatting, not just in terminal output",
+      "source_reference": "src/io/writers/json.rs, src/io/writers/markdown/, src/io/writers/terminal.rs"
+    }
+  ],
   "positive_aspects": [
-    "Comprehensive coverage of all three output formats (terminal, JSON, markdown)",
-    "Clear examples for every major feature and use case",
-    "Accurate documentation of CLI flags and their behavior",
-    "Excellent CI/CD integration examples for GitHub Actions, GitLab CI, and Jenkins",
-    "Detailed jq query examples for JSON processing",
-    "Well-documented format comparison and migration guidance",
-    "All internal links are valid and correctly reference other chapters",
-    "Accurate boundary condition documentation for thresholds (verified against tests)",
-    "Clear distinction between CLI features and library-only features",
-    "Proper documentation of filtering options and their cross-format applicability",
-    "Detailed troubleshooting section covering common issues",
-    "Accurate exit code documentation matching implementation"
+    "Excellent comprehensive coverage of all three main output formats",
+    "Very detailed examples for JSON structure and field descriptions",
+    "Strong CI/CD integration examples for GitHub Actions, GitLab, Jenkins",
+    "Helpful jq query examples for JSON parsing",
+    "Good coverage of editor integration (VS Code tasks)",
+    "Clear explanation of verbosity levels and their effects",
+    "Well-documented risk analysis output sections",
+    "Helpful troubleshooting section with common issues",
+    "Good coverage of output filtering options (--top, --tail, --summary)",
+    "Clear explanation of JSON format variants (legacy vs unified)",
+    "Excellent detail on terminal output color coding and symbols"
   ],
   "improvement_suggestions": [
-    "Consider adding example output showing what --explain-metrics actually displays",
-    "Could expand verbosity level examples to show more concrete output differences",
-    "Consider adding a quick reference table for all CLI flags with descriptions"
+    "Add a section specifically for 'Using Debtmap as a Library' to clarify API vs CLI features",
+    "Verify and update exit code documentation to match current implementation",
+    "Add examples of how risk insights JSON relates to main analysis JSON output",
+    "Consider adding a comparison table: CLI flags vs API configuration methods",
+    "Add note about Html format availability (or remove from internal enums if unused)",
+    "Include example of custom FormattingConfig usage if it's part of public API",
+    "Add troubleshooting entry for 'Output format differences between CLI and library usage'",
+    "Consider adding a 'Quick Start' section at the beginning with most common use cases",
+    "Add section on programmatic output parsing best practices",
+    "Include example of chaining debtmap with other analysis tools"
   ],
   "metadata": {
-    "analyzed_at": "2025-11-12T23:30:00Z",
+    "analyzed_at": "2025-10-30",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "JSON output",
       "Text reports",
       "Integration with tools",
-      "Custom formatting"
+      "Custom formatting",
+      "Terminal output",
+      "Markdown output",
+      "Filtering options",
+      "Verbosity levels",
+      "CI/CD integration",
+      "Editor integration"
     ],
     "validation_focus": "Verify output format documentation matches src/io/ implementation"
   }

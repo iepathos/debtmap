@@ -36,7 +36,7 @@ A file is classified as a god module when it has excessive standalone functions:
 1. **Standalone Function Count** - Total standalone functions (not in impl blocks)
 2. **Responsibility Count** - Distinct responsibilities across all functions
 3. **Lines of Code** - Total lines in the file
-4. **Complexity Sum** - Combined cyclomatic complexity (estimated as `function_count × 5`, assuming average complexity of 5 per function)
+4. **Complexity Sum** - Combined cyclomatic complexity (estimated as `function_count × 5`)
 
 **Key Difference:** God class detection focuses on a single struct's methods, while god module detection counts standalone functions across the entire file.
 
@@ -97,14 +97,9 @@ A **god module** is a file with excessive standalone functions (no dominant stru
 **Implementation Detail:** Debtmap uses the `DetectionType` enum with three variants:
 - `GodClass` - Single struct with excessive methods/fields
 - `GodFile` - File with excessive functions or lines of code
-- `GodModule` - Semantic alias for `GodFile` (both represent the same detection type)
+- `GodModule` - Alias for `GodFile` (both represent the same detection type)
 
-**When to use which term:**
-- Use **GodFile** when referring to any large file with excessive LOC or functions (general case)
-- Use **GodModule** when emphasizing the file has many standalone functions in a procedural/functional style
-- Both map to the same `DetectionType` internally and are treated identically by the detection algorithm
-
-The distinction is semantic to help clarify whether a file is large due to one bloated struct (GodClass) versus many standalone functions (GodModule), even though GodModule and GodFile are technically the same in the implementation.
+The `GodModule` variant is provided for clarity when discussing files with many standalone functions, but internally it's the same as `GodFile`. Both terms exist to help distinguish between "file is large" (GodFile) and "file has many functions" (GodModule) conceptually in documentation and error messages, even though they're implemented identically in the detection logic.
 
 **Example:** A file like `rust_call_graph.rs` with 270 standalone functions would be flagged as a god module (using the `GodFile`/`GodModule` detection type).
 
@@ -230,7 +225,7 @@ This advanced scoring variant combines both **complexity weighting** and **purit
 
 **Impact:** A file with 100 pure helper functions (total complexity 150) might have a weighted method count of only `150 × 0.3 = 45`, avoiding false positives while still catching stateful god objects with many impure methods.
 
-See `src/organization/god_object_detector.rs:196-258` and `src/analysis/purity_analysis.rs`.
+See `src/organization/god_object_detector.rs:196-258` and `src/organization/purity_analyzer.rs`.
 
 ## Responsibility Detection
 
@@ -389,24 +384,6 @@ impl UserFacade {
 ```
 
 ## Configuration
-
-### GodObjectThresholds Structure
-
-The `GodObjectThresholds` struct (defined in `src/config/thresholds.rs:5-20`) controls all detection thresholds:
-
-```rust
-pub struct GodObjectThresholds {
-    pub max_methods: usize,     // Maximum number of methods before flagging
-    pub max_fields: usize,      // Maximum number of fields before flagging
-    pub max_traits: usize,      // Maximum number of responsibilities (not Rust traits)
-    pub max_lines: usize,       // Maximum lines of code before flagging
-    pub max_complexity: u32,    // Maximum total cyclomatic complexity before flagging
-}
-```
-
-All five fields are evaluated during god object detection. Each threshold that is exceeded contributes one violation to the confidence level calculation.
-
-**Note:** `max_traits` is a legacy naming issue - it actually controls maximum **responsibilities** (distinct concerns), not Rust trait implementations. This naming exists for historical reasons from early development.
 
 ### TOML Configuration
 
@@ -660,7 +637,7 @@ To avoid god objects:
 
 ## Related Documentation
 
-- [Scoring Strategies](./scoring-strategies.md) - How god objects affect overall file scores and aggregation methods
+- [File-Level Scoring](./file-level-scoring.md) - How god objects affect overall file scores
 - [Configuration](./configuration.md) - Complete `.debtmap.toml` reference
 - [CLI Reference](./cli-reference.md) - All command-line options
 - [Tiered Prioritization](./tiered-prioritization.md) - How god objects are prioritized

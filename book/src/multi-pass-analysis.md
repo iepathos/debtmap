@@ -81,7 +81,7 @@ debtmap analyze . --multi-pass --attribution
 debtmap analyze . --multi-pass --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --multi-pass --attribution --format json
+debtmap analyze . --multi-pass --attribution --json
 ```
 
 ### Available Flags
@@ -91,7 +91,7 @@ debtmap analyze . --multi-pass --attribution --format json
 | `--multi-pass` | Enable two-pass analysis (raw + normalized) |
 | `--attribution` | Show detailed complexity attribution breakdown (requires `--multi-pass`) |
 | `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` |
-| `--format <format>` | Output format: `terminal`, `json`, `yaml`, `markdown`, `html`, `text` |
+| `--json` | Output results in JSON format |
 
 > **Note**: The `--attribution` flag requires `--multi-pass` to be enabled, as attribution depends on comparing raw and normalized analyses.
 

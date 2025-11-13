@@ -92,30 +92,25 @@ Debtmap provides several CLI flags for cache management:
 | `--force-cache-rebuild` | Force cache rebuild (same as `--clear-cache`) |
 | `--cache-stats` | Show cache statistics and location |
 | `--migrate-cache` | Migrate cache from local to shared location |
-| `--cache-location <LOCATION>` | Cache location strategy: `local`, `shared`, or custom path. Sets DEBTMAP_CACHE_DIR for this run. |
-
-> **Note:** The `--cache` flag (used to enable caching) is deprecated and hidden. Caching is now enabled by default; use `--no-cache` to disable it. This flag exists only for backward compatibility with older scripts.
+| `--cache-location <path>` | Specify custom cache directory path for this run (sets DEBTMAP_CACHE_DIR) |
 
 ### CLI Examples
 
 ```bash
 # Run analysis without using cache
-debtmap analyze . --no-cache
+debtmap --no-cache
 
 # Clear cache and rebuild from scratch
-debtmap analyze . --clear-cache
+debtmap --clear-cache
 
 # View cache statistics
-debtmap analyze . --cache-stats
+debtmap --cache-stats
 
 # Use custom cache location for this run
-debtmap analyze . --cache-location /tmp/temp-cache
-
-# Or use shared strategy
-debtmap analyze . --cache-location shared
+debtmap --cache-location /tmp/temp-cache
 
 # Migrate existing cache to shared location
-debtmap analyze . --migrate-cache
+debtmap --migrate-cache
 ```
 
 ## Automatic Pruning Strategies
@@ -206,7 +201,7 @@ export DEBTMAP_CACHE_MAX_AGE_DAYS=14      # 2 weeks
 export DEBTMAP_CACHE_STRATEGY=lru
 
 # Run analysis with cache
-debtmap analyze . --cache-stats  # Show cache hit rate
+debtmap --cache-stats  # Show cache hit rate
 ```
 
 ### Background vs Synchronous Pruning
@@ -236,13 +231,13 @@ export DEBTMAP_CACHE_SYNC_PRUNE=true
 export DEBTMAP_CACHE_MAX_SIZE=524288000  # 500MB
 
 # Option 2: Clear cache manually
-debtmap analyze . --clear-cache
+debtmap --clear-cache
 
 # Option 3: Reduce max age
 export DEBTMAP_CACHE_MAX_AGE_DAYS=7
 
 # Option 4: Inspect current cache usage
-debtmap analyze . --cache-stats
+debtmap --cache-stats
 ```
 
 ### Stale Cache Causing Incorrect Results
@@ -253,10 +248,10 @@ debtmap analyze . --cache-stats
 
 ```bash
 # Force cache rebuild
-debtmap analyze . --force-cache-rebuild
+debtmap --force-cache-rebuild
 
 # Or disable cache for this run
-debtmap analyze . --no-cache
+debtmap --no-cache
 ```
 
 ### Permission Errors
@@ -270,7 +265,7 @@ debtmap analyze . --no-cache
 export DEBTMAP_CACHE_DIR=$HOME/.local/cache/debtmap
 
 # Or check permissions on the default cache directory
-ls -la $(debtmap analyze . --cache-stats | grep "Cache location")
+ls -la $(debtmap --cache-stats | grep "Cache location")
 ```
 
 ### Inspecting Cache Statistics
@@ -278,7 +273,7 @@ ls -la $(debtmap analyze . --cache-stats | grep "Cache location")
 Use `--cache-stats` to inspect cache health:
 
 ```bash
-debtmap analyze . --cache-stats
+debtmap --cache-stats
 ```
 
 This displays:
@@ -314,7 +309,7 @@ To debug cache-related issues, check:
 If you previously used a local cache strategy and want to migrate to the shared XDG-compliant location:
 
 ```bash
-debtmap analyze . --migrate-cache
+debtmap --migrate-cache
 ```
 
 This command:

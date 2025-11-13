@@ -27,7 +27,7 @@ Debtmap provides three preset threshold configurations to match different projec
 | **Role Multipliers** | | | |
 | Entry Point Multiplier | 1.2x | 1.5x | 2.0x |
 | Utility Multiplier | 0.6x | 0.8x | 1.0x |
-| Test Function Multiplier | 1.5x | 2.0x | 3.0x |
+| Test Function Multiplier | 3.0x | 2.0x | 3.0x |
 
 ### When to Use Each Preset
 
@@ -133,13 +133,13 @@ Debtmap automatically adjusts thresholds based on function role, recognizing tha
 | Entry Points | 1.2x - 2.0x (preset-specific) | More lenient | `main()`, HTTP handlers, CLI commands |
 | Core Logic | 1.0x | Standard | Business logic, algorithms |
 | Utility Functions | 0.6x - 1.0x (preset-specific) | Stricter | Getters, setters, simple helpers |
-| Test Functions | 1.5x - 3.0x (preset-specific) | Most lenient | Unit tests, integration tests |
+| Test Functions | 2.0x - 3.0x (preset-specific) | Most lenient | Unit tests, integration tests |
 | Unknown Functions | 1.0x (defaults to core logic) | Standard | Functions that don't match any role pattern |
 
 **Note**: Some multipliers vary by preset:
 - **Entry Points**: Strict=1.2x, Balanced=1.5x, Lenient=2.0x
 - **Utility Functions**: Strict=0.6x, Balanced=0.8x, Lenient=1.0x
-- **Test Functions**: Strict=1.5x, Balanced=2.0x, Lenient=3.0x
+- **Test Functions**: Strict=3.0x, Balanced=2.0x, Lenient=3.0x
 
 **How multipliers work:**
 

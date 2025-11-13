@@ -93,23 +93,6 @@ Then run compare with the plan:
 debtmap compare --before before.json --after after.json --plan IMPLEMENTATION_PLAN.md
 ```
 
-**Plan Parser Format Requirements** (src/comparison/plan_parser.rs):
-
-The plan parser looks for a specific markdown pattern to extract the target location:
-- **Pattern:** `**Location**: ./file:function:line` (markdown bold formatting)
-- **File path:** Must start with `./` or `/` (leading `./` is stripped)
-- **Format:** Exactly 3 colon-separated parts: `file:function:line`
-- **Line number:** Must be a valid unsigned integer
-
-Valid examples:
-- `**Location**: ./src/main.rs:process_file:42`
-- `**Location**: ./src/builders/call_graph.rs:process_python_files:120`
-
-Invalid examples (will be rejected):
-- `src/main.rs:func:42` - missing `./` or `/` prefix
-- `./src/main.rs:func` - missing line number
-- `./src/main.rs:func:abc` - non-numeric line number
-
 #### Option 2: Manual Target Location
 
 Specify the target directly via command-line:
@@ -139,16 +122,11 @@ The comparison result includes the match strategy and confidence score used, alo
 After comparing, the target item will have one of these statuses:
 
 - **Resolved** - Item no longer exists in after analysis (debt eliminated!)
-- **Improved** - Item exists but with ≥30% debt score reduction
-- **Unchanged** - Item exists with score between 70%-110% of original
-- **Regressed** - Item exists but score increased by >10%
+- **Improved** - Item exists but with lower debt score
+- **Unchanged** - Item exists with similar metrics (within 5%)
+- **Regressed** - Item exists but got worse
 - **NotFoundBefore** - Item didn't exist in before analysis
 - **NotFound** - Item not found in either analysis
-
-**Status Classification Logic** (src/comparison/comparator.rs:264-270):
-- Items with score reduced to <70% of original (≥30% reduction) are classified as **Improved**
-- Items with score increased to >110% of original are classified as **Regressed**
-- Items with score between 70%-110% of original are classified as **Unchanged**
 
 ## Project Health Metrics
 
@@ -968,10 +946,11 @@ No changes detected - either no code changes or changes were neutral to debt.
 
 ## Related Documentation
 
-- [Validation Gates](validation-gates.md) - Enforce quality gates in CI/CD pipelines
+- [Validation Command](validation.md) - Validate implementation plans match analysis
 - [Prodigy Integration](prodigy-integration.md) - Automated refactoring workflows
 - [Output Formats](output-formats.md) - Understanding analysis JSON structure
 - [Scoring Strategies](scoring-strategies.md) - How debt scores are calculated
+- [CI/CD Integration](ci-cd.md) - Advanced pipeline configurations
 
 ## Summary
 

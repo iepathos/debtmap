@@ -1,60 +1,29 @@
 {
-  "item_type": "chapter",
   "chapter_id": "getting-started",
   "chapter_title": "Getting Started",
   "chapter_file": "book/src/getting-started.md",
-  "drift_detected": true,
+  "drift_detected": false,
   "severity": "low",
-  "quality_assessment": "Excellent chapter - comprehensive, accurate, well-organized, and beginner-friendly. All installation instructions, quick start examples, and CLI options verified against current implementation. Minor issue with internal link formatting that should be corrected for mdbook compatibility.",
+  "quality_assessment": "Excellent chapter - comprehensive, accurate, well-organized, and beginner-friendly. All installation instructions, quick start examples, and CLI options verified against current implementation. No significant drift detected.",
   "issues": [
-    {
-      "type": "broken_links",
-      "severity": "medium",
-      "section": "What's Next?",
-      "line_reference": "472-473",
-      "description": "Internal links use './' prefix which may cause issues with mdbook link resolution",
-      "broken_links": [
-        {
-          "link_text": "Analysis Guide",
-          "original_target": "./analysis-guide.md",
-          "expected_file": "book/src/analysis-guide.md",
-          "file_exists": true,
-          "fix_needed": "Remove ./ prefix for mdbook compatibility",
-          "suggested_fix": "analysis-guide.md",
-          "reason": "mdbook expects relative links without './' prefix for files in same directory"
-        },
-        {
-          "link_text": "Output Formats",
-          "original_target": "./output-formats.md",
-          "expected_file": "book/src/output-formats.md",
-          "file_exists": true,
-          "fix_needed": "Remove ./ prefix for mdbook compatibility",
-          "suggested_fix": "output-formats.md",
-          "reason": "mdbook expects relative links without './' prefix for files in same directory"
-        }
-      ],
-      "fix_suggestion": "Update links on lines 472-473:\n- Change '[Analysis Guide](./analysis-guide.md)' to '[Analysis Guide](analysis-guide.md)'\n- Change '[Output Formats](./output-formats.md)' to '[Output Formats](output-formats.md)'\n\nIn mdbook, relative links within the same directory should not use the './' prefix.",
-      "source_reference": "book/src/getting-started.md:472-473"
-    },
     {
       "type": "minor_enhancement",
       "severity": "low",
       "section": "Quick Start - Validate Command",
-      "line_reference": "140-145",
-      "description": "Chapter shows validate with --config but could clarify precedence",
-      "current_content": "# Validate against thresholds (CI/CD integration)\ndebtmap validate ./src --max-debt-density 5.0\n\n# Validate using config file settings\n# Note: CLI flags override config file values when both are specified\ndebtmap validate . --config .debtmap.toml --max-debt-density 5.0",
-      "fix_suggestion": "Actually, the chapter already includes a note on line 144 clarifying that CLI flags override config file values. This is correct and clear.",
+      "line_reference": "140-144",
+      "description": "Chapter shows validate with --config but could clarify when to use config file vs command-line flags",
+      "current_content": "# Validate against thresholds (CI/CD integration)\ndebtmap validate ./src --max-debt-density 5.0\n\n# Validate using config file settings\ndebtmap validate . --config .debtmap.toml --max-debt-density 5.0",
+      "fix_suggestion": "Examples are correct but could add a brief note about precedence: CLI flags override config file settings",
       "source_reference": "src/cli.rs:Validate command options"
     },
     {
       "type": "potential_enhancement",
       "severity": "low",
       "section": "Example Output",
-      "line_reference": "319",
-      "description": "Example output wording could be slightly more precise",
-      "current_content": "When you run `debtmap analyze .`, you'll see output similar to this:",
-      "should_be": "Line 319 already uses 'similar to this' - no change needed",
-      "fix_suggestion": "No change needed - the wording is already appropriate",
+      "description": "Example output shows realistic data but could mention this is representative, not live",
+      "current_content": "When you run `debtmap analyze .`, you'll see output like this:",
+      "should_be": "When you run `debtmap analyze .`, you'll see output similar to this:",
+      "fix_suggestion": "Add 'similar to' to clarify this is example output, not a literal paste",
       "source_reference": "Documentation style best practice"
     }
   ],
@@ -65,12 +34,11 @@
     "Rust edition 2021 requirement is accurate (verified in Cargo.toml)",
     "All command syntax verified against src/cli.rs implementation",
     "CLI flags and defaults are 100% accurate (--threshold-complexity=10, --threshold-duplication=50)",
-    "--lcov as alias for --coverage-file correctly documented (src/cli.rs:78)",
+    "--lcov as alias for --coverage-file correctly documented (src/cli.rs:77)",
     "Comprehensive coverage of all major commands: analyze, init, validate, compare",
     "Advanced options section covers virtually all flags from features.json",
     "Expert options section accurately documents power-user capabilities",
     "Cache management thoroughly explained with correct platform-specific paths",
-    "XDG_CACHE_HOME, Library/Caches, LOCALAPPDATA paths verified in src/cache/cache_location.rs",
     "Priority levels match implementation (CRITICAL ≥9.0, HIGH ≥7.0, MEDIUM ≥5.0, LOW ≥3.0)",
     "Complexity metrics correctly explained (cyclomatic, cognitive, nesting, lines)",
     "Language support accurately describes Rust (full), Python/JS/TS (partial support)",
@@ -86,28 +54,17 @@
     "Filtering options accurately documented (--min-priority, --filter, --group-by-category)",
     "Output control options complete (--plain, --summary, --compact)",
     "Parallel processing options correct (--no-parallel, --jobs)",
-    "Validation workflow examples are practical and accurate",
-    "CLI flag precedence note included (line 144) clarifying overrides",
-    "Line 319 uses appropriate wording 'similar to this' for example output"
+    "Validation workflow examples are practical and accurate"
   ],
   "improvement_suggestions": [
-    "Fix internal link formatting by removing './' prefix (lines 472-473)",
     "Consider adding a 'Common Workflows' section with end-to-end scenarios",
     "Could include performance benchmarks for different project sizes",
     "Might benefit from Windows-specific troubleshooting subsection",
     "Could add visual diagram of the analysis pipeline phases",
     "Consider adding table summarizing when to use which output format",
     "Could explain difference between --summary and --compact modes with examples",
-    "Might add note about --threshold-preset vs custom thresholds trade-offs",
-    "Consider adding link to configuration.md in 'What's Next?' section if it exists"
+    "Might add note about --threshold-preset vs custom thresholds trade-offs"
   ],
-  "link_validation": {
-    "total_internal_links": 2,
-    "broken_links": 0,
-    "formatting_issues": 2,
-    "validation_performed": true,
-    "details": "Both linked files exist (analysis-guide.md and output-formats.md), but links use './' prefix which is not standard mdbook convention and may cause issues. Should remove './' prefix for compatibility."
-  },
   "accuracy_verification": {
     "installation_verified": {
       "install_script_exists": true,
@@ -119,37 +76,36 @@
     "commands_verified": {
       "debtmap_version": "✓ Works correctly",
       "debtmap_help": "✓ Works correctly",
-      "analyze_command": "✓ All flags verified in src/cli.rs:44-311",
-      "init_command": "✓ Verified with --force option (src/cli.rs:314-318)",
-      "validate_command": "✓ All options verified (src/cli.rs:321-399)",
-      "compare_command": "✓ All options verified (src/cli.rs:402-427)",
-      "validate_improvement_command": "✓ Verified (src/cli.rs:430-449)"
+      "analyze_command": "✓ All flags verified in src/cli.rs:44-299",
+      "init_command": "✓ Verified with --force option",
+      "validate_command": "✓ All options verified",
+      "compare_command": "✓ All options verified (--before, --after, --plan, --target-location)"
     },
     "cli_flags_verified": [
-      "--coverage-file (alias: --lcov) - src/cli.rs:78 ✓",
-      "--threshold-complexity (default: 10) - src/cli.rs:64 ✓",
+      "--coverage-file (alias: --lcov) - src/cli.rs:77 ✓",
+      "--threshold-complexity (default: 10) - src/cli.rs:63 ✓",
       "--threshold-duplication (default: 50) - src/cli.rs:68 ✓",
-      "--format (json/markdown/terminal) - src/cli.rs:50 ✓",
-      "--output-format (legacy/unified) - src/cli.rs:56 ✓",
-      "--top (alias: --head) - src/cli.rs:94 ✓",
-      "--tail - src/cli.rs:98 ✓",
-      "--summary - src/cli.rs:102 ✓",
-      "--verbosity (-v, -vv, -vvv) - src/cli.rs:117 ✓",
-      "--compact - src/cli.rs:121 ✓",
-      "--group-by-category - src/cli.rs:133 ✓",
-      "--min-priority - src/cli.rs:137 ✓",
-      "--filter - src/cli.rs:141 ✓",
-      "--threshold-preset - src/cli.rs:149 ✓",
-      "--plain - src/cli.rs:153 ✓",
-      "--no-parallel - src/cli.rs:157 ✓",
-      "--jobs - src/cli.rs:161 ✓",
-      "--no-cache - src/cli.rs:169 ✓",
-      "--clear-cache - src/cli.rs:173 ✓",
-      "--cache-stats - src/cli.rs:181 ✓",
-      "--migrate-cache - src/cli.rs:185 ✓",
-      "--cache-location - src/cli.rs:189 ✓",
-      "--multi-pass - src/cli.rs:193 ✓",
-      "--attribution - src/cli.rs:197 ✓",
+      "--format (json/markdown/terminal) - src/cli.rs:49 ✓",
+      "--output-format (legacy/unified) - src/cli.rs:55 ✓",
+      "--top (alias: --head) - src/cli.rs:93 ✓",
+      "--tail - src/cli.rs:97 ✓",
+      "--summary - src/cli.rs:101 ✓",
+      "--verbosity (-v, -vv, -vvv) - src/cli.rs:116 ✓",
+      "--compact - src/cli.rs:120 ✓",
+      "--group-by-category - src/cli.rs:132 ✓",
+      "--min-priority - src/cli.rs:136 ✓",
+      "--filter - src/cli.rs:140 ✓",
+      "--threshold-preset - src/cli.rs:148 ✓",
+      "--plain - src/cli.rs:152 ✓",
+      "--no-parallel - src/cli.rs:156 ✓",
+      "--jobs - src/cli.rs:160 ✓",
+      "--no-cache - src/cli.rs:168 ✓",
+      "--clear-cache - src/cli.rs:172 ✓",
+      "--cache-stats - src/cli.rs:180 ✓",
+      "--migrate-cache - src/cli.rs:184 ✓",
+      "--cache-location - src/cli.rs:188 ✓",
+      "--multi-pass - src/cli.rs:192 ✓",
+      "--attribution - src/cli.rs:196 ✓",
       "--aggregate-only - src/cli.rs:205 ✓",
       "--no-aggregation - src/cli.rs:209 ✓",
       "--aggregation-method - src/cli.rs:213 ✓",
@@ -157,11 +113,6 @@
       "--max-files - src/cli.rs:225 ✓",
       "--validate-loc - src/cli.rs:229 ✓"
     ],
-    "cache_paths_verified": {
-      "xdg_cache_home": "✓ src/cache/cache_location.rs:61",
-      "library_caches": "✓ macOS path mentioned in docs, standard location",
-      "localappdata": "✓ src/cache/cache_location.rs:82"
-    },
     "config_file_structure": {
       "thresholds_section": "✓ Correct",
       "tiers_section": "✓ Correct (critical=9.0, high=7.0, medium=5.0)",
@@ -196,12 +147,11 @@
     "examples_accurate": 45
   },
   "metadata": {
-    "analyzed_at": "2025-01-13T07:20:00Z",
-    "analyzer": "prodigy-analyze-subsection-drift",
+    "analyzed_at": "2025-11-06",
+    "analyzer": "prodigy-analyze-book-chapter-drift",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "cli_implementation": "src/cli.rs",
     "install_script": "install.sh",
-    "cache_implementation": "src/cache/cache_location.rs",
     "topics_covered": [
       "Prerequisites",
       "Installation (quick install, cargo, from source)",
@@ -230,18 +180,18 @@
       "Next steps and learning path"
     ],
     "validation_focus": "Check installation instructions and quick start examples are current",
-    "validation_result": "PASSED WITH MINOR ISSUES - All installation instructions and quick start examples are 100% current and accurate. Minor link formatting issue should be corrected.",
-    "total_lines_analyzed": 606,
+    "validation_result": "PASSED - All installation instructions and quick start examples are 100% current and accurate",
+    "total_lines_analyzed": 605,
     "code_examples_verified": 45,
     "commands_documented": 35,
     "cli_flags_documented": 30,
     "drift_severity_breakdown": {
       "critical": 0,
       "high": 0,
-      "medium": 1,
+      "medium": 0,
       "low": 2
     },
-    "overall_accuracy": "99.5%",
-    "recommendation": "Fix internal link formatting (remove './' prefix on lines 472-473), otherwise chapter is excellent and accurate"
+    "overall_accuracy": "99%",
+    "recommendation": "No changes required - chapter is excellent and accurate"
   }
 }

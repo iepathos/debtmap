@@ -93,9 +93,7 @@ Module: api_handler
   Instability: 0.27          // Relatively stable
 ```
 
-A module is flagged for high coupling if **EITHER** its afferent coupling (Ca) **OR** efferent coupling (Ce) exceeds the threshold of 5. This means a module with Ca=8, Ce=2 OR Ca=2, Ce=8 would both be flagged, as either indicates potential maintainability issues.
-
-**Implementation reference:** `src/debt/coupling.rs:27-29` (is_highly_coupled uses || operator)
+High afferent or efferent coupling (typically >5) indicates potential maintainability issues.
 
 ## Instability Metric
 
@@ -339,15 +337,6 @@ The algorithm:
 3. Calculates SHA-256 hash for each normalized chunk
 4. Groups chunks by hash
 5. Returns groups with 2+ locations (duplicates found)
-6. Merges adjacent duplicate blocks for cleaner output
-
-### Adjacent Duplication Merging
-
-Debtmap can merge adjacent duplicate blocks using the `merge_adjacent_duplications` function. This consolidates consecutive duplicate chunks into larger duplication blocks, reducing noise in the output by grouping related duplications together.
-
-For example, if lines 100-149 and 150-199 of a file are duplicated elsewhere, they'll be merged into a single 100-line duplication block rather than reported as two separate 50-line blocks.
-
-**Implementation:** `src/debt/duplication.rs:98-133` (merge_adjacent_duplications function)
 
 ### Example Output
 
@@ -385,8 +374,8 @@ threshold_duplication = 50  # Default value
 ### Current Limitations
 
 - **Exact matching only** - Currently uses hash-based exact matching
-- **similarity_threshold parameter** - Defined but not currently used in detect_duplication. However, a `calculate_similarity` function using Jaccard token similarity already exists (`src/debt/duplication.rs:76-88`), suggesting fuzzy matching infrastructure is in place for future enhancement.
-- **Future enhancement** - Fuzzy matching for near-duplicates using the existing similarity calculation
+- **similarity_threshold parameter** - Defined but not implemented yet
+- **Future enhancement** - Fuzzy matching for near-duplicates
 
 ## Refactoring Recommendations
 
@@ -569,23 +558,15 @@ Architectural analysis results are integrated with debtmap's debt categorization
 
 ### Debt Type Mapping
 
-Architectural issues are mapped to existing DebtType enum variants. Below is the explicit mapping for each architectural issue type:
+Architectural issues are mapped to existing DebtType enum variants:
 
-```
-Architectural Issue Type    → DebtType Enum Variant
-───────────────────────────────────────────────────
-Code duplication            → Duplication
-Circular dependencies       → Dependency
-High coupling (Ca or Ce >5) → Dependency
-Bidirectional dependencies  → Dependency
-SDP violations             → CodeOrganization
-Zone of pain               → CodeOrganization
-Zone of uselessness        → CodeOrganization
-```
+- **Duplication** - Duplicated code blocks found
+- **Dependency** - Used for circular dependencies and coupling issues
+- **CodeOrganization** - May be used for architectural violations (SDP, zone issues)
 
-**Note:** The DebtType enum does not have dedicated variants for CircularDependency, HighCoupling, or ArchitecturalViolation. Architectural issues are mapped to existing general-purpose debt types based on their nature.
+**Note:** The DebtType enum does not have dedicated variants for CircularDependency, HighCoupling, or ArchitecturalViolation. Architectural issues are mapped to existing general-purpose debt types.
 
-**Reference:** `src/core/mod.rs:220-236` (DebtType enum definition)
+**Reference:** `src/core/mod.rs:220-236` for actual DebtType enum definition
 
 ### Tiered Prioritization
 
@@ -663,13 +644,7 @@ See [Configuration](configuration.md) for complete options.
 
 **Cause:** Default threshold of 5 may be too strict for your codebase.
 
-**Solution:** The coupling threshold is currently hardcoded at 5 in the implementation (`src/debt/coupling.rs:55-79`). Since this cannot be configured via CLI or config file, you have three options:
-
-1. **Use suppression patterns** to exclude specific modules - See [Suppression Patterns](suppression-patterns.md)
-2. **Filter results** using `--top` or `--min-priority` flags to focus on higher-priority issues
-3. **Modify the source code** if your architecture requires a different threshold
-
-**Implementation reference:** `src/debt/coupling.rs:55-79` (identify_coupling_issues function)
+**Solution:** The coupling threshold is currently hardcoded at 5 in the implementation (`src/debt/coupling.rs:62`). To adjust it, you would need to modify the source code. Consider using suppression patterns to exclude specific modules if needed. See [Suppression Patterns](suppression-patterns.md).
 
 ### "Duplication detected in generated code"
 

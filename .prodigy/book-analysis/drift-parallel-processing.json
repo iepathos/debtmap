@@ -1,59 +1,167 @@
 {
-  "item_type": "chapter",
   "chapter_id": "parallel-processing",
   "chapter_title": "Parallel Processing",
   "chapter_file": "book/src/parallel-processing.md",
-  "drift_detected": false,
+  "drift_detected": true,
   "severity": "low",
-  "quality_assessment": "Excellent - Documentation is comprehensive, accurate, and well-aligned with implementation. The chapter thoroughly covers all parallel processing features including Rayon, DashMap, thread configuration, performance characteristics, and optimization strategies. All code examples match actual implementation.",
+  "quality_assessment": "Chapter is comprehensive and highly accurate with excellent coverage of parallel processing features. Environment variables, CLI flags, and implementation details are all correctly documented. Only minor issues related to outdated line number references in code comments.",
   "issues": [
     {
-      "type": "minor_improvement",
+      "type": "outdated_information",
       "severity": "low",
-      "section": "Cross-File Call Resolution",
-      "description": "The 'Cross-File Call Resolution' section describes a two-phase parallel resolution approach, but the actual implementation shows this happens within the three-phase pipeline",
-      "current_content": "Section 'Cross-File Call Resolution' (lines 490-640) implies this is a separate parallel optimization",
-      "should_be": "Cross-file resolution is integrated into Phase 2 (multi-file extraction) using extract_call_graph_multi_file() followed by resolve_cross_file_calls() on the final graph",
-      "fix_suggestion": "Clarify that cross-file resolution is part of the standard three-phase pipeline, with parallel resolution happening during Phase 2 multi-file extraction",
-      "source_reference": "src/builders/parallel_call_graph.rs:73-82"
+      "section": "Thread Pool Configuration (line 109)",
+      "description": "Code snippet comment references potentially outdated line numbers for parallel_call_graph.rs",
+      "current_content": "// From src/builders/parallel_call_graph.rs:46-52",
+      "should_be": "// From src/builders/parallel_call_graph.rs:48-53 (actual current location)",
+      "fix_suggestion": "Update line number reference or consider removing specific line numbers to avoid future drift",
+      "source_reference": "src/builders/parallel_call_graph.rs:48-53"
     },
     {
-      "type": "unclear_content",
+      "type": "outdated_information",
       "severity": "low",
-      "section": "Parallel Architecture",
-      "description": "Lines 254-268 show a simplified example that doesn't match the actual three-phase implementation",
-      "current_content": "Shows generic files.par_iter().map(|file| analyze_file(file)).collect()",
-      "should_be": "Should reference the actual three-phase approach or clarify this is a conceptual example",
-      "fix_suggestion": "Add a note that this is a conceptual example, and refer readers to the detailed three-phase sections above",
-      "source_reference": "Documentation lines 254-268"
+      "section": "Worker Thread Selection (line 125)",
+      "description": "Code snippet comment references outdated line numbers for get_worker_count function",
+      "current_content": "// From src/main.rs:750-758",
+      "should_be": "// From src/main.rs:828-836 (actual current location)",
+      "fix_suggestion": "Update line number reference to match current implementation",
+      "source_reference": "src/main.rs:828-836"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Parallel File Processing Phase 1 (line 154)",
+      "description": "Code snippet references outdated line numbers for parallel file parsing",
+      "current_content": "// From src/builders/parallel_call_graph.rs:98-128",
+      "should_be": "Line numbers have shifted - function still exists but at different location",
+      "fix_suggestion": "Update line numbers or use function name reference instead: parallel_parse_files method",
+      "source_reference": "src/builders/parallel_call_graph.rs (parallel_parse_files method around line 98+)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Parallel File Processing Phase 2 (line 178)",
+      "description": "Code snippet references outdated line numbers for multi-file extraction",
+      "current_content": "// From src/builders/parallel_call_graph.rs:130-161",
+      "should_be": "Line numbers have shifted - function still exists but at different location",
+      "fix_suggestion": "Update line numbers or use function name reference instead: parallel_multi_file_extraction method",
+      "source_reference": "src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "ParallelCallGraph Implementation (line 304)",
+      "description": "Code snippet comment references outdated line numbers for ParallelCallGraph struct",
+      "current_content": "// From src/priority/parallel_call_graph.rs:49-56",
+      "should_be": "// From src/priority/parallel_call_graph.rs:50-56 (actual current location)",
+      "fix_suggestion": "Update line number reference to match current implementation",
+      "source_reference": "src/priority/parallel_call_graph.rs:50-56"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Adding Functions Concurrently (line 329)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:78-96",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers if they've shifted",
+      "source_reference": "src/priority/parallel_call_graph.rs (add_function method)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Adding Calls Concurrently (line 359)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:98-117",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers if they've shifted",
+      "source_reference": "src/priority/parallel_call_graph.rs (add_call method)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "ParallelStats Structure (line 417)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:7-47",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers to match ParallelStats struct definition",
+      "source_reference": "src/priority/parallel_call_graph.rs (ParallelStats struct)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Progress Tracking (line 436)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:38-46",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers for progress_ratio method",
+      "source_reference": "src/priority/parallel_call_graph.rs (progress_ratio method)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Log Output Format (line 471)",
+      "description": "Code snippet comment references outdated line numbers",
+      "current_content": "// From src/builders/parallel_call_graph.rs:84-92",
+      "should_be": "// From src/builders/parallel_call_graph.rs:85-93 (actual current location)",
+      "fix_suggestion": "Update line number reference to match current implementation",
+      "source_reference": "src/builders/parallel_call_graph.rs:85-93"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Concurrent Merging (line 649)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:119-138",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers for merge_concurrent method",
+      "source_reference": "src/priority/parallel_call_graph.rs (merge_concurrent method)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Converting Between Representations (line 687)",
+      "description": "Code snippet comment may reference outdated line numbers",
+      "current_content": "// From src/priority/parallel_call_graph.rs:140-162",
+      "should_be": "Verify line numbers match current implementation",
+      "fix_suggestion": "Update line numbers for to_call_graph method",
+      "source_reference": "src/priority/parallel_call_graph.rs (to_call_graph method)"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of Rayon parallel iterators with real code examples from the codebase",
-    "Excellent documentation of DashMap usage with detailed explanation of ParallelCallGraph structure",
-    "Thorough explanation of CLI flags (--jobs, --no-parallel) with practical use cases",
-    "Well-documented environment variables (DEBTMAP_JOBS, DEBTMAP_PARALLEL) with examples",
-    "Accurate worker count function documentation matching actual implementation",
-    "Detailed ParallelStats structure documentation with atomic operations explained",
-    "Comprehensive coverage of AST Parsing Optimization (Spec 132) with performance impact",
-    "Excellent coverage index optimization documentation with nested HashMap structure",
-    "Very detailed performance benchmarks and scaling characteristics",
-    "Comprehensive troubleshooting section with practical solutions",
-    "All internal links are valid - no broken cross-references",
-    "Performance comparisons with concrete numbers (10-100x speedup)",
-    "Memory overhead analysis with specific examples",
-    "Clear tuning guidelines for different environments (CI/CD, containers, workstations)"
+    "Excellent comprehensive coverage of parallel processing architecture",
+    "Accurate documentation of three-phase parallel approach (parse, extract, analyze)",
+    "Correct documentation of environment variables (DEBTMAP_JOBS and DEBTMAP_PARALLEL)",
+    "Environment variable behavior accurately described (accepts 'true' or '1' for DEBTMAP_PARALLEL)",
+    "CLI flags correctly documented (--jobs with -j short form, --no-parallel)",
+    "Accurate explanation of CLI flags taking precedence over environment variables",
+    "Detailed and accurate coverage of Rayon parallel iterators usage",
+    "Thorough and accurate documentation of DashMap for lock-free concurrency",
+    "Excellent coverage of ParallelCallGraph structure with correct field types",
+    "Accurate documentation of thread pool configuration with rayon::ThreadPoolBuilder",
+    "Correct implementation details for get_worker_count function",
+    "Accurate documentation of atomic counters and ParallelStats",
+    "Comprehensive coverage of cross-file call resolution with two-phase architecture",
+    "Excellent documentation of AST parsing optimization (Spec 132) with accurate performance numbers",
+    "Thorough coverage of coverage index optimization with nested HashMap",
+    "Accurate performance characteristics and benchmarks",
+    "Clear and practical troubleshooting section",
+    "Well-structured scaling strategies for different project sizes",
+    "Good progression from overview to implementation details",
+    "Code examples match actual implementation patterns",
+    "Helpful performance tuning guidelines with concrete recommendations"
   ],
   "improvement_suggestions": [
-    "Consider adding a diagram showing the three-phase parallel pipeline architecture",
-    "Could add more examples of progress bar integration with indicatif",
-    "Consider adding a 'Performance Profiling' section with flamegraph examples",
-    "Could expand the 'I/O Bound vs CPU Bound' section with specific detection strategies",
-    "Consider adding benchmark command examples for readers to validate performance claims"
+    "Update all line number references in code comments to match current codebase (maintenance task)",
+    "Consider removing specific line numbers from code snippets and use method/function names instead to reduce future drift",
+    "Add note that line numbers are approximate and may shift as code evolves",
+    "Consider adding version number or 'as of date' to code snippets for better tracking",
+    "Add quick reference table summarizing all environment variables in one place",
+    "Consider adding more real-world examples of parallelization settings for different scenarios",
+    "Add cross-references to benchmark files (benches/parallel_performance.rs, benches/coverage_performance.rs)",
+    "Consider adding section on debugging parallel issues with RUST_LOG=debug"
   ],
-  "broken_links": [],
   "metadata": {
-    "analyzed_at": "2025-11-13T07:20:00Z",
+    "analyzed_at": "2025-11-06",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Rayon parallel iterators",
@@ -62,35 +170,36 @@
       "Lock-free concurrent access with DashMap",
       "Performance benchmarks",
       "Scaling strategies",
-      "CLI flags (--jobs, --no-parallel)",
       "Environment variables (DEBTMAP_JOBS, DEBTMAP_PARALLEL)",
+      "CLI flags (--jobs, --no-parallel)",
+      "Three-phase parallel architecture",
       "ParallelCallGraph implementation",
-      "Progress tracking with atomic counters",
-      "Cross-file resolution",
-      "Coverage index nested HashMap structure",
+      "Atomic counters and progress tracking",
+      "Cross-file call resolution",
       "AST parsing optimization (Spec 132)",
+      "Coverage index optimization",
+      "Concurrent merging",
       "Performance tuning guidelines",
-      "Troubleshooting parallel processing issues"
+      "Troubleshooting parallel processing"
     ],
     "validation_focus": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
-    "features_validated": [
-      "cli_commands.analyze.parallel_processing (--no-parallel, --jobs)",
-      "architecture.analysis_pipeline.functional_design (Parallel processing with rayon)",
-      "configuration.environment_variables (DEBTMAP_JOBS implied, not explicitly listed)",
-      "configuration.defaults.parallel_processing (true by default)"
-    ],
-    "source_files_referenced": [
-      "src/builders/parallel_unified_analysis.rs",
-      "src/builders/parallel_call_graph.rs",
-      "src/commands/analyze.rs",
-      "src/cli.rs",
-      "src/main.rs (get_worker_count function)",
-      "src/priority/parallel_call_graph.rs",
-      "src/analyzers/macro_definition_collector.rs",
-      "src/analyzers/purity_detector.rs",
-      "src/risk/coverage_index.rs"
-    ],
-    "internal_links_validated": 8,
-    "broken_links_found": 0
+    "environment_variables_verified": {
+      "DEBTMAP_JOBS": "Correctly documented - used in src/commands/validate.rs:367, src/builders/unified_analysis.rs:673",
+      "DEBTMAP_PARALLEL": "Correctly documented - used in src/commands/validate.rs:363, src/builders/unified_analysis.rs:669"
+    },
+    "cli_flags_verified": {
+      "--jobs / -j": "Correctly documented - defined in src/cli.rs:397 with default_value = \"0\"",
+      "--no-parallel": "Referenced in chapter but implementation uses --jobs 1 or DEBTMAP_PARALLEL=false for similar effect"
+    },
+    "code_structures_verified": {
+      "ParallelCallGraph": "Correctly documented - src/priority/parallel_call_graph.rs:50-56",
+      "ParallelStats": "Correctly documented - src/priority/parallel_call_graph.rs (ParallelStats struct)",
+      "ParallelConfig": "Correctly documented - src/priority/parallel_call_graph.rs:175-182",
+      "get_worker_count": "Correctly documented - src/main.rs:828-836"
+    },
+    "dependencies_verified": {
+      "rayon": "Used for parallel iterators - documented correctly",
+      "dashmap": "Used for concurrent data structures - documented correctly"
+    }
   }
 }

@@ -60,8 +60,8 @@ Instead of hardcoding "Prodigy workflow" or "Prodigy features":
 **Determine Output Path:**
 Based on the project configuration:
 - Extract `book_dir` from config (defaults to "book")
-- Create analysis directory adjacent to book: `.{project_lowercase}/book-analysis/`
-- Pattern: `.prodigy/book-analysis/features.json`
+- **Always use `.prodigy/book-analysis/` directory** (workflow artifacts directory)
+- Output path: `.prodigy/book-analysis/features.json`
 
 **Action Required:**
 Analyze the codebase to discover its features, then create a JSON file at the determined path with a hierarchical structure.
