@@ -13,7 +13,7 @@ Functional analysis examines your code at the AST level to detect:
 
 This analysis integrates with debtmap's scoring system, providing score bonuses for high-quality functional code and reducing god object warnings for codebases with many small pure helper functions.
 
-**Specification**: This feature implements [Specification 111: AST-Based Functional Pattern Detection](https://github.com/yourusername/debtmap/specs/111) with accuracy targets of precision ≥90%, recall ≥85%, F1 ≥0.87, and performance overhead <10%.
+**Implementation**: This feature is implemented in [src/analysis/functional_composition.rs](../../src/analysis/functional_composition.rs) with accuracy targets of precision ≥90%, recall ≥85%, F1 ≥0.87, and performance overhead <10%.
 
 ## Configuration Profiles
 
@@ -920,11 +920,10 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanc
 ## Related Chapters
 
 - [Analysis Guide](analysis-guide.md) - Understanding analysis types
-- [Complexity Analysis](./complexity-analysis.md) - How functional patterns affect complexity metrics
-- [Scoring Strategies](./scoring.md) - Integration with overall technical debt scoring
-- [God Object Detection](./god-objects.md) - How purity weights reduce false positives
+- [Metrics Reference](./metrics-reference.md) - How functional patterns affect complexity metrics
+- [Scoring Strategies](./scoring-strategies.md) - Integration with overall technical debt scoring
+- [God Object Detection](./god-object-detection.md) - How purity weights reduce false positives
 - [Configuration](./configuration.md) - Advanced functional analysis configuration options
-- [Refactoring](refactoring-guide.md) - Extracting pure functions
 
 ## Summary
 
