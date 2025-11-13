@@ -1,0 +1,113 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "context-providers",
+  "chapter_title": "Context Providers",
+  "chapter_file": "book/src/context-providers.md",
+  "drift_detected": true,
+  "severity": "low",
+  "quality_assessment": "Good - Documentation is comprehensive and accurate with only minor improvements needed. Excellent coverage of all three providers with detailed examples, formulas, and configuration. The chapter correctly warns about planned vs. implemented features.",
+  "issues": [
+    {
+      "type": "incorrect_path_reference",
+      "severity": "medium",
+      "section": "Advanced Usage - Custom Provider Implementation",
+      "description": "Documentation references incorrect source file path for ContextProvider trait",
+      "current_content": "See [src/risk/context/mod.rs](https://github.com/your-repo/debtmap/blob/main/src/risk/context/mod.rs) for implementation examples.",
+      "should_be": "See src/risk/context/mod.rs for implementation examples. (Remove GitHub URL with placeholder 'your-repo')",
+      "fix_suggestion": "Update line 870 to reference the local source file without a placeholder GitHub URL. Either use a relative path or remove the link entirely since it contains 'your-repo' placeholder.",
+      "source_reference": "src/risk/context/mod.rs:10-23"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Critical Path Provider - Entry Point Detection",
+      "description": "API Endpoint detection logic explanation could be clearer about combined condition requirements",
+      "current_content": "**Note on API Endpoint detection:** Detection requires BOTH conditions: (1) path contains `api/`, `handler/`, or `route/` AND (2) function starts with `handle_*`, `get_*`, `post_*`, `put_*`, `delete_*` or ends with `*_handler`. This combined matching ensures accurate classification of HTTP endpoint handlers.",
+      "should_be": "Current explanation is accurate but could benefit from an example showing what matches and what doesn't",
+      "fix_suggestion": "Add a concrete example:\n```\n✓ Matches: src/api/handle_request() - path has 'api/' AND function starts with 'handle_'\n✗ No match: src/utils/handle_error() - function matches but path doesn't have api/handler/route\n✗ No match: src/api/process_data() - path matches but function name doesn't match patterns\n```",
+      "source_reference": "src/risk/context/critical_path.rs:82-98"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Git History Provider - Stability Status Classifications",
+      "description": "Documentation mentions status appears in 'verbose output' but doesn't clarify verbosity level required",
+      "current_content": "These classifications are used internally for contribution calculations and appear in verbose output.",
+      "should_be": "These classifications are used internally for contribution calculations and appear in verbose output (-v or higher).",
+      "fix_suggestion": "Specify the verbosity flag required to see stability status classifications",
+      "source_reference": "src/risk/context/git_history.rs:313-321"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "Missing explanation of how config file settings interact with CLI flags (precedence)",
+      "current_content": "Configuration shows both TOML config and CLI flags but doesn't explain precedence",
+      "should_be": "Add note explaining that CLI flags override config file settings when both are present",
+      "fix_suggestion": "Add a 'Configuration Precedence' subsection explaining:\n```toml\n# Precedence (highest to lowest):\n# 1. CLI flags (--context-providers, --disable-context)\n# 2. Config file settings ([analysis] section)\n# 3. Hard-coded defaults (all three providers)\n```",
+      "source_reference": "src/utils/risk_analyzer.rs:93-172"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all three context providers (Critical Path, Dependency, Git History)",
+    "Excellent technical depth with formulas, algorithms, and convergence parameters",
+    "Clear documentation of provider weights and contribution calculations",
+    "Accurate warning that provider-specific TOML sections are planned but not yet implemented (lines 628-666)",
+    "Strong practical examples showing before/after comparisons with context enabled",
+    "Thorough CLI usage examples for enabling/disabling providers",
+    "Good troubleshooting section addressing common issues",
+    "Performance considerations are well-documented with specific overhead percentages",
+    "Context Details Structure section accurately documents JSON output format",
+    "Advanced Usage section explains ContextProvider trait and custom implementation",
+    "All internal documentation links are valid (troubleshooting.md, analysis-guide.md, configuration.md, parallel-processing.md)",
+    "Formulas and algorithms match actual implementation (critical path weighting, blast radius, stability score)",
+    "Entry point detection table is accurate and comprehensive (lines 41-48)",
+    "Risk classification tables match code constants (lines 227-232, 140-145)",
+    "Configuration limitation warning is prominent and accurate (lines 628-629)"
+  ],
+  "improvement_suggestions": [
+    "Consider adding a 'Quick Start' section at the beginning showing the most common use case: `debtmap analyze --context`",
+    "Add visual diagram showing how context providers integrate into the analysis pipeline",
+    "Include performance benchmarks comparing analysis with/without each provider on different repo sizes",
+    "Expand troubleshooting section with more specific Git history provider issues (shallow clones, large repos, etc.)",
+    "Add section explaining how to interpret combined context contributions when multiple providers are active",
+    "Consider adding 'Real-World Examples' section showing actual debtmap output with context details",
+    "Clarify which settings are hard-coded vs configurable (current docs show many as configurable but they're actually hard-coded)",
+    "Add migration guide for users updating from versions without context providers"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-01-13T07:20:00Z",
+    "feature_inventory": "features.json (loaded in memory)",
+    "topics_covered": [
+      "Critical path detection",
+      "Dependency analysis",
+      "Git history integration",
+      "Change frequency analysis",
+      "Context-aware risk adjustment",
+      "Enabling and disabling providers"
+    ],
+    "validation_focus": "Check that all context providers are documented with configuration and use cases",
+    "files_examined": [
+      "src/risk/context/mod.rs",
+      "src/risk/context/critical_path.rs",
+      "src/risk/context/dependency.rs",
+      "src/risk/context/git_history.rs",
+      "src/utils/risk_analyzer.rs",
+      "src/risk/mod.rs",
+      "src/cli.rs",
+      "book/src/context-providers.md"
+    ],
+    "validation_results": {
+      "all_providers_documented": true,
+      "configuration_documented": true,
+      "use_cases_documented": true,
+      "cli_flags_documented": true,
+      "examples_provided": true,
+      "troubleshooting_provided": true,
+      "internal_links_valid": true,
+      "formulas_accurate": true,
+      "tables_accurate": true,
+      "warnings_present": true
+    }
+  }
+}
