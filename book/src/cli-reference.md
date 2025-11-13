@@ -911,59 +911,6 @@ debtmap analyze . --threshold-complexity 5
 debtmap analyze . --min-priority low
 ```
 
-## Best Practices
-
-### Regular Analysis
-
-Run analysis regularly to track code quality trends:
-```bash
-# Daily in CI
-debtmap validate . --config debtmap.toml
-
-# Weekly deep analysis with coverage
-debtmap analyze . --coverage-file coverage.lcov --format json --output weekly-report.json
-```
-
-### Team Workflows
-
-Use shared cache for consistent team experience:
-```bash
-# Set environment variable for all team members
-export DEBTMAP_CACHE_DIR=/shared/team/debtmap-cache
-
-# Or use flag
-debtmap analyze . --cache-location shared
-```
-
-### Performance Optimization
-
-For large codebases:
-```bash
-# Use maximum parallelization
-debtmap analyze . --jobs 0  # 0 = all cores
-
-# Cache aggressively
-debtmap analyze . --cache-location shared
-
-# Focus on changed files in CI
-# (implement via custom scripts to analyze git diff)
-```
-
-### Integration with Coverage
-
-Always analyze with coverage when available:
-```bash
-# Rust example
-cargo tarpaulin --out lcov
-debtmap analyze src/ --coverage-file lcov.info
-
-# Python example
-pytest --cov --cov-report=lcov
-debtmap analyze . --coverage-file coverage.lcov
-```
-
-Coverage integration helps prioritize untested complex code.
-
 ## Additional Tools
 
 ### prodigy-validate-debtmap-improvement
