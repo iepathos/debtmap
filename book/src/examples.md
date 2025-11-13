@@ -917,6 +917,18 @@ debtmap analyze . --validate-call-graph
 
 # Show detailed caller/callee relationships
 debtmap analyze . --show-dependencies
+
+# Show only call graph statistics (no detailed failure list)
+debtmap analyze . --call-graph-stats
+
+# Control debug output format (text or json)
+debtmap analyze . --debug-call-graph --debug-format json
+
+# Include external crate calls in dependency output
+debtmap analyze . --show-dependencies --show-external-calls
+
+# Include Rust standard library calls in dependency output
+debtmap analyze . --show-dependencies --show-std-lib-calls
 ```
 
 **Use cases:**
@@ -925,18 +937,30 @@ debtmap analyze . --show-dependencies
 ```bash
 # When a function isn't being analyzed correctly
 debtmap analyze . --debug-call-graph --trace-function problematic_function
+
+# Get JSON format for programmatic processing
+debtmap analyze . --debug-call-graph --debug-format json
 ```
 
 **Understanding function relationships:**
 ```bash
 # See who calls what
 debtmap analyze . --show-dependencies --top 10
+
+# Include external crate calls
+debtmap analyze . --show-dependencies --show-external-calls
+
+# Include standard library calls
+debtmap analyze . --show-dependencies --show-std-lib-calls
 ```
 
 **Validating call graph integrity:**
 ```bash
 # Detect cycles and orphaned nodes
 debtmap analyze . --validate-call-graph
+
+# Get summary statistics only
+debtmap analyze . --call-graph-stats
 ```
 
 Output includes:
