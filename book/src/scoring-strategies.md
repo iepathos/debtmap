@@ -230,13 +230,15 @@ Final Score = Base Score × Coverage Multiplier × Role Multiplier
 4. **Coverage Multiplier**: 1.0 - coverage_percent (0% coverage = 1.0, 100% coverage = 0.0)
 5. **Final Score**: Base Score × Coverage Multiplier × Role Multiplier
 
-**Why Hard-Coded Weights?** The base weights (0.50 for complexity, 0.25 for dependencies) are intentionally not configurable to:
+**Why Base Weights Are Hard-Coded:**
+
+The base weights (0.50 for complexity, 0.25 for dependencies) are intentionally not configurable to:
 - **Ensure consistency**: Scores remain comparable across projects and teams
 - **Prevent instability**: Avoid extreme configurations that break prioritization
 - **Simplify configuration**: Reduce cognitive load for users
 - **Maintain calibration**: Weights are empirically tuned based on analysis of real codebases
 
-You can still customize prioritization significantly through configurable `role_multipliers`, `coverage_weights`, and normalization settings.
+**What You Can Customize**: While base weights are fixed, you can still customize prioritization significantly through configurable `role_multipliers`, `coverage_weights`, and normalization settings.
 
 **Note**: Coverage acts as a dampening multiplier rather than an additive factor. Lower coverage (higher multiplier) increases the final score, making untested complex code a higher priority. Role multipliers and coverage weights remain configurable to allow customization while maintaining stable base calculations.
 
@@ -979,11 +981,11 @@ minimum_debt_score = 3.0
 
 ## Rebalanced Debt Scoring (Spec 136)
 
+> **IMPORTANT**: Rebalanced scoring is enabled through your `.debtmap.toml` configuration file, **not via CLI flags**. Add the `[scoring_rebalanced]` section to activate it.
+
 Debtmap now includes an advanced **rebalanced scoring algorithm** that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.
 
 ### Enabling Rebalanced Scoring
-
-> **IMPORTANT**: Rebalanced scoring is enabled through your `.debtmap.toml` configuration file, **not via CLI flags**. Add the `[scoring_rebalanced]` section to activate it.
 
 **Default Behavior**: By default, debtmap uses the standard scoring algorithm described earlier in this chapter. To use rebalanced scoring, add the `[scoring_rebalanced]` section to your config:
 
@@ -1232,7 +1234,7 @@ preset = "size-focused"
 3. Adjust team priorities based on new rankings
 4. Switch to rebalanced scoring after validation
 
-See [Migration Guide](./migration-guide.md) for detailed migration instructions.
+**Migration from Legacy Scoring**: The migration path outlined above provides guidance for teams transitioning to rebalanced scoring. Start by testing with both algorithms, comparing results, evaluating how priorities change, and then adopting rebalanced scoring once you're satisfied with the new prioritization.
 
 ### Configuration Reference
 
@@ -1570,5 +1572,5 @@ Exponential scaling has negligible performance impact:
 - [Tiered Prioritization](./tiered-prioritization.md) - Understanding tier-based classification
 - [Configuration](./configuration.md) - Scoring and aggregation configuration
 - [Analysis Guide](./analysis-guide.md) - Detailed metric explanations
-- [File Classification](./file-classification.md) - Context-aware file size thresholds (Spec 135)
+- [Configuration](./configuration.md) - Complete configuration reference including context-aware thresholds
 - [ARCHITECTURE.md](../ARCHITECTURE.md) - Technical details of exponential scaling implementation
