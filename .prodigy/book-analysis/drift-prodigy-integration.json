@@ -1,152 +1,74 @@
 {
+  "item_type": "chapter",
   "chapter_id": "prodigy-integration",
   "chapter_title": "Prodigy Integration",
   "chapter_file": "book/src/prodigy-integration.md",
   "drift_detected": true,
   "severity": "low",
-  "quality_assessment": "Chapter provides comprehensive and accurate Prodigy workflow documentation with verified examples. Chapter correctly documents validate-improvement as available both via Claude slash command and direct shell subcommand. The workflow examples accurately match the actual workflow files. Minor issues include: missing note about workflow inconsistency between sequential and MapReduce examples, and minor clarity improvements around 'just' command alternatives.",
+  "quality_assessment": "Chapter is comprehensive and generally accurate. Minor issues found: one outdated CLI flag usage in MapReduce example and validation threshold discrepancy. All internal cross-references are valid.",
   "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "MapReduce Configuration Options - Map Phase Fields",
+      "description": "Documentation shows incorrect filter/sort syntax with 'File.score' and 'Function.unified_score.final_score' but actual workflow uses different paths",
+      "current_content": "filter: \"File.score >= 10 OR Function.unified_score.final_score >= 10\"\nsort_by: \"File.score DESC, Function.unified_score.final_score DESC\"",
+      "should_be": "filter: \"File.score >= 10 OR Function.unified_score.final_score >= 10\"\nsort_by: \"File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST\"",
+      "fix_suggestion": "Update MapReduce example to include NULLS LAST handling in sort_by as shown in actual workflow file. This ensures Files sort before Functions.",
+      "source_reference": "workflows/debtmap-reduce.yml:79-80"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Quick Start - Run Workflow",
+      "description": "Documentation mentions worktrees managed by 'prodigy worktree' command but doesn't clarify automatic creation in MapReduce mode",
+      "current_content": "Worktrees are managed separately via the `prodigy worktree` command.",
+      "should_be": "In MapReduce mode, Prodigy automatically creates isolated worktrees for each parallel agent. Use `prodigy worktree` command to manage these worktrees.",
+      "fix_suggestion": "Clarify that MapReduce workflows automatically handle worktree creation and the command is primarily for cleanup/inspection",
+      "source_reference": "workflows/debtmap-reduce.yml (implicit from mode: mapreduce)"
+    },
     {
       "type": "missing_content",
       "severity": "low",
-      "section": "Workflow inconsistency between Sequential and MapReduce examples",
-      "description": "The chapter shows two different approaches for validate-improvement: Sequential workflow uses shell: command (line 133) while MapReduce workflow uses claude: wrapper (line 635). Both examples are ACCURATE to their respective actual workflow files (debtmap.yml:31 vs debtmap-reduce.yml:44), but chapter doesn't explain why they differ.",
-      "current_content": "Examples show different approaches without explanation",
-      "should_be": "Add a note explaining that both approaches work and workflows use different styles",
-      "fix_suggestion": "Add note near line 478: 'Note: The sequential workflow (workflows/debtmap.yml) uses the shell command directly, while the MapReduce workflow (workflows/debtmap-reduce.yml) uses the claude wrapper. Both approaches are valid - use whichever fits your workflow style.'",
-      "source_reference": "workflows/debtmap.yml:31 (shell) vs workflows/debtmap-reduce.yml:44 (claude wrapper)"
-    },
-    {
-      "type": "minor_clarity_issue",
-      "severity": "low",
-      "section": "Quick Start - Workflow File (Line 107)",
-      "description": "Chapter explains 'just' alternatives at line 161 but first usage at line 107 has no note",
-      "current_content": "- shell: \"just coverage-lcov\"  # or: cargo tarpaulin --out lcov --output-dir target/coverage (line 107 in chapter)",
-      "should_be": "Add note about 'just' at first usage for better user experience",
-      "fix_suggestion": "Either: (1) Move the 'just' explanation note from line 161 to immediately after line 107 (first usage), or (2) Add a cross-reference at line 107 pointing to the explanation at line 161",
-      "source_reference": "Documentation best practice - explain concepts at first usage"
-    },
-    {
-      "type": "minor_clarity_issue",
-      "severity": "low",
-      "section": "Claude Slash Commands Introduction (Line 416)",
-      "description": "Chapter has important note about slash commands being custom (line 416) but could be more explicit that they exist in Debtmap's repository",
-      "current_content": "> **Important**: The slash commands documented below are custom commands provided in Debtmap's `.claude/commands/` directory as examples...",
-      "should_be": "This is good but could explicitly say they're included in the repo",
-      "fix_suggestion": "Enhance note: '> **Important**: The slash commands documented below are custom commands provided in Debtmap's `.claude/commands/` directory. They are included in the Debtmap repository as working examples. You can use them as-is or create your own based on these patterns.'",
-      "source_reference": ".claude/commands/ directory contains these commands in Debtmap repo"
-    },
-    {
-      "type": "minor_clarity_issue",
-      "severity": "low",
-      "section": "MapReduce Variables Table (Line 747)",
-      "description": "Chapter already has a variables table at line 747 which is good, but validation.attempt_number variable is missing from table",
-      "current_content": "Table shows item, item_id, validation.gaps, shell.output, map.* variables",
-      "should_be": "Include validation.attempt_number which is used in examples",
-      "fix_suggestion": "Add row to table: | ${validation.attempt_number} | map phase | number | Current retry attempt number (1, 2, 3, etc.) |",
-      "source_reference": "Used in example at line 640 and in actual workflow debtmap-reduce.yml:49, but not in table at line 747"
-    },
-    {
-      "type": "incomplete_explanation",
-      "severity": "low",
-      "section": "Prerequisites Checklist (Line 14)",
-      "description": "Chapter has a prerequisites checklist which is excellent, but 'just' is listed as optional without explaining what it is at first mention",
-      "current_content": "- [ ] Optional: `just` command runner (a command runner like make), or use direct `cargo` commands as alternatives",
-      "should_be": "Good explanation but placement could be improved",
-      "fix_suggestion": "This is already well-explained in the checklist. Consider adding a link to justfile documentation or the project's justfile for users unfamiliar with it.",
-      "source_reference": "User experience - first mention already explains it well"
+      "section": "Claude Slash Commands - /prodigy-validate-debtmap-improvement",
+      "description": "Missing information about --threshold parameter available in validate-improvement command",
+      "fix_suggestion": "Add --threshold parameter documentation showing default value of 75.0 and ability to customize improvement threshold",
+      "source_reference": ".claude/commands/prodigy-validate-debtmap-improvement.md:495"
     }
   ],
   "positive_aspects": [
-    "VERIFIED: Examples accurately match actual workflow files - Sequential example matches workflows/debtmap.yml, MapReduce example matches workflows/debtmap-reduce.yml",
-    "VERIFIED: All debtmap commands (analyze, compare, validate-improvement) exist in codebase and examples use correct syntax",
-    "VERIFIED: All slash commands referenced exist in .claude/commands/ directory with correct parameters",
-    "Excellent prerequisites checklist at the beginning (lines 5-14) helps users prepare",
-    "Chapter correctly notes Prodigy is a separate tool requiring separate installation (lines 16-18)",
-    "Comprehensive coverage of Prodigy integration with detailed, accurate examples",
-    "Good progression from simple sequential workflows (lines 89-147) to complex MapReduce workflows (lines 562-680)",
-    "Correctly documents validate-improvement as available both via claude: slash command AND shell: subcommand (lines 478-488)",
-    "Complete documentation of Prodigy commands: run, resume, resume-job, sessions, checkpoints, worktree, progress, events, dlq, clean",
-    "Practical examples with real, verified debtmap commands",
-    "Detailed explanation of validation patterns with threshold, result_file, on_incomplete (lines 343-386)",
-    "Helpful ASCII diagram showing MapReduce architecture (lines 761-805)",
-    "MapReduce variables documented in table format (line 747)",
-    "Good coverage of iteration strategies and differences between sequential vs MapReduce (lines 816-884)",
-    "Extensive troubleshooting section covering common issues (lines 1144-1384) including MapReduce-specific troubleshooting",
-    "Important note that slash commands are custom and located in .claude/commands/ (line 416)",
-    "Explains 'just' command alternatives at line 161",
-    "CI/CD integration examples for GitHub Actions and GitLab CI with correct commands",
-    "Links to external documentation and related chapters"
+    "Comprehensive coverage of both sequential and MapReduce workflows",
+    "Excellent workflow examples with actual working YAML from the repository",
+    "All internal cross-references are valid (cli-reference.md, coverage-integration.md, configuration.md, tiered-prioritization.md)",
+    "Clear prerequisite checklist and installation instructions",
+    "Extensive troubleshooting section covering both sequential and MapReduce scenarios",
+    "Good explanation of validation process and step-level validation",
+    "Well-organized command reference with parameters and examples",
+    "MapReduce architecture diagram helps visualize parallel workflow execution",
+    "Helpful variable reference table for MapReduce workflows"
   ],
   "improvement_suggestions": [
-    "Add note explaining the workflow style difference: sequential uses shell: directly, MapReduce uses claude: wrapper (both are valid)",
-    "Add validation.attempt_number to MapReduce variables table",
-    "Consider moving 'just' explanation to first usage (line 107) or add forward reference",
-    "Consider adding a link to the project's justfile in the prerequisites section",
-    "Consider adding cross-reference to Coverage Integration chapter at line 404",
-    "Consider adding version compatibility note for Prodigy/Debtmap integration"
+    "Add note about NULLS LAST clause importance in sort_by for mixed File/Function items",
+    "Clarify automatic worktree creation in MapReduce mode vs manual management",
+    "Include example of customizing validation threshold in workflow files",
+    "Consider adding a comparison table: sequential vs MapReduce workflow characteristics",
+    "Add troubleshooting section for JSONPath filtering issues in MapReduce",
+    "Include example of debugging filter expressions for work item selection"
   ],
   "metadata": {
-    "analyzed_at": "2025-11-06",
+    "analyzed_at": "2025-11-13T07:25:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "What is Prodigy",
-      "Benefits (automated debt reduction, iterative improvement, safe experimentation)",
-      "Installation and prerequisites",
-      "Quick Start with sequential workflow",
-      "Prodigy CLI commands (run, resume, sessions, checkpoints, worktree, progress, events, dlq)",
-      "Workflow configuration (shell commands, claude commands, validation, error handling)",
-      "Claude slash commands with detailed parameters",
-      "Target selection and prioritization",
-      "MapReduce workflows with complete example and configuration reference",
-      "MapReduce architecture and variables",
-      "Iteration strategies (sequential vs MapReduce)",
-      "Validation patterns and thresholds",
-      "Output and metrics",
-      "CI/CD integration (GitHub Actions, GitLab CI)",
-      "Best practices",
-      "Troubleshooting (general and MapReduce-specific)",
-      "Example workflows"
+      "Automated debt reduction",
+      "Map-reduce workflows",
+      "Setting up Prodigy",
+      "Running debtmap workflows",
+      "Iterative improvement",
+      "Validation and testing"
     ],
     "validation_focus": "Check that Prodigy workflow integration is documented with workflow file examples",
-    "validation_result": "PASS - Prodigy workflow integration IS comprehensively documented with multiple accurate workflow file examples: (1) Sequential workflow (lines 103-159) matches workflows/debtmap.yml, (2) Complete MapReduce workflow (lines 589-706) matches workflows/debtmap-reduce.yml, (3) CI/CD examples. Chapter correctly documents validate-improvement as available both via claude: slash command and shell: subcommand.",
-    "workflow_verification": {
-      "sequential_example_accuracy": "VERIFIED - Lines 103-159 match workflows/debtmap.yml structure and commands",
-      "mapreduce_example_accuracy": "VERIFIED - Lines 589-706 match workflows/debtmap-reduce.yml structure and commands",
-      "validate_improvement_sequential": "shell: direct command at line 133 matches debtmap.yml:31",
-      "validate_improvement_mapreduce": "claude: wrapper at line 635 matches debtmap-reduce.yml:44",
-      "workflow_style_note": "Sequential and MapReduce workflows use different styles for validate-improvement - both are correct per actual workflow files"
-    },
-    "debtmap_commands_referenced": [
-      "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-before.json --format json",
-      "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json",
-      "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json",
-      "debtmap validate . --config .debtmap.toml --max-debt-density 50"
-    ],
-    "debtmap_commands_verified": "All debtmap commands verified against actual implementation: (1) analyze with --lcov/--output/--format exists, (2) compare with --before/--after/--plan/--format/--output exists, (3) validate-improvement subcommand exists at src/commands/validate_improvement.rs:120, (4) validate with --config/--max-debt-density exists",
-    "prodigy_commands_referenced": [
-      "prodigy run",
-      "prodigy resume",
-      "prodigy resume-job",
-      "prodigy sessions",
-      "prodigy checkpoints",
-      "prodigy worktree (list/clean/remove)",
-      "prodigy progress",
-      "prodigy events",
-      "prodigy dlq (list/retry/remove)",
-      "prodigy clean"
-    ],
-    "slash_commands_referenced": [
-      "/prodigy-debtmap-plan",
-      "/prodigy-validate-debtmap-plan",
-      "/prodigy-revise-debtmap-plan",
-      "/prodigy-debtmap-implement",
-      "/prodigy-validate-debtmap-improvement",
-      "/prodigy-complete-debtmap-fix",
-      "/prodigy-debug-test-failure",
-      "/prodigy-lint",
-      "/prodigy-compare-debt-results"
-    ],
-    "slash_commands_verified": "All slash commands verified to exist in .claude/commands/ directory: prodigy-debtmap-plan.md, prodigy-validate-debtmap-plan.md, prodigy-revise-debtmap-plan.md, prodigy-debtmap-implement.md, prodigy-validate-debtmap-improvement.md, prodigy-complete-debtmap-fix.md, prodigy-debug-test-failure.md, prodigy-lint.md, prodigy-compare-debt-results.md"
+    "cross_references_validated": true,
+    "broken_links": []
   }
 }
