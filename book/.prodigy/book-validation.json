@@ -1,0 +1,78 @@
+{
+  "validation_timestamp": "2025-11-13T08:23:25Z",
+  "project": "Debtmap",
+  "book_dir": "book",
+  "total_files": 36,
+  "total_chapters": 32,
+  "issues_found": [
+    {
+      "type": "best_practices_in_reference",
+      "severity": "medium",
+      "description": "Best Practices sections found in technical reference pages",
+      "files": [
+        {
+          "file": "cli-reference.md",
+          "lines": [914, 966],
+          "file_type": "technical_reference",
+          "title": "CLI Reference",
+          "recommendation": "Remove Best Practices section - this is API/command documentation, not a guide"
+        }
+      ]
+    },
+    {
+      "type": "redundant_best_practices",
+      "severity": "high",
+      "description": "Redundant Best Practices sections (not applicable - flat structure)",
+      "files": []
+    },
+    {
+      "type": "circular_see_also",
+      "severity": "low",
+      "description": "Circular See Also references detected",
+      "patterns": []
+    },
+    {
+      "type": "generic_see_also",
+      "severity": "low",
+      "description": "Generic See Also lists without specific relationships",
+      "files": []
+    },
+    {
+      "type": "over_fragmented_chapters",
+      "severity": "medium",
+      "description": "Over-fragmented chapters (not applicable - single-file chapters)",
+      "chapters": []
+    },
+    {
+      "type": "stub_navigation_files",
+      "severity": "medium",
+      "description": "Stub navigation files (not applicable - flat structure)",
+      "files": []
+    },
+    {
+      "type": "meta_sections_in_feature_chapters",
+      "severity": "medium",
+      "description": "Meta-sections in feature chapters (not applicable - flat structure)",
+      "files": []
+    }
+  ],
+  "summary": {
+    "best_practices_in_reference": 1,
+    "redundant_best_practices": 0,
+    "circular_see_also": 0,
+    "generic_see_also": 0,
+    "over_fragmented_chapters": 0,
+    "stub_navigation_files": 0,
+    "meta_sections_in_feature_chapters": 0,
+    "total_issues": 1
+  },
+  "recommendations": [
+    "Remove 1 Best Practices section from technical reference page (cli-reference.md)"
+  ],
+  "notes": [
+    "Book uses flat single-file chapter structure - most anti-patterns not applicable",
+    "Most files are feature/analysis guides, which appropriately have Best Practices sections",
+    "No circular See Also references detected",
+    "No generic See Also lists detected - all are focused and relevant"
+  ]
+}
