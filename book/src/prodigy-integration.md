@@ -177,7 +177,7 @@ prodigy run workflows/debtmap.yml -yn 1
 - `-y` (`--yes`) - Auto-confirm workflow steps (skip prompts)
 - `-n 5` (`--max-iterations 5`) - Run workflow for up to 5 iterations
 
-**Note**: Worktrees are managed separately via the `prodigy worktree` command. In MapReduce mode, Prodigy automatically creates isolated worktrees for each parallel agent.
+**Note on Worktrees**: In MapReduce mode, Prodigy automatically creates isolated worktrees for each parallel agent. For sequential workflows, worktrees are managed via the `prodigy worktree` command for cleanup and inspection.
 
 ### 3. Review Results
 
@@ -487,13 +487,16 @@ Validates that the implementation successfully addressed the debt item.
 
 # Or using shell command directly
 - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+
+# Custom threshold example (stricter validation)
+- shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json --threshold 85.0"
 ```
 
 **Parameters:**
 - `--comparison`: Debtmap comparison results (before vs after)
 - `--output`: Validation results JSON (with score 0-100)
 - `--previous-validation`: (Optional) Previous validation result for trend tracking
-- `--threshold`: (Optional) Improvement threshold percentage (default: 75.0)
+- `--threshold`: (Optional) Improvement threshold percentage (default: 75.0). Set lower for incremental improvements or higher for strict quality gates
 
 #### `/prodigy-complete-debtmap-fix`
 
@@ -665,8 +668,10 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Filter and sort items
+  # Note: Items are wrapped in either File or Function enums
+  # NULLS LAST ensures Files (with non-null File.score) sort before Functions (with null File.score)
   filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
-  sort_by: "File.score DESC, Function.unified_score.final_score DESC"
+  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
