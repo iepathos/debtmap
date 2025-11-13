@@ -306,6 +306,8 @@ debtmap validate . --summary
 debtmap validate . -s
 ```
 
+**Source:** `src/cli.rs:368-369` (Validate command)
+
 **Summary format output:**
 ```
 ✅ Validation PASSED
