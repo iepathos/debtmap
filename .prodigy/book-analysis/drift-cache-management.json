@@ -1,93 +1,94 @@
 {
+  "item_type": "chapter",
   "chapter_id": "cache-management",
   "chapter_title": "Cache Management",
   "chapter_file": "book/src/cache-management.md",
-  "drift_detected": false,
+  "drift_detected": true,
   "severity": "low",
-  "quality_assessment": "Chapter is comprehensive and accurately documents the cache management system. All major features are covered with clear examples and explanations. Minor improvements could enhance clarity around edge cases.",
+  "quality_assessment": "Documentation is highly comprehensive and accurate. Cache location, strategies, environment variables, CLI flags, and pruning mechanisms are all thoroughly documented and match the implementation. Minor issues found: (1) --cache-location parameter description doesn't mention 'local' and 'shared' as valid strategy values, (2) some CLI examples are missing the 'analyze' subcommand, (3) deprecated --cache flag could be mentioned for context. Overall quality is excellent with only minor clarifications needed.",
   "issues": [
     {
-      "type": "minor_clarity",
+      "type": "incomplete_description",
       "severity": "low",
-      "section": "Cache Strategy",
-      "description": "Chapter mentions 'Shared (default)' and 'Custom' strategies but doesn't explicitly link to CacheStrategy enum",
-      "current_content": "Debtmap supports two cache storage strategies:\n- **Shared (default)**: Stores cache in XDG-compliant shared directory\n- **Custom**: Stores cache in user-specified location via `DEBTMAP_CACHE_DIR`",
-      "improvement_suggestion": "This is accurate and well-explained. No changes needed, but could add a note that these map to CacheStrategy::Shared and CacheStrategy::Custom in the code for developers",
-      "source_reference": "src/cache/cache_location.rs:7-12"
+      "section": "Command Line Options",
+      "description": "The --cache-location parameter description states it accepts '<path>' and 'sets DEBTMAP_CACHE_DIR', but the CLI implementation shows it accepts a strategy string that can be 'local', 'shared', or a custom path. The parameter description doesn't mention these strategy values.",
+      "current_content": "| `--cache-location <path>` | Specify custom cache directory path for this run (sets DEBTMAP_CACHE_DIR) |",
+      "should_be": "| `--cache-location <LOCATION>` | Cache location strategy: 'local', 'shared', or custom path. Sets DEBTMAP_CACHE_DIR for this run. |",
+      "fix_suggestion": "Update the parameter description to explicitly mention 'local' and 'shared' as valid strategy values, not just custom paths. This aligns with the CLI implementation which documents it as 'Cache location strategy (local, shared, or path)' and other book chapters (cli-reference.md) that show examples like '--cache-location shared'.",
+      "source_reference": "src/cli.rs:188-190, book/src/cli-reference.md:525-526"
     },
     {
-      "type": "technical_accuracy",
+      "type": "incorrect_example",
       "severity": "low",
-      "section": "Pruning Strategies - Age Strategy",
-      "description": "Documentation accurately states age-based strategy behavior but could be even clearer",
-      "current_content": "### Age-Based Only\n\nOnly removes entries older than `DEBTMAP_CACHE_MAX_AGE_DAYS`. Does not prune based on size or entry count limits - this means the cache can grow unbounded if all entries are recent.",
-      "improvement_suggestion": "Documentation already clarifies this correctly in line 152-154. No changes needed.",
-      "source_reference": "src/cache/auto_pruner.rs:294-308"
+      "section": "CLI Examples",
+      "description": "Several CLI examples are missing the required 'analyze' subcommand, which would cause them to fail if executed. Examples show 'debtmap --flag' instead of 'debtmap analyze . --flag'.",
+      "current_content": "```bash\n# Run analysis without using cache\ndebtmap --no-cache\n\n# Clear cache and rebuild from scratch\ndebtmap --clear-cache\n\n# View cache statistics\ndebtmap --cache-stats\n\n# Use custom cache location for this run\ndebtmap --cache-location /tmp/temp-cache\n\n# Migrate existing cache to shared location\ndebtmap --migrate-cache\n```",
+      "should_be": "```bash\n# Run analysis without using cache\ndebtmap analyze . --no-cache\n\n# Clear cache and rebuild from scratch\ndebtmap analyze . --clear-cache\n\n# View cache statistics\ndebtmap analyze . --cache-stats\n\n# Use custom cache location for this run\ndebtmap analyze . --cache-location /tmp/temp-cache\n\n# Or use shared strategy\ndebtmap analyze . --cache-location shared\n\n# Migrate existing cache to shared location\ndebtmap analyze . --migrate-cache\n```",
+      "fix_suggestion": "Add 'analyze .' to all CLI examples to make them executable. Also add an example showing strategy-based usage (--cache-location shared) to demonstrate both path and strategy forms.",
+      "source_reference": "src/cli.rs:41-44, book/src/cli-reference.md:525-532"
     },
     {
-      "type": "completeness",
+      "type": "missing_content",
       "severity": "low",
-      "section": "CLI Examples - cache-location flag",
-      "description": "Chapter shows --cache-location CLI flag usage but doesn't mention it sets DEBTMAP_CACHE_DIR for that run",
-      "current_content": "# Use custom cache location for this run\ndebtmap --cache-location /tmp/temp-cache",
-      "improvement_suggestion": "Add note: '(sets DEBTMAP_CACHE_DIR)' to clarify the relationship between the flag and environment variable",
-      "source_reference": "src/cli.rs:189-190"
-    },
-    {
-      "type": "edge_case",
-      "severity": "low",
-      "section": "Project Identification",
-      "description": "Documentation doesn't mention the 'local:' prefix used when falling back to git repository root",
-      "current_content": "1. **Git remote URL hash** (preferred): SHA256 hash (first 16 characters) of the git remote origin URL\n2. **Absolute path hash** (fallback): SHA256 hash (first 16 characters) of the project's absolute path",
-      "improvement_suggestion": "Technically accurate. The 'local:' prefix is an implementation detail that doesn't affect user understanding. No change needed.",
-      "source_reference": "src/cache/cache_location.rs:138"
+      "section": "Command Line Options",
+      "description": "The deprecated --cache flag (which enabled caching) is mentioned in other book chapters but not documented here. For completeness and historical context, it should be noted that this flag exists but is hidden and deprecated.",
+      "fix_suggestion": "Add a note in a 'Deprecated Options' subsection or as a callout: 'Note: The --cache flag (to enable caching) is deprecated and hidden. Caching is now enabled by default; use --no-cache to disable it.' This helps users migrating from older versions.",
+      "source_reference": "src/cli.rs:164-166, book/src/troubleshooting.md:332"
     }
   ],
   "positive_aspects": [
-    "Comprehensive coverage of all cache environment variables with clear table format",
-    "All four pruning strategies (LRU, LFU, FIFO, Age) are documented with use cases and examples",
-    "CLI options are thoroughly documented with practical examples",
-    "Excellent troubleshooting section covering common issues like disk space, stale cache, and permissions",
-    "Default configuration values are clearly documented (1GB, 30 days, 10000 entries, 25% prune, LRU)",
-    "Cache directory structure is explained with subdirectory purposes",
-    "Performance optimization section explains cache benefits and CI best practices",
-    "Platform-specific cache locations are accurately documented for macOS, Linux, and Windows",
-    "Project identification mechanism using git remote URL or path hash is explained",
-    "Cache migration feature is documented with clear command example",
-    "Background vs synchronous pruning is explained with DEBTMAP_CACHE_SYNC_PRUNE configuration",
-    "Pruning triggers are clearly documented (size, count, age-based)",
-    "Cache scope for branch-specific caching is documented",
-    "All documented environment variables match the actual implementation",
-    "Examples are practical and ready to copy-paste"
+    "Comprehensive coverage of all cache strategies (LRU, LFU, FIFO, age-based) with use cases",
+    "Accurate documentation of all environment variables with correct defaults (verified against src/cache/auto_pruner.rs)",
+    "Excellent explanation of cache directory structure matching actual implementation (call_graphs/, analysis/, metadata/, temp/, file_metrics/)",
+    "Good troubleshooting section with practical solutions for common issues",
+    "Clear examples for CI/CD environments with recommended configurations",
+    "Accurate documentation of pruning triggers and strategies matching implementation",
+    "Well-explained cache scope feature for branch-specific caching (DEBTMAP_CACHE_SCOPE)",
+    "Correct documentation of synchronous vs background pruning (DEBTMAP_CACHE_SYNC_PRUNE)",
+    "Platform-specific cache locations are accurately documented for macOS, Linux, Windows with correct paths",
+    "Project identification mechanism (git remote URL hash, path hash fallback) is accurately explained",
+    "Default configuration values match implementation exactly (1GB, 30 days, 10k entries, 25%, LRU)",
+    "Cache migration feature is documented with clear command",
+    "Pruning percentage and strategies are accurately documented with behavioral details",
+    "All documented CLI flags exist in the implementation and have correct descriptions",
+    "Environment variable table is complete and accurate",
+    "Examples are practical and demonstrate real-world usage patterns"
   ],
   "improvement_suggestions": [
-    "Consider adding a decision flowchart for choosing the right pruning strategy",
-    "Add example output from --cache-stats command to show users what to expect",
-    "Consider adding a 'Quick Start' section at the beginning with common configurations",
-    "Add visual diagram of cache directory structure for better understanding"
+    "Add explicit mention of 'local' and 'shared' as valid strategy values for --cache-location",
+    "Fix CLI examples to include the 'analyze' subcommand for accuracy",
+    "Add an example showing '--cache-location shared' usage",
+    "Mention the deprecated --cache flag for historical context",
+    "Consider adding example output from --cache-stats to show what users should expect",
+    "Add cross-reference to CLI Reference chapter for complete flag documentation",
+    "Consider adding a decision flowchart for choosing the right pruning strategy"
   ],
+  "cross_references": [],
   "metadata": {
-    "analyzed_at": "2025-11-06",
+    "analyzed_at": "2025-01-13T07:30:00Z",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "Cache location and configuration",
       "Cache strategies (LRU, LFU, FIFO, age-based)",
       "Automatic pruning",
       "Environment variables",
-      "CLI options",
       "Performance optimization",
       "Troubleshooting cache issues",
       "Cache directory structure",
       "Project identification",
+      "CLI options",
       "Default configuration",
+      "Synchronous vs background pruning",
       "Cache migration"
     ],
     "validation_focus": "Check that cache configuration options, pruning strategies, and environment variables are documented",
-    "chapter_exists": true,
+    "internal_links_validated": true,
+    "broken_links": [],
+    "total_internal_links_found": 0,
     "implementation_files_verified": [
       "src/cache/cache_location.rs",
       "src/cache/auto_pruner.rs",
-      "src/cache/pruning/decision.rs",
+      "src/cache/shared_cache/pruning.rs",
       "src/cache/shared_cache/builder.rs",
       "src/cli.rs"
     ],
@@ -103,6 +104,7 @@
       "DEBTMAP_CACHE_SCOPE"
     ],
     "cli_flags_verified": [
+      "--cache (deprecated, hidden)",
       "--no-cache",
       "--clear-cache",
       "--force-cache-rebuild",
@@ -111,10 +113,15 @@
       "--cache-location"
     ],
     "pruning_strategies_verified": [
-      "lru",
-      "lfu",
-      "fifo",
-      "age (with age_based alias)"
+      "lru (Least Recently Used)",
+      "lfu (Least Frequently Used)",
+      "fifo (First In First Out)",
+      "age (Age-Based Only, alias: age_based)"
+    ],
+    "features_validated": [
+      "cli_commands.analyze.caching (verified all flags exist)",
+      "configuration.environment_variables (verified all 9 cache env vars)",
+      "architecture.caching_strategy (verified Shared/Custom strategies)"
     ]
   }
 }
