@@ -295,7 +295,7 @@ Accurately identifying constructors helps:
 
 ## Debt Patterns
 
-Debtmap detects 25 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
+Debtmap detects 24 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
 
 ### Debt Type Enum
 
@@ -725,7 +725,7 @@ The scoring formula uses configurable weights (default values shown):
 - **Coverage: 40%** - How well the code is tested
 - **Dependency: 20%** - How many other functions depend on this code
 
-These weights can be adjusted in `.debtmap.toml` to match your team's priorities.
+These weights can be adjusted in `.debtmap.toml` to match your team's priorities. See [Configuration Guide](./configuration.md#unified-scoring-weights) for details on customizing the scoring formula.
 
 #### Role-Based Prioritization
 
@@ -849,10 +849,10 @@ For legacy risk scoring, Debtmap classifies functions into four risk levels:
 
 ```rust
 pub enum RiskLevel {
-    Low,       // Score < 10
-    Medium,    // Score 10-24
-    High,      // Score 25-49
-    Critical,  // Score ≥ 50
+    Low,
+    Moderate,  // Not 'Medium'
+    High,
+    Critical,
 }
 ```
 
@@ -866,7 +866,7 @@ pub enum RiskLevel {
 - Risky code with incomplete testing
 - **Action**: Should be addressed soon
 
-**Medium** (legacy score 10-24)
+**Moderate** (legacy score 10-24)
 - Moderate complexity (cyclomatic > 5) AND low coverage (< 50%)
 - OR: High complexity with good coverage
 - **Action**: Plan for next sprint
@@ -1125,7 +1125,11 @@ Debtmap supports two JSON output format variants for different integration needs
 }
 ```
 
-**Note:** The unified format is currently an internal representation and is **not available** as a user-facing CLI option. The legacy format remains the stable default for all current integrations. If you need the unified format exposed as a CLI option (`--format json-unified`), please open a feature request on GitHub.
+**⚠️ Important:** The unified format is currently an **internal-only** representation and is **not available** to users as a CLI option.
+
+The legacy format (with wrapper objects like `{"File": {...}}` and `{"Function": {...}}`) remains the stable default for all current integrations. There is no `--format json-unified` flag available.
+
+If you need the unified format exposed as a user-facing CLI option, please open a feature request on GitHub.
 
 ### Reading Function Metrics
 
@@ -1239,6 +1243,24 @@ pub enum Tier {
 - **High** (70-89.9): Should be addressed this sprint
 - **Moderate** (50-69.9): Plan for next sprint
 - **Low** (< 50): Background maintenance work
+
+**Two Tier Systems:**
+
+Debtmap uses two complementary tier systems serving different purposes:
+
+1. **Tier enum** (score-based): Numerical classification for function-level prioritization
+   - Based on debt score thresholds (Critical ≥90, High 70-89.9, Moderate 50-69.9, Low <50)
+   - Used for individual item sprint planning
+   - Source: `src/priority/mod.rs:430-464`
+
+2. **RecommendationTier** (strategic): Category-based grouping for batch remediation
+   - Four strategic tiers (T1CriticalArchitecture, T2ComplexUntested, T3TestingGaps, T4Maintenance)
+   - Used for identifying patterns and batch refactoring opportunities
+   - Source: `src/priority/tiers.rs:10-26`
+
+**Usage guidance:**
+- Use **Tier** for sprint planning individual items and function-level work
+- Use **RecommendationTier** for architectural focus and strategic debt planning
 
 #### Effort Estimates Per Tier
 
@@ -2402,8 +2424,21 @@ Debtmap parses LCOV coverage data for risk analysis:
 - Overhead includes index build + lookups + coverage propagation
 
 **When to use coverage integration:**
-- **Skip coverage** (faster iteration): For rapid development iteration or quick local checks, omit `--lcov` to get baseline results 2.5x faster
-- **Include coverage** (comprehensive analysis): Use coverage integration for final validation, sprint planning, and CI/CD gates where comprehensive risk analysis is needed
+
+Understanding when to include or omit coverage helps balance analysis depth with iteration speed:
+
+- **Skip coverage** (faster iteration, ~2.5x speedup):
+  - Rapid development iteration cycles
+  - Quick local sanity checks before committing
+  - Early-stage development when focusing on implementation
+  - When you need fast feedback on complexity alone
+
+- **Include coverage** (comprehensive analysis, accepts 2.5x overhead):
+  - Final validation before merging pull requests
+  - Sprint planning sessions (identify highest-risk items)
+  - CI/CD quality gates
+  - Periodic debt audits and technical health reviews
+  - When prioritizing testing work (ROI analysis requires coverage data)
 
 **Thread Safety:**
 - Coverage index wrapped in `Arc<CoverageIndex>` for lock-free parallel access
