@@ -72,20 +72,7 @@ fn parse_value(s: &str) -> Result<i32> {
 }
 ```
 
-**Test code exceptions:**
-
-```rust
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_parsing() {
-        let result = "42".parse::<i32>().unwrap();  // ✅ OK in tests (LOW priority)
-        assert_eq!(result, 42);
-    }
-}
-```
-
-Debtmap detects `#[cfg(test)]` attributes and test function contexts, automatically assigning **Low priority** to panic patterns in test code.
+> **Note:** Panic patterns in test code are automatically detected and assigned **Low priority**. See [Test Code Detection and Handling](#test-code-detection-and-handling) for details.
 
 ### Error Propagation Analysis
 
@@ -124,6 +111,190 @@ fn load_multiple_configs(paths: &[PathBuf]) -> Result<Vec<Config>> {
 - Use `.context()` or `.with_context()` from `anyhow` or `thiserror`
 - Include relevant values in error messages (file paths, indices, input values)
 - Maintain error context at each transformation in the chain
+
+## Test Code Detection and Handling
+
+**Source:** `src/debt/error_swallowing.rs:12`, `src/debt/panic_patterns.rs:12`
+
+Debtmap automatically detects test code across all supported languages and applies lower severity or exclusion to error handling patterns in test contexts. This prevents false positives from legitimate test code practices like using `.unwrap()` for assertions.
+
+### How Test Detection Works
+
+#### Rust Test Detection
+
+Rust test code is identified by:
+- **`#[cfg(test)]` modules**: Entire modules marked for test compilation
+- **`#[test]` attributes**: Individual test functions
+- **`test_` function prefix**: Functions starting with `test_`
+- **`in_test_function()` check**: AST analysis to determine if code is within a test function
+- **`in_test_module()` check**: AST analysis to determine if code is within a `#[cfg(test)]` module
+
+```rust
+// ✅ Automatically detected as test code - lower priority
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_parsing() {
+        let result = "42".parse::<i32>().unwrap();  // LOW priority in tests
+        assert_eq!(result, 42);
+    }
+
+    fn test_helper() {
+        let data = load_test_data().unwrap();  // LOW priority (in test module)
+    }
+}
+
+// ❌ HIGH priority - production code
+pub fn parse_user_input(input: &str) -> i32 {
+    input.parse::<i32>().unwrap()  // HIGH priority panic pattern
+}
+```
+
+#### Python Test Detection
+
+Python test code is identified by:
+- **`test_` function prefix**: Functions whose names start with `test_`
+- **Test file patterns**: Files matching `test_*.py` or `*_test.py`
+- **Test class patterns**: Classes inheriting from `unittest.TestCase` or `pytest` fixtures
+
+```python
+# ✅ Automatically detected as test code
+def test_user_creation():
+    user = create_user("test@example.com")
+    assert user is not None  # No error handling needed in tests
+
+class TestUserService:
+    def test_registration(self):
+        result = register_user({"email": "test@example.com"})
+        # Exceptions can propagate in tests
+```
+
+#### JavaScript/TypeScript Test Detection
+
+JavaScript/TypeScript test code is identified by:
+- **Test file patterns**: Files matching `*.test.js`, `*.test.ts`, `*.spec.js`, `*.spec.ts`
+- **Test directory patterns**: Files in `__tests__/`, `test/`, `tests/` directories
+- **Test function patterns**: Functions passed to `test()`, `it()`, `describe()` from test frameworks
+
+```javascript
+// File: user.test.ts - automatically detected as test code
+describe('User Service', () => {
+    it('should create user', async () => {
+        const user = await createUser('test@example.com');
+        expect(user).toBeDefined();  // No error handling required
+    });
+});
+```
+
+### Priority Adjustments for Test Code
+
+When error handling patterns are detected in test code, severity is automatically reduced:
+
+| Pattern | Production Severity | Test Severity | Rationale |
+|---------|---------------------|---------------|-----------|
+| Unwrap on Result | HIGH | LOW | Tests should fail fast on unexpected errors |
+| Unwrap on Option | HIGH | LOW | Tests verify expected values exist |
+| Panic in function | CRITICAL | LOW | Test failures are acceptable |
+| Bare except (Python) | CRITICAL | MEDIUM | Tests may need catch-all for framework |
+| expect() with message | MEDIUM | LOW | Test error messages are internal |
+| TODO macro | MEDIUM | LOW | Tests can be work-in-progress |
+
+**Configuration:** Test detection is automatic and enabled by default. Severity adjustments are controlled by `severity_overrides` configuration:
+
+```toml
+# Default behavior (automatic)
+[[error_handling.severity_overrides]]
+pattern = "unwrap"
+context = "test"
+severity = "low"
+
+# Stricter test enforcement (optional)
+[[error_handling.severity_overrides]]
+pattern = "unwrap"
+context = "test"
+severity = "medium"  # Still flag in tests but don't treat as high priority
+```
+
+### When Test Detection May Miss Code
+
+Test detection is based on static analysis and may not catch:
+- Dynamic test registration (Python `nose` or custom test runners)
+- Unusual test naming conventions (e.g., `check_*`, `verify_*`)
+- Test helper utilities in non-test files
+
+**Solutions:**
+
+1. **Use suppression comments** for legitimate test helpers:
+```rust
+// debtmap: ignore - Test utility function
+pub fn create_test_user() -> User {
+    User::new("test@example.com").unwrap()
+}
+```
+
+2. **Follow standard naming conventions:**
+- Rust: Use `#[test]` or `#[cfg(test)]`
+- Python: Prefix with `test_` or use standard test frameworks
+- JS/TS: Use `.test.js` or `.spec.ts` file extensions
+
+3. **Configure custom test patterns** (future feature):
+```toml
+# Planned feature for custom test detection
+[[test_detection]]
+pattern = "verify_.*"
+language = "rust"
+```
+
+### Benchmark and Example Code Detection
+
+Similar to test code, benchmark and example code receives lower priority:
+
+**Rust Benchmarks:**
+- Files in `benches/` directory
+- Functions with `#[bench]` attribute
+- Criterion benchmark functions
+
+**Example Code:**
+- Files in `examples/` directory
+- Documentation examples in doc comments
+
+```rust
+// File: benches/parsing_benchmark.rs
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn parse_benchmark(c: &mut Criterion) {
+    c.bench_function("parse", |b| {
+        b.iter(|| {
+            let result = black_box("42").parse::<i32>().unwrap();  // LOW priority
+        });
+    });
+}
+```
+
+### Troubleshooting Test Detection
+
+**Problem:** Legitimate test code still flagged as HIGH severity
+
+**Solution:**
+1. Check test naming follows conventions (`#[test]`, `test_*`, `*.test.js`)
+2. Verify file is in recognized test location (`tests/`, `__tests__/`)
+3. Use suppression comment if detection fails:
+```rust
+let value = result.unwrap();  // debtmap: ignore - Test assertion
+```
+
+**Problem:** Test helpers in shared files flagged
+
+**Solution:**
+Move test helpers to test-specific modules or use suppression comments:
+```rust
+#[cfg(test)]
+pub mod test_helpers {
+    pub fn setup_test_db() -> Database {
+        Database::connect("test_db").unwrap()  // LOW priority (in #[cfg(test)])
+    }
+}
+```
 
 ### Error Swallowing in Rust
 
@@ -442,38 +613,54 @@ def process_batch(items):
 
 ## Async Error Handling
 
-### Unhandled Promise Rejections (JavaScript/TypeScript)
+### JavaScript/TypeScript Async Error Detection Status
 
-**Note:** JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code.
+> **Implementation Status: Limited**
+>
+> JavaScript/TypeScript async error handling detection is **NOT fully implemented** in the current release. Only test-specific unresolved promise detection is available.
+>
+> **What IS Implemented:**
+> - Test-specific async pattern detection (unresolved promises in test functions)
+> - Basic try/catch without error handling
+> - Resource management (timer/event listener leaks)
+>
+> **What IS NOT Implemented:**
+> - UnhandledPromiseRejection detection in production code
+> - MissingAwait detection in production code
+> - Promise chain error handling analysis
+>
+> The JavaScript/TypeScript examples below document **planned features** for future releases. For now, use external linting tools (ESLint with promise plugins) for comprehensive async error detection.
 
 **Current Language Support Comparison:**
 
 | Feature | Rust | Python | JavaScript/TypeScript |
 |---------|------|--------|----------------------|
-| Basic error swallowing | ✅ Full | ✅ Full | ✅ Basic |
-| Panic/exception patterns | ✅ Full | ✅ Full | ⚠️ Limited |
-| Async error detection | ✅ Full | N/A | ⚠️ Limited |
-| Error propagation analysis | ✅ Full | ✅ Basic | ❌ Not yet |
-| Context loss detection | ✅ Full | ⚠️ Limited | ❌ Not yet |
+| Basic error swallowing | ✅ Full | ✅ Full | ❌ Not implemented |
+| Panic/exception patterns | ✅ Full | ✅ Full | ❌ Not implemented |
+| Async error detection | ✅ Full | ❌ N/A | ⚠️ Tests only |
+| Error propagation analysis | ✅ Full | ✅ Basic | ❌ Not implemented |
+| Context loss detection | ✅ Full | ⚠️ Limited | ❌ Not implemented |
 
-Current JavaScript/TypeScript detection includes:
-- Basic try/catch without error handling
-- Some promise rejection patterns
-- Complexity analysis
+**Source References:**
+- Rust async error detection: `src/debt/async_errors.rs`
+- Python error handling: `src/debt/python_error_handling.rs`
+- JS/TS test async detection: `src/analyzers/javascript/detectors/testing/`
 
-Enhanced JavaScript/TypeScript async error detection is planned for future releases.
+### Unhandled Promise Rejections (Planned Feature)
+
+> **Note:** The following pattern is documented for future implementation. It is **not currently detected** by debtmap.
 
 ```javascript
-// ❌ CRITICAL: Unhandled promise rejection
+// ❌ PLANNED: Unhandled promise rejection detection
 async function loadUserData(userId) {
     const response = await fetch(`/api/users/${userId}`);
     // If fetch rejects, promise is unhandled
     return response.json();
 }
 
-loadUserData(123);  // Detected: UnhandledPromiseRejection
+loadUserData(123);  // Future: Will detect UnhandledPromiseRejection
 
-// ✅ GOOD: Handle rejections
+// ✅ RECOMMENDED: Handle rejections
 async function loadUserData(userId) {
     try {
         const response = await fetch(`/api/users/${userId}`);
@@ -492,22 +679,29 @@ loadUserData(123).catch(err => {
 });
 ```
 
-### Missing Await Detection
+### Missing Await Detection (Planned Feature)
+
+> **Note:** This pattern is documented for future implementation. It is **not currently detected** by debtmap.
 
 ```javascript
-// ❌ HIGH: Missing await - promise dropped
+// ❌ PLANNED: Missing await detection
 async function saveAndNotify(data) {
     await saveToDatabase(data);
-    sendNotification(data.userId);  // Detected: MissingAwait
+    sendNotification(data.userId);  // Future: Will detect MissingAwait
     // Function returns before notification completes
 }
 
-// ✅ GOOD: Await all async operations
+// ✅ RECOMMENDED: Await all async operations
 async function saveAndNotify(data) {
     await saveToDatabase(data);
     await sendNotification(data.userId);
 }
 ```
+
+**Current Workaround:** Use ESLint with these plugins for JavaScript/TypeScript async error detection:
+- `eslint-plugin-promise`
+- `@typescript-eslint/no-floating-promises`
+- `@typescript-eslint/no-misused-promises`
 
 ### Async Rust Error Handling
 
@@ -733,6 +927,112 @@ detect_propagation = true        # Error propagation analysis
 ```
 
 All error handling patterns are detected by default with the `ErrorSwallowing` debt category (weight 4). The configuration is fully implemented and functional - use it primarily to disable specific patterns when needed.
+
+### Advanced Configuration: Custom Patterns and Severity Overrides
+
+**Source:** `src/config/detection.rs:275-374`
+
+Beyond the basic detection toggles, `ErrorHandlingConfig` supports two advanced configuration options for customizing error pattern detection:
+
+#### Custom Error Patterns
+
+Define project-specific error patterns to detect anti-patterns unique to your codebase:
+
+```toml
+[[error_handling.custom_patterns]]
+name = "log_and_ignore"
+pattern = "log::error.*\n.*return None"
+pattern_type = "method_call"
+severity = "medium"
+description = "Error logged but silently converted to None without propagation"
+remediation = "Consider propagating the error or using Result<Option<T>>"
+
+[[error_handling.custom_patterns]]
+name = "custom_unwrap_macro"
+pattern = "must_succeed!"
+pattern_type = "macro_name"
+severity = "high"
+description = "Custom macro that can panic in production"
+remediation = "Replace with proper error handling using Result"
+
+[[error_handling.custom_patterns]]
+name = "swallow_on_match"
+pattern = "match.*\\{\n.*Ok\\(.*\\).*=>.*,\n.*Err\\(_\\).*=>.*\\(\\),?\n.*\\}"
+pattern_type = "match_expression"
+severity = "medium"
+description = "Match expression with empty tuple on error"
+remediation = "Log the error or propagate with ?"
+```
+
+**Configuration Fields** (`ErrorPatternConfig` struct):
+- `name`: Pattern identifier (used in reports)
+- `pattern`: Regex or matcher string
+- `pattern_type`: Type of pattern to match
+  - `function_name` - Match function calls
+  - `macro_name` - Match macro invocations
+  - `method_call` - Match method calls
+  - `match_expression` - Match expression patterns
+- `severity`: `low`, `medium`, `high`, or `critical`
+- `description`: What this pattern detects
+- `remediation`: Optional suggested fix
+
+#### Severity Overrides
+
+Override severity levels for specific contexts (tests, benchmarks, examples):
+
+```toml
+[[error_handling.severity_overrides]]
+pattern = "unwrap"
+context = "test"
+severity = "low"
+
+[[error_handling.severity_overrides]]
+pattern = "panic"
+context = "test"
+severity = "low"
+
+[[error_handling.severity_overrides]]
+pattern = "expect"
+context = "benchmark"
+severity = "low"
+
+[[error_handling.severity_overrides]]
+pattern = "todo"
+context = "example"
+severity = "low"
+```
+
+**Configuration Fields** (`SeverityOverride` struct):
+- `pattern`: Pattern to match (e.g., `unwrap`, `panic`, `expect`, `todo`)
+- `context`: Where override applies
+  - `test` - Code in test modules/functions
+  - `benchmark` - Code in benchmark functions
+  - `example` - Code in example files/directories
+- `severity`: New severity level (`low`, `medium`, `high`, `critical`)
+
+**Use Cases:**
+- **Custom patterns**: Detect project-specific error handling anti-patterns (custom macros, team conventions)
+- **Severity overrides**: Reduce noise from panic patterns in test code while keeping strict detection in production code
+- **Context-aware analysis**: Apply different standards to test/benchmark/example code vs production
+
+**Example: Stricter Test Error Handling**
+
+```toml
+# Still detect test unwraps, but at lower severity
+[[error_handling.severity_overrides]]
+pattern = "unwrap"
+context = "test"
+severity = "medium"  # Instead of default high
+
+# Custom pattern for test-specific anti-pattern
+[[error_handling.custom_patterns]]
+name = "test_panic_without_message"
+pattern = "panic!\\(\\)"
+pattern_type = "macro_name"
+severity = "medium"
+description = "Test panic without descriptive message"
+remediation = "Add message explaining what failed: panic!(\"Expected condition X\")"
+```
 
 ## Detection Examples
 
@@ -1054,6 +1354,52 @@ Look for:
 - Reduced ErrorSwallowing debt count
 - Lower risk scores for affected functions
 - Improved coverage of error paths (if running with coverage)
+
+### JavaScript/TypeScript Errors Not Being Detected
+
+**Problem:** JavaScript/TypeScript async error patterns (unhandled promises, missing await) not appearing in reports
+
+**Honest Answer:** JavaScript/TypeScript async error detection is **not fully implemented** in the current release.
+
+**What IS detected:**
+- Test-specific unresolved promises (in `*.test.js`, `*.spec.ts` files)
+- Resource management issues (timer leaks, event listener leaks)
+- Basic try/catch without error handling
+
+**What IS NOT detected:**
+- Unhandled promise rejections in production code
+- Missing await in production code
+- Promise chain error handling issues
+
+**Current Workarounds:**
+
+1. **Use ESLint for JavaScript/TypeScript async error detection:**
+   ```json
+   {
+     "plugins": ["promise", "@typescript-eslint"],
+     "rules": {
+       "promise/catch-or-return": "error",
+       "promise/no-return-wrap": "error",
+       "@typescript-eslint/no-floating-promises": "error",
+       "@typescript-eslint/no-misused-promises": "error"
+     }
+   }
+   ```
+
+2. **Combine debtmap with ESLint:**
+   ```bash
+   # Use debtmap for Rust/Python error handling
+   debtmap analyze --languages rust,python
+
+   # Use ESLint for JavaScript/TypeScript
+   eslint src/**/*.{js,ts} --config eslint.config.json
+   ```
+
+3. **Track progress on JS/TS support:**
+   - Check debtmap releases for async error detection updates
+   - The feature is planned but not yet available
+
+**Why the documentation shows JS/TS examples:** The examples document the planned behavior for future releases. They serve as design documentation and best practices guidance, even though detection is not yet implemented.
 
 ## Related Topics
 
