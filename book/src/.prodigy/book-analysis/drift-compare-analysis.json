@@ -1,0 +1,86 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "compare-analysis",
+  "chapter_title": "Compare Analysis",
+  "chapter_file": "book/src/compare-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Good comprehensive documentation with accurate feature coverage, but has broken internal links and one terminology inconsistency",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 2 broken internal link(s) to documentation files that don't exist",
+      "broken_links": [
+        {
+          "link_text": "Validation Command",
+          "target_path": "validation.md",
+          "expected_path": "book/src/validation.md",
+          "current_file": "book/src/compare-analysis.md",
+          "line": 949,
+          "status": "missing",
+          "suggested_fix": "Link points to non-existent file. Consider renaming to 'validation-gates.md' (which exists) or creating the validation.md file."
+        },
+        {
+          "link_text": "CI/CD Integration",
+          "target_path": "ci-cd.md",
+          "expected_path": "book/src/ci-cd.md",
+          "current_file": "book/src/compare-analysis.md",
+          "line": 953,
+          "status": "missing",
+          "suggested_fix": "Link points to non-existent file. The CI/CD examples are already included in this chapter, so this link may be obsolete or should point to another resource."
+        }
+      ],
+      "fix_suggestion": "Update links to point to existing files:\n- Replace 'validation.md' with 'validation-gates.md' if that's the intended target\n- Remove or update 'ci-cd.md' link (CI/CD content is already in this chapter)",
+      "source_reference": "book/src/compare-analysis.md:949-953"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "low",
+      "section": "Compare Command",
+      "description": "Documentation refers to a 'validate' command but the actual command appears to be 'compare' with validation features",
+      "current_content": "References to 'debtmap validate' command for validation",
+      "should_be": "The compare command itself provides validation through ComparisonResult structure",
+      "fix_suggestion": "Clarify that validation features are integrated into the compare command's ComparisonResult output, not a separate 'validate' command. The source code shows compare returns ComparisonResult with validation data.",
+      "source_reference": "src/comparison/comparator.rs:28-48, src/comparison/types.rs:1-142"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all compare command features",
+    "Accurate documentation of ComparisonResult structure and all fields",
+    "Excellent CI/CD integration examples with GitHub Actions and GitLab CI",
+    "Clear explanation of matching strategies (Exact, FunctionLevel, ApproximateName, FileLevel) with correct confidence scores",
+    "Good coverage of target location tracking and fuzzy matching",
+    "Accurate documentation of regression detection (score >= 60.0 threshold)",
+    "Correct improvement tracking with 30% score reduction threshold",
+    "Well-documented output formats (JSON, Markdown, Terminal)",
+    "Practical examples covering real-world use cases",
+    "Accurate representation of data structures from src/comparison/types.rs"
+  ],
+  "improvement_suggestions": [
+    "Fix broken internal links to validation.md and ci-cd.md",
+    "Clarify the relationship between 'compare' and 'validate' commands",
+    "Add note about the LocationMatcher implementation and its fuzzy matching algorithm",
+    "Consider adding troubleshooting section for common matching issues (e.g., path normalization)",
+    "Add example of handling MatchResult with multiple matched items",
+    "Document the metric aggregation behavior when multiple items match (average for most metrics, max for nesting_depth)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-11-13T08:00:32Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Compare command usage",
+      "Target location tracking",
+      "Project health trends",
+      "Regression detection",
+      "Before/after metrics comparison",
+      "Improvement percentage calculations",
+      "Integration with CI/CD"
+    ],
+    "validation_focus": "Check that compare command features and workflow integration are documented",
+    "total_internal_links": 5,
+    "broken_internal_links": 2,
+    "valid_internal_links": 3
+  }
+}
