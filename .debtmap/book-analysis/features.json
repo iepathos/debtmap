@@ -148,6 +148,23 @@
         "Regression detection",
         "CI/CD quality checks"
       ]
+    },
+    "explain-coverage": {
+      "description": "Debug coverage detection for specific functions (debugging tool)",
+      "options": [
+        "path (codebase path)",
+        "coverage-file (LCOV file)",
+        "function (function name)",
+        "file (optional file path to narrow search)",
+        "verbose (show all matching strategies)",
+        "format (text/json)"
+      ],
+      "use_cases": [
+        "Debug coverage matching issues",
+        "Understand coverage detection",
+        "Verify function name resolution",
+        "Troubleshoot LCOV integration"
+      ]
     }
   },
   "core_analysis": {
@@ -735,8 +752,20 @@
   },
   "version_info": {
     "analyzed_from": "Source code analysis",
-    "analysis_date": "2025-01-30",
+    "analysis_date": "2025-11-12",
     "project": "Debtmap",
-    "configuration_source": ".prodigy/book-config.json"
+    "configuration_source": ".prodigy/book-config.json",
+    "feature_areas_analyzed": [
+      "cli_commands (all 6 commands)",
+      "core_analysis (complexity metrics, language support, algorithms)",
+      "debt_detection (patterns, categories, priority system)",
+      "risk_assessment (scoring, prioritization, context-aware)",
+      "output_formats (terminal, json, markdown)",
+      "configuration (presets, environment variables, config files)",
+      "architecture (pipeline, DI, caching)",
+      "responsibility_analysis (god objects, SRP violations)",
+      "boilerplate_detection (trait patterns, macro recommendations)"
+    ],
+    "analysis_notes": "Comprehensive feature extraction including all CLI commands (analyze, init, validate, compare, validate-improvement, explain-coverage), analysis capabilities, detection patterns, and configuration options"
   }
 }
