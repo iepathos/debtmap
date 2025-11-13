@@ -980,6 +980,6 @@ See Prodigy documentation for detailed usage instructions.
 
 - [Configuration Format](./configuration.md) - Detailed configuration file format
 - [Output Formats](./output-formats.md) - Understanding JSON, Markdown, and Terminal output
-- [Coverage Integration](./coverage.md) - Integrating test coverage data
+- [Coverage Integration](./coverage-integration.md) - Integrating test coverage data
 - [Context Providers](./context-providers.md) - Understanding context-aware analysis
 - [Examples](./examples.md) - More comprehensive usage examples
