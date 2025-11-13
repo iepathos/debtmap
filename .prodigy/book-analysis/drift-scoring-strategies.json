@@ -2,10 +2,38 @@
   "chapter_id": "scoring-strategies",
   "chapter_title": "Scoring Strategies",
   "chapter_file": "book/src/scoring-strategies.md",
-  "drift_detected": false,
-  "severity": "low",
-  "quality_assessment": "Excellent - This chapter is comprehensive, accurate, and well-maintained. It correctly documents both file-level and function-level scoring with accurate formulas verified against src/priority/file_metrics.rs:224-262. The rebalanced scoring section (Spec 136) is thoroughly documented with correct implementation details from src/priority/scoring/rebalanced.rs. All formulas, configuration options, and use cases have been verified against the actual codebase. Only minor clarifications needed around CLI usage and configuration file naming.",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Excellent - This chapter is comprehensive, accurate, and well-maintained. It correctly documents both file-level and function-level scoring with accurate formulas verified against src/priority/file_metrics.rs:224-262. The rebalanced scoring section (Spec 136) is thoroughly documented with correct implementation details from src/priority/scoring/rebalanced.rs. All formulas, configuration options, and use cases have been verified against the actual codebase. However, 2 broken internal links need to be fixed (migration-guide.md and file-classification.md). Only minor clarifications needed around CLI usage and configuration file naming.",
   "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References (Lines 1235, 1573)",
+      "description": "Found 2 broken internal links that will cause mdbook build failures",
+      "broken_links": [
+        {
+          "link_text": "Migration Guide",
+          "original_target": "./migration-guide.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "line": 1235,
+          "expected_resolved_path": "book/src/migration-guide.md",
+          "file_exists": false,
+          "suggested_fix": "File does not exist. Either create the migration guide documenting transitions between scoring versions, or remove the reference if not applicable."
+        },
+        {
+          "link_text": "File Classification",
+          "original_target": "./file-classification.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "line": 1573,
+          "expected_resolved_path": "book/src/file-classification.md",
+          "file_exists": false,
+          "suggested_fix": "File does not exist. This references Spec 135 context-aware file size thresholds. Either create file-classification.md documenting file type classification, or update link if content was moved elsewhere."
+        }
+      ],
+      "fix_suggestion": "Create the missing documentation files or update links to point to existing content. These links are referenced in advanced sections (Rebalanced Scoring migration and File Classification integration).",
+      "source_reference": "book/src/scoring-strategies.md:1235, book/src/scoring-strategies.md:1573"
+    },
     {
       "type": "incomplete_explanation",
       "severity": "low",
@@ -90,7 +118,11 @@
     "validation_focus_met": "EXCELLENT - Chapter comprehensively explains file-level and function-level scoring differences with extensive use cases covering quarterly planning, sprint work, architectural refactoring, targeted fixes, and team collaboration scenarios"
   },
   "metadata": {
-    "analyzed_at": "2025-11-06",
+    "analyzed_at": "2025-11-12T23:40:00Z",
+    "internal_links_checked": 6,
+    "broken_links_found": 2,
+    "working_links_found": 4,
+    "previous_analysis_date": "2025-11-06",
     "feature_inventory": ".prodigy/book-analysis/features.json",
     "topics_covered": [
       "File-level scoring with formula: Size × Complexity × Coverage Factor × Density × GodObject × FunctionScores",
