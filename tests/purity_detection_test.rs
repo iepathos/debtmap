@@ -131,8 +131,12 @@ fn test_impure_function_with_unsafe() {
     let ast = analyzer.parse(code, PathBuf::from("test.rs")).unwrap();
     let metrics = analyzer.analyze(&ast);
 
-    // Function should be impure due to unsafe block
-    assert_eq!(metrics.complexity.functions[0].is_pure, Some(false));
+    // Spec 161: ptr.read() is pure unsafe (doesn't write), so function is pure with reduced confidence
+    assert_eq!(metrics.complexity.functions[0].is_pure, Some(true));
+    assert!(
+        metrics.complexity.functions[0].purity_confidence.unwrap() < 0.90,
+        "Pure unsafe should have reduced confidence"
+    );
 }
 
 #[test]

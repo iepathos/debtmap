@@ -36,6 +36,9 @@ pub struct PurityDetector {
 
     // Custom macro analyzer (Spec 160c)
     macro_analyzer: CustomMacroAnalyzer,
+
+    // Track pure unsafe operations (Spec 161)
+    has_pure_unsafe: bool,
 }
 
 /// A mutation of a local variable or owned parameter
@@ -59,6 +62,22 @@ pub enum MutationScope {
     Upvalue,
     /// Mutation of external state (fields, statics, etc.)
     External,
+}
+
+/// Classification of unsafe operations (Spec 161)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnsafeOp {
+    // Pure operations - no side effects
+    Transmute,
+    RawPointerRead,
+    UnionFieldRead,
+    PointerArithmetic,
+
+    // Impure operations - side effects
+    FFICall,
+    RawPointerWrite,
+    MutableStatic,
+    UnionFieldWrite,
 }
 
 impl Default for PurityDetector {
@@ -89,6 +108,7 @@ impl PurityDetector {
             unknown_macros_count: 0,
             macro_definitions,
             macro_analyzer: CustomMacroAnalyzer::new(),
+            has_pure_unsafe: false,
         }
     }
 
@@ -106,6 +126,7 @@ impl PurityDetector {
         self.upvalue_mutations.clear();
         self.closure_results.clear();
         self.unknown_macros_count = 0;
+        self.has_pure_unsafe = false;
 
         // Initialize scope with parameters
         for arg in &item_fn.sig.inputs {
@@ -164,6 +185,7 @@ impl PurityDetector {
         self.upvalue_mutations.clear();
         self.closure_results.clear();
         self.unknown_macros_count = 0;
+        self.has_pure_unsafe = false;
 
         self.visit_block(block);
 
@@ -407,11 +429,17 @@ impl PurityDetector {
             confidence *= 0.95;
         }
 
-        // If no impurities detected, high confidence
+        // Reduce confidence for pure unsafe operations (Spec 161)
+        if self.has_pure_unsafe {
+            confidence *= 0.85;
+        }
+
+        // If no impurities detected and no pure unsafe, high confidence
         if !self.has_side_effects
             && !self.has_io_operations
             && !self.has_unsafe_blocks
             && !self.modifies_external_state
+            && !self.has_pure_unsafe
         {
             confidence = 0.95;
         }
@@ -442,6 +470,117 @@ impl PurityDetector {
 
     pub fn local_mutations(&self) -> &[LocalMutation] {
         &self.local_mutations
+    }
+
+    /// Classify unsafe operations in a block (Spec 161)
+    fn classify_unsafe_operations(&self, block: &Block) -> Vec<UnsafeOp> {
+        use syn::visit::Visit;
+
+        struct UnsafeOpCollector {
+            ops: Vec<UnsafeOp>,
+        }
+
+        impl UnsafeOpCollector {
+            fn new() -> Self {
+                Self { ops: Vec::new() }
+            }
+        }
+
+        impl<'ast> Visit<'ast> for UnsafeOpCollector {
+            fn visit_expr(&mut self, expr: &'ast Expr) {
+                match expr {
+                    // Function calls: check for transmute or FFI
+                    Expr::Call(call) => {
+                        if let Expr::Path(path) = &*call.func {
+                            let path_str = quote::quote!(#path).to_string();
+                            if path_str.contains("transmute") {
+                                self.ops.push(UnsafeOp::Transmute);
+                            } else if !path_str.starts_with("std::")
+                                && !path_str.starts_with("core::")
+                                && path.path.segments.len() == 1
+                            {
+                                // Likely an extern "C" function (FFI call)
+                                self.ops.push(UnsafeOp::FFICall);
+                            }
+                        }
+                    }
+                    // Method calls that might be unsafe operations
+                    Expr::MethodCall(method) => {
+                        let method_name = method.method.to_string();
+                        match method_name.as_str() {
+                            "read" | "read_volatile" | "read_unaligned" => {
+                                self.ops.push(UnsafeOp::RawPointerRead);
+                            }
+                            "write" | "write_volatile" | "write_unaligned" => {
+                                self.ops.push(UnsafeOp::RawPointerWrite);
+                            }
+                            "offset" | "add" | "sub" | "wrapping_offset" | "wrapping_add"
+                            | "wrapping_sub" => {
+                                self.ops.push(UnsafeOp::PointerArithmetic);
+                            }
+                            _ => {}
+                        }
+                    }
+                    // Assignment to dereferenced pointers
+                    Expr::Assign(assign) => {
+                        if matches!(&*assign.left, Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Deref(_)))
+                        {
+                            self.ops.push(UnsafeOp::RawPointerWrite);
+                        }
+                    }
+                    // Dereference operations (reading)
+                    Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Deref(_)) => {
+                        // Context-dependent: could be read or write
+                        // Conservative: assume read unless in assignment LHS
+                        self.ops.push(UnsafeOp::RawPointerRead);
+                    }
+                    // Path expressions that might be mutable statics
+                    Expr::Path(path) => {
+                        let path_str = quote::quote!(#path).to_string();
+                        // Heuristic: all-caps paths might be statics
+                        if path_str.chars().all(|c| c.is_uppercase() || c == '_') {
+                            self.ops.push(UnsafeOp::MutableStatic);
+                        }
+                    }
+                    // Union field access
+                    Expr::Field(_field) => {
+                        // Union field reads are unsafe
+                        self.ops.push(UnsafeOp::UnionFieldRead);
+                    }
+                    _ => {}
+                }
+                syn::visit::visit_expr(self, expr);
+            }
+        }
+
+        let mut collector = UnsafeOpCollector::new();
+        collector.visit_block(block);
+        collector.ops
+    }
+
+    /// Analyze an unsafe block and classify its purity (Spec 161)
+    fn analyze_unsafe_block(&mut self, block: &Block) {
+        let ops = self.classify_unsafe_operations(block);
+
+        let has_impure = ops.iter().any(|op| {
+            matches!(
+                op,
+                UnsafeOp::FFICall
+                    | UnsafeOp::RawPointerWrite
+                    | UnsafeOp::MutableStatic
+                    | UnsafeOp::UnionFieldWrite
+            )
+        });
+
+        if has_impure {
+            self.has_unsafe_blocks = true;
+            self.modifies_external_state = true;
+            self.has_side_effects = true;
+        } else {
+            // Pure unsafe - still mark has_unsafe_blocks but allow as pure
+            // with reduced confidence
+            self.has_pure_unsafe = true;
+        }
     }
 
     fn visit_expr_closure_internal(&mut self, closure: &ExprClosure) {
@@ -669,10 +808,10 @@ impl<'ast> Visit<'ast> for PurityDetector {
             Expr::Macro(expr_macro) => {
                 self.handle_macro(&expr_macro.mac);
             }
-            // Unsafe blocks are impure
-            Expr::Unsafe(_) => {
-                self.has_unsafe_blocks = true;
-                self.has_side_effects = true;
+            // Unsafe blocks - analyze operations to distinguish pure/impure (Spec 161)
+            Expr::Unsafe(unsafe_expr) => {
+                self.analyze_unsafe_block(&unsafe_expr.block);
+                return; // Don't continue visiting - we've already analyzed the block
             }
             // Assignment expressions indicate mutation
             Expr::Assign(assign) => {
@@ -871,7 +1010,8 @@ mod tests {
     }
 
     #[test]
-    fn test_function_with_unsafe() {
+    fn test_function_with_unsafe_read_is_pure() {
+        // Spec 161: ptr.read() is pure unsafe (just reads, doesn't write)
         let analysis = analyze_function_str(
             r#"
             fn dangerous() -> i32 {
@@ -881,8 +1021,8 @@ mod tests {
             }
             "#,
         );
-        assert!(!analysis.is_pure);
-        assert!(analysis.reasons.contains(&ImpurityReason::UnsafeCode));
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+        assert!(analysis.confidence < 0.90); // Reduced confidence for pure unsafe
     }
 
     #[test]
@@ -1295,6 +1435,95 @@ mod tests {
         let analysis = detector.is_pure_function(&item_fn);
 
         // Should detect println! in the macro body
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    // Tests for spec 161: refined unsafe block analysis
+
+    #[test]
+    fn test_transmute_is_pure_unsafe() {
+        let analysis = analyze_function_str(
+            r#"
+            fn bytes_to_u32(bytes: [u8; 4]) -> u32 {
+                unsafe { std::mem::transmute(bytes) }
+            }
+            "#,
+        );
+
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+        assert!(analysis.confidence > 0.80); // Reduced from 1.0
+        assert!(analysis.confidence < 0.90); // Should be reduced by ~15%
+    }
+
+    #[test]
+    fn test_ffi_call_is_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn call_external() {
+                extern "C" { fn external_func(); }
+                unsafe { external_func(); }
+            }
+            "#,
+        );
+
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_pointer_read_is_pure_unsafe() {
+        let analysis = analyze_function_str(
+            r#"
+            fn read_ptr(ptr: *const i32) -> i32 {
+                unsafe { ptr.read() }
+            }
+            "#,
+        );
+
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+        assert!(analysis.confidence > 0.80);
+    }
+
+    #[test]
+    fn test_pointer_write_is_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn write_ptr(ptr: *mut i32, value: i32) {
+                unsafe { ptr.write(value); }
+            }
+            "#,
+        );
+
+        assert_eq!(analysis.purity_level, PurityLevel::Impure);
+    }
+
+    #[test]
+    fn test_pointer_arithmetic_is_pure_unsafe() {
+        let analysis = analyze_function_str(
+            r#"
+            fn offset_ptr(ptr: *const i32, offset: isize) -> *const i32 {
+                unsafe { ptr.offset(offset) }
+            }
+            "#,
+        );
+
+        assert_eq!(analysis.purity_level, PurityLevel::StrictlyPure);
+        assert!(analysis.confidence > 0.80);
+    }
+
+    #[test]
+    fn test_mutable_static_is_impure() {
+        let analysis = analyze_function_str(
+            r#"
+            fn access_static() -> i32 {
+                static mut COUNTER: i32 = 0;
+                unsafe {
+                    COUNTER += 1;
+                    COUNTER
+                }
+            }
+            "#,
+        );
+
         assert_eq!(analysis.purity_level, PurityLevel::Impure);
     }
 }
