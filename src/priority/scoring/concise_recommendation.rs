@@ -1,4 +1,4 @@
-// Concise recommendation generation (spec 138a)
+// Concise recommendation generation (spec 138a, spec 176)
 //
 // This module generates actionable recommendations with:
 // - Maximum 5 high-level steps per recommendation
@@ -6,8 +6,11 @@
 // - Difficulty indicators (Easy/Medium/Hard)
 // - Executable commands for each step
 // - Estimated total effort in hours
+// - Pattern-based complexity recommendations (spec 176)
 
 use crate::core::FunctionMetrics;
+use crate::priority::complexity_patterns::{ComplexityMetrics, ComplexityPattern};
+use crate::priority::refactoring_impact::RefactoringImpact;
 use crate::priority::semantic_classifier::FunctionRole;
 use crate::priority::{
     ActionStep, ActionableRecommendation, DebtType, Difficulty, FunctionVisibility,
@@ -144,15 +147,319 @@ fn generate_testing_gap_steps(
     }
 }
 
-/// Generate complexity hotspot recommendation
+/// Generate complexity hotspot recommendation using pattern detection (spec 176)
 fn generate_complexity_steps(
     cyclomatic: u32,
     cognitive: u32,
     metrics: &FunctionMetrics,
 ) -> ActionableRecommendation {
-    let functions_to_extract = calculate_functions_to_extract(cyclomatic, cognitive);
+    // Detect complexity pattern
+    let complexity_metrics = ComplexityMetrics {
+        cyclomatic,
+        cognitive,
+        nesting: metrics.nesting,
+        entropy_score: metrics.entropy_score.as_ref().map(|e| e.effective_complexity),
+    };
+
+    let pattern = ComplexityPattern::detect(&complexity_metrics);
+
+    // Generate pattern-specific recommendation
+    match pattern {
+        ComplexityPattern::HighNesting {
+            nesting_depth,
+            cognitive_score,
+            ratio,
+        } => generate_nesting_recommendation(nesting_depth, cognitive_score, ratio, metrics),
+        ComplexityPattern::HighBranching {
+            branch_count,
+            cyclomatic: _,
+        } => generate_branching_recommendation(branch_count, cyclomatic, metrics),
+        ComplexityPattern::MixedComplexity {
+            nesting_depth,
+            cyclomatic: cyclo,
+            cognitive: cog,
+        } => generate_mixed_recommendation(nesting_depth, cyclo, cog, metrics),
+        ComplexityPattern::ChaoticStructure { entropy, .. } => {
+            generate_chaotic_recommendation(entropy, cyclomatic, cognitive, metrics)
+        }
+        ComplexityPattern::ModerateComplexity { .. } => {
+            generate_moderate_recommendation(cyclomatic, cognitive, metrics)
+        }
+    }
+}
+
+/// Generate recommendation for high nesting pattern
+fn generate_nesting_recommendation(
+    nesting: u32,
+    cognitive: u32,
+    ratio: f64,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let early_return_impact = RefactoringImpact::early_returns(nesting);
+    let predicate_impact = RefactoringImpact::predicate_functions(3); // Estimate 3 conditionals
+    let language = crate::core::Language::from_path(&metrics.file);
+
+    let steps = vec![
+        ActionStep {
+            description: "Apply early returns for error conditions".to_string(),
+            impact: format!(
+                "-{} cognitive ({} impact)",
+                early_return_impact.complexity_reduction,
+                early_return_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: add_language_hints_for_early_returns(&language),
+        },
+        ActionStep {
+            description: "Extract nested conditionals into predicate functions".to_string(),
+            impact: format!(
+                "-{} cognitive ({} impact)",
+                predicate_impact.complexity_reduction,
+                predicate_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Find: nested if within if/match".to_string(),
+                "# Create: is_valid(), should_process() functions".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Verify nesting reduced to < 3 levels".to_string(),
+            impact: "Target: nesting < 3, cognitive < 25".to_string(),
+            difficulty: Difficulty::Easy,
+            commands: add_language_verification_commands(&language),
+        },
+    ];
+
+    let estimated_effort = (nesting as f32 - 2.0) * 0.5; // ~30min per nesting level
+
+    ActionableRecommendation {
+        primary_action: format!(
+            "Reduce nesting from {} to 2 levels (primary impact: -{})",
+            nesting,
+            early_return_impact.complexity_reduction + predicate_impact.complexity_reduction
+        ),
+        rationale: format!(
+            "Deep nesting (depth {}) drives cognitive complexity to {}. \
+             Cognitive/Cyclomatic ratio of {:.1}x confirms nesting is primary issue.",
+            nesting, cognitive, ratio
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort.max(0.5)),
+    }
+}
+
+/// Add language-specific hints for early returns (spec 176)
+fn add_language_hints_for_early_returns(language: &crate::core::Language) -> Vec<String> {
+    match language {
+        crate::core::Language::Rust => vec![
+            "# Use `?` operator for Result propagation".to_string(),
+            "# Pattern: if let ... else { return Err(...) }".to_string(),
+            "# Replace nested matches with guard patterns".to_string(),
+        ],
+        crate::core::Language::Python => vec![
+            "# Use early returns for validation".to_string(),
+            "# Pattern: if not valid: return error".to_string(),
+            "# Reduce try-except nesting with early checks".to_string(),
+        ],
+        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
+            "# Use early returns for null/undefined checks".to_string(),
+            "# Pattern: if (!value) return error".to_string(),
+            "# Use optional chaining (?.) where possible".to_string(),
+        ],
+        _ => vec![
+            "# Move validation checks to function start".to_string(),
+            "# Return early on invalid states".to_string(),
+            "# Pattern: nested if/match -> guard + early return".to_string(),
+        ],
+    }
+}
+
+/// Add language-specific verification commands (spec 176)
+fn add_language_verification_commands(language: &crate::core::Language) -> Vec<String> {
+    match language {
+        crate::core::Language::Rust => vec![
+            "cargo clippy -- -W clippy::cognitive_complexity".to_string(),
+            "cargo test --all".to_string(),
+        ],
+        crate::core::Language::Python => vec![
+            "# Run pylint or flake8 for complexity checks".to_string(),
+            "pytest".to_string(),
+        ],
+        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
+            "# Run eslint with complexity rules".to_string(),
+            "npm test".to_string(),
+        ],
+        _ => vec!["# Run your test suite".to_string()],
+    }
+}
+
+/// Generate recommendation for high branching pattern
+fn generate_branching_recommendation(
+    branch_count: u32,
+    cyclomatic: u32,
+    _metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let functions_to_extract = calculate_functions_to_extract(cyclomatic, 0);
+    let extraction_impact =
+        RefactoringImpact::extract_function(branch_count / functions_to_extract);
+
+    let steps = vec![
+        ActionStep {
+            description: "Identify decision clusters (related conditional logic)".to_string(),
+            impact: format!(
+                "-{} complexity per extraction ({} impact)",
+                extraction_impact.complexity_reduction,
+                extraction_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Group related if/match statements".to_string(),
+                "# Each cluster becomes focused function".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Extract setup/validation logic to separate function".to_string(),
+            impact: format!("-{} complexity", extraction_impact.complexity_reduction),
+            difficulty: Difficulty::Medium,
+            commands: vec!["# Returns Result<PreparedState, Error>".to_string()],
+        },
+        ActionStep {
+            description: "Verify cyclomatic < 10 per function".to_string(),
+            impact: "Target: cyclomatic < 10".to_string(),
+            difficulty: Difficulty::Easy,
+            commands: vec!["cargo test --all".to_string()],
+        },
+    ];
+
+    let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5; // ~1.5hr per 10 complexity
+
+    ActionableRecommendation {
+        primary_action: format!(
+            "Split into {} focused functions by decision clusters",
+            functions_to_extract
+        ),
+        rationale: format!(
+            "Many decision points ({} branches) drive cyclomatic complexity. \
+             Extract cohesive logic into focused functions.",
+            branch_count
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort),
+    }
+}
+
+/// Generate recommendation for mixed complexity pattern
+fn generate_mixed_recommendation(
+    nesting: u32,
+    cyclomatic: u32,
+    cognitive: u32,
+    _metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let early_return_impact = RefactoringImpact::early_returns(nesting);
+    let extraction_impact = RefactoringImpact::extract_function(cyclomatic / 3);
+
+    let steps = vec![
+        ActionStep {
+            description: "Phase 1: Apply early returns and guard clauses".to_string(),
+            impact: format!(
+                "-{} cognitive (makes branching clearer)",
+                early_return_impact.complexity_reduction
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec!["# Flatten nesting first".to_string()],
+        },
+        ActionStep {
+            description: "Phase 2: Extract functions from flattened structure".to_string(),
+            impact: format!("-{} cyclomatic", extraction_impact.complexity_reduction),
+            difficulty: Difficulty::Hard,
+            commands: vec!["# Identify decision clusters after flattening".to_string()],
+        },
+        ActionStep {
+            description: "Verify: nesting < 3, cyclomatic < 10".to_string(),
+            impact: "Both metrics in healthy range".to_string(),
+            difficulty: Difficulty::Easy,
+            commands: vec![
+                "cargo clippy -- -W clippy::cognitive_complexity".to_string(),
+                "cargo test --all".to_string(),
+            ],
+        },
+    ];
+
+    let estimated_effort = ((nesting as f32 - 2.0) * 0.5) + ((cyclomatic as f32 / 10.0) * 1.5);
+
+    ActionableRecommendation {
+        primary_action: "Reduce nesting FIRST, then extract functions (two-phase approach)"
+            .to_string(),
+        rationale: format!(
+            "Both nesting ({} levels) AND branching ({} branches) drive complexity to {}/{}. \
+             Mixed complexity requires phased refactoring.",
+            nesting, cyclomatic, cyclomatic, cognitive
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort),
+    }
+}
+
+/// Generate recommendation for chaotic structure pattern
+fn generate_chaotic_recommendation(
+    entropy: f64,
+    cyclomatic: u32,
+    cognitive: u32,
+    _metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let steps = vec![
+        ActionStep {
+            description: "Standardize error handling patterns".to_string(),
+            impact: "More predictable control flow".to_string(),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Convert all error handling to Result<?> propagation".to_string(),
+                "# Replace unwrap()/expect() with proper error handling".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Group related state transitions".to_string(),
+            impact: "Clear state evolution, fewer bugs".to_string(),
+            difficulty: Difficulty::Medium,
+            commands: vec!["# Collect scattered state changes into cohesive blocks".to_string()],
+        },
+        ActionStep {
+            description: "Re-run entropy calculation after standardization".to_string(),
+            impact: format!("Target: entropy < 0.35 (currently {:.2})", entropy),
+            difficulty: Difficulty::Easy,
+            commands: vec!["# Then proceed with complexity reduction".to_string()],
+        },
+    ];
+
+    ActionableRecommendation {
+        primary_action: "Standardize control flow patterns before refactoring".to_string(),
+        rationale: format!(
+            "High entropy ({:.2}) indicates inconsistent structure. \
+             Standardize patterns to enable safe refactoring of {}/{} complexity.",
+            entropy, cyclomatic, cognitive
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(2.0), // Chaotic code takes longer
+    }
+}
+
+/// Generate recommendation for moderate complexity
+fn generate_moderate_recommendation(
+    cyclomatic: u32,
+    cognitive: u32,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
     let target_complexity = 10;
-    let complexity_reduction = cyclomatic.saturating_sub(target_complexity);
+    let complexity_reduction = cyclomatic.saturating_sub(target_complexity).max(5);
 
     let steps = vec![
         ActionStep {
@@ -162,7 +469,7 @@ fn generate_complexity_steps(
             commands: vec![format!("cargo test {}::", metrics.name)],
         },
         ActionStep {
-            description: format!("Extract {} focused functions", functions_to_extract),
+            description: "Extract most complex section into focused function".to_string(),
             impact: format!("-{} complexity", complexity_reduction),
             difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
             commands: vec!["cargo clippy".to_string()],
@@ -175,7 +482,7 @@ fn generate_complexity_steps(
         },
     ];
 
-    let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5; // ~1.5hr per 10 complexity
+    let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5;
 
     ActionableRecommendation {
         primary_action: format!(
@@ -183,10 +490,11 @@ fn generate_complexity_steps(
             cyclomatic, target_complexity
         ),
         rationale: format!(
-            "High complexity {}/{} makes function hard to test and maintain",
+            "Approaching complexity threshold ({}/{}). \
+             Preventive refactoring will keep code maintainable.",
             cyclomatic, cognitive
         ),
-        implementation_steps: vec![], // Legacy field
+        implementation_steps: vec![],
         related_items: vec![],
         steps: Some(steps),
         estimated_effort_hours: Some(estimated_effort),
