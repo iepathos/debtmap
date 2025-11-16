@@ -126,10 +126,7 @@ impl ComplexityPattern {
         }
 
         // Mixed: both high
-        if metrics.cyclomatic >= 12
-            && metrics.cognitive >= 40
-            && (2.5..=3.5).contains(&ratio)
-        {
+        if metrics.cyclomatic >= 12 && metrics.cognitive >= 40 && (2.5..=3.5).contains(&ratio) {
             return ComplexityPattern::MixedComplexity {
                 nesting_depth: metrics.nesting,
                 cyclomatic: metrics.cyclomatic,

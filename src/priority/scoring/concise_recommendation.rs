@@ -158,7 +158,10 @@ fn generate_complexity_steps(
         cyclomatic,
         cognitive,
         nesting: metrics.nesting,
-        entropy_score: metrics.entropy_score.as_ref().map(|e| e.effective_complexity),
+        entropy_score: metrics
+            .entropy_score
+            .as_ref()
+            .map(|e| e.effective_complexity),
     };
 
     let pattern = ComplexityPattern::detect(&complexity_metrics);
