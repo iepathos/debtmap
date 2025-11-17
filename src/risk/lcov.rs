@@ -119,7 +119,11 @@ pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionNam
             let content_without_hash = if let Some(bracket_start) = content.find('[') {
                 if let Some(bracket_end) = content.find(']') {
                     // Reconstruct: before[hash]after -> beforeafter
-                    format!("{}{}", &content[..bracket_start], &content[(bracket_end + 1)..])
+                    format!(
+                        "{}{}",
+                        &content[..bracket_start],
+                        &content[(bracket_end + 1)..]
+                    )
                 } else {
                     content.to_string()
                 }
@@ -139,16 +143,14 @@ pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionNam
     // Use fold to track depth and only keep characters outside angle brackets
     let result = without_impl_brackets
         .chars()
-        .fold((String::new(), 0usize), |(mut acc, depth), ch| {
-            match ch {
-                '<' => (acc, depth + 1),
-                '>' if depth > 0 => (acc, depth - 1),
-                _ if depth == 0 => {
-                    acc.push(ch);
-                    (acc, depth)
-                }
-                _ => (acc, depth),
+        .fold((String::new(), 0usize), |(mut acc, depth), ch| match ch {
+            '<' => (acc, depth + 1),
+            '>' if depth > 0 => (acc, depth - 1),
+            _ if depth == 0 => {
+                acc.push(ch);
+                (acc, depth)
             }
+            _ => (acc, depth),
         })
         .0;
 

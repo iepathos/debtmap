@@ -227,7 +227,8 @@ impl CoverageIndex {
                     // Try function name suffix match (for querying with short form)
                     // Allows querying "ResumeExecutor::method" to match stored "prodigy::cook::resume::ResumeExecutor::method"
                     for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
+                        {
                             log::debug!(
                                 "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
                                 function_name,
@@ -270,7 +271,8 @@ impl CoverageIndex {
                     }
                     // Try function name suffix match (for querying with short form)
                     for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
+                        {
                             log::debug!(
                                 "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
                                 function_name,
@@ -313,7 +315,8 @@ impl CoverageIndex {
                     }
                     // Try function name suffix match (for querying with short form)
                     for func in file_functions.values() {
-                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name)
+                        {
                             log::debug!(
                                 "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
                                 function_name,
