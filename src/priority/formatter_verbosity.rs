@@ -602,6 +602,9 @@ fn format_item_body(
     // COMPLEXITY section (acts as EVIDENCE - metrics only)
     format_complexity_summary(output, item, _formatter);
 
+    // COVERAGE section (show right after complexity for consistency)
+    format_coverage_section(output, item, _formatter, verbosity, tree_pipe);
+
     // FILE CONTEXT section (spec 181: show non-production contexts in default mode)
     if verbosity == 0 {
         if let Some(ref context) = item.file_context {
@@ -655,9 +658,6 @@ fn format_item_body(
     if (1..2).contains(&verbosity) {
         format_scoring_breakdown(output, item, _formatter);
     }
-
-    // COVERAGE section
-    format_coverage_section(output, item, _formatter, verbosity, tree_pipe);
 
     // RELATED items
     format_related_items(output, &item.recommendation.related_items, _formatter);
