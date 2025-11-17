@@ -8,6 +8,8 @@ fn chaotic_pattern_uses_token_entropy_not_effective_complexity() {
         cognitive: 50,
         nesting: 3,
         entropy_score: Some(0.6), // This should be token_entropy
+        state_signals: None,
+        coordinator_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -32,6 +34,8 @@ fn below_threshold_not_chaotic() {
         cognitive: 50,
         nesting: 3,
         entropy_score: Some(0.44), // Just below 0.45 threshold
+        state_signals: None,
+        coordinator_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -49,6 +53,8 @@ fn at_threshold_is_chaotic() {
         cognitive: 50,
         nesting: 3,
         entropy_score: Some(0.45), // Exactly at threshold
+        state_signals: None,
+        coordinator_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -67,6 +73,8 @@ fn chaotic_pattern_takes_precedence() {
         cognitive: 50,            // ratio = 4.17 > 3.0
         nesting: 5,               // >= 4
         entropy_score: Some(0.6), // >= 0.45, should trigger chaotic
+        state_signals: None,
+        coordinator_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -84,6 +92,8 @@ fn none_entropy_allows_other_patterns() {
         cognitive: 50,       // ratio = 4.17 > 3.0
         nesting: 5,          // >= 4
         entropy_score: None, // No entropy data
+        state_signals: None,
+        coordinator_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
