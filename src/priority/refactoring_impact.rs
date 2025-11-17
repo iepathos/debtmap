@@ -70,6 +70,10 @@ pub enum RefactoringTechnique {
     StatePattern,
     /// Extract nested conditionals into predicate functions
     PredicateFunctions,
+    /// Extract state transition functions from state machine
+    StateTransitionExtraction,
+    /// Extract coordinator logic into transition map
+    CoordinatorExtraction,
 }
 
 impl RefactoringImpact {
@@ -217,6 +221,74 @@ impl RefactoringImpact {
             risk_reduction: reduction as f64 * 0.04,
             confidence: ImpactConfidence::Estimated,
             technique: RefactoringTechnique::PredicateFunctions,
+        }
+    }
+
+    /// Calculate impact of extracting state transition functions.
+    ///
+    /// State transition extraction isolates each state change into a named function,
+    /// reducing cyclomatic and cognitive complexity in the main state machine.
+    ///
+    /// **Formula**: Each transition reduces complexity by 2-3 cyclomatic, 4-6 cognitive
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use debtmap::priority::refactoring_impact::RefactoringImpact;
+    ///
+    /// let impact = RefactoringImpact::state_transition_extraction(3);
+    /// assert_eq!(impact.complexity_reduction, 21); // (3*2) + (3*5) = 6 + 15 = 21
+    /// ```
+    pub fn state_transition_extraction(transition_count: u32) -> Self {
+        // Each extracted transition typically reduces:
+        // - Cyclomatic by 2-3 (condition + branches)
+        // - Cognitive by 4-6 (nesting + logic)
+        let cyclomatic_reduction = (transition_count * 2).min(12);
+        let cognitive_reduction = (transition_count * 5).min(20);
+
+        Self {
+            complexity_reduction: cyclomatic_reduction + cognitive_reduction,
+            risk_reduction: cyclomatic_reduction as f64 * 0.06,
+            confidence: if transition_count >= 3 {
+                ImpactConfidence::Expected
+            } else {
+                ImpactConfidence::Estimated
+            },
+            technique: RefactoringTechnique::StateTransitionExtraction,
+        }
+    }
+
+    /// Calculate impact of coordinator pattern extraction.
+    ///
+    /// Coordinator refactoring moves action orchestration logic into a transition map
+    /// or separate coordination functions, flattening the main function.
+    ///
+    /// **Formula**: Impact depends on action count and comparison count
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use debtmap::priority::refactoring_impact::RefactoringImpact;
+    ///
+    /// let impact = RefactoringImpact::coordinator_extraction(4, 2);
+    /// assert!(impact.complexity_reduction > 0);
+    /// ```
+    pub fn coordinator_extraction(action_count: u32, comparison_count: u32) -> Self {
+        // Coordinator refactoring impact depends on:
+        // - Number of actions (each action = 1-2 complexity)
+        // - Number of comparisons (each comparison = 1-2 complexity)
+        let cyclomatic_reduction = (comparison_count * 2).min(10);
+        let cognitive_reduction = (action_count + comparison_count).min(15);
+
+        Self {
+            complexity_reduction: cyclomatic_reduction + cognitive_reduction,
+            risk_reduction: cyclomatic_reduction as f64 * 0.05,
+            confidence: if action_count >= 4 && comparison_count >= 2 {
+                ImpactConfidence::Expected
+            } else {
+                ImpactConfidence::Estimated
+            },
+            technique: RefactoringTechnique::CoordinatorExtraction,
         }
     }
 }

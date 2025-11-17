@@ -251,12 +251,28 @@ fn generate_complexity_steps(
         nesting: metrics.nesting,
         // Use token_entropy (Shannon entropy) for pattern detection, not effective_complexity
         entropy_score: metrics.entropy_score.as_ref().map(|e| e.token_entropy),
+        state_signals: None,       // TODO: populate from AST analysis
+        coordinator_signals: None, // TODO: populate from AST analysis
     };
 
     let pattern = ComplexityPattern::detect(&complexity_metrics);
 
     // Generate pattern-specific recommendation
     match pattern {
+        ComplexityPattern::StateMachine {
+            state_transitions,
+            cyclomatic: cyclo,
+            cognitive: cog,
+            nesting,
+        } => generate_state_machine_recommendation(state_transitions, cyclo, cog, nesting, metrics),
+        ComplexityPattern::Coordinator {
+            action_count,
+            comparison_count,
+            cyclomatic: cyclo,
+            cognitive: cog,
+        } => {
+            generate_coordinator_recommendation(action_count, comparison_count, cyclo, cog, metrics)
+        }
         ComplexityPattern::HighNesting {
             nesting_depth,
             cognitive_score,
@@ -541,6 +557,139 @@ fn generate_chaotic_recommendation(
         related_items: vec![],
         steps: Some(steps),
         estimated_effort_hours: Some(2.0), // Chaotic code takes longer
+    }
+}
+
+/// Generate recommendation for state machine pattern
+fn generate_state_machine_recommendation(
+    transitions: u32,
+    cyclomatic: u32,
+    cognitive: u32,
+    nesting: u32,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let extraction_impact = RefactoringImpact::state_transition_extraction(transitions);
+    let language = crate::core::Language::from_path(&metrics.file);
+
+    let steps = vec![
+        ActionStep {
+            description: "Extract each state transition into a named function".to_string(),
+            impact: format!(
+                "-{} complexity ({} impact)",
+                extraction_impact.complexity_reduction,
+                extraction_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Identify each state transition path".to_string(),
+                "# Extract into handle_X_to_Y() functions".to_string(),
+                format!("# Example: fn handle_online_to_offline(state: &State) -> Vec<Action>"),
+            ],
+        },
+        ActionStep {
+            description: "Create transition map or lookup table".to_string(),
+            impact: format!(
+                "-{} nesting (flatten conditionals)",
+                nesting.saturating_sub(1)
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Replace nested if/match with transition table".to_string(),
+                "# Example: HashMap<(State, Event), Action>".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Verify state transitions with property tests".to_string(),
+            impact: "Ensure correctness of extracted logic".to_string(),
+            difficulty: Difficulty::Medium,
+            commands: add_language_verification_commands(&language),
+        },
+    ];
+
+    let estimated_effort = (transitions as f32) * 0.75; // ~45min per transition
+
+    ActionableRecommendation {
+        primary_action: format!(
+            "Extract {} state transitions into named functions",
+            transitions
+        ),
+        rationale: format!(
+            "State machine pattern detected with {} transitions. \
+             Extracting transitions will reduce complexity from {}/{} to ~{}/{}.",
+            transitions,
+            cyclomatic,
+            cognitive,
+            cyclomatic.saturating_sub(extraction_impact.complexity_reduction / 2),
+            cognitive.saturating_sub(extraction_impact.complexity_reduction / 2)
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort),
+    }
+}
+
+/// Generate recommendation for coordinator pattern
+fn generate_coordinator_recommendation(
+    action_count: u32,
+    comparison_count: u32,
+    cyclomatic: u32,
+    cognitive: u32,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let extraction_impact =
+        RefactoringImpact::coordinator_extraction(action_count, comparison_count);
+    let language = crate::core::Language::from_path(&metrics.file);
+
+    let steps = vec![
+        ActionStep {
+            description: "Extract action selection logic into pure functions".to_string(),
+            impact: format!(
+                "-{} complexity ({} impact)",
+                extraction_impact.complexity_reduction,
+                extraction_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Extract: fn select_actions_for_state_diff(...) -> Vec<Action>".to_string(),
+                "# Pure functions easier to test and reason about".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Replace state comparisons with diff calculation".to_string(),
+            impact: format!("-{} comparisons (single diff pass)", comparison_count),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Create: fn calculate_state_diff(current, target) -> StateDiff".to_string(),
+                "# Pattern match on diff instead of individual field checks".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Verify actions with property-based tests".to_string(),
+            impact: "Ensure action correctness across state combinations".to_string(),
+            difficulty: Difficulty::Medium,
+            commands: add_language_verification_commands(&language),
+        },
+    ];
+
+    let estimated_effort = (action_count as f32 + comparison_count as f32) * 0.3; // ~20min per action/comparison
+
+    ActionableRecommendation {
+        primary_action: "Extract state reconciliation logic into transition functions".to_string(),
+        rationale: format!(
+            "Coordinator pattern detected with {} actions and {} state comparisons. \
+             Extracting transitions will reduce complexity from {}/{} to ~{}/{}.",
+            action_count,
+            comparison_count,
+            cyclomatic,
+            cognitive,
+            cyclomatic.saturating_sub(extraction_impact.complexity_reduction / 2),
+            cognitive.saturating_sub(extraction_impact.complexity_reduction / 2)
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort),
     }
 }
 

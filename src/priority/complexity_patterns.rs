@@ -15,6 +15,20 @@ use serde::{Deserialize, Serialize};
 /// Complexity pattern classification based on metric ratios
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ComplexityPattern {
+    /// State machine pattern: nested conditionals on enum states
+    StateMachine {
+        state_transitions: u32,
+        cyclomatic: u32,
+        cognitive: u32,
+        nesting: u32,
+    },
+    /// Coordinator pattern: orchestrates actions based on state comparisons
+    Coordinator {
+        action_count: u32,
+        comparison_count: u32,
+        cyclomatic: u32,
+        cognitive: u32,
+    },
     /// Deep nesting drives complexity (cognitive >> cyclomatic)
     HighNesting {
         nesting_depth: u32,
@@ -35,6 +49,26 @@ pub enum ComplexityPattern {
     ModerateComplexity { cyclomatic: u32, cognitive: u32 },
 }
 
+/// Signals indicating state machine pattern
+#[derive(Debug, Clone)]
+pub struct StateMachineSignals {
+    pub transition_count: u32,
+    pub has_enum_match: bool,
+    pub has_state_comparison: bool,
+    pub action_dispatch_count: u32,
+    pub confidence: f64,
+}
+
+/// Signals indicating coordinator pattern
+#[derive(Debug, Clone)]
+pub struct CoordinatorSignals {
+    pub actions: u32,
+    pub comparisons: u32,
+    pub has_action_accumulation: bool,
+    pub has_helper_calls: bool,
+    pub confidence: f64,
+}
+
 /// Complexity metrics for pattern detection
 #[derive(Debug, Clone)]
 pub struct ComplexityMetrics {
@@ -42,6 +76,8 @@ pub struct ComplexityMetrics {
     pub cognitive: u32,
     pub nesting: u32,
     pub entropy_score: Option<f64>,
+    pub state_signals: Option<StateMachineSignals>,
+    pub coordinator_signals: Option<CoordinatorSignals>,
 }
 
 impl ComplexityPattern {
@@ -49,26 +85,36 @@ impl ComplexityPattern {
     ///
     /// # Pattern Detection Logic
     ///
-    /// 1. **Chaotic Structure** (checked first): token_entropy >= 0.45
+    /// 1. **State Machine** (checked first): High-confidence state transition signals
+    ///    - Detects functions with nested conditionals on enum states
+    ///    - Requires: cyclomatic >= 6, cognitive >= 12, confidence >= 0.7
+    ///    - Refactoring: extract state transition functions, create transition map
+    ///
+    /// 2. **Coordinator** (checked second): Action accumulation and state comparisons
+    ///    - Detects functions that orchestrate actions based on state
+    ///    - Requires: actions >= 3, comparisons >= 2, confidence >= 0.7
+    ///    - Refactoring: extract reconciliation logic into transition map
+    ///
+    /// 3. **Chaotic Structure**: token_entropy >= 0.45
     ///    - Uses token_entropy (Shannon entropy of code tokens, 0.0-1.0 scale)
     ///    - Threshold 0.45 chosen empirically (typical range: 0.2-0.8)
     ///    - High token entropy indicates inconsistent patterns that make refactoring risky
     ///    - Should be standardized before other refactorings
     ///
-    /// 2. **High Nesting**: cognitive/cyclomatic > 3.0 AND nesting >= 4
+    /// 4. **High Nesting**: cognitive/cyclomatic > 3.0 AND nesting >= 4
     ///    - Cognitive dominates cyclomatic (high ratio)
     ///    - Deep nesting (4+ levels) is the primary driver
     ///    - Refactoring: early returns, guard clauses, extract conditionals
     ///
-    /// 3. **High Branching**: cyclomatic >= 15 AND ratio < 2.5
+    /// 5. **High Branching**: cyclomatic >= 15 AND ratio < 2.5
     ///    - Many decision points with moderate nesting
     ///    - Refactoring: extract functions, lookup tables, strategy pattern
     ///
-    /// 4. **Mixed Complexity**: cyclomatic >= 12 AND cognitive >= 40 AND 2.5 <= ratio <= 3.5
+    /// 6. **Mixed Complexity**: cyclomatic >= 12 AND cognitive >= 40 AND 2.5 <= ratio <= 3.5
     ///    - Both nesting and branching contribute significantly
     ///    - Refactoring: two-phase approach (flatten then extract)
     ///
-    /// 5. **Moderate Complexity**: default
+    /// 7. **Moderate Complexity**: default
     ///    - Approaching thresholds but not critical
     ///    - Preventive refactoring recommended
     ///
@@ -83,6 +129,8 @@ impl ComplexityPattern {
     ///     cognitive: 50,  // 4.2x ratio
     ///     nesting: 5,
     ///     entropy_score: Some(0.35),
+    ///     state_signals: None,
+    ///     coordinator_signals: None,
     /// };
     /// let pattern = ComplexityPattern::detect(&metrics);
     /// assert!(matches!(pattern, ComplexityPattern::HighNesting { .. }));
@@ -93,6 +141,8 @@ impl ComplexityPattern {
     ///     cognitive: 35,  // 1.9x ratio
     ///     nesting: 2,
     ///     entropy_score: Some(0.30),
+    ///     state_signals: None,
+    ///     coordinator_signals: None,
     /// };
     /// let pattern = ComplexityPattern::detect(&metrics);
     /// assert!(matches!(pattern, ComplexityPattern::HighBranching { .. }));
@@ -100,7 +150,35 @@ impl ComplexityPattern {
     pub fn detect(metrics: &ComplexityMetrics) -> Self {
         let ratio = metrics.cognitive as f64 / metrics.cyclomatic.max(1) as f64;
 
-        // Chaotic: high token entropy (check first - requires standardization before refactoring)
+        // Check for state machine pattern (highest priority - specific, high-value)
+        if let Some(ref state_signals) = metrics.state_signals {
+            if state_signals.confidence >= 0.7 && metrics.cyclomatic >= 6 && metrics.cognitive >= 12
+            {
+                return ComplexityPattern::StateMachine {
+                    state_transitions: state_signals.transition_count,
+                    cyclomatic: metrics.cyclomatic,
+                    cognitive: metrics.cognitive,
+                    nesting: metrics.nesting,
+                };
+            }
+        }
+
+        // Check for coordinator pattern (second priority - specific, high-value)
+        if let Some(ref coord_signals) = metrics.coordinator_signals {
+            if coord_signals.confidence >= 0.7
+                && coord_signals.actions >= 3
+                && coord_signals.comparisons >= 2
+            {
+                return ComplexityPattern::Coordinator {
+                    action_count: coord_signals.actions,
+                    comparison_count: coord_signals.comparisons,
+                    cyclomatic: metrics.cyclomatic,
+                    cognitive: metrics.cognitive,
+                };
+            }
+        }
+
+        // Chaotic: high token entropy (check before generic patterns - requires standardization)
         // Note: entropy_score here is token_entropy (Shannon entropy), not effective_complexity
         if let Some(token_entropy) = metrics.entropy_score {
             if token_entropy >= 0.45 {
@@ -147,6 +225,10 @@ impl ComplexityPattern {
     /// Get a human-readable description of the pattern
     pub fn description(&self) -> &'static str {
         match self {
+            ComplexityPattern::StateMachine { .. } => "State machine with transition logic",
+            ComplexityPattern::Coordinator { .. } => {
+                "Coordinator orchestrating state-based actions"
+            }
             ComplexityPattern::HighNesting { .. } => "Deep nesting drives complexity",
             ComplexityPattern::HighBranching { .. } => "Many decision points",
             ComplexityPattern::MixedComplexity { .. } => "Both nesting and branching high",
@@ -167,6 +249,8 @@ mod tests {
             cognitive: 50, // 4.2x ratio
             nesting: 5,
             entropy_score: Some(0.35),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -191,6 +275,8 @@ mod tests {
             cognitive: 35, // 1.9x ratio
             nesting: 2,
             entropy_score: Some(0.30),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -204,6 +290,8 @@ mod tests {
             cognitive: 45, // 3.0x ratio
             nesting: 3,
             entropy_score: Some(0.32),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -217,6 +305,8 @@ mod tests {
             cognitive: 30,
             nesting: 3,
             entropy_score: Some(0.50), // High entropy
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -233,6 +323,8 @@ mod tests {
             cognitive: 18,
             nesting: 2,
             entropy_score: Some(0.30),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -250,6 +342,8 @@ mod tests {
             cognitive: 50,
             nesting: 5,
             entropy_score: Some(0.48), // High entropy takes precedence
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -267,6 +361,8 @@ mod tests {
             cognitive: 30, // Exactly 3.0x
             nesting: 4,
             entropy_score: Some(0.30),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -285,6 +381,8 @@ mod tests {
             cognitive: 10,
             nesting: 2,
             entropy_score: Some(0.30),
+            state_signals: None,
+            coordinator_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -296,7 +394,103 @@ mod tests {
     }
 
     #[test]
+    fn detect_state_machine_pattern() {
+        let metrics = ComplexityMetrics {
+            cyclomatic: 9,
+            cognitive: 16,
+            nesting: 4,
+            entropy_score: Some(0.32),
+            state_signals: Some(StateMachineSignals {
+                transition_count: 3,
+                has_enum_match: true,
+                has_state_comparison: true,
+                action_dispatch_count: 4,
+                confidence: 0.85,
+            }),
+            coordinator_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(matches!(pattern, ComplexityPattern::StateMachine { .. }));
+
+        if let ComplexityPattern::StateMachine {
+            state_transitions, ..
+        } = pattern
+        {
+            assert_eq!(state_transitions, 3);
+        }
+    }
+
+    #[test]
+    fn detect_coordinator_pattern() {
+        let metrics = ComplexityMetrics {
+            cyclomatic: 8,
+            cognitive: 14,
+            nesting: 3,
+            entropy_score: Some(0.28),
+            state_signals: None,
+            coordinator_signals: Some(CoordinatorSignals {
+                actions: 4,
+                comparisons: 2,
+                has_action_accumulation: true,
+                has_helper_calls: true,
+                confidence: 0.80,
+            }),
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(matches!(pattern, ComplexityPattern::Coordinator { .. }));
+    }
+
+    #[test]
+    fn state_pattern_takes_precedence_over_nesting() {
+        // High nesting metrics BUT state machine signals
+        let metrics = ComplexityMetrics {
+            cyclomatic: 12,
+            cognitive: 50,
+            nesting: 5,
+            entropy_score: Some(0.35),
+            state_signals: Some(StateMachineSignals {
+                transition_count: 4,
+                has_enum_match: true,
+                has_state_comparison: true,
+                action_dispatch_count: 6,
+                confidence: 0.90,
+            }),
+            coordinator_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            matches!(pattern, ComplexityPattern::StateMachine { .. }),
+            "State machine pattern should take precedence over generic high nesting"
+        );
+    }
+
+    #[test]
     fn pattern_descriptions() {
+        assert_eq!(
+            ComplexityPattern::StateMachine {
+                state_transitions: 3,
+                cyclomatic: 9,
+                cognitive: 16,
+                nesting: 4,
+            }
+            .description(),
+            "State machine with transition logic"
+        );
+
+        assert_eq!(
+            ComplexityPattern::Coordinator {
+                action_count: 4,
+                comparison_count: 2,
+                cyclomatic: 8,
+                cognitive: 14,
+            }
+            .description(),
+            "Coordinator orchestrating state-based actions"
+        );
+
         assert_eq!(
             ComplexityPattern::HighNesting {
                 nesting_depth: 5,
