@@ -792,22 +792,14 @@ fn format_priority_item_markdown(
     }
 
     // Location and type
-    // Add file context tag if present (spec 166)
-    let file_context_tag = if let Some(ref context) = item.file_context {
-        use crate::priority::scoring::file_context_scoring::context_label;
-        format!(" [{}]", context_label(context))
-    } else {
-        String::new()
-    };
-
+    // Location line (spec 181: clean location line without context tag)
     writeln!(
         output,
-        "**Type:** {} | **Location:** `{}:{} {}(){}`",
+        "**Type:** {} | **Location:** `{}:{} {}()`",
         format_debt_type(&item.debt_type),
         item.location.file.display(),
         item.location.line,
-        item.location.function,
-        file_context_tag
+        item.location.function
     )
     .unwrap();
 
