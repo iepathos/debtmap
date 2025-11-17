@@ -5,12 +5,12 @@ use colored::*;
 use std::fmt::Write;
 
 // Pure function to classify coverage percentage
-// Returns (inline_indicator, standalone_indicator) following [SEVERITY] STATE pattern
+// Returns (inline_indicator, standalone_indicator) following [SEVERITY STATE] pattern
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
     match coverage_pct {
-        0.0 => (" [ERROR] UNTESTED", "[ERROR] UNTESTED"),
-        c if c < 20.0 => (" [WARN] LOW", "[WARN] LOW"),
-        c if c < 50.0 => (" [WARN] PARTIAL", "[WARN] PARTIAL"),
+        0.0 => (" [ERROR UNTESTED]", "[ERROR UNTESTED]"),
+        c if c < 20.0 => (" [WARN LOW]", "[WARN LOW]"),
+        c if c < 50.0 => (" [WARN PARTIAL]", "[WARN PARTIAL]"),
         _ => ("", ""),
     }
 }
@@ -34,12 +34,12 @@ fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'
 // Pure function to format coverage status
 fn format_coverage_status(coverage_pct: f64) -> String {
     match coverage_pct {
-        0.0 => "[ERROR] UNTESTED".to_string(),
-        c if c < 20.0 => format!("[WARN] LOW ({:.1}%)", c),
-        c if c < 50.0 => format!("[WARN] PARTIAL ({:.1}%)", c),
-        c if c < 80.0 => format!("[INFO] MODERATE ({:.1}%)", c),
-        c if c < 95.0 => format!("[OK] GOOD ({:.1}%)", c),
-        _ => format!("[OK] EXCELLENT ({:.1}%)", coverage_pct),
+        0.0 => "[ERROR UNTESTED]".to_string(),
+        c if c < 20.0 => format!("[WARN LOW] ({:.1}%)", c),
+        c if c < 50.0 => format!("[WARN PARTIAL] ({:.1}%)", c),
+        c if c < 80.0 => format!("[INFO MODERATE] ({:.1}%)", c),
+        c if c < 95.0 => format!("[OK GOOD] ({:.1}%)", c),
+        _ => format!("[OK EXCELLENT] ({:.1}%)", coverage_pct),
     }
 }
 
@@ -56,9 +56,9 @@ fn format_coverage_factor_description(
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
-            0.0 => Some("[ERROR] UNTESTED (0% coverage, weight: 50%)".to_string()),
-            c if c < 20.0 => Some(format!("[WARN] LOW COVERAGE ({:.1}%, weight: 50%)", c)),
-            c if c < 50.0 => Some(format!("[WARN] PARTIAL COVERAGE ({:.1}%, weight: 50%)", c)),
+            0.0 => Some("[ERROR UNTESTED] (0% coverage, weight: 50%)".to_string()),
+            c if c < 20.0 => Some(format!("[WARN LOW COVERAGE] ({:.1}%, weight: 50%)", c)),
+            c if c < 50.0 => Some(format!("[WARN PARTIAL COVERAGE] ({:.1}%, weight: 50%)", c)),
             c if c >= 95.0 => Some(format!("Excellent coverage {:.1}%", c)),
             c if c >= 80.0 => Some(format!("Good coverage {:.1}%", c)),
             _ if item.unified_score.coverage_factor > 3.0 => {
@@ -67,7 +67,7 @@ fn format_coverage_factor_description(
             _ => None,
         }
     } else if item.unified_score.coverage_factor >= 10.0 {
-        Some("[ERROR] UNTESTED (no coverage data, weight: 50%)".to_string())
+        Some("[ERROR UNTESTED] (no coverage data, weight: 50%)".to_string())
     } else if item.unified_score.coverage_factor > 3.0 {
         Some("No coverage data (weight: 50%)".to_string())
     } else {
@@ -76,12 +76,12 @@ fn format_coverage_factor_description(
 }
 
 // Pure function to get gap severity indicator based on gap percentage
-// Follows [SEVERITY] STATE pattern, except [CRITICAL] which stands alone
+// Follows [SEVERITY STATE] pattern, except [CRITICAL] which stands alone
 fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
     match gap_percentage {
-        p if p <= 25.0 => "[WARN] LOW",
-        p if p <= 50.0 => "[WARN] MODERATE",
-        p if p <= 75.0 => "[ERROR] HIGH",
+        p if p <= 25.0 => "[WARN LOW]",
+        p if p <= 50.0 => "[WARN MODERATE]",
+        p if p <= 75.0 => "[ERROR HIGH]",
         _ => "[CRITICAL]",
     }
 }
@@ -1168,19 +1168,19 @@ mod tests {
     #[test]
     fn test_get_gap_severity_indicator() {
         // LOW: 1-25%
-        assert_eq!(get_gap_severity_indicator(0.0), "[WARN] LOW");
-        assert_eq!(get_gap_severity_indicator(10.0), "[WARN] LOW");
-        assert_eq!(get_gap_severity_indicator(25.0), "[WARN] LOW");
+        assert_eq!(get_gap_severity_indicator(0.0), "[WARN LOW]");
+        assert_eq!(get_gap_severity_indicator(10.0), "[WARN LOW]");
+        assert_eq!(get_gap_severity_indicator(25.0), "[WARN LOW]");
 
         // MODERATE: 26-50%
-        assert_eq!(get_gap_severity_indicator(26.0), "[WARN] MODERATE");
-        assert_eq!(get_gap_severity_indicator(40.0), "[WARN] MODERATE");
-        assert_eq!(get_gap_severity_indicator(50.0), "[WARN] MODERATE");
+        assert_eq!(get_gap_severity_indicator(26.0), "[WARN MODERATE]");
+        assert_eq!(get_gap_severity_indicator(40.0), "[WARN MODERATE]");
+        assert_eq!(get_gap_severity_indicator(50.0), "[WARN MODERATE]");
 
         // HIGH: 51-75%
-        assert_eq!(get_gap_severity_indicator(51.0), "[ERROR] HIGH");
-        assert_eq!(get_gap_severity_indicator(65.0), "[ERROR] HIGH");
-        assert_eq!(get_gap_severity_indicator(75.0), "[ERROR] HIGH");
+        assert_eq!(get_gap_severity_indicator(51.0), "[ERROR HIGH]");
+        assert_eq!(get_gap_severity_indicator(65.0), "[ERROR HIGH]");
+        assert_eq!(get_gap_severity_indicator(75.0), "[ERROR HIGH]");
 
         // CRITICAL: 76-100%
         assert_eq!(get_gap_severity_indicator(76.0), "[CRITICAL]");
@@ -1216,23 +1216,23 @@ mod tests {
     fn test_classify_coverage_percentage() {
         assert_eq!(
             classify_coverage_percentage(0.0),
-            (" [ERROR] UNTESTED", "[ERROR] UNTESTED")
+            (" [ERROR UNTESTED]", "[ERROR UNTESTED]")
         );
         assert_eq!(
             classify_coverage_percentage(10.0),
-            (" [WARN] LOW", "[WARN] LOW")
+            (" [WARN LOW]", "[WARN LOW]")
         );
         assert_eq!(
             classify_coverage_percentage(19.9),
-            (" [WARN] LOW", "[WARN] LOW")
+            (" [WARN LOW]", "[WARN LOW]")
         );
         assert_eq!(
             classify_coverage_percentage(20.0),
-            (" [WARN] PARTIAL", "[WARN] PARTIAL")
+            (" [WARN PARTIAL]", "[WARN PARTIAL]")
         );
         assert_eq!(
             classify_coverage_percentage(49.9),
-            (" [WARN] PARTIAL", "[WARN] PARTIAL")
+            (" [WARN PARTIAL]", "[WARN PARTIAL]")
         );
         assert_eq!(classify_coverage_percentage(50.0), ("", ""));
         assert_eq!(classify_coverage_percentage(100.0), ("", ""));
@@ -1240,12 +1240,12 @@ mod tests {
 
     #[test]
     fn test_format_coverage_status() {
-        assert_eq!(format_coverage_status(0.0), "[ERROR] UNTESTED");
-        assert_eq!(format_coverage_status(10.0), "[WARN] LOW (10.0%)");
-        assert_eq!(format_coverage_status(30.0), "[WARN] PARTIAL (30.0%)");
-        assert_eq!(format_coverage_status(60.0), "[INFO] MODERATE (60.0%)");
-        assert_eq!(format_coverage_status(85.0), "[OK] GOOD (85.0%)");
-        assert_eq!(format_coverage_status(96.0), "[OK] EXCELLENT (96.0%)");
+        assert_eq!(format_coverage_status(0.0), "[ERROR UNTESTED]");
+        assert_eq!(format_coverage_status(10.0), "[WARN LOW] (10.0%)");
+        assert_eq!(format_coverage_status(30.0), "[WARN PARTIAL] (30.0%)");
+        assert_eq!(format_coverage_status(60.0), "[INFO MODERATE] (60.0%)");
+        assert_eq!(format_coverage_status(85.0), "[OK GOOD] (85.0%)");
+        assert_eq!(format_coverage_status(96.0), "[OK EXCELLENT] (96.0%)");
     }
 
     #[test]

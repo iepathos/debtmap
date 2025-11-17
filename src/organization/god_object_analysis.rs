@@ -426,13 +426,19 @@ pub fn calculate_god_object_score(
     // Exponential scaling for severe violations
     let base_score = method_factor * field_factor * responsibility_factor * size_factor;
 
-    // Ensure minimum score of 100 for any god object
+    // Apply appropriate scoring based on violation severity
+    // More nuanced approach to prevent over-flagging moderate files
     if violation_count > 0 {
-        // For any god object (at least 1 violation), ensure minimum 100 points
-        // Scale up based on severity of violations
-        let min_score = 100.0;
-        let severity_multiplier = violation_count as f64;
-        (base_score * 50.0 * severity_multiplier).max(min_score)
+        // Graduated minimum scores based on violation count
+        let base_min_score = match violation_count {
+            1 => 30.0, // Single violation: Moderate score
+            2 => 50.0, // Two violations: Borderline CRITICAL
+            _ => 70.0, // Three+ violations: Likely CRITICAL
+        };
+
+        // Reduced multiplier from 50.0 to 20.0 for more conservative scoring
+        let score = base_score * 20.0 * (violation_count as f64);
+        score.max(base_min_score)
     } else {
         base_score * 10.0
     }
@@ -497,11 +503,22 @@ pub fn calculate_god_object_score_weighted(
     // Exponential scaling for severe violations
     let base_score = method_factor * field_factor * responsibility_factor * size_factor;
 
-    // Apply complexity factor and ensure minimum score for violations
+    // Apply complexity factor and ensure appropriate score for violations
+    // Scale scores more conservatively to prevent small files from being CRITICAL
     if violation_count > 0 {
-        let min_score = 100.0;
-        let severity_multiplier = violation_count as f64;
-        (base_score * 50.0 * complexity_factor * severity_multiplier).max(min_score)
+        // More nuanced minimum scores based on violation severity
+        // 1 violation (e.g., just responsibilities): 30-50 range
+        // 2 violations: 50-70 range
+        // 3+ violations: 70+ range (CRITICAL territory)
+        let base_min_score = match violation_count {
+            1 => 30.0, // Moderate threshold - won't trigger CRITICAL (< 50)
+            2 => 50.0, // High threshold - borderline CRITICAL
+            _ => 70.0, // Multiple violations - likely CRITICAL
+        };
+
+        // Reduced multiplier from 50.0 to 20.0 for more conservative scoring
+        let score = base_score * 20.0 * complexity_factor * (violation_count as f64);
+        score.max(base_min_score)
     } else {
         base_score * 10.0 * complexity_factor
     }
