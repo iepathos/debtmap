@@ -37,13 +37,13 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 
-// Progress bar templates
-pub const TEMPLATE_CALL_GRAPH: &str = "🔗 {msg} {pos}/{len} files ({percent}%) - {eta}";
-pub const TEMPLATE_TRAIT_RESOLUTION: &str = "🔍 {msg} {pos}/{len} traits - {eta}";
-pub const TEMPLATE_COVERAGE: &str = "📊 {msg} {pos}/{len} files - {eta}";
+// Progress bar templates - text-based for terminal compatibility
+pub const TEMPLATE_CALL_GRAPH: &str = "[graph] {msg} {pos}/{len} files ({percent}%) - {eta}";
+pub const TEMPLATE_TRAIT_RESOLUTION: &str = "[traits] {msg} {pos}/{len} traits - {eta}";
+pub const TEMPLATE_COVERAGE: &str = "[coverage] {msg} {pos}/{len} files - {eta}";
 pub const TEMPLATE_FUNCTION_ANALYSIS: &str =
-    "⚙️  {msg} {pos}/{len} functions ({percent}%) - {per_sec}/sec - {eta}";
-pub const TEMPLATE_FILE_ANALYSIS: &str = "📁 {msg} {pos}/{len} files ({percent}%) - {eta}";
+    "[funcs] {msg} {pos}/{len} functions ({percent}%) - {per_sec}/sec - {eta}";
+pub const TEMPLATE_FILE_ANALYSIS: &str = "[files] {msg} {pos}/{len} files ({percent}%) - {eta}";
 pub const TEMPLATE_SPINNER: &str = "{spinner} {msg}";
 
 /// Configuration for progress display behavior
@@ -140,7 +140,7 @@ impl ProgressManager {
             ProgressStyle::default_spinner()
                 .template(TEMPLATE_SPINNER)
                 .expect("Invalid spinner template")
-                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+                .tick_chars("|/-\\"),
         );
         pb.set_message(msg.to_string());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -158,7 +158,7 @@ impl ProgressManager {
             ProgressStyle::default_spinner()
                 .template(template)
                 .expect("Invalid counter template")
-                .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+                .tick_chars("|/-\\"),
         );
         pb.set_message(msg.to_string());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));

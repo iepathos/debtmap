@@ -1569,7 +1569,8 @@ end_of_record
         #[test]
         fn test_normalize_impl_method_with_angle_brackets() {
             // This is the actual pattern from LCOV that fails to match
-            let demangled = "<prodigy::cook::workflow::resume::ResumeExecutor>::execute_remaining_steps";
+            let demangled =
+                "<prodigy::cook::workflow::resume::ResumeExecutor>::execute_remaining_steps";
             let result = normalize_demangled_name(demangled);
 
             // After normalization, should be usable for matching
@@ -1611,14 +1612,16 @@ end_of_record
             let file_path = PathBuf::from("src/cook/workflow/resume.rs");
 
             // Test 1: Query with short form (what debtmap uses)
-            let coverage = data.get_function_coverage(&file_path, "ResumeExecutor::execute_remaining_steps");
+            let coverage =
+                data.get_function_coverage(&file_path, "ResumeExecutor::execute_remaining_steps");
             assert!(
                 coverage.is_some(),
                 "BUG: Should match 'ResumeExecutor::execute_remaining_steps' but got None"
             );
 
             // Test 2: Query with method name only
-            let coverage = data.get_function_coverage_with_line(&file_path, "execute_remaining_steps", 824);
+            let coverage =
+                data.get_function_coverage_with_line(&file_path, "execute_remaining_steps", 824);
             assert!(
                 coverage.is_some(),
                 "BUG: Should match method name 'execute_remaining_steps' but got None"
@@ -1627,7 +1630,7 @@ end_of_record
             // Test 3: Query with full path
             let coverage = data.get_function_coverage(
                 &file_path,
-                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps"
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
             );
             assert!(
                 coverage.is_some(),
@@ -1665,11 +1668,8 @@ end_of_record
 
             // Standalone function - should work
             let file_path_1 = PathBuf::from("src/cli/commands/resume.rs");
-            let coverage_standalone = data.get_function_coverage_with_line(
-                &file_path_1,
-                "execute_mapreduce_resume",
-                568
-            );
+            let coverage_standalone =
+                data.get_function_coverage_with_line(&file_path_1, "execute_mapreduce_resume", 568);
             assert!(
                 coverage_standalone.is_some(),
                 "Standalone function 'execute_mapreduce_resume' should match (baseline test)"
@@ -1677,11 +1677,8 @@ end_of_record
 
             // Impl method - currently fails
             let file_path_2 = PathBuf::from("src/cook/workflow/resume.rs");
-            let coverage_impl = data.get_function_coverage_with_line(
-                &file_path_2,
-                "execute_remaining_steps",
-                824
-            );
+            let coverage_impl =
+                data.get_function_coverage_with_line(&file_path_2, "execute_remaining_steps", 824);
             assert!(
                 coverage_impl.is_some(),
                 "BUG: Impl method 'execute_remaining_steps' should match but doesn't"
@@ -1692,36 +1689,30 @@ end_of_record
         fn test_multiple_impl_methods() {
             // Test multiple common patterns that appear in real codebases
             let test_cases = vec![
-                (
-                    "<Type>::method",
-                    "method",
-                    "Simple impl method"
-                ),
+                ("<Type>::method", "method", "Simple impl method"),
                 (
                     "<crate::module::Type>::method",
                     "method",
-                    "Fully qualified impl method"
+                    "Fully qualified impl method",
                 ),
                 (
                     "<impl Trait for Type>::method",
                     "method",
-                    "Trait impl method"
+                    "Trait impl method",
                 ),
                 (
                     "<Type<T>>::generic_method",
                     "generic_method",
-                    "Generic impl method"
+                    "Generic impl method",
                 ),
             ];
 
             for (input, expected_method, description) in test_cases {
                 let result = normalize_demangled_name(input);
                 assert_eq!(
-                    result.method_name,
-                    expected_method,
+                    result.method_name, expected_method,
                     "{}: method_name mismatch for '{}'",
-                    description,
-                    input
+                    description, input
                 );
             }
         }
