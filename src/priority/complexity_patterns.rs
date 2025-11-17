@@ -49,8 +49,10 @@ impl ComplexityPattern {
     ///
     /// # Pattern Detection Logic
     ///
-    /// 1. **Chaotic Structure** (checked first): entropy >= 0.45
-    ///    - High entropy indicates inconsistent patterns that make refactoring risky
+    /// 1. **Chaotic Structure** (checked first): token_entropy >= 0.45
+    ///    - Uses token_entropy (Shannon entropy of code tokens, 0.0-1.0 scale)
+    ///    - Threshold 0.45 chosen empirically (typical range: 0.2-0.8)
+    ///    - High token entropy indicates inconsistent patterns that make refactoring risky
     ///    - Should be standardized before other refactorings
     ///
     /// 2. **High Nesting**: cognitive/cyclomatic > 3.0 AND nesting >= 4
@@ -98,11 +100,12 @@ impl ComplexityPattern {
     pub fn detect(metrics: &ComplexityMetrics) -> Self {
         let ratio = metrics.cognitive as f64 / metrics.cyclomatic.max(1) as f64;
 
-        // Chaotic: high entropy (check first - requires standardization before refactoring)
-        if let Some(entropy) = metrics.entropy_score {
-            if entropy >= 0.45 {
+        // Chaotic: high token entropy (check first - requires standardization before refactoring)
+        // Note: entropy_score here is token_entropy (Shannon entropy), not effective_complexity
+        if let Some(token_entropy) = metrics.entropy_score {
+            if token_entropy >= 0.45 {
                 return ComplexityPattern::ChaoticStructure {
-                    entropy,
+                    entropy: token_entropy,
                     cyclomatic: metrics.cyclomatic,
                 };
             }

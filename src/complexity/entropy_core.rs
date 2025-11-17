@@ -3,15 +3,42 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 /// Language-agnostic entropy score
+///
+/// This structure contains multiple distinct metrics that should not be confused:
+/// - `token_entropy`: Shannon entropy measuring code unpredictability (used for chaotic pattern detection)
+/// - `effective_complexity`: Composite metric combining entropy, repetition, and similarity
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntropyScore {
-    pub token_entropy: f64,        // 0.0-1.0, higher = more complex
-    pub pattern_repetition: f64,   // 0.0-1.0, higher = more repetitive
-    pub branch_similarity: f64,    // 0.0-1.0, higher = similar branches
-    pub effective_complexity: f64, // Adjusted complexity score
-    pub unique_variables: usize,   // Variable diversity count
-    pub max_nesting: u32,          // Maximum nesting depth
-    pub dampening_applied: f64,    // Actual dampening factor applied
+    /// Shannon entropy of code tokens (0.0-1.0, higher = more unpredictable)
+    /// - Used for chaotic structure detection (threshold: 0.45)
+    /// - Typical range: 0.2 (repetitive) to 0.8 (chaotic)
+    /// - Example: Repetitive code = 0.2, Typical code = 0.4, Chaotic code = 0.7
+    pub token_entropy: f64,
+
+    /// Pattern repetition score (0.0-1.0, higher = more repetitive)
+    /// - Used for dampening complexity in pattern-heavy code
+    /// - Measures how often code patterns repeat
+    pub pattern_repetition: f64,
+
+    /// Branch similarity score (0.0-1.0, higher = similar branches)
+    /// - Used for dampening complexity in similar conditional branches
+    /// - Measures structural similarity between branches
+    pub branch_similarity: f64,
+
+    /// Composite complexity metric combining entropy, repetition, and similarity
+    /// - NOT the same as token_entropy - this is the adjusted final score
+    /// - Used for overall complexity assessment, not pattern detection
+    /// - Accounts for dampening from repetition and branch similarity
+    pub effective_complexity: f64,
+
+    /// Variable diversity count
+    pub unique_variables: usize,
+
+    /// Maximum nesting depth
+    pub max_nesting: u32,
+
+    /// Actual dampening factor applied (0.0-1.0)
+    pub dampening_applied: f64,
 }
 
 /// Generic token category for language-agnostic entropy calculation
