@@ -253,6 +253,7 @@ fn generate_complexity_steps(
         entropy_score: metrics.entropy_score.as_ref().map(|e| e.token_entropy),
         state_signals: None,       // TODO: populate from AST analysis
         coordinator_signals: None, // TODO: populate from AST analysis
+        validation_signals: None,  // TODO: populate from AST analysis
     };
 
     let pattern = ComplexityPattern::detect(&complexity_metrics);
@@ -273,6 +274,18 @@ fn generate_complexity_steps(
         } => {
             generate_coordinator_recommendation(action_count, comparison_count, cyclo, cog, metrics)
         }
+        ComplexityPattern::RepetitiveValidation {
+            validation_count,
+            entropy,
+            cyclomatic: cyclo,
+            adjusted_cyclomatic,
+        } => generate_repetitive_validation_recommendation(
+            validation_count,
+            entropy,
+            cyclo,
+            adjusted_cyclomatic,
+            metrics,
+        ),
         ComplexityPattern::HighNesting {
             nesting_depth,
             cognitive_score,
@@ -690,6 +703,115 @@ fn generate_coordinator_recommendation(
         related_items: vec![],
         steps: Some(steps),
         estimated_effort_hours: Some(estimated_effort),
+    }
+}
+
+/// Generate recommendation for repetitive validation pattern (spec 180)
+fn generate_repetitive_validation_recommendation(
+    validation_count: u32,
+    entropy: f64,
+    cyclomatic: u32,
+    adjusted_cyclomatic: u32,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let boilerplate_reduction = RefactoringImpact::validation_extraction(validation_count);
+    let language = crate::core::Language::from_path(&metrics.file);
+
+    let steps = vec![
+        ActionStep {
+            description: "Replace imperative validation with declarative pattern".to_string(),
+            impact: format!(
+                "-{} LOC boilerplate, improved maintainability ({} impact)",
+                validation_count * 2,
+                boilerplate_reduction.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: add_declarative_validation_examples(&language, validation_count),
+        },
+        ActionStep {
+            description: "Extract validation rules into data structure".to_string(),
+            impact: format!(
+                "Single source of truth for {} validation rules",
+                validation_count
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Define validation schema/rules declaratively".to_string(),
+                format!(
+                    "# Example: [{} required fields in config]",
+                    validation_count
+                ),
+            ],
+        },
+        ActionStep {
+            description: "Add comprehensive validation tests".to_string(),
+            impact: "Ensure all validation rules covered by tests".to_string(),
+            difficulty: Difficulty::Easy,
+            commands: vec![
+                "cargo test validate_*".to_string(),
+                "# Test each validation rule independently".to_string(),
+            ],
+        },
+    ];
+
+    let estimated_effort = (validation_count as f32 / 10.0) * 1.5; // ~1.5hr per 10 validations
+
+    ActionableRecommendation {
+        primary_action: format!(
+            "Replace {} repetitive validation checks with declarative pattern",
+            validation_count
+        ),
+        rationale: format!(
+            "Repetitive validation pattern detected (entropy {:.2}, {} checks). \
+             Low entropy ({:.2}) indicates boilerplate, not complexity. \
+             Adjusted complexity: {} → {} (reflects actual cognitive load). \
+             Refactoring improves maintainability and reduces error-prone boilerplate.",
+            entropy, validation_count, entropy, cyclomatic, adjusted_cyclomatic
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort.max(0.5)),
+    }
+}
+
+/// Add language-specific declarative validation examples (spec 180)
+fn add_declarative_validation_examples(
+    language: &crate::core::Language,
+    count: u32,
+) -> Vec<String> {
+    match language {
+        crate::core::Language::Rust => vec![
+            "# Option 1: Builder pattern with validation".to_string(),
+            "# ConfigBuilder::new().required(\"output_dir\").build()?".to_string(),
+            "".to_string(),
+            "# Option 2: Validation trait".to_string(),
+            "# impl Validate for Config { fn validate(&self) -> Result<()> }".to_string(),
+            "".to_string(),
+            "# Option 3: Macro-based validation".to_string(),
+            "# #[validate(required = [\"output_dir\", \"max_workers\", ...])]".to_string(),
+        ],
+        crate::core::Language::Python => vec![
+            "# Option 1: Pydantic model".to_string(),
+            "# class Config(BaseModel):".to_string(),
+            "#     output_dir: str".to_string(),
+            "#     max_workers: int".to_string(),
+            "".to_string(),
+            "# Option 2: attrs with validators".to_string(),
+            "# @define".to_string(),
+            "# class Config:".to_string(),
+            "#     output_dir: str = field(validator=instance_of(str))".to_string(),
+        ],
+        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
+            "# Option 1: Joi schema".to_string(),
+            format!("# const schema = Joi.object({{ /* {} fields */ }});", count),
+            "# schema.validate(config);".to_string(),
+            "".to_string(),
+            "# Option 2: Zod schema".to_string(),
+            "# const ConfigSchema = z.object({ ... });".to_string(),
+            "# ConfigSchema.parse(config);".to_string(),
+        ],
+        _ => vec!["# Use declarative validation approach for your language".to_string()],
     }
 }
 
