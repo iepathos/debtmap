@@ -124,10 +124,16 @@ fn test_untested_labels_shown_when_coverage_data_available() {
     // Format the analysis
     let output = format_priorities_with_verbosity(&analysis, OutputFormat::Top(1), 0);
 
-    // Verify coverage indicators ARE present
+    // Verify coverage line is present (spec 180)
+    // When LCOV was provided but function not found, show "no coverage data"
     assert!(
-        output.contains("UNTESTED"),
-        "Output should contain UNTESTED label when has_coverage_data=true. Output:\n{}",
+        output.contains("COVERAGE:"),
+        "Output should contain COVERAGE line when has_coverage_data=true. Output:\n{}",
+        output
+    );
+    assert!(
+        output.contains("no coverage data"),
+        "Output should show 'no coverage data' when function not found in LCOV. Output:\n{}",
         output
     );
 }
