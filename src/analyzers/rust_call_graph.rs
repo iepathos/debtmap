@@ -46,7 +46,7 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         .map(|pm| {
             let pb = pm.create_bar(
                 total_files as u64,
-                "[analyze] {msg} {pos}/{len} files ({percent}%) - {eta}",
+                "{msg} {pos}/{len} files ({percent}%) - {eta}",
             );
             pb.set_message("Analyzing functions and imports");
             pb
@@ -106,7 +106,7 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         .map(|pm| {
             let pb = pm.create_bar(
                 total_unresolved as u64,
-                "[resolve] {msg} {pos}/{len} calls ({percent}%) - {eta}",
+                "{msg} {pos}/{len} calls ({percent}%) - {eta}",
             );
             pb.set_message("Resolving function calls");
             pb

@@ -38,12 +38,12 @@ use once_cell::sync::Lazy;
 use std::sync::{Arc, Mutex};
 
 // Progress bar templates - text-based for terminal compatibility
-pub const TEMPLATE_CALL_GRAPH: &str = "[graph] {msg} {pos}/{len} files ({percent}%) - {eta}";
-pub const TEMPLATE_TRAIT_RESOLUTION: &str = "[traits] {msg} {pos}/{len} traits - {eta}";
-pub const TEMPLATE_COVERAGE: &str = "[coverage] {msg} {pos}/{len} files - {eta}";
+pub const TEMPLATE_CALL_GRAPH: &str = "{msg} {pos}/{len} files ({percent}%) - {eta}";
+pub const TEMPLATE_TRAIT_RESOLUTION: &str = "{msg} {pos}/{len} traits - {eta}";
+pub const TEMPLATE_COVERAGE: &str = "{msg} {pos}/{len} files - {eta}";
 pub const TEMPLATE_FUNCTION_ANALYSIS: &str =
-    "[funcs] {msg} {pos}/{len} functions ({percent}%) - {per_sec}/sec - {eta}";
-pub const TEMPLATE_FILE_ANALYSIS: &str = "[files] {msg} {pos}/{len} files ({percent}%) - {eta}";
+    "{msg} {pos}/{len} functions ({percent}%) - {per_sec}/sec - {eta}";
+pub const TEMPLATE_FILE_ANALYSIS: &str = "{msg} {pos}/{len} files ({percent}%) - {eta}";
 pub const TEMPLATE_SPINNER: &str = "{spinner} {msg}";
 
 /// Configuration for progress display behavior

@@ -95,7 +95,7 @@ pub fn process_rust_files_for_call_graph(
     // Finalize trait analysis - detect patterns ONCE after all files processed
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
     if !quiet_mode {
-        eprint!("[analyze] Resolving trait patterns and method calls...");
+        eprint!("Resolving trait patterns and method calls...");
         std::io::Write::flush(&mut std::io::stderr()).ok();
     }
     enhanced_builder.finalize_trait_analysis()?;
