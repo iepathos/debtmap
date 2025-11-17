@@ -17,7 +17,98 @@ use crate::priority::{
     TransitiveCoverage,
 };
 
-use super::test_calculation::{calculate_tests_needed, ComplexityTier};
+use super::test_calculation::{calculate_tests_needed, ComplexityTier as TestComplexityTier};
+
+/// Complexity tier classification for tier-appropriate recommendations
+///
+/// # Tier Definitions
+///
+/// - **Low** (cyclo < 8, cognitive < 15): Well-structured, easy to understand
+///   - Recommendation: Maintain current patterns
+///   - Example: Simple validation, accessors, small functions
+///
+/// - **Moderate** (cyclo 8-14, cognitive 15-24): Manageable but approaching limits
+///   - Recommendation: Optional preventive refactoring
+///   - Example: Business logic with moderate branching
+///
+/// - **High** (cyclo 15-24, cognitive 25-39): Exceeds maintainability thresholds
+///   - Recommendation: Refactoring required
+///   - Example: Complex orchestration, large case statements
+///
+/// - **VeryHigh** (cyclo >= 25, cognitive >= 40): Critical complexity
+///   - Recommendation: Significant refactoring required
+///   - Example: God functions, tangled logic
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RecommendationComplexityTier {
+    /// Low complexity: cyclo < 8, cognitive < 15
+    Low,
+    /// Moderate complexity: cyclo 8-14, cognitive 15-24
+    Moderate,
+    /// High complexity: cyclo 15-24, cognitive 25-39
+    High,
+    /// Very high complexity: cyclo >= 25, cognitive >= 40
+    VeryHigh,
+}
+
+/// Classify complexity tier based on cyclomatic and cognitive complexity
+fn classify_complexity_tier(cyclomatic: u32, cognitive: u32) -> RecommendationComplexityTier {
+    // Use the higher of the two complexities to determine tier
+    if cyclomatic >= 25 || cognitive >= 40 {
+        RecommendationComplexityTier::VeryHigh
+    } else if cyclomatic >= 15 || cognitive >= 25 {
+        RecommendationComplexityTier::High
+    } else if cyclomatic >= 8 || cognitive >= 15 {
+        RecommendationComplexityTier::Moderate
+    } else {
+        RecommendationComplexityTier::Low
+    }
+}
+
+/// Calculate appropriate complexity reduction target based on current tier
+///
+/// # Target Selection Strategy
+///
+/// - **Low tier**: Maintain or slight improvement (current - 1, min 3)
+/// - **Moderate tier**: Aim for single-digit (8 if >= 10, else current - 3)
+/// - **High tier**: Aim for moderate complexity (min(10, current - 2))
+/// - **Very High tier**: Significant reduction (half current, capped at 10-15)
+///
+/// # Examples
+///
+/// - complexity=6 → target=5 (maintain)
+/// - complexity=9 → target=6 (preventive)
+/// - complexity=12 → target=8 (reduce to single-digit)
+/// - complexity=20 → target=10 (significant reduction)
+/// - complexity=40 → target=15 (very high → high tier)
+fn calculate_target_complexity(current: u32, tier: RecommendationComplexityTier) -> u32 {
+    match tier {
+        RecommendationComplexityTier::Low => {
+            // Already low - maintain or slightly improve
+            current.saturating_sub(1).max(3)
+        }
+        RecommendationComplexityTier::Moderate => {
+            // Aim for single-digit complexity
+            if current >= 10 {
+                // 10-14 → target 8
+                8
+            } else {
+                // 8-9 → target 5-6 (reduce by 2-3)
+                current.saturating_sub(3).max(5)
+            }
+        }
+        RecommendationComplexityTier::High => {
+            // Aim for moderate complexity, but never exceed current
+            // For low cyclomatic but high cognitive, reduce modestly
+            10.min(current.saturating_sub(2).max(5))
+        }
+        RecommendationComplexityTier::VeryHigh => {
+            // Significant reduction needed (aim for 10-15)
+            let half_current = current / 2;
+            let clamped = half_current.clamp(10, 15);
+            clamped.min(current.saturating_sub(5))
+        }
+    }
+}
 
 /// Generate concise recommendation from debt type and metrics
 pub fn generate_concise_recommendation(
@@ -66,11 +157,11 @@ fn generate_testing_gap_steps(
     _transitive_cov: &Option<TransitiveCoverage>,
 ) -> ActionableRecommendation {
     let tier = if cyclomatic > 30 {
-        ComplexityTier::High
+        TestComplexityTier::High
     } else if cyclomatic > 10 {
-        ComplexityTier::Moderate
+        TestComplexityTier::Moderate
     } else {
-        ComplexityTier::Simple
+        TestComplexityTier::Simple
     };
 
     let test_result = calculate_tests_needed(cyclomatic, coverage_pct, Some(tier));
@@ -453,52 +544,130 @@ fn generate_chaotic_recommendation(
     }
 }
 
-/// Generate recommendation for moderate complexity
+/// Generate recommendation for moderate complexity (spec 178)
 fn generate_moderate_recommendation(
     cyclomatic: u32,
     cognitive: u32,
     metrics: &FunctionMetrics,
 ) -> ActionableRecommendation {
-    let target_complexity = 10;
-    let complexity_reduction = cyclomatic.saturating_sub(target_complexity).max(5);
+    let tier = classify_complexity_tier(cyclomatic, cognitive);
+    let target = calculate_target_complexity(cyclomatic, tier);
+    let reduction = cyclomatic.saturating_sub(target);
 
-    let steps = vec![
-        ActionStep {
-            description: "Add tests before refactoring (if coverage < 80%)".to_string(),
-            impact: "+safety net for refactoring".to_string(),
-            difficulty: Difficulty::Medium,
-            commands: vec![format!("cargo test {}::", metrics.name)],
-        },
-        ActionStep {
-            description: "Extract most complex section into focused function".to_string(),
-            impact: format!("-{} complexity", complexity_reduction),
-            difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
-            commands: vec!["cargo clippy".to_string()],
-        },
-        ActionStep {
-            description: "Verify tests still pass".to_string(),
-            impact: "Confirmed refactoring safe".to_string(),
-            difficulty: Difficulty::Easy,
-            commands: vec!["cargo test --all".to_string()],
-        },
-    ];
+    match tier {
+        RecommendationComplexityTier::Low => {
+            // Already below thresholds - maintenance recommendation
+            let steps = vec![ActionStep {
+                description: "Add tests to preserve behavior during future changes".to_string(),
+                impact: "+safety for refactoring".to_string(),
+                difficulty: Difficulty::Easy,
+                commands: vec![format!("cargo test {}::", metrics.name)],
+            }];
 
-    let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5;
+            ActionableRecommendation {
+                primary_action: "Maintain current low complexity".to_string(),
+                rationale: format!(
+                    "Function has low complexity ({}/{}). \
+                     Continue following current patterns to keep it maintainable.",
+                    cyclomatic, cognitive
+                ),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: Some(steps),
+                estimated_effort_hours: Some(0.5),
+            }
+        }
 
-    ActionableRecommendation {
-        primary_action: format!(
-            "Reduce complexity from {} to ~{}",
-            cyclomatic, target_complexity
-        ),
-        rationale: format!(
-            "Approaching complexity threshold ({}/{}). \
-             Preventive refactoring will keep code maintainable.",
-            cyclomatic, cognitive
-        ),
-        implementation_steps: vec![],
-        related_items: vec![],
-        steps: Some(steps),
-        estimated_effort_hours: Some(estimated_effort),
+        RecommendationComplexityTier::Moderate => {
+            // Near threshold - preventive refactoring
+            let steps = vec![
+                ActionStep {
+                    description: "Add tests before refactoring (if coverage < 80%)".to_string(),
+                    impact: "+safety net for refactoring".to_string(),
+                    difficulty: Difficulty::Medium,
+                    commands: vec![format!("cargo test {}::", metrics.name)],
+                },
+                ActionStep {
+                    description: "Extract most complex section into focused function".to_string(),
+                    impact: format!("-{} complexity", reduction),
+                    difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
+                    commands: vec!["cargo clippy".to_string()],
+                },
+                ActionStep {
+                    description: "Verify tests still pass".to_string(),
+                    impact: "Confirmed refactoring safe".to_string(),
+                    difficulty: Difficulty::Easy,
+                    commands: vec!["cargo test --all".to_string()],
+                },
+            ];
+
+            let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5;
+
+            ActionableRecommendation {
+                primary_action: if cyclomatic >= 10 {
+                    format!("Reduce complexity from {} to ~{}", cyclomatic, target)
+                } else {
+                    format!(
+                        "Optional: Reduce complexity from {} to ~{} for future-proofing",
+                        cyclomatic, target
+                    )
+                },
+                rationale: format!(
+                    "Moderate complexity ({}/{}). {} threshold but maintainable. \
+                     Preventive refactoring will ease future changes.",
+                    cyclomatic,
+                    cognitive,
+                    if cyclomatic >= 10 {
+                        "Approaching"
+                    } else {
+                        "Below"
+                    }
+                ),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: Some(steps),
+                estimated_effort_hours: Some(estimated_effort),
+            }
+        }
+
+        RecommendationComplexityTier::High | RecommendationComplexityTier::VeryHigh => {
+            // High complexity - significant refactoring required
+            let steps = vec![
+                ActionStep {
+                    description: "Add tests before refactoring (if coverage < 80%)".to_string(),
+                    impact: "+safety net for refactoring".to_string(),
+                    difficulty: Difficulty::Medium,
+                    commands: vec![format!("cargo test {}::", metrics.name)],
+                },
+                ActionStep {
+                    description: "Extract most complex section into focused function".to_string(),
+                    impact: format!("-{} complexity", reduction),
+                    difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
+                    commands: vec!["cargo clippy".to_string()],
+                },
+                ActionStep {
+                    description: "Verify tests still pass".to_string(),
+                    impact: "Confirmed refactoring safe".to_string(),
+                    difficulty: Difficulty::Easy,
+                    commands: vec!["cargo test --all".to_string()],
+                },
+            ];
+
+            let estimated_effort = (cyclomatic as f32 / 10.0) * 2.0;
+
+            ActionableRecommendation {
+                primary_action: format!("Reduce complexity from {} to ~{}", cyclomatic, target),
+                rationale: format!(
+                    "High complexity ({}/{}). Exceeds maintainability thresholds. \
+                     Refactoring required.",
+                    cyclomatic, cognitive
+                ),
+                implementation_steps: vec![],
+                related_items: vec![],
+                steps: Some(steps),
+                estimated_effort_hours: Some(estimated_effort),
+            }
+        }
     }
 }
 
@@ -710,5 +879,336 @@ mod tests {
         assert_eq!(calculate_functions_to_extract(18, 25), 2);
         assert_eq!(calculate_functions_to_extract(25, 35), 3);
         assert_eq!(calculate_functions_to_extract(35, 45), 4);
+    }
+
+    // Tests for spec 178: Fix Moderate Complexity Recommendation Logic
+
+    #[test]
+    fn test_low_complexity_gets_maintenance_recommendation() {
+        let metrics = create_test_metrics(6, 8);
+        let rec = generate_moderate_recommendation(6, 8, &metrics);
+
+        assert!(
+            rec.primary_action.contains("Maintain"),
+            "Low complexity should get maintenance recommendation, got: {}",
+            rec.primary_action
+        );
+        assert!(
+            !rec.primary_action.contains("Reduce from 6 to ~10"),
+            "Should NOT suggest increasing complexity"
+        );
+        assert!(rec.rationale.contains("low complexity"));
+    }
+
+    #[test]
+    fn test_moderate_complexity_below_10_suggests_lower_target() {
+        let metrics = create_test_metrics(9, 16);
+        let rec = generate_moderate_recommendation(9, 16, &metrics);
+
+        // Should suggest reducing to 5-6, not 10
+        assert!(
+            rec.primary_action.contains("Optional")
+                || rec.primary_action.contains("to ~5")
+                || rec.primary_action.contains("to ~6"),
+            "Should suggest optional reduction to lower target, got: {}",
+            rec.primary_action
+        );
+        assert!(
+            !rec.primary_action.contains("to ~10"),
+            "Should NOT suggest reducing to 10 when current is 9"
+        );
+    }
+
+    #[test]
+    fn test_moderate_at_threshold_suggests_reduction() {
+        let metrics = create_test_metrics(12, 20);
+        let rec = generate_moderate_recommendation(12, 20, &metrics);
+
+        // Should suggest reducing to 8
+        assert!(
+            rec.primary_action.contains("to ~8"),
+            "Should suggest reducing to 8, got: {}",
+            rec.primary_action
+        );
+        assert!(
+            !rec.primary_action.contains("to ~10")
+                && !rec.primary_action.contains("to ~12")
+                && !rec.primary_action.contains("to ~14"),
+            "Target should be 8, not 10+ for moderate complexity at threshold"
+        );
+    }
+
+    #[test]
+    fn test_high_complexity_suggests_target_10() {
+        let metrics = create_test_metrics(20, 30);
+        let rec = generate_moderate_recommendation(20, 30, &metrics);
+
+        // Should suggest reducing to 10
+        assert!(
+            rec.primary_action.contains("from 20 to ~10"),
+            "High complexity should suggest target 10, got: {}",
+            rec.primary_action
+        );
+    }
+
+    #[test]
+    fn test_impact_matches_target() {
+        let metrics = create_test_metrics(12, 20);
+        let rec = generate_moderate_recommendation(12, 20, &metrics);
+
+        // If recommending "from 12 to ~8", impact should be "-4 complexity"
+        if rec.primary_action.contains("to ~8") {
+            assert!(rec.steps.is_some());
+            let steps = rec.steps.unwrap();
+            let extract_step = steps.iter().find(|s| s.description.contains("Extract"));
+            assert!(extract_step.is_some(), "Should have extract step");
+            assert!(
+                extract_step.unwrap().impact.contains("-4")
+                    || extract_step.unwrap().impact.contains("4"),
+                "Impact should match reduction, got: {}",
+                extract_step.unwrap().impact
+            );
+        }
+    }
+
+    #[test]
+    fn test_complexity_tier_classification() {
+        // Low tier
+        assert_eq!(
+            classify_complexity_tier(5, 10),
+            RecommendationComplexityTier::Low
+        );
+        assert_eq!(
+            classify_complexity_tier(7, 14),
+            RecommendationComplexityTier::Low
+        );
+
+        // Moderate tier
+        assert_eq!(
+            classify_complexity_tier(8, 15),
+            RecommendationComplexityTier::Moderate
+        );
+        assert_eq!(
+            classify_complexity_tier(12, 20),
+            RecommendationComplexityTier::Moderate
+        );
+        assert_eq!(
+            classify_complexity_tier(14, 24),
+            RecommendationComplexityTier::Moderate
+        );
+
+        // High tier
+        assert_eq!(
+            classify_complexity_tier(15, 25),
+            RecommendationComplexityTier::High
+        );
+        assert_eq!(
+            classify_complexity_tier(20, 30),
+            RecommendationComplexityTier::High
+        );
+
+        // Very high tier
+        assert_eq!(
+            classify_complexity_tier(25, 40),
+            RecommendationComplexityTier::VeryHigh
+        );
+        assert_eq!(
+            classify_complexity_tier(40, 60),
+            RecommendationComplexityTier::VeryHigh
+        );
+    }
+
+    #[test]
+    fn test_target_complexity_calculation() {
+        // Low tier targets
+        assert_eq!(
+            calculate_target_complexity(5, RecommendationComplexityTier::Low),
+            4
+        );
+        assert_eq!(
+            calculate_target_complexity(3, RecommendationComplexityTier::Low),
+            3
+        );
+
+        // Moderate tier targets
+        assert_eq!(
+            calculate_target_complexity(8, RecommendationComplexityTier::Moderate),
+            5
+        );
+        assert_eq!(
+            calculate_target_complexity(9, RecommendationComplexityTier::Moderate),
+            6
+        );
+        assert_eq!(
+            calculate_target_complexity(10, RecommendationComplexityTier::Moderate),
+            8
+        );
+        assert_eq!(
+            calculate_target_complexity(12, RecommendationComplexityTier::Moderate),
+            8
+        );
+
+        // High tier targets
+        assert_eq!(
+            calculate_target_complexity(20, RecommendationComplexityTier::High),
+            10
+        );
+
+        // Very high tier targets
+        assert_eq!(
+            calculate_target_complexity(30, RecommendationComplexityTier::VeryHigh),
+            15
+        );
+        assert_eq!(
+            calculate_target_complexity(50, RecommendationComplexityTier::VeryHigh),
+            15
+        );
+    }
+
+    #[test]
+    fn test_target_always_less_than_current() {
+        // Test various complexity levels to ensure target is always less than current
+        for cyclo in 5..50 {
+            for cognitive in 10..60 {
+                let tier = classify_complexity_tier(cyclo, cognitive);
+                let target = calculate_target_complexity(cyclo, tier);
+                assert!(
+                    target <= cyclo,
+                    "Target ({}) should be <= current ({}) for tier {:?}",
+                    target,
+                    cyclo,
+                    tier
+                );
+            }
+        }
+    }
+
+    // Regression tests for other complexity patterns (spec 178)
+
+    #[test]
+    fn test_high_nesting_pattern_recommendation() {
+        let mut metrics = create_test_metrics(10, 35);
+        metrics.nesting = 5; // High nesting
+
+        let rec = generate_complexity_steps(10, 35, &metrics);
+
+        assert!(
+            rec.primary_action.contains("nesting"),
+            "High nesting pattern should mention nesting, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should have early returns step
+        let has_early_returns = steps.iter().any(|s| s.description.contains("early return"));
+        assert!(
+            has_early_returns,
+            "Should recommend early returns for high nesting"
+        );
+    }
+
+    #[test]
+    fn test_high_branching_pattern_recommendation() {
+        let mut metrics = create_test_metrics(25, 20);
+        metrics.nesting = 2; // Low nesting, high branching
+
+        let rec = generate_complexity_steps(25, 20, &metrics);
+
+        assert!(
+            rec.primary_action.contains("Split") || rec.primary_action.contains("function"),
+            "High branching pattern should suggest splitting, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+    }
+
+    #[test]
+    fn test_mixed_complexity_pattern_recommendation() {
+        // For MixedComplexity: cyclo >= 12, cognitive >= 40, ratio 2.5-3.5
+        // Using cyclo=15, cognitive=45 gives ratio=3.0 (in range)
+        let mut metrics = create_test_metrics(15, 45);
+        metrics.nesting = 4; // Both high nesting and high branching
+
+        let rec = generate_complexity_steps(15, 45, &metrics);
+
+        assert!(
+            rec.primary_action.contains("FIRST") || rec.primary_action.contains("phase"),
+            "Mixed complexity should suggest phased approach, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should have Phase 1 and Phase 2
+        let has_phases = steps.iter().any(|s| s.description.contains("Phase"));
+        assert!(
+            has_phases,
+            "Should have phased approach for mixed complexity"
+        );
+    }
+
+    #[test]
+    fn test_chaotic_structure_pattern_recommendation() {
+        use crate::complexity::entropy_core::EntropyScore;
+
+        let mut metrics = create_test_metrics(20, 30);
+        metrics.entropy_score = Some(EntropyScore {
+            token_entropy: 0.45, // High entropy for chaotic detection
+            pattern_repetition: 0.2,
+            branch_similarity: 0.3,
+            effective_complexity: 15.0,
+            unique_variables: 10,
+            max_nesting: 3,
+            dampening_applied: 0.0,
+        });
+
+        let rec = generate_complexity_steps(20, 30, &metrics);
+
+        assert!(
+            rec.primary_action.contains("Standardize")
+                || rec.primary_action.contains("control flow"),
+            "Chaotic structure should suggest standardization, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should mention error handling or state transitions
+        let has_standardization = steps
+            .iter()
+            .any(|s| s.description.contains("error handling") || s.description.contains("state"));
+        assert!(
+            has_standardization,
+            "Should recommend standardization for chaotic structure"
+        );
+    }
+
+    #[test]
+    fn test_pattern_detection_still_works() {
+        // Verify that pattern detection correctly identifies different patterns
+
+        // High nesting pattern
+        let mut nesting_metrics = create_test_metrics(10, 35);
+        nesting_metrics.nesting = 5;
+        let nesting_rec = generate_complexity_steps(10, 35, &nesting_metrics);
+        assert!(nesting_rec.primary_action.contains("nesting"));
+
+        // High branching pattern
+        let branching_metrics = create_test_metrics(25, 20);
+        let branching_rec = generate_complexity_steps(25, 20, &branching_metrics);
+        assert!(
+            branching_rec.primary_action.contains("Split")
+                || branching_rec.primary_action.contains("function")
+        );
+
+        // Moderate complexity pattern
+        let moderate_metrics = create_test_metrics(10, 18);
+        let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics);
+        assert!(
+            moderate_rec.primary_action.contains("Reduce")
+                || moderate_rec.primary_action.contains("Optional")
+                || moderate_rec.primary_action.contains("Maintain")
+        );
     }
 }
