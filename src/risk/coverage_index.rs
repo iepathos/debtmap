@@ -1,4 +1,4 @@
-use super::lcov::{FunctionCoverage, LcovData};
+use super::lcov::{normalize_demangled_name, FunctionCoverage, LcovData};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -151,22 +151,45 @@ impl CoverageIndex {
             file.display()
         );
 
+        // Normalize the query function name (remove angle brackets, etc.)
+        let normalized_query = normalize_demangled_name(function_name);
+        let query_name = &normalized_query.full_path;
+
         // O(1) exact match: file lookup + function lookup
         if let Some(file_functions) = self.by_file.get(file) {
-            if let Some(f) = file_functions.get(function_name) {
+            // Try exact match with normalized query first
+            if let Some(f) = file_functions.get(query_name) {
                 log::debug!(
-                    "✓ Found via exact match: {}% coverage",
+                    "✓ Found via exact match (normalized): {}% coverage",
                     f.coverage_percentage
                 );
                 return Some(f.coverage_percentage / 100.0);
+            }
+            // Try original query (in case it was already normalized)
+            if query_name != function_name {
+                if let Some(f) = file_functions.get(function_name) {
+                    log::debug!(
+                        "✓ Found via exact match (original): {}% coverage",
+                        f.coverage_percentage
+                    );
+                    return Some(f.coverage_percentage / 100.0);
+                }
             }
         }
 
         log::debug!("Exact match failed, trying path strategies...");
 
         // O(files) fallback strategies - much faster than O(functions)
-        self.find_by_path_strategies(file, function_name)
-            .map(|f| f.coverage_percentage / 100.0)
+        // Try with normalized query first, then original
+        if let Some(result) = self.find_by_path_strategies(file, query_name) {
+            return Some(result.coverage_percentage / 100.0);
+        }
+        if query_name != function_name {
+            self.find_by_path_strategies(file, function_name)
+                .map(|f| f.coverage_percentage / 100.0)
+        } else {
+            None
+        }
     }
 
     /// Try multiple path matching strategies to handle relative/absolute path mismatches
@@ -201,6 +224,19 @@ impl CoverageIndex {
                         );
                         return Some(coverage);
                     }
+                    // Try function name suffix match (for querying with short form)
+                    // Allows querying "ResumeExecutor::method" to match stored "prodigy::cook::resume::ResumeExecutor::method"
+                    for func in file_functions.values() {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                            log::debug!(
+                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
+                                function_name,
+                                func.name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
+                    }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {
                         if func.normalized.method_name == function_name {
@@ -232,6 +268,18 @@ impl CoverageIndex {
                         );
                         return Some(coverage);
                     }
+                    // Try function name suffix match (for querying with short form)
+                    for func in file_functions.values() {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                            log::debug!(
+                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
+                                function_name,
+                                func.name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
+                    }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {
                         if func.normalized.method_name == function_name {
@@ -262,6 +310,18 @@ impl CoverageIndex {
                             coverage.coverage_percentage
                         );
                         return Some(coverage);
+                    }
+                    // Try function name suffix match (for querying with short form)
+                    for func in file_functions.values() {
+                        if func.name.ends_with(function_name) || function_name.ends_with(&func.name) {
+                            log::debug!(
+                                "  ✓ Matched function name via suffix: query '{}' matches stored '{}': {}%",
+                                function_name,
+                                func.name,
+                                func.coverage_percentage
+                            );
+                            return Some(func);
+                        }
                     }
                     // Try method name match (for Rust methods)
                     for func in file_functions.values() {

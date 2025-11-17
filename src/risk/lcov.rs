@@ -107,28 +107,27 @@ fn demangle_function_name(name: &str) -> String {
 /// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> full_path: `debtmap::Foo::bar`, method_name: `bar`
 /// - `std::collections::HashMap<K,V>::insert` -> full_path: `std::collections::HashMap::insert`, method_name: `insert`
 /// - `<Struct as Trait>::method` -> full_path: `Struct as Trait::method`, method_name: `method`
-fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
-    // Remove crate hash from names like <debtmap[hash]::...>::method
-    // Pattern: <crate[hash]::rest>::method -> crate::rest::method
-    let without_hash = if demangled.starts_with('<') {
-        // Find the pattern <name[hash]...>
-        if let Some(bracket_start) = demangled.find('[') {
-            if let Some(bracket_end) = demangled.find(']') {
-                // Find the closing > after the crate path
-                if let Some(angle_end) = demangled[bracket_end..].find('>') {
-                    let angle_end = bracket_end + angle_end;
-                    // Extract everything: before [ + after ] up to > + after >
-                    let before = &demangled[1..bracket_start]; // Skip the '<'
-                    let middle = &demangled[(bracket_end + 1)..angle_end];
-                    let after = &demangled[(angle_end + 1)..];
-                    // Reconstruct without the hash and angle brackets
-                    format!("{}{}{}", before, middle, after)
+pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
+    // Handle impl method patterns: <module::path::Type>::method -> module::path::Type::method
+    // Remove angle brackets and crate hash: <crate[hash]::rest>::method -> crate::rest::method
+    let without_impl_brackets = if demangled.starts_with('<') {
+        if let Some(angle_end) = demangled.find('>') {
+            let content = &demangled[1..angle_end];
+            let after = &demangled[(angle_end + 1)..];
+
+            // Remove hash from path if present: crate[hash]::rest -> crate::rest
+            let content_without_hash = if let Some(bracket_start) = content.find('[') {
+                if let Some(bracket_end) = content.find(']') {
+                    // Reconstruct: before[hash]after -> beforeafter
+                    format!("{}{}", &content[..bracket_start], &content[(bracket_end + 1)..])
                 } else {
-                    demangled.to_string()
+                    content.to_string()
                 }
             } else {
-                demangled.to_string()
-            }
+                content.to_string()
+            };
+
+            format!("{}{}", content_without_hash, after)
         } else {
             demangled.to_string()
         }
@@ -137,28 +136,21 @@ fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
     };
 
     // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
-    // BUT preserve impl blocks: "<impl Trait for Type>" should be kept
-    // We look for the last occurrence of '<' that has a matching '>' before the next '::'
-    let mut result = without_hash.clone();
-    while let Some(angle_start) = result.rfind('<') {
-        // Find the matching '>'
-        if let Some(angle_end) = result[angle_start..].find('>') {
-            let angle_end = angle_start + angle_end;
-
-            // Check if this is an impl block (starts with "impl ")
-            // If so, preserve it
-            let content = &result[angle_start + 1..angle_end];
-            if content.trim().starts_with("impl ") {
-                // This is an impl block, preserve it
-                break;
+    // Use fold to track depth and only keep characters outside angle brackets
+    let result = without_impl_brackets
+        .chars()
+        .fold((String::new(), 0usize), |(mut acc, depth), ch| {
+            match ch {
+                '<' => (acc, depth + 1),
+                '>' if depth > 0 => (acc, depth - 1),
+                _ if depth == 0 => {
+                    acc.push(ch);
+                    (acc, depth)
+                }
+                _ => (acc, depth),
             }
-
-            // Remove everything from < to > inclusive
-            result = format!("{}{}", &result[..angle_start], &result[(angle_end + 1)..]);
-        } else {
-            break;
-        }
-    }
+        })
+        .0;
 
     // Extract method name (final segment after last ::)
     let method_name = result.rsplit("::").next().unwrap_or(&result).to_string();
