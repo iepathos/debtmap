@@ -1,6 +1,6 @@
 # Debtmap Sample Code
 
-This directory contains sample code used in the blog post "Why Debtmap? Rethinking Code Quality Analysis".
+This directory contains sample code used in the blog post "Rethinking Code Quality Analysis".
 
 ## Purpose
 
@@ -100,4 +100,4 @@ Debtmap should identify `reconcile_state()` as higher priority (4.15 vs 3.10) th
 
 ## Blog Post
 
-See the full analysis at: `/blog/why-debtmap/`
+See the full analysis at: `https://entropicdrift.com/blog/rethinking-code-quality-analysis/`
