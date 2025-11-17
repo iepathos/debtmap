@@ -578,6 +578,7 @@ fn format_item_body(
     _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
+    has_coverage_data: bool,
 ) {
     // Location section (spec 139: tree formatting, spec 181: clean location line)
     writeln!(
@@ -603,7 +604,14 @@ fn format_item_body(
     format_complexity_summary(output, item, _formatter);
 
     // COVERAGE section (show right after complexity for consistency)
-    format_coverage_section(output, item, _formatter, verbosity, tree_pipe);
+    format_coverage_section(
+        output,
+        item,
+        _formatter,
+        verbosity,
+        tree_pipe,
+        has_coverage_data,
+    );
 
     // FILE CONTEXT section (spec 181: show non-production contexts in default mode)
     if verbosity == 0 {
@@ -837,6 +845,7 @@ fn format_coverage_section(
     _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
+    has_coverage_data: bool,
 ) {
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
@@ -853,6 +862,20 @@ fn format_coverage_section(
         // For verbosity >= 2, show detailed analysis with test recommendations
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
+        }
+    } else if has_coverage_data {
+        // Coverage data was provided but this function has no coverage
+        // Check if this function is untested based on coverage_factor
+        if item.unified_score.coverage_factor >= 10.0 {
+            writeln!(
+                output,
+                "├─ {}: {} (0% coverage)",
+                "COVERAGE".bright_blue(),
+                "[UNTESTED]".bright_red().bold()
+            )
+            .unwrap();
+        } else {
+            writeln!(output, "├─ {}: no coverage data", "COVERAGE".bright_blue()).unwrap();
         }
     } else {
         // No coverage data available - show this explicitly
@@ -985,7 +1008,14 @@ pub fn format_priority_item_with_config(
     }
 
     // Format the rest of the item
-    format_item_body(output, item, &formatter, verbosity, tree_pipe);
+    format_item_body(
+        output,
+        item,
+        &formatter,
+        verbosity,
+        tree_pipe,
+        has_coverage_data,
+    );
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations

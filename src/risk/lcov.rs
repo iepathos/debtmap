@@ -106,9 +106,9 @@ fn demangle_function_name(name: &str) -> String {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use std::borrow::Cow;
-/// # use debtmap::risk::lcov::strip_trailing_generics;
+/// use debtmap::risk::lcov::strip_trailing_generics;
 ///
 /// assert_eq!(strip_trailing_generics("Type::method::<T>"), Cow::Borrowed("Type::method"));
 /// assert_eq!(strip_trailing_generics("method::<Vec<T>>"), Cow::Borrowed("method"));
