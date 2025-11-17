@@ -108,28 +108,31 @@ fn demangle_function_name(name: &str) -> String {
 /// - `std::collections::HashMap<K,V>::insert` -> full_path: `std::collections::HashMap::insert`, method_name: `insert`
 /// - `<Struct as Trait>::method` -> full_path: `Struct as Trait::method`, method_name: `method`
 fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
-    // Remove crate hash from names like <debtmap[hash]::...>::method
-    // Pattern: <crate[hash]::rest>::method -> crate::rest::method
-    let without_hash = if demangled.starts_with('<') {
-        // Find the pattern <name[hash]...>
-        if let Some(bracket_start) = demangled.find('[') {
-            if let Some(bracket_end) = demangled.find(']') {
-                // Find the closing > after the crate path
-                if let Some(angle_end) = demangled[bracket_end..].find('>') {
-                    let angle_end = bracket_end + angle_end;
-                    // Extract everything: before [ + after ] up to > + after >
-                    let before = &demangled[1..bracket_start]; // Skip the '<'
-                    let middle = &demangled[(bracket_end + 1)..angle_end];
-                    let after = &demangled[(angle_end + 1)..];
-                    // Reconstruct without the hash and angle brackets
-                    format!("{}{}{}", before, middle, after)
+    // Handle Rust impl method pattern: <Type>::method or <crate[hash]::Type>::method
+    // Pattern: <crate::module::Type>::method -> crate::module::Type::method
+    let without_impl_brackets = if demangled.starts_with('<') {
+        // Find the closing >::
+        if let Some(end_pos) = demangled.find(">::") {
+            // Extract type path from inside <...>
+            let type_path = &demangled[1..end_pos];
+            let method_part = &demangled[end_pos + 3..]; // Skip >::
+
+            // Now handle crate hash if present: crate[hash]::rest -> crate::rest
+            let type_path_without_hash = if let Some(bracket_start) = type_path.find('[') {
+                if let Some(bracket_end) = type_path.find(']') {
+                    // Remove [hash] part
+                    format!("{}{}", &type_path[..bracket_start], &type_path[bracket_end + 1..])
                 } else {
-                    demangled.to_string()
+                    type_path.to_string()
                 }
             } else {
-                demangled.to_string()
-            }
+                type_path.to_string()
+            };
+
+            // Reconstruct as Type::method
+            format!("{}::{}", type_path_without_hash, method_part)
         } else {
+            // No >:: pattern found, keep as-is
             demangled.to_string()
         }
     } else {
@@ -139,7 +142,7 @@ fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
     // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
     // BUT preserve impl blocks: "<impl Trait for Type>" should be kept
     // We look for the last occurrence of '<' that has a matching '>' before the next '::'
-    let mut result = without_hash.clone();
+    let mut result = without_impl_brackets.clone();
     while let Some(angle_start) = result.rfind('<') {
         // Find the matching '>'
         if let Some(angle_end) = result[angle_start..].find('>') {

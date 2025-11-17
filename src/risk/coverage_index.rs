@@ -3,6 +3,92 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+// ============================================================================
+// Pure Function Matching Logic
+// ============================================================================
+
+/// Match strategies for finding functions in coverage data
+#[derive(Debug, PartialEq, Eq)]
+enum MatchStrategy {
+    /// Exact match on function name
+    ExactName,
+    /// Match on method name only (final segment after ::)
+    MethodName,
+    /// Match on suffix of normalized full path (e.g., Type::method matches crate::Type::method)
+    SuffixPath,
+}
+
+/// Result of attempting to match a function
+#[derive(Debug)]
+struct FunctionMatch<'a> {
+    coverage: &'a FunctionCoverage,
+    strategy: MatchStrategy,
+}
+
+/// Pure function: Check if query function name matches a coverage record
+///
+/// Tries multiple strategies in order of specificity:
+/// 1. Exact name match
+/// 2. Suffix match on full path (for partial paths like "Type::method")
+/// 3. Method name match (for bare method names like "method")
+///
+/// Note: Suffix matching must come before method name matching to correctly
+/// distinguish "Type::method" (suffix) from "method" (method name).
+fn matches_function(query: &str, coverage: &FunctionCoverage) -> Option<MatchStrategy> {
+    // Strategy 1: Exact match
+    if coverage.name == query {
+        return Some(MatchStrategy::ExactName);
+    }
+
+    // Strategy 2: Suffix match on normalized full path
+    // Handles: query="Type::method" matches full="crate::module::Type::method"
+    // Must check this BEFORE method name to avoid false positives
+    if query.contains("::") && coverage.normalized.full_path.ends_with(query) {
+        // Verify it's a proper path segment boundary (preceded by :: or start of string)
+        let full = &coverage.normalized.full_path;
+        if full == query {
+            return Some(MatchStrategy::ExactName);
+        }
+        // Check if the character before the match is :: or this is the full path
+        if let Some(prefix_len) = full.len().checked_sub(query.len()) {
+            if prefix_len == 0 || full[..prefix_len].ends_with("::") {
+                return Some(MatchStrategy::SuffixPath);
+            }
+        }
+    }
+
+    // Strategy 3: Method name match (bare method name, no ::)
+    // Only matches if query is a simple identifier without path separators
+    if coverage.normalized.method_name == query {
+        return Some(MatchStrategy::MethodName);
+    }
+
+    None
+}
+
+/// Pure function: Find first matching function in a collection
+fn find_matching_function<'a>(
+    query: &str,
+    functions: &'a HashMap<String, FunctionCoverage>,
+) -> Option<FunctionMatch<'a>> {
+    // Try exact match first (O(1) hash lookup)
+    if let Some(coverage) = functions.get(query) {
+        return Some(FunctionMatch {
+            coverage,
+            strategy: MatchStrategy::ExactName,
+        });
+    }
+
+    // Fall back to iterating and trying all strategies
+    for coverage in functions.values() {
+        if let Some(strategy) = matches_function(query, coverage) {
+            return Some(FunctionMatch { coverage, strategy });
+        }
+    }
+
+    None
+}
+
 /// Normalize a path by removing leading ./
 pub fn normalize_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
@@ -175,10 +261,7 @@ impl CoverageIndex {
     /// instead of O(functions). For 375 files with ~4 functions each, this is
     /// 375 iterations vs 1,500, a 4x speedup.
     ///
-    /// Matching strategies in order:
-    /// 1. Exact name match (query path matches file path)
-    /// 2. Method name match (for Rust methods, match just the final segment)
-    /// 3. Suffix/path matching strategies
+    /// Uses pure function matching logic for each file found.
     fn find_by_path_strategies(
         &self,
         query_path: &Path,
@@ -186,96 +269,47 @@ impl CoverageIndex {
     ) -> Option<&FunctionCoverage> {
         let normalized_query = normalize_path(query_path);
 
-        log::debug!("Strategy 1: Suffix matching (query.ends_with(lcov_file))");
-        // Strategy 1: Suffix matching - iterate over FILES not functions
-        for file_path in &self.file_paths {
-            if query_path.ends_with(file_path) {
-                log::debug!("  Found path match: '{}'", file_path.display());
-                // O(1) lookup once we find the file
-                if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
-                        log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
-                        );
-                        return Some(coverage);
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
-                            log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
-                        }
-                    }
-                    log::debug!("  ✗ No function match in this file");
-                }
-            }
-        }
+        // Path matching strategies - try each one until we find a file match
+        let path_strategies: [(
+            &str,
+            Box<dyn Fn(&Path, &Path, &PathBuf) -> bool>,
+        ); 3] = [
+            (
+                "Suffix matching (query.ends_with(lcov_file))",
+                Box::new(|query_path, _, file_path| query_path.ends_with(file_path)),
+            ),
+            (
+                "Reverse suffix matching (lcov_file.ends_with(query))",
+                Box::new(|_, normalized_query, file_path| file_path.ends_with(normalized_query)),
+            ),
+            (
+                "Normalized path equality",
+                Box::new(|_, normalized_query, file_path| {
+                    normalize_path(file_path) == *normalized_query
+                }),
+            ),
+        ];
 
-        log::debug!("Strategy 2: Reverse suffix matching (lcov_file.ends_with(query))");
-        // Strategy 2: Reverse suffix matching - iterate over FILES
-        for file_path in &self.file_paths {
-            if file_path.ends_with(&normalized_query) {
-                log::debug!("  Found path match: '{}'", file_path.display());
-                if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
-                        log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
-                        );
-                        return Some(coverage);
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
+        for (strategy_name, path_matches) in &path_strategies {
+            log::debug!("Path strategy: {}", strategy_name);
+            for file_path in &self.file_paths {
+                if path_matches(query_path, &normalized_query, file_path) {
+                    log::debug!("  Found path match: '{}'", file_path.display());
+                    if let Some(file_functions) = self.by_file.get(file_path) {
+                        // Use pure function matching
+                        if let Some(func_match) =
+                            find_matching_function(function_name, file_functions)
+                        {
                             log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
+                                "  ✓ Matched via {:?}: '{}' -> {}%",
+                                func_match.strategy,
+                                func_match.coverage.name,
+                                func_match.coverage.coverage_percentage
                             );
-                            return Some(func);
+                            return Some(func_match.coverage);
                         }
+                        log::debug!("  ✗ No function match in this file");
                     }
-                    log::debug!("  ✗ No function match in this file");
-                }
-            }
-        }
-
-        log::debug!("Strategy 3: Normalized path equality");
-        // Strategy 3: Normalized equality - iterate over FILES
-        for file_path in &self.file_paths {
-            if normalize_path(file_path) == normalized_query {
-                log::debug!("  Found path match: '{}'", file_path.display());
-                if let Some(file_functions) = self.by_file.get(file_path) {
-                    // Try exact match first
-                    if let Some(coverage) = file_functions.get(function_name) {
-                        log::debug!(
-                            "  ✓ Matched function name exactly: {}%",
-                            coverage.coverage_percentage
-                        );
-                        return Some(coverage);
-                    }
-                    // Try method name match (for Rust methods)
-                    for func in file_functions.values() {
-                        if func.normalized.method_name == function_name {
-                            log::debug!(
-                                "  ✓ Matched method name '{}' -> '{}': {}%",
-                                func.name,
-                                func.normalized.method_name,
-                                func.coverage_percentage
-                            );
-                            return Some(func);
-                        }
-                    }
-                    log::debug!("  ✗ No function match in this file");
                 }
             }
         }
@@ -542,5 +576,244 @@ mod tests {
             index.get_function_coverage(Path::new("file2.rs"), "func2"),
             Some(0.0)
         );
+    }
+
+    // ========================================================================
+    // Pure Function Matching Tests
+    // ========================================================================
+
+    mod function_matching_tests {
+        use super::*;
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        fn make_coverage(name: &str, full_path: &str, method_name: &str) -> FunctionCoverage {
+            FunctionCoverage {
+                name: name.to_string(),
+                start_line: 1,
+                execution_count: 0,
+                coverage_percentage: 50.0,
+                uncovered_lines: vec![],
+                normalized: NormalizedFunctionName {
+                    full_path: full_path.to_string(),
+                    method_name: method_name.to_string(),
+                    original: name.to_string(),
+                },
+            }
+        }
+
+        #[test]
+        fn test_exact_name_match() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                "execute_mapreduce_resume",
+            );
+
+            let strategy = matches_function(
+                "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                &coverage,
+            );
+            assert_eq!(strategy, Some(MatchStrategy::ExactName));
+        }
+
+        #[test]
+        fn test_suffix_path_match_impl_method() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            // Query with Type::method (what debtmap typically uses)
+            let strategy =
+                matches_function("ResumeExecutor::execute_remaining_steps", &coverage);
+            assert_eq!(
+                strategy,
+                Some(MatchStrategy::SuffixPath),
+                "Should match Type::method against full::path::Type::method"
+            );
+        }
+
+        #[test]
+        fn test_suffix_path_match_with_module() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            // Query with module::Type::method
+            let strategy = matches_function(
+                "resume::ResumeExecutor::execute_remaining_steps",
+                &coverage,
+            );
+            assert_eq!(
+                strategy,
+                Some(MatchStrategy::SuffixPath),
+                "Should match module::Type::method suffix"
+            );
+        }
+
+        #[test]
+        fn test_method_name_only_match() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            // Query with bare method name
+            let strategy = matches_function("execute_remaining_steps", &coverage);
+            assert_eq!(
+                strategy,
+                Some(MatchStrategy::MethodName),
+                "Should match bare method name"
+            );
+        }
+
+        #[test]
+        fn test_no_match_partial_type_name() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            // Should NOT match partial type name (not on :: boundary)
+            let strategy = matches_function("Executor::execute_remaining_steps", &coverage);
+            assert_eq!(
+                strategy, None,
+                "Should NOT match partial type name that doesn't align with :: boundary"
+            );
+        }
+
+        #[test]
+        fn test_no_match_wrong_function() {
+            let coverage = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            let strategy = matches_function("different_function", &coverage);
+            assert_eq!(strategy, None, "Should not match wrong function name");
+        }
+
+        #[test]
+        fn test_find_matching_function_exact() {
+            let mut functions = HashMap::new();
+            functions.insert(
+                "full::path::func".to_string(),
+                make_coverage("full::path::func", "full::path::func", "func"),
+            );
+
+            let result = find_matching_function("full::path::func", &functions);
+            assert!(result.is_some());
+            assert_eq!(result.unwrap().strategy, MatchStrategy::ExactName);
+        }
+
+        #[test]
+        fn test_find_matching_function_suffix() {
+            let mut functions = HashMap::new();
+            functions.insert(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps"
+                    .to_string(),
+                make_coverage(
+                    "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                    "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                    "execute_remaining_steps",
+                ),
+            );
+
+            let result =
+                find_matching_function("ResumeExecutor::execute_remaining_steps", &functions);
+            assert!(
+                result.is_some(),
+                "Should find function using suffix path match"
+            );
+            assert_eq!(result.unwrap().strategy, MatchStrategy::SuffixPath);
+        }
+
+        #[test]
+        fn test_find_matching_function_method_name() {
+            let mut functions = HashMap::new();
+            functions.insert(
+                "crate::module::Type::method".to_string(),
+                make_coverage("crate::module::Type::method", "crate::module::Type::method", "method"),
+            );
+
+            let result = find_matching_function("method", &functions);
+            assert!(result.is_some(), "Should find function using method name");
+            assert_eq!(result.unwrap().strategy, MatchStrategy::MethodName);
+        }
+
+        #[test]
+        fn test_find_matching_function_priority_order() {
+            // Test that exact match takes priority over suffix match
+            let mut functions = HashMap::new();
+
+            // Add two functions where one is exact and one is suffix
+            functions.insert(
+                "Type::method".to_string(),
+                make_coverage("Type::method", "Type::method", "method"),
+            );
+            functions.insert(
+                "crate::other::Type::method".to_string(),
+                make_coverage(
+                    "crate::other::Type::method",
+                    "crate::other::Type::method",
+                    "method",
+                ),
+            );
+
+            let result = find_matching_function("Type::method", &functions);
+            assert!(result.is_some());
+            // Should find the exact match via hash lookup
+            assert_eq!(result.unwrap().strategy, MatchStrategy::ExactName);
+        }
+
+        #[test]
+        fn test_matches_function_standalone_vs_impl() {
+            // Standalone function
+            let standalone = make_coverage(
+                "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                "execute_mapreduce_resume",
+            );
+
+            // Should match bare function name
+            assert_eq!(
+                matches_function("execute_mapreduce_resume", &standalone),
+                Some(MatchStrategy::MethodName)
+            );
+
+            // Should match full path
+            assert_eq!(
+                matches_function(
+                    "prodigy::cook::workflow::resume::execute_mapreduce_resume",
+                    &standalone
+                ),
+                Some(MatchStrategy::ExactName)
+            );
+
+            // Impl method
+            let impl_method = make_coverage(
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
+                "execute_remaining_steps",
+            );
+
+            // Should match Type::method
+            assert_eq!(
+                matches_function("ResumeExecutor::execute_remaining_steps", &impl_method),
+                Some(MatchStrategy::SuffixPath)
+            );
+
+            // Should match bare method name
+            assert_eq!(
+                matches_function("execute_remaining_steps", &impl_method),
+                Some(MatchStrategy::MethodName)
+            );
+        }
     }
 }
