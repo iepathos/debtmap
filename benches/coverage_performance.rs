@@ -336,10 +336,7 @@ fn benchmark_trait_method_variants(c: &mut Criterion) {
     group.bench_function("baseline_single_name", |b| {
         b.iter(|| {
             // Try exact match with method name
-            let coverage = data.get_function_coverage(
-                black_box(&file),
-                black_box("visit_expr"),
-            );
+            let coverage = data.get_function_coverage(black_box(&file), black_box("visit_expr"));
             black_box(coverage);
         })
     });
@@ -353,25 +350,16 @@ fn benchmark_trait_method_variants(c: &mut Criterion) {
             let trait_name = "Visit::visit_expr";
 
             // Try full name first (won't match in this case)
-            let mut coverage = data.get_function_coverage(
-                black_box(&file),
-                black_box(full_name),
-            );
+            let mut coverage = data.get_function_coverage(black_box(&file), black_box(full_name));
 
             // Try method name (will match)
             if coverage.is_none() {
-                coverage = data.get_function_coverage(
-                    black_box(&file),
-                    black_box(method_name),
-                );
+                coverage = data.get_function_coverage(black_box(&file), black_box(method_name));
             }
 
             // Try trait-qualified name (won't be needed)
             if coverage.is_none() {
-                coverage = data.get_function_coverage(
-                    black_box(&file),
-                    black_box(trait_name),
-                );
+                coverage = data.get_function_coverage(black_box(&file), black_box(trait_name));
             }
 
             black_box(coverage);
@@ -381,14 +369,27 @@ fn benchmark_trait_method_variants(c: &mut Criterion) {
     // Benchmark 3: Batch lookup with variants for multiple trait methods
     group.bench_function("batch_variant_lookup", |b| {
         let trait_methods = vec![
-            ("RecursiveMatchDetector::visit_expr", "visit_expr", "Visit::visit_expr"),
-            ("RecursiveMatchDetector::visit_stmt", "visit_stmt", "Visit::visit_stmt"),
-            ("RecursiveMatchDetector::visit_item", "visit_item", "Visit::visit_item"),
+            (
+                "RecursiveMatchDetector::visit_expr",
+                "visit_expr",
+                "Visit::visit_expr",
+            ),
+            (
+                "RecursiveMatchDetector::visit_stmt",
+                "visit_stmt",
+                "Visit::visit_stmt",
+            ),
+            (
+                "RecursiveMatchDetector::visit_item",
+                "visit_item",
+                "Visit::visit_item",
+            ),
         ];
 
         b.iter(|| {
             for (full_name, method_name, trait_name) in &trait_methods {
-                let mut coverage = data.get_function_coverage(black_box(&file), black_box(full_name));
+                let mut coverage =
+                    data.get_function_coverage(black_box(&file), black_box(full_name));
                 if coverage.is_none() {
                     coverage = data.get_function_coverage(black_box(&file), black_box(method_name));
                 }

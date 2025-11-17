@@ -4,7 +4,6 @@
 /// with LCOV coverage data even when the function names differ between what
 /// debtmap stores (e.g., "RecursiveMatchDetector::visit_expr") and what LCOV
 /// stores (e.g., "visit_expr").
-
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
