@@ -152,7 +152,7 @@ pub fn generate_concise_recommendation(
     }
 }
 
-/// Generate testing gap recommendation with max 5 steps
+/// Generate testing gap recommendation with max 5 steps (spec 183)
 fn generate_testing_gap_steps(
     coverage_pct: f64,
     cyclomatic: u32,
@@ -161,15 +161,21 @@ fn generate_testing_gap_steps(
     _role: FunctionRole,
     _transitive_cov: &Option<TransitiveCoverage>,
 ) -> ActionableRecommendation {
-    let tier = if cyclomatic > 30 {
+    // Use adjusted complexity if available (spec 183)
+    let effective_cyclomatic = metrics
+        .adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(cyclomatic);
+
+    let tier = if effective_cyclomatic > 30 {
         TestComplexityTier::High
-    } else if cyclomatic > 10 {
+    } else if effective_cyclomatic > 10 {
         TestComplexityTier::Moderate
     } else {
         TestComplexityTier::Simple
     };
 
-    let test_result = calculate_tests_needed(cyclomatic, coverage_pct, Some(tier));
+    let test_result = calculate_tests_needed(effective_cyclomatic, coverage_pct, Some(tier));
     let tests_needed = test_result.count;
     let coverage_gap = (100.0 - coverage_pct * 100.0) as u32;
 
@@ -183,7 +189,7 @@ fn generate_testing_gap_steps(
                 tests_needed, coverage_gap
             ),
             impact: format!("+{} tests, reduce risk", tests_needed),
-            difficulty: Difficulty::for_testing(tests_needed, cyclomatic),
+            difficulty: Difficulty::for_testing(tests_needed, effective_cyclomatic),
             commands: vec![
                 format!("cargo test {}::", metrics.name),
                 "# Write focused tests covering critical paths".to_string(),
@@ -192,14 +198,14 @@ fn generate_testing_gap_steps(
     }
 
     // Step 2: Refactoring (only if complex)
-    if cyclomatic > 15 || cognitive > 20 {
+    if effective_cyclomatic > 15 || cognitive > 20 {
         let target_complexity = 10;
-        let complexity_reduction = (cyclomatic.saturating_sub(target_complexity)).max(5);
+        let complexity_reduction = (effective_cyclomatic.saturating_sub(target_complexity)).max(5);
 
         steps.push(ActionStep {
             description: "Extract complex branches into focused functions".to_string(),
             impact: format!("-{} complexity", complexity_reduction),
-            difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
+            difficulty: Difficulty::for_refactoring(effective_cyclomatic, cognitive),
             commands: vec!["cargo clippy -- -W clippy::cognitive_complexity".to_string()],
         });
     }
@@ -221,7 +227,7 @@ fn generate_testing_gap_steps(
         });
     }
 
-    let estimated_effort = estimate_effort(cyclomatic, tests_needed);
+    let estimated_effort = estimate_effort(effective_cyclomatic, tests_needed);
 
     ActionableRecommendation {
         primary_action: if tests_needed > 0 {
@@ -232,7 +238,7 @@ fn generate_testing_gap_steps(
         rationale: format!(
             "Function has {}% coverage with complexity {}/{}. Needs {} tests minimum.",
             (coverage_pct * 100.0) as u32,
-            cyclomatic,
+            effective_cyclomatic,
             cognitive,
             tests_needed
         ),
@@ -820,15 +826,21 @@ fn add_declarative_validation_examples(
     }
 }
 
-/// Generate recommendation for moderate complexity (spec 178)
+/// Generate recommendation for moderate complexity (spec 178, spec 183)
 fn generate_moderate_recommendation(
     cyclomatic: u32,
     cognitive: u32,
     metrics: &FunctionMetrics,
 ) -> ActionableRecommendation {
-    let tier = classify_complexity_tier(cyclomatic, cognitive);
-    let target = calculate_target_complexity(cyclomatic, tier);
-    let reduction = cyclomatic.saturating_sub(target);
+    // Use adjusted complexity if available (spec 183)
+    let effective_cyclomatic = metrics
+        .adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(cyclomatic);
+
+    let tier = classify_complexity_tier(effective_cyclomatic, cognitive);
+    let target = calculate_target_complexity(effective_cyclomatic, tier);
+    let reduction = effective_cyclomatic.saturating_sub(target);
 
     match tier {
         RecommendationComplexityTier::Low => {
@@ -845,7 +857,7 @@ fn generate_moderate_recommendation(
                 rationale: format!(
                     "Function has low complexity ({}/{}). \
                      Continue following current patterns to keep it maintainable.",
-                    cyclomatic, cognitive
+                    effective_cyclomatic, cognitive
                 ),
                 implementation_steps: vec![],
                 related_items: vec![],
@@ -866,7 +878,7 @@ fn generate_moderate_recommendation(
                 ActionStep {
                     description: "Extract most complex section into focused function".to_string(),
                     impact: format!("-{} complexity", reduction),
-                    difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
+                    difficulty: Difficulty::for_refactoring(effective_cyclomatic, cognitive),
                     commands: vec!["cargo clippy".to_string()],
                 },
                 ActionStep {
@@ -877,28 +889,51 @@ fn generate_moderate_recommendation(
                 },
             ];
 
-            let estimated_effort = (cyclomatic as f32 / 10.0) * 1.5;
+            let estimated_effort = (effective_cyclomatic as f32 / 10.0) * 1.5;
+
+            // Generate appropriate rationale and action based on adjusted vs raw complexity
+            let (primary_action, rationale) = if effective_cyclomatic < 10 && cyclomatic >= 10 {
+                // Adjusted complexity is below threshold but raw is not - focus on cognitive
+                (
+                    "Focus on reducing cognitive complexity through early returns and guard clauses"
+                        .to_string(),
+                    format!(
+                        "Moderate cognitive complexity ({}). \
+                         Cyclomatic complexity is manageable (adjusted: {}).",
+                        cognitive, effective_cyclomatic
+                    ),
+                )
+            } else {
+                // Both need attention or adjusted is still above threshold
+                (
+                    if effective_cyclomatic >= 10 {
+                        format!(
+                            "Reduce complexity from {} to ~{}",
+                            effective_cyclomatic, target
+                        )
+                    } else {
+                        format!(
+                            "Optional: Reduce complexity from {} to ~{} for future-proofing",
+                            effective_cyclomatic, target
+                        )
+                    },
+                    format!(
+                        "Moderate complexity ({}/{}). {} threshold but maintainable. \
+                         Preventive refactoring will ease future changes.",
+                        effective_cyclomatic,
+                        cognitive,
+                        if effective_cyclomatic >= 10 {
+                            "Approaching"
+                        } else {
+                            "Below"
+                        }
+                    ),
+                )
+            };
 
             ActionableRecommendation {
-                primary_action: if cyclomatic >= 10 {
-                    format!("Reduce complexity from {} to ~{}", cyclomatic, target)
-                } else {
-                    format!(
-                        "Optional: Reduce complexity from {} to ~{} for future-proofing",
-                        cyclomatic, target
-                    )
-                },
-                rationale: format!(
-                    "Moderate complexity ({}/{}). {} threshold but maintainable. \
-                     Preventive refactoring will ease future changes.",
-                    cyclomatic,
-                    cognitive,
-                    if cyclomatic >= 10 {
-                        "Approaching"
-                    } else {
-                        "Below"
-                    }
-                ),
+                primary_action,
+                rationale,
                 implementation_steps: vec![],
                 related_items: vec![],
                 steps: Some(steps),
@@ -918,7 +953,7 @@ fn generate_moderate_recommendation(
                 ActionStep {
                     description: "Extract most complex section into focused function".to_string(),
                     impact: format!("-{} complexity", reduction),
-                    difficulty: Difficulty::for_refactoring(cyclomatic, cognitive),
+                    difficulty: Difficulty::for_refactoring(effective_cyclomatic, cognitive),
                     commands: vec!["cargo clippy".to_string()],
                 },
                 ActionStep {
@@ -929,14 +964,17 @@ fn generate_moderate_recommendation(
                 },
             ];
 
-            let estimated_effort = (cyclomatic as f32 / 10.0) * 2.0;
+            let estimated_effort = (effective_cyclomatic as f32 / 10.0) * 2.0;
 
             ActionableRecommendation {
-                primary_action: format!("Reduce complexity from {} to ~{}", cyclomatic, target),
+                primary_action: format!(
+                    "Reduce complexity from {} to ~{}",
+                    effective_cyclomatic, target
+                ),
                 rationale: format!(
                     "High complexity ({}/{}). Exceeds maintainability thresholds. \
                      Refactoring required.",
-                    cyclomatic, cognitive
+                    effective_cyclomatic, cognitive
                 ),
                 implementation_steps: vec![],
                 related_items: vec![],
