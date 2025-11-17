@@ -637,22 +637,14 @@ fn format_item_body(
     verbosity: u8,
     tree_pipe: &str,
 ) {
-    // Location section (spec 139: tree formatting, spec 166: test file tags)
-    let file_context_tag = if let Some(ref context) = item.file_context {
-        use crate::priority::scoring::file_context_scoring::context_label;
-        format!(" [{}]", context_label(context))
-    } else {
-        String::new()
-    };
-
+    // Location section (spec 139: tree formatting, spec 181: clean location line)
     writeln!(
         output,
-        "├─ {} {}:{} {}(){}",
+        "├─ {} {}:{} {}()",
         "LOCATION:".bright_blue(),
         item.location.file.display(),
         item.location.line,
-        item.location.function.bright_green(),
-        file_context_tag.bright_magenta()
+        item.location.function.bright_green()
     )
     .unwrap();
 
@@ -667,6 +659,29 @@ fn format_item_body(
 
     // COMPLEXITY section (acts as EVIDENCE - metrics only)
     format_complexity_summary(output, item, _formatter);
+
+    // FILE CONTEXT section (spec 181: show non-production contexts in default mode)
+    if verbosity == 0 {
+        if let Some(ref context) = item.file_context {
+            use crate::analysis::FileContext;
+            use crate::priority::scoring::file_context_scoring::{
+                context_label, context_reduction_factor,
+            };
+
+            // Only show non-production contexts in default mode
+            if !matches!(context, FileContext::Production) {
+                let reduction_pct = ((1.0 - context_reduction_factor(context)) * 100.0) as u32;
+                writeln!(
+                    output,
+                    "├─ {} {} ({}% score reduction)",
+                    "FILE CONTEXT:".bright_blue(),
+                    context_label(context).bright_magenta(),
+                    reduction_pct
+                )
+                .unwrap();
+            }
+        }
+    }
 
     // WHY THIS MATTERS section (spec 139: explains why evidence matters)
     let why_label = "├─ WHY THIS MATTERS:".bright_blue();
@@ -833,6 +848,44 @@ fn format_scoring_breakdown(
         dependency_contribution.bright_yellow()
     )
     .unwrap();
+
+    // Add file context information (spec 181: show context in verbose mode)
+    if let Some(ref context) = item.file_context {
+        use crate::priority::scoring::file_context_scoring::{
+            context_label, context_reduction_factor,
+        };
+
+        let factor = context_reduction_factor(context);
+        let label = context_label(context);
+
+        // Determine explanation based on context type
+        let explanation = if factor >= 1.0 {
+            "no score adjustment"
+        } else if factor >= 0.6 {
+            "40% score reduction"
+        } else if factor >= 0.2 {
+            "80% score reduction"
+        } else {
+            "90% score reduction"
+        };
+
+        writeln!(
+            output,
+            "  - {} {} ({})",
+            "File Context:".bright_blue(),
+            label.bright_magenta(),
+            explanation
+        )
+        .unwrap();
+
+        writeln!(
+            output,
+            "  - {} {:.2}",
+            "Context Factor:".bright_blue(),
+            factor
+        )
+        .unwrap();
+    }
 }
 
 /// Format coverage section
