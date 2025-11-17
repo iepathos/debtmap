@@ -515,29 +515,97 @@ impl CoverageIndex {
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
+        log::debug!(
+            "Attempting coverage lookup for '{}' at {}:{}",
+            function_name,
+            file.display(),
+            line
+        );
+
         // Try aggregated coverage first (handles generics)
         if let Some(agg) = self.get_aggregated_coverage(file, function_name) {
+            log::debug!(
+                "✓ Coverage found via aggregated match: {:.1}%",
+                agg.coverage_pct
+            );
             return Some(agg.coverage_pct / 100.0);
         }
 
         // Try name variants (for trait methods where LCOV may use simplified names)
         for variant in generate_name_variants(function_name) {
+            log::debug!("Trying name variant: '{}'", variant);
             if let Some(agg) = self.get_aggregated_coverage(file, &variant) {
+                log::debug!(
+                    "✓ Coverage found via name variant '{}': {:.1}%",
+                    variant,
+                    agg.coverage_pct
+                );
                 return Some(agg.coverage_pct / 100.0);
             }
         }
 
         // Try line-based lookup (O(log n)) - faster than path matching strategies
-        if let Some(coverage) = self
-            .find_function_by_line(file, line, 2)
-            .map(|f| f.coverage_percentage / 100.0)
-        {
-            return Some(coverage);
+        log::debug!("Trying line-based lookup with tolerance ±2");
+        match self.find_function_by_line(file, line, 2) {
+            Some(f) => {
+                log::debug!(
+                    "✓ Coverage found via line-based fallback: matched '{}' at line {}, coverage {:.1}%",
+                    f.name,
+                    f.start_line,
+                    f.coverage_percentage
+                );
+                return Some(f.coverage_percentage / 100.0);
+            }
+            None => {
+                // Log diagnostic info about why line-based lookup failed
+                if !self.by_line.contains_key(file) {
+                    log::warn!(
+                        "File '{}' not found in line-based index (has {} files indexed)",
+                        file.display(),
+                        self.by_line.len()
+                    );
+                } else {
+                    let line_map = &self.by_line[file];
+                    log::debug!(
+                        "Line-based lookup failed: file has {} indexed functions, searched for line {} with ±2 tolerance",
+                        line_map.len(),
+                        line
+                    );
+
+                    // Show nearby lines to help diagnose tolerance issues
+                    let min_line = line.saturating_sub(5);
+                    let max_line = line.saturating_add(5);
+                    let nearby_lines: Vec<usize> = line_map
+                        .range(min_line..=max_line)
+                        .map(|(l, _)| *l)
+                        .collect();
+                    if !nearby_lines.is_empty() {
+                        log::debug!("Nearby indexed lines (±5): {:?}", nearby_lines);
+                    }
+                }
+            }
         }
 
         // Only fall back to path matching strategies if line lookup fails
-        self.find_by_path_strategies(file, function_name)
-            .map(|f| f.coverage_percentage / 100.0)
+        log::debug!("Trying path matching strategies");
+        match self.find_by_path_strategies(file, function_name) {
+            Some(f) => {
+                log::debug!(
+                    "✓ Coverage found via path matching: {:.1}%",
+                    f.coverage_percentage
+                );
+                Some(f.coverage_percentage / 100.0)
+            }
+            None => {
+                log::warn!(
+                    "✗ No coverage found for '{}' at {}:{} after all strategies",
+                    function_name,
+                    file.display(),
+                    line
+                );
+                None
+            }
+        }
     }
 
     /// Get uncovered lines for a function
@@ -566,8 +634,23 @@ impl CoverageIndex {
 
     /// Find function by line number with tolerance (private helper)
     ///
-    /// Searches for a function whose start_line is within `tolerance` of the target line.
-    /// Returns the closest matching function.
+    /// This is a fallback mechanism for when name-based matching fails.
+    /// It's particularly useful for:
+    /// - Trait implementation methods (name format varies)
+    /// - Generic functions (multiple monomorphizations)
+    /// - Functions where LCOV and AST disagree on naming
+    ///
+    /// # Arguments
+    /// * `file` - Path to source file
+    /// * `target_line` - Line number to search for
+    /// * `tolerance` - Number of lines above/below to check (typically 2)
+    ///
+    /// # Returns
+    /// The closest function within tolerance, or None if no match found.
+    ///
+    /// # Algorithm
+    /// Uses BTreeMap range query for O(log n) performance. When multiple
+    /// functions are within tolerance, returns the closest by absolute distance.
     fn find_function_by_line(
         &self,
         file: &Path,
@@ -580,11 +663,32 @@ impl CoverageIndex {
         let min_line = target_line.saturating_sub(tolerance);
         let max_line = target_line.saturating_add(tolerance);
 
-        // Use BTreeMap range query to find functions in range
-        line_map
+        log::trace!(
+            "Searching line-based index: target={}, range={}..={}, index_size={}",
+            target_line,
+            min_line,
+            max_line,
+            line_map.len()
+        );
+
+        // Use BTreeMap range query to find functions in range (inclusive on both ends)
+        let result = line_map
             .range(min_line..=max_line)
             .min_by_key(|(line, _)| line.abs_diff(target_line))
-            .map(|(_, func)| func)
+            .map(|(_, func)| func);
+
+        if let Some(func) = result {
+            log::trace!(
+                "Found function '{}' at line {} (distance: {})",
+                func.name,
+                func.start_line,
+                func.start_line.abs_diff(target_line)
+            );
+        } else {
+            log::trace!("No function found within tolerance range");
+        }
+
+        result
     }
 
     /// Get index statistics
@@ -1052,5 +1156,266 @@ mod tests {
         let coverage_b =
             index.get_function_coverage_with_line(Path::new("src/test.rs"), "TypeB::process", 30);
         assert_eq!(coverage_b.unwrap(), 0.90);
+    }
+
+    // Tests for Spec 182: Line-Based Coverage Fallback Reliability
+
+    #[test]
+    fn test_line_based_fallback_exact_match() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![create_test_function_coverage("foo", 100, 10, 85.0, vec![])],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query with wrong name but exact line - should find via line-based fallback
+        let result = index.get_function_coverage_with_line(
+            Path::new("test.rs"),
+            "WRONG_NAME", // Name won't match
+            100,          // Exact line
+        );
+
+        assert!(
+            result.is_some(),
+            "Line-based fallback should find function at exact line"
+        );
+        assert_eq!(result.unwrap(), 0.85);
+    }
+
+    #[test]
+    fn test_line_based_fallback_within_tolerance() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![create_test_function_coverage("foo", 100, 10, 85.0, vec![])],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Try lines 98-102 (all within ±2 tolerance)
+        for line in 98..=102 {
+            let result =
+                index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", line);
+
+            assert!(
+                result.is_some(),
+                "Line {} should match function at 100 with ±2 tolerance",
+                line
+            );
+            assert_eq!(result.unwrap(), 0.85);
+        }
+    }
+
+    #[test]
+    fn test_line_based_fallback_outside_tolerance() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![create_test_function_coverage("foo", 100, 10, 85.0, vec![])],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Line 97 is just outside ±2 tolerance (100 - 2 = 98)
+        let result = index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", 97);
+
+        assert!(
+            result.is_none(),
+            "Line 97 should be outside ±2 tolerance of line 100"
+        );
+
+        // Line 103 is just outside ±2 tolerance (100 + 2 = 102)
+        let result = index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", 103);
+
+        assert!(
+            result.is_none(),
+            "Line 103 should be outside ±2 tolerance of line 100"
+        );
+    }
+
+    #[test]
+    fn test_line_based_fallback_chooses_closest() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![
+                create_test_function_coverage("func_at_100", 100, 10, 80.0, vec![]),
+                create_test_function_coverage("func_at_105", 105, 10, 90.0, vec![]),
+            ],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Line 102 is closer to 100 (distance 2) than 105 (distance 3)
+        let result = index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", 102);
+
+        assert!(result.is_some());
+        assert_eq!(
+            result.unwrap(),
+            0.80,
+            "Should match function at line 100 (closer)"
+        );
+
+        // Line 103 is closer to 105 (distance 2) than 100 (distance 3)
+        let result = index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", 104);
+
+        assert!(result.is_some());
+        assert_eq!(
+            result.unwrap(),
+            0.90,
+            "Should match function at line 105 (closer)"
+        );
+    }
+
+    #[test]
+    fn test_line_based_fallback_boundary_conditions() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![
+                create_test_function_coverage("func_at_0", 0, 10, 70.0, vec![]),
+                create_test_function_coverage(
+                    "func_at_usize_max",
+                    usize::MAX - 5,
+                    10,
+                    75.0,
+                    vec![],
+                ),
+            ],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Test line 0 with tolerance (should handle underflow correctly)
+        let result = index.get_function_coverage_with_line(Path::new("test.rs"), "WRONG_NAME", 0);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 0.70);
+
+        // Test near usize::MAX (should handle overflow correctly)
+        let result = index.get_function_coverage_with_line(
+            Path::new("test.rs"),
+            "WRONG_NAME",
+            usize::MAX - 4,
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), 0.75);
+    }
+
+    #[test]
+    fn test_line_index_populated_for_all_functions() {
+        let mut coverage = LcovData::default();
+        let test_functions = vec![
+            create_test_function_coverage("func_a", 10, 5, 100.0, vec![]),
+            create_test_function_coverage("func_b", 20, 3, 75.0, vec![22, 24]),
+            create_test_function_coverage("func_c", 30, 0, 0.0, vec![30, 31, 32, 33]),
+        ];
+        coverage
+            .functions
+            .insert(PathBuf::from("test.rs"), test_functions);
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Verify all functions are in the line index
+        let file = Path::new("test.rs");
+        assert!(
+            index.by_line.contains_key(file),
+            "File should be in line index"
+        );
+
+        let line_map = &index.by_line[file];
+        assert_eq!(line_map.len(), 3, "All 3 functions should be in line index");
+        assert!(
+            line_map.contains_key(&10),
+            "Function at line 10 should be indexed"
+        );
+        assert!(
+            line_map.contains_key(&20),
+            "Function at line 20 should be indexed"
+        );
+        assert!(
+            line_map.contains_key(&30),
+            "Function at line 30 should be indexed"
+        );
+    }
+
+    #[test]
+    fn test_line_based_fallback_with_trait_method() {
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        let mut coverage = LcovData::default();
+
+        // Simulate LCOV storing just the method name (common for trait implementations)
+        coverage.functions.insert(
+            PathBuf::from("src/test.rs"),
+            vec![FunctionCoverage {
+                name: "visit_expr".to_string(),
+                start_line: 177,
+                execution_count: 3507,
+                coverage_percentage: 90.2,
+                uncovered_lines: vec![200, 205],
+                normalized: NormalizedFunctionName {
+                    full_path: "visit_expr".to_string(),
+                    method_name: "visit_expr".to_string(),
+                    original: "visit_expr".to_string(),
+                },
+            }],
+        );
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query with full qualified name that doesn't match, but correct line
+        // This simulates the RecursiveMatchDetector::visit_expr case
+        let coverage = index.get_function_coverage_with_line(
+            Path::new("src/test.rs"),
+            "SomeType::visit_expr", // Won't match stored "visit_expr" by aggregated lookup
+            177,
+        );
+
+        // Should find coverage via line-based fallback
+        assert!(
+            coverage.is_some(),
+            "Line-based fallback should find coverage when name doesn't match exactly"
+        );
+        assert_eq!(coverage.unwrap(), 0.902);
+    }
+
+    #[test]
+    fn test_line_based_fallback_empty_file() {
+        let coverage = LcovData::default();
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query for non-existent file
+        let result =
+            index.get_function_coverage_with_line(Path::new("nonexistent.rs"), "func", 100);
+
+        assert!(result.is_none(), "Should return None for non-existent file");
+    }
+
+    #[test]
+    fn test_tolerance_calculation_inclusive_range() {
+        let mut coverage = LcovData::default();
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![
+                create_test_function_coverage("func_98", 98, 10, 70.0, vec![]),
+                create_test_function_coverage("func_100", 100, 10, 80.0, vec![]),
+                create_test_function_coverage("func_102", 102, 10, 90.0, vec![]),
+            ],
+        );
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Verify range is inclusive on both ends for target line 100 with tolerance 2
+        // Should match lines 98, 100, 102 (range 98..=102)
+
+        // Test exact boundary: line 98 (min_line = 100 - 2 = 98)
+        let result = index.find_function_by_line(Path::new("test.rs"), 100, 2);
+        assert!(result.is_some());
+        assert_eq!(
+            result.unwrap().name,
+            "func_100",
+            "Should find closest function at 100"
+        );
+
+        // Test that all functions in range are considered
+        let result = index.find_function_by_line(Path::new("test.rs"), 99, 2);
+        assert!(result.is_some());
+        // 99 is equidistant from 98 and 100, should pick first (min_by_key behavior)
     }
 }
