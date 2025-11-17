@@ -107,32 +107,32 @@ fn demangle_function_name(name: &str) -> String {
 /// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> full_path: `debtmap::Foo::bar`, method_name: `bar`
 /// - `std::collections::HashMap<K,V>::insert` -> full_path: `std::collections::HashMap::insert`, method_name: `insert`
 /// - `<Struct as Trait>::method` -> full_path: `Struct as Trait::method`, method_name: `method`
-fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
-    // Handle Rust impl method pattern: <Type>::method or <crate[hash]::Type>::method
-    // Pattern: <crate::module::Type>::method -> crate::module::Type::method
+pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
+    // Handle impl method patterns: <module::path::Type>::method -> module::path::Type::method
+    // Remove angle brackets and crate hash: <crate[hash]::rest>::method -> crate::rest::method
     let without_impl_brackets = if demangled.starts_with('<') {
-        // Find the closing >::
-        if let Some(end_pos) = demangled.find(">::") {
-            // Extract type path from inside <...>
-            let type_path = &demangled[1..end_pos];
-            let method_part = &demangled[end_pos + 3..]; // Skip >::
+        if let Some(angle_end) = demangled.find('>') {
+            let content = &demangled[1..angle_end];
+            let after = &demangled[(angle_end + 1)..];
 
-            // Now handle crate hash if present: crate[hash]::rest -> crate::rest
-            let type_path_without_hash = if let Some(bracket_start) = type_path.find('[') {
-                if let Some(bracket_end) = type_path.find(']') {
-                    // Remove [hash] part
-                    format!("{}{}", &type_path[..bracket_start], &type_path[bracket_end + 1..])
+            // Remove hash from path if present: crate[hash]::rest -> crate::rest
+            let content_without_hash = if let Some(bracket_start) = content.find('[') {
+                if let Some(bracket_end) = content.find(']') {
+                    // Reconstruct: before[hash]after -> beforeafter
+                    format!(
+                        "{}{}",
+                        &content[..bracket_start],
+                        &content[(bracket_end + 1)..]
+                    )
                 } else {
-                    type_path.to_string()
+                    content.to_string()
                 }
             } else {
-                type_path.to_string()
+                content.to_string()
             };
 
-            // Reconstruct as Type::method
-            format!("{}::{}", type_path_without_hash, method_part)
+            format!("{}{}", content_without_hash, after)
         } else {
-            // No >:: pattern found, keep as-is
             demangled.to_string()
         }
     } else {
@@ -140,28 +140,19 @@ fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
     };
 
     // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
-    // BUT preserve impl blocks: "<impl Trait for Type>" should be kept
-    // We look for the last occurrence of '<' that has a matching '>' before the next '::'
-    let mut result = without_impl_brackets.clone();
-    while let Some(angle_start) = result.rfind('<') {
-        // Find the matching '>'
-        if let Some(angle_end) = result[angle_start..].find('>') {
-            let angle_end = angle_start + angle_end;
-
-            // Check if this is an impl block (starts with "impl ")
-            // If so, preserve it
-            let content = &result[angle_start + 1..angle_end];
-            if content.trim().starts_with("impl ") {
-                // This is an impl block, preserve it
-                break;
+    // Use fold to track depth and only keep characters outside angle brackets
+    let result = without_impl_brackets
+        .chars()
+        .fold((String::new(), 0usize), |(mut acc, depth), ch| match ch {
+            '<' => (acc, depth + 1),
+            '>' if depth > 0 => (acc, depth - 1),
+            _ if depth == 0 => {
+                acc.push(ch);
+                (acc, depth)
             }
-
-            // Remove everything from < to > inclusive
-            result = format!("{}{}", &result[..angle_start], &result[(angle_end + 1)..]);
-        } else {
-            break;
-        }
-    }
+            _ => (acc, depth),
+        })
+        .0;
 
     // Extract method name (final segment after last ::)
     let method_name = result.rsplit("::").next().unwrap_or(&result).to_string();
@@ -1572,7 +1563,8 @@ end_of_record
         #[test]
         fn test_normalize_impl_method_with_angle_brackets() {
             // This is the actual pattern from LCOV that fails to match
-            let demangled = "<prodigy::cook::workflow::resume::ResumeExecutor>::execute_remaining_steps";
+            let demangled =
+                "<prodigy::cook::workflow::resume::ResumeExecutor>::execute_remaining_steps";
             let result = normalize_demangled_name(demangled);
 
             // After normalization, should be usable for matching
@@ -1614,14 +1606,16 @@ end_of_record
             let file_path = PathBuf::from("src/cook/workflow/resume.rs");
 
             // Test 1: Query with short form (what debtmap uses)
-            let coverage = data.get_function_coverage(&file_path, "ResumeExecutor::execute_remaining_steps");
+            let coverage =
+                data.get_function_coverage(&file_path, "ResumeExecutor::execute_remaining_steps");
             assert!(
                 coverage.is_some(),
                 "BUG: Should match 'ResumeExecutor::execute_remaining_steps' but got None"
             );
 
             // Test 2: Query with method name only
-            let coverage = data.get_function_coverage_with_line(&file_path, "execute_remaining_steps", 824);
+            let coverage =
+                data.get_function_coverage_with_line(&file_path, "execute_remaining_steps", 824);
             assert!(
                 coverage.is_some(),
                 "BUG: Should match method name 'execute_remaining_steps' but got None"
@@ -1630,7 +1624,7 @@ end_of_record
             // Test 3: Query with full path
             let coverage = data.get_function_coverage(
                 &file_path,
-                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps"
+                "prodigy::cook::workflow::resume::ResumeExecutor::execute_remaining_steps",
             );
             assert!(
                 coverage.is_some(),
@@ -1668,11 +1662,8 @@ end_of_record
 
             // Standalone function - should work
             let file_path_1 = PathBuf::from("src/cli/commands/resume.rs");
-            let coverage_standalone = data.get_function_coverage_with_line(
-                &file_path_1,
-                "execute_mapreduce_resume",
-                568
-            );
+            let coverage_standalone =
+                data.get_function_coverage_with_line(&file_path_1, "execute_mapreduce_resume", 568);
             assert!(
                 coverage_standalone.is_some(),
                 "Standalone function 'execute_mapreduce_resume' should match (baseline test)"
@@ -1680,11 +1671,8 @@ end_of_record
 
             // Impl method - currently fails
             let file_path_2 = PathBuf::from("src/cook/workflow/resume.rs");
-            let coverage_impl = data.get_function_coverage_with_line(
-                &file_path_2,
-                "execute_remaining_steps",
-                824
-            );
+            let coverage_impl =
+                data.get_function_coverage_with_line(&file_path_2, "execute_remaining_steps", 824);
             assert!(
                 coverage_impl.is_some(),
                 "BUG: Impl method 'execute_remaining_steps' should match but doesn't"
@@ -1695,36 +1683,30 @@ end_of_record
         fn test_multiple_impl_methods() {
             // Test multiple common patterns that appear in real codebases
             let test_cases = vec![
-                (
-                    "<Type>::method",
-                    "method",
-                    "Simple impl method"
-                ),
+                ("<Type>::method", "method", "Simple impl method"),
                 (
                     "<crate::module::Type>::method",
                     "method",
-                    "Fully qualified impl method"
+                    "Fully qualified impl method",
                 ),
                 (
                     "<impl Trait for Type>::method",
                     "method",
-                    "Trait impl method"
+                    "Trait impl method",
                 ),
                 (
                     "<Type<T>>::generic_method",
                     "generic_method",
-                    "Generic impl method"
+                    "Generic impl method",
                 ),
             ];
 
             for (input, expected_method, description) in test_cases {
                 let result = normalize_demangled_name(input);
                 assert_eq!(
-                    result.method_name,
-                    expected_method,
+                    result.method_name, expected_method,
                     "{}: method_name mismatch for '{}'",
-                    description,
-                    input
+                    description, input
                 );
             }
         }

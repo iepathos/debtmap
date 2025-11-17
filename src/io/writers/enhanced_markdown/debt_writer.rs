@@ -91,7 +91,7 @@ pub fn write_dependency_analysis<W: Write>(
     writer: &mut W,
     analysis: &UnifiedAnalysis,
 ) -> Result<()> {
-    writeln!(writer, "## 🔗 Dependency Analysis\n")?;
+    writeln!(writer, "## Dependency Analysis\n")?;
 
     let items: Vec<_> = analysis.items.iter().cloned().collect();
     let deps = extract_module_dependencies(&items);

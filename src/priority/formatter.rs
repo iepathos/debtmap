@@ -609,7 +609,7 @@ fn format_tail(analysis: &UnifiedAnalysis, limit: usize) -> String {
         if let Some(coverage) = analysis.overall_coverage {
             writeln!(
                 output,
-                "📈 {}",
+                "[COVERAGE] {}",
                 format!("OVERALL COVERAGE: {coverage:.2}%")
                     .bright_green()
                     .bold()
@@ -904,7 +904,7 @@ fn format_god_object_steps_with_verbosity(
                     if evidence.confidence < 0.80 && !evidence.alternatives.is_empty() {
                         writeln!(
                             output,
-                            "       ⚠  Low confidence classification - review recommended"
+                            "       [WARN] Low confidence classification - review recommended"
                         )
                         .unwrap();
                     }
@@ -1308,12 +1308,12 @@ fn format_file_score_calculation_section(
     let coverage_detail = if factors.coverage_percent == 0.0 {
         format!(
             " {}",
-            "⚠️  No coverage data - assuming untested".bright_red()
+            "[WARN] No coverage data - assuming untested".bright_red()
         )
     } else if factors.coverage_factor >= 2.0 {
         format!(
             " {} Low coverage: {:.0}%",
-            "⚠️".bright_yellow(),
+            "[WARN]".bright_yellow(),
             factors.coverage_percent * 100.0
         )
     } else {
@@ -1345,7 +1345,7 @@ fn format_file_score_calculation_section(
     let god_detail = if factors.is_god_object {
         format!(
             " {} Flagged as god object (score: {:.1})",
-            "⚠️".bright_yellow(),
+            "[WARN]".bright_yellow(),
             factors.god_object_score
         )
     } else {
@@ -1390,7 +1390,7 @@ fn format_file_score_calculation_section(
         if diff > 0.5 {
             lines.push(format!(
                 "   {} Calculation mismatch: displayed={:.1}, calculated={:.1}",
-                "⚠️".bright_red(),
+                "[WARN]".bright_red(),
                 actual_score,
                 calculated_score
             ));
