@@ -856,12 +856,7 @@ fn format_coverage_section(
         }
     } else {
         // No coverage data available - show this explicitly
-        writeln!(
-            output,
-            "├─ {}: no coverage data",
-            "COVERAGE".bright_blue()
-        )
-        .unwrap();
+        writeln!(output, "├─ {}: no coverage data", "COVERAGE".bright_blue()).unwrap();
     }
 }
 
