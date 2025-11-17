@@ -539,34 +539,6 @@ fn format_complexity_details_section(
     lines
 }
 
-/// Format coverage details section for verbosity >= 2
-fn format_coverage_details_section(
-    trans_cov: &TransitiveCoverage,
-    _formatter: &ColoredFormatter,
-) -> Vec<String> {
-    let mut lines = Vec::new();
-    let tree_pipe = " ";
-
-    if !trans_cov.uncovered_lines.is_empty() {
-        lines.push(format!("{} {}", "-", "COVERAGE DETAILS:".bright_blue()));
-
-        lines.push(format!(
-            "{}  {} Coverage: {:.1}%",
-            tree_pipe,
-            "-",
-            trans_cov.direct * 100.0
-        ));
-
-        let line_ranges = format_line_ranges(&trans_cov.uncovered_lines);
-        lines.push(format!(
-            "{}  {} Uncovered Lines: {}",
-            tree_pipe, "-", line_ranges
-        ));
-    }
-
-    lines
-}
-
 /// Format call graph section for verbosity >= 2
 fn format_call_graph_section(item: &UnifiedDebtItem, _formatter: &ColoredFormatter) -> Vec<String> {
     let mut lines = Vec::new();
@@ -898,30 +870,32 @@ fn format_coverage_section(
 ) {
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
-        let coverage_status = format_coverage_status(coverage_pct);
-        let uncovered_summary = format_uncovered_lines_summary(&trans_cov.uncovered_lines, 5);
 
-        // Calculate gap percentage and add severity indicator
-        let gap_pct = 100.0 - coverage_pct;
-        let gap_severity = if gap_pct > 0.0 {
-            format!(" {}", get_gap_severity_indicator(gap_pct))
-        } else {
-            String::new()
-        };
-
-        writeln!(
-            output,
-            "- {} {}{}{}",
-            "COVERAGE:".bright_blue(),
-            coverage_status.bright_yellow(),
-            uncovered_summary.bright_red(),
-            gap_severity
-        )
-        .unwrap();
-
-        // Detailed coverage analysis for verbosity >= 2
+        // For verbosity >= 2, show detailed coverage analysis only (no redundant summary line)
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
+        } else if verbosity >= 1 {
+            // For verbosity 1, show concise summary line
+            let coverage_status = format_coverage_status(coverage_pct);
+            let uncovered_summary = format_uncovered_lines_summary(&trans_cov.uncovered_lines, 5);
+
+            // Calculate gap percentage and add severity indicator
+            let gap_pct = 100.0 - coverage_pct;
+            let gap_severity = if gap_pct > 0.0 {
+                format!(" {}", get_gap_severity_indicator(gap_pct))
+            } else {
+                String::new()
+            };
+
+            writeln!(
+                output,
+                "- {} {}{}{}",
+                "COVERAGE:".bright_blue(),
+                coverage_status.bright_yellow(),
+                uncovered_summary.bright_red(),
+                gap_severity
+            )
+            .unwrap();
         }
     }
 }
@@ -1040,13 +1014,8 @@ pub fn format_priority_item_with_config(
             writeln!(output, "{}", line).unwrap();
         }
 
-        // Format coverage details if available
-        if let Some(ref trans_cov) = item.transitive_coverage {
-            let coverage_lines = format_coverage_details_section(trans_cov, &formatter);
-            for line in coverage_lines {
-                writeln!(output, "{}", line).unwrap();
-            }
-        }
+        // Coverage details are shown in the coverage summary section below
+        // (see format_coverage_summary -> format_detailed_coverage_analysis)
 
         // Format call graph section
         let call_graph_lines = format_call_graph_section(item, &formatter);
