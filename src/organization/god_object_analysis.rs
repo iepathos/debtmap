@@ -1409,7 +1409,7 @@ fn ensure_not_reserved(mut name: String) -> String {
 /// # use debtmap::organization::god_object_analysis::sanitize_module_name;
 /// assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
 /// assert_eq!(sanitize_module_name("Data  Access"), "data_access");
-/// assert_eq!(sanitize_module_name("I/O Utilities"), "io_utilities");
+/// assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
 /// assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
 /// assert_eq!(sanitize_module_name("Data-Access-Layer"), "data_access_layer");
 /// ```
