@@ -8,7 +8,7 @@ use std::fmt::Write;
 // Returns (inline_indicator, standalone_indicator) following [SEVERITY STATE] pattern
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
     match coverage_pct {
-        0.0 => (" [ERROR UNTESTED]", "[ERROR UNTESTED]"),
+        0.0 => (" [UNTESTED]", "[UNTESTED]"),
         c if c < 20.0 => (" [WARN LOW]", "[WARN LOW]"),
         c if c < 50.0 => (" [WARN PARTIAL]", "[WARN PARTIAL]"),
         _ => ("", ""),
@@ -25,7 +25,7 @@ fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'
         let coverage_pct = trans_cov.direct * 100.0;
         classify_coverage_percentage(coverage_pct).0
     } else if item.unified_score.coverage_factor >= 10.0 {
-        " [ERROR UNTESTED]"
+        " [UNTESTED]"
     } else {
         ""
     }
@@ -34,7 +34,7 @@ fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'
 // Pure function to format coverage status
 fn format_coverage_status(coverage_pct: f64) -> String {
     match coverage_pct {
-        0.0 => "[ERROR UNTESTED]".to_string(),
+        0.0 => "[UNTESTED]".to_string(),
         c if c < 20.0 => format!("[WARN LOW] ({:.1}%)", c),
         c if c < 50.0 => format!("[WARN PARTIAL] ({:.1}%)", c),
         c if c < 80.0 => format!("[INFO MODERATE] ({:.1}%)", c),
@@ -56,7 +56,7 @@ fn format_coverage_factor_description(
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
         match coverage_pct {
-            0.0 => Some("[ERROR UNTESTED] (0% coverage, weight: 50%)".to_string()),
+            0.0 => Some("[UNTESTED] (0% coverage, weight: 50%)".to_string()),
             c if c < 20.0 => Some(format!("[WARN LOW COVERAGE] ({:.1}%, weight: 50%)", c)),
             c if c < 50.0 => Some(format!("[WARN PARTIAL COVERAGE] ({:.1}%, weight: 50%)", c)),
             c if c >= 95.0 => Some(format!("Excellent coverage {:.1}%", c)),
@@ -67,7 +67,7 @@ fn format_coverage_factor_description(
             _ => None,
         }
     } else if item.unified_score.coverage_factor >= 10.0 {
-        Some("[ERROR UNTESTED] (no coverage data, weight: 50%)".to_string())
+        Some("[UNTESTED] (no coverage data, weight: 50%)".to_string())
     } else if item.unified_score.coverage_factor > 3.0 {
         Some("No coverage data (weight: 50%)".to_string())
     } else {
@@ -1216,7 +1216,7 @@ mod tests {
     fn test_classify_coverage_percentage() {
         assert_eq!(
             classify_coverage_percentage(0.0),
-            (" [ERROR UNTESTED]", "[ERROR UNTESTED]")
+            (" [UNTESTED]", "[UNTESTED]")
         );
         assert_eq!(
             classify_coverage_percentage(10.0),
@@ -1240,7 +1240,7 @@ mod tests {
 
     #[test]
     fn test_format_coverage_status() {
-        assert_eq!(format_coverage_status(0.0), "[ERROR UNTESTED]");
+        assert_eq!(format_coverage_status(0.0), "[UNTESTED]");
         assert_eq!(format_coverage_status(10.0), "[WARN LOW] (10.0%)");
         assert_eq!(format_coverage_status(30.0), "[WARN PARTIAL] (30.0%)");
         assert_eq!(format_coverage_status(60.0), "[INFO MODERATE] (60.0%)");
