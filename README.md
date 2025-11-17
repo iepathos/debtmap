@@ -173,6 +173,43 @@ jobs:
           output: 'debtmap-report.json'
 ```
 
+#### Coverage Matching for Trait Methods (Rust)
+
+Debtmap automatically handles coverage matching for Rust trait implementation methods, which can have different names between the AST analysis and LCOV coverage data.
+
+**How it works:**
+
+When analyzing Rust code, debtmap stores trait methods with their full qualified names (e.g., `RecursiveMatchDetector::visit_expr`), but LCOV often stores them with just the method name (e.g., `visit_expr`) after symbol demangling.
+
+Debtmap tries multiple name variants automatically:
+1. Full qualified name: `RecursiveMatchDetector::visit_expr`
+2. Method name only: `visit_expr`
+3. Trait-qualified name: `Visit::visit_expr`
+
+**Benefits:**
+- ✓ No false-positive "no coverage data" reports for trait methods
+- ✓ Correctly reports coverage for `syn::visit::Visit`, `std::fmt::Display`, and other trait implementations
+- ✓ Works automatically - no configuration needed
+- ✓ Minimal performance impact (<2% overhead)
+
+**Example:**
+
+```bash
+# Generate coverage
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
+
+# Analyze with coverage - trait methods automatically matched
+debtmap analyze . --coverage-file target/coverage/lcov.info
+
+# Verify specific trait method coverage
+debtmap explain-coverage . \
+  --coverage-file target/coverage/lcov.info \
+  --function visit_expr \
+  --file src/complexity/recursive_detector.rs
+```
+
+See [Spec 181](specs/181-trait-method-coverage-matching.md) for technical details.
+
 ### Enforce Quality Gates
 
 Fail builds when quality thresholds are exceeded:

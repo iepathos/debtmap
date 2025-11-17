@@ -296,11 +296,147 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark trait method coverage lookup with name variants (Spec 181)
+///
+/// Tests the performance impact of trying multiple name variants for trait methods:
+/// 1. Full qualified name (e.g., "RecursiveMatchDetector::visit_expr")
+/// 2. Method name only (e.g., "visit_expr")
+/// 3. Trait-qualified name (e.g., "Visit::visit_expr")
+///
+/// Target: <5% performance impact compared to single-name lookup
+fn benchmark_trait_method_variants(c: &mut Criterion) {
+    let mut group = c.benchmark_group("trait_method_coverage_variants");
+
+    // Create LCOV file with trait methods stored by method name only
+    let mut temp_file = NamedTempFile::new().unwrap();
+    writeln!(temp_file, "TN:").unwrap();
+    writeln!(temp_file, "SF:src/complexity/recursive_detector.rs").unwrap();
+
+    // Add trait method with method name only (as LCOV demangles it)
+    writeln!(temp_file, "FN:177,visit_expr").unwrap();
+    writeln!(temp_file, "FNDA:3507,visit_expr").unwrap();
+    for line in 177..200 {
+        writeln!(temp_file, "DA:{},{}", line, if line < 195 { 5 } else { 0 }).unwrap();
+    }
+
+    // Add more trait methods
+    writeln!(temp_file, "FN:250,visit_stmt").unwrap();
+    writeln!(temp_file, "FNDA:2100,visit_stmt").unwrap();
+    writeln!(temp_file, "FN:300,visit_item").unwrap();
+    writeln!(temp_file, "FNDA:1500,visit_item").unwrap();
+
+    writeln!(temp_file, "LF:50").unwrap();
+    writeln!(temp_file, "LH:43").unwrap();
+    writeln!(temp_file, "end_of_record").unwrap();
+
+    let data = parse_lcov_file(temp_file.path()).unwrap();
+    let file = PathBuf::from("src/complexity/recursive_detector.rs");
+
+    // Benchmark 1: Single name lookup (baseline - what regular functions do)
+    group.bench_function("baseline_single_name", |b| {
+        b.iter(|| {
+            // Try exact match with method name
+            let coverage = data.get_function_coverage(black_box(&file), black_box("visit_expr"));
+            black_box(coverage);
+        })
+    });
+
+    // Benchmark 2: Lookup with name variants (Spec 181 implementation)
+    // This simulates trying multiple variants until one matches
+    group.bench_function("with_name_variants", |b| {
+        b.iter(|| {
+            let full_name = "RecursiveMatchDetector::visit_expr";
+            let method_name = "visit_expr";
+            let trait_name = "Visit::visit_expr";
+
+            // Try full name first (won't match in this case)
+            let mut coverage = data.get_function_coverage(black_box(&file), black_box(full_name));
+
+            // Try method name (will match)
+            if coverage.is_none() {
+                coverage = data.get_function_coverage(black_box(&file), black_box(method_name));
+            }
+
+            // Try trait-qualified name (won't be needed)
+            if coverage.is_none() {
+                coverage = data.get_function_coverage(black_box(&file), black_box(trait_name));
+            }
+
+            black_box(coverage);
+        })
+    });
+
+    // Benchmark 3: Batch lookup with variants for multiple trait methods
+    group.bench_function("batch_variant_lookup", |b| {
+        let trait_methods = vec![
+            (
+                "RecursiveMatchDetector::visit_expr",
+                "visit_expr",
+                "Visit::visit_expr",
+            ),
+            (
+                "RecursiveMatchDetector::visit_stmt",
+                "visit_stmt",
+                "Visit::visit_stmt",
+            ),
+            (
+                "RecursiveMatchDetector::visit_item",
+                "visit_item",
+                "Visit::visit_item",
+            ),
+        ];
+
+        b.iter(|| {
+            for (full_name, method_name, trait_name) in &trait_methods {
+                let mut coverage =
+                    data.get_function_coverage(black_box(&file), black_box(full_name));
+                if coverage.is_none() {
+                    coverage = data.get_function_coverage(black_box(&file), black_box(method_name));
+                }
+                if coverage.is_none() {
+                    coverage = data.get_function_coverage(black_box(&file), black_box(trait_name));
+                }
+                black_box(coverage);
+            }
+        })
+    });
+
+    // Benchmark 4: Worst case - all 3 variants miss, fallback to line-based lookup
+    group.bench_function("worst_case_line_fallback", |b| {
+        b.iter(|| {
+            let full_name = "SomeType::unknown_method";
+            let method_name = "unknown_method";
+            let trait_name = "SomeTrait::unknown_method";
+
+            // All variants fail
+            let mut coverage = data.get_function_coverage(black_box(&file), black_box(full_name));
+            if coverage.is_none() {
+                coverage = data.get_function_coverage(black_box(&file), black_box(method_name));
+            }
+            if coverage.is_none() {
+                coverage = data.get_function_coverage(black_box(&file), black_box(trait_name));
+            }
+            // Fallback to line-based lookup
+            if coverage.is_none() {
+                coverage = data.get_function_coverage_with_line(
+                    black_box(&file),
+                    black_box(full_name),
+                    black_box(177),
+                );
+            }
+            black_box(coverage);
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     benchmark_index_build,
     benchmark_lookup_comparison,
     benchmark_flat_vs_nested,
-    benchmark_analysis_overhead
+    benchmark_analysis_overhead,
+    benchmark_trait_method_variants
 );
 criterion_main!(benches);
