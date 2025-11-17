@@ -259,7 +259,7 @@ impl CallGraph {
             .map(|pm| {
                 let pb = pm.create_bar(
                     total_calls as u64,
-                    "🔗 {msg} {pos}/{len} calls ({percent}%) - {eta}",
+                    "[graph] {msg} {pos}/{len} calls ({percent}%) - {eta}",
                 );
                 pb.set_message("Resolving cross-file calls");
                 pb

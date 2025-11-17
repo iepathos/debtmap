@@ -181,7 +181,7 @@ fn warn_deprecated_thresholds(thresholds: &config::ValidationThresholds) {
     }
 
     if !deprecated.is_empty() {
-        eprintln!("\n⚠️  DEPRECATION WARNING:");
+        eprintln!("\n[WARN] DEPRECATION WARNING:");
         eprintln!("   The following validation thresholds are deprecated:");
         for metric in &deprecated {
             eprintln!("   - {}", metric);

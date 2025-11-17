@@ -206,7 +206,7 @@ impl ParallelCallGraphBuilder {
             .map(|pm| {
                 let pb = pm.create_bar(
                     workspace_files.len() as u64,
-                    "🔧 {msg} {pos}/{len} files ({percent}%) - {eta}",
+                    "[graph] {msg} {pos}/{len} files ({percent}%) - {eta}",
                 );
                 pb.set_message("Enhanced call graph analysis");
                 pb
