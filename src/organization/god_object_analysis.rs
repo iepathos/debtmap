@@ -1079,11 +1079,14 @@ pub fn recommend_module_splits_with_evidence(
         if methods.len() > 5 {
             let classification_evidence = evidence_map.get(responsibility).cloned();
 
+            // Sanitize the responsibility name for use in module name
+            let sanitized_responsibility = sanitize_module_name(responsibility);
+
             recommendations.push(ModuleSplit {
                 suggested_name: format!(
                     "{}_{}",
                     type_name.to_lowercase(),
-                    responsibility.to_lowercase().replace(' ', "_")
+                    sanitized_responsibility
                 ),
                 methods_to_move: methods.clone(),
                 structs_to_move: vec![],
@@ -1267,6 +1270,210 @@ pub struct StructWithMethods {
     pub name: String,
     pub methods: Vec<String>,
     pub line_span: (usize, usize),
+}
+
+/// Reserved keywords across Rust, Python, JavaScript, and TypeScript.
+const RESERVED_KEYWORDS: &[&str] = &[
+    // Rust
+    "mod",
+    "pub",
+    "use",
+    "type",
+    "impl",
+    "trait",
+    "fn",
+    "let",
+    "mut",
+    "const",
+    "static",
+    "self",
+    "Self",
+    "super",
+    "crate",
+    "as",
+    "break",
+    "continue",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "for",
+    "if",
+    "in",
+    "loop",
+    "match",
+    "move",
+    "ref",
+    "return",
+    "struct",
+    "true",
+    "unsafe",
+    "while",
+    "where",
+    "async",
+    "await",
+    "dyn",
+    // Python
+    "import",
+    "from",
+    "def",
+    "class",
+    "if",
+    "elif",
+    "else",
+    "for",
+    "while",
+    "try",
+    "except",
+    "finally",
+    "with",
+    "lambda",
+    "yield",
+    "return",
+    "pass",
+    "break",
+    "continue",
+    "raise",
+    "assert",
+    "global",
+    "nonlocal",
+    "del",
+    "and",
+    "or",
+    "not",
+    "is",
+    "in",
+    "None",
+    "True",
+    "False",
+    // JavaScript/TypeScript
+    "export",
+    "default",
+    "function",
+    "var",
+    "case",
+    "catch",
+    "debugger",
+    "delete",
+    "do",
+    "new",
+    "switch",
+    "this",
+    "throw",
+    "typeof",
+    "void",
+    "with",
+    "arguments",
+    "interface",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "implements",
+    "extends",
+];
+
+/// Check if a name is a reserved keyword in any supported language.
+fn is_reserved_keyword(name: &str) -> bool {
+    RESERVED_KEYWORDS.contains(&name)
+}
+
+/// Ensure the name is not a reserved keyword by appending "_module" if needed.
+fn ensure_not_reserved(mut name: String) -> String {
+    if is_reserved_keyword(&name) {
+        name.push_str("_module");
+    }
+    name
+}
+
+/// Sanitize module name to be valid across all languages.
+///
+/// Transforms human-readable responsibility names into valid module identifiers
+/// by replacing invalid characters and normalizing whitespace.
+///
+/// # Character Transformations
+///
+/// - `&` → `and`
+/// - `'` → removed
+/// - `-` → `_`
+/// - `/` → `_` (except when part of directory path)
+/// - Multiple spaces → single `_`
+/// - Multiple underscores → single `_`
+/// - Leading/trailing underscores removed
+/// - Convert to lowercase
+/// - Preserve only alphanumeric characters and underscores
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::sanitize_module_name;
+/// assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
+/// assert_eq!(sanitize_module_name("Data  Access"), "data_access");
+/// assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
+/// assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
+/// assert_eq!(sanitize_module_name("Data-Access-Layer"), "data_access_layer");
+/// ```
+pub fn sanitize_module_name(name: &str) -> String {
+    let sanitized = name
+        .to_lowercase()
+        .replace('&', "and")
+        .replace(['/', '-'], "_")
+        .replace('\'', "")
+        .replace(' ', "_")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .collect::<String>()
+        .split('_')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+
+    ensure_not_reserved(sanitized)
+}
+
+/// Ensure uniqueness by appending numeric suffix if needed.
+///
+/// If the name already exists in the set of existing names, appends a numeric
+/// suffix starting from 1 until a unique name is found.
+///
+/// # Arguments
+///
+/// * `name` - The proposed module name
+/// * `existing_names` - Set of already-used names
+///
+/// # Returns
+///
+/// A unique name, either the original or with a numeric suffix
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::HashSet;
+/// # use debtmap::organization::god_object_analysis::ensure_unique_name;
+/// let mut existing = HashSet::new();
+/// existing.insert("utilities".to_string());
+///
+/// assert_eq!(ensure_unique_name("utilities".to_string(), &existing), "utilities_1");
+///
+/// existing.insert("utilities_1".to_string());
+/// assert_eq!(ensure_unique_name("utilities".to_string(), &existing), "utilities_2");
+/// ```
+pub fn ensure_unique_name(
+    name: String,
+    existing_names: &std::collections::HashSet<String>,
+) -> String {
+    if !existing_names.contains(&name) {
+        return name;
+    }
+
+    let mut counter = 1;
+    loop {
+        let candidate = format!("{}_{}", name, counter);
+        if !existing_names.contains(&candidate) {
+            return candidate;
+        }
+        counter += 1;
+    }
 }
 
 /// Suggest module splits using enhanced struct ownership analysis.
@@ -2283,5 +2490,301 @@ mod tests {
     #[should_panic(expected = "should not include file extension")]
     fn test_split_name_validation_catches_ts_extension() {
         ModuleSplit::validate_name("component.ts");
+    }
+
+    // Tests for module name sanitization (Spec 172)
+    #[test]
+    fn test_sanitize_ampersand_replacement() {
+        assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
+        assert_eq!(sanitize_module_name("Read & Write"), "read_and_write");
+        assert_eq!(
+            sanitize_module_name("Data Access & Validation"),
+            "data_access_and_validation"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_multiple_spaces() {
+        assert_eq!(sanitize_module_name("Data  Access"), "data_access");
+        // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
+        assert_eq!(sanitize_module_name("I/O   Utilities"), "i_o_utilities");
+        assert_eq!(
+            sanitize_module_name("Formatting    &    Output"),
+            "formatting_and_output"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_special_characters() {
+        assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
+        assert_eq!(
+            sanitize_module_name("Data-Access-Layer"),
+            "data_access_layer"
+        );
+        assert_eq!(sanitize_module_name("Config/Settings"), "config_settings");
+        // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
+        assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
+    }
+
+    #[test]
+    fn test_sanitize_leading_trailing_underscores() {
+        assert_eq!(sanitize_module_name("_utilities_"), "utilities");
+        assert_eq!(sanitize_module_name("__internal__"), "internal");
+        assert_eq!(sanitize_module_name("_data_access_"), "data_access");
+    }
+
+    #[test]
+    fn test_sanitize_empty_and_whitespace() {
+        assert_eq!(sanitize_module_name(""), "");
+        assert_eq!(sanitize_module_name("   "), "");
+        assert_eq!(sanitize_module_name("___"), "");
+    }
+
+    #[test]
+    fn test_sanitize_consecutive_underscores() {
+        assert_eq!(sanitize_module_name("data__access"), "data_access");
+        assert_eq!(
+            sanitize_module_name("multiple___underscores"),
+            "multiple_underscores"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_mixed_case() {
+        assert_eq!(sanitize_module_name("MixedCase"), "mixedcase");
+        assert_eq!(sanitize_module_name("CamelCase"), "camelcase");
+        assert_eq!(sanitize_module_name("UPPERCASE"), "uppercase");
+    }
+
+    #[test]
+    fn test_sanitize_numbers() {
+        assert_eq!(sanitize_module_name("version2"), "version2");
+        assert_eq!(sanitize_module_name("data_v2"), "data_v2");
+        assert_eq!(sanitize_module_name("test123"), "test123");
+    }
+
+    #[test]
+    fn test_sanitize_all_special_chars() {
+        assert_eq!(
+            sanitize_module_name("@#$%^*()!~`"),
+            "" // All special chars removed
+        );
+        assert_eq!(sanitize_module_name("data@access"), "dataaccess");
+    }
+
+    #[test]
+    fn test_sanitize_real_world_examples() {
+        // From spec - real-world example
+        assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
+        assert_eq!(sanitize_module_name("Data Access"), "data_access");
+        assert_eq!(sanitize_module_name("Utilities"), "utilities");
+        assert_eq!(
+            sanitize_module_name("Formatting & Output"),
+            "formatting_and_output"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_already_valid_names() {
+        // Names that are already valid should remain unchanged (except lowercase)
+        assert_eq!(sanitize_module_name("utilities"), "utilities");
+        assert_eq!(sanitize_module_name("data_access"), "data_access");
+        assert_eq!(sanitize_module_name("io_handler"), "io_handler");
+    }
+
+    #[test]
+    fn test_sanitize_complex_combinations() {
+        assert_eq!(
+            sanitize_module_name("User's Data & Config Settings"),
+            "users_data_and_config_settings"
+        );
+        // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
+        assert_eq!(
+            sanitize_module_name("I/O - Read & Write"),
+            "i_o_read_and_write"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_deterministic() {
+        // Same input should always produce same output
+        let input = "Parsing & Input";
+        let result1 = sanitize_module_name(input);
+        let result2 = sanitize_module_name(input);
+        assert_eq!(result1, result2);
+    }
+
+    #[test]
+    fn test_reserved_keyword_rust() {
+        assert_eq!(ensure_not_reserved("mod".to_string()), "mod_module");
+        assert_eq!(ensure_not_reserved("type".to_string()), "type_module");
+        assert_eq!(ensure_not_reserved("impl".to_string()), "impl_module");
+        assert_eq!(ensure_not_reserved("trait".to_string()), "trait_module");
+    }
+
+    #[test]
+    fn test_reserved_keyword_python() {
+        assert_eq!(ensure_not_reserved("import".to_string()), "import_module");
+        assert_eq!(ensure_not_reserved("class".to_string()), "class_module");
+        assert_eq!(ensure_not_reserved("def".to_string()), "def_module");
+    }
+
+    #[test]
+    fn test_reserved_keyword_javascript() {
+        assert_eq!(
+            ensure_not_reserved("function".to_string()),
+            "function_module"
+        );
+        assert_eq!(ensure_not_reserved("export".to_string()), "export_module");
+        assert_eq!(ensure_not_reserved("const".to_string()), "const_module");
+    }
+
+    #[test]
+    fn test_reserved_keyword_not_reserved() {
+        assert_eq!(ensure_not_reserved("utilities".to_string()), "utilities");
+        assert_eq!(ensure_not_reserved("data".to_string()), "data");
+        assert_eq!(
+            ensure_not_reserved("my_function".to_string()),
+            "my_function"
+        );
+    }
+
+    #[test]
+    fn test_is_reserved_keyword() {
+        assert!(is_reserved_keyword("mod"));
+        assert!(is_reserved_keyword("import"));
+        assert!(is_reserved_keyword("function"));
+        assert!(!is_reserved_keyword("utilities"));
+        assert!(!is_reserved_keyword("data_access"));
+    }
+
+    #[test]
+    fn test_ensure_unique_name_no_collision() {
+        use std::collections::HashSet;
+        let existing = HashSet::new();
+        assert_eq!(
+            ensure_unique_name("utilities".to_string(), &existing),
+            "utilities"
+        );
+    }
+
+    #[test]
+    fn test_ensure_unique_name_single_collision() {
+        use std::collections::HashSet;
+        let mut existing = HashSet::new();
+        existing.insert("utilities".to_string());
+
+        assert_eq!(
+            ensure_unique_name("utilities".to_string(), &existing),
+            "utilities_1"
+        );
+    }
+
+    #[test]
+    fn test_ensure_unique_name_multiple_collisions() {
+        use std::collections::HashSet;
+        let mut existing = HashSet::new();
+        existing.insert("utilities".to_string());
+        existing.insert("utilities_1".to_string());
+        existing.insert("utilities_2".to_string());
+
+        assert_eq!(
+            ensure_unique_name("utilities".to_string(), &existing),
+            "utilities_3"
+        );
+    }
+
+    #[test]
+    fn test_ensure_unique_name_deterministic() {
+        use std::collections::HashSet;
+        let mut existing = HashSet::new();
+        existing.insert("data".to_string());
+
+        let result1 = ensure_unique_name("data".to_string(), &existing);
+        let result2 = ensure_unique_name("data".to_string(), &existing);
+        assert_eq!(result1, result2);
+    }
+
+    #[test]
+    fn test_sanitize_no_valid_characters() {
+        // When all characters are removed, should result in empty string
+        assert_eq!(sanitize_module_name("@#$%"), "");
+        assert_eq!(sanitize_module_name("!!!"), "");
+    }
+
+    #[test]
+    fn test_sanitize_unicode_characters() {
+        // Unicode emojis should be filtered out
+        assert_eq!(sanitize_module_name("data_🔥_access"), "data_access");
+        // Unicode letters (like é) are preserved by is_alphanumeric()
+        assert_eq!(sanitize_module_name("café"), "café");
+    }
+
+    #[test]
+    fn test_sanitize_single_character() {
+        assert_eq!(sanitize_module_name("a"), "a");
+        // & → and → and_module (since "and" is a Python reserved keyword)
+        assert_eq!(sanitize_module_name("&"), "and_module");
+        assert_eq!(sanitize_module_name("1"), "1");
+    }
+
+    #[test]
+    fn test_sanitize_very_long_name() {
+        let long_name =
+            "This Is A Very Long Module Name With Many Words And Special Characters & Symbols";
+        let result = sanitize_module_name(long_name);
+        assert!(!result.contains("  "));
+        assert!(!result.contains("&"));
+        assert!(!result.starts_with('_'));
+        assert!(!result.ends_with('_'));
+    }
+
+    #[test]
+    fn test_sanitize_preserves_alphanumeric() {
+        assert_eq!(sanitize_module_name("abc123xyz"), "abc123xyz");
+        assert_eq!(sanitize_module_name("test_123_data"), "test_123_data");
+    }
+
+    #[test]
+    fn test_sanitize_no_consecutive_underscores_in_output() {
+        let result = sanitize_module_name("data___access");
+        assert!(!result.contains("__"));
+
+        let result = sanitize_module_name("multiple   spaces");
+        assert!(!result.contains("__"));
+    }
+
+    #[test]
+    fn test_sanitize_integration_with_module_split() {
+        // Test that sanitized names work in real module split creation
+        let responsibility = "Parsing & Input";
+        let sanitized = sanitize_module_name(responsibility);
+        let module_name = format!("mytype_{}", sanitized);
+
+        assert_eq!(module_name, "mytype_parsing_and_input");
+        assert!(!module_name.contains('&'));
+        assert!(!module_name.contains("  "));
+    }
+
+    #[test]
+    fn test_recommend_module_splits_uses_sanitization() {
+        let mut responsibility_groups = HashMap::new();
+        responsibility_groups.insert(
+            "Parsing & Input".to_string(),
+            vec![
+                "parse_a".to_string(),
+                "parse_b".to_string(),
+                "parse_c".to_string(),
+                "parse_d".to_string(),
+                "parse_e".to_string(),
+                "parse_f".to_string(),
+            ],
+        );
+
+        let splits = recommend_module_splits("MyType", &[], &responsibility_groups);
+
+        assert_eq!(splits.len(), 1);
+        assert_eq!(splits[0].suggested_name, "mytype_parsing_and_input");
+        assert!(!splits[0].suggested_name.contains('&'));
     }
 }
