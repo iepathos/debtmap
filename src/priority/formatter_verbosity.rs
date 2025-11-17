@@ -868,6 +868,20 @@ fn format_coverage_section(
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
         }
+    } else if has_coverage_data {
+        // Coverage data was provided but this function has no coverage
+        // Check if this function is untested based on coverage_factor
+        if item.unified_score.coverage_factor >= 10.0 {
+            writeln!(
+                output,
+                "├─ {}: {} (0% coverage)",
+                "COVERAGE".bright_blue(),
+                "[UNTESTED]".bright_red().bold()
+            )
+            .unwrap();
+        } else {
+            writeln!(output, "├─ {}: no coverage data", "COVERAGE".bright_blue()).unwrap();
+        }
     } else {
         // No coverage data available - show this explicitly
         writeln!(output, "├─ {}: no coverage data", "COVERAGE".bright_blue()).unwrap();

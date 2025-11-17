@@ -97,6 +97,56 @@ fn demangle_function_name(name: &str) -> String {
     }
 }
 
+/// Strip trailing generic parameters from function names.
+///
+/// Handles nested generics like `method::<Vec<HashMap<K, V>>>`.
+/// Returns `Cow` to avoid allocation when no stripping is needed.
+///
+/// This is a pure function with no side effects - it transforms strings deterministically.
+///
+/// # Examples
+///
+/// ```ignore
+/// use std::borrow::Cow;
+/// use debtmap::risk::lcov::strip_trailing_generics;
+///
+/// assert_eq!(strip_trailing_generics("Type::method::<T>"), Cow::Borrowed("Type::method"));
+/// assert_eq!(strip_trailing_generics("method::<Vec<T>>"), Cow::Borrowed("method"));
+/// assert_eq!(strip_trailing_generics("method"), Cow::Borrowed("method"));
+/// ```
+pub(crate) fn strip_trailing_generics(s: &str) -> std::borrow::Cow<'_, str> {
+    use std::borrow::Cow;
+
+    if let Some(pos) = s.rfind("::<") {
+        // Count angle brackets to find matching close (handles nested generics)
+        let mut depth = 0;
+        let mut end_pos = None;
+
+        for (i, ch) in s[pos + 3..].char_indices() {
+            match ch {
+                '<' => depth += 1,
+                '>' => {
+                    if depth == 0 {
+                        end_pos = Some(pos + 3 + i);
+                        break;
+                    }
+                    depth -= 1;
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(end) = end_pos {
+            let after = &s[end + 1..];
+            // If nothing after the >, this is a trailing generic
+            if after.is_empty() {
+                return Cow::Owned(s[..pos].to_string());
+            }
+        }
+    }
+    Cow::Borrowed(s)
+}
+
 /// Normalize a demangled function name for consolidation
 ///
 /// Removes generic type parameters and crate hash IDs to
@@ -107,6 +157,7 @@ fn demangle_function_name(name: &str) -> String {
 /// - `<debtmap[71f4b4990cdcf1ab]::Foo>::bar` -> full_path: `debtmap::Foo::bar`, method_name: `bar`
 /// - `std::collections::HashMap<K,V>::insert` -> full_path: `std::collections::HashMap::insert`, method_name: `insert`
 /// - `<Struct as Trait>::method` -> full_path: `Struct as Trait::method`, method_name: `method`
+/// - `Type::method::<T>` -> full_path: `Type::method`, method_name: `method`
 pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionName {
     // Handle impl method patterns: <module::path::Type>::method -> module::path::Type::method
     // Remove angle brackets and crate hash: <crate[hash]::rest>::method -> crate::rest::method
@@ -139,9 +190,12 @@ pub(crate) fn normalize_demangled_name(demangled: &str) -> NormalizedFunctionNam
         demangled.to_string()
     };
 
+    // Strip trailing generic parameters from functions (e.g., "method::<T>" -> "method")
+    let without_function_generics = strip_trailing_generics(&without_impl_brackets);
+
     // Now remove generic type parameters: "HashMap<K,V>::insert" -> "HashMap::insert"
     // Use fold to track depth and only keep characters outside angle brackets
-    let result = without_impl_brackets
+    let result = without_function_generics
         .chars()
         .fold((String::new(), 0usize), |(mut acc, depth), ch| match ch {
             '<' => (acc, depth + 1),
@@ -896,6 +950,57 @@ mod tests {
 
             let result = normalize_demangled_name("<Foo as Bar>::method");
             assert_eq!(result.method_name, "method");
+        }
+
+        #[test]
+        fn test_strip_trailing_generics_simple() {
+            use std::borrow::Cow;
+
+            assert_eq!(
+                strip_trailing_generics("Type::method::<WorkflowExecutor>"),
+                Cow::Borrowed("Type::method")
+            );
+            assert_eq!(
+                strip_trailing_generics("crate::Type::method::<T>"),
+                Cow::Borrowed("crate::Type::method")
+            );
+            assert_eq!(
+                strip_trailing_generics("Type::method"), // No generics
+                Cow::Borrowed("Type::method")
+            );
+        }
+
+        #[test]
+        fn test_strip_trailing_generics_nested() {
+            use std::borrow::Cow;
+
+            // Nested generics
+            assert_eq!(
+                strip_trailing_generics("method::<Vec<HashMap<K, V>>>"),
+                Cow::Borrowed("method")
+            );
+            // Multiple type parameters
+            assert_eq!(
+                strip_trailing_generics("method::<T, U, V>"),
+                Cow::Borrowed("method")
+            );
+            // Complex nested case
+            assert_eq!(
+                strip_trailing_generics("Type::method::<Result<Vec<T>, Error>>"),
+                Cow::Borrowed("Type::method")
+            );
+        }
+
+        #[test]
+        fn test_normalize_strips_trailing_generics() {
+            // Test that normalize_demangled_name now strips trailing generics
+            let result = normalize_demangled_name("Type::method::<WorkflowExecutor>");
+            assert_eq!(result.full_path, "Type::method");
+            assert_eq!(result.method_name, "method");
+
+            let result = normalize_demangled_name("SetupPhaseExecutor::execute::<T>");
+            assert_eq!(result.full_path, "SetupPhaseExecutor::execute");
+            assert_eq!(result.method_name, "execute");
         }
     }
 

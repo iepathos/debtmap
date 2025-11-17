@@ -1,5 +1,5 @@
-use super::lcov::{normalize_demangled_name, FunctionCoverage, LcovData};
-use std::collections::{BTreeMap, HashMap};
+use super::lcov::{normalize_demangled_name, strip_trailing_generics, FunctionCoverage, LcovData};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -8,6 +8,97 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
     let cleaned = path_str.strip_prefix("./").unwrap_or(&path_str);
     PathBuf::from(cleaned)
+}
+
+/// Aggregated coverage from multiple monomorphized versions of a generic function
+///
+/// Uses intersection strategy: a line is covered if ANY monomorphization covers it
+/// (i.e., uncovered only if ALL versions leave it uncovered).
+#[derive(Debug, Clone)]
+pub struct AggregateCoverage {
+    /// Aggregate coverage percentage (averaged across all versions)
+    pub coverage_pct: f64,
+    /// Intersection of uncovered lines across all versions
+    pub uncovered_lines: Vec<usize>,
+    /// Number of monomorphized versions found
+    pub version_count: usize,
+}
+
+impl AggregateCoverage {
+    /// Create an aggregate from a single function (no monomorphization)
+    fn single(func: &FunctionCoverage) -> Self {
+        Self {
+            coverage_pct: func.coverage_percentage,
+            uncovered_lines: func.uncovered_lines.clone(),
+            version_count: 1,
+        }
+    }
+}
+
+/// Pure function: Merge coverage data from multiple monomorphizations.
+///
+/// Uses intersection strategy: a line is uncovered only if ALL versions leave it uncovered.
+/// This conservative approach ensures we don't claim coverage that doesn't exist in all paths.
+///
+/// # Strategy
+///
+/// - A line is **covered** if ANY monomorphization covers it
+/// - A line is **uncovered** only if ALL monomorphizations leave it uncovered
+/// - Coverage percentage is averaged across all versions
+///
+/// # Examples
+///
+/// For a generic function with two monomorphizations:
+/// - `execute::<WorkflowExecutor>` - 70% coverage, uncovered: [10, 20, 30]
+/// - `execute::<MockExecutor>` - 80% coverage, uncovered: [20, 40]
+///
+/// Result: 75% coverage (average), uncovered: [20] (intersection - only line uncovered in BOTH)
+///
+/// # Performance
+///
+/// O(m*n) time complexity where m is number of monomorphizations
+/// and n is average number of uncovered lines.
+fn merge_coverage(coverages: Vec<&FunctionCoverage>) -> AggregateCoverage {
+    if coverages.is_empty() {
+        return AggregateCoverage {
+            coverage_pct: 0.0,
+            uncovered_lines: vec![],
+            version_count: 0,
+        };
+    }
+
+    if coverages.len() == 1 {
+        return AggregateCoverage {
+            coverage_pct: coverages[0].coverage_percentage,
+            uncovered_lines: coverages[0].uncovered_lines.clone(),
+            version_count: 1,
+        };
+    }
+
+    // Intersection strategy: line is uncovered only if ALL versions leave it uncovered
+    let mut uncovered_in_all: HashSet<usize> =
+        coverages[0].uncovered_lines.iter().copied().collect();
+
+    for coverage in &coverages[1..] {
+        let uncovered_set: HashSet<usize> = coverage.uncovered_lines.iter().copied().collect();
+        uncovered_in_all = uncovered_in_all
+            .intersection(&uncovered_set)
+            .copied()
+            .collect();
+    }
+
+    // Average coverage percentage across all versions
+    let avg_coverage: f64 =
+        coverages.iter().map(|c| c.coverage_percentage).sum::<f64>() / coverages.len() as f64;
+
+    let mut uncovered_lines: Vec<usize> = uncovered_in_all.into_iter().collect();
+    uncovered_lines.sort_unstable();
+
+    AggregateCoverage {
+        coverage_pct: avg_coverage,
+        uncovered_lines,
+        version_count: coverages.len(),
+    }
 }
 
 /// Pre-indexed coverage data for O(1) function lookups
@@ -53,6 +144,10 @@ pub struct CoverageIndex {
     /// Pre-computed set of all file paths for faster iteration in fallback strategies
     file_paths: Vec<PathBuf>,
 
+    /// Index from base function name to all monomorphized versions
+    /// Maps (file, base_name) -> [monomorphized_names] for O(1) generic function lookup
+    base_function_index: HashMap<(PathBuf, String), Vec<String>>,
+
     /// Statistics for debugging and monitoring
     stats: CoverageIndexStats,
 }
@@ -73,6 +168,7 @@ impl CoverageIndex {
             by_file: HashMap::new(),
             by_line: HashMap::new(),
             file_paths: Vec::new(),
+            base_function_index: HashMap::new(),
             stats: CoverageIndexStats {
                 total_files: 0,
                 total_records: 0,
@@ -84,14 +180,16 @@ impl CoverageIndex {
 
     /// Build coverage index from LCOV data (O(n) operation)
     ///
-    /// This creates two indexes:
+    /// This creates three indexes:
     /// 1. Nested HashMap for O(1) file + function lookups
     /// 2. BTreeMap for line-based range queries
+    /// 3. Base function index for generic/monomorphized function aggregation
     pub fn from_coverage(coverage: &LcovData) -> Self {
         let start = Instant::now();
 
         let mut by_file: HashMap<PathBuf, HashMap<String, FunctionCoverage>> = HashMap::new();
         let mut by_line: HashMap<PathBuf, BTreeMap<usize, FunctionCoverage>> = HashMap::new();
+        let mut base_function_index: HashMap<(PathBuf, String), Vec<String>> = HashMap::new();
         let mut total_records = 0;
 
         for (file_path, functions) in &coverage.functions {
@@ -107,6 +205,17 @@ impl CoverageIndex {
 
                 // Index by start_line for range queries
                 line_map.insert(func.start_line, func.clone());
+
+                // Extract base name and update generic function index
+                let base_name_cow = strip_trailing_generics(&func.name);
+                let base_name = base_name_cow.as_ref();
+                if base_name != func.name {
+                    // This is a monomorphized function - add to index
+                    base_function_index
+                        .entry((file_path.clone(), base_name.to_string()))
+                        .or_default()
+                        .push(func.name.clone());
+                }
             }
 
             if !file_functions.is_empty() {
@@ -131,6 +240,7 @@ impl CoverageIndex {
             by_file,
             by_line,
             file_paths,
+            base_function_index,
             stats: CoverageIndexStats {
                 total_files,
                 total_records,
@@ -351,17 +461,16 @@ impl CoverageIndex {
     ///
     /// Falls back to line-based lookup when exact name match fails.
     /// Uses BTreeMap range query for efficient lookups.
+    /// Also tries aggregated coverage for generic/monomorphized functions.
     pub fn get_function_coverage_with_line(
         &self,
         file: &Path,
         function_name: &str,
         line: usize,
     ) -> Option<f64> {
-        // Try exact name match with O(1) nested lookup first
-        if let Some(file_functions) = self.by_file.get(file) {
-            if let Some(f) = file_functions.get(function_name) {
-                return Some(f.coverage_percentage / 100.0);
-            }
+        // Try aggregated coverage first (handles generics)
+        if let Some(agg) = self.get_aggregated_coverage(file, function_name) {
+            return Some(agg.coverage_pct / 100.0);
         }
 
         // Try line-based lookup (O(log n)) - faster than path matching strategies
@@ -427,6 +536,48 @@ impl CoverageIndex {
     /// Get index statistics
     pub fn stats(&self) -> &CoverageIndexStats {
         &self.stats
+    }
+
+    /// Find all monomorphizations of a function and aggregate coverage.
+    ///
+    /// Uses pre-built index for O(1) lookup of monomorphized versions.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file path containing the function
+    /// * `function_name` - The base function name (without generic parameters)
+    ///
+    /// # Returns
+    ///
+    /// `Some(AggregateCoverage)` if any monomorphizations are found, `None` otherwise
+    fn get_aggregated_coverage(
+        &self,
+        file: &Path,
+        function_name: &str,
+    ) -> Option<AggregateCoverage> {
+        // Try exact match first (O(1))
+        if let Some(file_functions) = self.by_file.get(file) {
+            if let Some(exact) = file_functions.get(function_name) {
+                return Some(AggregateCoverage::single(exact));
+            }
+        }
+
+        // Try monomorphized versions using index (O(1))
+        if let Some(versions) = self
+            .base_function_index
+            .get(&(file.to_path_buf(), function_name.to_string()))
+        {
+            let coverages: Vec<&FunctionCoverage> = versions
+                .iter()
+                .filter_map(|name| self.by_file.get(file).and_then(|funcs| funcs.get(name)))
+                .collect();
+
+            if !coverages.is_empty() {
+                return Some(merge_coverage(coverages));
+            }
+        }
+
+        None
     }
 }
 
@@ -605,5 +756,99 @@ mod tests {
             index.get_function_coverage(Path::new("file2.rs"), "func2"),
             Some(0.0)
         );
+    }
+
+    #[test]
+    fn test_merge_coverage_intersection() {
+        let cov1 = create_test_function_coverage("func", 10, 5, 70.0, vec![10, 20, 30]);
+        let cov2 = create_test_function_coverage("func", 10, 3, 80.0, vec![20, 40]);
+
+        let agg = merge_coverage(vec![&cov1, &cov2]);
+        assert_eq!(agg.version_count, 2);
+        assert_eq!(agg.coverage_pct, 75.0); // Average: (70 + 80) / 2
+                                            // Intersection: only line 20 is uncovered in BOTH versions
+        assert_eq!(agg.uncovered_lines.len(), 1);
+        assert!(agg.uncovered_lines.contains(&20));
+        assert!(!agg.uncovered_lines.contains(&10)); // Covered in cov2
+        assert!(!agg.uncovered_lines.contains(&40)); // Covered in cov1
+    }
+
+    #[test]
+    fn test_merge_coverage_all_covered_in_some() {
+        // If ANY version covers a line, it's considered covered (intersection)
+        let cov1 = create_test_function_coverage("func", 10, 5, 50.0, vec![10, 20]);
+        let cov2 = create_test_function_coverage("func", 10, 3, 50.0, vec![30, 40]);
+
+        let agg = merge_coverage(vec![&cov1, &cov2]);
+        // No lines uncovered in BOTH versions
+        assert_eq!(agg.uncovered_lines.len(), 0);
+    }
+
+    #[test]
+    fn test_merge_coverage_single() {
+        let cov = create_test_function_coverage("func", 10, 5, 75.0, vec![10, 20]);
+
+        let agg = merge_coverage(vec![&cov]);
+        assert_eq!(agg.version_count, 1);
+        assert_eq!(agg.coverage_pct, 75.0);
+        assert_eq!(agg.uncovered_lines, vec![10, 20]);
+    }
+
+    #[test]
+    fn test_merge_coverage_empty() {
+        let agg = merge_coverage(vec![]);
+        assert_eq!(agg.version_count, 0);
+        assert_eq!(agg.coverage_pct, 0.0);
+        assert_eq!(agg.uncovered_lines.len(), 0);
+    }
+
+    #[test]
+    fn test_monomorphized_function_indexing() {
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        let mut coverage = LcovData::default();
+
+        // Create monomorphized versions of the same function
+        coverage.functions.insert(
+            PathBuf::from("test.rs"),
+            vec![
+                FunctionCoverage {
+                    name: "Type::method::<WorkflowExecutor>".to_string(),
+                    start_line: 10,
+                    execution_count: 5,
+                    coverage_percentage: 70.0,
+                    uncovered_lines: vec![10, 20, 30],
+                    normalized: NormalizedFunctionName {
+                        full_path: "Type::method".to_string(),
+                        method_name: "method".to_string(),
+                        original: "Type::method::<WorkflowExecutor>".to_string(),
+                    },
+                },
+                FunctionCoverage {
+                    name: "Type::method::<MockExecutor>".to_string(),
+                    start_line: 10,
+                    execution_count: 3,
+                    coverage_percentage: 80.0,
+                    uncovered_lines: vec![20, 40],
+                    normalized: NormalizedFunctionName {
+                        full_path: "Type::method".to_string(),
+                        method_name: "method".to_string(),
+                        original: "Type::method::<MockExecutor>".to_string(),
+                    },
+                },
+            ],
+        );
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query for the base function name (without generics)
+        let agg = index.get_aggregated_coverage(Path::new("test.rs"), "Type::method");
+        assert!(agg.is_some());
+
+        let agg = agg.unwrap();
+        assert_eq!(agg.version_count, 2);
+        assert_eq!(agg.coverage_pct, 75.0); // (70 + 80) / 2
+                                            // Only line 20 is uncovered in both versions
+        assert_eq!(agg.uncovered_lines, vec![20]);
     }
 }
