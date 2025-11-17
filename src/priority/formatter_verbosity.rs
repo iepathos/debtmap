@@ -854,6 +854,14 @@ fn format_coverage_section(
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
         }
+    } else {
+        // No coverage data available - show this explicitly
+        writeln!(
+            output,
+            "├─ {}: no coverage data",
+            "COVERAGE".bright_blue()
+        )
+        .unwrap();
     }
 }
 
