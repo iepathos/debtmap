@@ -6,6 +6,7 @@ use std::fmt::Write;
 
 // Pure function to classify coverage percentage
 // Returns (inline_indicator, standalone_indicator) following [SEVERITY STATE] pattern
+#[allow(dead_code)]
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
     match coverage_pct {
         0.0 => (" [UNTESTED]", "[UNTESTED]"),
@@ -16,22 +17,13 @@ fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static st
 }
 
 // Pure function to get coverage indicator
-fn get_coverage_indicator(item: &UnifiedDebtItem, has_coverage_data: bool) -> &'static str {
-    if !has_coverage_data {
-        return ""; // No coverage data, no indicator
-    }
-
-    if let Some(ref trans_cov) = item.transitive_coverage {
-        let coverage_pct = trans_cov.direct * 100.0;
-        classify_coverage_percentage(coverage_pct).0
-    } else if item.unified_score.coverage_factor >= 10.0 {
-        " [UNTESTED]"
-    } else {
-        ""
-    }
+// Note: Coverage is now shown in dedicated COVERAGE line, not in header
+fn get_coverage_indicator(_item: &UnifiedDebtItem, _has_coverage_data: bool) -> &'static str {
+    "" // Coverage shown in dedicated line below, not in header
 }
 
 // Pure function to format coverage status
+#[allow(dead_code)]
 fn format_coverage_status(coverage_pct: f64) -> String {
     match coverage_pct {
         0.0 => "[UNTESTED]".to_string(),
@@ -77,6 +69,7 @@ fn format_coverage_factor_description(
 
 // Pure function to get gap severity indicator based on gap percentage
 // Follows [SEVERITY STATE] pattern, except [CRITICAL] which stands alone
+#[allow(dead_code)]
 fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
     match gap_percentage {
         p if p <= 25.0 => "[WARN LOW]",
@@ -160,30 +153,6 @@ fn format_ranges(ranges: &[(usize, usize)]) -> Vec<String> {
             }
         })
         .collect()
-}
-
-// Pure function to format uncovered lines summary
-fn format_uncovered_lines_summary(uncovered_lines: &[usize], max_ranges: usize) -> String {
-    if uncovered_lines.is_empty() {
-        return String::new();
-    }
-
-    let ranges = group_lines_into_ranges(uncovered_lines);
-    let formatted_ranges = format_ranges(&ranges);
-
-    let display_ranges: Vec<String> = formatted_ranges.iter().take(max_ranges).cloned().collect();
-
-    let more_indicator = if ranges.len() > max_ranges {
-        format!(", ... ({} total gaps)", uncovered_lines.len())
-    } else {
-        String::new()
-    };
-
-    format!(
-        " - Missing lines: {}{}",
-        display_ranges.join(", "),
-        more_indicator
-    )
 }
 
 // Pure function to collect main scoring factors
@@ -302,6 +271,7 @@ fn format_callees_display(callees: &[String], max_display: usize) -> String {
 }
 
 /// Format a list of line numbers into readable ranges (e.g., "10-15, 22, 30-35")
+#[allow(dead_code)]
 fn format_line_ranges(lines: &[usize]) -> String {
     if lines.is_empty() {
         return String::new();
@@ -871,31 +841,18 @@ fn format_coverage_section(
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
 
-        // For verbosity >= 2, show detailed coverage analysis only (no redundant summary line)
+        // Always show simple coverage percentage line
+        writeln!(
+            output,
+            "├─ {}: {:.1}% coverage",
+            "COVERAGE".bright_blue(),
+            coverage_pct
+        )
+        .unwrap();
+
+        // For verbosity >= 2, show detailed analysis with test recommendations
         if coverage_pct < 100.0 && !trans_cov.uncovered_lines.is_empty() && verbosity >= 2 {
             format_detailed_coverage_analysis(output, trans_cov, item, _formatter, tree_pipe);
-        } else if verbosity >= 1 {
-            // For verbosity 1, show concise summary line
-            let coverage_status = format_coverage_status(coverage_pct);
-            let uncovered_summary = format_uncovered_lines_summary(&trans_cov.uncovered_lines, 5);
-
-            // Calculate gap percentage and add severity indicator
-            let gap_pct = 100.0 - coverage_pct;
-            let gap_severity = if gap_pct > 0.0 {
-                format!(" {}", get_gap_severity_indicator(gap_pct))
-            } else {
-                String::new()
-            };
-
-            writeln!(
-                output,
-                "- {} {}{}{}",
-                "COVERAGE:".bright_blue(),
-                coverage_status.bright_yellow(),
-                uncovered_summary.bright_red(),
-                gap_severity
-            )
-            .unwrap();
         }
     }
 }
