@@ -665,6 +665,15 @@ impl FunctionVisitor {
             detector.detect(block, &context.name)
         };
 
+        // Detect state machine and coordinator patterns (spec 179)
+        let (state_signals, coordinator_signals) = {
+            use crate::analyzers::state_machine_pattern_detector::StateMachinePatternDetector;
+            let detector = StateMachinePatternDetector::new();
+            let state_signals = detector.detect_state_machine(block);
+            let coordinator_signals = detector.detect_coordinator(block);
+            (state_signals, coordinator_signals)
+        };
+
         // Rust-specific pattern detection (spec 146)
         // IMPORTANT: Always create language_specific to store validation_signals
         // even if enable_rust_patterns is false
@@ -699,13 +708,21 @@ impl FunctionVisitor {
 
             let detector = RustPatternDetector::new();
 
-            // Only run full pattern detection if enabled, but always store validation_signals
+            // Only run full pattern detection if enabled, but always store pattern signals
             if self.enable_rust_patterns {
                 Some(crate::core::LanguageSpecificData::Rust(
-                    detector.detect_all_patterns(&rust_context, validation_signals.clone()),
+                    detector.detect_all_patterns(
+                        &rust_context,
+                        validation_signals.clone(),
+                        state_signals.clone(),
+                        coordinator_signals.clone(),
+                    ),
                 ))
-            } else if validation_signals.is_some() {
-                // Minimal pattern result with just validation signals
+            } else if validation_signals.is_some()
+                || state_signals.is_some()
+                || coordinator_signals.is_some()
+            {
+                // Minimal pattern result with just pattern signals
                 Some(crate::core::LanguageSpecificData::Rust(
                     crate::analysis::rust_patterns::RustPatternResult {
                         trait_impl: None,
@@ -713,6 +730,8 @@ impl FunctionVisitor {
                         error_patterns: vec![],
                         builder_patterns: vec![],
                         validation_signals: validation_signals.clone(),
+                        state_machine_signals: state_signals.clone(),
+                        coordinator_signals: coordinator_signals.clone(),
                     },
                 ))
             } else {

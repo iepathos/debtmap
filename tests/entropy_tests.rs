@@ -131,9 +131,10 @@ fn test_entropy_for_switch_like_patterns() {
         .find(|f| f.name == "process_command")
         .expect("process_command function not found");
 
-    // Pattern-based match should have LOW cyclomatic complexity due to logarithmic scaling
-    // 7 arms -> log2(7) = 2.807 -> ceil = 3
-    assert_eq!(process_fn.cyclomatic, 3);
+    // Pattern-based match returns RAW cyclomatic complexity
+    // 7 arms = 7 cyclomatic complexity (no dampening applied at this level)
+    // Entropy/pattern-based adjustments are now stored in adjusted_complexity field
+    assert_eq!(process_fn.cyclomatic, 7);
 }
 
 #[test]

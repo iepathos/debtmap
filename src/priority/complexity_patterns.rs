@@ -57,7 +57,7 @@ pub enum ComplexityPattern {
 }
 
 /// Signals indicating state machine pattern
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StateMachineSignals {
     pub transition_count: u32,
     pub has_enum_match: bool,
@@ -67,7 +67,7 @@ pub struct StateMachineSignals {
 }
 
 /// Signals indicating coordinator pattern
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoordinatorSignals {
     pub actions: u32,
     pub comparisons: u32,

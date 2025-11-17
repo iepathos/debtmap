@@ -30,6 +30,8 @@ impl RustPatternDetector {
         &self,
         context: &RustFunctionContext,
         validation_signals: Option<crate::priority::complexity_patterns::ValidationSignals>,
+        state_machine_signals: Option<crate::priority::complexity_patterns::StateMachineSignals>,
+        coordinator_signals: Option<crate::priority::complexity_patterns::CoordinatorSignals>,
     ) -> RustPatternResult {
         RustPatternResult {
             trait_impl: self.trait_detector.detect_trait_impl(context),
@@ -37,6 +39,8 @@ impl RustPatternDetector {
             error_patterns: self.error_detector.detect_error_patterns(context),
             builder_patterns: self.builder_detector.detect_builder_patterns(context),
             validation_signals,
+            state_machine_signals,
+            coordinator_signals,
         }
     }
 
@@ -134,6 +138,10 @@ pub struct RustPatternResult {
     pub builder_patterns: Vec<BuilderPattern>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_signals: Option<crate::priority::complexity_patterns::ValidationSignals>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_machine_signals: Option<crate::priority::complexity_patterns::StateMachineSignals>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coordinator_signals: Option<crate::priority::complexity_patterns::CoordinatorSignals>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

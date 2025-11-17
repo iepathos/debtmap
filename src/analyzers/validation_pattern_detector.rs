@@ -125,15 +125,14 @@ impl ValidationVisitor {
 
     /// Check if a block contains an early return
     fn has_early_return(&self, block: &Block) -> bool {
-        block.stmts.iter().any(|stmt| {
-            matches!(
-                stmt,
-                Stmt::Expr(Expr::Return(_), _) | Stmt::Expr(Expr::Return(_), None)
-            )
-        })
+        block
+            .stmts
+            .iter()
+            .any(|stmt| matches!(stmt, Stmt::Expr(Expr::Return(_), _)))
     }
 
     /// Check if return expression is Result::Err or similar error pattern
+    #[allow(dead_code)]
     fn is_error_return(&self, ret: &ExprReturn) -> bool {
         if let Some(ref expr) = ret.expr {
             match &**expr {
@@ -198,7 +197,6 @@ impl<'ast> Visit<'ast> for ValidationVisitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quote::quote;
     use syn::parse_quote;
 
     #[test]
