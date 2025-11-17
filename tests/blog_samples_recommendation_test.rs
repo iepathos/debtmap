@@ -110,7 +110,7 @@ fn test_blog_sample_reconcile_state_recommendation() {
     // Should have actionable steps
     assert!(rec.steps.is_some());
     let steps = rec.steps.unwrap();
-    assert!(steps.len() > 0, "Should have actionable steps");
+    assert!(!steps.is_empty(), "Should have actionable steps");
     assert!(steps.len() <= 5, "Should have max 5 steps");
 
     // Rationale should mention moderate complexity
@@ -161,7 +161,7 @@ fn test_blog_sample_validate_config_recommendation() {
     // Should have simple steps (like add tests for safety)
     assert!(rec.steps.is_some());
     let steps = rec.steps.unwrap();
-    assert!(steps.len() > 0, "Should have at least one step");
+    assert!(!steps.is_empty(), "Should have at least one step");
 }
 
 #[test]
