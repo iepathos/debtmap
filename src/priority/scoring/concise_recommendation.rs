@@ -1082,4 +1082,116 @@ mod tests {
             }
         }
     }
+
+    // Regression tests for other complexity patterns (spec 178)
+
+    #[test]
+    fn test_high_nesting_pattern_recommendation() {
+        let mut metrics = create_test_metrics(10, 35);
+        metrics.nesting = 5; // High nesting
+
+        let rec = generate_complexity_steps(10, 35, &metrics);
+
+        assert!(
+            rec.primary_action.contains("nesting"),
+            "High nesting pattern should mention nesting, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should have early returns step
+        let has_early_returns = steps.iter().any(|s| s.description.contains("early return"));
+        assert!(has_early_returns, "Should recommend early returns for high nesting");
+    }
+
+    #[test]
+    fn test_high_branching_pattern_recommendation() {
+        let mut metrics = create_test_metrics(25, 20);
+        metrics.nesting = 2; // Low nesting, high branching
+
+        let rec = generate_complexity_steps(25, 20, &metrics);
+
+        assert!(
+            rec.primary_action.contains("Split") || rec.primary_action.contains("function"),
+            "High branching pattern should suggest splitting, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+    }
+
+    #[test]
+    fn test_mixed_complexity_pattern_recommendation() {
+        // For MixedComplexity: cyclo >= 12, cognitive >= 40, ratio 2.5-3.5
+        // Using cyclo=15, cognitive=45 gives ratio=3.0 (in range)
+        let mut metrics = create_test_metrics(15, 45);
+        metrics.nesting = 4; // Both high nesting and high branching
+
+        let rec = generate_complexity_steps(15, 45, &metrics);
+
+        assert!(
+            rec.primary_action.contains("FIRST") || rec.primary_action.contains("phase"),
+            "Mixed complexity should suggest phased approach, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should have Phase 1 and Phase 2
+        let has_phases = steps.iter().any(|s| s.description.contains("Phase"));
+        assert!(has_phases, "Should have phased approach for mixed complexity");
+    }
+
+    #[test]
+    fn test_chaotic_structure_pattern_recommendation() {
+        use crate::complexity::entropy_core::EntropyScore;
+
+        let mut metrics = create_test_metrics(20, 30);
+        metrics.entropy_score = Some(EntropyScore {
+            token_entropy: 0.45, // High entropy for chaotic detection
+            pattern_repetition: 0.2,
+            branch_similarity: 0.3,
+            effective_complexity: 15.0,
+            unique_variables: 10,
+            max_nesting: 3,
+            dampening_applied: 0.0,
+        });
+
+        let rec = generate_complexity_steps(20, 30, &metrics);
+
+        assert!(
+            rec.primary_action.contains("Standardize") || rec.primary_action.contains("control flow"),
+            "Chaotic structure should suggest standardization, got: {}",
+            rec.primary_action
+        );
+        assert!(rec.steps.is_some());
+        let steps = rec.steps.unwrap();
+
+        // Should mention error handling or state transitions
+        let has_standardization = steps.iter().any(|s|
+            s.description.contains("error handling") || s.description.contains("state")
+        );
+        assert!(has_standardization, "Should recommend standardization for chaotic structure");
+    }
+
+    #[test]
+    fn test_pattern_detection_still_works() {
+        // Verify that pattern detection correctly identifies different patterns
+
+        // High nesting pattern
+        let mut nesting_metrics = create_test_metrics(10, 35);
+        nesting_metrics.nesting = 5;
+        let nesting_rec = generate_complexity_steps(10, 35, &nesting_metrics);
+        assert!(nesting_rec.primary_action.contains("nesting"));
+
+        // High branching pattern
+        let branching_metrics = create_test_metrics(25, 20);
+        let branching_rec = generate_complexity_steps(25, 20, &branching_metrics);
+        assert!(branching_rec.primary_action.contains("Split") || branching_rec.primary_action.contains("function"));
+
+        // Moderate complexity pattern
+        let moderate_metrics = create_test_metrics(10, 18);
+        let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics);
+        assert!(moderate_rec.primary_action.contains("Reduce") || moderate_rec.primary_action.contains("Optional") || moderate_rec.primary_action.contains("Maintain"));
+    }
 }
