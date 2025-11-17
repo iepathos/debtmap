@@ -3,8 +3,8 @@
 //! Verifies that the state machine and coordinator patterns are correctly
 //! detected from real Rust code examples.
 
-use debtmap::analyzers::Analyzer;
 use debtmap::analyzers::rust::RustAnalyzer;
+use debtmap::analyzers::Analyzer;
 use debtmap::core::LanguageSpecificData;
 use std::path::PathBuf;
 
@@ -124,10 +124,7 @@ fn reconcile_state(current: &State, desired: &State, force_maintenance: bool) ->
 
         // If state machine signals detected, verify the transition count
         if let Some(state_signals) = &rust_patterns.state_machine_signals {
-            assert!(
-                state_signals.has_enum_match,
-                "Should detect enum match"
-            );
+            assert!(state_signals.has_enum_match, "Should detect enum match");
             assert!(
                 state_signals.transition_count >= 2,
                 "Should have at least 2 transitions, got {}",
