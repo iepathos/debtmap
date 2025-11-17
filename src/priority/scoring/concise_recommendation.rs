@@ -158,10 +158,8 @@ fn generate_complexity_steps(
         cyclomatic,
         cognitive,
         nesting: metrics.nesting,
-        entropy_score: metrics
-            .entropy_score
-            .as_ref()
-            .map(|e| e.effective_complexity),
+        // Use token_entropy (Shannon entropy) for pattern detection, not effective_complexity
+        entropy_score: metrics.entropy_score.as_ref().map(|e| e.token_entropy),
     };
 
     let pattern = ComplexityPattern::detect(&complexity_metrics);
@@ -444,7 +442,7 @@ fn generate_chaotic_recommendation(
     ActionableRecommendation {
         primary_action: "Standardize control flow patterns before refactoring".to_string(),
         rationale: format!(
-            "High entropy ({:.2}) indicates inconsistent structure. \
+            "High token entropy ({:.2}) indicates inconsistent structure. \
              Standardize patterns to enable safe refactoring of {}/{} complexity.",
             entropy, cyclomatic, cognitive
         ),
