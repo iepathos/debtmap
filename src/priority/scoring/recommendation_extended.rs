@@ -407,7 +407,12 @@ pub fn generate_infrastructure_recommendation_with_coverage(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-        } => generate_complexity_hotspot_recommendation(*cyclomatic, *cognitive),
+            adjusted_cyclomatic,
+        } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            generate_complexity_hotspot_recommendation(effective_cyclomatic, *cognitive)
+        }
         _ => unreachable!("Not an infrastructure debt type"),
     }
 }

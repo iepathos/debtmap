@@ -144,6 +144,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: complexity as u32,
                 cognitive: complexity as u32,
+                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor,

@@ -147,6 +147,7 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 25,
+                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 50.0,

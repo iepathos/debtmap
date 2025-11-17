@@ -2276,7 +2276,8 @@ mod tests {
         assert_eq!(
             format_debt_type(&DebtType::ComplexityHotspot {
                 cyclomatic: 10,
-                cognitive: 15
+                cognitive: 15,
+                adjusted_cyclomatic: None,
             }),
             "COMPLEXITY"
         );

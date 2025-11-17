@@ -143,6 +143,7 @@ mod tests {
             debt_type: UnifiedDebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
+                adjusted_cyclomatic: None,
             },
             recommendation: ActionableRecommendation {
                 primary_action: "Refactor complex function".to_string(),

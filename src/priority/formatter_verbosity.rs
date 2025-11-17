@@ -1524,6 +1524,7 @@ mod tests {
         item.debt_type = DebtType::ComplexityHotspot {
             cyclomatic: 20,
             cognitive: 30,
+            adjusted_cyclomatic: None,
         };
         let recommendations = analyze_coverage_gaps(&lines, &item);
         assert!(recommendations
@@ -1762,6 +1763,7 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 10,
                 cognitive: 20,
+                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,

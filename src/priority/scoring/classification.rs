@@ -53,10 +53,28 @@ fn check_testing_gap(
         })
 }
 
+/// Determine if a function is a complexity hotspot.
+///
+/// Uses entropy-adjusted cyclomatic complexity when available (spec 182).
+/// This prevents false positives for functions with repetitive, predictable structure.
+///
+/// # Thresholds
+/// - Cyclomatic (or adjusted): > 10
+/// - Cognitive: > 15
+///
+/// # Returns
+/// `Some(DebtType::ComplexityHotspot)` if function exceeds thresholds.
 fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    (func.cyclomatic > 10 || func.cognitive > 15).then_some(DebtType::ComplexityHotspot {
+    // Use adjusted complexity if available (spec 182)
+    let effective_cyclomatic = func
+        .adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(func.cyclomatic);
+
+    (effective_cyclomatic > 10 || func.cognitive > 15).then_some(DebtType::ComplexityHotspot {
         cyclomatic: func.cyclomatic,
         cognitive: func.cognitive,
+        adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
     })
 }
 
@@ -223,6 +241,7 @@ pub fn classify_debt_type_with_exclusions(
         return DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
+            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         };
     }
 
@@ -305,11 +324,18 @@ pub fn should_surface_untested_function(
 
 /// Check if function is a complexity hotspot
 pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Option<DebtType> {
+    // Use adjusted complexity if available (spec 182)
+    let effective_cyclomatic = func
+        .adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(func.cyclomatic);
+
     // Direct complexity check
-    if func.cyclomatic > 10 || func.cognitive > 15 {
+    if effective_cyclomatic > 10 || func.cognitive > 15 {
         return Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
+            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         });
     }
 
@@ -324,10 +350,11 @@ pub fn is_complexity_hotspot(func: &FunctionMetrics, role: &FunctionRole) -> Opt
         FunctionRole::Unknown => (10, 15),
     };
 
-    if func.cyclomatic > cyclo_threshold || func.cognitive > cog_threshold {
+    if effective_cyclomatic > cyclo_threshold || func.cognitive > cog_threshold {
         Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
+            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         })
     } else {
         None
@@ -1121,5 +1148,88 @@ mod tests {
             test_extract_visibility(&module_func),
             FunctionVisibility::Private
         );
+    }
+
+    // Unit tests for spec 182: adjusted complexity in classification
+    #[test]
+    fn check_complexity_hotspot_uses_adjusted_complexity() {
+        // Function with low entropy, adjusted complexity below threshold
+        let mut func = create_test_function("test_func", None);
+        func.cyclomatic = 11; // Above threshold (raw)
+        func.cognitive = 12; // Below threshold
+        func.adjusted_complexity = Some(4.15); // Below threshold (adjusted)
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "Should NOT flag - adjusted complexity is below threshold"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_falls_back_to_raw_when_no_adjustment() {
+        // Function without entropy analysis
+        let mut func = create_test_function("test_func", None);
+        func.cyclomatic = 11; // Above threshold
+        func.cognitive = 12;
+        func.adjusted_complexity = None; // No adjustment available
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag - raw cyclomatic above threshold"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_stores_both_raw_and_adjusted() {
+        let mut func = create_test_function("test_func", None);
+        func.cyclomatic = 15;
+        func.cognitive = 20;
+        func.adjusted_complexity = Some(8.5);
+
+        if let Some(DebtType::ComplexityHotspot {
+            cyclomatic,
+            cognitive,
+            adjusted_cyclomatic,
+        }) = check_complexity_hotspot(&func)
+        {
+            assert_eq!(cyclomatic, 15, "Raw cyclomatic should be stored");
+            assert_eq!(cognitive, 20, "Cognitive should be stored");
+            assert_eq!(
+                adjusted_cyclomatic,
+                Some(9),
+                "Adjusted cyclomatic should be rounded and stored"
+            );
+        } else {
+            panic!("Expected ComplexityHotspot");
+        }
+    }
+
+    #[test]
+    fn check_complexity_hotspot_high_cognitive_still_flags() {
+        // Even with low adjusted cyclomatic, high cognitive should flag
+        let mut func = create_test_function("reconcile_state", None);
+        func.cyclomatic = 9;
+        func.cognitive = 16; // Above threshold
+        func.adjusted_complexity = Some(4.15); // Below threshold
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag due to high cognitive complexity"
+        );
+
+        if let Some(DebtType::ComplexityHotspot {
+            adjusted_cyclomatic,
+            ..
+        }) = result
+        {
+            assert_eq!(
+                adjusted_cyclomatic,
+                Some(4),
+                "Should store adjusted complexity"
+            );
+        }
     }
 }

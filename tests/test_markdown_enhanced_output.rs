@@ -214,6 +214,7 @@ fn test_enhanced_markdown_full_report() {
     item3.debt_type = DebtType::ComplexityHotspot {
         cyclomatic: 25,
         cognitive: 30,
+        adjusted_cyclomatic: None,
     };
     analysis.add_item(item3);
 

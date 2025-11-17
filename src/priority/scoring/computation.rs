@@ -173,7 +173,15 @@ pub(super) fn calculate_complexity_reduction(debt_type: &DebtType, is_complex: b
             ..
         } => (*cyclomatic + *cognitive) as f64 * 0.5,
         DebtType::TestingGap { cyclomatic, .. } if is_complex => *cyclomatic as f64 * 0.3,
-        DebtType::ComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.5,
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            adjusted_cyclomatic,
+            ..
+        } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            effective_cyclomatic as f64 * 0.5
+        }
         DebtType::TestComplexityHotspot { cyclomatic, .. } => *cyclomatic as f64 * 0.3,
         // Organization debt types - significant complexity reduction potential
         DebtType::GodObject {
@@ -332,7 +340,8 @@ mod tests {
         assert_eq!(
             calculate_risk_factor(&DebtType::ComplexityHotspot {
                 cyclomatic: 20,
-                cognitive: 15
+                cognitive: 15,
+                adjusted_cyclomatic: None,
             }),
             0.35
         );

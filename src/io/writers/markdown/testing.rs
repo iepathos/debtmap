@@ -158,6 +158,7 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
+                adjusted_cyclomatic: None,
             },
             function_role: FunctionRole::PureLogic,
             recommendation: ActionableRecommendation {
