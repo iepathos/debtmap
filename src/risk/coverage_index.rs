@@ -10,6 +10,44 @@ pub fn normalize_path(path: &Path) -> PathBuf {
     PathBuf::from(cleaned)
 }
 
+/// Generate name variants for coverage matching
+///
+/// For trait implementation methods, LCOV may store just the method name
+/// (e.g., `visit_expr`) while debtmap stores the full qualified name
+/// (e.g., `RecursiveMatchDetector::visit_expr`).
+///
+/// This function generates variant names to try during coverage lookup:
+/// 1. Method name only (last segment after `::`), if the name contains `::`
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::risk::coverage_index::generate_name_variants;
+/// let variants: Vec<String> = generate_name_variants("RecursiveMatchDetector::visit_expr").collect();
+/// assert_eq!(variants, vec!["visit_expr"]);
+///
+/// let variants: Vec<String> = generate_name_variants("simple_function").collect();
+/// assert_eq!(variants.len(), 0); // No variants for simple functions
+/// ```
+///
+/// # Performance
+///
+/// O(1) time complexity - only splits on `::` delimiter
+pub fn generate_name_variants(function_name: &str) -> impl Iterator<Item = String> + '_ {
+    // Extract method name from "Type::method" or "path::to::Type::method"
+    function_name
+        .rsplit("::")
+        .next()
+        .filter(|method_name| {
+            // Only generate variant if:
+            // 1. The original name contains :: (is qualified)
+            // 2. The method name is different from the full name
+            function_name.contains("::") && *method_name != function_name
+        })
+        .map(|s| s.to_string())
+        .into_iter()
+}
+
 /// Aggregated coverage from multiple monomorphized versions of a generic function
 ///
 /// Uses intersection strategy: a line is covered if ANY monomorphization covers it
@@ -462,6 +500,15 @@ impl CoverageIndex {
     /// Falls back to line-based lookup when exact name match fails.
     /// Uses BTreeMap range query for efficient lookups.
     /// Also tries aggregated coverage for generic/monomorphized functions.
+    ///
+    /// # Name Variant Matching (for trait methods)
+    ///
+    /// Tries multiple name variants before falling back to line-based lookup:
+    /// 1. Full qualified name (e.g., `RecursiveMatchDetector::visit_expr`)
+    /// 2. Method name only (e.g., `visit_expr`)
+    ///
+    /// This handles cases where LCOV stores demangled symbols with just the method
+    /// name, while debtmap stores the full qualified name including the impl type.
     pub fn get_function_coverage_with_line(
         &self,
         file: &Path,
@@ -471,6 +518,13 @@ impl CoverageIndex {
         // Try aggregated coverage first (handles generics)
         if let Some(agg) = self.get_aggregated_coverage(file, function_name) {
             return Some(agg.coverage_pct / 100.0);
+        }
+
+        // Try name variants (for trait methods where LCOV may use simplified names)
+        for variant in generate_name_variants(function_name) {
+            if let Some(agg) = self.get_aggregated_coverage(file, &variant) {
+                return Some(agg.coverage_pct / 100.0);
+            }
         }
 
         // Try line-based lookup (O(log n)) - faster than path matching strategies
@@ -850,5 +904,153 @@ mod tests {
         assert_eq!(agg.coverage_pct, 75.0); // (70 + 80) / 2
                                             // Only line 20 is uncovered in both versions
         assert_eq!(agg.uncovered_lines, vec![20]);
+    }
+
+    #[test]
+    fn test_generate_name_variants_trait_method() {
+        let variants: Vec<String> =
+            generate_name_variants("RecursiveMatchDetector::visit_expr").collect();
+        assert_eq!(variants, vec!["visit_expr"]);
+    }
+
+    #[test]
+    fn test_generate_name_variants_nested_path() {
+        let variants: Vec<String> = generate_name_variants("crate::module::Type::method").collect();
+        assert_eq!(variants, vec!["method"]);
+    }
+
+    #[test]
+    fn test_generate_name_variants_simple_function() {
+        let variants: Vec<String> = generate_name_variants("simple_function").collect();
+        assert_eq!(variants.len(), 0); // No variants for functions without ::
+    }
+
+    #[test]
+    fn test_generate_name_variants_single_segment() {
+        let variants: Vec<String> = generate_name_variants("main").collect();
+        assert_eq!(variants.len(), 0); // No variants for single segment names
+    }
+
+    #[test]
+    fn test_trait_method_coverage_match_by_method_name() {
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        let mut coverage = LcovData::default();
+
+        // Simulate LCOV storing just the method name (common for trait implementations)
+        coverage.functions.insert(
+            PathBuf::from("src/complexity/recursive_detector.rs"),
+            vec![FunctionCoverage {
+                name: "visit_expr".to_string(),
+                start_line: 177,
+                execution_count: 3507,
+                coverage_percentage: 90.2,
+                uncovered_lines: vec![200, 205],
+                normalized: NormalizedFunctionName {
+                    full_path: "visit_expr".to_string(),
+                    method_name: "visit_expr".to_string(),
+                    original: "visit_expr".to_string(),
+                },
+            }],
+        );
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query with full qualified name (what debtmap stores)
+        let coverage = index.get_function_coverage_with_line(
+            Path::new("src/complexity/recursive_detector.rs"),
+            "RecursiveMatchDetector::visit_expr",
+            177,
+        );
+
+        // Should find coverage via method name variant matching
+        assert!(coverage.is_some());
+        assert_eq!(coverage.unwrap(), 0.902); // 90.2% as fraction
+    }
+
+    #[test]
+    fn test_trait_method_coverage_no_regression_exact_match() {
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        let mut coverage = LcovData::default();
+
+        // LCOV stores full qualified name (ideal case)
+        coverage.functions.insert(
+            PathBuf::from("src/test.rs"),
+            vec![FunctionCoverage {
+                name: "MyType::my_method".to_string(),
+                start_line: 10,
+                execution_count: 100,
+                coverage_percentage: 95.0,
+                uncovered_lines: vec![15],
+                normalized: NormalizedFunctionName {
+                    full_path: "MyType::my_method".to_string(),
+                    method_name: "my_method".to_string(),
+                    original: "MyType::my_method".to_string(),
+                },
+            }],
+        );
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query with full qualified name - should still work via exact match
+        let coverage = index.get_function_coverage_with_line(
+            Path::new("src/test.rs"),
+            "MyType::my_method",
+            10,
+        );
+
+        assert!(coverage.is_some());
+        assert_eq!(coverage.unwrap(), 0.95);
+    }
+
+    #[test]
+    fn test_trait_method_coverage_method_name_conflict() {
+        use crate::risk::lcov::NormalizedFunctionName;
+
+        let mut coverage = LcovData::default();
+
+        // Two different types with same method name, both stored in LCOV
+        coverage.functions.insert(
+            PathBuf::from("src/test.rs"),
+            vec![
+                FunctionCoverage {
+                    name: "TypeA::process".to_string(),
+                    start_line: 10,
+                    execution_count: 50,
+                    coverage_percentage: 80.0,
+                    uncovered_lines: vec![12],
+                    normalized: NormalizedFunctionName {
+                        full_path: "TypeA::process".to_string(),
+                        method_name: "process".to_string(),
+                        original: "TypeA::process".to_string(),
+                    },
+                },
+                FunctionCoverage {
+                    name: "TypeB::process".to_string(),
+                    start_line: 30,
+                    execution_count: 75,
+                    coverage_percentage: 90.0,
+                    uncovered_lines: vec![35],
+                    normalized: NormalizedFunctionName {
+                        full_path: "TypeB::process".to_string(),
+                        method_name: "process".to_string(),
+                        original: "TypeB::process".to_string(),
+                    },
+                },
+            ],
+        );
+
+        let index = CoverageIndex::from_coverage(&coverage);
+
+        // Query TypeA::process - should get correct coverage
+        let coverage_a =
+            index.get_function_coverage_with_line(Path::new("src/test.rs"), "TypeA::process", 10);
+        assert_eq!(coverage_a.unwrap(), 0.80);
+
+        // Query TypeB::process - should get correct coverage
+        let coverage_b =
+            index.get_function_coverage_with_line(Path::new("src/test.rs"), "TypeB::process", 30);
+        assert_eq!(coverage_b.unwrap(), 0.90);
     }
 }
