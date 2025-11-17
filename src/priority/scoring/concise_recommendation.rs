@@ -1102,7 +1102,10 @@ mod tests {
 
         // Should have early returns step
         let has_early_returns = steps.iter().any(|s| s.description.contains("early return"));
-        assert!(has_early_returns, "Should recommend early returns for high nesting");
+        assert!(
+            has_early_returns,
+            "Should recommend early returns for high nesting"
+        );
     }
 
     #[test]
@@ -1139,7 +1142,10 @@ mod tests {
 
         // Should have Phase 1 and Phase 2
         let has_phases = steps.iter().any(|s| s.description.contains("Phase"));
-        assert!(has_phases, "Should have phased approach for mixed complexity");
+        assert!(
+            has_phases,
+            "Should have phased approach for mixed complexity"
+        );
     }
 
     #[test]
@@ -1160,7 +1166,8 @@ mod tests {
         let rec = generate_complexity_steps(20, 30, &metrics);
 
         assert!(
-            rec.primary_action.contains("Standardize") || rec.primary_action.contains("control flow"),
+            rec.primary_action.contains("Standardize")
+                || rec.primary_action.contains("control flow"),
             "Chaotic structure should suggest standardization, got: {}",
             rec.primary_action
         );
@@ -1168,10 +1175,13 @@ mod tests {
         let steps = rec.steps.unwrap();
 
         // Should mention error handling or state transitions
-        let has_standardization = steps.iter().any(|s|
-            s.description.contains("error handling") || s.description.contains("state")
+        let has_standardization = steps
+            .iter()
+            .any(|s| s.description.contains("error handling") || s.description.contains("state"));
+        assert!(
+            has_standardization,
+            "Should recommend standardization for chaotic structure"
         );
-        assert!(has_standardization, "Should recommend standardization for chaotic structure");
     }
 
     #[test]
@@ -1187,11 +1197,18 @@ mod tests {
         // High branching pattern
         let branching_metrics = create_test_metrics(25, 20);
         let branching_rec = generate_complexity_steps(25, 20, &branching_metrics);
-        assert!(branching_rec.primary_action.contains("Split") || branching_rec.primary_action.contains("function"));
+        assert!(
+            branching_rec.primary_action.contains("Split")
+                || branching_rec.primary_action.contains("function")
+        );
 
         // Moderate complexity pattern
         let moderate_metrics = create_test_metrics(10, 18);
         let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics);
-        assert!(moderate_rec.primary_action.contains("Reduce") || moderate_rec.primary_action.contains("Optional") || moderate_rec.primary_action.contains("Maintain"));
+        assert!(
+            moderate_rec.primary_action.contains("Reduce")
+                || moderate_rec.primary_action.contains("Optional")
+                || moderate_rec.primary_action.contains("Maintain")
+        );
     }
 }

@@ -253,7 +253,8 @@ fn test_blog_samples_complexity_tier_boundaries() {
     );
 
     assert!(
-        rec_moderate.primary_action.contains("Optional") || rec_moderate.primary_action.contains("Reduce"),
+        rec_moderate.primary_action.contains("Optional")
+            || rec_moderate.primary_action.contains("Reduce"),
         "8/15 should be MODERATE tier (preventive), got: {}",
         rec_moderate.primary_action
     );
