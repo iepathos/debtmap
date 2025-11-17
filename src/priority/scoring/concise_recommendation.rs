@@ -255,6 +255,15 @@ fn generate_complexity_steps(
     cognitive: u32,
     metrics: &FunctionMetrics,
 ) -> ActionableRecommendation {
+    // Extract validation signals from Rust-specific pattern data
+    let validation_signals = metrics.language_specific.as_ref().and_then(|lang_data| {
+        if let crate::core::LanguageSpecificData::Rust(rust_patterns) = lang_data {
+            rust_patterns.validation_signals.clone()
+        } else {
+            None
+        }
+    });
+
     // Detect complexity pattern
     let complexity_metrics = ComplexityMetrics {
         cyclomatic,
@@ -264,7 +273,7 @@ fn generate_complexity_steps(
         entropy_score: metrics.entropy_score.as_ref().map(|e| e.token_entropy),
         state_signals: None,       // TODO: populate from AST analysis
         coordinator_signals: None, // TODO: populate from AST analysis
-        validation_signals: None,  // TODO: populate from AST analysis
+        validation_signals,
     };
 
     let pattern = ComplexityPattern::detect(&complexity_metrics);

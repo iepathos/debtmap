@@ -6,23 +6,24 @@
 
 use crate::complexity::{
     cognitive::calculate_cognitive_with_patterns,
-    cyclomatic::calculate_cyclomatic_adjusted,
     visitor_detector::{PatternInfo, PatternType},
 };
 use syn::visit::Visit;
 
 /// Calculate cyclomatic complexity with visitor pattern detection.
 ///
-/// If a visitor pattern is detected, uses the adjusted complexity from pattern analysis.
-/// Otherwise, falls back to standard cyclomatic complexity calculation.
+/// Returns the RAW cyclomatic complexity (before any dampening).
+/// Pattern-based adjustments should be stored separately in adjusted_complexity field.
+/// This ensures pattern detection logic can access the true complexity metrics.
 pub fn calculate_cyclomatic_with_visitor(
     block: &syn::Block,
-    func: &syn::ItemFn,
-    file_ast: Option<&syn::File>,
+    _func: &syn::ItemFn,
+    _file_ast: Option<&syn::File>,
 ) -> u32 {
-    try_detect_visitor_pattern(func, file_ast)
-        .map(|pattern_info| pattern_info.adjusted_complexity)
-        .unwrap_or_else(|| calculate_cyclomatic_adjusted(block))
+    // ALWAYS return raw cyclomatic complexity
+    // Pattern detection and dampening should happen separately
+    use crate::complexity::cyclomatic::calculate_cyclomatic;
+    calculate_cyclomatic(block)
 }
 
 /// Calculate cognitive complexity with visitor pattern detection.

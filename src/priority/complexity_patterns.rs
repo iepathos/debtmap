@@ -77,7 +77,7 @@ pub struct CoordinatorSignals {
 }
 
 /// Signals indicating repetitive validation pattern
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ValidationSignals {
     pub check_count: u32,
     pub early_return_count: u32,
@@ -294,6 +294,7 @@ fn is_repetitive_validation(
     if let Some(signals) = validation_signals {
         // Require majority of branches to be early returns
         let early_return_ratio = signals.early_return_count as f64 / cyclomatic as f64;
+
         if early_return_ratio < 0.6 {
             return false;
         }

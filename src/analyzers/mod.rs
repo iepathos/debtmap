@@ -35,6 +35,7 @@ pub mod trait_resolver;
 pub mod traits;
 pub mod type_registry;
 pub mod type_tracker;
+pub mod validation_pattern_detector;
 
 pub use enhanced_analyzer::{AnalysisResult, EnhancedAnalyzer};
 

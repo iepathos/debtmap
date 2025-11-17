@@ -658,8 +658,17 @@ impl FunctionVisitor {
             None
         };
 
+        // Detect repetitive validation patterns (spec 180)
+        let validation_signals = {
+            use crate::analyzers::validation_pattern_detector::ValidationPatternDetector;
+            let detector = ValidationPatternDetector::new();
+            detector.detect(block, &context.name)
+        };
+
         // Rust-specific pattern detection (spec 146)
-        let language_specific = if self.enable_rust_patterns {
+        // IMPORTANT: Always create language_specific to store validation_signals
+        // even if enable_rust_patterns is false
+        let language_specific = {
             use crate::analysis::rust_patterns::{
                 ImplContext, RustFunctionContext, RustPatternDetector,
             };
@@ -689,11 +698,26 @@ impl FunctionVisitor {
             };
 
             let detector = RustPatternDetector::new();
-            Some(crate::core::LanguageSpecificData::Rust(
-                detector.detect_all_patterns(&rust_context),
-            ))
-        } else {
-            None
+
+            // Only run full pattern detection if enabled, but always store validation_signals
+            if self.enable_rust_patterns {
+                Some(crate::core::LanguageSpecificData::Rust(
+                    detector.detect_all_patterns(&rust_context, validation_signals.clone()),
+                ))
+            } else if validation_signals.is_some() {
+                // Minimal pattern result with just validation signals
+                Some(crate::core::LanguageSpecificData::Rust(
+                    crate::analysis::rust_patterns::RustPatternResult {
+                        trait_impl: None,
+                        async_patterns: vec![],
+                        error_patterns: vec![],
+                        builder_patterns: vec![],
+                        validation_signals: validation_signals.clone(),
+                    },
+                ))
+            } else {
+                None
+            }
         };
 
         FunctionMetrics {

@@ -26,12 +26,17 @@ impl RustPatternDetector {
     }
 
     /// Detect all Rust-specific patterns for a function
-    pub fn detect_all_patterns(&self, context: &RustFunctionContext) -> RustPatternResult {
+    pub fn detect_all_patterns(
+        &self,
+        context: &RustFunctionContext,
+        validation_signals: Option<crate::priority::complexity_patterns::ValidationSignals>,
+    ) -> RustPatternResult {
         RustPatternResult {
             trait_impl: self.trait_detector.detect_trait_impl(context),
             async_patterns: self.async_detector.detect_async_patterns(context),
             error_patterns: self.error_detector.detect_error_patterns(context),
             builder_patterns: self.builder_detector.detect_builder_patterns(context),
+            validation_signals,
         }
     }
 
@@ -127,6 +132,8 @@ pub struct RustPatternResult {
     pub async_patterns: Vec<AsyncPattern>,
     pub error_patterns: Vec<ErrorPattern>,
     pub builder_patterns: Vec<BuilderPattern>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_signals: Option<crate::priority::complexity_patterns::ValidationSignals>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
