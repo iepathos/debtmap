@@ -74,6 +74,8 @@ pub enum RefactoringTechnique {
     StateTransitionExtraction,
     /// Extract coordinator logic into transition map
     CoordinatorExtraction,
+    /// Replace imperative validation with declarative pattern
+    ValidationExtraction,
 }
 
 impl RefactoringImpact {
@@ -289,6 +291,43 @@ impl RefactoringImpact {
                 ImpactConfidence::Estimated
             },
             technique: RefactoringTechnique::CoordinatorExtraction,
+        }
+    }
+
+    /// Calculate impact of extracting repetitive validation boilerplate (spec 180).
+    ///
+    /// Validation extraction replaces imperative validation checks with
+    /// declarative validation patterns (schemas, builders, validation traits).
+    ///
+    /// **Impact**: Primarily maintainability improvement, not complexity reduction
+    /// - Reduces LOC (lines of code) by consolidating checks
+    /// - Improves maintainability (single source of truth)
+    /// - May not reduce cyclomatic complexity initially
+    /// - Reduces cognitive load for understanding validation logic
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use debtmap::priority::refactoring_impact::RefactoringImpact;
+    ///
+    /// let impact = RefactoringImpact::validation_extraction(20);
+    /// assert_eq!(impact.complexity_reduction, 20); // Cognitive reduction
+    /// ```
+    pub fn validation_extraction(validation_count: u32) -> Self {
+        // Validation extraction impact is about maintainability, not complexity reduction
+        // - Each validation check reduces cognitive load by ~1 (easier to understand declarative rules)
+        // - Cyclomatic complexity may stay same or increase with schema
+        // - Primary benefit: reduced boilerplate and single source of truth
+
+        Self {
+            complexity_reduction: validation_count, // Cognitive reduction
+            risk_reduction: (validation_count as f64) * 0.02, // Reduced boilerplate = fewer bugs
+            confidence: if validation_count >= 10 {
+                ImpactConfidence::Expected
+            } else {
+                ImpactConfidence::Estimated
+            },
+            technique: RefactoringTechnique::ValidationExtraction,
         }
     }
 }

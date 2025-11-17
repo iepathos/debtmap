@@ -10,6 +10,7 @@ fn chaotic_pattern_uses_token_entropy_not_effective_complexity() {
         entropy_score: Some(0.6), // This should be token_entropy
         state_signals: None,
         coordinator_signals: None,
+        validation_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -36,6 +37,7 @@ fn below_threshold_not_chaotic() {
         entropy_score: Some(0.44), // Just below 0.45 threshold
         state_signals: None,
         coordinator_signals: None,
+        validation_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -55,6 +57,7 @@ fn at_threshold_is_chaotic() {
         entropy_score: Some(0.45), // Exactly at threshold
         state_signals: None,
         coordinator_signals: None,
+        validation_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -75,6 +78,7 @@ fn chaotic_pattern_takes_precedence() {
         entropy_score: Some(0.6), // >= 0.45, should trigger chaotic
         state_signals: None,
         coordinator_signals: None,
+        validation_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);
@@ -94,6 +98,7 @@ fn none_entropy_allows_other_patterns() {
         entropy_score: None, // No entropy data
         state_signals: None,
         coordinator_signals: None,
+        validation_signals: None,
     };
 
     let pattern = ComplexityPattern::detect(&metrics);

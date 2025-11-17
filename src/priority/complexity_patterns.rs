@@ -29,6 +29,13 @@ pub enum ComplexityPattern {
         cyclomatic: u32,
         cognitive: u32,
     },
+    /// Repetitive validation pattern: many early returns with same structure
+    RepetitiveValidation {
+        validation_count: u32,    // Number of validation checks
+        entropy: f64,             // Token entropy (low = repetitive)
+        cyclomatic: u32,          // Raw cyclomatic (before dampening)
+        adjusted_cyclomatic: u32, // Dampened complexity (reflects cognitive load)
+    },
     /// Deep nesting drives complexity (cognitive >> cyclomatic)
     HighNesting {
         nesting_depth: u32,
@@ -69,6 +76,16 @@ pub struct CoordinatorSignals {
     pub confidence: f64,
 }
 
+/// Signals indicating repetitive validation pattern
+#[derive(Debug, Clone)]
+pub struct ValidationSignals {
+    pub check_count: u32,
+    pub early_return_count: u32,
+    pub structural_similarity: f64,
+    pub has_validation_name: bool,
+    pub confidence: f64,
+}
+
 /// Complexity metrics for pattern detection
 #[derive(Debug, Clone)]
 pub struct ComplexityMetrics {
@@ -78,6 +95,7 @@ pub struct ComplexityMetrics {
     pub entropy_score: Option<f64>,
     pub state_signals: Option<StateMachineSignals>,
     pub coordinator_signals: Option<CoordinatorSignals>,
+    pub validation_signals: Option<ValidationSignals>,
 }
 
 impl ComplexityPattern {
@@ -131,6 +149,7 @@ impl ComplexityPattern {
     ///     entropy_score: Some(0.35),
     ///     state_signals: None,
     ///     coordinator_signals: None,
+    ///     validation_signals: None,
     /// };
     /// let pattern = ComplexityPattern::detect(&metrics);
     /// assert!(matches!(pattern, ComplexityPattern::HighNesting { .. }));
@@ -143,12 +162,31 @@ impl ComplexityPattern {
     ///     entropy_score: Some(0.30),
     ///     state_signals: None,
     ///     coordinator_signals: None,
+    ///     validation_signals: None,
     /// };
     /// let pattern = ComplexityPattern::detect(&metrics);
     /// assert!(matches!(pattern, ComplexityPattern::HighBranching { .. }));
     /// ```
     pub fn detect(metrics: &ComplexityMetrics) -> Self {
         let ratio = metrics.cognitive as f64 / metrics.cyclomatic.max(1) as f64;
+
+        // Check for repetitive validation pattern FIRST (low entropy + high branching)
+        // This prevents validation boilerplate from being misclassified as high complexity
+        if let Some(entropy) = metrics.entropy_score {
+            if is_repetitive_validation(metrics.cyclomatic, entropy, &metrics.validation_signals) {
+                let adjusted = dampen_complexity_for_repetition(metrics.cyclomatic, entropy);
+                return ComplexityPattern::RepetitiveValidation {
+                    validation_count: metrics
+                        .validation_signals
+                        .as_ref()
+                        .map(|v| v.check_count)
+                        .unwrap_or(metrics.cyclomatic),
+                    entropy,
+                    cyclomatic: metrics.cyclomatic,
+                    adjusted_cyclomatic: adjusted,
+                };
+            }
+        }
 
         // Check for state machine pattern (highest priority - specific, high-value)
         if let Some(ref state_signals) = metrics.state_signals {
@@ -229,6 +267,7 @@ impl ComplexityPattern {
             ComplexityPattern::Coordinator { .. } => {
                 "Coordinator orchestrating state-based actions"
             }
+            ComplexityPattern::RepetitiveValidation { .. } => "Repetitive validation boilerplate",
             ComplexityPattern::HighNesting { .. } => "Deep nesting drives complexity",
             ComplexityPattern::HighBranching { .. } => "Many decision points",
             ComplexityPattern::MixedComplexity { .. } => "Both nesting and branching high",
@@ -236,6 +275,57 @@ impl ComplexityPattern {
             ComplexityPattern::ModerateComplexity { .. } => "Approaching complexity thresholds",
         }
     }
+}
+
+/// Determine if metrics indicate repetitive validation pattern
+fn is_repetitive_validation(
+    cyclomatic: u32,
+    entropy: f64,
+    validation_signals: &Option<ValidationSignals>,
+) -> bool {
+    // Low entropy + high branching is primary signal
+    let has_low_entropy_high_branching = entropy < 0.35 && cyclomatic >= 10;
+
+    if !has_low_entropy_high_branching {
+        return false;
+    }
+
+    // Additional validation signals strengthen confidence
+    if let Some(signals) = validation_signals {
+        // Require majority of branches to be early returns
+        let early_return_ratio = signals.early_return_count as f64 / cyclomatic as f64;
+        if early_return_ratio < 0.6 {
+            return false;
+        }
+
+        // High structural similarity (measured by AST pattern matching)
+        if signals.structural_similarity < 0.7 {
+            return false;
+        }
+
+        true
+    } else {
+        // Without validation signals, we can't confirm it's a validation pattern
+        // Return false to avoid false positives
+        false
+    }
+}
+
+/// Dampen cyclomatic complexity for repetitive patterns
+fn dampen_complexity_for_repetition(cyclomatic: u32, entropy: f64) -> u32 {
+    // Lower entropy = more dampening (recognition of low cognitive load)
+    // entropy < 0.25: 60% dampening (very repetitive)
+    // entropy < 0.30: 50% dampening (highly repetitive)
+    // entropy < 0.35: 40% dampening (moderately repetitive)
+    let dampening_factor = if entropy < 0.25 {
+        0.4
+    } else if entropy < 0.30 {
+        0.5
+    } else {
+        0.6
+    };
+
+    (cyclomatic as f64 * dampening_factor).ceil() as u32
 }
 
 #[cfg(test)]
@@ -251,6 +341,7 @@ mod tests {
             entropy_score: Some(0.35),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -277,6 +368,7 @@ mod tests {
             entropy_score: Some(0.30),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -292,6 +384,7 @@ mod tests {
             entropy_score: Some(0.32),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -307,6 +400,7 @@ mod tests {
             entropy_score: Some(0.50), // High entropy
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -325,6 +419,7 @@ mod tests {
             entropy_score: Some(0.30),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -344,6 +439,7 @@ mod tests {
             entropy_score: Some(0.48), // High entropy takes precedence
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -363,6 +459,7 @@ mod tests {
             entropy_score: Some(0.30),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -383,6 +480,7 @@ mod tests {
             entropy_score: Some(0.30),
             state_signals: None,
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -408,6 +506,7 @@ mod tests {
                 confidence: 0.85,
             }),
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -436,6 +535,7 @@ mod tests {
                 has_helper_calls: true,
                 confidence: 0.80,
             }),
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -458,6 +558,7 @@ mod tests {
                 confidence: 0.90,
             }),
             coordinator_signals: None,
+            validation_signals: None,
         };
 
         let pattern = ComplexityPattern::detect(&metrics);
@@ -509,5 +610,96 @@ mod tests {
             .description(),
             "Many decision points"
         );
+    }
+
+    #[test]
+    fn detect_repetitive_validation_pattern() {
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 25,
+            nesting: 1,
+            entropy_score: Some(0.28),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: Some(ValidationSignals {
+                check_count: 20,
+                early_return_count: 20,
+                structural_similarity: 0.95,
+                has_validation_name: true,
+                confidence: 0.9,
+            }),
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(matches!(
+            pattern,
+            ComplexityPattern::RepetitiveValidation { .. }
+        ));
+
+        if let ComplexityPattern::RepetitiveValidation {
+            validation_count,
+            entropy,
+            cyclomatic,
+            adjusted_cyclomatic,
+        } = pattern
+        {
+            assert_eq!(validation_count, 20);
+            assert_eq!(cyclomatic, 20);
+            assert_eq!(adjusted_cyclomatic, 10); // 20 * 0.5 dampening
+            assert!((entropy - 0.28).abs() < 0.01);
+        }
+    }
+
+    #[test]
+    fn validation_pattern_takes_precedence_over_high_branching() {
+        // High branching metrics BUT repetitive validation signals
+        let metrics = ComplexityMetrics {
+            cyclomatic: 18,
+            cognitive: 20,
+            nesting: 1,
+            entropy_score: Some(0.30),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: Some(ValidationSignals {
+                check_count: 18,
+                early_return_count: 18,
+                structural_similarity: 0.92,
+                has_validation_name: true,
+                confidence: 0.85,
+            }),
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            matches!(pattern, ComplexityPattern::RepetitiveValidation { .. }),
+            "Repetitive validation should take precedence over high branching"
+        );
+    }
+
+    #[test]
+    fn high_entropy_prevents_validation_detection() {
+        // High branching but HIGH entropy (varied logic)
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 45,
+            nesting: 2,
+            entropy_score: Some(0.55),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            !matches!(pattern, ComplexityPattern::RepetitiveValidation { .. }),
+            "High entropy should prevent validation pattern detection"
+        );
+    }
+
+    #[test]
+    fn dampening_factor_scales_with_entropy() {
+        assert_eq!(dampen_complexity_for_repetition(20, 0.20), 8); // 0.4 factor
+        assert_eq!(dampen_complexity_for_repetition(20, 0.28), 10); // 0.5 factor
+        assert_eq!(dampen_complexity_for_repetition(20, 0.33), 12); // 0.6 factor
     }
 }
