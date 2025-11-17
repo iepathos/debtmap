@@ -1417,8 +1417,7 @@ pub fn sanitize_module_name(name: &str) -> String {
     let sanitized = name
         .to_lowercase()
         .replace('&', "and")
-        .replace('/', "_")
-        .replace('-', "_")
+        .replace(['/', '-'], "_")
         .replace('\'', "")
         .replace(' ', "_")
         .chars()
