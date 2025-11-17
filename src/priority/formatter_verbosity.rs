@@ -578,6 +578,7 @@ fn format_item_body(
     _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
+    has_coverage_data: bool,
 ) {
     // Location section (spec 139: tree formatting, spec 181: clean location line)
     writeln!(
@@ -603,7 +604,14 @@ fn format_item_body(
     format_complexity_summary(output, item, _formatter);
 
     // COVERAGE section (show right after complexity for consistency)
-    format_coverage_section(output, item, _formatter, verbosity, tree_pipe);
+    format_coverage_section(
+        output,
+        item,
+        _formatter,
+        verbosity,
+        tree_pipe,
+        has_coverage_data,
+    );
 
     // FILE CONTEXT section (spec 181: show non-production contexts in default mode)
     if verbosity == 0 {
@@ -837,7 +845,13 @@ fn format_coverage_section(
     _formatter: &ColoredFormatter,
     verbosity: u8,
     tree_pipe: &str,
+    has_coverage_data: bool,
 ) {
+    // Skip entire coverage section if no LCOV data was provided (spec 180)
+    if !has_coverage_data {
+        return;
+    }
+
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
 
@@ -985,7 +999,14 @@ pub fn format_priority_item_with_config(
     }
 
     // Format the rest of the item
-    format_item_body(output, item, &formatter, verbosity, tree_pipe);
+    format_item_body(
+        output,
+        item,
+        &formatter,
+        verbosity,
+        tree_pipe,
+        has_coverage_data,
+    );
 }
 
 /// Analyze coverage gaps to provide specific testing recommendations
