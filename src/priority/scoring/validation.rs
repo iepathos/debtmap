@@ -29,11 +29,19 @@ pub(super) fn check_testing_gap(
 }
 
 /// Pure function to check for complexity hotspots
+/// Uses adjusted complexity when available (spec 182)
 pub(super) fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
-    if func.cyclomatic > 10 || func.cognitive > 15 {
+    // Use adjusted complexity if available (spec 182)
+    let effective_cyclomatic = func
+        .adjusted_complexity
+        .map(|adj| adj.round() as u32)
+        .unwrap_or(func.cyclomatic);
+
+    if effective_cyclomatic > 10 || func.cognitive > 15 {
         Some(DebtType::ComplexityHotspot {
             cyclomatic: func.cyclomatic,
             cognitive: func.cognitive,
+            adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
         })
     } else {
         None

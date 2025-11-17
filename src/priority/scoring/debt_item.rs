@@ -518,12 +518,15 @@ fn generate_standard_recommendation(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
+            adjusted_cyclomatic,
         } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
             // Always try to use intelligent pattern-based recommendations
             // The DataFlowGraph is passed through but may still be None in some cases
             generate_complexity_recommendation_with_patterns_and_coverage(
                 func,
-                *cyclomatic,
+                effective_cyclomatic,
                 *cognitive,
                 coverage,
                 data_flow,
@@ -1238,7 +1241,8 @@ mod tests {
         assert_eq!(
             calculate_risk_factor(&DebtType::ComplexityHotspot {
                 cyclomatic: 20,
-                cognitive: 25
+                cognitive: 25,
+                adjusted_cyclomatic: None,
             }),
             0.35
         );
@@ -1299,6 +1303,7 @@ mod tests {
         let complexity = DebtType::ComplexityHotspot {
             cyclomatic: 20,
             cognitive: 25,
+            adjusted_cyclomatic: None,
         };
         assert_eq!(calculate_lines_reduction(&complexity), 0);
     }
@@ -1334,6 +1339,7 @@ mod tests {
             extract_cyclomatic_complexity(&DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 20,
+                adjusted_cyclomatic: None,
             }),
             15
         );
@@ -1406,6 +1412,7 @@ mod tests {
         let debt_type = DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 20,
+            adjusted_cyclomatic: None,
         };
 
         let score = UnifiedScore {

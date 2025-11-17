@@ -40,10 +40,14 @@ pub fn format_debt_issue(debt_type: &crate::priority::DebtType) -> String {
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
+            adjusted_cyclomatic,
         } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
             let weights = ComplexityWeights::default();
             let norm = ComplexityNormalization::default();
-            let weighted = WeightedComplexity::calculate(*cyclomatic, *cognitive, weights, &norm);
+            let weighted =
+                WeightedComplexity::calculate(effective_cyclomatic, *cognitive, weights, &norm);
             weighted.format_complexity_info()
         }
         DebtType::DeadCode { visibility, .. } => {

@@ -817,6 +817,7 @@ mod tests {
                 DebtType::ComplexityHotspot {
                     cyclomatic: 30,
                     cognitive: 25,
+                    adjusted_cyclomatic: None,
                 },
                 30,
             ),

@@ -181,6 +181,7 @@ mod tests {
             DebtCategory::from_debt_type(&DebtType::ComplexityHotspot {
                 cyclomatic: 25,
                 cognitive: 40,
+                adjusted_cyclomatic: None,
             }),
             DebtCategory::CodeQuality
         );
@@ -277,6 +278,7 @@ mod tests {
             DebtType::ComplexityHotspot {
                 cyclomatic: 25,
                 cognitive: 35,
+                adjusted_cyclomatic: None,
             },
             70.0,
         ));

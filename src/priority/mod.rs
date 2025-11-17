@@ -160,6 +160,10 @@ pub enum DebtType {
     ComplexityHotspot {
         cyclomatic: u32,
         cognitive: u32,
+        /// Entropy-adjusted cyclomatic complexity (spec 182)
+        /// None if entropy analysis was not performed
+        #[serde(default)]
+        adjusted_cyclomatic: Option<u32>,
     },
     DeadCode {
         visibility: FunctionVisibility,

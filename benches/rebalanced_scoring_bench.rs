@@ -87,6 +87,7 @@ fn bench_batch_score_calculation(c: &mut Criterion) {
                 DebtType::ComplexityHotspot {
                     cyclomatic: f.cyclomatic,
                     cognitive: f.cognitive,
+                    adjusted_cyclomatic: None,
                 }
             } else {
                 DebtType::Risk {

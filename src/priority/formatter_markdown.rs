@@ -925,8 +925,22 @@ fn extract_complexity_info(debt_type: &DebtType) -> Option<String> {
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
+            adjusted_cyclomatic,
+        } => {
+            // Show adjusted complexity if available (spec 182)
+            if let Some(adjusted) = adjusted_cyclomatic {
+                Some(format!(
+                    "cyclomatic={} (adj={}), cognitive={}",
+                    cyclomatic, adjusted, cognitive
+                ))
+            } else {
+                Some(format!(
+                    "cyclomatic={}, cognitive={}",
+                    cyclomatic, cognitive
+                ))
+            }
         }
-        | DebtType::TestComplexityHotspot {
+        DebtType::TestComplexityHotspot {
             cyclomatic,
             cognitive,
             ..
@@ -1160,6 +1174,7 @@ mod tests {
         let complexity = DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 30,
+            adjusted_cyclomatic: None,
         };
         assert_eq!(format_debt_type(&complexity), "Complexity");
 
@@ -1223,6 +1238,7 @@ mod tests {
         let complexity_hotspot = DebtType::ComplexityHotspot {
             cyclomatic: 15,
             cognitive: 30,
+            adjusted_cyclomatic: None,
         };
         assert_eq!(
             extract_complexity_info(&complexity_hotspot),
@@ -1394,6 +1410,7 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 15,
                 cognitive: 25,
+                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 7.0,
@@ -2075,6 +2092,7 @@ mod tests {
             debt_type: DebtType::ComplexityHotspot {
                 cyclomatic: 30,
                 cognitive: 40,
+                adjusted_cyclomatic: None,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 8.0,

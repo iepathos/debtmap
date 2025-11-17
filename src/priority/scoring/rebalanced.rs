@@ -268,14 +268,17 @@ fn score_complexity(_func: &FunctionMetrics, debt_type: &DebtType, _weights: &Sc
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
+            adjusted_cyclomatic,
         } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
             // Base score from cyclomatic complexity
-            let cyclomatic_score: f64 = match cyclomatic {
-                c if *c > 30 => 100.0,
-                c if *c > 20 => 80.0,
-                c if *c > 15 => 60.0,
-                c if *c > 10 => 40.0,
-                c if *c > 5 => 20.0,
+            let cyclomatic_score: f64 = match effective_cyclomatic {
+                c if c > 30 => 100.0,
+                c if c > 20 => 80.0,
+                c if c > 15 => 60.0,
+                c if c > 10 => 40.0,
+                c if c > 5 => 20.0,
                 _ => 0.0,
             };
 
@@ -513,6 +516,7 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 42,
                 cognitive: 77,
+                adjusted_cyclomatic: None,
             },
             &ScoreWeights::default(),
         );
@@ -588,6 +592,7 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 42,
                 cognitive: 77,
+                adjusted_cyclomatic: None,
             },
             &ScoreWeights::default(),
         );
@@ -604,6 +609,7 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 12,
                 cognitive: 20,
+                adjusted_cyclomatic: None,
             },
             &ScoreWeights::default(),
         );
@@ -637,6 +643,7 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 30,
                 cognitive: 50,
+                adjusted_cyclomatic: None,
             },
             &ScoreWeights::default(),
         );

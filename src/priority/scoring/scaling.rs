@@ -53,12 +53,20 @@ fn apply_exponential_scaling(base_score: f64, debt_type: &DebtType, config: &Sca
         DebtType::GodObject { .. } => config.god_object_exponent,
         DebtType::GodModule { .. } => config.god_module_exponent,
 
-        // High complexity gets moderate exponential scaling
-        DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 30 => {
-            config.high_complexity_exponent
-        }
-        DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 15 => {
-            config.moderate_complexity_exponent
+        // High complexity gets moderate exponential scaling (use adjusted complexity - spec 182)
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            adjusted_cyclomatic,
+            ..
+        } => {
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            if effective_cyclomatic > 30 {
+                config.high_complexity_exponent
+            } else if effective_cyclomatic > 15 {
+                config.moderate_complexity_exponent
+            } else {
+                1.0
+            }
         }
 
         // Complex untested code gets slight exponential boost
@@ -124,11 +132,19 @@ pub fn calculate_final_score(
     let exponent = match debt_type {
         DebtType::GodObject { .. } => config.god_object_exponent,
         DebtType::GodModule { .. } => config.god_module_exponent,
-        DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 30 => {
-            config.high_complexity_exponent
-        }
-        DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 15 => {
-            config.moderate_complexity_exponent
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            adjusted_cyclomatic,
+            ..
+        } => {
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            if effective_cyclomatic > 30 {
+                config.high_complexity_exponent
+            } else if effective_cyclomatic > 15 {
+                config.moderate_complexity_exponent
+            } else {
+                1.0
+            }
         }
         DebtType::TestingGap { cyclomatic, .. } if *cyclomatic > 20 => {
             config.moderate_complexity_exponent
@@ -435,6 +451,7 @@ mod tests {
                     DebtType::ComplexityHotspot {
                         cyclomatic: 35,
                         cognitive: 40,
+                        adjusted_cyclomatic: None,
                     }
                 } else {
                     DebtType::TestingGap {

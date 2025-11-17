@@ -81,6 +81,7 @@ fn test_blog_sample_reconcile_state_recommendation() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 9,
             cognitive: 16,
+            adjusted_cyclomatic: None,
         },
         &metrics,
         FunctionRole::PureLogic,
@@ -131,6 +132,7 @@ fn test_blog_sample_validate_config_recommendation() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 6,
             cognitive: 6,
+            adjusted_cyclomatic: None,
         },
         &metrics,
         FunctionRole::PureLogic,
@@ -202,6 +204,7 @@ fn test_blog_samples_complexity_tier_boundaries() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 7,
             cognitive: 14,
+            adjusted_cyclomatic: None,
         },
         &low_metrics,
         FunctionRole::PureLogic,
@@ -246,6 +249,7 @@ fn test_blog_samples_complexity_tier_boundaries() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 8,
             cognitive: 15,
+            adjusted_cyclomatic: None,
         },
         &moderate_metrics,
         FunctionRole::PureLogic,
@@ -270,6 +274,7 @@ fn test_blog_sample_recommendations_have_effort_estimates() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 9,
             cognitive: 16,
+            adjusted_cyclomatic: None,
         },
         &reconcile_metrics,
         FunctionRole::PureLogic,
@@ -280,6 +285,7 @@ fn test_blog_sample_recommendations_have_effort_estimates() {
         &DebtType::ComplexityHotspot {
             cyclomatic: 6,
             cognitive: 6,
+            adjusted_cyclomatic: None,
         },
         &validate_metrics,
         FunctionRole::PureLogic,

@@ -153,7 +153,15 @@ fn is_architectural_issue(debt_type: &DebtType) -> bool {
     match debt_type {
         DebtType::GodObject { .. } => true,
         DebtType::GodModule { .. } => true,
-        DebtType::ComplexityHotspot { cyclomatic, .. } if *cyclomatic > 50 => true,
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            adjusted_cyclomatic,
+            ..
+        } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            effective_cyclomatic > 50
+        }
         _ => false,
     }
 }

@@ -127,6 +127,7 @@ fn bench_sorting_various_sizes(c: &mut Criterion) {
                     1 => DebtType::ComplexityHotspot {
                         cyclomatic: 35,
                         cognitive: 40,
+                        adjusted_cyclomatic: None,
                     },
                     _ => DebtType::TestingGap {
                         coverage: 0.0,
@@ -248,6 +249,7 @@ fn bench_mixed_debt_types(c: &mut Criterion) {
                 2 => DebtType::ComplexityHotspot {
                     cyclomatic: 35,
                     cognitive: 40,
+                    adjusted_cyclomatic: None,
                 },
                 3 => DebtType::TestingGap {
                     coverage: 0.0,

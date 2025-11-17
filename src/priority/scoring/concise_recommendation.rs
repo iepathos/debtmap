@@ -126,7 +126,12 @@ pub fn generate_concise_recommendation(
         DebtType::ComplexityHotspot {
             cyclomatic,
             cognitive,
-        } => generate_complexity_steps(*cyclomatic, *cognitive, metrics),
+            adjusted_cyclomatic,
+        } => {
+            // Use adjusted complexity if available (spec 182)
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            generate_complexity_steps(effective_cyclomatic, *cognitive, metrics)
+        }
         DebtType::DeadCode {
             visibility,
             cyclomatic,
@@ -943,6 +948,7 @@ mod tests {
             &DebtType::ComplexityHotspot {
                 cyclomatic: 20,
                 cognitive: 25,
+                adjusted_cyclomatic: None,
             },
             &metrics,
             FunctionRole::PureLogic,
