@@ -95,18 +95,19 @@ fn format_impact_section(context: &FormatContext) -> String {
     )
 }
 
-// Pure function to format complexity section
+// Pure function to format complexity section (spec 183)
 fn format_complexity_section(context: &FormatContext) -> Option<String> {
     if !context.complexity_info.has_complexity {
         return None;
     }
 
     if let Some(ref entropy) = context.complexity_info.entropy_details {
+        // Show raw → adjusted for clarity (spec 183)
         Some(format!(
-            "{} cyclomatic={} (dampened: {}, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
+            "{} cyclomatic={} → {} (entropy-adjusted, factor: {:.2}), est_branches={}, cognitive={}, nesting={}, entropy={:.2}",
             "├─ COMPLEXITY:".bright_blue(),
             format!("{}", context.complexity_info.cyclomatic).yellow(),
-            format!("{}", entropy.adjusted_complexity).yellow(),
+            format!("{}", entropy.adjusted_complexity).bright_green().bold(),
             entropy.dampening_factor,
             format!("{}", context.complexity_info.branch_count).yellow(),
             format!("{}", context.complexity_info.cognitive).yellow(),
