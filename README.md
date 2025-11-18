@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/license-MIT)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
-> 🚧 **Early Prototype** - This project is under active development and APIs may change
+> **Beta Software** - Debtmap is actively developed and tested in production. Core features are stable for Rust, though APIs may evolve as we add new capabilities. Contributions and feedback welcome!
 
 Debtmap combines coverage-risk correlation with multi-factor analysis (complexity, dependencies, call graphs) and entropy-adjusted scoring to reduce false positives and prioritize testing efforts effectively.
 
