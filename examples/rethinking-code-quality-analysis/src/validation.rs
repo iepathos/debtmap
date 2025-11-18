@@ -25,7 +25,7 @@ pub struct Config {
 }
 
 /// Function A: High Cyclomatic Complexity, Low Risk
-/// This function has high cyclomatic complexity (20) but low cognitive complexity
+/// This function has high cyclomatic complexity (21) but low cognitive complexity
 /// because all branches follow the same repetitive pattern.
 pub fn validate_config(config: &Config) -> Result<()> {
     if config.output_dir.is_none() {
