@@ -186,6 +186,11 @@ pub struct CoverageIndex {
     /// Maps (file, base_name) -> [monomorphized_names] for O(1) generic function lookup
     base_function_index: HashMap<(PathBuf, String), Vec<String>>,
 
+    /// Index from method name to actual function names for trait method matching
+    /// Maps (file, method_name) -> [actual_function_names] for O(1) variant matching
+    /// Example: (recursive_detector.rs, "visit_expr") -> ["_RNvXs0_...visit_expr"]
+    method_name_index: HashMap<(PathBuf, String), Vec<String>>,
+
     /// Statistics for debugging and monitoring
     stats: CoverageIndexStats,
 }
@@ -207,6 +212,7 @@ impl CoverageIndex {
             by_line: HashMap::new(),
             file_paths: Vec::new(),
             base_function_index: HashMap::new(),
+            method_name_index: HashMap::new(),
             stats: CoverageIndexStats {
                 total_files: 0,
                 total_records: 0,
@@ -218,16 +224,18 @@ impl CoverageIndex {
 
     /// Build coverage index from LCOV data (O(n) operation)
     ///
-    /// This creates three indexes:
+    /// This creates four indexes:
     /// 1. Nested HashMap for O(1) file + function lookups
     /// 2. BTreeMap for line-based range queries
     /// 3. Base function index for generic/monomorphized function aggregation
+    /// 4. Method name index for trait method variant matching
     pub fn from_coverage(coverage: &LcovData) -> Self {
         let start = Instant::now();
 
         let mut by_file: HashMap<PathBuf, HashMap<String, FunctionCoverage>> = HashMap::new();
         let mut by_line: HashMap<PathBuf, BTreeMap<usize, FunctionCoverage>> = HashMap::new();
         let mut base_function_index: HashMap<(PathBuf, String), Vec<String>> = HashMap::new();
+        let mut method_name_index: HashMap<(PathBuf, String), Vec<String>> = HashMap::new();
         let mut total_records = 0;
 
         for (file_path, functions) in &coverage.functions {
@@ -251,6 +259,17 @@ impl CoverageIndex {
                     // This is a monomorphized function - add to index
                     base_function_index
                         .entry((file_path.clone(), base_name.to_string()))
+                        .or_default()
+                        .push(func.name.clone());
+                }
+
+                // Extract method name for trait method matching
+                // Use the normalized method_name field if available
+                let method_name = &func.normalized.method_name;
+                if !method_name.is_empty() && method_name != &func.name {
+                    // Add to method name index for O(1) variant lookups
+                    method_name_index
+                        .entry((file_path.clone(), method_name.clone()))
                         .or_default()
                         .push(func.name.clone());
                 }
@@ -279,6 +298,7 @@ impl CoverageIndex {
             by_line,
             file_paths,
             base_function_index,
+            method_name_index,
             stats: CoverageIndexStats {
                 total_files,
                 total_records,
@@ -534,6 +554,7 @@ impl CoverageIndex {
         // Try name variants (for trait methods where LCOV may use simplified names)
         for variant in generate_name_variants(function_name) {
             log::debug!("Trying name variant: '{}'", variant);
+            // First try O(1) aggregated lookup
             if let Some(agg) = self.get_aggregated_coverage(file, &variant) {
                 log::debug!(
                     "✓ Coverage found via name variant '{}': {:.1}%",
@@ -541,6 +562,15 @@ impl CoverageIndex {
                     agg.coverage_pct
                 );
                 return Some(agg.coverage_pct / 100.0);
+            }
+            // If that fails, try path strategies (handles file path mismatches)
+            if let Some(func) = self.find_by_path_strategies(file, &variant) {
+                log::debug!(
+                    "✓ Coverage found via name variant '{}' with path strategies: {:.1}%",
+                    variant,
+                    func.coverage_percentage
+                );
+                return Some(func.coverage_percentage / 100.0);
             }
         }
 
@@ -717,6 +747,27 @@ impl CoverageIndex {
         if let Some(file_functions) = self.by_file.get(file) {
             if let Some(exact) = file_functions.get(function_name) {
                 return Some(AggregateCoverage::single(exact));
+            }
+        }
+
+        // Try method name index for trait methods (O(1))
+        // This handles cases where LCOV stores "visit_expr" but we're looking up "Type::visit_expr"
+        if let Some(matching_functions) = self
+            .method_name_index
+            .get(&(file.to_path_buf(), function_name.to_string()))
+        {
+            let coverages: Vec<&FunctionCoverage> = matching_functions
+                .iter()
+                .filter_map(|name| self.by_file.get(file).and_then(|funcs| funcs.get(name)))
+                .collect();
+
+            if !coverages.is_empty() {
+                log::debug!(
+                    "✓ Found {} matching functions via method_name_index for '{}'",
+                    coverages.len(),
+                    function_name
+                );
+                return Some(merge_coverage(coverages));
             }
         }
 
