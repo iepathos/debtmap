@@ -18,6 +18,7 @@ pub enum ComplexityPattern {
     /// State machine pattern: nested conditionals on enum states
     StateMachine {
         state_transitions: u32,
+        match_expression_count: u32,
         cyclomatic: u32,
         cognitive: u32,
         nesting: u32,
@@ -60,6 +61,7 @@ pub enum ComplexityPattern {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StateMachineSignals {
     pub transition_count: u32,
+    pub match_expression_count: u32,
     pub has_enum_match: bool,
     pub has_state_comparison: bool,
     pub action_dispatch_count: u32,
@@ -194,6 +196,7 @@ impl ComplexityPattern {
             {
                 return ComplexityPattern::StateMachine {
                     state_transitions: state_signals.transition_count,
+                    match_expression_count: state_signals.match_expression_count,
                     cyclomatic: metrics.cyclomatic,
                     cognitive: metrics.cognitive,
                     nesting: metrics.nesting,
@@ -501,6 +504,7 @@ mod tests {
             entropy_score: Some(0.32),
             state_signals: Some(StateMachineSignals {
                 transition_count: 3,
+                match_expression_count: 2,
                 has_enum_match: true,
                 has_state_comparison: true,
                 action_dispatch_count: 4,
@@ -553,6 +557,7 @@ mod tests {
             entropy_score: Some(0.35),
             state_signals: Some(StateMachineSignals {
                 transition_count: 4,
+                match_expression_count: 3,
                 has_enum_match: true,
                 has_state_comparison: true,
                 action_dispatch_count: 6,
@@ -574,6 +579,7 @@ mod tests {
         assert_eq!(
             ComplexityPattern::StateMachine {
                 state_transitions: 3,
+                match_expression_count: 2,
                 cyclomatic: 9,
                 cognitive: 16,
                 nesting: 4,

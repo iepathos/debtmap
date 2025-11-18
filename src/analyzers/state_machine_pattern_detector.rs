@@ -41,6 +41,7 @@ impl StateMachinePatternDetector {
 
         Some(StateMachineSignals {
             transition_count: visitor.enum_match_count + visitor.tuple_match_count,
+            match_expression_count: visitor.match_expression_count,
             has_enum_match: visitor.has_enum_match,
             has_state_comparison: visitor.state_comparison_count > 0,
             action_dispatch_count: visitor.action_dispatch_count,
@@ -141,6 +142,7 @@ struct StateMachineVisitor {
     tuple_match_count: u32,
     state_comparison_count: u32,
     action_dispatch_count: u32,
+    match_expression_count: u32,
     has_enum_match: bool,
 }
 
@@ -151,6 +153,7 @@ impl StateMachineVisitor {
             tuple_match_count: 0,
             state_comparison_count: 0,
             action_dispatch_count: 0,
+            match_expression_count: 0,
             has_enum_match: false,
         }
     }
@@ -191,6 +194,9 @@ impl StateMachineVisitor {
 
 impl<'ast> Visit<'ast> for StateMachineVisitor {
     fn visit_expr_match(&mut self, match_expr: &'ast ExprMatch) {
+        // Count this match expression
+        self.match_expression_count += 1;
+
         // Check if matching on state-related expression
         if self.has_state_field_access(&match_expr.expr) {
             self.has_enum_match = true;
@@ -357,6 +363,7 @@ mod tests {
         let signals = signals.unwrap();
         assert!(signals.has_enum_match);
         assert_eq!(signals.transition_count, 2); // Two tuple patterns matched
+        assert_eq!(signals.match_expression_count, 1); // One match expression
         assert!(signals.confidence >= 0.6);
     }
 

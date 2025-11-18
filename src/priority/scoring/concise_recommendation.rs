@@ -286,10 +286,18 @@ fn generate_complexity_steps(
     match pattern {
         ComplexityPattern::StateMachine {
             state_transitions,
+            match_expression_count,
             cyclomatic: cyclo,
             cognitive: cog,
             nesting,
-        } => generate_state_machine_recommendation(state_transitions, cyclo, cog, nesting, metrics),
+        } => generate_state_machine_recommendation(
+            state_transitions,
+            match_expression_count,
+            cyclo,
+            cog,
+            nesting,
+            metrics,
+        ),
         ComplexityPattern::Coordinator {
             action_count,
             comparison_count,
@@ -600,6 +608,7 @@ fn generate_chaotic_recommendation(
 /// Generate recommendation for state machine pattern
 fn generate_state_machine_recommendation(
     transitions: u32,
+    match_expression_count: u32,
     cyclomatic: u32,
     cognitive: u32,
     nesting: u32,
@@ -645,15 +654,25 @@ fn generate_state_machine_recommendation(
 
     let estimated_effort = (transitions as f32) * 0.75; // ~45min per transition
 
+    // Create a clearer explanation of what's being counted
+    let explanation = if match_expression_count > 1 {
+        format!(
+            "{} enum pattern transitions across {} match expressions",
+            transitions, match_expression_count
+        )
+    } else {
+        format!("{} state transitions", transitions)
+    };
+
     ActionableRecommendation {
         primary_action: format!(
             "Extract {} state transitions into named functions",
             transitions
         ),
         rationale: format!(
-            "State machine pattern detected with {} transitions. \
+            "State machine pattern detected with {}. \
              Extracting transitions will reduce complexity from {}/{} to ~{}/{}.",
-            transitions,
+            explanation,
             cyclomatic,
             cognitive,
             cyclomatic.saturating_sub(extraction_impact.complexity_reduction / 2),
