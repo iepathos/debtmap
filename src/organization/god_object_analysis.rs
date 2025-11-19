@@ -269,19 +269,15 @@ pub struct ModuleSplit {
         Option<crate::analysis::multi_signal_aggregation::AggregatedClassification>,
     /// Representative method names to show in recommendations (Spec 178)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
     pub representative_methods: Vec<String>,
     /// Fields from original struct needed by this extracted module (Spec 178)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
     pub fields_needed: Vec<String>,
     /// Suggested trait extraction for this behavioral group (Spec 178)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trait_suggestion: Option<String>,
     /// Behavioral category for this split (Spec 178)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub behavior_category: Option<String>,
 }
 

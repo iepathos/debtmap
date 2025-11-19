@@ -216,6 +216,10 @@ mod tests {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         }
     }
 
@@ -239,6 +243,10 @@ mod tests {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         };
 
         let validated = validate_and_refine_splits(vec![split]);

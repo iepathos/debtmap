@@ -143,6 +143,10 @@ impl ValidationLimits {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         }];
 
         let enhanced =
@@ -185,6 +189,10 @@ impl ValidationLimits {
                 severity: None,
                 interface_estimate: None,
                 classification_evidence: None,
+                representative_methods: vec![],
+                fields_needed: vec![],
+                trait_suggestion: None,
+                behavior_category: None,
             },
             ModuleSplit {
                 suggested_name: "validation".to_string(),
@@ -204,6 +212,10 @@ impl ValidationLimits {
                 severity: None,
                 interface_estimate: None,
                 classification_evidence: None,
+                representative_methods: vec![],
+                fields_needed: vec![],
+                trait_suggestion: None,
+                behavior_category: None,
             },
         ];
 
@@ -240,6 +252,10 @@ impl ValidationLimits {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         }];
 
         let enhanced =
