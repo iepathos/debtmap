@@ -564,19 +564,45 @@ use std::fmt;
 
 impl fmt::Display for SplitQualityReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║              Split Quality Analysis                          ║")?;
-        writeln!(f, "╠══════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ Quality Score: {:<46} ║", format!("{:.1}/100.0", self.quality_score))?;
+        writeln!(
+            f,
+            "╔══════════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║              Split Quality Analysis                          ║"
+        )?;
+        writeln!(
+            f,
+            "╠══════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ Quality Score: {:<46} ║",
+            format!("{:.1}/100.0", self.quality_score)
+        )?;
         writeln!(f, "║ Total Splits: {:<47} ║", self.total_splits)?;
         writeln!(f, "║ Idiomatic Splits: {:<43} ║", self.idiomatic_splits)?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════════╝"
+        )?;
 
         if !self.anti_patterns.is_empty() {
             writeln!(f)?;
-            writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
-            writeln!(f, "║              Anti-Patterns Found ({:<2})                        ║", self.anti_patterns.len())?;
-            writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
+            writeln!(
+                f,
+                "╔══════════════════════════════════════════════════════════════╗"
+            )?;
+            writeln!(
+                f,
+                "║              Anti-Patterns Found ({:<2})                        ║",
+                self.anti_patterns.len()
+            )?;
+            writeln!(
+                f,
+                "╚══════════════════════════════════════════════════════════════╝"
+            )?;
 
             for (i, pattern) in self.anti_patterns.iter().enumerate() {
                 if i > 0 {
@@ -607,36 +633,68 @@ impl fmt::Display for AntiPattern {
             AntiPatternType::LackOfTypeOwnership => "Lack of Type Ownership",
         };
 
-        writeln!(f, "┌──────────────────────────────────────────────────────────────┐")?;
+        writeln!(
+            f,
+            "┌──────────────────────────────────────────────────────────────┐"
+        )?;
         writeln!(f, "│ {} - {:<40} │", severity_str, pattern_name)?;
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+        writeln!(
+            f,
+            "├──────────────────────────────────────────────────────────────┤"
+        )?;
         writeln!(f, "│ Location: {:<51} │", self.location)?;
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+        writeln!(
+            f,
+            "├──────────────────────────────────────────────────────────────┤"
+        )?;
 
         // Description - wrap text to fit width
-        writeln!(f, "│ Description:                                                 │")?;
+        writeln!(
+            f,
+            "│ Description:                                                 │"
+        )?;
         for line in wrap_text(&self.description, 58) {
             writeln!(f, "│   {:<58} │", line)?;
         }
 
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-        writeln!(f, "│ Correction:                                                  │")?;
+        writeln!(
+            f,
+            "├──────────────────────────────────────────────────────────────┤"
+        )?;
+        writeln!(
+            f,
+            "│ Correction:                                                  │"
+        )?;
         for line in wrap_text(&self.correction, 58) {
             writeln!(f, "│   {:<58} │", line)?;
         }
 
         if !self.affected_methods.is_empty() {
-            writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-            writeln!(f, "│ Affected Methods ({:<2}):                                     │", self.affected_methods.len())?;
+            writeln!(
+                f,
+                "├──────────────────────────────────────────────────────────────┤"
+            )?;
+            writeln!(
+                f,
+                "│ Affected Methods ({:<2}):                                     │",
+                self.affected_methods.len()
+            )?;
             for method in self.affected_methods.iter().take(5) {
                 writeln!(f, "│   • {:<56} │", method)?;
             }
             if self.affected_methods.len() > 5 {
-                writeln!(f, "│   ... and {} more                                        │", self.affected_methods.len() - 5)?;
+                writeln!(
+                    f,
+                    "│   ... and {} more                                        │",
+                    self.affected_methods.len() - 5
+                )?;
             }
         }
 
-        writeln!(f, "└──────────────────────────────────────────────────────────────┘")?;
+        writeln!(
+            f,
+            "└──────────────────────────────────────────────────────────────┘"
+        )?;
 
         Ok(())
     }

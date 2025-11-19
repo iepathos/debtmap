@@ -99,10 +99,7 @@ fn test_detect_behavioral_split_anti_patterns() {
         p.pattern_type == AntiPatternType::UtilitiesModule
             && p.severity == AntiPatternSeverity::Critical
     });
-    assert!(
-        has_utilities,
-        "Should detect utilities module anti-pattern"
-    );
+    assert!(has_utilities, "Should detect utilities module anti-pattern");
 
     // Should detect technical grouping (high severity)
     let has_technical_grouping = report.anti_patterns.iter().any(|p| {
@@ -211,10 +208,12 @@ fn test_mixed_data_types_detection() {
 
     // Should detect mixed data types
     let has_mixed_types = anti_patterns.iter().any(|p| {
-        p.pattern_type == AntiPatternType::MixedDataTypes
-            && p.severity == AntiPatternSeverity::High
+        p.pattern_type == AntiPatternType::MixedDataTypes && p.severity == AntiPatternSeverity::High
     });
-    assert!(has_mixed_types, "Should detect mixed data types anti-pattern");
+    assert!(
+        has_mixed_types,
+        "Should detect mixed data types anti-pattern"
+    );
 }
 
 /// Test that good domain-based splits get high quality scores

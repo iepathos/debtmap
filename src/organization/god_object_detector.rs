@@ -1443,7 +1443,10 @@ impl GodObjectDetector {
     pub fn validate_and_improve_splits(
         splits: Vec<ModuleSplit>,
         signatures: &[crate::analyzers::type_registry::MethodSignature],
-    ) -> (Vec<ModuleSplit>, crate::organization::anti_pattern_detector::SplitQualityReport) {
+    ) -> (
+        Vec<ModuleSplit>,
+        crate::organization::anti_pattern_detector::SplitQualityReport,
+    ) {
         use crate::organization::anti_pattern_detector::{
             AntiPatternDetector, AntiPatternSeverity,
         };
