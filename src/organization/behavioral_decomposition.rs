@@ -763,11 +763,8 @@ fn ensure_all_methods_clustered(
     use std::collections::HashSet;
 
     // Collect all methods currently in clusters
-    let clustered_methods: HashSet<String> = clusters
-        .iter()
-        .flat_map(|c| &c.methods)
-        .cloned()
-        .collect();
+    let clustered_methods: HashSet<String> =
+        clusters.iter().flat_map(|c| &c.methods).cloned().collect();
 
     // Find missing methods
     let missing_methods: Vec<String> = all_methods
@@ -784,9 +781,9 @@ fn ensure_all_methods_clustered(
         );
 
         // Try to find an existing Utilities cluster first
-        let utilities_cluster = clusters
-            .iter_mut()
-            .find(|c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"));
+        let utilities_cluster = clusters.iter_mut().find(
+            |c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"),
+        );
 
         if let Some(utilities) = utilities_cluster {
             // Merge into existing Utilities cluster
@@ -921,14 +918,42 @@ fn cluster_by_verb_patterns(methods: &[String]) -> HashMap<String, Vec<String>> 
 fn extract_verb_pattern(method_name: &str) -> String {
     // Common verb patterns in Rust
     let prefixes = [
-        "parse", "build", "create", "make", "construct",
-        "get", "fetch", "retrieve", "find", "search", "lookup", "query",
-        "set", "update", "modify", "change",
-        "is", "has", "can", "should", "check",
-        "apply", "execute", "run", "process", "handle",
-        "demangle", "normalize", "sanitize", "clean",
-        "calculate", "compute", "derive",
-        "match", "compare", "equals",
+        "parse",
+        "build",
+        "create",
+        "make",
+        "construct",
+        "get",
+        "fetch",
+        "retrieve",
+        "find",
+        "search",
+        "lookup",
+        "query",
+        "set",
+        "update",
+        "modify",
+        "change",
+        "is",
+        "has",
+        "can",
+        "should",
+        "check",
+        "apply",
+        "execute",
+        "run",
+        "process",
+        "handle",
+        "demangle",
+        "normalize",
+        "sanitize",
+        "clean",
+        "calculate",
+        "compute",
+        "derive",
+        "match",
+        "compare",
+        "equals",
     ];
 
     for prefix in &prefixes {
@@ -998,9 +1023,9 @@ fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
     // 3. Small clusters don't survive
     if !unmerged_methods.is_empty() {
         // Check if we should create a Utilities cluster or merge into existing
-        let utilities_exists = normal_clusters
-            .iter_mut()
-            .find(|c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"));
+        let utilities_exists = normal_clusters.iter_mut().find(
+            |c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"),
+        );
 
         if let Some(utilities) = utilities_exists {
             // Merge into existing Utilities cluster
@@ -1106,7 +1131,15 @@ fn apply_rust_patterns(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
 }
 
 fn cluster_is_io_boundary(methods: &[String]) -> bool {
-    let io_keywords = ["parse", "read", "write", "load", "save", "deserialize", "serialize"];
+    let io_keywords = [
+        "parse",
+        "read",
+        "write",
+        "load",
+        "save",
+        "deserialize",
+        "serialize",
+    ];
     let io_count = methods
         .iter()
         .filter(|m| {
@@ -2186,10 +2219,7 @@ mod tests {
         let clusters = apply_production_ready_clustering(&methods, &adjacency);
 
         // Verify tests are filtered out
-        let all_cluster_methods: Vec<&String> = clusters
-            .iter()
-            .flat_map(|c| &c.methods)
-            .collect();
+        let all_cluster_methods: Vec<&String> = clusters.iter().flat_map(|c| &c.methods).collect();
 
         assert!(
             !all_cluster_methods.contains(&&"test_parse_lcov_file".to_string()),
@@ -2233,7 +2263,11 @@ mod tests {
 
         println!("\n=== Production-Ready Clustering Results ===");
         println!("Total clusters: {}", clusters.len());
-        println!("Production methods: {} / {} total", all_cluster_methods.len(), methods.len());
+        println!(
+            "Production methods: {} / {} total",
+            all_cluster_methods.len(),
+            methods.len()
+        );
         for (i, cluster) in clusters.iter().enumerate() {
             println!(
                 "Cluster {}: {} ({} methods)",
@@ -2271,7 +2305,10 @@ mod tests {
 
         let adjacency = HashMap::from([
             // Rendering cluster has internal calls
-            (("render_text".to_string(), "paint_highlights".to_string()), 1),
+            (
+                ("render_text".to_string(), "paint_highlights".to_string()),
+                1,
+            ),
             (("render_cursor".to_string(), "draw_gutter".to_string()), 1),
             // Utilities have zero internal calls (low cohesion)
             // Validation has no calls (isolated)
@@ -2282,11 +2319,8 @@ mod tests {
         let clusters = apply_production_ready_clustering(&methods, &adjacency);
 
         // REQUIREMENT 1: All methods must be accounted for
-        let clustered_methods: std::collections::HashSet<String> = clusters
-            .iter()
-            .flat_map(|c| &c.methods)
-            .cloned()
-            .collect();
+        let clustered_methods: std::collections::HashSet<String> =
+            clusters.iter().flat_map(|c| &c.methods).cloned().collect();
 
         for method in &methods {
             assert!(
@@ -2317,11 +2351,11 @@ mod tests {
         // REQUIREMENT 3: Low-cohesion methods kept (not filtered out)
         // format_timestamp and clamp_value have zero cohesion but should be in a cluster
         assert!(
-            clustered_methods.contains(&"format_timestamp".to_string()),
+            clustered_methods.contains("format_timestamp"),
             "Low-cohesion method 'format_timestamp' should be kept"
         );
         assert!(
-            clustered_methods.contains(&"clamp_value".to_string()),
+            clustered_methods.contains("clamp_value"),
             "Low-cohesion method 'clamp_value' should be kept"
         );
 

@@ -958,6 +958,7 @@ impl GodObjectDetector {
     }
 
     /// Helper to capitalize first character
+    #[allow(dead_code)]
     fn capitalize_first(s: &str) -> String {
         let mut chars = s.chars();
         match chars.next() {
