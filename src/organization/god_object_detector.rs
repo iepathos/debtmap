@@ -217,7 +217,78 @@ impl GodObjectDetector {
             }
         }
 
+        // Check if module as a whole is large with many small structs (god module)
+        // This should be checked BEFORE individual God Class detection because
+        // God Module is a file-level architectural pattern that takes precedence.
+        // Files with many small structs shouldn't be flagged as God Class just
+        // because one struct has slightly elevated metrics (e.g., 6 responsibilities vs 5 threshold).
+        //
+        // Key criteria for God Module (to distinguish from God Class with helper structs):
+        // 1. At least 5 structs
+        // 2. Total methods > 2x threshold (40 for Rust)
+        // 3. NO single struct dominates (largest struct has <60% of total methods)
+        if params.per_struct_metrics.len() >= 5
+            && params.total_methods > params.thresholds.max_methods * 2
+        {
+            // Calculate largest struct's share of methods
+            let largest_method_count = params
+                .per_struct_metrics
+                .iter()
+                .map(|s| s.method_count)
+                .max()
+                .unwrap_or(0);
+
+            let largest_share = if params.total_methods > 0 {
+                largest_method_count as f64 / params.total_methods as f64
+            } else {
+                0.0
+            };
+
+            // Only classify as God Module if no struct dominates (>60% of methods)
+            // This prevents "God Class + helpers" from being misclassified as God Module
+            if largest_share < 0.6 {
+                let largest_struct = params
+                    .per_struct_metrics
+                    .iter()
+                    .max_by_key(|s| s.method_count)
+                    .cloned()
+                    .unwrap_or_else(|| StructMetrics {
+                        name: "Unknown".to_string(),
+                        method_count: 0,
+                        field_count: 0,
+                        responsibilities: vec![],
+                        line_span: (0, 0),
+                    });
+
+                // Use enhanced struct ownership analysis if available, otherwise use module function classifier
+                let suggested_splits = if params.ownership.is_some() {
+                    crate::organization::suggest_splits_by_struct_grouping(
+                        params.per_struct_metrics,
+                        params.ownership,
+                        Some(params.file_path),
+                        Some(params.ast),
+                    )
+                } else {
+                    // Try module function classification first (Spec 149)
+                    self.try_module_function_classification(params.visitor, params.file_path)
+                        .unwrap_or_else(|| {
+                            suggest_module_splits_by_domain(params.per_struct_metrics)
+                        })
+                };
+
+                return GodObjectType::GodModule {
+                    total_structs: params.per_struct_metrics.len(),
+                    total_methods: params.total_methods,
+                    largest_struct,
+                    suggested_splits,
+                };
+            }
+            // If largest struct dominates (>=60%), fall through to God Class check
+        }
+
         // Check if any individual struct exceeds thresholds (god class)
+        // This is checked AFTER God Module detection to avoid false positives
+        // in files with many small structs where one struct might marginally exceed limits.
         for struct_metrics in params.per_struct_metrics {
             if struct_metrics.method_count > params.thresholds.max_methods
                 || struct_metrics.field_count > params.thresholds.max_fields
@@ -230,45 +301,6 @@ impl GodObjectDetector {
                     responsibilities: struct_metrics.responsibilities.len(),
                 };
             }
-        }
-
-        // Check if module as a whole is large with many small structs (god module)
-        if params.per_struct_metrics.len() >= 5
-            && params.total_methods > params.thresholds.max_methods * 2
-        {
-            let largest_struct = params
-                .per_struct_metrics
-                .iter()
-                .max_by_key(|s| s.method_count)
-                .cloned()
-                .unwrap_or_else(|| StructMetrics {
-                    name: "Unknown".to_string(),
-                    method_count: 0,
-                    field_count: 0,
-                    responsibilities: vec![],
-                    line_span: (0, 0),
-                });
-
-            // Use enhanced struct ownership analysis if available, otherwise use module function classifier
-            let suggested_splits = if params.ownership.is_some() {
-                crate::organization::suggest_splits_by_struct_grouping(
-                    params.per_struct_metrics,
-                    params.ownership,
-                    Some(params.file_path),
-                    Some(params.ast),
-                )
-            } else {
-                // Try module function classification first (Spec 149)
-                self.try_module_function_classification(params.visitor, params.file_path)
-                    .unwrap_or_else(|| suggest_module_splits_by_domain(params.per_struct_metrics))
-            };
-
-            return GodObjectType::GodModule {
-                total_structs: params.per_struct_metrics.len(),
-                total_methods: params.total_methods,
-                largest_struct,
-                suggested_splits,
-            };
         }
 
         GodObjectType::NotGodObject
@@ -803,7 +835,10 @@ impl GodObjectDetector {
         )
     }
 
-    /// Generate behavioral splits using community detection (Spec 178)
+    /// Generate behavioral splits using hybrid clustering (Spec 178)
+    ///
+    /// Uses a hybrid approach combining name-based categorization with
+    /// call-graph community detection for improved accuracy.
     fn generate_behavioral_splits(
         all_methods: &[String],
         field_tracker: Option<&crate::organization::FieldAccessTracker>,
@@ -811,7 +846,7 @@ impl GodObjectDetector {
         base_name: &str,
     ) -> Vec<ModuleSplit> {
         use crate::organization::behavioral_decomposition::{
-            apply_community_detection, build_method_call_adjacency_matrix,
+            apply_hybrid_clustering, build_method_call_adjacency_matrix_with_functions,
             detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
         };
 
@@ -828,15 +863,29 @@ impl GodObjectDetector {
             })
             .collect();
 
-        if impl_blocks.is_empty() || all_methods.is_empty() {
+        // Collect standalone functions for adjacency matrix
+        let standalone_functions: Vec<&syn::ItemFn> = ast
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::Item::Fn(func) = item {
+                    Some(func)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if all_methods.is_empty() {
             return Vec::new();
         }
 
-        // Build method call adjacency matrix
-        let adjacency = build_method_call_adjacency_matrix(&impl_blocks);
+        // Build method call adjacency matrix (includes standalone function calls)
+        let adjacency =
+            build_method_call_adjacency_matrix_with_functions(&impl_blocks, &standalone_functions);
 
-        // Apply community detection to cluster methods
-        let clusters = apply_community_detection(all_methods, &adjacency);
+        // Apply hybrid clustering (name-based + community detection)
+        let clusters = apply_hybrid_clustering(all_methods, &adjacency);
 
         // Convert clusters to ModuleSplit recommendations
         let mut splits: Vec<ModuleSplit> = clusters

@@ -934,11 +934,7 @@ fn format_god_object_steps_with_verbosity(
 
                 writeln!(output, "      Methods ({} total):", total_methods).unwrap();
 
-                for method in split
-                    .representative_methods
-                    .iter()
-                    .take(sample_size)
-                {
+                for method in split.representative_methods.iter().take(sample_size) {
                     writeln!(output, "        • {}()", method).unwrap();
                 }
 

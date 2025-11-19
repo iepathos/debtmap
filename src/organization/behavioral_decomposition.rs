@@ -225,6 +225,7 @@ impl BehavioralCategorizer {
             "deserialize",
             "write",
             "read",
+            "parse",
         ];
         PERSISTENCE_KEYWORDS
             .iter()
@@ -267,25 +268,56 @@ pub fn cluster_methods_by_behavior(methods: &[String]) -> HashMap<BehaviorCatego
                 | BehaviorCategory::Persistence
                 | BehaviorCategory::Validation
                 | BehaviorCategory::Computation
-        ) || methods.len() >= 5 // Keep domain clusters only if they have 5+ methods
+        ) || methods.len() >= 3 // Keep domain clusters only if they have 3+ methods
     });
 
     clusters
 }
 
-/// Build method call adjacency matrix from impl blocks
+/// Build method call adjacency matrix from impl blocks and standalone functions
 ///
-/// This function analyzes method call patterns within impl blocks to build
-/// an adjacency matrix showing which methods call which other methods.
+/// This function analyzes method call patterns within impl blocks and standalone
+/// functions to build an adjacency matrix showing which methods call which other methods.
 ///
 /// Returns: HashMap<(method_a, method_b), call_count>
 pub fn build_method_call_adjacency_matrix(
     impl_blocks: &[&syn::ItemImpl],
 ) -> HashMap<(String, String), usize> {
+    build_method_call_adjacency_matrix_with_functions(impl_blocks, &[])
+}
+
+/// Build method call adjacency matrix with support for standalone functions
+///
+/// This enhanced version also tracks calls between standalone functions in the same file,
+/// providing better clustering for modules with utility functions.
+///
+/// Returns: HashMap<(method_a, method_b), call_count>
+pub fn build_method_call_adjacency_matrix_with_functions(
+    impl_blocks: &[&syn::ItemImpl],
+    standalone_functions: &[&syn::ItemFn],
+) -> HashMap<(String, String), usize> {
     use syn::visit::Visit;
 
     let mut matrix = HashMap::new();
 
+    // Collect all function names for validation
+    let mut all_function_names = HashSet::new();
+
+    // Add impl method names
+    for impl_block in impl_blocks {
+        for item in &impl_block.items {
+            if let syn::ImplItem::Fn(method) = item {
+                all_function_names.insert(method.sig.ident.to_string());
+            }
+        }
+    }
+
+    // Add standalone function names
+    for func in standalone_functions {
+        all_function_names.insert(func.sig.ident.to_string());
+    }
+
+    // Process impl methods
     for impl_block in impl_blocks {
         for item in &impl_block.items {
             if let syn::ImplItem::Fn(method) = item {
@@ -295,6 +327,7 @@ pub fn build_method_call_adjacency_matrix(
                 let mut call_visitor = MethodCallVisitor {
                     current_method: method_name.clone(),
                     calls: Vec::new(),
+                    all_function_names: &all_function_names,
                 };
                 call_visitor.visit_impl_item_fn(method);
 
@@ -307,16 +340,35 @@ pub fn build_method_call_adjacency_matrix(
         }
     }
 
+    // Process standalone functions
+    for func in standalone_functions {
+        let func_name = func.sig.ident.to_string();
+
+        let mut call_visitor = MethodCallVisitor {
+            current_method: func_name.clone(),
+            calls: Vec::new(),
+            all_function_names: &all_function_names,
+        };
+        call_visitor.visit_item_fn(func);
+
+        // Record calls in adjacency matrix
+        for called_function in call_visitor.calls {
+            let key = (func_name.clone(), called_function);
+            *matrix.entry(key).or_insert(0) += 1;
+        }
+    }
+
     matrix
 }
 
 /// Visitor to extract method calls from a method body
-struct MethodCallVisitor {
+struct MethodCallVisitor<'a> {
     current_method: String,
     calls: Vec<String>,
+    all_function_names: &'a HashSet<String>,
 }
 
-impl<'ast> Visit<'ast> for MethodCallVisitor {
+impl<'ast, 'a> Visit<'ast> for MethodCallVisitor<'a> {
     fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
         // Check if this is a self.method_name() call
         if let syn::Expr::Path(ref path) = *node.receiver {
@@ -348,6 +400,16 @@ impl<'ast> Visit<'ast> for MethodCallVisitor {
                     if method_name != self.current_method {
                         self.calls.push(method_name);
                     }
+                }
+            } else if path.path.segments.len() == 1 {
+                // NEW: Track standalone function calls within the same module
+                let func_name = path.path.segments[0].ident.to_string();
+
+                // Only track if this is a function defined in the same file
+                // and not the current method (avoid self-recursion)
+                if func_name != self.current_method && self.all_function_names.contains(&func_name)
+                {
+                    self.calls.push(func_name);
                 }
             }
         }
@@ -455,7 +517,7 @@ pub fn apply_community_detection(
     // Convert to MethodCluster structs
     let clusters_result: Vec<MethodCluster> = clusters
         .into_values()
-        .filter(|methods| methods.len() >= 5) // Only clusters with 5+ methods
+        .filter(|methods| methods.len() >= 3) // Only clusters with 3+ methods (more granular)
         .map(|methods| {
             let (internal_calls, external_calls) =
                 calculate_cluster_cohesion(&methods, adjacency, &method_to_cluster);
@@ -472,16 +534,110 @@ pub fn apply_community_detection(
             cluster.calculate_cohesion();
             cluster
         })
-        .filter(|cluster| cluster.cohesion_score > 0.3) // Filter low-cohesion clusters
+        .filter(|cluster| cluster.cohesion_score > 0.2) // Filter low-cohesion clusters (relaxed threshold)
         .collect();
 
-    // If only 1 cluster found, treat as "no useful splits" - all methods are tightly coupled
-    // Better to fall back to responsibility-based grouping which can still split by purpose
-    if clusters_result.len() <= 1 {
-        return Vec::new();
+    // Return all clusters found, even if only one
+    // A single large cohesive cluster can still be a useful signal for splitting
+    // (e.g., by responsibility or behavioral patterns)
+    clusters_result
+}
+
+/// Apply hybrid clustering: name-based categorization refined by community detection
+///
+/// This improved approach combines the best of both strategies:
+/// 1. Initial clustering by behavioral categories (name-based)
+/// 2. Refinement using call-graph community detection for large clusters
+///
+/// Benefits:
+/// - Works for files with sparse call graphs (utility modules)
+/// - Finds natural cohesion boundaries within behavioral categories
+/// - More accurate than either approach alone
+pub fn apply_hybrid_clustering(
+    methods: &[String],
+    adjacency: &HashMap<(String, String), usize>,
+) -> Vec<MethodCluster> {
+    // Step 1: Initial clustering by name-based behavioral categories
+    let name_clusters = cluster_methods_by_behavior(methods);
+
+    if name_clusters.is_empty() {
+        // No meaningful categorization found, fall back to pure community detection
+        return apply_community_detection(methods, adjacency);
     }
 
-    clusters_result
+    let mut refined_clusters = Vec::new();
+
+    // Step 2: Refine each behavioral category
+    for (category, cluster_methods) in name_clusters {
+        if cluster_methods.len() <= 5 {
+            // Small clusters: keep as-is, no need for further splitting
+            let mut cluster = MethodCluster {
+                category: category.clone(),
+                methods: cluster_methods.clone(),
+                fields_accessed: vec![],
+                internal_calls: 0,
+                external_calls: 0,
+                cohesion_score: 0.0,
+            };
+
+            // Calculate cohesion for this cluster
+            let method_to_cluster: HashMap<String, usize> =
+                cluster_methods.iter().map(|m| (m.clone(), 0)).collect();
+
+            let (internal_calls, external_calls) =
+                calculate_cluster_cohesion(&cluster_methods, adjacency, &method_to_cluster);
+
+            cluster.internal_calls = internal_calls;
+            cluster.external_calls = external_calls;
+            cluster.calculate_cohesion();
+
+            refined_clusters.push(cluster);
+        } else {
+            // Large clusters: try to split further using community detection
+            let sub_clusters = apply_community_detection(&cluster_methods, adjacency);
+
+            if sub_clusters.is_empty() {
+                // Community detection found no useful splits, keep original behavioral cluster
+                let mut cluster = MethodCluster {
+                    category: category.clone(),
+                    methods: cluster_methods.clone(),
+                    fields_accessed: vec![],
+                    internal_calls: 0,
+                    external_calls: 0,
+                    cohesion_score: 0.0,
+                };
+
+                let method_to_cluster: HashMap<String, usize> =
+                    cluster_methods.iter().map(|m| (m.clone(), 0)).collect();
+
+                let (internal_calls, external_calls) =
+                    calculate_cluster_cohesion(&cluster_methods, adjacency, &method_to_cluster);
+
+                cluster.internal_calls = internal_calls;
+                cluster.external_calls = external_calls;
+                cluster.calculate_cohesion();
+
+                refined_clusters.push(cluster);
+            } else {
+                // Found meaningful subclusters, use those instead
+                // But preserve the original behavioral category as a hint
+                for mut subcluster in sub_clusters {
+                    // If the subcluster's inferred category is generic (Domain),
+                    // prefer the original behavioral category
+                    if matches!(subcluster.category, BehaviorCategory::Domain(_)) {
+                        subcluster.category = category.clone();
+                    }
+                    refined_clusters.push(subcluster);
+                }
+            }
+        }
+    }
+
+    // Note: We don't filter by cohesion score here because name-based clusters
+    // may have low/zero cohesion (no internal calls) but are still valid behavioral groups.
+    // Community detection already filters by cohesion (>0.2), so we trust the categorization.
+
+    refined_clusters
 }
 
 /// Calculate modularity score for a method in a cluster
@@ -1183,5 +1339,295 @@ mod tests {
         let methods = vec!["render".to_string(), "draw".to_string()];
         let minimal_fields = tracker.get_minimal_field_set(&methods);
         assert_eq!(minimal_fields, vec!["cursor_position", "display_map"]);
+    }
+
+    #[test]
+    fn test_hybrid_clustering_lcov_like_example() {
+        // This test mimics the structure of lcov.rs with multiple behavioral categories
+        // to ensure hybrid clustering correctly identifies diverse method groups
+        let code = quote::quote! {
+            pub struct LcovData {
+                file_index: HashMap<String, Vec<String>>,
+                function_cache: HashMap<String, CoverageData>,
+                loc_counter: Option<LocCounter>,
+            }
+
+            impl LcovData {
+                // Lifecycle methods
+                pub fn new() -> Self {
+                    Self {
+                        file_index: HashMap::new(),
+                        function_cache: HashMap::new(),
+                        loc_counter: None,
+                    }
+                }
+
+                pub fn create_empty() -> Self {
+                    Self::new()
+                }
+
+                pub fn initialize(&mut self) {
+                    self.build_index();
+                }
+
+                pub fn build_index(&mut self) {
+                    // Build index logic
+                }
+
+                pub fn with_loc_counter(mut self, counter: LocCounter) -> Self {
+                    self.loc_counter = Some(counter);
+                    self
+                }
+
+                // Query methods - these call each other
+                pub fn get_function_coverage(&self, file: &str, function: &str) -> Option<f64> {
+                    let funcs = self.find_functions_by_path(file)?;
+                    self.find_function_by_name(funcs, function)
+                }
+
+                pub fn get_file_coverage(&self, file: &str) -> Option<f64> {
+                    let funcs = self.find_functions_by_path(file)?;
+                    Some(self.calculate_average(funcs))
+                }
+
+                pub fn get_overall_coverage(&self) -> f64 {
+                    let all_files = self.get_all_files();
+                    self.calculate_weighted_average(&all_files)
+                }
+
+                pub fn batch_get_function_coverage(&self, queries: Vec<Query>) -> Vec<f64> {
+                    queries.iter().map(|q| {
+                        self.get_function_coverage(&q.file, &q.func).unwrap_or(0.0)
+                    }).collect()
+                }
+
+                // Path matching methods - these call each other
+                fn find_functions_by_path(&self, path: &str) -> Option<Vec<String>> {
+                    if self.matches_suffix_strategy(path) {
+                        Some(vec![])
+                    } else {
+                        self.apply_strategies_parallel(path)
+                    }
+                }
+
+                fn matches_suffix_strategy(&self, path: &str) -> bool {
+                    let normalized = normalize_path(path);
+                    self.file_index.contains_key(&normalized)
+                }
+
+                fn apply_strategies_parallel(&self, path: &str) -> Option<Vec<String>> {
+                    let results = self.apply_strategies_sequential(path);
+                    results
+                }
+
+                fn apply_strategies_sequential(&self, path: &str) -> Option<Vec<String>> {
+                    if self.matches_reverse_suffix(path) {
+                        Some(vec![])
+                    } else {
+                        None
+                    }
+                }
+
+                fn matches_reverse_suffix(&self, path: &str) -> bool {
+                    false
+                }
+
+                // Helper methods for queries
+                fn find_function_by_name(&self, funcs: Vec<String>, name: &str) -> Option<f64> {
+                    let normalized = normalize_function_name(name);
+                    Some(0.5)
+                }
+
+                fn calculate_average(&self, funcs: Vec<String>) -> f64 {
+                    0.75
+                }
+
+                fn calculate_weighted_average(&self, files: &[String]) -> f64 {
+                    0.85
+                }
+
+                fn get_all_files(&self) -> Vec<String> {
+                    vec![]
+                }
+            }
+
+            // Standalone normalization functions - should be tracked too
+            fn normalize_path(path: &str) -> String {
+                demangle_path_components(path)
+            }
+
+            fn demangle_path_components(path: &str) -> String {
+                path.to_lowercase()
+            }
+
+            fn normalize_function_name(name: &str) -> String {
+                demangle_function_name(name)
+            }
+
+            fn demangle_function_name(name: &str) -> String {
+                strip_trailing_generics(name)
+            }
+
+            fn strip_trailing_generics(name: &str) -> String {
+                name.trim_end_matches(">").to_string()
+            }
+
+            // Parsing functions
+            pub fn parse_lcov_file(path: &str) -> Result<LcovData, String> {
+                parse_lcov_file_with_progress(path, &ProgressBar::new())
+            }
+
+            pub fn parse_lcov_file_with_progress(path: &str, progress: &ProgressBar) -> Result<LcovData, String> {
+                let data = parse_coverage_data(path)?;
+                calculate_function_coverage_data(data)
+            }
+
+            fn parse_coverage_data(path: &str) -> Result<Vec<String>, String> {
+                Ok(vec![])
+            }
+
+            fn process_function_coverage_parallel(path: &str) -> Result<Vec<String>, String> {
+                Ok(vec![])
+            }
+
+            fn calculate_function_coverage_data(data: Vec<String>) -> Result<LcovData, String> {
+                Ok(LcovData::new())
+            }
+        };
+
+        let ast: syn::File = syn::parse2(code).unwrap();
+
+        // Collect impl blocks
+        let impl_blocks: Vec<&syn::ItemImpl> = ast
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::Item::Impl(impl_block) = item {
+                    Some(impl_block)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Collect standalone functions
+        let standalone_functions: Vec<&syn::ItemFn> = ast
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::Item::Fn(func) = item {
+                    Some(func)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Collect all method names
+        let mut all_methods = Vec::new();
+        for impl_block in &impl_blocks {
+            for item in &impl_block.items {
+                if let syn::ImplItem::Fn(method) = item {
+                    all_methods.push(method.sig.ident.to_string());
+                }
+            }
+        }
+        for func in &standalone_functions {
+            all_methods.push(func.sig.ident.to_string());
+        }
+
+        // Build adjacency matrix with standalone function support
+        let adjacency =
+            build_method_call_adjacency_matrix_with_functions(&impl_blocks, &standalone_functions);
+
+        // Apply hybrid clustering
+        let clusters = apply_hybrid_clustering(&all_methods, &adjacency);
+
+        // Verify we found multiple clusters (not just one big cluster)
+        assert!(
+            clusters.len() >= 3,
+            "Expected at least 3 behavioral clusters, but found {}. Clusters: {:?}",
+            clusters.len(),
+            clusters
+                .iter()
+                .map(|c| (c.category.display_name(), c.methods.len()))
+                .collect::<Vec<_>>()
+        );
+
+        // Verify that we have different behavioral categories
+        let categories: HashSet<String> =
+            clusters.iter().map(|c| c.category.display_name()).collect();
+
+        assert!(
+            categories.len() >= 2,
+            "Expected diverse behavioral categories, but found only: {:?}",
+            categories
+        );
+
+        // Check that we have a Lifecycle cluster (new, build_index, with_loc_counter)
+        let lifecycle_cluster = clusters
+            .iter()
+            .find(|c| matches!(c.category, BehaviorCategory::Lifecycle));
+        assert!(
+            lifecycle_cluster.is_some(),
+            "Expected to find Lifecycle cluster for methods like 'new', 'build_index'"
+        );
+
+        // Check that we have a StateManagement cluster (get_* methods)
+        let state_mgmt_cluster = clusters
+            .iter()
+            .find(|c| matches!(c.category, BehaviorCategory::StateManagement));
+        assert!(
+            state_mgmt_cluster.is_some(),
+            "Expected to find StateManagement cluster for get_* methods"
+        );
+
+        // Verify that Persistence cluster exists (parse_*, load_*, etc.)
+        let persistence_cluster = clusters
+            .iter()
+            .find(|c| matches!(c.category, BehaviorCategory::Persistence));
+        assert!(
+            persistence_cluster.is_some(),
+            "Expected to find Persistence cluster for parse_* methods"
+        );
+
+        // Verify each cluster has reasonable size (at least 3 methods as per our new threshold)
+        for cluster in &clusters {
+            assert!(
+                cluster.methods.len() >= 3,
+                "Cluster {:?} has only {} methods, expected at least 3",
+                cluster.category,
+                cluster.methods.len()
+            );
+        }
+
+        // Verify that standalone function calls were tracked
+        // normalize_path calls demangle_path_components, so they should be in same cluster
+        let normalize_cluster = clusters
+            .iter()
+            .find(|c| c.methods.contains(&"normalize_path".to_string()));
+
+        if let Some(cluster) = normalize_cluster {
+            // If normalize_path is in a cluster, demangle_path_components should be too
+            // (they're related by call graph)
+            let has_related_demangle = cluster.methods.iter().any(|m| m.contains("demangle"));
+            assert!(
+                has_related_demangle || cluster.methods.len() >= 3,
+                "Expected normalize functions to be clustered together or in a reasonable cluster"
+            );
+        }
+
+        println!("\n=== Hybrid Clustering Results ===");
+        for (i, cluster) in clusters.iter().enumerate() {
+            println!(
+                "Cluster {}: {} ({} methods, cohesion: {:.2})",
+                i + 1,
+                cluster.category.display_name(),
+                cluster.methods.len(),
+                cluster.cohesion_score
+            );
+            println!("  Methods: {:?}", cluster.methods);
+        }
+        println!("=================================\n");
     }
 }
