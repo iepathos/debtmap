@@ -285,6 +285,9 @@ pub struct ModuleSplit {
     /// Data flow showing input and output types (Spec 181, 182)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub data_flow: Vec<String>,
+    /// Example type definition with impl blocks showing idiomatic Rust patterns (Spec 181)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggested_type_definition: Option<String>,
 }
 
 /// Helper to create ModuleSplit with behavioral defaults
@@ -314,6 +317,7 @@ impl Default for ModuleSplit {
             behavior_category: None,
             core_type: None,
             data_flow: vec![],
+            suggested_type_definition: None,
         }
     }
 }
@@ -343,6 +347,7 @@ impl PartialEq for ModuleSplit {
             && self.behavior_category == other.behavior_category
             && self.core_type == other.core_type
             && self.data_flow == other.data_flow
+            && self.suggested_type_definition == other.suggested_type_definition
         // Skip classification_evidence in equality comparison
     }
 }
@@ -1238,6 +1243,7 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 behavior_category,
                 core_type: None,
                 data_flow: vec![],
+                suggested_type_definition: None,
             });
         }
     }
@@ -1320,6 +1326,7 @@ pub fn recommend_module_splits_with_evidence(
                 behavior_category,
                 core_type: None,
                 data_flow: vec![],
+                suggested_type_definition: None,
             });
         }
     }
@@ -1432,6 +1439,7 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 behavior_category: None,
                 core_type: None,
                 data_flow: vec![],
+                suggested_type_definition: None,
             }
         })
         .collect()
@@ -1809,6 +1817,7 @@ pub fn suggest_splits_by_struct_grouping(
                 behavior_category: None,
                 core_type: None,
                 data_flow: vec![],
+                suggested_type_definition: None,
             }
         })
         .collect();

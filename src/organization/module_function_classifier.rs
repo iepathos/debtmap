@@ -185,6 +185,7 @@ impl ModuleFunctionClassifier {
                 behavior_category: Some(responsibility.as_str().to_string()),
                 core_type: None,
                 data_flow: vec![],
+                suggested_type_definition: None,
             };
 
             splits.push(split);

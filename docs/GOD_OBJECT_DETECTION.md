@@ -126,6 +126,105 @@ When a god object is detected, DebtMap provides:
 3. **Priority Ordering**: Most cohesive splits recommended first
 4. **Size Estimates**: Approximate lines of code for each split module
 
+## Type-Based Clustering (Spec 181)
+
+### Overview
+
+Type-based clustering is an advanced refactoring recommendation strategy that groups functions and methods by their type affinity rather than behavioral patterns. This approach is particularly effective for:
+
+1. **Data-centric modules**: Files with many parameter-heavy functions
+2. **Utilities modules**: When behavioral clustering produces generic "helpers" or "utilities" modules
+3. **Type ownership patterns**: Encouraging idiomatic Rust design with clear type ownership
+
+### When Type-Based Clustering is Used
+
+DebtMap automatically applies type-based clustering when:
+
+- **Behavioral clustering produces utilities modules**: When behavioral analysis generates modules named "utilities", "helpers", or "utils"
+- **Parameter-heavy functions**: Files with many functions that work with specific types
+- **Empty behavioral results**: When behavioral clustering produces no actionable splits
+
+### Type Affinity Analysis
+
+Type-based clustering analyzes:
+
+1. **Input Types**: Parameter types for each function/method
+2. **Output Types**: Return types for each function/method
+3. **Primary Type**: The type that appears most frequently in parameters
+4. **Type Clusters**: Groups of functions working with the same types
+
+Functions are clustered together when they share:
+- The same primary input type
+- Similar type signatures
+- Related data transformations
+
+### Example Output
+
+When type-based clustering identifies a refactoring opportunity, it provides:
+
+```
+Recommended Module Split: priority_item
+  Core Type: PriorityItem
+  Methods: create_priority_item, update_priority, compare_items, format_item
+  Data Flow: String -> PriorityItem -> String
+
+  Suggested Type Definition:
+  pub struct PriorityItem {
+      priority: u32,
+      name: String,
+  }
+
+  impl PriorityItem {
+      pub fn new(name: String, priority: u32) -> Self {
+          PriorityItem { name, priority }
+      }
+
+      pub fn update_priority(&mut self, new_priority: u32) {
+          self.priority = new_priority;
+      }
+
+      // ... additional methods
+  }
+```
+
+### Type Ownership Principles
+
+Type-based recommendations follow idiomatic Rust patterns:
+
+1. **Single Type Ownership**: Each module owns one primary type
+2. **Method Organization**: Methods grouped by the type they operate on
+3. **Clear Boundaries**: Explicit input/output types for each module
+4. **Data Transformation**: Pure functions that transform data
+
+### Behavioral vs Type-Based Clustering
+
+| Aspect | Behavioral Clustering | Type-Based Clustering |
+|--------|----------------------|----------------------|
+| **Focus** | Method call patterns and naming | Type signatures and data flow |
+| **Best For** | Method-heavy god objects | Data-centric utilities files |
+| **Output** | Behavioral groups (I/O, Query, etc.) | Type-centric modules |
+| **Rust Idioms** | Method categorization | Type ownership patterns |
+| **When Used** | Primary strategy for 50+ methods | Fallback when behavioral produces utilities |
+
+### Quality Criteria
+
+Type-based splits are preferred when:
+
+1. They avoid generic module names (no "utilities" or "helpers")
+2. Each cluster has ≥3 methods working with the same type
+3. Clear type affinity score (measuring how strongly methods relate to the type)
+4. Well-defined data flow with input/output types
+
+### Integration with Pipeline
+
+Type-based clustering integrates with the god object detection pipeline:
+
+1. **Priority 1**: Behavioral clustering for method-heavy files (50+ methods, 500+ LOC)
+2. **Fallback**: If behavioral produces utilities modules → try type-based
+3. **Quality Check**: Use type-based if it produces better-named modules
+4. **Priority 2**: Cross-domain analysis for struct-heavy files
+5. **Priority 3**: Small god objects with behavioral/type-based fallback
+
 ## Integration with Scoring
 
 God objects impact the overall technical debt score through:
