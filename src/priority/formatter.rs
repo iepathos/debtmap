@@ -856,12 +856,21 @@ fn format_god_object_steps_with_verbosity(
 
     // If we have detailed split recommendations, use them
     if !indicators.recommended_splits.is_empty() {
-        writeln!(
-            output,
-            "  - RECOMMENDED SPLITS ({} modules):",
-            indicators.recommended_splits.len()
-        )
-        .unwrap();
+        // Use different header based on number of splits
+        if indicators.recommended_splits.len() == 1 {
+            writeln!(
+                output,
+                "  - EXTRACTION CANDIDATE (single cohesive group found):"
+            )
+            .unwrap();
+        } else {
+            writeln!(
+                output,
+                "  - RECOMMENDED SPLITS ({} modules):",
+                indicators.recommended_splits.len()
+            )
+            .unwrap();
+        }
 
         // Create evidence formatter for displaying classification evidence
         let evidence_formatter = EvidenceFormatter::new(verbosity);
@@ -997,6 +1006,21 @@ fn format_god_object_steps_with_verbosity(
                 let _branch_prefix = if is_last { " " } else { "│" };
                 writeln!(output, "      [!] {}", warning).unwrap();
             }
+        }
+
+        // Add explanation if only 1 group found
+        if indicators.recommended_splits.len() == 1 {
+            writeln!(output).unwrap();
+            writeln!(
+                output,
+                "  NOTE: Only one cohesive group detected. This suggests methods are tightly coupled."
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "        Consider splitting by feature/responsibility rather than call patterns."
+            )
+            .unwrap();
         }
 
         // Add language-specific advice
