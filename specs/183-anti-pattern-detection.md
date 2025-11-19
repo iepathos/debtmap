@@ -170,48 +170,116 @@ Identify verb-based module names instead of type/domain-based:
 ```rust
 impl AntiPatternDetector {
     /// Detect technical/verb-based grouping anti-pattern
+    ///
+    /// Uses semantic analysis instead of hardcoded verb list:
+    /// 1. Check if module name is a verb (ends in -ing, -tion, -ment, etc.)
+    /// 2. Check if methods in module share same verb prefix
+    /// 3. Compare against known domain terms
     pub fn detect_technical_grouping(
         &self,
         split: &ModuleSplit,
     ) -> Option<AntiPattern> {
-        const TECHNICAL_VERBS: &[&str] = &[
-            "calculate", "compute", "process", "handle", "manage",
-            "render", "format", "display", "show", "print",
-            "validate", "check", "verify", "ensure",
-            "parse", "transform", "convert",
-            "get", "set", "update", "modify",
-        ];
-
         let module_name = split.suggested_name
             .split('/')
             .last()
             .unwrap_or(&split.suggested_name)
             .trim_end_matches(".rs");
 
-        // Check if module name starts with a technical verb (word boundary)
-        let is_technical = TECHNICAL_VERBS.iter()
-            .any(|verb| {
-                module_name == *verb  // Exact match: "render.rs"
-                || module_name.starts_with(&format!("{}_", verb))  // With underscore: "render_utils"
-                || module_name.starts_with(&format!("{}ing", verb.trim_end_matches('e')))  // -ing form: "rendering"
-            });
+        // Check 1: Module name looks like a verb/action
+        let is_verb_name = self.is_likely_verb(module_name);
 
-        if !is_technical {
-            return None;
+        // Check 2: Methods share same verb prefix
+        let method_verbs: Vec<_> = split.methods_to_move.iter()
+            .filter_map(|m| self.extract_leading_verb(m))
+            .collect();
+
+        let shared_verb = if method_verbs.len() >= split.methods_to_move.len() / 2 {
+            // More than half share a verb prefix
+            let most_common = self.most_common_element(&method_verbs);
+            Some(most_common)
+        } else {
+            None
+        };
+
+        // Check 3: Not a known domain term
+        let is_domain_term = self.is_domain_term(module_name);
+
+        if (is_verb_name || shared_verb.is_some()) && !is_domain_term {
+            Some(AntiPattern {
+                pattern_type: AntiPatternType::TechnicalGrouping,
+                severity: AntiPatternSeverity::High,
+                location: split.suggested_name.clone(),
+                description: format!(
+                    "Module '{}' is grouped by technical operation (verb) instead of data domain. \
+                     This scatters type-related behavior across multiple modules.",
+                    module_name
+                ),
+                correction: self.suggest_type_based_grouping(split),
+                affected_methods: split.methods_to_move.clone(),
+            })
+        } else {
+            None
         }
+    }
 
-        Some(AntiPattern {
-            pattern_type: AntiPatternType::TechnicalGrouping,
-            severity: AntiPatternSeverity::High,
-            location: split.suggested_name.clone(),
-            description: format!(
-                "Module '{}' is grouped by technical operation (verb) instead of data domain. \
-                 This scatters type-related behavior across multiple modules.",
-                module_name
-            ),
-            correction: self.suggest_type_based_grouping(split),
-            affected_methods: split.methods_to_move.clone(),
-        })
+    /// Check if word is likely a verb based on linguistic patterns
+    fn is_likely_verb(&self, word: &str) -> bool {
+        // Verbal noun suffixes
+        word.ends_with("ing") ||     // rendering, parsing
+        word.ends_with("tion") ||    // calculation, validation
+        word.ends_with("ment") ||    // management, placement
+        word.ends_with("sion") ||    // conversion, extension
+        word.ends_with("ance") ||    // performance, maintenance
+        word.ends_with("ence") ||    // reference, persistence
+        // Known action words
+        matches!(
+            word,
+            "calculate" | "compute" | "process" | "handle" | "manage" |
+            "render" | "format" | "display" | "show" | "print" |
+            "validate" | "check" | "verify" | "ensure" |
+            "parse" | "transform" | "convert" | "serialize" | "deserialize" |
+            "get" | "set" | "update" | "modify" | "create" | "delete" |
+            "authenticate" | "authorize" | "encrypt" | "decrypt"
+        )
+    }
+
+    /// Extract leading verb from method name (e.g., "format_header" → "format")
+    fn extract_leading_verb(&self, method_name: &str) -> Option<String> {
+        method_name.split('_').next().map(|s| s.to_string())
+    }
+
+    /// Find most common element in vector
+    fn most_common_element(&self, items: &[String]) -> String {
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        for item in items {
+            *counts.entry(item.as_str()).or_insert(0) += 1;
+        }
+        counts.into_iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(item, _)| item.to_string())
+            .unwrap_or_default()
+    }
+
+    /// Check if word is a known domain term (not an action)
+    fn is_domain_term(&self, word: &str) -> bool {
+        // Common domain suffixes
+        word.ends_with("metrics") ||
+        word.ends_with("data") ||
+        word.ends_with("config") ||
+        word.ends_with("settings") ||
+        word.ends_with("context") ||
+        word.ends_with("item") ||
+        word.ends_with("result") ||
+        word.ends_with("info") ||
+        word.ends_with("details") ||
+        // Plural nouns (likely domain objects)
+        (word.ends_with('s') && !word.ends_with("ss")) ||
+        // Single words that are nouns
+        matches!(
+            word,
+            "priority" | "god_object" | "debt" | "complexity" |
+            "coverage" | "analysis" | "report" | "summary"
+        )
     }
 
     fn suggest_type_based_grouping(&self, split: &ModuleSplit) -> String {
@@ -376,23 +444,60 @@ impl AntiPatternDetector {
     }
 }
 
-fn is_primitive(type_name: &str) -> bool {
-    matches!(
+/// Determine if a type is primitive/stdlib (context-aware)
+///
+/// Path/PathBuf are considered domain types in file-handling contexts,
+/// but primitives in general analysis.
+fn is_primitive_contextaware(type_name: &str, context: &ModuleSplit) -> bool {
+    // Core primitives (always)
+    if matches!(
         type_name,
-        // Primitives
         "String" | "str" | "usize" | "isize" | "u32" | "i32" | "u64" | "i64" |
         "u8" | "i8" | "u16" | "i16" | "u128" | "i128" |
         "f32" | "f64" | "bool" | "char" | "()" |
-        // Standard library generics
         "Vec" | "Option" | "Result" | "Box" | "Rc" | "Arc" |
         "HashMap" | "HashSet" | "BTreeMap" | "BTreeSet" |
         "VecDeque" | "LinkedList" | "BinaryHeap" |
-        // Common path types
-        "Path" | "PathBuf" | "OsString" | "OsStr" |
-        // IO types
         "File" | "BufReader" | "BufWriter" |
-        // Cow and other smart pointers
         "Cow" | "RefCell" | "Cell" | "Mutex" | "RwLock"
+    ) || type_name.starts_with('&') {
+        return true;
+    }
+
+    // Context-aware decisions
+    match type_name {
+        "Path" | "PathBuf" | "OsString" | "OsStr" => {
+            // If module deals with file paths, these are domain types
+            let module_name = &context.suggested_name.to_lowercase();
+            let is_path_domain = module_name.contains("path") ||
+                                 module_name.contains("file") ||
+                                 module_name.contains("location") ||
+                                 module_name.contains("source");
+            !is_path_domain  // Primitive if NOT in path domain
+        }
+        "Error" => {
+            // Error is a primitive type in error-handling contexts
+            let is_error_domain = context.suggested_name.to_lowercase().contains("error");
+            !is_error_domain
+        }
+        _ => false
+    }
+}
+
+/// Simplified version for non-context-aware usage
+fn is_primitive(type_name: &str) -> bool {
+    matches!(
+        type_name,
+        "String" | "str" | "usize" | "isize" | "u32" | "i32" | "u64" | "i64" |
+        "u8" | "i8" | "u16" | "i16" | "u128" | "i128" |
+        "f32" | "f64" | "bool" | "char" | "()" |
+        "Vec" | "Option" | "Result" | "Box" | "Rc" | "Arc" |
+        "HashMap" | "HashSet" | "BTreeMap" | "BTreeSet" |
+        "VecDeque" | "LinkedList" | "BinaryHeap" |
+        "Path" | "PathBuf" | "OsString" | "OsStr" |
+        "File" | "BufReader" | "BufWriter" |
+        "Cow" | "RefCell" | "Cell" | "Mutex" | "RwLock" |
+        "Error"
     ) || type_name.starts_with("&")  // References
       || type_name.starts_with("&mut")  // Mutable references
 }

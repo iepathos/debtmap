@@ -140,33 +140,123 @@ impl HiddenTypeExtractor {
     }
 
     /// Find parameter clumps that appear in multiple functions
+    ///
+    /// Uses **fuzzy matching** to handle type variations:
+    /// - `String` matches `&str`
+    /// - `&T` matches `T`
+    /// - `Option<T>` matches `T`
+    /// - `&mut T` matches `&T`
     pub fn find_parameter_clumps(
         &self,
         signatures: &[MethodSignature],
         min_occurrences: usize,
     ) -> Vec<ParameterClump> {
-        let mut clump_map: HashMap<ParamSignature, Vec<String>> = HashMap::new();
+        let mut clump_groups: Vec<(NormalizedParamSignature, Vec<String>)> = Vec::new();
 
-        // Group methods by parameter signature
+        // Group methods by normalized parameter signature
         for sig in signatures {
-            let param_sig = self.create_param_signature(&sig.param_types);
-            clump_map.entry(param_sig).or_default().push(sig.name.clone());
+            let normalized_sig = self.create_normalized_signature(&sig.param_types);
+
+            // Find existing group with fuzzy match
+            let mut found = false;
+            for (existing_sig, methods) in &mut clump_groups {
+                if self.signatures_match_fuzzy(existing_sig, &normalized_sig) {
+                    methods.push(sig.name.clone());
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                clump_groups.push((normalized_sig, vec![sig.name.clone()]));
+            }
         }
 
         // Filter for clumps that appear min_occurrences times
-        clump_map.into_iter()
+        clump_groups.into_iter()
             .filter(|(_, methods)| methods.len() >= min_occurrences)
-            .map(|(param_sig, methods)| ParameterClump {
-                params: param_sig.types,
+            .map(|(normalized_sig, methods)| ParameterClump {
+                params: normalized_sig.types,
                 methods,
             })
             .collect()
     }
 
-    fn create_param_signature(&self, params: &[TypeInfo]) -> ParamSignature {
-        ParamSignature {
-            types: params.to_vec(),
+    fn create_normalized_signature(&self, params: &[TypeInfo]) -> NormalizedParamSignature {
+        NormalizedParamSignature {
+            types: params.iter()
+                .map(|t| self.normalize_type_for_matching(t))
+                .collect(),
         }
+    }
+
+    /// Normalize type for fuzzy matching
+    ///
+    /// Transformations:
+    /// - `&str` → `String`
+    /// - `&T` → `T`
+    /// - `&mut T` → `T`
+    /// - `Option<T>` → `T`
+    /// - Remove generic wrappers
+    fn normalize_type_for_matching(&self, type_info: &TypeInfo) -> TypeInfo {
+        let mut normalized = type_info.clone();
+
+        // Remove reference/mutability
+        if normalized.is_reference {
+            normalized.is_reference = false;
+            normalized.is_mutable = false;
+        }
+
+        // Normalize String/str
+        if normalized.name == "str" {
+            normalized.name = "String".to_string();
+        }
+
+        // Remove Option wrapper
+        if normalized.name.starts_with("Option<") {
+            if let Some(inner) = self.extract_generic_inner(&normalized.name) {
+                normalized.name = inner;
+            }
+        }
+
+        // Extract from Vec, Box, etc. for comparison
+        if matches!(normalized.name.as_str(), s if s.starts_with("Vec<") || s.starts_with("Box<")) {
+            if let Some(inner) = self.extract_generic_inner(&normalized.name) {
+                // Keep the wrapper but store the inner type for comparison
+                normalized.generics = vec![inner];
+            }
+        }
+
+        normalized
+    }
+
+    fn extract_generic_inner(&self, type_name: &str) -> Option<String> {
+        if let Some(start) = type_name.find('<') {
+            if let Some(end) = type_name.rfind('>') {
+                return Some(type_name[start + 1..end].trim().to_string());
+            }
+        }
+        None
+    }
+
+    /// Check if two normalized signatures match with fuzzy rules
+    fn signatures_match_fuzzy(
+        &self,
+        sig1: &NormalizedParamSignature,
+        sig2: &NormalizedParamSignature,
+    ) -> bool {
+        if sig1.types.len() != sig2.types.len() {
+            return false;
+        }
+
+        sig1.types.iter()
+            .zip(&sig2.types)
+            .all(|(t1, t2)| self.types_fuzzy_match(t1, t2))
+    }
+
+    fn types_fuzzy_match(&self, t1: &TypeInfo, t2: &TypeInfo) -> bool {
+        // After normalization, should be exact match
+        t1.name == t2.name
     }
 }
 
@@ -178,6 +268,11 @@ pub struct ParameterClump {
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct ParamSignature {
+    types: Vec<TypeInfo>,
+}
+
+#[derive(Clone, Debug)]
+struct NormalizedParamSignature {
     types: Vec<TypeInfo>,
 }
 
@@ -398,28 +493,101 @@ impl HiddenTypeExtractor {
         }
     }
 
+    /// Suggest type name from parameter types
+    ///
+    /// Uses semantic analysis of type names to infer domain:
+    /// 1. Extract nouns from parameter types
+    /// 2. Identify dominant domain (metrics, config, data, etc.)
+    /// 3. Generate meaningful name based on domain
     fn suggest_type_name_from_params(&self, params: &[TypeInfo], module_name: &str) -> String {
         // Extract nouns from type names
         let nouns: Vec<_> = params.iter()
             .map(|p| extract_noun(&p.name))
             .collect();
 
-        // Combine into meaningful name
-        if nouns.len() == 2 {
-            format!("{}{}", nouns[0], nouns[1])
-        } else {
-            format!("{}Context", to_pascal_case(module_name))
+        // Identify domain
+        let domain = self.identify_domain(&nouns, module_name);
+
+        // Generate name based on domain and structure
+        match domain.as_str() {
+            "metrics" if nouns.iter().any(|n| n.contains("Location")) => {
+                "MetricsContext".to_string()
+            }
+            "config" | "settings" => {
+                format!("{}Config", to_pascal_case(module_name))
+            }
+            "analysis" | "analyzer" => {
+                "AnalysisContext".to_string()
+            }
+            _ => {
+                // Combine most meaningful nouns
+                if nouns.len() == 2 {
+                    format!("{}{}", nouns[0], nouns[1])
+                } else if nouns.len() > 2 {
+                    // Use first and last
+                    format!("{}{}", nouns[0], nouns[nouns.len() - 1])
+                } else if !nouns.is_empty() {
+                    format!("{}Context", nouns[0])
+                } else {
+                    format!("{}Context", to_pascal_case(module_name))
+                }
+            }
         }
     }
 
+    /// Identify domain from noun collection
+    fn identify_domain(&self, nouns: &[String], module_name: &str) -> String {
+        // Check for domain-specific terms
+        for noun in nouns {
+            let lower = noun.to_lowercase();
+            if matches!(lower.as_str(), "metrics" | "metric") {
+                return "metrics".to_string();
+            }
+            if matches!(lower.as_str(), "config" | "configuration" | "settings") {
+                return "config".to_string();
+            }
+            if matches!(lower.as_str(), "analysis" | "analyzer") {
+                return "analysis".to_string();
+            }
+        }
+
+        // Fallback to module name
+        module_name.to_lowercase()
+    }
+
+    /// Suggest type name from method name
+    ///
+    /// Uses method verb and context to infer appropriate type suffix
     fn suggest_type_name_from_method(&self, method_name: &str, module_name: &str) -> String {
-        // Extract noun from method name
-        if method_name.starts_with("analyze") {
-            format!("{}Result", to_pascal_case(&method_name.replace("analyze_", "")))
-        } else if method_name.starts_with("calculate") {
-            format!("{}Metrics", to_pascal_case(&method_name.replace("calculate_", "")))
+        // Common verb → suffix mappings
+        let (verb, remainder) = self.split_method_verb(method_name);
+
+        match verb {
+            "analyze" => format!("{}Result", to_pascal_case(&remainder)),
+            "calculate" | "compute" => format!("{}Metrics", to_pascal_case(&remainder)),
+            "validate" | "check" => format!("{}Validation", to_pascal_case(&remainder)),
+            "parse" => format!("{}Data", to_pascal_case(&remainder)),
+            "format" | "render" => format!("{}Output", to_pascal_case(&remainder)),
+            "build" | "create" => format!("{}Builder", to_pascal_case(&remainder)),
+            _ => {
+                // Fallback: use method name or module context
+                if !remainder.is_empty() {
+                    format!("{}Result", to_pascal_case(&remainder))
+                } else {
+                    format!("{}Result", to_pascal_case(module_name))
+                }
+            }
+        }
+    }
+
+    fn split_method_verb(&self, method_name: &str) -> (String, String) {
+        // Split on first underscore
+        if let Some(pos) = method_name.find('_') {
+            let verb = method_name[..pos].to_string();
+            let remainder = method_name[pos + 1..].to_string();
+            (verb, remainder)
         } else {
-            format!("{}Result", to_pascal_case(method_name))
+            (method_name.to_string(), String::new())
         }
     }
 

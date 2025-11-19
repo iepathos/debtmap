@@ -291,43 +291,217 @@ impl DataFlowAnalyzer {
             .collect()
     }
 
+    /// Compute depths for each type in the flow graph
+    ///
+    /// # Cycle Handling
+    ///
+    /// Cycles are common in real codebases (e.g., validation that returns
+    /// the input type). We handle cycles by:
+    ///
+    /// 1. **Tarjan's SCC algorithm** - Detect strongly connected components
+    /// 2. **Collapse cycles** - Treat each SCC as a single "super-node"
+    /// 3. **Assign minimum depth** - Use the shortest path to reach the SCC
+    ///
+    /// Example:
+    /// ```
+    /// A → B → C → B  (cycle: B ↔ C)
+    /// ```
+    /// Becomes:
+    /// ```
+    /// A → [B+C]  (collapsed)
+    /// depths: A=0, B=1, C=1
+    /// ```
     fn compute_type_depths(
         &self,
         graph: &TypeFlowGraph,
         sources: &HashSet<String>,
     ) -> Result<HashMap<String, usize>, String> {
+        // Step 1: Detect cycles using Tarjan's algorithm
+        let sccs = self.find_strongly_connected_components(graph)?;
+
+        // Step 2: Build SCC graph (DAG of components)
+        let scc_graph = self.build_scc_graph(graph, &sccs);
+
+        // Step 3: Compute depths using topological sort
         let mut depths = HashMap::new();
-        let mut queue: Vec<(String, usize)> = sources.iter()
-            .map(|s| (s.clone(), 0))
+        let mut scc_depths = HashMap::new();
+
+        // Find source SCCs
+        let source_sccs: Vec<_> = sccs.iter()
+            .enumerate()
+            .filter(|(_, component)| {
+                component.iter().any(|node| sources.contains(node))
+            })
+            .map(|(idx, _)| idx)
             .collect();
-        let mut visiting = HashSet::new();
 
-        while let Some((type_name, depth)) = queue.pop() {
-            // Already processed this type
-            if depths.contains_key(&type_name) {
-                continue;
-            }
+        // BFS from source SCCs
+        let mut queue: VecDeque<(usize, usize)> = source_sccs.iter()
+            .map(|&idx| (idx, 0))
+            .collect();
 
-            // Cycle detection: if we're visiting this type again before finishing
-            if visiting.contains(&type_name) {
-                return Err(format!("Cycle detected involving type: {}", type_name));
-            }
-
-            visiting.insert(type_name.clone());
-            depths.insert(type_name.clone(), depth);
-
-            // Find all types produced by consuming this type
-            for edge in &graph.edges {
-                if edge.from_type == type_name {
-                    queue.push((edge.to_type.clone(), depth + 1));
+        while let Some((scc_idx, depth)) = queue.pop_front() {
+            // Skip if already processed with shorter depth
+            if let Some(&existing_depth) = scc_depths.get(&scc_idx) {
+                if existing_depth <= depth {
+                    continue;
                 }
             }
 
-            visiting.remove(&type_name);
+            scc_depths.insert(scc_idx, depth);
+
+            // Assign depth to all nodes in this SCC
+            for node in &sccs[scc_idx] {
+                depths.insert(node.clone(), depth);
+            }
+
+            // Add successor SCCs to queue
+            if let Some(successors) = scc_graph.get(&scc_idx) {
+                for &succ_idx in successors {
+                    queue.push_back((succ_idx, depth + 1));
+                }
+            }
         }
 
         Ok(depths)
     }
+
+    /// Find strongly connected components using Tarjan's algorithm
+    fn find_strongly_connected_components(
+        &self,
+        graph: &TypeFlowGraph,
+    ) -> Result<Vec<Vec<String>>, String> {
+        let mut index = 0;
+        let mut stack = Vec::new();
+        let mut indices: HashMap<String, usize> = HashMap::new();
+        let mut lowlinks: HashMap<String, usize> = HashMap::new();
+        let mut on_stack: HashSet<String> = HashSet::new();
+        let mut sccs = Vec::new();
+
+        // Get all nodes
+        let mut nodes: HashSet<String> = HashSet::new();
+        for edge in &graph.edges {
+            nodes.insert(edge.from_type.clone());
+            nodes.insert(edge.to_type.clone());
+        }
+
+        // Run Tarjan's for each unvisited node
+        for node in nodes {
+            if !indices.contains_key(&node) {
+                self.tarjan_visit(
+                    &node,
+                    graph,
+                    &mut index,
+                    &mut stack,
+                    &mut indices,
+                    &mut lowlinks,
+                    &mut on_stack,
+                    &mut sccs,
+                );
+            }
+        }
+
+        Ok(sccs)
+    }
+
+    fn tarjan_visit(
+        &self,
+        node: &str,
+        graph: &TypeFlowGraph,
+        index: &mut usize,
+        stack: &mut Vec<String>,
+        indices: &mut HashMap<String, usize>,
+        lowlinks: &mut HashMap<String, usize>,
+        on_stack: &mut HashSet<String>,
+        sccs: &mut Vec<Vec<String>>,
+    ) {
+        indices.insert(node.to_string(), *index);
+        lowlinks.insert(node.to_string(), *index);
+        *index += 1;
+        stack.push(node.to_string());
+        on_stack.insert(node.to_string());
+
+        // Visit successors
+        for edge in &graph.edges {
+            if edge.from_type == node {
+                let successor = &edge.to_type;
+
+                if !indices.contains_key(successor) {
+                    // Successor not visited, recurse
+                    self.tarjan_visit(
+                        successor,
+                        graph,
+                        index,
+                        stack,
+                        indices,
+                        lowlinks,
+                        on_stack,
+                        sccs,
+                    );
+                    let succ_lowlink = lowlinks[successor];
+                    let node_lowlink = lowlinks.get_mut(node).unwrap();
+                    *node_lowlink = (*node_lowlink).min(succ_lowlink);
+                } else if on_stack.contains(successor) {
+                    // Successor on stack, update lowlink
+                    let succ_index = indices[successor];
+                    let node_lowlink = lowlinks.get_mut(node).unwrap();
+                    *node_lowlink = (*node_lowlink).min(succ_index);
+                }
+            }
+        }
+
+        // If node is root of SCC, pop the SCC
+        if lowlinks[node] == indices[node] {
+            let mut component = Vec::new();
+            loop {
+                let w = stack.pop().unwrap();
+                on_stack.remove(&w);
+                component.push(w.clone());
+                if w == node {
+                    break;
+                }
+            }
+            sccs.push(component);
+        }
+    }
+
+    /// Build graph of SCCs (condensation graph)
+    fn build_scc_graph(
+        &self,
+        graph: &TypeFlowGraph,
+        sccs: &[Vec<String>],
+    ) -> HashMap<usize, Vec<usize>> {
+        // Map each node to its SCC index
+        let mut node_to_scc: HashMap<String, usize> = HashMap::new();
+        for (idx, component) in sccs.iter().enumerate() {
+            for node in component {
+                node_to_scc.insert(node.clone(), idx);
+            }
+        }
+
+        // Build SCC graph
+        let mut scc_graph: HashMap<usize, Vec<usize>> = HashMap::new();
+
+        for edge in &graph.edges {
+            let from_scc = node_to_scc[&edge.from_type];
+            let to_scc = node_to_scc[&edge.to_type];
+
+            // Only add edge if crossing SCC boundary
+            if from_scc != to_scc {
+                scc_graph.entry(from_scc).or_default().push(to_scc);
+            }
+        }
+
+        // Deduplicate edges
+        for edges in scc_graph.values_mut() {
+            edges.sort_unstable();
+            edges.dedup();
+        }
+
+        scc_graph
+    }
+
+use std::collections::VecDeque;
 
     fn create_stage_from_methods(
         &self,
@@ -720,11 +894,227 @@ fn test_god_object_analysis_pipeline_detection() {
 }
 ```
 
+## Branching Pipeline Detection
+
+### Multi-Path Data Flows
+
+Real pipelines often branch (one input produces multiple outputs):
+
+```
+    ┌─→ Validator
+A ──┤
+    └─→ Formatter
+```
+
+Or merge (multiple inputs produce one output):
+
+```
+Config ──┐
+         ├─→ Analyzer
+Metrics ─┘
+```
+
+### Branch Detection Algorithm
+
+```rust
+impl DataFlowAnalyzer {
+    /// Detect branching points in pipeline
+    ///
+    /// A branch point is a type that flows to 2+ distinct downstream stages
+    pub fn detect_branches(&self, graph: &TypeFlowGraph) -> Vec<BranchPoint> {
+        let mut branches = Vec::new();
+
+        for (type_name, consumers) in &graph.consumers {
+            if consumers.len() >= 2 {
+                // This type branches to multiple consumers
+                let consumer_stages: HashSet<_> = consumers.iter()
+                    .map(|method| self.infer_stage_for_method(method))
+                    .collect();
+
+                if consumer_stages.len() >= 2 {
+                    branches.push(BranchPoint {
+                        type_name: type_name.clone(),
+                        branches: consumer_stages.into_iter().collect(),
+                        branch_type: BranchType::Fan Out,
+                    });
+                }
+            }
+        }
+
+        // Detect merge points (fan-in)
+        for (type_name, producers) in &graph.producers {
+            if producers.len() >= 2 {
+                let producer_stages: HashSet<_> = producers.iter()
+                    .map(|method| self.infer_stage_for_method(method))
+                    .collect();
+
+                if producer_stages.len() >= 2 {
+                    branches.push(BranchPoint {
+                        type_name: type_name.clone(),
+                        branches: producer_stages.into_iter().collect(),
+                        branch_type: BranchType::FanIn,
+                    });
+                }
+            }
+        }
+
+        branches
+    }
+
+    /// Recommend split strategy for branching pipelines
+    ///
+    /// Options:
+    /// 1. **Separate branches** - Each branch gets its own module
+    /// 2. **Shared core** - Extract common logic, branch-specific modules
+    /// 3. **Strategy pattern** - Use trait for branch variants
+    pub fn recommend_branch_strategy(
+        &self,
+        branch: &BranchPoint,
+        graph: &TypeFlowGraph,
+    ) -> BranchStrategy {
+        let branch_complexity: Vec<_> = branch.branches.iter()
+            .map(|stage| self.estimate_stage_complexity(stage, graph))
+            .collect();
+
+        let total_complexity: usize = branch_complexity.iter().sum();
+        let max_complexity = branch_complexity.iter().max().unwrap_or(&0);
+
+        if total_complexity < 10 {
+            // Small branches - keep together
+            BranchStrategy::Combined
+        } else if branch_complexity.len() > 3 {
+            // Many branches - use strategy pattern
+            BranchStrategy::StrategyPattern {
+                trait_name: format!("{}Handler", branch.type_name),
+            }
+        } else if *max_complexity > total_complexity / 2 {
+            // One dominant branch - extract core + specialized
+            BranchStrategy::SharedCore {
+                core_module: format!("{}_core", branch.type_name.to_lowercase()),
+                specialized_modules: branch.branches.clone(),
+            }
+        } else {
+            // Balanced branches - separate modules
+            BranchStrategy::SeparateBranches
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BranchPoint {
+    pub type_name: String,
+    pub branches: Vec<String>,
+    pub branch_type: BranchType,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum BranchType {
+    FanOut,  // 1 → N
+    FanIn,   // N → 1
+}
+
+#[derive(Clone, Debug)]
+pub enum BranchStrategy {
+    /// Keep all branches in one module (small)
+    Combined,
+
+    /// Separate module for each branch
+    SeparateBranches,
+
+    /// Extract shared core + specialized modules
+    SharedCore {
+        core_module: String,
+        specialized_modules: Vec<String>,
+    },
+
+    /// Use strategy/visitor pattern
+    StrategyPattern {
+        trait_name: String,
+    },
+}
+```
+
+### Enhanced Pipeline Recommendation
+
+```rust
+pub struct EnhancedPipelineRecommendation {
+    pub linear_stages: Vec<PipelineStage>,
+    pub branch_points: Vec<BranchPoint>,
+    pub branch_strategies: HashMap<String, BranchStrategy>,
+    pub pipeline_topology: PipelineTopology,
+}
+
+#[derive(Clone, Debug)]
+pub enum PipelineTopology {
+    /// Simple linear pipeline (A → B → C)
+    Linear,
+
+    /// Diamond pattern (A → B+C → D)
+    Diamond,
+
+    /// Tree pattern (A → B → C+D+E)
+    Tree,
+
+    /// DAG (arbitrary directed acyclic graph)
+    DAG,
+}
+
+impl DataFlowAnalyzer {
+    pub fn generate_enhanced_recommendations(
+        &self,
+        graph: &TypeFlowGraph,
+        signatures: &[MethodSignature],
+    ) -> Result<EnhancedPipelineRecommendation, String> {
+        let stages = self.detect_pipeline_stages(graph, signatures)?;
+        let branches = self.detect_branches(graph);
+        let topology = self.infer_topology(graph, &stages, &branches);
+
+        let branch_strategies = branches.iter()
+            .map(|branch| {
+                let strategy = self.recommend_branch_strategy(branch, graph);
+                (branch.type_name.clone(), strategy)
+            })
+            .collect();
+
+        Ok(EnhancedPipelineRecommendation {
+            linear_stages: stages,
+            branch_points: branches,
+            branch_strategies,
+            pipeline_topology: topology,
+        })
+    }
+
+    fn infer_topology(
+        &self,
+        graph: &TypeFlowGraph,
+        stages: &[PipelineStage],
+        branches: &[BranchPoint],
+    ) -> PipelineTopology {
+        if branches.is_empty() {
+            return PipelineTopology::Linear;
+        }
+
+        // Check for diamond pattern (fan-out then fan-in)
+        let has_fan_out = branches.iter().any(|b| b.branch_type == BranchType::FanOut);
+        let has_fan_in = branches.iter().any(|b| b.branch_type == BranchType::FanIn);
+
+        if has_fan_out && has_fan_in {
+            PipelineTopology::Diamond
+        } else if has_fan_out {
+            PipelineTopology::Tree
+        } else {
+            PipelineTopology::DAG
+        }
+    }
+}
+```
+
 ## Dependencies
 
 - **Spec 181**: Type signature extraction for building flow graph
 - **Spec 178**: Call graph infrastructure for method relationships
 - Existing `ModuleSplit` structure for output format
+- **Integration**: Works with Spec 185 for conflict resolution with type-based clustering
 
 ## Migration Path
 
