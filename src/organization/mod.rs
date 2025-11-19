@@ -3,9 +3,10 @@ use syn;
 
 pub mod behavioral_decomposition;
 pub use behavioral_decomposition::{
-    apply_hybrid_clustering, build_method_call_adjacency_matrix_with_functions,
-    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer,
-    FieldAccessStats, FieldAccessTracker, MethodCluster,
+    apply_hybrid_clustering, apply_production_ready_clustering,
+    build_method_call_adjacency_matrix_with_functions, cluster_methods_by_behavior,
+    suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer, FieldAccessStats,
+    FieldAccessTracker, MethodCluster,
 };
 pub mod boilerplate_detector;
 pub mod builder_pattern;

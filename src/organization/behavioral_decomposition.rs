@@ -640,6 +640,338 @@ pub fn apply_hybrid_clustering(
     refined_clusters
 }
 
+/// Apply production-ready clustering with test filtering and size balancing
+///
+/// This is a refinement pipeline on top of hybrid clustering that:
+/// 1. Filters out test methods (should stay in #[cfg(test)])
+/// 2. Subdivides oversized Domain clusters using secondary heuristics
+/// 3. Merges tiny clusters (<3 methods) into related ones
+/// 4. Applies Rust-specific patterns (I/O vs Pure vs Query)
+///
+/// Use this for generating split recommendations for Rust projects.
+pub fn apply_production_ready_clustering(
+    methods: &[String],
+    adjacency: &HashMap<(String, String), usize>,
+) -> Vec<MethodCluster> {
+    // Step 1: Filter out test methods (they should stay in #[cfg(test)] modules)
+    let production_methods: Vec<String> = methods
+        .iter()
+        .filter(|m| !is_test_method(m))
+        .cloned()
+        .collect();
+
+    if production_methods.is_empty() {
+        return Vec::new();
+    }
+
+    // Step 2: Apply hybrid clustering on production methods only
+    let mut clusters = apply_hybrid_clustering(&production_methods, adjacency);
+
+    // Step 3: Subdivide oversized Domain clusters (>15 methods)
+    clusters = subdivide_oversized_clusters(clusters, adjacency);
+
+    // Step 4: Merge tiny clusters (<3 methods) into related ones
+    clusters = merge_tiny_clusters(clusters);
+
+    // Step 5: Apply Rust-specific naming patterns
+    clusters = apply_rust_patterns(clusters);
+
+    // Step 6: Merge clusters with identical categories to avoid duplicate module names
+    clusters = merge_duplicate_categories(clusters);
+
+    clusters
+}
+
+/// Merge clusters that have the same category name to avoid duplicate module names
+fn merge_duplicate_categories(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
+    use std::collections::HashMap;
+
+    let mut category_map: HashMap<String, MethodCluster> = HashMap::new();
+
+    for cluster in clusters {
+        let category_key = cluster.category.display_name();
+
+        if let Some(existing) = category_map.get_mut(&category_key) {
+            // Merge into existing cluster with same category
+            existing.methods.extend(cluster.methods);
+            existing.internal_calls += cluster.internal_calls;
+            existing.external_calls += cluster.external_calls;
+            // Recalculate cohesion after merge
+            existing.calculate_cohesion();
+        } else {
+            // First cluster with this category
+            category_map.insert(category_key, cluster);
+        }
+    }
+
+    category_map.into_values().collect()
+}
+
+/// Detect if a method is a test method that should stay in #[cfg(test)]
+pub fn is_test_method(method_name: &str) -> bool {
+    // Common test patterns in Rust
+    method_name.starts_with("test_")
+        || method_name.contains("_test_")
+        || method_name.ends_with("_test")
+        // Benchmark patterns
+        || method_name.starts_with("bench_")
+        || method_name.contains("_bench_")
+        // Test helper patterns
+        || method_name.starts_with("mock_")
+        || method_name.starts_with("stub_")
+        || method_name.starts_with("fixture_")
+        || method_name == "setup"
+        || method_name == "teardown"
+}
+
+/// Subdivide oversized Domain clusters using secondary heuristics
+fn subdivide_oversized_clusters(
+    clusters: Vec<MethodCluster>,
+    adjacency: &HashMap<(String, String), usize>,
+) -> Vec<MethodCluster> {
+    let mut result = Vec::new();
+
+    for cluster in clusters {
+        // Only subdivide large Domain clusters (>15 methods)
+        if cluster.methods.len() > 15 && matches!(cluster.category, BehaviorCategory::Domain(_)) {
+            // Try secondary clustering by prefix/verb patterns
+            let subclusters = cluster_by_verb_patterns(&cluster.methods);
+
+            if subclusters.len() > 1 {
+                // Found meaningful subclusters based on naming
+                for (verb, methods) in subclusters {
+                    if methods.len() >= 3 {
+                        let mut subcluster = MethodCluster {
+                            category: BehaviorCategory::Domain(verb),
+                            methods: methods.clone(),
+                            fields_accessed: vec![],
+                            internal_calls: 0,
+                            external_calls: 0,
+                            cohesion_score: 0.0,
+                        };
+
+                        // Calculate cohesion
+                        let method_to_cluster: HashMap<String, usize> =
+                            methods.iter().map(|m| (m.clone(), 0)).collect();
+
+                        let (internal_calls, external_calls) =
+                            calculate_cluster_cohesion(&methods, adjacency, &method_to_cluster);
+
+                        subcluster.internal_calls = internal_calls;
+                        subcluster.external_calls = external_calls;
+                        subcluster.calculate_cohesion();
+
+                        result.push(subcluster);
+                    }
+                }
+            } else {
+                // No subdivision possible, keep as-is
+                result.push(cluster);
+            }
+        } else {
+            // Small enough or non-Domain cluster, keep as-is
+            result.push(cluster);
+        }
+    }
+
+    result
+}
+
+/// Cluster methods by verb/action patterns for secondary subdivision
+fn cluster_by_verb_patterns(methods: &[String]) -> HashMap<String, Vec<String>> {
+    let mut clusters: HashMap<String, Vec<String>> = HashMap::new();
+
+    for method in methods {
+        let verb = extract_verb_pattern(method);
+        clusters.entry(verb).or_default().push(method.clone());
+    }
+
+    clusters
+}
+
+/// Extract verb pattern from method name for grouping
+fn extract_verb_pattern(method_name: &str) -> String {
+    // Common verb patterns in Rust
+    let prefixes = [
+        "parse", "build", "create", "make", "construct",
+        "get", "fetch", "retrieve", "find", "search", "lookup", "query",
+        "set", "update", "modify", "change",
+        "is", "has", "can", "should", "check",
+        "apply", "execute", "run", "process", "handle",
+        "demangle", "normalize", "sanitize", "clean",
+        "calculate", "compute", "derive",
+        "match", "compare", "equals",
+    ];
+
+    for prefix in &prefixes {
+        if method_name.to_lowercase().starts_with(prefix) {
+            return capitalize_first(prefix);
+        }
+    }
+
+    // Fallback: use first word
+    method_name
+        .split('_')
+        .next()
+        .filter(|s| !s.is_empty())
+        .map(capitalize_first)
+        .unwrap_or_else(|| "Utilities".to_string())
+}
+
+/// Merge tiny clusters (<3 methods) into related larger clusters
+fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
+    if clusters.len() <= 1 {
+        return clusters;
+    }
+
+    // Separate tiny clusters from normal ones
+    let mut normal_clusters = Vec::new();
+    let mut tiny_clusters = Vec::new();
+
+    for cluster in clusters {
+        if cluster.methods.len() < 3 {
+            tiny_clusters.push(cluster);
+        } else {
+            normal_clusters.push(cluster);
+        }
+    }
+
+    // Try to merge each tiny cluster into a related normal cluster
+    for tiny in tiny_clusters {
+        let mut merged = false;
+
+        // Find a normal cluster with same category type
+        for normal in &mut normal_clusters {
+            if categories_are_related(&tiny.category, &normal.category) {
+                // Merge tiny into normal
+                normal.methods.extend(tiny.methods.clone());
+                merged = true;
+                break;
+            }
+        }
+
+        if !merged {
+            // No related cluster found, create "Utilities" cluster or keep as-is if >=2 methods
+            if tiny.methods.len() >= 2 {
+                normal_clusters.push(tiny);
+            }
+            // If only 1 method, we drop it (could add to a utilities cluster instead)
+        }
+    }
+
+    normal_clusters
+}
+
+/// Check if two behavioral categories are related for merging purposes
+fn categories_are_related(cat1: &BehaviorCategory, cat2: &BehaviorCategory) -> bool {
+    use BehaviorCategory::*;
+
+    match (cat1, cat2) {
+        // Same category type
+        (Lifecycle, Lifecycle) => true,
+        (StateManagement, StateManagement) => true,
+        (Persistence, Persistence) => true,
+        (Validation, Validation) => true,
+        (Rendering, Rendering) => true,
+        (EventHandling, EventHandling) => true,
+        (Computation, Computation) => true,
+
+        // Domain categories with same or similar names
+        (Domain(name1), Domain(name2)) => {
+            name1 == name2
+                || name1.to_lowercase().contains(&name2.to_lowercase())
+                || name2.to_lowercase().contains(&name1.to_lowercase())
+        }
+
+        // Related categories
+        (Persistence, StateManagement) | (StateManagement, Persistence) => true,
+        (Validation, Computation) | (Computation, Validation) => true,
+
+        _ => false,
+    }
+}
+
+/// Apply Rust-specific naming patterns to improve categorization
+///
+/// Only refines Domain categories - preserves named behavioral categories
+/// (Rendering, StateManagement, etc.) to avoid over-relabeling
+fn apply_rust_patterns(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
+    clusters
+        .into_iter()
+        .map(|mut cluster| {
+            // Only refine generic Domain categories, preserve specific behavioral categories
+            if !matches!(cluster.category, BehaviorCategory::Domain(_)) {
+                return cluster;
+            }
+
+            // Detect I/O boundary patterns (parser, reader, writer)
+            if cluster_is_io_boundary(&cluster.methods) {
+                cluster.category = BehaviorCategory::Domain("Parser".to_string());
+            }
+            // Detect query patterns (get_*, fetch_*, find_*)
+            else if cluster_is_query(&cluster.methods) {
+                cluster.category = BehaviorCategory::Domain("Query".to_string());
+            }
+            // Detect matching/strategy patterns
+            else if cluster_is_matching(&cluster.methods) {
+                cluster.category = BehaviorCategory::Domain("Matching".to_string());
+            }
+            // Detect lookup patterns
+            else if cluster_is_lookup(&cluster.methods) {
+                cluster.category = BehaviorCategory::Domain("Lookup".to_string());
+            }
+
+            cluster
+        })
+        .collect()
+}
+
+fn cluster_is_io_boundary(methods: &[String]) -> bool {
+    let io_keywords = ["parse", "read", "write", "load", "save", "deserialize", "serialize"];
+    let io_count = methods
+        .iter()
+        .filter(|m| {
+            let lower = m.to_lowercase();
+            io_keywords.iter().any(|kw| lower.contains(kw))
+        })
+        .count();
+
+    io_count as f64 / methods.len() as f64 > 0.6 // >60% I/O methods
+}
+
+fn cluster_is_query(methods: &[String]) -> bool {
+    let query_keywords = ["get_", "fetch_", "retrieve_", "query_"];
+    methods
+        .iter()
+        .filter(|m| query_keywords.iter().any(|kw| m.starts_with(kw)))
+        .count() as f64
+        / methods.len() as f64
+        > 0.6
+}
+
+fn cluster_is_matching(methods: &[String]) -> bool {
+    let match_keywords = ["match", "compare", "equals", "strategy"];
+    methods
+        .iter()
+        .filter(|m| {
+            let lower = m.to_lowercase();
+            match_keywords.iter().any(|kw| lower.contains(kw))
+        })
+        .count() as f64
+        / methods.len() as f64
+        > 0.6
+}
+
+fn cluster_is_lookup(methods: &[String]) -> bool {
+    let lookup_keywords = ["find_", "search_", "lookup_", "locate_"];
+    methods
+        .iter()
+        .filter(|m| lookup_keywords.iter().any(|kw| m.starts_with(kw)))
+        .count() as f64
+        / methods.len() as f64
+        > 0.6
+}
+
 /// Calculate modularity score for a method in a cluster
 fn calculate_method_modularity(
     method: &str,
@@ -1629,5 +1961,109 @@ mod tests {
             println!("  Methods: {:?}", cluster.methods);
         }
         println!("=================================\n");
+    }
+
+    #[test]
+    fn test_production_ready_clustering_filters_tests() {
+        // This test verifies that production-ready clustering:
+        // 1. Filters out test methods
+        // 2. Subdivides oversized Domain clusters
+        // 3. Merges tiny clusters
+        // 4. Applies Rust-specific patterns
+
+        let methods = vec![
+            // Production methods - Parser group
+            "parse_lcov_file".to_string(),
+            "parse_lcov_file_with_progress".to_string(),
+            "parse_coverage_data".to_string(),
+            "read_file_contents".to_string(),
+            // Production methods - Query group
+            "get_function_coverage".to_string(),
+            "get_file_coverage".to_string(),
+            "get_overall_coverage".to_string(),
+            "get_all_files".to_string(),
+            "fetch_coverage_data".to_string(),
+            // Production methods - Normalize group
+            "normalize_path".to_string(),
+            "normalize_function_name".to_string(),
+            "normalize_demangled_name".to_string(),
+            // Production methods - Find group
+            "find_function_by_name".to_string(),
+            "find_functions_by_path".to_string(),
+            "find_function_by_line".to_string(),
+            // Test methods - should be filtered out
+            "test_parse_lcov_file".to_string(),
+            "test_function_name_normalization".to_string(),
+            "test_coverage_calculation".to_string(),
+            "test_empty_data".to_string(),
+            // Test helpers - should be filtered out
+            "mock_coverage_data".to_string(),
+            "fixture_test_file".to_string(),
+        ];
+
+        let adjacency = HashMap::new(); // Empty adjacency for simplicity
+
+        // Apply production-ready clustering
+        let clusters = apply_production_ready_clustering(&methods, &adjacency);
+
+        // Verify tests are filtered out
+        let all_cluster_methods: Vec<&String> = clusters
+            .iter()
+            .flat_map(|c| &c.methods)
+            .collect();
+
+        assert!(
+            !all_cluster_methods.contains(&&"test_parse_lcov_file".to_string()),
+            "Test methods should be filtered out"
+        );
+        assert!(
+            !all_cluster_methods.contains(&&"mock_coverage_data".to_string()),
+            "Test helper methods should be filtered out"
+        );
+
+        // Verify production methods are included
+        assert!(
+            all_cluster_methods.contains(&&"parse_lcov_file".to_string()),
+            "Production methods should be included"
+        );
+        assert!(
+            all_cluster_methods.contains(&&"get_function_coverage".to_string()),
+            "Production methods should be included"
+        );
+
+        // Verify we have multiple clusters (not one big cluster)
+        assert!(
+            clusters.len() >= 3,
+            "Should have multiple clusters, found {}",
+            clusters.len()
+        );
+
+        // Verify proper categorization (either behavioral or Rust-specific patterns)
+        // Clusters should be well-categorized, not just generic "Utilities"
+        let has_good_categories = clusters.iter().all(|c| {
+            !matches!(
+                c.category,
+                BehaviorCategory::Domain(ref name) if name == "Utilities" || name == "Operations"
+            )
+        });
+
+        assert!(
+            has_good_categories,
+            "All clusters should have meaningful categories (not Utilities/Operations)"
+        );
+
+        println!("\n=== Production-Ready Clustering Results ===");
+        println!("Total clusters: {}", clusters.len());
+        println!("Production methods: {} / {} total", all_cluster_methods.len(), methods.len());
+        for (i, cluster) in clusters.iter().enumerate() {
+            println!(
+                "Cluster {}: {} ({} methods)",
+                i + 1,
+                cluster.category.display_name(),
+                cluster.methods.len()
+            );
+            println!("  Methods: {:?}", cluster.methods);
+        }
+        println!("==========================================\n");
     }
 }

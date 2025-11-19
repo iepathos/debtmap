@@ -835,10 +835,14 @@ impl GodObjectDetector {
         )
     }
 
-    /// Generate behavioral splits using hybrid clustering (Spec 178)
+    /// Generate behavioral splits using production-ready clustering (Spec 178)
     ///
-    /// Uses a hybrid approach combining name-based categorization with
-    /// call-graph community detection for improved accuracy.
+    /// Uses a multi-pass refinement pipeline that:
+    /// 1. Filters out test methods (stay in #[cfg(test)])
+    /// 2. Applies hybrid clustering (name-based + call-graph)
+    /// 3. Subdivides oversized Domain clusters
+    /// 4. Merges tiny clusters (<3 methods)
+    /// 5. Applies Rust-specific patterns (I/O, Pure, Query)
     fn generate_behavioral_splits(
         all_methods: &[String],
         field_tracker: Option<&crate::organization::FieldAccessTracker>,
@@ -846,7 +850,7 @@ impl GodObjectDetector {
         base_name: &str,
     ) -> Vec<ModuleSplit> {
         use crate::organization::behavioral_decomposition::{
-            apply_hybrid_clustering, build_method_call_adjacency_matrix_with_functions,
+            apply_production_ready_clustering, build_method_call_adjacency_matrix_with_functions,
             detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
         };
 
@@ -884,8 +888,8 @@ impl GodObjectDetector {
         let adjacency =
             build_method_call_adjacency_matrix_with_functions(&impl_blocks, &standalone_functions);
 
-        // Apply hybrid clustering (name-based + community detection)
-        let clusters = apply_hybrid_clustering(all_methods, &adjacency);
+        // Apply production-ready clustering (filters tests, subdivides oversized clusters, merges tiny ones)
+        let clusters = apply_production_ready_clustering(all_methods, &adjacency);
 
         // Convert clusters to ModuleSplit recommendations
         let mut splits: Vec<ModuleSplit> = clusters
@@ -934,14 +938,39 @@ impl GodObjectDetector {
             .collect();
 
         // Detect service object candidates (Spec 178)
+        // Only include methods NOT already in behavioral clusters to avoid redundancy
         let service_candidates = if let Some(tracker) = field_tracker {
-            detect_service_candidates(tracker, all_methods)
+            // Filter out test methods before service detection (same as production_ready_clustering)
+            let production_methods: Vec<String> = all_methods
+                .iter()
+                .filter(|m| {
+                    use crate::organization::behavioral_decomposition::is_test_method;
+                    !is_test_method(m)
+                })
+                .cloned()
+                .collect();
+
+            let all_service_candidates = detect_service_candidates(tracker, &production_methods);
+
+            // Get all methods already in behavioral clusters
+            let methods_in_clusters: std::collections::HashSet<String> = splits
+                .iter()
+                .flat_map(|split| split.methods_to_move.iter())
+                .cloned()
+                .collect();
+
+            // Filter to only service candidates NOT in behavioral clusters
+            all_service_candidates
+                .into_iter()
+                .filter(|(method, _, _)| !methods_in_clusters.contains(method))
+                .collect()
         } else {
             vec![]
         };
 
-        // If we have service candidates, add them as a separate split
-        if !service_candidates.is_empty() {
+        // Only create service split if we have unclustered service candidates
+        // and if they form a meaningful group (>=3 methods)
+        if service_candidates.len() >= 3 {
             let service_recommendation = recommend_service_extraction(
                 &service_candidates,
                 &format!("{}Service", Self::capitalize_first(base_name)),
@@ -960,14 +989,14 @@ impl GodObjectDetector {
                 estimated_lines: service_methods.len() * 12,
                 method_count: service_methods.len(),
                 warning: None,
-                priority: Priority::High,
+                priority: Priority::Medium, // Lower priority than behavioral splits
                 cohesion_score: Some(0.3), // Low coupling by design
                 representative_methods: service_methods.iter().take(8).cloned().collect(),
                 fields_needed: vec![],
                 trait_suggestion: Some(service_recommendation),
                 behavior_category: Some("Service Object".to_string()),
                 rationale: Some(
-                    "These methods have minimal field dependencies and can be extracted to a service object".to_string()
+                    "These methods have minimal field dependencies (not already clustered)".to_string()
                 ),
                 ..Default::default()
             };
