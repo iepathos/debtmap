@@ -1,6 +1,7 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod anti_pattern_detector;
 pub mod behavioral_decomposition;
 pub use behavioral_decomposition::{
     apply_hybrid_clustering, apply_production_ready_clustering,
@@ -90,6 +91,11 @@ pub use boilerplate_detector::{
 pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 
 pub use macro_recommendations::MacroRecommendationEngine;
+
+pub use anti_pattern_detector::{
+    is_primitive, to_pascal_case, AntiPattern, AntiPatternConfig, AntiPatternDetector,
+    AntiPatternSeverity, AntiPatternType, SplitQualityReport,
+};
 
 pub use file_classifier::{
     calculate_reduction_target, classify_file, get_threshold, recommendation_level, ConfigType,

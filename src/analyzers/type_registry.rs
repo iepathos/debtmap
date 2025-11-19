@@ -50,6 +50,7 @@ pub struct MethodSignature {
     pub name: String,
     pub self_param: Option<SelfParam>,
     pub return_type: Option<String>,
+    pub param_types: Vec<String>,
 }
 
 /// Self parameter information

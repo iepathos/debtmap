@@ -31,6 +31,7 @@ pub struct MethodSignature {
     pub takes_self: bool,
     pub takes_mut_self: bool,
     pub visibility: VisibilityInfo,
+    pub param_types: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

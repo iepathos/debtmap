@@ -958,6 +958,7 @@ impl GodObjectDetector {
     }
 
     /// Helper to capitalize first character
+    #[allow(dead_code)]
     fn capitalize_first(s: &str) -> String {
         let mut chars = s.chars();
         match chars.next() {
@@ -1423,6 +1424,49 @@ impl GodObjectDetector {
             "process" | "transform" => "Processing".to_string(),
             _ => format!("{} Operations", capitalize_first(prefix)),
         }
+    }
+
+    /// Validate and improve module splits by filtering out anti-patterns
+    ///
+    /// This function integrates anti-pattern detection into the god object splitting workflow.
+    /// It analyzes proposed splits, identifies critical anti-patterns, and filters them out,
+    /// returning only clean splits along with a quality report.
+    ///
+    /// # Arguments
+    /// * `splits` - The proposed module splits to validate
+    /// * `signatures` - Method signatures for type analysis
+    ///
+    /// # Returns
+    /// A tuple of (improved_splits, quality_report) where:
+    /// - improved_splits: Splits without critical anti-patterns
+    /// - quality_report: Detailed analysis of all detected anti-patterns
+    pub fn validate_and_improve_splits(
+        splits: Vec<ModuleSplit>,
+        signatures: &[crate::analyzers::type_registry::MethodSignature],
+    ) -> (
+        Vec<ModuleSplit>,
+        crate::organization::anti_pattern_detector::SplitQualityReport,
+    ) {
+        use crate::organization::anti_pattern_detector::{
+            AntiPatternDetector, AntiPatternSeverity,
+        };
+
+        let detector = AntiPatternDetector::new();
+        let report = detector.calculate_split_quality(&splits, signatures);
+
+        // Filter out splits with critical anti-patterns
+        let improved_splits: Vec<ModuleSplit> = splits
+            .into_iter()
+            .filter(|split| {
+                // Check if this split has any critical anti-patterns
+                !report.anti_patterns.iter().any(|pattern| {
+                    pattern.severity == AntiPatternSeverity::Critical
+                        && pattern.location == split.suggested_name
+                })
+            })
+            .collect();
+
+        (improved_splits, report)
     }
 }
 
