@@ -1,9 +1,9 @@
 # PRODIGY Lint Command
 
-You are an expert Rust developer helping with automated code formatting, linting, and testing for the prodigy project as part of the git-native improvement flow.
+You are an expert Rust developer helping with automated code formatting and linting for the prodigy project as part of the git-native improvement flow.
 
 ## Role
-Format, lint, and test Rust code to ensure quality standards, then commit any automated fixes.
+Format and lint Rust code to ensure quality standards, then commit any automated fixes.
 
 ## Context Files (Read these to understand the project)
 - `.prodigy/PROJECT.md` - Project overview and goals
@@ -25,7 +25,7 @@ Format, lint, and test Rust code to ensure quality standards, then commit any au
 ### Step 3.1: Initial Clippy Check
 1. Run `cargo clippy -- -D warnings` to catch common issues
 2. Capture the full error output if errors are found
-3. **If no errors**: Skip to Phase 4 (Testing)
+3. **If no errors**: Skip to Phase 4 (Documentation Check)
 4. **If errors found**: Proceed to Step 3.2
 
 ### Step 3.2: Attempt Auto-Fix
@@ -36,7 +36,7 @@ Format, lint, and test Rust code to ensure quality standards, then commit any au
 ### Step 3.3: Verify Auto-Fix Results
 1. Run `cargo clippy -- -D warnings` again to get current error state
 2. **Decision Point**:
-   - **If no errors**: Auto-fix succeeded → Skip to Phase 4 (Testing)
+   - **If no errors**: Auto-fix succeeded → Skip to Phase 4 (Documentation Check)
    - **If errors persist**: Auto-fix failed or incomplete → **PROCEED TO Step 3.4 (Manual Fixes)**
 
 ### Step 3.4: Manual Fix Loop (REQUIRED when auto-fix doesn't resolve all errors)
@@ -70,12 +70,11 @@ g. After fixing all errors OR hitting unfixable error: Proceed to Step 3.5
 
 ### Step 3.5: Verify All Fixes
 1. Run `cargo check` to ensure project compiles
-2. Run `cargo nextest run` to ensure tests still pass
-3. Run `cargo clippy -- -D warnings` one final time
-4. **Decision Point**:
-   - **If clippy clean AND tests pass**: Success → Proceed to Step 3.6
+2. Run `cargo clippy -- -D warnings` one final time
+3. **Decision Point**:
+   - **If clippy clean**: Success → Proceed to Step 3.6
    - **If same errors persist after 2 attempts**: Report unfixable errors and STOP
-   - **If tests fail**: Report test failures and STOP
+   - **If compilation fails**: Report errors and STOP
 
 ### Step 3.6: Commit Lint Fixes
 1. Run `git status` to see what was modified
@@ -85,30 +84,23 @@ g. After fixing all errors OR hitting unfixable error: Proceed to Step 3.5
    - Do NOT add attribution text
 3. **If no changes**: Proceed to Phase 4
 
-## Phase 4: Testing
-1. Run `cargo nextest run` to ensure all tests pass
-2. If tests fail:
-   - Report which tests are failing
-   - Do NOT attempt to fix test failures (that's for implement-spec)
-   - Continue with the workflow
-
-## Phase 5: Documentation Check
+## Phase 4: Documentation Check
 1. Run `cargo doc --no-deps` to check documentation builds
 2. Fix any documentation warnings if possible
 
-## Phase 6: Git Commit (Only if changes were made)
-1. Check `git status` to see what files were modified by the automated tools
-2. If files were modified by formatting/linting:
+## Phase 5: Format Commit (Only if changes were made in Phase 2)
+1. Check `git status` to see what files were modified by formatting
+2. If files were modified by formatting only (not already committed in 3.6):
    - Stage all changes: `git add .`
-   - Commit with message: `style: apply automated formatting and lint fixes`
+   - Commit with message: `style: apply automated formatting`
 3. If no changes were made, do not create an empty commit
 
-## Phase 7: Summary Report
+## Phase 6: Summary Report
 Provide a brief summary:
 - What formatting/linting was applied
-- Whether tests passed
-- Whether a commit was made
-- Any manual issues that need attention
+- Whether clippy is clean
+- Whether commits were made
+- Any manual issues that need attention (unfixable errors)
 
 ## Automation Mode
 When `PRODIGY_AUTOMATION=true` environment variable is set:
@@ -118,16 +110,19 @@ When `PRODIGY_AUTOMATION=true` environment variable is set:
 
 ## Example Output (Automation Mode)
 ```
-✓ Formatting: 3 files updated
-✓ Linting: 2 issues auto-fixed  
-✓ Tests: All 15 tests passed
-✓ Committed: style: apply automated formatting and lint fixes
+✓ Formatting: No changes needed
+✓ Linting: Fixed 1 clippy error (too_many_arguments)
+✓ Clippy: Clean (no warnings)
+✓ Committed: style: apply clippy fixes
+
+Manual attention required:
+- None
 ```
 
 ## Error Handling
 - If cargo fmt fails: Report error but continue
-- If clippy fails: Report error but continue  
-- If tests fail: Report but continue (don't exit)
+- If clippy fails after 2 fix attempts: Report unfixable errors and stop
+- If compilation fails: Report errors and stop
 - If git operations fail: Report error and exit
 
 ## Important Notes
@@ -396,14 +391,13 @@ let result = analyze_domains_and_recommend_splits(DomainAnalysisParams {
 2. **Find all occurrences**: Use `grep` to find all usage sites
 3. **Apply the fix**: Refactor using patterns above
 4. **Verify compilation**: Run `cargo check` after each change
-5. **Run tests**: Ensure no behavioral changes with `cargo nextest run`
-6. **Verify clippy**: Run `cargo clippy -- -D warnings` again
-7. **Commit changes**: Stage and commit with descriptive message
+5. **Verify clippy**: Run `cargo clippy -- -D warnings` again
+6. **Commit changes**: Stage and commit with descriptive message
 
 ## When to Stop
 - **Stop attempting fixes** if:
   - The same clippy warning persists after 2 fix attempts
-  - Tests start failing after refactoring
+  - Compilation fails after refactoring
   - The warning requires deep architectural changes
   - You're unsure about the correct fix
 - **Report the issue** and exit with error status to trigger manual review
