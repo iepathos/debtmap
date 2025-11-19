@@ -139,6 +139,117 @@ impl TypeSignatureAnalyzer {
     }
 }
 
+/// Detects implicit types through repeated parameter patterns and tuple returns
+pub struct ImplicitTypeDetector;
+
+impl ImplicitTypeDetector {
+    /// Detect repeated parameter patterns (3+ occurrences) that suggest a missing type
+    pub fn find_parameter_patterns(&self, signatures: &[MethodSignature]) -> Vec<ParameterPattern> {
+        let mut pattern_map: HashMap<Vec<String>, Vec<String>> = HashMap::new();
+
+        for sig in signatures {
+            if sig.param_types.len() >= 2 {
+                let pattern: Vec<String> = sig.param_types.iter().map(|t| t.name.clone()).collect();
+                pattern_map.entry(pattern).or_default().push(sig.name.clone());
+            }
+        }
+
+        pattern_map
+            .into_iter()
+            .filter(|(_, methods)| methods.len() >= 3)
+            .map(|(param_types, methods)| {
+                let suggested_type_name = Self::suggest_type_name(&methods);
+                ParameterPattern {
+                    param_types,
+                    methods,
+                    suggested_type_name,
+                }
+            })
+            .collect()
+    }
+
+    /// Detect tuple returns that should be named structs
+    pub fn find_tuple_returns(&self, signatures: &[MethodSignature]) -> Vec<TupleReturnPattern> {
+        signatures
+            .iter()
+            .filter_map(|sig| {
+                sig.return_type.as_ref().and_then(|ret| {
+                    if ret.name.starts_with('(') || ret.generics.len() > 1 {
+                        Some(TupleReturnPattern {
+                            method_name: sig.name.clone(),
+                            return_types: ret.generics.clone(),
+                            suggested_type_name: format!("{}Result", Self::to_pascal_case(&sig.name)),
+                        })
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn suggest_type_name(methods: &[String]) -> String {
+        if let Some(common_prefix) = Self::find_common_prefix(methods) {
+            if common_prefix.len() > 2 {
+                return Self::to_pascal_case(&common_prefix);
+            }
+        }
+        "ImplicitType".to_string()
+    }
+
+    fn find_common_prefix(methods: &[String]) -> Option<String> {
+        if methods.is_empty() {
+            return None;
+        }
+
+        let first = &methods[0];
+        let mut prefix_len = 0;
+
+        for (i, ch) in first.chars().enumerate() {
+            if methods.iter().all(|m| m.chars().nth(i) == Some(ch)) {
+                prefix_len = i + 1;
+            } else {
+                break;
+            }
+        }
+
+        if prefix_len > 0 {
+            Some(first[..prefix_len].trim_end_matches('_').to_string())
+        } else {
+            None
+        }
+    }
+
+    fn to_pascal_case(s: &str) -> String {
+        s.split('_')
+            .filter(|part| !part.is_empty())
+            .map(|part| {
+                let mut chars = part.chars();
+                match chars.next() {
+                    Some(first) => first.to_uppercase().chain(chars).collect::<String>(),
+                    None => String::new(),
+                }
+            })
+            .collect()
+    }
+}
+
+/// Repeated parameter pattern suggesting a missing type
+#[derive(Clone, Debug)]
+pub struct ParameterPattern {
+    pub param_types: Vec<String>,
+    pub methods: Vec<String>,
+    pub suggested_type_name: String,
+}
+
+/// Tuple return suggesting a missing result type
+#[derive(Clone, Debug)]
+pub struct TupleReturnPattern {
+    pub method_name: String,
+    pub return_types: Vec<String>,
+    pub suggested_type_name: String,
+}
+
 /// Analyzes type affinity between methods to suggest type-based clustering
 pub struct TypeAffinityAnalyzer;
 
@@ -654,5 +765,128 @@ mod tests {
         let analyzer = TypeAffinityAnalyzer;
         let clusters = analyzer.cluster_by_type_affinity(&[]);
         assert!(clusters.is_empty());
+    }
+
+    #[test]
+    fn test_implicit_type_detector_parameter_patterns() {
+        let detector = ImplicitTypeDetector;
+
+        let signatures = vec![
+            method_sig(
+                "format_item",
+                vec![simple_type("Score"), simple_type("Metrics")],
+                Some(simple_type("String")),
+            ),
+            method_sig(
+                "render_item",
+                vec![simple_type("Score"), simple_type("Metrics")],
+                Some(simple_type("String")),
+            ),
+            method_sig(
+                "validate_item",
+                vec![simple_type("Score"), simple_type("Metrics")],
+                Some(simple_type("bool")),
+            ),
+            method_sig(
+                "different_method",
+                vec![simple_type("Other")],
+                None,
+            ),
+        ];
+
+        let patterns = detector.find_parameter_patterns(&signatures);
+
+        // Should find one pattern with 3 methods
+        assert_eq!(patterns.len(), 1);
+        let pattern = &patterns[0];
+        assert_eq!(pattern.methods.len(), 3);
+        assert!(pattern.methods.contains(&"format_item".to_string()));
+        assert!(pattern.methods.contains(&"render_item".to_string()));
+        assert!(pattern.methods.contains(&"validate_item".to_string()));
+    }
+
+    #[test]
+    fn test_implicit_type_detector_no_patterns() {
+        let detector = ImplicitTypeDetector;
+
+        let signatures = vec![
+            method_sig(
+                "method1",
+                vec![simple_type("TypeA")],
+                Some(simple_type("String")),
+            ),
+            method_sig(
+                "method2",
+                vec![simple_type("TypeB")],
+                Some(simple_type("String")),
+            ),
+        ];
+
+        let patterns = detector.find_parameter_patterns(&signatures);
+
+        // Should find no patterns (need 3+ occurrences)
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_implicit_type_detector_tuple_returns() {
+        let detector = ImplicitTypeDetector;
+
+        let mut tuple_type = simple_type("tuple");
+        tuple_type.generics = vec!["Score".to_string(), "Metrics".to_string()];
+
+        let signatures = vec![
+            method_sig(
+                "analyze_complexity",
+                vec![simple_type("Code")],
+                Some(tuple_type),
+            ),
+        ];
+
+        let tuple_returns = detector.find_tuple_returns(&signatures);
+
+        // Should detect tuple return
+        assert_eq!(tuple_returns.len(), 1);
+        let tuple_ret = &tuple_returns[0];
+        assert_eq!(tuple_ret.method_name, "analyze_complexity");
+        assert_eq!(tuple_ret.return_types.len(), 2);
+    }
+
+    #[test]
+    fn test_to_pascal_case() {
+        assert_eq!(
+            ImplicitTypeDetector::to_pascal_case("format_item"),
+            "FormatItem"
+        );
+        assert_eq!(
+            ImplicitTypeDetector::to_pascal_case("analyze_code"),
+            "AnalyzeCode"
+        );
+        assert_eq!(
+            ImplicitTypeDetector::to_pascal_case("simple"),
+            "Simple"
+        );
+    }
+
+    #[test]
+    fn test_find_common_prefix() {
+        let methods = vec![
+            "format_item".to_string(),
+            "format_header".to_string(),
+            "format_footer".to_string(),
+        ];
+        assert_eq!(
+            ImplicitTypeDetector::find_common_prefix(&methods),
+            Some("format".to_string())
+        );
+
+        let no_common = vec![
+            "analyze".to_string(),
+            "render".to_string(),
+        ];
+        assert_eq!(
+            ImplicitTypeDetector::find_common_prefix(&no_common),
+            None
+        );
     }
 }
