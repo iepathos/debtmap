@@ -3,8 +3,8 @@ use super::{
     god_object::{metrics, TypeAnalysis, TypeVisitor},
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
     EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectThresholds, GodObjectType,
-    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector,
-    Priority, RecommendationSeverity, ResponsibilityGroup, StructMetrics,
+    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector, Priority,
+    RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
 use std::collections::HashMap;
@@ -724,12 +724,8 @@ impl GodObjectDetector {
                 .unwrap_or("module");
 
             // Use behavioral clustering for god objects
-            let mut splits = Self::generate_behavioral_splits(
-                all_methods,
-                field_tracker,
-                ast,
-                file_name,
-            );
+            let mut splits =
+                Self::generate_behavioral_splits(all_methods, field_tracker, ast, file_name);
 
             // If behavioral clustering doesn't produce results, fall back to method-based
             if splits.is_empty() {
@@ -767,7 +763,7 @@ impl GodObjectDetector {
     ) -> Vec<ModuleSplit> {
         use crate::organization::behavioral_decomposition::{
             apply_community_detection, build_method_call_adjacency_matrix,
-            suggest_trait_extraction, detect_service_candidates, recommend_service_extraction,
+            detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
         };
 
         // Collect impl blocks for adjacency matrix
@@ -801,12 +797,8 @@ impl GodObjectDetector {
                 let suggested_name = format!("{}/{}", base_name, category_name);
 
                 // Get representative methods (top 5-8)
-                let representative_methods: Vec<String> = cluster
-                    .methods
-                    .iter()
-                    .take(8)
-                    .cloned()
-                    .collect();
+                let representative_methods: Vec<String> =
+                    cluster.methods.iter().take(8).cloned().collect();
 
                 // Get fields needed for this cluster
                 let fields_needed = if let Some(tracker) = field_tracker {
@@ -909,12 +901,8 @@ impl GodObjectDetector {
         for split in splits {
             // Populate representative_methods (top 5-8 methods)
             if split.representative_methods.is_empty() && !split.methods_to_move.is_empty() {
-                split.representative_methods = split
-                    .methods_to_move
-                    .iter()
-                    .take(8)
-                    .cloned()
-                    .collect();
+                split.representative_methods =
+                    split.methods_to_move.iter().take(8).cloned().collect();
             }
 
             // Populate fields_needed using FieldAccessTracker
@@ -934,7 +922,8 @@ impl GodObjectDetector {
                 }
 
                 // Use most common category
-                if let Some((category, _)) = category_counts.iter().max_by_key(|(_, count)| *count) {
+                if let Some((category, _)) = category_counts.iter().max_by_key(|(_, count)| *count)
+                {
                     split.behavior_category = Some(category.clone());
                 }
             }

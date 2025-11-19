@@ -416,7 +416,7 @@ fn test_spec_130_god_class_vs_god_file_detection() {
 /// Test behavioral decomposition with field access tracking and trait extraction (Spec 178)
 #[test]
 fn test_behavioral_decomposition_with_field_tracking() {
-    use debtmap::organization::{FieldAccessTracker, cluster_methods_by_behavior};
+    use debtmap::organization::{cluster_methods_by_behavior, FieldAccessTracker};
 
     let code = r#"
         struct Editor {
@@ -517,15 +517,34 @@ fn test_behavioral_decomposition_with_field_tracking() {
 
     // Verify behavioral clustering
     use debtmap::organization::BehaviorCategory;
-    assert!(clusters.contains_key(&BehaviorCategory::Rendering), "Should identify rendering cluster");
-    assert!(clusters.contains_key(&BehaviorCategory::EventHandling), "Should identify event handling cluster");
-    assert!(clusters.contains_key(&BehaviorCategory::Persistence), "Should identify persistence cluster");
-    assert!(clusters.contains_key(&BehaviorCategory::Validation), "Should identify validation cluster");
-    assert!(clusters.contains_key(&BehaviorCategory::StateManagement), "Should identify state management cluster");
+    assert!(
+        clusters.contains_key(&BehaviorCategory::Rendering),
+        "Should identify rendering cluster"
+    );
+    assert!(
+        clusters.contains_key(&BehaviorCategory::EventHandling),
+        "Should identify event handling cluster"
+    );
+    assert!(
+        clusters.contains_key(&BehaviorCategory::Persistence),
+        "Should identify persistence cluster"
+    );
+    assert!(
+        clusters.contains_key(&BehaviorCategory::Validation),
+        "Should identify validation cluster"
+    );
+    assert!(
+        clusters.contains_key(&BehaviorCategory::StateManagement),
+        "Should identify state management cluster"
+    );
 
     // Verify rendering cluster contains expected methods
     let rendering_methods = clusters.get(&BehaviorCategory::Rendering).unwrap();
-    assert_eq!(rendering_methods.len(), 3, "Should have 3 rendering methods");
+    assert_eq!(
+        rendering_methods.len(),
+        3,
+        "Should have 3 rendering methods"
+    );
     assert!(rendering_methods.contains(&"render".to_string()));
     assert!(rendering_methods.contains(&"draw_cursor".to_string()));
     assert!(rendering_methods.contains(&"paint_background".to_string()));
@@ -534,11 +553,19 @@ fn test_behavioral_decomposition_with_field_tracking() {
     let rendering_fields = tracker.get_minimal_field_set(rendering_methods);
     assert!(rendering_fields.contains(&"display_map".to_string()));
     assert!(rendering_fields.contains(&"cursor_position".to_string()));
-    assert_eq!(rendering_fields.len(), 2, "Rendering should only need 2 fields");
+    assert_eq!(
+        rendering_fields.len(),
+        2,
+        "Rendering should only need 2 fields"
+    );
 
     // Verify persistence cluster
     let persistence_methods = clusters.get(&BehaviorCategory::Persistence).unwrap();
-    assert_eq!(persistence_methods.len(), 2, "Should have 2 persistence methods");
+    assert_eq!(
+        persistence_methods.len(),
+        2,
+        "Should have 2 persistence methods"
+    );
     let persistence_fields = tracker.get_minimal_field_set(persistence_methods);
     assert!(persistence_fields.contains(&"file_path".to_string()));
 }
@@ -546,7 +573,7 @@ fn test_behavioral_decomposition_with_field_tracking() {
 /// Test that behavioral decomposition avoids 'misc' category (Spec 178)
 #[test]
 fn test_behavioral_decomposition_no_misc_category() {
-    use debtmap::organization::{BehavioralCategorizer, BehaviorCategory};
+    use debtmap::organization::{BehaviorCategory, BehavioralCategorizer};
 
     // Test various method names that should NOT result in "misc"
     let test_cases = vec![

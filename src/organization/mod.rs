@@ -3,8 +3,8 @@ use syn;
 
 pub mod behavioral_decomposition;
 pub use behavioral_decomposition::{
-    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory,
-    BehavioralCategorizer, FieldAccessTracker, MethodCluster,
+    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer,
+    FieldAccessTracker, MethodCluster,
 };
 pub mod boilerplate_detector;
 pub mod builder_pattern;
@@ -38,9 +38,9 @@ pub use god_object_analysis::{
     calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
     determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
     recommend_module_splits, recommend_module_splits_enhanced, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis,
-    GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit,
-    Priority, PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StructMetrics,
+    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
+    GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
+    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StructMetrics,
     StructWithMethods,
 };
 

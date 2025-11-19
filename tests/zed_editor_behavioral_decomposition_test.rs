@@ -9,8 +9,8 @@
 /// 3. Shows field dependencies for each behavioral group
 /// 4. Provides specific method extraction recommendations (not just struct grouping)
 use debtmap::organization::{
-    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory,
-    BehavioralCategorizer, FieldAccessTracker, GodObjectDetector, MethodCluster,
+    cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer,
+    FieldAccessTracker, GodObjectDetector, MethodCluster,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -60,7 +60,7 @@ fn test_identifies_rendering_method_group() {
 
             method_categories
                 .entry(category)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(method_name);
         }
     }
@@ -146,7 +146,7 @@ fn test_identifies_event_handling_group() {
 
             method_categories
                 .entry(category)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(method_name);
         }
     }
@@ -353,7 +353,7 @@ fn test_provides_specific_method_extraction_recommendations() {
                         .map(|s| s.as_str())
                         .collect();
 
-                    let expected_methods = vec!["render", "paint", "draw", "display", "show"];
+                    let expected_methods = ["render", "paint", "draw", "display", "show"];
                     let has_rendering_method = expected_methods.iter().any(|expected| {
                         rendering_method_names
                             .iter()
@@ -373,9 +373,11 @@ fn test_provides_specific_method_extraction_recommendations() {
                         .map(|s| s.as_str())
                         .collect();
 
-                    let expected_methods = vec!["handle", "on_", "dispatch", "process", "trigger"];
+                    let expected_methods = ["handle", "on_", "dispatch", "process", "trigger"];
                     let has_event_method = expected_methods.iter().any(|expected| {
-                        event_method_names.iter().any(|name| name.contains(expected))
+                        event_method_names
+                            .iter()
+                            .any(|name| name.contains(expected))
                     });
 
                     if has_event_method {
@@ -408,7 +410,9 @@ fn test_provides_specific_method_extraction_recommendations() {
     // fully support behavioral categorization, they may fail. That's expected
     // and indicates what needs to be completed.
     if !has_rendering_split {
-        eprintln!("Warning: No rendering split found - behavioral categorization may need enhancement");
+        eprintln!(
+            "Warning: No rendering split found - behavioral categorization may need enhancement"
+        );
     }
 
     if !has_event_handling_split {
@@ -465,10 +469,7 @@ fn test_suggests_trait_extraction_for_cohesive_groups() {
     // Cluster methods by behavior
     let clusters = cluster_methods_by_behavior(&method_names);
 
-    assert!(
-        !clusters.is_empty(),
-        "Should identify method clusters"
-    );
+    assert!(!clusters.is_empty(), "Should identify method clusters");
 
     // For behavioral categories that have methods, verify trait extraction works
     for (category, methods) in &clusters {
@@ -520,10 +521,7 @@ fn test_complete_zed_editor_analysis() {
     let analysis = detector.analyze_comprehensive(Path::new(fixture_path), &file);
 
     // Verify god object is detected (this fixture is intentionally a god object)
-    assert!(
-        analysis.is_god_object,
-        "Should detect Editor as god object"
-    );
+    assert!(analysis.is_god_object, "Should detect Editor as god object");
 
     // Verify we have recommendations
     assert!(
@@ -560,14 +558,15 @@ fn test_complete_zed_editor_analysis() {
     // Summary output for debugging
     println!("\n=== Zed Editor Analysis Summary ===");
     println!("God object detected: {}", analysis.is_god_object);
-    println!("Number of recommendations: {}", analysis.recommended_splits.len());
+    println!(
+        "Number of recommendations: {}",
+        analysis.recommended_splits.len()
+    );
     println!("\nRecommended splits:");
     for split in &analysis.recommended_splits {
         println!(
             "  - {} ({} methods) - Category: {:?}",
-            split.suggested_name,
-            split.method_count,
-            split.behavior_category
+            split.suggested_name, split.method_count, split.behavior_category
         );
         if !split.representative_methods.is_empty() {
             println!(

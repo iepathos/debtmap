@@ -168,7 +168,7 @@ impl BehavioralCategorizer {
             .split('_')
             .next()
             .filter(|s| !s.is_empty())
-            .map(|s| capitalize_first(s))
+            .map(capitalize_first)
             .unwrap_or_else(|| "Operations".to_string());
         BehaviorCategory::Domain(domain)
     }
@@ -377,8 +377,11 @@ pub fn apply_community_detection(
         .map(|(i, m)| (i, vec![m.clone()]))
         .collect();
 
-    let mut method_to_cluster: HashMap<String, usize> =
-        methods.iter().enumerate().map(|(i, m)| (m.clone(), i)).collect();
+    let mut method_to_cluster: HashMap<String, usize> = methods
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.clone(), i))
+        .collect();
 
     let mut improved = true;
     let mut iterations = 0;
@@ -424,7 +427,10 @@ pub fn apply_community_detection(
                 }
 
                 // Add to best cluster
-                clusters.entry(best_cluster).or_default().push(method.clone());
+                clusters
+                    .entry(best_cluster)
+                    .or_default()
+                    .push(method.clone());
                 method_to_cluster.insert(method.clone(), best_cluster);
                 improved = true;
             }
@@ -617,7 +623,11 @@ pub fn recommend_service_extraction(
             if fields.is_empty() {
                 format!("    fn {}(...) -> Result<...>", method)
             } else {
-                format!("    fn {}(&self, {}: ...) -> Result<...>", method, fields.join(", "))
+                format!(
+                    "    fn {}(&self, {}: ...) -> Result<...>",
+                    method,
+                    fields.join(", ")
+                )
             }
         })
         .collect();
