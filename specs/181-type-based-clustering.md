@@ -67,21 +67,14 @@ Implement type-based clustering that analyzes **what data types methods operate 
 
 2. **Type Affinity Detection**
    - Group methods that operate on the same types
-   - Calculate type affinity score for each method pair
+   - Calculate type affinity score for each method pair (simple counting)
    - Identify primary type for each cluster (most common param/return type)
-   - Detect implicit types (parameter groups appearing together in 3+ methods)
 
 3. **Type Cluster Generation**
    - Create clusters based on shared type usage (not shared behavior)
    - Name clusters after primary data type ("PriorityItem", "GodObjectMetrics")
    - Ensure each cluster represents single data domain
    - Avoid creating technical groupings (no "rendering", "utilities")
-
-4. **Implicit Type Extraction**
-   - Detect repeated parameter patterns across methods
-   - Suggest extracting struct for parameter groups appearing 3+ times
-   - Detect tuple returns that should be structs
-   - Recommend type names based on domain analysis
 
 ### Non-Functional Requirements
 
@@ -93,11 +86,10 @@ Implement type-based clustering that analyzes **what data types methods operate 
 ## Acceptance Criteria
 
 - [ ] Type signature analyzer extracts param/return types from syn AST
-- [ ] Type affinity calculator groups methods by shared type usage
+- [ ] Type affinity calculator groups methods by shared type usage (simple counting)
 - [ ] Cluster naming reflects data domains (not behaviors)
 - [ ] Zero "utilities" modules in recommendations (all methods belong to types)
-- [ ] Implicit type detector finds parameter clumps (3+ occurrences)
-- [ ] Recommendations include example type definitions
+- [ ] Recommendations include example type definitions with impl blocks
 - [ ] When run on formatter.rs:
   - Recommends priority_item.rs (not rendering.rs)
   - Shows PriorityItem struct definition
@@ -273,66 +265,32 @@ impl TypeAffinityAnalyzer {
 
     /// Calculate type affinity between two method signatures
     ///
-    /// # Affinity Scoring (Empirically Calibrated)
+    /// # Affinity Scoring (Simplified)
     ///
-    /// Weights determined from analysis of 50+ Rust codebases:
+    /// Simple counting approach - methods belong together if they share types:
     ///
-    /// - **Shared parameter types**: 0.6 per shared type
-    ///   - Rationale: Methods operating on same data types likely belong together
-    ///   - Example: `analyze(metrics: &Metrics)` + `format(metrics: &Metrics)` → 0.6
+    /// - **Shared domain types**: +1 per shared type (ignoring primitives)
+    ///   - Example: `analyze(metrics: &Metrics)` + `format(metrics: &Metrics)` → 1
+    ///   - Primitives like String, Vec ignored - too generic
     ///
-    /// - **Pipeline connections**: 1.2 per connection
-    ///   - Rationale: Strong signal of data transformation relationship
-    ///   - Example: `parse() -> Data` + `validate(data: Data)` → 1.2
-    ///
-    /// - **Same self type**: 0.4
-    ///   - Rationale: Already grouped by impl block, moderate affinity boost
+    /// - **Same self type**: +1
     ///   - Example: Both methods in `impl Analyzer`
     ///
-    /// - **Domain type bonus**: +0.3 if types are domain-specific (not primitives)
-    ///   - Rationale: Domain types indicate stronger semantic relationship
-    ///   - Example: `GodObjectMetrics` vs `String`
-    ///
-    /// These weights were validated to produce:
-    /// - 92% accuracy in clustering related methods
-    /// - 88% reduction in utilities modules vs behavioral clustering
-    /// - 0.7+ average cohesion scores
+    /// That's it. No fancy weights, just count shared domain types.
     fn calculate_type_affinity(&self, sig1: &MethodSignature, sig2: &MethodSignature) -> f64 {
         let mut score = 0.0;
 
-        // Shared parameter types (empirically calibrated: 0.6)
-        let shared_params: Vec<_> = sig1.param_types.iter()
+        // Count shared domain types (ignore primitives)
+        let shared_domain_types = sig1.param_types.iter()
+            .filter(|t1| self.is_domain_type(&t1.name))
             .filter(|t1| sig2.param_types.iter().any(|t2| t1.name == t2.name))
-            .collect();
+            .count();
 
-        for shared_type in &shared_params {
-            let base_weight = 0.6;
-            // Bonus for domain types (not primitives/stdlib)
-            let domain_bonus = if self.is_domain_type(&shared_type.name) {
-                0.3
-            } else {
-                0.0
-            };
-            score += base_weight + domain_bonus;
-        }
+        score += shared_domain_types as f64;
 
-        // Return type matches param type (pipeline connection: 1.2)
-        if let Some(ret1) = &sig1.return_type {
-            if sig2.param_types.iter().any(|p| self.types_match(&p.name, &ret1.name)) {
-                score += 1.2; // A → B pipeline connection
-            }
-        }
-
-        // Reverse pipeline check
-        if let Some(ret2) = &sig2.return_type {
-            if sig1.param_types.iter().any(|p| self.types_match(&p.name, &ret2.name)) {
-                score += 1.2; // B → A pipeline connection
-            }
-        }
-
-        // Same self type (0.4)
+        // Same self type
         if sig1.self_type == sig2.self_type && sig1.self_type.is_some() {
-            score += 0.4;
+            score += 1.0;
         }
 
         score
@@ -509,94 +467,6 @@ impl TypeAffinityAnalyzer {
 }
 ```
 
-#### 3. Implicit Type Detector
-
-```rust
-pub struct ImplicitTypeDetector;
-
-pub struct ImplicitType {
-    pub suggested_name: String,
-    pub fields: Vec<(String, TypeInfo)>,
-    pub methods: Vec<String>,
-    pub occurrences: usize,
-}
-
-impl ImplicitTypeDetector {
-    /// Find parameter groups that should be extracted as types
-    pub fn detect_implicit_types(
-        &self,
-        signatures: &[MethodSignature],
-    ) -> Vec<ImplicitType> {
-        // 1. Find parameter clumps (same params in 3+ methods)
-        let clumps = self.find_parameter_clumps(signatures);
-
-        // 2. Find tuple returns that should be structs
-        let tuple_returns = self.find_tuple_returns(signatures);
-
-        // 3. Suggest type names and structure
-        let mut implicit_types = vec![];
-
-        for clump in clumps {
-            implicit_types.push(ImplicitType {
-                suggested_name: self.suggest_type_name(&clump.params),
-                fields: clump.params.clone(),
-                methods: clump.methods.clone(),
-                occurrences: clump.methods.len(),
-            });
-        }
-
-        implicit_types
-    }
-
-    fn find_parameter_clumps(&self, signatures: &[MethodSignature]) -> Vec<ParameterClump> {
-        // Group methods by parameter signature
-        let mut param_groups: HashMap<Vec<String>, Vec<String>> = HashMap::new();
-
-        for sig in signatures {
-            let param_key: Vec<String> = sig.param_types.iter()
-                .map(|t| t.name.clone())
-                .collect();
-
-            param_groups.entry(param_key).or_default().push(sig.name.clone());
-        }
-
-        // Filter for groups with 3+ methods
-        param_groups.into_iter()
-            .filter(|(_, methods)| methods.len() >= 3)
-            .map(|(params, methods)| ParameterClump {
-                params: params.into_iter()
-                    .map(|name| (name.clone(), TypeInfo { name, ..Default::default() }))
-                    .collect(),
-                methods,
-            })
-            .collect()
-    }
-
-    fn suggest_type_name(&self, fields: &[(String, TypeInfo)]) -> String {
-        // Use dominant type name or domain inference
-        let types: Vec<_> = fields.iter().map(|(_, t)| &t.name).collect();
-
-        // If UnifiedDebtItem appears, suggest "PriorityItem"
-        if types.contains(&&"UnifiedDebtItem".to_string()) {
-            return "PriorityItem".to_string();
-        }
-
-        // If GodObjectAnalysis appears, suggest based on context
-        if types.contains(&&"GodObjectAnalysis".to_string()) {
-            return "GodObjectSection".to_string();
-        }
-
-        // Generic fallback
-        "ExtractedType".to_string()
-    }
-}
-
-struct ParameterClump {
-    params: Vec<(String, TypeInfo)>,
-    methods: Vec<String>,
-}
-```
-
 ### ModuleSplit Extensions
 
 Add new fields to `ModuleSplit` struct for type-based clustering:
@@ -614,20 +484,6 @@ pub struct ModuleSplit {
     /// Data flow showing input and output types (Spec 181, 182)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub data_flow: Vec<String>,
-
-    /// Suggested implicit type extraction (Spec 181, 184)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub implicit_type_suggestion: Option<ImplicitTypeSuggestion>,
-}
-
-/// Implicit type suggestion for parameter clumps or tuple returns
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ImplicitTypeSuggestion {
-    pub type_name: String,
-    pub fields: Vec<(String, String)>,  // (field_name, field_type)
-    pub occurrences: usize,
-    pub confidence: f64,
-    pub rationale: String,
 }
 ```
 
@@ -645,7 +501,6 @@ fn generate_idiomatic_splits(
     use crate::organization::type_based_clustering::{
         TypeSignatureAnalyzer,
         TypeAffinityAnalyzer,
-        ImplicitTypeDetector,
     };
 
     // 1. Extract type signatures
@@ -662,32 +517,12 @@ fn generate_idiomatic_splits(
         })
         .collect::<Vec<_>>();
 
-    // 2. Cluster by type affinity
+    // 2. Cluster by type affinity (simple counting)
     let affinity_analyzer = TypeAffinityAnalyzer;
     let type_clusters = affinity_analyzer.cluster_by_type_affinity(&signatures);
 
-    // 3. Detect implicit types
-    let implicit_detector = ImplicitTypeDetector;
-    let implicit_types = implicit_detector.detect_implicit_types(&signatures);
-
-    // 4. Convert to ModuleSplit recommendations
+    // 3. Convert to ModuleSplit recommendations
     type_clusters.into_iter().map(|cluster| {
-        // Find matching implicit type suggestion
-        let implicit_suggestion = implicit_types.iter()
-            .find(|t| cluster.methods.iter().any(|m| t.methods.contains(m)))
-            .map(|t| ImplicitTypeSuggestion {
-                type_name: t.suggested_name.clone(),
-                fields: t.fields.iter()
-                    .map(|(name, info)| (name.clone(), info.name.clone()))
-                    .collect(),
-                occurrences: t.occurrences,
-                confidence: 0.8, // Based on clustering strength
-                rationale: format!(
-                    "Parameter pattern appears in {} methods with shared type {}",
-                    t.occurrences, cluster.primary_type.name
-                ),
-            });
-
         ModuleSplit {
             suggested_name: format!("{}/{}", base_name, cluster.primary_type.name.to_lowercase()),
             responsibility: format!(
@@ -699,7 +534,6 @@ fn generate_idiomatic_splits(
             data_flow: cluster.input_types.into_iter()
                 .chain(cluster.output_types)
                 .collect(),
-            implicit_type_suggestion: implicit_suggestion,
             ..Default::default()
         }
     }).collect()
@@ -792,11 +626,10 @@ Extract domain types that own their behavior:
    - Test clustering with type weights
    - Test primary type identification
 
-3. **Implicit Type Detection**:
-   - Test parameter clump detection (3+ occurrences)
-   - Test type name suggestion
-   - Test tuple return detection
-   - Test field extraction
+3. **Type Cluster Generation**:
+   - Test cluster naming based on primary type
+   - Test that clusters avoid behavioral groupings
+   - Test data flow identification
 
 ### Integration Tests
 

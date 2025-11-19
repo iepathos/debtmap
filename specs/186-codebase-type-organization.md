@@ -3,6 +3,7 @@
 **Status**: Draft
 **Priority**: High
 **Dependencies**: [180, 181, 183]
+**Related**: [187 - Presentation Format]
 **Created**: 2025-01-19
 
 ## Context
@@ -729,129 +730,11 @@ impl CodebaseTypeAnalyzer {
 }
 ```
 
-## Output Format
+## Integration as Technical Debt Issues
 
-```
-Codebase Type Organization Analysis
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Type organization problems are detected as **technical debt issues** alongside god objects, complexity hotspots, etc. No separate commands - just another issue type in standard analysis.
 
-Summary:
-  ⚠ 5 scattered types detected
-  ⚠ 3 orphaned function groups detected
-  ⚠ 2 utilities modules with mixed responsibilities
-  ✓ 0 cross-file technical groupings
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[CRITICAL] Scattered Type: FileMetrics
-  Definition: src/analysis/file_metrics.rs
-  Methods scattered across 6 files (23 total methods):
-
-  src/utils.rs (8 methods):
-    - calculate_complexity, calculate_coverage, calculate_debt_score
-    - format_metrics, validate_metrics, merge_metrics
-    - normalize_metrics, aggregate_metrics
-
-  src/helpers.rs (6 methods):
-    - get_metric_value, set_metric_value, update_metric
-    - is_high_complexity, is_low_coverage, has_debt
-
-  src/processing.rs (4 methods):
-    - process_metrics, batch_process, filter_metrics, sort_metrics
-
-  src/formatting/metrics.rs (3 methods):
-    - format_detailed, format_summary, format_json
-
-  src/validation/metrics.rs (2 methods):
-    - validate_ranges, validate_consistency
-
-  Recommendation:
-    Move all 23 methods to src/analysis/file_metrics.rs as impl methods
-
-    impl FileMetrics {
-        // Calculation methods
-        pub fn complexity(&self) -> u32 { }
-        pub fn coverage(&self) -> f64 { }
-        pub fn debt_score(&self) -> f64 { }
-
-        // Validation methods
-        pub fn validate(&self) -> Result<()> { }
-        pub fn is_high_complexity(&self) -> bool { }
-
-        // Formatting methods
-        pub fn format_detailed(&self) -> String { }
-        pub fn format_summary(&self) -> String { }
-    }
-
-  Estimated Effort: 3 hours (Moderate complexity, Medium risk)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[HIGH] Orphaned Functions: PriorityItem
-  12 standalone functions should be methods:
-
-  src/utils.rs:
-    - format_priority, validate_priority, calculate_priority_score
-    - normalize_priority, is_high_priority
-
-  src/helpers.rs:
-    - get_priority_location, get_priority_metrics, update_priority
-
-  src/processing.rs:
-    - process_priority, batch_priorities, filter_priorities, sort_priorities
-
-  Recommendation:
-    Convert to impl methods in src/priority/priority_item.rs:
-
-    impl PriorityItem {
-        pub fn format(&self) -> String { }
-        pub fn validate(&self) -> Result<()> { }
-        pub fn score(&self) -> f64 { }
-        pub fn is_high_priority(&self) -> bool { }
-    }
-
-  Estimated Effort: 3 hours (Simple complexity, Low risk)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-[HIGH] Utilities Sprawl: src/utils.rs
-  50 functions operating on 10 distinct types:
-
-  Type Distribution:
-    FileMetrics: 8 functions
-    PriorityItem: 5 functions
-    DebtItem: 6 functions
-    GodObjectAnalysis: 4 functions
-    ComplexityMetrics: 3 functions
-    CoverageMetrics: 3 functions
-    ... 4 more types
-
-  Recommendation:
-    Break up utils.rs - move functions to appropriate type modules:
-    - FileMetrics functions → src/analysis/file_metrics.rs
-    - PriorityItem functions → src/priority/priority_item.rs
-    - DebtItem functions → src/debt/debt_item.rs
-    etc.
-
-  Estimated Effort: 10 hours (Moderate complexity, Medium risk)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Total Recommendations: 10
-  Critical: 2
-  High: 5
-  Medium: 3
-  Low: 0
-
-Estimated Total Effort: 28 hours
-
-Priority Order:
-  1. Consolidate FileMetrics (Critical, 3h)
-  2. Consolidate DebtItem (Critical, 2.5h)
-  3. Convert PriorityItem orphans to methods (High, 3h)
-  4. Break up utils.rs (High, 10h)
-  5. Consolidate GodObjectAnalysis (High, 2h)
-```
+See **Spec 187** for detailed output format examples showing how these issues appear in terminal, markdown, and JSON output.
 
 ## Integration with Existing Analysis
 
@@ -900,23 +783,103 @@ impl CodebaseSnapshot {
 }
 ```
 
-### CLI Integration
+### Integration with debtmap analyze
 
-```bash
-# Analyze entire codebase for type organization issues
-debtmap analyze-types --codebase ./src
+The `CodebaseTypeAnalyzer` runs automatically as part of `debtmap analyze`:
 
-# With filters
-debtmap analyze-types --codebase ./src \
-    --min-scattered 3 \
-    --min-files 2 \
-    --detect-utilities
+```rust
+// In main analysis pipeline
+pub fn run_analysis(config: &AnalysisConfig) -> AnalysisResult {
+    let mut issues = vec![];
 
-# Generate report
-debtmap analyze-types --codebase ./src --output type-analysis.json
+    // 1. God object detection (existing)
+    issues.extend(detect_god_objects(codebase));
 
-# Auto-fix (with confirmation)
-debtmap analyze-types --codebase ./src --auto-fix --dry-run
+    // 2. Type organization analysis (NEW)
+    let type_analyzer = CodebaseTypeAnalyzer::default();
+    let type_analysis = type_analyzer.analyze_codebase(&codebase);
+
+    // Convert to standard issue format
+    issues.extend(convert_to_issues(type_analysis));
+
+    // 3. Other analyses (complexity, coverage, etc.)
+    // ...
+
+    AnalysisResult { issues }
+}
+```
+
+Configuration options in `debtmap.toml`:
+
+```toml
+[analysis.type_organization]
+enabled = true
+min_scattered_methods = 3
+min_file_scattering = 2
+min_orphaned_functions = 3
+detect_utilities_sprawl = true
+```
+
+### Converting to Standard Issue Format
+
+```rust
+/// Convert type organization analysis to standard debtmap issues
+fn convert_to_issues(analysis: CodebaseTypeAnalysis) -> Vec<Issue> {
+    let mut issues = vec![];
+
+    // 1. Scattered types → SCATTERED_TYPE issues
+    for scattered in analysis.scattered_types {
+        issues.push(Issue {
+            issue_type: IssueType::ScatteredType,
+            severity: match scattered.severity {
+                ScatteringSeverity::High => Severity::Critical,
+                ScatteringSeverity::Medium => Severity::High,
+                ScatteringSeverity::Low => Severity::Medium,
+            },
+            title: format!("Scattered Type: {}", scattered.type_name),
+            location: scattered.definition_file,
+            metadata: serde_json::to_value(&scattered).ok(),
+        });
+    }
+
+    // 2. Orphaned functions → ORPHANED_FUNCTIONS issues
+    for orphaned in analysis.orphaned_functions {
+        issues.push(Issue {
+            issue_type: IssueType::OrphanedFunctions,
+            severity: Severity::High,
+            title: format!("Orphaned Functions: {}", orphaned.target_type),
+            location: orphaned.suggested_location,
+            metadata: serde_json::to_value(&orphaned).ok(),
+        });
+    }
+
+    // 3. Utilities sprawl → UTILITIES_SPRAWL issues
+    for util in analysis.utilities_sprawl {
+        issues.push(Issue {
+            issue_type: IssueType::UtilitiesSprawl,
+            severity: Severity::High,
+            title: format!("Utilities Sprawl: {}", util.file_path.display()),
+            location: util.file_path,
+            metadata: serde_json::to_value(&util).ok(),
+        });
+    }
+
+    issues
+}
+
+/// New issue types added to existing enum
+pub enum IssueType {
+    // Existing types
+    GodObject,
+    HighComplexity,
+    LowCoverage,
+    // ... other existing types
+
+    // NEW: Type organization issues
+    ScatteredType,
+    OrphanedFunctions,
+    UtilitiesSprawl,
+}
 ```
 
 ## Dependencies
@@ -989,11 +952,11 @@ fn test_analyze_debtmap_codebase() {
 
 ## Future Enhancements
 
-1. **Auto-refactoring**: Generate pull requests with actual code changes
-2. **Incremental analysis**: Only analyze changed files
-3. **CI integration**: Block PRs that increase scattering
-4. **Visualization**: Generate dependency graphs showing type scattering
-5. **IDE integration**: Real-time warnings for misplaced methods
+1. **Auto-refactoring**: Generate suggested code changes with `debtmap fix`
+2. **Incremental analysis**: Only analyze changed files for faster CI
+3. **Quality gates**: Track and prevent increases in type scattering
+4. **Visualization**: Generate graphs showing type organization patterns
+5. **Smart recommendations**: Use ML to learn project-specific organization patterns
 
 ## Migration Path
 
