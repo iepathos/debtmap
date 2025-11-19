@@ -802,6 +802,7 @@ mod tests {
                 takes_self: false,
                 takes_mut_self: false,
                 visibility: VisibilityInfo::Public,
+                param_types: vec![],
                 generic_params: vec![],
             },
         );

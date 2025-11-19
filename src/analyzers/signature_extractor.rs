@@ -92,6 +92,7 @@ impl SignatureExtractor {
         let visibility = VisibilityInfo::from(&impl_fn.vis);
 
         let (takes_self, takes_mut_self) = self.analyze_self_parameter(&impl_fn.sig.inputs);
+        let param_types = self.extract_parameter_types(&impl_fn.sig.inputs);
 
         MethodSignature {
             name,
@@ -101,6 +102,7 @@ impl SignatureExtractor {
             takes_self,
             takes_mut_self,
             visibility,
+            param_types,
         }
     }
 
@@ -116,6 +118,20 @@ impl SignatureExtractor {
         } else {
             (false, false)
         }
+    }
+
+    /// Extract parameter types from function inputs
+    fn extract_parameter_types(
+        &self,
+        inputs: &syn::punctuated::Punctuated<FnArg, syn::token::Comma>,
+    ) -> Vec<String> {
+        inputs
+            .iter()
+            .filter_map(|arg| match arg {
+                FnArg::Receiver(_) => None, // Skip self parameter
+                FnArg::Typed(pat_type) => Self::get_type_name(&pat_type.ty),
+            })
+            .collect()
     }
 
     /// Detect builder patterns in registered methods
