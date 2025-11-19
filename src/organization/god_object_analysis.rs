@@ -1024,7 +1024,7 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 /// assert_eq!(infer_responsibility_from_method("format_output"), "Formatting & Output");
 /// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing & Input");
 /// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
-/// assert_eq!(infer_responsibility_from_method("helper_function"), "Utilities");
+/// assert_eq!(infer_responsibility_from_method("helper_function"), "Helper");
 /// ```
 ///
 /// # Performance
