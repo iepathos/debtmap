@@ -851,7 +851,7 @@ impl GodObjectDetector {
     ) -> Vec<ModuleSplit> {
         use crate::organization::behavioral_decomposition::{
             apply_production_ready_clustering, build_method_call_adjacency_matrix_with_functions,
-            detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
+            suggest_trait_extraction,
         };
 
         // Collect impl blocks for adjacency matrix
@@ -892,7 +892,7 @@ impl GodObjectDetector {
         let clusters = apply_production_ready_clustering(all_methods, &adjacency);
 
         // Convert clusters to ModuleSplit recommendations
-        let mut splits: Vec<ModuleSplit> = clusters
+        let splits: Vec<ModuleSplit> = clusters
             .into_iter()
             .map(|cluster| {
                 let category_name = cluster.category.module_name();
@@ -937,74 +937,18 @@ impl GodObjectDetector {
             })
             .collect();
 
-        // Detect service object candidates (Spec 178)
-        // Only include methods NOT already in behavioral clusters to avoid redundancy
-        let service_candidates = if let Some(tracker) = field_tracker {
-            // Filter out test methods before service detection (same as production_ready_clustering)
-            let production_methods: Vec<String> = all_methods
-                .iter()
-                .filter(|m| {
-                    use crate::organization::behavioral_decomposition::is_test_method;
-                    !is_test_method(m)
-                })
-                .cloned()
-                .collect();
+        // REMOVED: Service object detection (Phase 1 - Spec 178 refinement)
+        //
+        // Service splits are eliminated because:
+        // 1. They're a symptom of methods being lost during clustering
+        // 2. Now that we ensure all methods are clustered, there are no "unclustered" methods
+        // 3. Low-coupling methods should be in behavioral categories (Utilities, etc.)
+        // 4. Creating service splits violates the goal of behavioral decomposition
+        //
+        // Future work: Spec 180 will add module quality validation that prevents
+        // creating new god objects from extracted service layers.
 
-            let all_service_candidates = detect_service_candidates(tracker, &production_methods);
-
-            // Get all methods already in behavioral clusters
-            let methods_in_clusters: std::collections::HashSet<String> = splits
-                .iter()
-                .flat_map(|split| split.methods_to_move.iter())
-                .cloned()
-                .collect();
-
-            // Filter to only service candidates NOT in behavioral clusters
-            all_service_candidates
-                .into_iter()
-                .filter(|(method, _, _)| !methods_in_clusters.contains(method))
-                .collect()
-        } else {
-            vec![]
-        };
-
-        // Only create service split if we have unclustered service candidates
-        // and if they form a meaningful group (>=3 methods)
-        if service_candidates.len() >= 3 {
-            let service_recommendation = recommend_service_extraction(
-                &service_candidates,
-                &format!("{}Service", Self::capitalize_first(base_name)),
-            );
-
-            let service_methods: Vec<String> = service_candidates
-                .iter()
-                .map(|(method, _, _)| method.clone())
-                .collect();
-
-            let service_split = ModuleSplit {
-                suggested_name: format!("{}/service", base_name),
-                methods_to_move: service_methods.clone(),
-                structs_to_move: vec![],
-                responsibility: "Service Object - Low coupling methods".to_string(),
-                estimated_lines: service_methods.len() * 12,
-                method_count: service_methods.len(),
-                warning: None,
-                priority: Priority::Medium, // Lower priority than behavioral splits
-                cohesion_score: Some(0.3), // Low coupling by design
-                representative_methods: service_methods.iter().take(8).cloned().collect(),
-                fields_needed: vec![],
-                trait_suggestion: Some(service_recommendation),
-                behavior_category: Some("Service Object".to_string()),
-                rationale: Some(
-                    "These methods have minimal field dependencies (not already clustered)".to_string()
-                ),
-                ..Default::default()
-            };
-
-            splits.push(service_split);
-        }
-
-        // If only 1 split found (service object), treat as "no useful splits"
+        // If only 1 split found, treat as "no useful splits"
         // Single split is not really a "split" - better to use responsibility-based fallback
         if splits.len() <= 1 {
             return Vec::new();

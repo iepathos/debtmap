@@ -621,13 +621,53 @@ pub fn apply_hybrid_clustering(
             } else {
                 // Found meaningful subclusters, use those instead
                 // But preserve the original behavioral category as a hint
-                for mut subcluster in sub_clusters {
+                for subcluster in &sub_clusters {
+                    let mut refined_subcluster = subcluster.clone();
                     // If the subcluster's inferred category is generic (Domain),
                     // prefer the original behavioral category
-                    if matches!(subcluster.category, BehaviorCategory::Domain(_)) {
-                        subcluster.category = category.clone();
+                    if matches!(refined_subcluster.category, BehaviorCategory::Domain(_)) {
+                        refined_subcluster.category = category.clone();
                     }
-                    refined_clusters.push(subcluster);
+                    refined_clusters.push(refined_subcluster);
+                }
+
+                // CRITICAL: Check for lost methods during community detection
+                // Community detection may filter out low-cohesion or small clusters,
+                // losing methods. We must recover them and keep them in the behavioral category.
+                let methods_in_subclusters: std::collections::HashSet<String> = sub_clusters
+                    .iter()
+                    .flat_map(|c| &c.methods)
+                    .cloned()
+                    .collect();
+
+                let lost_methods: Vec<String> = cluster_methods
+                    .iter()
+                    .filter(|m| !methods_in_subclusters.contains(*m))
+                    .cloned()
+                    .collect();
+
+                if !lost_methods.is_empty() {
+                    // Recover lost methods by keeping them in the original behavioral category
+                    let mut recovery_cluster = MethodCluster {
+                        category: category.clone(),
+                        methods: lost_methods.clone(),
+                        fields_accessed: vec![],
+                        internal_calls: 0,
+                        external_calls: 0,
+                        cohesion_score: 0.0,
+                    };
+
+                    let method_to_cluster: HashMap<String, usize> =
+                        lost_methods.iter().map(|m| (m.clone(), 0)).collect();
+
+                    let (internal_calls, external_calls) =
+                        calculate_cluster_cohesion(&lost_methods, adjacency, &method_to_cluster);
+
+                    recovery_cluster.internal_calls = internal_calls;
+                    recovery_cluster.external_calls = external_calls;
+                    recovery_cluster.calculate_cohesion();
+
+                    refined_clusters.push(recovery_cluster);
                 }
             }
         }
@@ -679,6 +719,9 @@ pub fn apply_production_ready_clustering(
     // Step 6: Merge clusters with identical categories to avoid duplicate module names
     clusters = merge_duplicate_categories(clusters);
 
+    // Step 7: CRITICAL - Ensure all methods are accounted for (no method loss)
+    clusters = ensure_all_methods_clustered(clusters, &production_methods, adjacency);
+
     clusters
 }
 
@@ -705,6 +748,91 @@ fn merge_duplicate_categories(clusters: Vec<MethodCluster>) -> Vec<MethodCluster
     }
 
     category_map.into_values().collect()
+}
+
+/// Ensure all production methods are accounted for in clusters
+///
+/// This is a safety check to prevent method loss during clustering.
+/// If any methods are missing (filtered out by cohesion or size thresholds),
+/// we create a Utilities cluster to hold them.
+fn ensure_all_methods_clustered(
+    mut clusters: Vec<MethodCluster>,
+    all_methods: &[String],
+    adjacency: &HashMap<(String, String), usize>,
+) -> Vec<MethodCluster> {
+    use std::collections::HashSet;
+
+    // Collect all methods currently in clusters
+    let clustered_methods: HashSet<String> = clusters
+        .iter()
+        .flat_map(|c| &c.methods)
+        .cloned()
+        .collect();
+
+    // Find missing methods
+    let missing_methods: Vec<String> = all_methods
+        .iter()
+        .filter(|m| !clustered_methods.contains(*m))
+        .cloned()
+        .collect();
+
+    if !missing_methods.is_empty() {
+        eprintln!(
+            "WARNING: {} methods were not clustered, merging into existing clusters: {:?}",
+            missing_methods.len(),
+            &missing_methods[..missing_methods.len().min(5)]
+        );
+
+        // Try to find an existing Utilities cluster first
+        let utilities_cluster = clusters
+            .iter_mut()
+            .find(|c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"));
+
+        if let Some(utilities) = utilities_cluster {
+            // Merge into existing Utilities cluster
+            utilities.methods.extend(missing_methods);
+        } else if missing_methods.len() >= 3 {
+            // Create new Utilities cluster only if we have enough methods
+            let mut utilities_cluster = MethodCluster {
+                category: BehaviorCategory::Domain("Utilities".to_string()),
+                methods: missing_methods.clone(),
+                fields_accessed: vec![],
+                internal_calls: 0,
+                external_calls: 0,
+                cohesion_score: 0.0,
+            };
+
+            let method_to_cluster: HashMap<String, usize> =
+                missing_methods.iter().map(|m| (m.clone(), 0)).collect();
+
+            let (internal_calls, external_calls) =
+                calculate_cluster_cohesion(&missing_methods, adjacency, &method_to_cluster);
+
+            utilities_cluster.internal_calls = internal_calls;
+            utilities_cluster.external_calls = external_calls;
+            utilities_cluster.calculate_cohesion();
+
+            clusters.push(utilities_cluster);
+        } else {
+            // <3 missing methods - merge into largest existing cluster to avoid tiny clusters
+            if let Some(largest) = clusters.iter_mut().max_by_key(|c| c.methods.len()) {
+                largest.methods.extend(missing_methods);
+            } else {
+                // Edge case: no clusters exist at all
+                // Create one anyway (shouldn't happen in practice)
+                clusters.push(MethodCluster {
+                    category: BehaviorCategory::Domain("Utilities".to_string()),
+                    methods: missing_methods,
+                    fields_accessed: vec![],
+                    internal_calls: 0,
+                    external_calls: 0,
+                    cohesion_score: 0.0,
+                });
+            }
+        }
+    }
+
+    clusters
 }
 
 /// Detect if a method is a test method that should stay in #[cfg(test)]
@@ -819,6 +947,11 @@ fn extract_verb_pattern(method_name: &str) -> String {
 }
 
 /// Merge tiny clusters (<3 methods) into related larger clusters
+///
+/// Enforces minimum cluster size of 3 methods by:
+/// 1. Merging tiny clusters into related normal clusters
+/// 2. Combining all unmerged tiny clusters into a single Utilities cluster
+/// 3. NEVER dropping methods - all methods must be accounted for
 fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
     if clusters.len() <= 1 {
         return clusters;
@@ -837,6 +970,8 @@ fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
     }
 
     // Try to merge each tiny cluster into a related normal cluster
+    let mut unmerged_methods = Vec::new();
+
     for tiny in tiny_clusters {
         let mut merged = false;
 
@@ -851,11 +986,55 @@ fn merge_tiny_clusters(clusters: Vec<MethodCluster>) -> Vec<MethodCluster> {
         }
 
         if !merged {
-            // No related cluster found, create "Utilities" cluster or keep as-is if >=2 methods
-            if tiny.methods.len() >= 2 {
-                normal_clusters.push(tiny);
-            }
-            // If only 1 method, we drop it (could add to a utilities cluster instead)
+            // No related cluster found - collect methods for Utilities cluster
+            unmerged_methods.extend(tiny.methods);
+        }
+    }
+
+    // If we have unmerged methods, combine them intelligently
+    // This ensures:
+    // 1. No methods are lost
+    // 2. We enforce minimum cluster size
+    // 3. Small clusters don't survive
+    if !unmerged_methods.is_empty() {
+        // Check if we should create a Utilities cluster or merge into existing
+        let utilities_exists = normal_clusters
+            .iter_mut()
+            .find(|c| matches!(c.category, BehaviorCategory::Domain(ref name) if name == "Utilities"));
+
+        if let Some(utilities) = utilities_exists {
+            // Merge into existing Utilities cluster
+            utilities.methods.extend(unmerged_methods);
+        } else if unmerged_methods.len() >= 3 {
+            // Only create new Utilities cluster if we have enough methods
+            normal_clusters.push(MethodCluster {
+                category: BehaviorCategory::Domain("Utilities".to_string()),
+                methods: unmerged_methods,
+                fields_accessed: vec![],
+                internal_calls: 0,
+                external_calls: 0,
+                cohesion_score: 0.0,
+            });
+        } else if !normal_clusters.is_empty() {
+            // If we have <3 unmerged methods and no Utilities cluster exists,
+            // merge them into the largest existing cluster to avoid creating tiny clusters
+            let largest_cluster = normal_clusters
+                .iter_mut()
+                .max_by_key(|c| c.methods.len())
+                .unwrap();
+
+            largest_cluster.methods.extend(unmerged_methods);
+        } else {
+            // Edge case: no normal clusters exist, and <3 unmerged methods
+            // Create cluster anyway (will be handled by ensure_all_methods_clustered)
+            normal_clusters.push(MethodCluster {
+                category: BehaviorCategory::Domain("Utilities".to_string()),
+                methods: unmerged_methods,
+                fields_accessed: vec![],
+                internal_calls: 0,
+                external_calls: 0,
+                cohesion_score: 0.0,
+            });
         }
     }
 
@@ -2065,5 +2244,101 @@ mod tests {
             println!("  Methods: {:?}", cluster.methods);
         }
         println!("==========================================\n");
+    }
+
+    #[test]
+    fn test_no_method_loss_and_minimum_cluster_size() {
+        // Phase 1 requirements test:
+        // 1. All methods must be accounted for (no losses)
+        // 2. No clusters smaller than 3 methods
+        // 3. Low-cohesion methods kept in behavioral categories
+
+        let methods = vec![
+            // Rendering group (high cohesion)
+            "render_text".to_string(),
+            "render_cursor".to_string(),
+            "paint_highlights".to_string(),
+            "draw_gutter".to_string(),
+            // Utilities (low cohesion, no internal calls)
+            "format_timestamp".to_string(),
+            "clamp_value".to_string(),
+            // Single method categories
+            "validate_config".to_string(),
+            // State management
+            "get_state".to_string(),
+            "set_state".to_string(),
+        ];
+
+        let adjacency = HashMap::from([
+            // Rendering cluster has internal calls
+            (("render_text".to_string(), "paint_highlights".to_string()), 1),
+            (("render_cursor".to_string(), "draw_gutter".to_string()), 1),
+            // Utilities have zero internal calls (low cohesion)
+            // Validation has no calls (isolated)
+            // State methods call each other
+            (("set_state".to_string(), "get_state".to_string()), 1),
+        ]);
+
+        let clusters = apply_production_ready_clustering(&methods, &adjacency);
+
+        // REQUIREMENT 1: All methods must be accounted for
+        let clustered_methods: std::collections::HashSet<String> = clusters
+            .iter()
+            .flat_map(|c| &c.methods)
+            .cloned()
+            .collect();
+
+        for method in &methods {
+            assert!(
+                clustered_methods.contains(method),
+                "Method '{}' was lost during clustering!",
+                method
+            );
+        }
+
+        assert_eq!(
+            clustered_methods.len(),
+            methods.len(),
+            "Total methods mismatch: {} clustered vs {} input",
+            clustered_methods.len(),
+            methods.len()
+        );
+
+        // REQUIREMENT 2: No clusters smaller than 3 methods
+        for cluster in &clusters {
+            assert!(
+                cluster.methods.len() >= 3,
+                "Cluster '{}' has only {} methods (minimum is 3)",
+                cluster.category.display_name(),
+                cluster.methods.len()
+            );
+        }
+
+        // REQUIREMENT 3: Low-cohesion methods kept (not filtered out)
+        // format_timestamp and clamp_value have zero cohesion but should be in a cluster
+        assert!(
+            clustered_methods.contains(&"format_timestamp".to_string()),
+            "Low-cohesion method 'format_timestamp' should be kept"
+        );
+        assert!(
+            clustered_methods.contains(&"clamp_value".to_string()),
+            "Low-cohesion method 'clamp_value' should be kept"
+        );
+
+        println!("\n=== No Method Loss Test Results ===");
+        println!("Total input methods: {}", methods.len());
+        println!("Total clustered methods: {}", clustered_methods.len());
+        println!("Clusters created: {}", clusters.len());
+        for (i, cluster) in clusters.iter().enumerate() {
+            println!(
+                "Cluster {}: {} ({} methods, cohesion: {:.2})",
+                i + 1,
+                cluster.category.display_name(),
+                cluster.methods.len(),
+                cluster.cohesion_score
+            );
+            println!("  Methods: {:?}", cluster.methods);
+        }
+        println!("=====================================\n");
     }
 }
