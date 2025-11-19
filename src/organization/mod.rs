@@ -4,7 +4,7 @@ use syn;
 pub mod behavioral_decomposition;
 pub use behavioral_decomposition::{
     cluster_methods_by_behavior, suggest_trait_extraction, BehaviorCategory, BehavioralCategorizer,
-    FieldAccessTracker, MethodCluster,
+    FieldAccessStats, FieldAccessTracker, MethodCluster,
 };
 pub mod boilerplate_detector;
 pub mod builder_pattern;

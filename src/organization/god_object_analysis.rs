@@ -1045,12 +1045,18 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 pub fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
-    RESPONSIBILITY_CATEGORIES
+    // First try the responsibility categories
+    if let Some(cat) = RESPONSIBILITY_CATEGORIES
         .iter()
         .find(|cat| cat.matches(&lower))
-        .map(|cat| cat.name)
-        .unwrap_or("Utilities")
-        .to_string()
+    {
+        return cat.name.to_string();
+    }
+
+    // Fall back to behavioral categorization (Spec 178: avoid "misc" and "utilities")
+    use crate::organization::BehavioralCategorizer;
+    let category = BehavioralCategorizer::categorize_method(method_name);
+    category.display_name()
 }
 
 /// Metrics for an individual struct within a file
@@ -1969,12 +1975,15 @@ mod tests {
     }
 
     #[test]
-    fn test_catch_all_renamed_to_utilities() {
+    fn test_catch_all_uses_behavioral_categorization() {
+        // Spec 178: Avoid "Utilities", use behavioral categorization
+        // "unknown_function" -> Domain("Unknown") based on first word
         assert_eq!(
             infer_responsibility_from_method("unknown_function"),
-            "Utilities"
+            "Unknown"
         );
-        assert_eq!(infer_responsibility_from_method("some_helper"), "Utilities");
+        // "some_helper" -> Domain("Some") based on first word
+        assert_eq!(infer_responsibility_from_method("some_helper"), "Some");
     }
 
     #[test]
@@ -2117,19 +2126,22 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_string_returns_utilities() {
-        assert_eq!(infer_responsibility_from_method(""), "Utilities");
+    fn test_empty_string_returns_operations() {
+        // Spec 178: Empty string defaults to "Operations" via Domain fallback
+        assert_eq!(infer_responsibility_from_method(""), "Operations");
     }
 
     #[test]
-    fn test_underscore_only_returns_utilities() {
-        assert_eq!(infer_responsibility_from_method("_"), "Utilities");
-        assert_eq!(infer_responsibility_from_method("__"), "Utilities");
+    fn test_underscore_only_returns_operations() {
+        // Spec 178: Underscores default to "Operations" via Domain fallback
+        assert_eq!(infer_responsibility_from_method("_"), "Operations");
+        assert_eq!(infer_responsibility_from_method("__"), "Operations");
     }
 
     #[test]
-    fn test_special_chars_return_utilities() {
-        assert_eq!(infer_responsibility_from_method("@#$%"), "Utilities");
+    fn test_special_chars_return_first_word_domain() {
+        // Spec 178: Special chars extracted as domain name
+        assert_eq!(infer_responsibility_from_method("@#$%"), "@#$%");
     }
 
     #[test]
