@@ -273,7 +273,9 @@ impl TypeAffinityAnalyzer {
         let type_groups = self.group_by_dominant_type(signatures, &affinity_matrix);
 
         // Convert to TypeCluster
-        type_groups.into_values().map(|methods| {
+        type_groups
+            .into_values()
+            .map(|methods| {
                 let method_sigs: Vec<_> = signatures
                     .iter()
                     .filter(|s| methods.contains(&s.name))
