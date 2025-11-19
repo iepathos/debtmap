@@ -364,7 +364,7 @@ impl AntiPatternDetector {
         }
 
         // Flag if we have 3+ distinct non-primitive types
-        if types.len() >= self.config.max_mixed_types {
+        if types.len() > self.config.max_mixed_types - 1 {
             let type_list: Vec<_> = types.iter().cloned().collect();
             Some(AntiPattern {
                 pattern_type: AntiPatternType::MixedDataTypes,
@@ -384,7 +384,7 @@ impl AntiPatternDetector {
                      3. Move cross-cutting concerns to trait implementations\n\
                      \n\
                      Detected types: {}",
-                    type_list.get(0).unwrap_or(&"type1".to_string()),
+                    type_list.first().unwrap_or(&"type1".to_string()),
                     type_list.get(1).unwrap_or(&"type2".to_string()),
                     type_list.join(", ")
                 ),
@@ -479,7 +479,10 @@ impl AntiPatternDetector {
             quality_score: quality_score.max(0.0),
             anti_patterns: all_anti_patterns,
             total_splits: splits.len(),
-            idiomatic_splits: splits.len() - critical_count - high_count,
+            idiomatic_splits: splits
+                .len()
+                .saturating_sub(critical_count)
+                .saturating_sub(high_count),
         }
     }
 }
@@ -554,6 +557,113 @@ pub fn is_primitive(type_name: &str) -> bool {
             | "Error"
     ) || type_name.starts_with('&')
         || type_name.starts_with("&mut")
+}
+
+// Display implementations for formatted output (Spec 183)
+use std::fmt;
+
+impl fmt::Display for SplitQualityReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
+        writeln!(f, "║              Split Quality Analysis                          ║")?;
+        writeln!(f, "╠══════════════════════════════════════════════════════════════╣")?;
+        writeln!(f, "║ Quality Score: {:<46} ║", format!("{:.1}/100.0", self.quality_score))?;
+        writeln!(f, "║ Total Splits: {:<47} ║", self.total_splits)?;
+        writeln!(f, "║ Idiomatic Splits: {:<43} ║", self.idiomatic_splits)?;
+        writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
+
+        if !self.anti_patterns.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
+            writeln!(f, "║              Anti-Patterns Found ({:<2})                        ║", self.anti_patterns.len())?;
+            writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
+
+            for (i, pattern) in self.anti_patterns.iter().enumerate() {
+                if i > 0 {
+                    writeln!(f)?;
+                }
+                write!(f, "{}", pattern)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl fmt::Display for AntiPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let severity_str = match self.severity {
+            AntiPatternSeverity::Critical => "🔴 CRITICAL",
+            AntiPatternSeverity::High => "🟠 HIGH",
+            AntiPatternSeverity::Medium => "🟡 MEDIUM",
+            AntiPatternSeverity::Low => "🟢 LOW",
+        };
+
+        let pattern_name = match self.pattern_type {
+            AntiPatternType::UtilitiesModule => "Utilities Module",
+            AntiPatternType::TechnicalGrouping => "Technical Grouping",
+            AntiPatternType::ParameterPassing => "Parameter Passing",
+            AntiPatternType::MixedDataTypes => "Mixed Data Types",
+            AntiPatternType::LackOfTypeOwnership => "Lack of Type Ownership",
+        };
+
+        writeln!(f, "┌──────────────────────────────────────────────────────────────┐")?;
+        writeln!(f, "│ {} - {:<40} │", severity_str, pattern_name)?;
+        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+        writeln!(f, "│ Location: {:<51} │", self.location)?;
+        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+
+        // Description - wrap text to fit width
+        writeln!(f, "│ Description:                                                 │")?;
+        for line in wrap_text(&self.description, 58) {
+            writeln!(f, "│   {:<58} │", line)?;
+        }
+
+        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+        writeln!(f, "│ Correction:                                                  │")?;
+        for line in wrap_text(&self.correction, 58) {
+            writeln!(f, "│   {:<58} │", line)?;
+        }
+
+        if !self.affected_methods.is_empty() {
+            writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
+            writeln!(f, "│ Affected Methods ({:<2}):                                     │", self.affected_methods.len())?;
+            for method in self.affected_methods.iter().take(5) {
+                writeln!(f, "│   • {:<56} │", method)?;
+            }
+            if self.affected_methods.len() > 5 {
+                writeln!(f, "│   ... and {} more                                        │", self.affected_methods.len() - 5)?;
+            }
+        }
+
+        writeln!(f, "└──────────────────────────────────────────────────────────────┘")?;
+
+        Ok(())
+    }
+}
+
+/// Wrap text to fit within a specified width
+fn wrap_text(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            current_line = word.to_string();
+        } else if current_line.len() + word.len() < width {
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            lines.push(current_line);
+            current_line = word.to_string();
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines
 }
 
 #[cfg(test)]
@@ -674,111 +784,4 @@ mod tests {
         assert!(!is_primitive("CustomType"));
         assert!(!is_primitive("MyStruct"));
     }
-}
-
-// Display implementations for formatted output (Spec 183)
-use std::fmt;
-
-impl fmt::Display for SplitQualityReport {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║              Split Quality Analysis                          ║")?;
-        writeln!(f, "╠══════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ Quality Score: {:<46} ║", format!("{:.1}/100.0", self.quality_score))?;
-        writeln!(f, "║ Total Splits: {:<47} ║", self.total_splits)?;
-        writeln!(f, "║ Idiomatic Splits: {:<43} ║", self.idiomatic_splits)?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
-
-        if !self.anti_patterns.is_empty() {
-            writeln!(f)?;
-            writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
-            writeln!(f, "║              Anti-Patterns Found ({:<2})                        ║", self.anti_patterns.len())?;
-            writeln!(f, "╚══════════════════════════════════════════════════════════════╝")?;
-
-            for (i, pattern) in self.anti_patterns.iter().enumerate() {
-                if i > 0 {
-                    writeln!(f)?;
-                }
-                write!(f, "{}", pattern)?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Display for AntiPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let severity_str = match self.severity {
-            AntiPatternSeverity::Critical => "🔴 CRITICAL",
-            AntiPatternSeverity::High => "🟠 HIGH",
-            AntiPatternSeverity::Medium => "🟡 MEDIUM",
-            AntiPatternSeverity::Low => "🟢 LOW",
-        };
-
-        let pattern_name = match self.pattern_type {
-            AntiPatternType::UtilitiesModule => "Utilities Module",
-            AntiPatternType::TechnicalGrouping => "Technical Grouping",
-            AntiPatternType::ParameterPassing => "Parameter Passing",
-            AntiPatternType::MixedDataTypes => "Mixed Data Types",
-            AntiPatternType::LackOfTypeOwnership => "Lack of Type Ownership",
-        };
-
-        writeln!(f, "┌──────────────────────────────────────────────────────────────┐")?;
-        writeln!(f, "│ {} - {:<40} │", severity_str, pattern_name)?;
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-        writeln!(f, "│ Location: {:<51} │", self.location)?;
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-
-        // Description - wrap text to fit width
-        writeln!(f, "│ Description:                                                 │")?;
-        for line in wrap_text(&self.description, 58) {
-            writeln!(f, "│   {:<58} │", line)?;
-        }
-
-        writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-        writeln!(f, "│ Correction:                                                  │")?;
-        for line in wrap_text(&self.correction, 58) {
-            writeln!(f, "│   {:<58} │", line)?;
-        }
-
-        if !self.affected_methods.is_empty() {
-            writeln!(f, "├──────────────────────────────────────────────────────────────┤")?;
-            writeln!(f, "│ Affected Methods ({:<2}):                                     │", self.affected_methods.len())?;
-            for method in self.affected_methods.iter().take(5) {
-                writeln!(f, "│   • {:<56} │", method)?;
-            }
-            if self.affected_methods.len() > 5 {
-                writeln!(f, "│   ... and {} more                                        │", self.affected_methods.len() - 5)?;
-            }
-        }
-
-        writeln!(f, "└──────────────────────────────────────────────────────────────┘")?;
-
-        Ok(())
-    }
-}
-
-/// Wrap text to fit within a specified width
-fn wrap_text(text: &str, width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current_line = String::new();
-
-    for word in text.split_whitespace() {
-        if current_line.is_empty() {
-            current_line = word.to_string();
-        } else if current_line.len() + word.len() + 1 <= width {
-            current_line.push(' ');
-            current_line.push_str(word);
-        } else {
-            lines.push(current_line);
-            current_line = word.to_string();
-        }
-    }
-
-    if !current_line.is_empty() {
-        lines.push(current_line);
-    }
-
-    lines
 }
