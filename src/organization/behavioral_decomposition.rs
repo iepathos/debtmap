@@ -2,7 +2,8 @@
 ///
 /// This module implements Spec 178: shifting from struct-based organization
 /// to behavioral method clustering for god object refactoring.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use syn::{visit::Visit, Expr, ExprField, ImplItemFn, ItemImpl};
 
 /// Behavioral category for method clustering
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -162,8 +163,13 @@ impl BehavioralCategorizer {
             return BehaviorCategory::StateManagement;
         }
 
-        // Default: domain-specific based on first word
-        let domain = method_name.split('_').next().unwrap_or("misc").to_string();
+        // Default: domain-specific based on first word (capitalized for better naming)
+        let domain = method_name
+            .split('_')
+            .next()
+            .filter(|s| !s.is_empty())
+            .map(|s| capitalize_first(s))
+            .unwrap_or_else(|| "Operations".to_string());
         BehaviorCategory::Domain(domain)
     }
 
@@ -306,6 +312,104 @@ fn capitalize_first(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+/// Field access tracker for analyzing which fields each method accesses
+pub struct FieldAccessTracker {
+    /// Map from method name to set of fields accessed
+    method_fields: HashMap<String, HashSet<String>>,
+    /// Currently analyzing method name
+    current_method: Option<String>,
+}
+
+impl FieldAccessTracker {
+    /// Create a new field access tracker
+    pub fn new() -> Self {
+        Self {
+            method_fields: HashMap::new(),
+            current_method: None,
+        }
+    }
+
+    /// Analyze an impl block and extract field access patterns
+    pub fn analyze_impl(&mut self, impl_block: &ItemImpl) {
+        self.visit_item_impl(impl_block);
+    }
+
+    /// Get fields accessed by a specific method
+    pub fn get_method_fields(&self, method_name: &str) -> Vec<String> {
+        self.method_fields
+            .get(method_name)
+            .map(|fields| {
+                let mut sorted: Vec<_> = fields.iter().cloned().collect();
+                sorted.sort();
+                sorted
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get minimal field set for a group of methods
+    pub fn get_minimal_field_set(&self, methods: &[String]) -> Vec<String> {
+        let mut field_set = HashSet::new();
+        for method in methods {
+            if let Some(fields) = self.method_fields.get(method) {
+                field_set.extend(fields.iter().cloned());
+            }
+        }
+        let mut sorted: Vec<_> = field_set.into_iter().collect();
+        sorted.sort();
+        sorted
+    }
+}
+
+impl Default for FieldAccessTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'ast> Visit<'ast> for FieldAccessTracker {
+    fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
+        let method_name = node.sig.ident.to_string();
+        let old_method = self.current_method.replace(method_name.clone());
+
+        // Initialize field set for this method
+        self.method_fields.insert(method_name, HashSet::new());
+
+        // Visit the method body
+        syn::visit::visit_impl_item_fn(self, node);
+
+        self.current_method = old_method;
+    }
+
+    fn visit_expr_field(&mut self, node: &'ast ExprField) {
+        // Track field accesses of the form self.field_name
+        if let Some(ref method_name) = self.current_method {
+            // Check if this is a self.field access
+            if is_self_field_access(&node.base) {
+                if let syn::Member::Named(field_ident) = &node.member {
+                    if let Some(fields) = self.method_fields.get_mut(method_name) {
+                        fields.insert(field_ident.to_string());
+                    }
+                }
+            }
+        }
+
+        syn::visit::visit_expr_field(self, node);
+    }
+}
+
+/// Check if an expression is a self reference
+fn is_self_field_access(expr: &Expr) -> bool {
+    match expr {
+        Expr::Path(path) => path
+            .path
+            .segments
+            .first()
+            .map(|seg| seg.ident == "self")
+            .unwrap_or(false),
+        _ => false,
     }
 }
 
@@ -486,5 +590,62 @@ mod tests {
         assert!(suggestion.contains("trait Renderable"));
         assert!(suggestion.contains("fn render(&self);"));
         assert!(suggestion.contains("3 methods total"));
+    }
+
+    #[test]
+    fn test_field_access_tracking() {
+        let code = quote::quote! {
+            impl Editor {
+                fn render(&self) {
+                    let x = self.display_map;
+                    let y = self.cursor_position;
+                }
+
+                fn handle_input(&mut self) {
+                    self.input_buffer.clear();
+                }
+
+                fn save(&self) {
+                    let path = self.file_path;
+                }
+            }
+        };
+
+        let impl_block: ItemImpl = syn::parse2(code).unwrap();
+        let mut tracker = FieldAccessTracker::new();
+        tracker.analyze_impl(&impl_block);
+
+        let render_fields = tracker.get_method_fields("render");
+        assert_eq!(render_fields, vec!["cursor_position", "display_map"]);
+
+        let input_fields = tracker.get_method_fields("handle_input");
+        assert_eq!(input_fields, vec!["input_buffer"]);
+
+        let save_fields = tracker.get_method_fields("save");
+        assert_eq!(save_fields, vec!["file_path"]);
+    }
+
+    #[test]
+    fn test_minimal_field_set() {
+        let code = quote::quote! {
+            impl Editor {
+                fn render(&self) {
+                    let x = self.display_map;
+                    let y = self.cursor_position;
+                }
+
+                fn draw(&self) {
+                    let z = self.display_map;
+                }
+            }
+        };
+
+        let impl_block: ItemImpl = syn::parse2(code).unwrap();
+        let mut tracker = FieldAccessTracker::new();
+        tracker.analyze_impl(&impl_block);
+
+        let methods = vec!["render".to_string(), "draw".to_string()];
+        let minimal_fields = tracker.get_minimal_field_set(&methods);
+        assert_eq!(minimal_fields, vec!["cursor_position", "display_map"]);
     }
 }

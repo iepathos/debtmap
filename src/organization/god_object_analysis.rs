@@ -1126,6 +1126,106 @@ pub fn recommend_module_splits(
     )
 }
 
+/// Enhanced version that includes field access tracking and trait extraction
+pub fn recommend_module_splits_enhanced(
+    type_name: &str,
+    responsibility_groups: &HashMap<String, Vec<String>>,
+    field_tracker: Option<&crate::organization::FieldAccessTracker>,
+) -> Vec<ModuleSplit> {
+    recommend_module_splits_enhanced_with_evidence(
+        type_name,
+        responsibility_groups,
+        &HashMap::new(),
+        field_tracker,
+    )
+}
+
+/// Full-featured recommendation with evidence, field tracking, and trait extraction
+pub fn recommend_module_splits_enhanced_with_evidence(
+    type_name: &str,
+    responsibility_groups: &HashMap<String, Vec<String>>,
+    evidence_map: &HashMap<
+        String,
+        crate::analysis::multi_signal_aggregation::AggregatedClassification,
+    >,
+    field_tracker: Option<&crate::organization::FieldAccessTracker>,
+) -> Vec<ModuleSplit> {
+    let mut recommendations = Vec::new();
+
+    for (responsibility, methods) in responsibility_groups {
+        if methods.len() > 5 {
+            let classification_evidence = evidence_map.get(responsibility).cloned();
+
+            // Sanitize the responsibility name for use in module name
+            let sanitized_responsibility = sanitize_module_name(responsibility);
+
+            // Get representative methods (first 5-8)
+            let representative_methods: Vec<String> = methods.iter().take(8).cloned().collect();
+
+            // Infer behavioral category from responsibility
+            let behavior_category = Some(responsibility.clone());
+
+            // Calculate minimal field set if field tracker available
+            let fields_needed = field_tracker
+                .map(|tracker| tracker.get_minimal_field_set(methods))
+                .unwrap_or_default();
+
+            // Generate trait suggestion using behavioral categorization
+            use crate::organization::behavioral_decomposition::{
+                suggest_trait_extraction, BehavioralCategorizer, MethodCluster,
+            };
+
+            let category = BehavioralCategorizer::categorize_method(
+                methods.first().map(|s| s.as_str()).unwrap_or(""),
+            );
+
+            let cluster = MethodCluster {
+                category,
+                methods: methods.clone(),
+                fields_accessed: fields_needed.clone(),
+                internal_calls: 0, // Will be populated by call graph analysis
+                external_calls: 0, // Will be populated by call graph analysis
+                cohesion_score: 0.0,
+            };
+
+            let trait_suggestion = Some(suggest_trait_extraction(&cluster, type_name));
+
+            recommendations.push(ModuleSplit {
+                suggested_name: format!(
+                    "{}_{}",
+                    type_name.to_lowercase(),
+                    sanitized_responsibility
+                ),
+                methods_to_move: methods.clone(),
+                structs_to_move: vec![],
+                responsibility: responsibility.clone(),
+                estimated_lines: methods.len() * 20,
+                method_count: methods.len(),
+                warning: None,
+                priority: Priority::Medium,
+                cohesion_score: None,
+                dependencies_in: vec![],
+                dependencies_out: vec![],
+                domain: String::new(),
+                rationale: Some(format!(
+                    "Methods grouped by '{}' responsibility pattern",
+                    responsibility
+                )),
+                method: SplitAnalysisMethod::MethodBased,
+                severity: None,
+                interface_estimate: None,
+                classification_evidence,
+                representative_methods,
+                fields_needed,
+                trait_suggestion,
+                behavior_category,
+            });
+        }
+    }
+
+    recommendations
+}
+
 pub fn recommend_module_splits_with_evidence(
     type_name: &str,
     _methods: &[String],
@@ -1149,6 +1249,26 @@ pub fn recommend_module_splits_with_evidence(
 
             // Infer behavioral category from responsibility
             let behavior_category = Some(responsibility.clone());
+
+            // Generate trait suggestion using behavioral categorization
+            use crate::organization::behavioral_decomposition::{
+                suggest_trait_extraction, BehavioralCategorizer, MethodCluster,
+            };
+
+            let category = BehavioralCategorizer::categorize_method(
+                methods.first().map(|s| s.as_str()).unwrap_or(""),
+            );
+
+            let cluster = MethodCluster {
+                category,
+                methods: methods.clone(),
+                fields_accessed: vec![], // Will be populated when field tracker is available
+                internal_calls: 0,       // Will be populated by call graph analysis
+                external_calls: 0,       // Will be populated by call graph analysis
+                cohesion_score: 0.0,
+            };
+
+            let trait_suggestion = Some(suggest_trait_extraction(&cluster, type_name));
 
             recommendations.push(ModuleSplit {
                 suggested_name: format!(
@@ -1176,8 +1296,8 @@ pub fn recommend_module_splits_with_evidence(
                 interface_estimate: None,
                 classification_evidence,
                 representative_methods,
-                fields_needed: vec![], // Will be populated by field access analysis
-                trait_suggestion: None, // Will be added later
+                fields_needed: vec![], // Will be populated by field access analysis when available
+                trait_suggestion,
                 behavior_category,
             });
         }
@@ -1314,7 +1434,31 @@ pub fn classify_struct_domain(struct_name: &str) -> String {
     } else if lower.contains("data") || lower.contains("info") || lower.contains("metrics") {
         "data".to_string()
     } else {
-        "misc".to_string()
+        // Extract first meaningful word from struct name as domain
+        extract_domain_from_name(struct_name)
+    }
+}
+
+/// Extract domain name from struct/type name by taking first meaningful word
+fn extract_domain_from_name(name: &str) -> String {
+    // Handle camelCase and PascalCase
+    let mut domain = String::new();
+    for (i, c) in name.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            break;
+        }
+        domain.push(c);
+    }
+
+    if !domain.is_empty() {
+        domain
+    } else {
+        // Fallback to snake_case extraction
+        name.split('_')
+            .next()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "Core".to_string())
     }
 }
 

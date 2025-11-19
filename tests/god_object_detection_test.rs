@@ -412,3 +412,168 @@ fn test_spec_130_god_class_vs_god_file_detection() {
         "Detection type should be GodFile for file with standalone functions"
     );
 }
+
+/// Test behavioral decomposition with field access tracking and trait extraction (Spec 178)
+#[test]
+fn test_behavioral_decomposition_with_field_tracking() {
+    use debtmap::organization::{FieldAccessTracker, cluster_methods_by_behavior};
+
+    let code = r#"
+        struct Editor {
+            display_map: DisplayMap,
+            cursor_position: Position,
+            input_buffer: Buffer,
+            file_path: PathBuf,
+            config: Config,
+        }
+
+        impl Editor {
+            fn render(&self) {
+                let map = self.display_map;
+                let pos = self.cursor_position;
+            }
+
+            fn draw_cursor(&self) {
+                let pos = self.cursor_position;
+            }
+
+            fn paint_background(&self) {
+                let map = self.display_map;
+            }
+
+            fn handle_keypress(&mut self) {
+                self.input_buffer.clear();
+            }
+
+            fn on_mouse_down(&mut self) {
+                let pos = self.cursor_position;
+            }
+
+            fn save(&self) {
+                let path = self.file_path;
+            }
+
+            fn load(&mut self) {
+                let path = self.file_path;
+            }
+
+            fn validate_input(&self) -> bool {
+                !self.input_buffer.is_empty()
+            }
+
+            fn check_dirty(&self) -> bool {
+                true
+            }
+
+            fn get_config(&self) -> &Config {
+                &self.config
+            }
+
+            fn set_config(&mut self, config: Config) {
+                self.config = config;
+            }
+        }
+    "#;
+
+    let file = syn::parse_file(code).expect("Failed to parse");
+
+    // Test field access tracking
+    let mut tracker = FieldAccessTracker::new();
+    if let Some(impl_item) = file.items.iter().find_map(|item| {
+        if let syn::Item::Impl(impl_block) = item {
+            Some(impl_block)
+        } else {
+            None
+        }
+    }) {
+        tracker.analyze_impl(impl_item);
+    }
+
+    // Verify field tracking for render method
+    let render_fields = tracker.get_method_fields("render");
+    assert!(render_fields.contains(&"display_map".to_string()));
+    assert!(render_fields.contains(&"cursor_position".to_string()));
+
+    // Verify field tracking for save method
+    let save_fields = tracker.get_method_fields("save");
+    assert!(save_fields.contains(&"file_path".to_string()));
+
+    // Test behavioral categorization
+    let methods = vec![
+        "render".to_string(),
+        "draw_cursor".to_string(),
+        "paint_background".to_string(),
+        "handle_keypress".to_string(),
+        "on_mouse_down".to_string(),
+        "save".to_string(),
+        "load".to_string(),
+        "validate_input".to_string(),
+        "check_dirty".to_string(),
+        "get_config".to_string(),
+        "set_config".to_string(),
+    ];
+
+    let clusters = cluster_methods_by_behavior(&methods);
+
+    // Verify behavioral clustering
+    use debtmap::organization::BehaviorCategory;
+    assert!(clusters.contains_key(&BehaviorCategory::Rendering), "Should identify rendering cluster");
+    assert!(clusters.contains_key(&BehaviorCategory::EventHandling), "Should identify event handling cluster");
+    assert!(clusters.contains_key(&BehaviorCategory::Persistence), "Should identify persistence cluster");
+    assert!(clusters.contains_key(&BehaviorCategory::Validation), "Should identify validation cluster");
+    assert!(clusters.contains_key(&BehaviorCategory::StateManagement), "Should identify state management cluster");
+
+    // Verify rendering cluster contains expected methods
+    let rendering_methods = clusters.get(&BehaviorCategory::Rendering).unwrap();
+    assert_eq!(rendering_methods.len(), 3, "Should have 3 rendering methods");
+    assert!(rendering_methods.contains(&"render".to_string()));
+    assert!(rendering_methods.contains(&"draw_cursor".to_string()));
+    assert!(rendering_methods.contains(&"paint_background".to_string()));
+
+    // Verify minimal field set for rendering cluster
+    let rendering_fields = tracker.get_minimal_field_set(rendering_methods);
+    assert!(rendering_fields.contains(&"display_map".to_string()));
+    assert!(rendering_fields.contains(&"cursor_position".to_string()));
+    assert_eq!(rendering_fields.len(), 2, "Rendering should only need 2 fields");
+
+    // Verify persistence cluster
+    let persistence_methods = clusters.get(&BehaviorCategory::Persistence).unwrap();
+    assert_eq!(persistence_methods.len(), 2, "Should have 2 persistence methods");
+    let persistence_fields = tracker.get_minimal_field_set(persistence_methods);
+    assert!(persistence_fields.contains(&"file_path".to_string()));
+}
+
+/// Test that behavioral decomposition avoids 'misc' category (Spec 178)
+#[test]
+fn test_behavioral_decomposition_no_misc_category() {
+    use debtmap::organization::{BehavioralCategorizer, BehaviorCategory};
+
+    // Test various method names that should NOT result in "misc"
+    let test_cases = vec![
+        ("render_display", BehaviorCategory::Rendering),
+        ("handle_click", BehaviorCategory::EventHandling),
+        ("save_state", BehaviorCategory::Persistence),
+        ("validate_email", BehaviorCategory::Validation),
+        ("get_name", BehaviorCategory::StateManagement),
+        ("initialize_system", BehaviorCategory::Lifecycle),
+    ];
+
+    for (method_name, expected_category) in test_cases {
+        let category = BehavioralCategorizer::categorize_method(method_name);
+        assert_eq!(
+            category, expected_category,
+            "Method '{}' should be categorized as {:?}, got {:?}",
+            method_name, expected_category, category
+        );
+    }
+
+    // For methods that don't match standard categories, should use domain-specific name
+    let domain_method = "calculate_interest_rate";
+    let category = BehavioralCategorizer::categorize_method(domain_method);
+    match category {
+        BehaviorCategory::Domain(name) => {
+            assert_eq!(name, "Calculate", "Should extract first word as domain");
+        }
+        _ => panic!("Expected Domain category for method '{}'", domain_method),
+    }
+}
