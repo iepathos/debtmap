@@ -58,7 +58,32 @@ Detect repeated parameter patterns that should be structs:
 use std::collections::{HashMap, HashSet};
 use crate::organization::type_based_clustering::{MethodSignature, TypeInfo};
 
-pub struct HiddenTypeExtractor;
+pub struct HiddenTypeExtractor {
+    config: HiddenTypeConfig,
+}
+
+/// Configuration for hidden type extraction
+#[derive(Clone, Debug)]
+pub struct HiddenTypeConfig {
+    /// Minimum occurrences to suggest a type (default: 3)
+    pub min_occurrences: usize,
+
+    /// Weight for occurrences in confidence formula (default: 10.0)
+    pub occurrence_weight: f64,
+
+    /// Weight for parameter count in confidence formula (default: 5.0)
+    pub param_count_weight: f64,
+}
+
+impl Default for HiddenTypeConfig {
+    fn default() -> Self {
+        Self {
+            min_occurrences: 3,
+            occurrence_weight: 10.0,
+            param_count_weight: 5.0,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct HiddenType {
@@ -102,6 +127,18 @@ pub enum Visibility {
 }
 
 impl HiddenTypeExtractor {
+    /// Create a new extractor with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: HiddenTypeConfig::default(),
+        }
+    }
+
+    /// Create a new extractor with custom configuration
+    pub fn with_config(config: HiddenTypeConfig) -> Self {
+        Self { config }
+    }
+
     /// Find parameter clumps that appear in multiple functions
     pub fn find_parameter_clumps(
         &self,
@@ -144,24 +181,8 @@ struct ParamSignature {
     types: Vec<TypeInfo>,
 }
 
-// Custom Hash/Eq for TypeInfo to make it work in HashMap
-impl std::hash::Hash for TypeInfo {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.is_reference.hash(state);
-        self.is_mutable.hash(state);
-    }
-}
-
-impl PartialEq for TypeInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.is_reference == other.is_reference
-            && self.is_mutable == other.is_mutable
-    }
-}
-
-impl Eq for TypeInfo {}
+// Note: TypeInfo Hash/Eq/PartialEq are derived in Spec 181
+// This ensures all fields (including generics) are included in equality/hashing
 ```
 
 ### 2. Tuple Return Detection
@@ -171,39 +192,67 @@ Identify tuple returns that should be named structs:
 ```rust
 impl HiddenTypeExtractor {
     /// Detect tuple returns that should be structs
+    ///
+    /// Analyzes return types from method signatures to find tuples.
+    /// Uses syn AST instead of string parsing for correctness.
     pub fn find_tuple_returns(
         &self,
-        signatures: &[MethodSignature],
+        ast: &syn::File,
     ) -> Vec<TupleReturn> {
-        signatures.iter()
-            .filter_map(|sig| {
-                if let Some(ret_type) = &sig.return_type {
-                    if self.is_tuple(&ret_type.name) {
-                        return Some(TupleReturn {
-                            method_name: sig.name.clone(),
-                            tuple_type: ret_type.name.clone(),
-                            components: self.extract_tuple_components(&ret_type.name),
-                        });
+        let mut tuple_returns = Vec::new();
+
+        // Extract from impl blocks
+        for item in &ast.items {
+            if let syn::Item::Impl(impl_block) = item {
+                for impl_item in &impl_block.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        if let syn::ReturnType::Type(_, ty) = &method.sig.output {
+                            if let syn::Type::Tuple(tuple_type) = ty.as_ref() {
+                                // Found a tuple return
+                                let components = tuple_type.elems.iter()
+                                    .map(|elem| self.type_to_string(elem))
+                                    .collect();
+
+                                tuple_returns.push(TupleReturn {
+                                    method_name: method.sig.ident.to_string(),
+                                    tuple_type: format!("({})",
+                                        tuple_type.elems.iter()
+                                            .map(|t| self.type_to_string(t))
+                                            .collect::<Vec<_>>()
+                                            .join(", ")
+                                    ),
+                                    components,
+                                });
+                            }
+                        }
                     }
                 }
-                None
-            })
-            .collect()
+            }
+        }
+
+        tuple_returns
     }
 
-    fn is_tuple(&self, type_name: &str) -> bool {
-        type_name.starts_with('(') && type_name.ends_with(')')
-            || type_name.contains(',')
-    }
-
-    fn extract_tuple_components(&self, tuple_type: &str) -> Vec<String> {
-        // Parse tuple like "(f64, Vec<String>, DomainDiversity)"
-        tuple_type
-            .trim_start_matches('(')
-            .trim_end_matches(')')
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .collect()
+    /// Convert syn::Type to string representation
+    fn type_to_string(&self, ty: &syn::Type) -> String {
+        match ty {
+            syn::Type::Path(type_path) => {
+                quote::quote!(#type_path).to_string()
+            }
+            syn::Type::Reference(type_ref) => {
+                let mutability = if type_ref.mutability.is_some() { "mut " } else { "" };
+                format!("&{}{}", mutability, self.type_to_string(&type_ref.elem))
+            }
+            syn::Type::Tuple(tuple) => {
+                format!("({})",
+                    tuple.elems.iter()
+                        .map(|t| self.type_to_string(t))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            _ => quote::quote!(#ty).to_string(),
+        }
     }
 }
 
@@ -225,18 +274,19 @@ impl HiddenTypeExtractor {
     pub fn extract_hidden_types(
         &self,
         signatures: &[MethodSignature],
+        ast: &syn::File,
         module_name: &str,
     ) -> Vec<HiddenType> {
         let mut hidden_types = Vec::new();
 
-        // 1. Parameter clumps (3+ occurrences)
-        let clumps = self.find_parameter_clumps(signatures, 3);
+        // 1. Parameter clumps (configurable minimum occurrences)
+        let clumps = self.find_parameter_clumps(signatures, self.config.min_occurrences);
         for clump in clumps {
             hidden_types.push(self.synthesize_type_from_clump(&clump, module_name));
         }
 
-        // 2. Tuple returns
-        let tuples = self.find_tuple_returns(signatures);
+        // 2. Tuple returns (using syn AST for accurate parsing)
+        let tuples = self.find_tuple_returns(ast);
         for tuple in tuples {
             hidden_types.push(self.synthesize_type_from_tuple(&tuple, module_name));
         }
@@ -374,18 +424,51 @@ impl HiddenTypeExtractor {
     }
 
     fn suggest_field_name(&self, type_info: &TypeInfo, index: usize) -> String {
-        // Convert type name to snake_case field name
-        let type_lower = type_info.name.to_lowercase();
+        let type_name = &type_info.name;
 
-        if type_lower.ends_with("location") {
-            "location".to_string()
-        } else if type_lower.contains("metric") {
-            "metrics".to_string()
-        } else if type_lower.contains("score") {
-            "score".to_string()
-        } else {
-            format!("field_{}", index)
+        // Common type mappings
+        let field_name = match type_name.as_str() {
+            // Exact matches
+            "SourceLocation" | "Location" | "PathBuf" | "Path" => "location",
+            "FileMetrics" | "Metrics" => "metrics",
+            "Config" | "Configuration" => "config",
+            "Verbosity" => "verbosity",
+            _ => {
+                // Heuristic matching
+                let lower = type_name.to_lowercase();
+                if lower.contains("location") || lower.contains("path") {
+                    "location"
+                } else if lower.contains("metric") {
+                    "metrics"
+                } else if lower.contains("score") || lower.contains("rating") {
+                    "score"
+                } else if lower.contains("config") || lower.contains("setting") {
+                    "config"
+                } else if lower.contains("data") {
+                    "data"
+                } else if lower.contains("result") {
+                    "result"
+                } else if lower.contains("context") {
+                    "context"
+                } else {
+                    // Last resort: convert type name to snake_case
+                    &self.to_snake_case(type_name)
+                }
+            }
+        };
+
+        field_name.to_string()
+    }
+
+    fn to_snake_case(&self, s: &str) -> String {
+        let mut result = String::new();
+        for (i, ch) in s.chars().enumerate() {
+            if ch.is_uppercase() && i > 0 {
+                result.push('_');
+            }
+            result.push(ch.to_lowercase().next().unwrap());
         }
+        result
     }
 
     fn infer_method_purpose(&self, method_name: &str) -> MethodPurpose {
@@ -402,10 +485,21 @@ impl HiddenTypeExtractor {
         }
     }
 
+    /// Calculate confidence score for hidden type suggestion
+    ///
+    /// Confidence Formula:
+    /// - occurrence_factor = min(occurrences / occurrence_weight, 1.0)
+    /// - param_factor = min(param_count / param_count_weight, 1.0)
+    /// - confidence = (occurrence_factor + param_factor) / 2.0
+    ///
+    /// Score interpretation:
+    /// - 0.9-1.0: Very High (10+ occurrences, 5+ params)
+    /// - 0.7-0.89: High (7+ occurrences, 3+ params)
+    /// - 0.5-0.69: Medium (5+ occurrences, 2+ params)
+    /// - 0.0-0.49: Low (< 5 occurrences or 1 param)
     fn calculate_confidence(&self, occurrences: usize, param_count: usize) -> f64 {
-        // Higher occurrences and more parameters = higher confidence
-        let occurrence_factor = (occurrences as f64 / 10.0).min(1.0);
-        let param_factor = (param_count as f64 / 5.0).min(1.0);
+        let occurrence_factor = (occurrences as f64 / self.config.occurrence_weight).min(1.0);
+        let param_factor = (param_count as f64 / self.config.param_count_weight).min(1.0);
 
         (occurrence_factor + param_factor) / 2.0
     }
@@ -431,15 +525,32 @@ impl HiddenTypeExtractor {
     }
 }
 
+/// Extract core noun from compound type names
+///
+/// Examples:
+/// - "SourceLocation" -> "Location"
+/// - "FileMetrics" -> "Metrics"
+/// - "HttpRequestHandler" -> "HttpRequest"
+/// - "UserData" -> "User"
 fn extract_noun(type_name: &str) -> String {
-    // Extract core noun from type (e.g., "SourceLocation" -> "Location")
-    type_name
-        .trim_end_matches("Location")
-        .trim_end_matches("Metrics")
-        .trim_end_matches("Data")
-        .to_string()
+    // Common suffixes to remove
+    const SUFFIXES: &[&str] = &[
+        "Location", "Metrics", "Data", "Info", "Details",
+        "Handler", "Manager", "Service", "Provider", "Factory",
+        "Builder", "Analyzer", "Processor", "Controller"
+    ];
+
+    for suffix in SUFFIXES {
+        if type_name.ends_with(suffix) && type_name.len() > suffix.len() {
+            return type_name[..type_name.len() - suffix.len()].to_string();
+        }
+    }
+
+    // No suffix found, return as-is
+    type_name.to_string()
 }
 
+// Note: to_pascal_case is shared with Spec 183 (see Shared Utilities section)
 fn to_pascal_case(s: &str) -> String {
     s.split('_')
         .map(|word| {
@@ -788,8 +899,19 @@ fn test_extract_priority_item_from_formatter() {
 ## Dependencies
 
 - **Spec 181**: Type signature extraction for parameter analysis
-- **Spec 183**: Anti-pattern detection for parameter passing
+- **Spec 183**: Anti-pattern detection for parameter passing and shared utilities
 - Rust `syn` crate for AST parsing
+- Rust `quote` crate for type-to-string conversion
+- Rust `serde` crate for serialization
+
+### External Crate Additions
+
+```toml
+[dependencies]
+syn = { version = "2.0", features = ["full", "parsing", "visit"] }
+quote = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+```
 
 ## Migration Path
 

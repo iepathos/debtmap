@@ -128,7 +128,7 @@ pub struct MethodSignature {
     pub self_type: Option<TypeInfo>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct TypeInfo {
     pub name: String,
     pub is_reference: bool,
@@ -166,15 +166,33 @@ impl TypeSignatureAnalyzer {
     fn extract_type_info(&self, ty: &Type) -> TypeInfo {
         match ty {
             Type::Path(type_path) => {
-                let name = type_path.path.segments.last()
+                let segment = type_path.path.segments.last();
+                let name = segment
                     .map(|seg| seg.ident.to_string())
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                // Extract generic parameters
+                let generics = segment
+                    .and_then(|seg| match &seg.arguments {
+                        syn::PathArguments::AngleBracketed(args) => {
+                            Some(args.args.iter()
+                                .filter_map(|arg| match arg {
+                                    syn::GenericArgument::Type(ty) => {
+                                        Some(self.extract_type_info(ty).name)
+                                    }
+                                    _ => None,
+                                })
+                                .collect())
+                        }
+                        _ => None,
+                    })
                     .unwrap_or_default();
 
                 TypeInfo {
                     name,
                     is_reference: false,
                     is_mutable: false,
-                    generics: vec![],
+                    generics,
                 }
             },
             Type::Reference(type_ref) => {
@@ -217,7 +235,8 @@ impl TypeAffinityAnalyzer {
         let affinity_matrix = self.build_type_affinity_matrix(signatures);
 
         // 2. Use existing community detection with type affinity as weights
-        let clusters = self.apply_community_detection_with_types(
+        // Reuse Louvain algorithm from behavioral_decomposition.rs
+        let clusters = self.cluster_by_affinity(
             signatures,
             &affinity_matrix,
         );
@@ -399,6 +418,40 @@ struct ParameterClump {
 }
 ```
 
+### ModuleSplit Extensions
+
+Add new fields to `ModuleSplit` struct for type-based clustering:
+
+```rust
+// src/organization/god_object_analysis.rs
+
+pub struct ModuleSplit {
+    // ... existing fields ...
+
+    /// Core type that owns the methods in this module (Spec 181)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub core_type: Option<String>,
+
+    /// Data flow showing input and output types (Spec 181, 182)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub data_flow: Vec<String>,
+
+    /// Suggested implicit type extraction (Spec 181, 184)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub implicit_type_suggestion: Option<ImplicitTypeSuggestion>,
+}
+
+/// Implicit type suggestion for parameter clumps or tuple returns
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ImplicitTypeSuggestion {
+    pub type_name: String,
+    pub fields: Vec<(String, String)>,  // (field_name, field_type)
+    pub occurrences: usize,
+    pub confidence: f64,
+    pub rationale: String,
+}
+```
+
 ### Integration with Existing Infrastructure
 
 ```rust
@@ -440,6 +493,22 @@ fn generate_idiomatic_splits(
 
     // 4. Convert to ModuleSplit recommendations
     type_clusters.into_iter().map(|cluster| {
+        // Find matching implicit type suggestion
+        let implicit_suggestion = implicit_types.iter()
+            .find(|t| cluster.methods.iter().any(|m| t.methods.contains(m)))
+            .map(|t| ImplicitTypeSuggestion {
+                type_name: t.suggested_name.clone(),
+                fields: t.fields.iter()
+                    .map(|(name, info)| (name.clone(), info.name.clone()))
+                    .collect(),
+                occurrences: t.occurrences,
+                confidence: 0.8, // Based on clustering strength
+                rationale: format!(
+                    "Parameter pattern appears in {} methods with shared type {}",
+                    t.occurrences, cluster.primary_type.name
+                ),
+            });
+
         ModuleSplit {
             suggested_name: format!("{}/{}", base_name, cluster.primary_type.name.to_lowercase()),
             responsibility: format!(
@@ -447,13 +516,11 @@ fn generate_idiomatic_splits(
                 cluster.primary_type.name
             ),
             methods_to_move: cluster.methods,
-            core_type: Some(cluster.primary_type.name),
+            core_type: Some(cluster.primary_type.name.clone()),
             data_flow: cluster.input_types.into_iter()
                 .chain(cluster.output_types)
                 .collect(),
-            implicit_type_suggestion: implicit_types.iter()
-                .find(|t| cluster.methods.iter().any(|m| t.methods.contains(m)))
-                .cloned(),
+            implicit_type_suggestion: implicit_suggestion,
             ..Default::default()
         }
     }).collect()

@@ -25,6 +25,44 @@ Implement data flow analysis that detects transformation pipelines and recommend
 
 ## Requirements
 
+### 0. ModuleSplit Extensions
+
+Add new fields to `ModuleSplit` struct for data flow analysis:
+
+```rust
+// src/organization/god_object_analysis.rs
+
+pub struct ModuleSplit {
+    // ... existing fields ...
+
+    /// Pipeline stage type (Source, Transform, Validate, Aggregate, Sink)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_flow_stage: Option<StageType>,
+
+    /// Position in pipeline (0 = input, N = output)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline_position: Option<usize>,
+
+    /// Input types consumed by this module
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub input_types: Vec<String>,
+
+    /// Output types produced by this module
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_types: Vec<String>,
+}
+
+/// Stage type in data transformation pipeline
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum StageType {
+    Source,
+    Transform,
+    Validate,
+    Aggregate,
+    Sink,
+}
+```
+
 ### 1. Type Flow Graph Construction
 
 Build a directed graph showing how data types flow through method calls:
@@ -201,7 +239,7 @@ impl DataFlowAnalyzer {
         &self,
         graph: &TypeFlowGraph,
         signatures: &[MethodSignature],
-    ) -> Vec<PipelineStage> {
+    ) -> Result<Vec<PipelineStage>, String> {
         // 1. Find source nodes (no inputs, only outputs)
         let source_types = self.find_source_types(graph);
 
@@ -209,7 +247,7 @@ impl DataFlowAnalyzer {
         let sink_types = self.find_sink_types(graph);
 
         // 3. Compute depth for each type (distance from source)
-        let type_depths = self.compute_type_depths(graph, &source_types);
+        let type_depths = self.compute_type_depths(graph, &source_types)?;
 
         // 4. Group methods by depth and transformation type
         let mut stages = Vec::new();
@@ -236,7 +274,7 @@ impl DataFlowAnalyzer {
         }
 
         stages.sort_by_key(|s| s.depth);
-        stages
+        Ok(stages)
     }
 
     fn find_source_types(&self, graph: &TypeFlowGraph) -> HashSet<String> {
@@ -257,16 +295,25 @@ impl DataFlowAnalyzer {
         &self,
         graph: &TypeFlowGraph,
         sources: &HashSet<String>,
-    ) -> HashMap<String, usize> {
+    ) -> Result<HashMap<String, usize>, String> {
         let mut depths = HashMap::new();
         let mut queue: Vec<(String, usize)> = sources.iter()
             .map(|s| (s.clone(), 0))
             .collect();
+        let mut visiting = HashSet::new();
 
         while let Some((type_name, depth)) = queue.pop() {
+            // Already processed this type
             if depths.contains_key(&type_name) {
                 continue;
             }
+
+            // Cycle detection: if we're visiting this type again before finishing
+            if visiting.contains(&type_name) {
+                return Err(format!("Cycle detected involving type: {}", type_name));
+            }
+
+            visiting.insert(type_name.clone());
             depths.insert(type_name.clone(), depth);
 
             // Find all types produced by consuming this type
@@ -275,9 +322,11 @@ impl DataFlowAnalyzer {
                     queue.push((edge.to_type.clone(), depth + 1));
                 }
             }
+
+            visiting.remove(&type_name);
         }
 
-        depths
+        Ok(depths)
     }
 
     fn create_stage_from_methods(
@@ -352,18 +401,59 @@ impl DataFlowAnalyzer {
     }
 
     fn suggest_stage_name(&self, stage_type: &StageType, output_types: &HashSet<String>) -> String {
-        let primary_type = output_types.iter()
-            .max_by_key(|t| t.len())
-            .cloned()
-            .unwrap_or_else(|| "Unknown".to_string());
+        // Filter out generic/primitive types to find domain types
+        let domain_types: Vec<_> = output_types.iter()
+            .filter(|t| !self.is_generic_type(t))
+            .collect();
 
+        // Choose most specific type (prefer longer, domain-specific names)
+        let primary_type = domain_types.iter()
+            .max_by_key(|t| {
+                let name = t.as_str();
+                // Prefer types ending in domain suffixes
+                let domain_bonus = if name.ends_with("Analysis")
+                    || name.ends_with("Metrics")
+                    || name.ends_with("Result")
+                    || name.ends_with("Data") {
+                    100
+                } else {
+                    0
+                };
+                name.len() + domain_bonus
+            })
+            .map(|s| s.as_str())
+            .unwrap_or("Unknown");
+
+        // Convert to snake_case and append stage suffix
+        let snake_case = self.to_snake_case(primary_type);
         match stage_type {
-            StageType::Source => format!("{}_source", primary_type.to_lowercase()),
-            StageType::Transform => format!("{}_transform", primary_type.to_lowercase()),
-            StageType::Validate => format!("{}_validation", primary_type.to_lowercase()),
-            StageType::Aggregate => format!("{}_aggregation", primary_type.to_lowercase()),
-            StageType::Sink => format!("{}_output", primary_type.to_lowercase()),
+            StageType::Source => snake_case,  // Source types don't need suffix
+            StageType::Transform => format!("{}_transform", snake_case),
+            StageType::Validate => format!("{}_validation", snake_case),
+            StageType::Aggregate => format!("{}_aggregation", snake_case),
+            StageType::Sink => format!("{}_output", snake_case),
         }
+    }
+
+    fn is_generic_type(&self, type_name: &str) -> bool {
+        matches!(
+            type_name,
+            "String" | "str" | "Vec" | "Option" | "Result" |
+            "HashMap" | "HashSet" | "BTreeMap" | "BTreeSet" |
+            "usize" | "isize" | "u32" | "i32" | "u64" | "i64" |
+            "f32" | "f64" | "bool" | "char"
+        )
+    }
+
+    fn to_snake_case(&self, s: &str) -> String {
+        let mut result = String::new();
+        for (i, ch) in s.chars().enumerate() {
+            if ch.is_uppercase() && i > 0 {
+                result.push('_');
+            }
+            result.push(ch.to_lowercase().next().unwrap());
+        }
+        result
     }
 }
 ```
@@ -575,7 +665,7 @@ mod tests {
 
         let analyzer = DataFlowAnalyzer;
         let graph = analyzer.build_type_flow_graph(&signatures, &HashMap::new());
-        let stages = analyzer.detect_pipeline_stages(&graph, &signatures);
+        let stages = analyzer.detect_pipeline_stages(&graph, &signatures).unwrap();
 
         assert_eq!(stages.len(), 2);
         assert_eq!(stages[0].depth, 0);

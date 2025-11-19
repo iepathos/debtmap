@@ -43,7 +43,44 @@ use std::collections::{HashMap, HashSet};
 use crate::organization::god_object_analysis::ModuleSplit;
 use crate::organization::type_based_clustering::TypeInfo;
 
-pub struct AntiPatternDetector;
+pub struct AntiPatternDetector {
+    config: AntiPatternConfig,
+}
+
+/// Configuration for anti-pattern detection thresholds
+#[derive(Clone, Debug)]
+pub struct AntiPatternConfig {
+    /// Minimum parameter count to flag as anti-pattern (default: 4)
+    pub max_parameters: usize,
+
+    /// Minimum distinct types to flag as mixed (default: 3)
+    pub max_mixed_types: usize,
+
+    /// Quality score penalty for critical anti-patterns (default: 20.0)
+    pub critical_penalty: f64,
+
+    /// Quality score penalty for high severity anti-patterns (default: 10.0)
+    pub high_penalty: f64,
+
+    /// Quality score penalty for medium severity anti-patterns (default: 5.0)
+    pub medium_penalty: f64,
+
+    /// Quality score penalty for low severity anti-patterns (default: 2.0)
+    pub low_penalty: f64,
+}
+
+impl Default for AntiPatternConfig {
+    fn default() -> Self {
+        Self {
+            max_parameters: 4,
+            max_mixed_types: 3,
+            critical_penalty: 20.0,
+            high_penalty: 10.0,
+            medium_penalty: 5.0,
+            low_penalty: 2.0,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct AntiPattern {
@@ -73,6 +110,18 @@ pub enum AntiPatternSeverity {
 }
 
 impl AntiPatternDetector {
+    /// Create a new detector with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: AntiPatternConfig::default(),
+        }
+    }
+
+    /// Create a new detector with custom configuration
+    pub fn with_config(config: AntiPatternConfig) -> Self {
+        Self { config }
+    }
+
     /// Detect utilities module anti-pattern
     pub fn detect_utilities_module(
         &self,
@@ -136,10 +185,16 @@ impl AntiPatternDetector {
         let module_name = split.suggested_name
             .split('/')
             .last()
-            .unwrap_or(&split.suggested_name);
+            .unwrap_or(&split.suggested_name)
+            .trim_end_matches(".rs");
 
+        // Check if module name starts with a technical verb (word boundary)
         let is_technical = TECHNICAL_VERBS.iter()
-            .any(|verb| module_name.starts_with(verb) || module_name.contains(verb));
+            .any(|verb| {
+                module_name == *verb  // Exact match: "render.rs"
+                || module_name.starts_with(&format!("{}_", verb))  // With underscore: "render_utils"
+                || module_name.starts_with(&format!("{}ing", verb.trim_end_matches('e')))  // -ing form: "rendering"
+            });
 
         if !is_technical {
             return None;
@@ -196,8 +251,8 @@ impl AntiPatternDetector {
                 continue;
             }
 
-            // 4+ parameters = likely parameter clump
-            if sig.param_types.len() >= 4 {
+            // Check against configured threshold
+            if sig.param_types.len() >= self.config.max_parameters {
                 anti_patterns.push(AntiPattern {
                     pattern_type: AntiPatternType::ParameterPassing,
                     severity: AntiPatternSeverity::Medium,
@@ -291,8 +346,8 @@ impl AntiPatternDetector {
         // Remove common types (String, usize, bool, etc.)
         type_counts.retain(|k, _| !is_primitive(k));
 
-        // If 3+ distinct non-primitive types, likely mixed
-        if type_counts.len() >= 3 {
+        // Check against configured threshold
+        if type_counts.len() >= self.config.max_mixed_types {
             let types: Vec<_> = type_counts.keys().cloned().collect();
 
             return Some(AntiPattern {
@@ -324,9 +379,22 @@ impl AntiPatternDetector {
 fn is_primitive(type_name: &str) -> bool {
     matches!(
         type_name,
+        // Primitives
         "String" | "str" | "usize" | "isize" | "u32" | "i32" | "u64" | "i64" |
-        "f32" | "f64" | "bool" | "char" | "()" | "Vec" | "Option" | "Result"
-    )
+        "u8" | "i8" | "u16" | "i16" | "u128" | "i128" |
+        "f32" | "f64" | "bool" | "char" | "()" |
+        // Standard library generics
+        "Vec" | "Option" | "Result" | "Box" | "Rc" | "Arc" |
+        "HashMap" | "HashSet" | "BTreeMap" | "BTreeSet" |
+        "VecDeque" | "LinkedList" | "BinaryHeap" |
+        // Common path types
+        "Path" | "PathBuf" | "OsString" | "OsStr" |
+        // IO types
+        "File" | "BufReader" | "BufWriter" |
+        // Cow and other smart pointers
+        "Cow" | "RefCell" | "Cell" | "Mutex" | "RwLock"
+    ) || type_name.starts_with("&")  // References
+      || type_name.starts_with("&mut")  // Mutable references
 }
 ```
 
@@ -379,18 +447,38 @@ impl AntiPatternDetector {
             all_anti_patterns.extend(patterns);
         }
 
+        // Count anti-patterns by severity
         let critical_count = all_anti_patterns.iter()
             .filter(|p| p.severity == AntiPatternSeverity::Critical)
             .count();
-
         let high_count = all_anti_patterns.iter()
             .filter(|p| p.severity == AntiPatternSeverity::High)
             .count();
+        let medium_count = all_anti_patterns.iter()
+            .filter(|p| p.severity == AntiPatternSeverity::Medium)
+            .count();
+        let low_count = all_anti_patterns.iter()
+            .filter(|p| p.severity == AntiPatternSeverity::Low)
+            .count();
 
-        // Quality score: 100 - (critical*20 + high*10 + medium*5 + low*2)
+        /// Quality Score Formula:
+        ///
+        /// Starting from 100 (perfect), subtract penalties for each anti-pattern:
+        /// - Critical: -20 points (utilities modules, major violations)
+        /// - High: -10 points (technical groupings, mixed types)
+        /// - Medium: -5 points (parameter passing, minor issues)
+        /// - Low: -2 points (style issues, suggestions)
+        ///
+        /// Score interpretation:
+        /// - 90-100: Excellent (idiomatic Rust/FP)
+        /// - 70-89: Good (minor improvements needed)
+        /// - 50-69: Needs Improvement (several anti-patterns)
+        /// - 0-49: Poor (major refactoring needed)
         let quality_score = 100.0
-            - (critical_count as f64 * 20.0)
-            - (high_count as f64 * 10.0);
+            - (critical_count as f64 * self.config.critical_penalty)
+            - (high_count as f64 * self.config.high_penalty)
+            - (medium_count as f64 * self.config.medium_penalty)
+            - (low_count as f64 * self.config.low_penalty);
 
         SplitQualityReport {
             quality_score: quality_score.max(0.0),
@@ -410,7 +498,28 @@ pub struct SplitQualityReport {
 }
 ```
 
-### 6. Integration with God Object Detector
+### 6. Shared Utilities
+
+Common helper functions used across anti-pattern detection and specs 181-184:
+
+```rust
+/// Convert string to PascalCase (shared with Spec 184)
+pub fn to_pascal_case(s: &str) -> String {
+    s.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect()
+}
+```
+
+Note: The `is_primitive` function is defined inline in the "Mixed Data Types Detection" section above.
+
+### 7. Integration with God Object Detector
 
 ```rust
 // src/organization/god_object_detector.rs
