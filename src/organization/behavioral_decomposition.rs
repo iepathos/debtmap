@@ -370,6 +370,18 @@ pub fn apply_community_detection(
     methods: &[String],
     adjacency: &HashMap<(String, String), usize>,
 ) -> Vec<MethodCluster> {
+    // Performance optimization: If no method calls exist, skip expensive clustering
+    if adjacency.is_empty() {
+        return Vec::new();
+    }
+
+    // Performance optimization: Limit to reasonable method count for clustering
+    // Files with >200 methods should use responsibility-based grouping instead
+    const MAX_METHODS_FOR_CLUSTERING: usize = 200;
+    if methods.len() > MAX_METHODS_FOR_CLUSTERING {
+        return Vec::new();
+    }
+
     // Build initial clusters - one per method
     let mut clusters: HashMap<usize, Vec<String>> = methods
         .iter()

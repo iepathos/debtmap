@@ -692,93 +692,94 @@ impl GodObjectDetector {
 
         // Determine analysis method and generate recommendations
         // Spec 178: Prioritize behavioral decomposition for method-heavy god objects
-        let (recommended_splits, analysis_method) = if params.total_methods > 50 {
-            // PRIORITY 1: Behavioral method clustering for method-heavy files (Spec 178)
-            // When a file has 50+ methods, the method impl is the problem, not the structs.
-            // Use call graph analysis and community detection to find behavioral cohesion.
-            // This applies regardless of god object score - method count is the primary criterion.
-            let file_name = params
-                .path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("module");
+        let (recommended_splits, analysis_method) =
+            if params.total_methods > 50 && params.lines_of_code > 500 {
+                // PRIORITY 1: Behavioral method clustering for substantial method-heavy files (Spec 178)
+                // When a file has 50+ methods AND substantial LOC, the method impl is the problem.
+                // Use call graph analysis and community detection to find behavioral cohesion.
+                // LOC check prevents wasting time on trivial files (auto-generated, test stubs, etc.)
+                let file_name = params
+                    .path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("module");
 
-            let mut splits = Self::generate_behavioral_splits(
-                params.all_methods,
-                params.field_tracker,
-                params.ast,
-                file_name,
-            );
-
-            // If behavioral clustering doesn't produce results, fall back to responsibility-based
-            if splits.is_empty() {
-                splits = crate::organization::recommend_module_splits_enhanced(
-                    file_name,
-                    params.responsibility_groups,
+                let mut splits = Self::generate_behavioral_splits(
+                    params.all_methods,
                     params.field_tracker,
+                    params.ast,
+                    file_name,
                 );
-            }
 
-            (
-                splits,
-                crate::organization::SplitAnalysisMethod::MethodBased,
-            )
-        } else if struct_count >= 5 && domain_count >= 3 {
-            // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
-            // For files with many structs but manageable methods (<= 50),
-            // struct-based domain grouping is appropriate.
-            let mut splits =
-                crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
-
-            // Attach severity to all splits
-            if let Some(severity) = cross_domain_severity {
-                for split in &mut splits {
-                    split.severity = Some(severity);
+                // If behavioral clustering doesn't produce results, fall back to responsibility-based
+                if splits.is_empty() {
+                    splits = crate::organization::recommend_module_splits_enhanced(
+                        file_name,
+                        params.responsibility_groups,
+                        params.field_tracker,
+                    );
                 }
-            }
 
-            // Enrich with behavioral analysis for method information
-            Self::enrich_splits_with_behavioral_analysis(
-                &mut splits,
-                params.all_methods,
-                params.field_tracker,
-                params.ast,
-            );
+                (
+                    splits,
+                    crate::organization::SplitAnalysisMethod::MethodBased,
+                )
+            } else if struct_count >= 5 && domain_count >= 3 {
+                // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
+                // For files with many structs but manageable methods (<= 50),
+                // struct-based domain grouping is appropriate.
+                let mut splits =
+                    crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
 
-            (
-                splits,
-                crate::organization::SplitAnalysisMethod::CrossDomain,
-            )
-        } else if params.is_god_object {
-            // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
-            let file_name = params
-                .path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("module");
+                // Attach severity to all splits
+                if let Some(severity) = cross_domain_severity {
+                    for split in &mut splits {
+                        split.severity = Some(severity);
+                    }
+                }
 
-            let mut splits = Self::generate_behavioral_splits(
-                params.all_methods,
-                params.field_tracker,
-                params.ast,
-                file_name,
-            );
-
-            if splits.is_empty() {
-                splits = crate::organization::recommend_module_splits_enhanced(
-                    file_name,
-                    params.responsibility_groups,
+                // Enrich with behavioral analysis for method information
+                Self::enrich_splits_with_behavioral_analysis(
+                    &mut splits,
+                    params.all_methods,
                     params.field_tracker,
+                    params.ast,
                 );
-            }
 
-            (
-                splits,
-                crate::organization::SplitAnalysisMethod::MethodBased,
-            )
-        } else {
-            (Vec::new(), crate::organization::SplitAnalysisMethod::None)
-        };
+                (
+                    splits,
+                    crate::organization::SplitAnalysisMethod::CrossDomain,
+                )
+            } else if params.is_god_object {
+                // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
+                let file_name = params
+                    .path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("module");
+
+                let mut splits = Self::generate_behavioral_splits(
+                    params.all_methods,
+                    params.field_tracker,
+                    params.ast,
+                    file_name,
+                );
+
+                if splits.is_empty() {
+                    splits = crate::organization::recommend_module_splits_enhanced(
+                        file_name,
+                        params.responsibility_groups,
+                        params.field_tracker,
+                    );
+                }
+
+                (
+                    splits,
+                    crate::organization::SplitAnalysisMethod::MethodBased,
+                )
+            } else {
+                (Vec::new(), crate::organization::SplitAnalysisMethod::None)
+            };
 
         (
             recommended_splits,
