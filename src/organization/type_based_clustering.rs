@@ -49,7 +49,7 @@ impl TypeSignatureAnalyzer {
             .collect();
 
         let return_type = match &method.sig.output {
-            ReturnType::Type(_, ty) => Some(self.extract_type_info(ty)),
+            ReturnType::Type(_, ty) => Some(Self::extract_type_info(ty)),
             _ => None,
         };
 
@@ -71,7 +71,7 @@ impl TypeSignatureAnalyzer {
             .collect();
 
         let return_type = match &func.sig.output {
-            ReturnType::Type(_, ty) => Some(self.extract_type_info(ty)),
+            ReturnType::Type(_, ty) => Some(Self::extract_type_info(ty)),
             _ => None,
         };
 
@@ -85,12 +85,12 @@ impl TypeSignatureAnalyzer {
 
     fn extract_type_from_arg(&self, arg: &FnArg) -> Option<TypeInfo> {
         match arg {
-            FnArg::Typed(pat_type) => Some(self.extract_type_info(&pat_type.ty)),
+            FnArg::Typed(pat_type) => Some(Self::extract_type_info(&pat_type.ty)),
             FnArg::Receiver(_) => None, // self
         }
     }
 
-    fn extract_type_info(&self, ty: &Type) -> TypeInfo {
+    fn extract_type_info(ty: &Type) -> TypeInfo {
         match ty {
             Type::Path(type_path) => {
                 let segment = type_path.path.segments.last();
@@ -106,7 +106,7 @@ impl TypeSignatureAnalyzer {
                                 .iter()
                                 .filter_map(|arg| match arg {
                                     syn::GenericArgument::Type(ty) => {
-                                        Some(self.extract_type_info(ty).name)
+                                        Some(Self::extract_type_info(ty).name)
                                     }
                                     _ => None,
                                 })
@@ -124,7 +124,7 @@ impl TypeSignatureAnalyzer {
                 }
             }
             Type::Reference(type_ref) => {
-                let mut inner = self.extract_type_info(&type_ref.elem);
+                let mut inner = Self::extract_type_info(&type_ref.elem);
                 inner.is_reference = true;
                 inner.is_mutable = type_ref.mutability.is_some();
                 inner
@@ -150,7 +150,10 @@ impl ImplicitTypeDetector {
         for sig in signatures {
             if sig.param_types.len() >= 2 {
                 let pattern: Vec<String> = sig.param_types.iter().map(|t| t.name.clone()).collect();
-                pattern_map.entry(pattern).or_default().push(sig.name.clone());
+                pattern_map
+                    .entry(pattern)
+                    .or_default()
+                    .push(sig.name.clone());
             }
         }
 
@@ -178,7 +181,10 @@ impl ImplicitTypeDetector {
                         Some(TupleReturnPattern {
                             method_name: sig.name.clone(),
                             return_types: ret.generics.clone(),
-                            suggested_type_name: format!("{}Result", Self::to_pascal_case(&sig.name)),
+                            suggested_type_name: format!(
+                                "{}Result",
+                                Self::to_pascal_case(&sig.name)
+                            ),
                         })
                     } else {
                         None
@@ -267,9 +273,7 @@ impl TypeAffinityAnalyzer {
         let type_groups = self.group_by_dominant_type(signatures, &affinity_matrix);
 
         // Convert to TypeCluster
-        type_groups
-            .into_iter()
-            .map(|(_type_name, methods)| {
+        type_groups.into_values().map(|methods| {
                 let method_sigs: Vec<_> = signatures
                     .iter()
                     .filter(|s| methods.contains(&s.name))
@@ -787,11 +791,7 @@ mod tests {
                 vec![simple_type("Score"), simple_type("Metrics")],
                 Some(simple_type("bool")),
             ),
-            method_sig(
-                "different_method",
-                vec![simple_type("Other")],
-                None,
-            ),
+            method_sig("different_method", vec![simple_type("Other")], None),
         ];
 
         let patterns = detector.find_parameter_patterns(&signatures);
@@ -835,13 +835,11 @@ mod tests {
         let mut tuple_type = simple_type("tuple");
         tuple_type.generics = vec!["Score".to_string(), "Metrics".to_string()];
 
-        let signatures = vec![
-            method_sig(
-                "analyze_complexity",
-                vec![simple_type("Code")],
-                Some(tuple_type),
-            ),
-        ];
+        let signatures = vec![method_sig(
+            "analyze_complexity",
+            vec![simple_type("Code")],
+            Some(tuple_type),
+        )];
 
         let tuple_returns = detector.find_tuple_returns(&signatures);
 
@@ -862,10 +860,7 @@ mod tests {
             ImplicitTypeDetector::to_pascal_case("analyze_code"),
             "AnalyzeCode"
         );
-        assert_eq!(
-            ImplicitTypeDetector::to_pascal_case("simple"),
-            "Simple"
-        );
+        assert_eq!(ImplicitTypeDetector::to_pascal_case("simple"), "Simple");
     }
 
     #[test]
@@ -880,13 +875,7 @@ mod tests {
             Some("format".to_string())
         );
 
-        let no_common = vec![
-            "analyze".to_string(),
-            "render".to_string(),
-        ];
-        assert_eq!(
-            ImplicitTypeDetector::find_common_prefix(&no_common),
-            None
-        );
+        let no_common = vec!["analyze".to_string(), "render".to_string()];
+        assert_eq!(ImplicitTypeDetector::find_common_prefix(&no_common), None);
     }
 }

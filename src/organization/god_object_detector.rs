@@ -1128,7 +1128,11 @@ impl GodObjectDetector {
         // Infer fields from input/output types
         let mut added_fields = std::collections::HashSet::new();
         for input_type in input_types.iter().take(3) {
-            let field_name = input_type.to_lowercase().replace("&", "").trim().to_string();
+            let field_name = input_type
+                .to_lowercase()
+                .replace("&", "")
+                .trim()
+                .to_string();
             if !field_name.is_empty() && added_fields.insert(field_name.clone()) {
                 example.push_str(&format!("    {}: {},\n", field_name, input_type));
             }
@@ -1144,7 +1148,7 @@ impl GodObjectDetector {
         example.push_str(&format!("impl {} {{\n", core_type_name));
 
         // Add example constructor
-        example.push_str(&format!("    pub fn new(/* parameters */) -> Self {{\n"));
+        example.push_str("    pub fn new(/* parameters */) -> Self {\n");
         example.push_str(&format!("        {} {{\n", core_type_name));
         example.push_str("            // Initialize fields\n");
         example.push_str("        }\n");
@@ -1168,17 +1172,26 @@ impl GodObjectDetector {
                 example.push_str("        todo!()\n");
                 example.push_str("    }\n\n");
             } else if method.starts_with("get_") || method.starts_with("compute_") {
-                example.push_str(&format!("    pub fn {}(&self) -> /* ReturnType */ {{\n", method));
+                example.push_str(&format!(
+                    "    pub fn {}(&self) -> /* ReturnType */ {{\n",
+                    method
+                ));
                 example.push_str("        // Computation logic\n");
                 example.push_str("        todo!()\n");
                 example.push_str("    }\n\n");
             } else if method.starts_with("set_") || method.starts_with("update_") {
-                example.push_str(&format!("    pub fn {}(&mut self, /* params */) {{\n", method));
+                example.push_str(&format!(
+                    "    pub fn {}(&mut self, /* params */) {{\n",
+                    method
+                ));
                 example.push_str("        // Mutation logic\n");
                 example.push_str("        todo!()\n");
                 example.push_str("    }\n\n");
             } else {
-                example.push_str(&format!("    pub fn {}(&self, /* params */) -> /* ReturnType */ {{\n", method));
+                example.push_str(&format!(
+                    "    pub fn {}(&self, /* params */) -> /* ReturnType */ {{\n",
+                    method
+                ));
                 example.push_str("        // Method logic\n");
                 example.push_str("        todo!()\n");
                 example.push_str("    }\n\n");
@@ -1186,7 +1199,10 @@ impl GodObjectDetector {
         }
 
         if methods.len() > 3 {
-            example.push_str(&format!("    // ... and {} more methods\n", methods.len() - 3));
+            example.push_str(&format!(
+                "    // ... and {} more methods\n",
+                methods.len() - 3
+            ));
         }
 
         example.push_str("}\n");

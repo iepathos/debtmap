@@ -166,8 +166,8 @@ fn test_type_based_clustering_quality() {
     // but we can verify the analysis completes successfully
 
     // Analysis completes successfully - no panics
-    // Just verify the analysis ran without errors
-    assert!(!analysis.is_god_object || analysis.is_god_object, "Analysis completed successfully");
+    // Just verify the analysis ran without errors (always true, just checking it doesn't panic)
+    assert!(true, "Analysis completed successfully");
 }
 
 /// Test that utilities modules trigger type-based clustering fallback
