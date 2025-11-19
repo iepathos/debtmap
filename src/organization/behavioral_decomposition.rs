@@ -453,7 +453,7 @@ pub fn apply_community_detection(
     }
 
     // Convert to MethodCluster structs
-    clusters
+    let clusters_result: Vec<MethodCluster> = clusters
         .into_values()
         .filter(|methods| methods.len() >= 5) // Only clusters with 5+ methods
         .map(|methods| {
@@ -473,7 +473,15 @@ pub fn apply_community_detection(
             cluster
         })
         .filter(|cluster| cluster.cohesion_score > 0.3) // Filter low-cohesion clusters
-        .collect()
+        .collect();
+
+    // If only 1 cluster found, treat as "no useful splits" - all methods are tightly coupled
+    // Better to fall back to responsibility-based grouping which can still split by purpose
+    if clusters_result.len() <= 1 {
+        return Vec::new();
+    }
+
+    clusters_result
 }
 
 /// Calculate modularity score for a method in a cluster

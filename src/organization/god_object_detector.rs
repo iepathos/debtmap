@@ -718,6 +718,12 @@ impl GodObjectDetector {
                         params.responsibility_groups,
                         params.field_tracker,
                     );
+
+                    // If fallback also produces <=1 split, treat as "no actionable splits"
+                    // A single split is not really a "split" - it's just renaming the file
+                    if splits.len() <= 1 {
+                        splits = Vec::new();
+                    }
                 }
 
                 (
@@ -771,6 +777,12 @@ impl GodObjectDetector {
                         params.responsibility_groups,
                         params.field_tracker,
                     );
+
+                    // If fallback also produces <=1 split, treat as "no actionable splits"
+                    // A single split is not really a "split" - it's just renaming the file
+                    if splits.len() <= 1 {
+                        splits = Vec::new();
+                    }
                 }
 
                 (
@@ -912,6 +924,12 @@ impl GodObjectDetector {
             };
 
             splits.push(service_split);
+        }
+
+        // If only 1 split found (service object), treat as "no useful splits"
+        // Single split is not really a "split" - better to use responsibility-based fallback
+        if splits.len() <= 1 {
+            return Vec::new();
         }
 
         splits
