@@ -257,8 +257,8 @@ fn test_shows_field_dependencies() {
     field_tracker.analyze_impl(impl_block);
 
     // Verify field tracker has recorded field accesses for key methods
-    let render_fields = field_tracker.get_method_fields("render");
-    let keypress_fields = field_tracker.get_method_fields("handle_keypress");
+    let _render_fields = field_tracker.get_method_fields("render");
+    let _keypress_fields = field_tracker.get_method_fields("handle_keypress");
 
     // Rendering methods should access some fields
     // Note: Field tracking may be limited for simple fixture code

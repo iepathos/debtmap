@@ -41,6 +41,19 @@ struct GodObjectClassificationParams<'a> {
     visitor: &'a super::god_object::TypeVisitor,
 }
 
+/// Parameters for domain analysis and split recommendations
+struct DomainAnalysisParams<'a> {
+    per_struct_metrics: &'a [StructMetrics],
+    total_methods: usize,
+    lines_of_code: usize,
+    is_god_object: bool,
+    path: &'a Path,
+    all_methods: &'a [String],
+    field_tracker: Option<&'a crate::organization::FieldAccessTracker>,
+    responsibility_groups: &'a HashMap<String, Vec<String>>,
+    ast: &'a syn::File,
+}
+
 pub struct GodObjectDetector {
     max_methods: usize,
     max_fields: usize,
@@ -633,28 +646,13 @@ impl GodObjectDetector {
     /// Analyzes cross-domain struct mixing and generates module split recommendations
     ///
     /// # Arguments
-    /// * `per_struct_metrics` - Metrics for each struct in the file
-    /// * `total_methods` - Total number of methods
-    /// * `lines_of_code` - Estimated lines of code
-    /// * `is_god_object` - Whether this is classified as a god object
-    /// * `path` - File path for generating split names
-    /// * `all_methods` - All method names
-    /// * `responsibility_groups` - Methods grouped by responsibility
-    /// * `ast` - AST for analyzing method call graph
+    /// * `params` - Domain analysis parameters
     ///
     /// # Returns
     /// Tuple of (recommended_splits, analysis_method, cross_domain_severity, domain_count, domain_diversity, struct_ratio)
     #[allow(clippy::type_complexity)]
     fn analyze_domains_and_recommend_splits(
-        per_struct_metrics: &[StructMetrics],
-        total_methods: usize,
-        lines_of_code: usize,
-        is_god_object: bool,
-        path: &Path,
-        all_methods: &[String],
-        field_tracker: Option<&crate::organization::FieldAccessTracker>,
-        responsibility_groups: &HashMap<String, Vec<String>>,
-        ast: &syn::File,
+        params: &DomainAnalysisParams,
     ) -> (
         Vec<ModuleSplit>,
         crate::organization::SplitAnalysisMethod,
@@ -664,21 +662,22 @@ impl GodObjectDetector {
         f64,
     ) {
         // Cross-domain struct mixing analysis (Spec 140)
-        let struct_count = per_struct_metrics.len();
+        let struct_count = params.per_struct_metrics.len();
         let domain_count = if struct_count >= 5 {
-            crate::organization::count_distinct_domains(per_struct_metrics)
+            crate::organization::count_distinct_domains(params.per_struct_metrics)
         } else {
             0
         };
-        let struct_ratio = crate::organization::calculate_struct_ratio(struct_count, total_methods);
+        let struct_ratio =
+            crate::organization::calculate_struct_ratio(struct_count, params.total_methods);
 
         // Determine cross-domain severity
         let cross_domain_severity = if domain_count >= 3 {
             Some(crate::organization::determine_cross_domain_severity(
                 struct_count,
                 domain_count,
-                lines_of_code,
-                is_god_object,
+                params.lines_of_code,
+                params.is_god_object,
             ))
         } else {
             None
@@ -695,7 +694,7 @@ impl GodObjectDetector {
         let (recommended_splits, analysis_method) = if struct_count >= 5 && domain_count >= 3 {
             // PRIORITY 1: Cross-domain mixing analysis (primary strategy)
             let mut splits =
-                crate::organization::suggest_module_splits_by_domain(per_struct_metrics);
+                crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
 
             // Attach severity to all splits
             if let Some(severity) = cross_domain_severity {
@@ -707,32 +706,37 @@ impl GodObjectDetector {
             // Spec 178: Integrate behavioral decomposition to enrich splits
             Self::enrich_splits_with_behavioral_analysis(
                 &mut splits,
-                all_methods,
-                field_tracker,
-                ast,
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
             );
 
             (
                 splits,
                 crate::organization::SplitAnalysisMethod::CrossDomain,
             )
-        } else if is_god_object {
+        } else if params.is_god_object {
             // PRIORITY 2: Method-based analysis with behavioral clustering (Spec 178)
-            let file_name = path
+            let file_name = params
+                .path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("module");
 
             // Use behavioral clustering for god objects
-            let mut splits =
-                Self::generate_behavioral_splits(all_methods, field_tracker, ast, file_name);
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
 
             // If behavioral clustering doesn't produce results, fall back to method-based
             if splits.is_empty() {
                 splits = crate::organization::recommend_module_splits_enhanced(
                     file_name,
-                    responsibility_groups,
-                    field_tracker,
+                    params.responsibility_groups,
+                    params.field_tracker,
                 );
             }
 
@@ -1101,6 +1105,18 @@ impl GodObjectDetector {
         };
 
         // Analyze cross-domain mixing and generate split recommendations
+        let domain_params = DomainAnalysisParams {
+            per_struct_metrics: &per_struct_metrics,
+            total_methods,
+            lines_of_code,
+            is_god_object,
+            path,
+            all_methods: &all_methods,
+            field_tracker: field_tracker.as_ref(),
+            responsibility_groups: &responsibility_groups,
+            ast,
+        };
+
         let (
             recommended_splits,
             analysis_method,
@@ -1108,17 +1124,7 @@ impl GodObjectDetector {
             domain_count,
             domain_diversity,
             struct_ratio,
-        ) = Self::analyze_domains_and_recommend_splits(
-            &per_struct_metrics,
-            total_methods,
-            lines_of_code,
-            is_god_object,
-            path,
-            &all_methods,
-            field_tracker.as_ref(),
-            &responsibility_groups,
-            ast,
-        );
+        ) = Self::analyze_domains_and_recommend_splits(&domain_params);
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 
