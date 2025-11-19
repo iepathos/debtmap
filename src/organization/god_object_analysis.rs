@@ -267,6 +267,51 @@ pub struct ModuleSplit {
     #[serde(skip)] // Skip in equality comparison
     pub classification_evidence:
         Option<crate::analysis::multi_signal_aggregation::AggregatedClassification>,
+    /// Representative method names to show in recommendations (Spec 178)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub representative_methods: Vec<String>,
+    /// Fields from original struct needed by this extracted module (Spec 178)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub fields_needed: Vec<String>,
+    /// Suggested trait extraction for this behavioral group (Spec 178)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub trait_suggestion: Option<String>,
+    /// Behavioral category for this split (Spec 178)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub behavior_category: Option<String>,
+}
+
+/// Helper to create ModuleSplit with behavioral defaults
+impl Default for ModuleSplit {
+    fn default() -> Self {
+        Self {
+            suggested_name: String::new(),
+            methods_to_move: vec![],
+            structs_to_move: vec![],
+            responsibility: String::new(),
+            estimated_lines: 0,
+            method_count: 0,
+            warning: None,
+            priority: Priority::Medium,
+            cohesion_score: None,
+            dependencies_in: vec![],
+            dependencies_out: vec![],
+            domain: String::new(),
+            rationale: None,
+            method: SplitAnalysisMethod::None,
+            severity: None,
+            interface_estimate: None,
+            classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
+        }
+    }
 }
 
 // Manual PartialEq implementation that skips classification_evidence field
@@ -288,6 +333,10 @@ impl PartialEq for ModuleSplit {
             && self.method == other.method
             && self.severity == other.severity
             && self.interface_estimate == other.interface_estimate
+            && self.representative_methods == other.representative_methods
+            && self.fields_needed == other.fields_needed
+            && self.trait_suggestion == other.trait_suggestion
+            && self.behavior_category == other.behavior_category
         // Skip classification_evidence in equality comparison
     }
 }
@@ -1099,6 +1148,12 @@ pub fn recommend_module_splits_with_evidence(
             // Sanitize the responsibility name for use in module name
             let sanitized_responsibility = sanitize_module_name(responsibility);
 
+            // Get representative methods (first 5-8)
+            let representative_methods: Vec<String> = methods.iter().take(8).cloned().collect();
+
+            // Infer behavioral category from responsibility
+            let behavior_category = Some(responsibility.clone());
+
             recommendations.push(ModuleSplit {
                 suggested_name: format!(
                     "{}_{}",
@@ -1124,6 +1179,10 @@ pub fn recommend_module_splits_with_evidence(
                 severity: None,
                 interface_estimate: None,
                 classification_evidence,
+                representative_methods,
+                fields_needed: vec![], // Will be populated by field access analysis
+                trait_suggestion: None, // Will be added later
+                behavior_category,
             });
         }
     }
@@ -1230,6 +1289,10 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 severity: None, // Will be set by caller based on overall analysis
                 interface_estimate: None,
                 classification_evidence: None,
+                representative_methods: vec![],
+                fields_needed: vec![],
+                trait_suggestion: None,
+                behavior_category: None,
             }
         })
         .collect()
@@ -1577,6 +1640,10 @@ pub fn suggest_splits_by_struct_grouping(
                 severity: None,
                 interface_estimate: None,
                 classification_evidence: None,
+                representative_methods: vec![],
+                fields_needed: vec![],
+                trait_suggestion: None,
+                behavior_category: None,
             }
         })
         .collect();

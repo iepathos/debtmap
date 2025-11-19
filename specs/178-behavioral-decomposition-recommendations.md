@@ -3,9 +3,14 @@ number: 178
 title: Behavioral Decomposition for God Object Recommendations
 category: optimization
 priority: high
-status: draft
+status: partially-implemented
 dependencies: [133]
 created: 2025-11-18
+implementation_note: |
+  This spec is too large for single-session implementation.
+  Foundation completed (data structures, ModuleSplit fields).
+  See SPEC_178_STATUS.md for details and phased approach.
+  Remaining: Fix compilation errors, method clustering, field tracking, output formatting.
 ---
 
 # Specification 178: Behavioral Decomposition for God Object Recommendations

@@ -148,16 +148,20 @@ impl ModuleFunctionClassifier {
             let priority = Self::calculate_priority(avg_confidence, classified_functions.len());
 
             // Generate split recommendation
+            let method_names: Vec<String> = classified_functions
+                .iter()
+                .map(|f| f.function.name.clone())
+                .collect();
+            let representative_methods: Vec<String> =
+                method_names.iter().take(8).cloned().collect();
+
             let split = ModuleSplit {
                 suggested_name: format!(
                     "{}_module",
                     Self::responsibility_to_snake_case(responsibility)
                 ),
                 responsibility: responsibility.as_str().to_string(),
-                methods_to_move: classified_functions
-                    .iter()
-                    .map(|f| f.function.name.clone())
-                    .collect(),
+                methods_to_move: method_names,
                 structs_to_move: vec![],
                 estimated_lines: classified_functions
                     .iter()
@@ -175,6 +179,10 @@ impl ModuleFunctionClassifier {
                 severity: None,
                 interface_estimate: None,
                 classification_evidence: Self::build_aggregate_evidence(&classified_functions),
+                representative_methods,
+                fields_needed: vec![],
+                trait_suggestion: None,
+                behavior_category: Some(responsibility.as_str().to_string()),
             };
 
             splits.push(split);

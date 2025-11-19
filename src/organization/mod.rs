@@ -1,6 +1,7 @@
 use crate::common::SourceLocation;
 use syn;
 
+pub mod behavioral_decomposition;
 pub mod boilerplate_detector;
 pub mod builder_pattern;
 pub mod call_graph_cohesion;
