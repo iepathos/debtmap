@@ -148,7 +148,7 @@ pub fn create_dependency_report(file_metrics: &[FileMetrics]) -> DependencyRepor
 }
 
 // Default timeout per file (can be overridden by env var)
-const DEFAULT_FILE_TIMEOUT_SECS: u64 = 30;
+const DEFAULT_FILE_TIMEOUT_SECS: u64 = 60;
 
 pub fn analyze_single_file(file_path: &Path) -> Option<FileMetrics> {
     analyze_single_file_with_timeout(file_path, None)

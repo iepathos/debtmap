@@ -30,7 +30,7 @@ pub enum FunctionRole {
 }
 
 /// Maximum recursion depth to prevent stack overflow
-const MAX_RECURSION_DEPTH: u32 = 50;
+const MAX_RECURSION_DEPTH: u32 = 150;
 
 /// Cache key for match detection results
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
