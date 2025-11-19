@@ -877,17 +877,24 @@ fn format_god_object_steps_with_verbosity(
                 crate::priority::file_metrics::Priority::Low => "Low",
             };
 
-            // Show module name and responsibility
+            // Show module name and responsibility (reformatted for readability)
             writeln!(
                 output,
-                "  {}  {}.{} - {} ({} methods, ~{} lines) [{}]",
-                branch,
-                split.suggested_name,
-                extension,
-                split.responsibility,
+                "\n  {}  {}.{}",
+                branch, split.suggested_name, extension,
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "      Category: {} | Priority: {}",
+                split.responsibility, priority_indicator
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "      Size: {} methods, ~{} lines",
                 split.methods_to_move.len(),
                 split.estimated_lines,
-                priority_indicator
             )
             .unwrap();
 
@@ -897,14 +904,14 @@ fn format_god_object_steps_with_verbosity(
                     let formatted_evidence = evidence_formatter.format_evidence(evidence);
                     // Indent evidence to align with split details
                     for line in formatted_evidence.lines() {
-                        writeln!(output, "       {}", line).unwrap();
+                        writeln!(output, "      {}", line).unwrap();
                     }
 
                     // Show alternatives warning if confidence is low
                     if evidence.confidence < 0.80 && !evidence.alternatives.is_empty() {
                         writeln!(
                             output,
-                            "       [WARN] Low confidence classification - review recommended"
+                            "      [WARN] Low confidence classification - review recommended"
                         )
                         .unwrap();
                     }
@@ -913,55 +920,54 @@ fn format_god_object_steps_with_verbosity(
 
             // Show representative methods first (Spec 178: methods before structs)
             if !split.representative_methods.is_empty() {
-                let sample_size = 5.min(split.representative_methods.len());
-                let methods_display: Vec<String> = split
+                let total_methods = split.representative_methods.len();
+                let sample_size = 5.min(total_methods);
+
+                writeln!(output, "      Methods ({} total):", total_methods).unwrap();
+
+                for method in split
                     .representative_methods
                     .iter()
                     .take(sample_size)
-                    .map(|m| format!("{}()", m))
-                    .collect();
+                {
+                    writeln!(output, "        • {}()", method).unwrap();
+                }
 
-                let continuation = if split.representative_methods.len() > sample_size {
+                if total_methods > sample_size {
                     writeln!(
                         output,
-                        "       -> Methods: {}, ... +{} more",
-                        methods_display.join(", "),
-                        split.representative_methods.len() - sample_size
+                        "        ... and {} more",
+                        total_methods - sample_size
                     )
-                } else {
-                    writeln!(output, "       -> Methods: {}", methods_display.join(", "))
-                };
-                continuation.unwrap();
+                    .unwrap();
+                }
             } else if !split.methods_to_move.is_empty() {
                 // Fallback to methods_to_move if representative_methods not populated
-                let sample_size = 5.min(split.methods_to_move.len());
-                let methods_display: Vec<String> = split
-                    .methods_to_move
-                    .iter()
-                    .take(sample_size)
-                    .map(|m| format!("{}()", m))
-                    .collect();
+                let total_methods = split.methods_to_move.len();
+                let sample_size = 5.min(total_methods);
 
-                let continuation = if split.methods_to_move.len() > sample_size {
+                writeln!(output, "      Methods ({} total):", total_methods).unwrap();
+
+                for method in split.methods_to_move.iter().take(sample_size) {
+                    writeln!(output, "        • {}()", method).unwrap();
+                }
+
+                if total_methods > sample_size {
                     writeln!(
                         output,
-                        "       -> Methods: {}, ... +{} more",
-                        methods_display.join(", "),
-                        split.methods_to_move.len() - sample_size
+                        "        ... and {} more",
+                        total_methods - sample_size
                     )
-                } else {
-                    writeln!(output, "       -> Methods: {}", methods_display.join(", "))
-                };
-                continuation.unwrap();
+                    .unwrap();
+                }
             }
 
             // Show fields needed (Spec 178: field dependencies)
             if !split.fields_needed.is_empty() {
                 writeln!(
                     output,
-                    "       -> Fields needed: {} ({} fields)",
-                    split.fields_needed.join(", "),
-                    split.fields_needed.len()
+                    "      Fields needed: {}",
+                    split.fields_needed.join(", ")
                 )
                 .unwrap();
             }
@@ -969,9 +975,9 @@ fn format_god_object_steps_with_verbosity(
             // Show trait extraction suggestion (Spec 178)
             if let Some(ref trait_suggestion) = split.trait_suggestion {
                 if verbosity > 0 {
-                    writeln!(output, "       -> Trait extraction:").unwrap();
+                    writeln!(output, "      Trait extraction:").unwrap();
                     for line in trait_suggestion.lines() {
-                        writeln!(output, "          {}", line).unwrap();
+                        writeln!(output, "        {}", line).unwrap();
                     }
                 }
             }
@@ -980,9 +986,8 @@ fn format_god_object_steps_with_verbosity(
             if !split.structs_to_move.is_empty() {
                 writeln!(
                     output,
-                    "       -> Structs: {} ({} structs)",
-                    split.structs_to_move.join(", "),
-                    split.structs_to_move.len()
+                    "      Structs: {}",
+                    split.structs_to_move.join(", ")
                 )
                 .unwrap();
             }
@@ -990,7 +995,7 @@ fn format_god_object_steps_with_verbosity(
             // Show warning if present
             if let Some(warning) = &split.warning {
                 let _branch_prefix = if is_last { " " } else { "│" };
-                writeln!(output, "       [!] {}", warning).unwrap();
+                writeln!(output, "      [!] {}", warning).unwrap();
             }
         }
 
