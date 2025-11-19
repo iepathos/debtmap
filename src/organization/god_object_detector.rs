@@ -692,93 +692,93 @@ impl GodObjectDetector {
 
         // Determine analysis method and generate recommendations
         // Spec 178: Prioritize behavioral decomposition for method-heavy god objects
-        let (recommended_splits, analysis_method) =
-            if params.is_god_object && params.total_methods > 50 {
-                // PRIORITY 1: Behavioral method clustering for large god objects (Spec 178)
-                // When a file has 50+ methods, the method impl is the problem, not the structs.
-                // Use call graph analysis and community detection to find behavioral cohesion.
-                let file_name = params
-                    .path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("module");
+        let (recommended_splits, analysis_method) = if params.total_methods > 50 {
+            // PRIORITY 1: Behavioral method clustering for method-heavy files (Spec 178)
+            // When a file has 50+ methods, the method impl is the problem, not the structs.
+            // Use call graph analysis and community detection to find behavioral cohesion.
+            // This applies regardless of god object score - method count is the primary criterion.
+            let file_name = params
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
 
-                let mut splits = Self::generate_behavioral_splits(
-                    params.all_methods,
-                    params.field_tracker,
-                    params.ast,
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
+
+            // If behavioral clustering doesn't produce results, fall back to responsibility-based
+            if splits.is_empty() {
+                splits = crate::organization::recommend_module_splits_enhanced(
                     file_name,
-                );
-
-                // If behavioral clustering doesn't produce results, fall back to responsibility-based
-                if splits.is_empty() {
-                    splits = crate::organization::recommend_module_splits_enhanced(
-                        file_name,
-                        params.responsibility_groups,
-                        params.field_tracker,
-                    );
-                }
-
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::MethodBased,
-                )
-            } else if struct_count >= 5 && domain_count >= 3 {
-                // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
-                // For files with many structs but manageable methods (<= 50),
-                // struct-based domain grouping is appropriate.
-                let mut splits =
-                    crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
-
-                // Attach severity to all splits
-                if let Some(severity) = cross_domain_severity {
-                    for split in &mut splits {
-                        split.severity = Some(severity);
-                    }
-                }
-
-                // Enrich with behavioral analysis for method information
-                Self::enrich_splits_with_behavioral_analysis(
-                    &mut splits,
-                    params.all_methods,
+                    params.responsibility_groups,
                     params.field_tracker,
-                    params.ast,
                 );
+            }
 
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::CrossDomain,
-                )
-            } else if params.is_god_object {
-                // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
-                let file_name = params
-                    .path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("module");
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::MethodBased,
+            )
+        } else if struct_count >= 5 && domain_count >= 3 {
+            // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
+            // For files with many structs but manageable methods (<= 50),
+            // struct-based domain grouping is appropriate.
+            let mut splits =
+                crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
 
-                let mut splits = Self::generate_behavioral_splits(
-                    params.all_methods,
-                    params.field_tracker,
-                    params.ast,
+            // Attach severity to all splits
+            if let Some(severity) = cross_domain_severity {
+                for split in &mut splits {
+                    split.severity = Some(severity);
+                }
+            }
+
+            // Enrich with behavioral analysis for method information
+            Self::enrich_splits_with_behavioral_analysis(
+                &mut splits,
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+            );
+
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::CrossDomain,
+            )
+        } else if params.is_god_object {
+            // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
+            let file_name = params
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
+
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
+
+            if splits.is_empty() {
+                splits = crate::organization::recommend_module_splits_enhanced(
                     file_name,
+                    params.responsibility_groups,
+                    params.field_tracker,
                 );
+            }
 
-                if splits.is_empty() {
-                    splits = crate::organization::recommend_module_splits_enhanced(
-                        file_name,
-                        params.responsibility_groups,
-                        params.field_tracker,
-                    );
-                }
-
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::MethodBased,
-                )
-            } else {
-                (Vec::new(), crate::organization::SplitAnalysisMethod::None)
-            };
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::MethodBased,
+            )
+        } else {
+            (Vec::new(), crate::organization::SplitAnalysisMethod::None)
+        };
 
         (
             recommended_splits,
@@ -2170,6 +2170,187 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_behavioral_decomposition_priority_for_large_god_objects() {
+        // Spec 178: Test that files with 50+ methods use behavioral clustering
+        // This test verifies the prioritization fix that ensures method-heavy
+        // god objects don't fall through to struct-based decomposition
+        let code = r#"
+            pub struct Editor {
+                buffer: String,
+                cursor: usize,
+                display: Vec<String>,
+                scroll: usize,
+                config: Config,
+                handlers: Vec<Handler>,
+                cache: Option<String>,
+                rules: Vec<Rule>,
+                state: State,
+                field10: u32,
+                field11: u32,
+                field12: u32,
+            }
+
+            pub struct Config {}
+            pub struct Handler {}
+            pub struct Rule {}
+            pub struct State {}
+
+            impl Editor {
+                // Lifecycle methods
+                pub fn new() -> Self { todo!() }
+                pub fn initialize(&mut self) { todo!() }
+                pub fn setup(&mut self) { todo!() }
+                pub fn shutdown(&mut self) { todo!() }
+                pub fn cleanup(&mut self) { todo!() }
+                pub fn destroy(&mut self) { todo!() }
+                pub fn create() -> Self { todo!() }
+                pub fn init_system(&mut self) { todo!() }
+                pub fn dispose(&mut self) { todo!() }
+                pub fn close(&mut self) { todo!() }
+
+                // Rendering methods
+                pub fn render(&self) -> String { todo!() }
+                pub fn draw_cursor(&self) { todo!() }
+                pub fn paint_background(&self) { todo!() }
+                pub fn render_gutter(&self) { todo!() }
+                pub fn paint_highlighted_ranges(&self) { todo!() }
+                pub fn format_line(&self, line: usize) -> String { todo!() }
+                pub fn display_status(&self) -> String { todo!() }
+                pub fn show_popup(&self) { todo!() }
+                pub fn render_scrollbar(&self) { todo!() }
+                pub fn draw_minimap(&self) { todo!() }
+                pub fn paint_selection(&self) { todo!() }
+                pub fn render_diagnostics(&self) { todo!() }
+                pub fn draw_line_numbers(&self) { todo!() }
+                pub fn paint_hover(&self) { todo!() }
+                pub fn render_completions(&self) { todo!() }
+
+                // Event handling methods
+                pub fn handle_keypress(&mut self, key: char) { todo!() }
+                pub fn on_mouse_down(&mut self) { todo!() }
+                pub fn on_mouse_up(&mut self) { todo!() }
+                pub fn on_scroll(&mut self) { todo!() }
+                pub fn handle_input_event(&mut self) { todo!() }
+                pub fn dispatch_action(&mut self) { todo!() }
+                pub fn process_events(&mut self) { todo!() }
+                pub fn on_resize(&mut self) { todo!() }
+                pub fn handle_drag(&mut self) { todo!() }
+                pub fn on_focus(&mut self) { todo!() }
+                pub fn on_blur(&mut self) { todo!() }
+                pub fn handle_click(&mut self) { todo!() }
+                pub fn on_double_click(&mut self) { todo!() }
+                pub fn handle_context_menu(&mut self) { todo!() }
+                pub fn on_wheel(&mut self) { todo!() }
+
+                // Persistence methods
+                pub fn save_state(&self) -> Result<(), String> { todo!() }
+                pub fn load_config(&mut self) -> Result<(), String> { todo!() }
+                pub fn serialize(&self) -> String { todo!() }
+                pub fn deserialize(&mut self, data: &str) { todo!() }
+                pub fn write_to_disk(&self) { todo!() }
+                pub fn read_from_disk(&mut self) { todo!() }
+                pub fn save_buffer(&self) { todo!() }
+                pub fn load_buffer(&mut self) { todo!() }
+                pub fn persist_settings(&self) { todo!() }
+                pub fn restore_session(&mut self) { todo!() }
+
+                // Validation methods
+                pub fn validate_input(&self, input: &str) -> bool { todo!() }
+                pub fn check_bounds(&self, pos: usize) -> bool { todo!() }
+                pub fn verify_signature(&self) -> bool { todo!() }
+                pub fn ensure_valid_state(&self) -> Result<(), String> { todo!() }
+                pub fn validate_config(&self) -> bool { todo!() }
+                pub fn check_syntax(&self) -> bool { todo!() }
+                pub fn verify_permissions(&self) -> bool { todo!() }
+                pub fn validate_path(&self, path: &str) -> bool { todo!() }
+                pub fn check_file_exists(&self) -> bool { todo!() }
+                pub fn ensure_writable(&self) -> bool { todo!() }
+
+                // More methods to exceed 50 threshold
+                pub fn method_a(&self) { todo!() }
+                pub fn method_b(&self) { todo!() }
+                pub fn method_c(&self) { todo!() }
+                pub fn method_d(&self) { todo!() }
+                pub fn method_e(&self) { todo!() }
+            }
+        "#;
+
+        let ast: syn::File = syn::parse_str(code).unwrap();
+        let detector = GodObjectDetector::with_source_content(code);
+        let path = std::path::Path::new("editor.rs");
+        let analysis = detector.analyze_enhanced(path, &ast);
+
+        // Verify test expectations
+
+        // Verify it's classified as a god object
+        assert!(
+            matches!(analysis.classification, GodObjectType::GodClass { .. }),
+            "Should be classified as GodClass, got: {:?}",
+            analysis.classification
+        );
+
+        // Verify we have splits
+        assert!(
+            !analysis.file_metrics.recommended_splits.is_empty(),
+            "Should have recommended splits for god object with 65 methods"
+        );
+
+        // KEY TEST: Verify splits contain METHOD information (not "0 methods")
+        // This is what Spec 178 is all about - showing which methods to extract
+        let has_methods = analysis
+            .file_metrics
+            .recommended_splits
+            .iter()
+            .any(|split| {
+                !split.methods_to_move.is_empty() || !split.representative_methods.is_empty()
+            });
+
+        if !has_methods {
+            eprintln!("\n⚠️  SPEC 178 FAILURE: All splits show 0 methods!");
+            eprintln!("Splits details:");
+            for (i, split) in analysis.file_metrics.recommended_splits.iter().enumerate() {
+                eprintln!(
+                    "  Split {}: {} - {} methods, {} structs, {} representatives",
+                    i + 1,
+                    split.suggested_name,
+                    split.methods_to_move.len(),
+                    split.structs_to_move.len(),
+                    split.representative_methods.len()
+                );
+            }
+        }
+
+        assert!(
+            has_methods,
+            "Spec 178 BROKEN: Behavioral decomposition should show methods to extract, but all splits have 0 methods. \
+             This indicates struct-based decomposition is being used instead of behavioral clustering."
+        );
+
+        // Verify behavioral categorization is being used
+        let has_behavioral_categories =
+            analysis
+                .file_metrics
+                .recommended_splits
+                .iter()
+                .any(|split| {
+                    split.behavior_category.is_some()
+                        || matches!(
+                            split.responsibility.as_str(),
+                            "Rendering"
+                                | "Event Handling"
+                                | "Lifecycle"
+                                | "Persistence"
+                                | "Validation"
+                        )
+                });
+
+        assert!(
+            has_behavioral_categories,
+            "Should use behavioral categories (Rendering, Event Handling, etc.), not generic categories"
+        );
     }
 
     #[test]
