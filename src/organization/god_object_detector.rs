@@ -967,6 +967,89 @@ impl GodObjectDetector {
         }
     }
 
+    /// Generate type-based splits using type affinity clustering (Spec 181)
+    ///
+    /// Analyzes method signatures to group methods by the data types they operate on,
+    /// following idiomatic Rust principles where data owns its behavior.
+    fn generate_type_based_splits(ast: &syn::File, base_name: &str) -> Vec<ModuleSplit> {
+        use crate::organization::{TypeAffinityAnalyzer, TypeSignatureAnalyzer};
+
+        let type_analyzer = TypeSignatureAnalyzer;
+
+        // Extract signatures from impl blocks
+        let impl_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(impl_block) => Some(impl_block),
+                _ => None,
+            })
+            .flat_map(|impl_block| &impl_block.items)
+            .filter_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(type_analyzer.analyze_method(method)),
+                _ => None,
+            })
+            .collect();
+
+        // Extract signatures from standalone functions
+        let fn_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(func) => Some(type_analyzer.analyze_function(func)),
+                _ => None,
+            })
+            .collect();
+
+        // Combine all signatures
+        let mut all_signatures = impl_signatures;
+        all_signatures.extend(fn_signatures);
+
+        if all_signatures.is_empty() {
+            return vec![];
+        }
+
+        // Cluster by type affinity
+        let affinity_analyzer = TypeAffinityAnalyzer;
+        let type_clusters = affinity_analyzer.cluster_by_type_affinity(&all_signatures);
+
+        // Filter clusters with too few methods
+        let type_clusters: Vec<_> = type_clusters
+            .into_iter()
+            .filter(|cluster| cluster.methods.len() >= 3)
+            .collect();
+
+        // Convert to ModuleSplit recommendations
+        type_clusters
+            .into_iter()
+            .map(|cluster| {
+                let core_type_name = cluster.primary_type.name.clone();
+                let suggested_name = format!("{}/{}", base_name, core_type_name.to_lowercase());
+
+                ModuleSplit {
+                    suggested_name,
+                    responsibility: format!(
+                        "Manage {} data and its transformations",
+                        core_type_name
+                    ),
+                    methods_to_move: cluster.methods.clone(),
+                    method_count: cluster.methods.len(),
+                    estimated_lines: cluster.methods.len() * 15, // Rough estimate
+                    core_type: Some(core_type_name),
+                    data_flow: cluster
+                        .input_types
+                        .into_iter()
+                        .chain(cluster.output_types)
+                        .collect(),
+                    cohesion_score: Some(cluster.type_affinity_score),
+                    method: crate::organization::SplitAnalysisMethod::TypeBased,
+                    representative_methods: cluster.methods.iter().take(8).cloned().collect(),
+                    ..Default::default()
+                }
+            })
+            .collect()
+    }
+
     /// Enrich existing splits with behavioral analysis (Spec 178)
     fn enrich_splits_with_behavioral_analysis(
         splits: &mut [ModuleSplit],

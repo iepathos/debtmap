@@ -183,6 +183,8 @@ impl ModuleFunctionClassifier {
                 fields_needed: vec![],
                 trait_suggestion: None,
                 behavior_category: Some(responsibility.as_str().to_string()),
+                core_type: None,
+                data_flow: vec![],
             };
 
             splits.push(split);

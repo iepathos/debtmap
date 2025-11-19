@@ -1362,6 +1362,9 @@ fn convert_to_org_split_method(
         crate::priority::file_metrics::SplitAnalysisMethod::Hybrid => {
             crate::organization::SplitAnalysisMethod::Hybrid
         }
+        crate::priority::file_metrics::SplitAnalysisMethod::TypeBased => {
+            crate::organization::SplitAnalysisMethod::TypeBased
+        }
     }
 }
 

@@ -118,6 +118,7 @@ mod tests {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         }
     }
 

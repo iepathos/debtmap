@@ -103,6 +103,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -126,6 +127,7 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         },
     ]
 }
@@ -161,6 +163,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -184,6 +187,7 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         },
     ]
 }
@@ -220,6 +224,7 @@ mod tests {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         }
     }
 
@@ -247,6 +252,7 @@ mod tests {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         };
 
         let validated = validate_and_refine_splits(vec![split]);

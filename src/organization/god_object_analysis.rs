@@ -279,6 +279,12 @@ pub struct ModuleSplit {
     /// Behavioral category for this split (Spec 178)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub behavior_category: Option<String>,
+    /// Core type that owns the methods in this module (Spec 181)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub core_type: Option<String>,
+    /// Data flow showing input and output types (Spec 181, 182)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub data_flow: Vec<String>,
 }
 
 /// Helper to create ModuleSplit with behavioral defaults
@@ -306,6 +312,8 @@ impl Default for ModuleSplit {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            core_type: None,
+            data_flow: vec![],
         }
     }
 }
@@ -333,6 +341,8 @@ impl PartialEq for ModuleSplit {
             && self.fields_needed == other.fields_needed
             && self.trait_suggestion == other.trait_suggestion
             && self.behavior_category == other.behavior_category
+            && self.core_type == other.core_type
+            && self.data_flow == other.data_flow
         // Skip classification_evidence in equality comparison
     }
 }
@@ -378,6 +388,7 @@ pub enum SplitAnalysisMethod {
     CrossDomain,
     MethodBased,
     Hybrid,
+    TypeBased,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -1225,6 +1236,8 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 fields_needed,
                 trait_suggestion,
                 behavior_category,
+                core_type: None,
+                data_flow: vec![],
             });
         }
     }
@@ -1305,6 +1318,8 @@ pub fn recommend_module_splits_with_evidence(
                 fields_needed: vec![], // Will be populated by field access analysis when available
                 trait_suggestion,
                 behavior_category,
+                core_type: None,
+                data_flow: vec![],
             });
         }
     }
@@ -1415,6 +1430,8 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 fields_needed: vec![],
                 trait_suggestion: None,
                 behavior_category: None,
+                core_type: None,
+                data_flow: vec![],
             }
         })
         .collect()
@@ -1790,6 +1807,8 @@ pub fn suggest_splits_by_struct_grouping(
                 fields_needed: vec![],
                 trait_suggestion: None,
                 behavior_category: None,
+                core_type: None,
+                data_flow: vec![],
             }
         })
         .collect();

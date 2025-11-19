@@ -134,6 +134,7 @@ pub enum SplitAnalysisMethod {
     CrossDomain,
     MethodBased,
     Hybrid,
+    TypeBased,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
