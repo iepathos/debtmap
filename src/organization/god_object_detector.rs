@@ -650,7 +650,8 @@ impl GodObjectDetector {
         lines_of_code: usize,
         is_god_object: bool,
         path: &Path,
-        all_methods: &[String],
+        _all_methods: &[String],
+        field_tracker: Option<&crate::organization::FieldAccessTracker>,
         responsibility_groups: &HashMap<String, Vec<String>>,
     ) -> (
         Vec<ModuleSplit>,
@@ -712,10 +713,10 @@ impl GodObjectDetector {
                 .and_then(|s| s.to_str())
                 .unwrap_or("module");
             (
-                crate::organization::recommend_module_splits(
+                crate::organization::recommend_module_splits_enhanced(
                     file_name,
-                    all_methods,
                     responsibility_groups,
+                    field_tracker,
                 ),
                 crate::organization::SplitAnalysisMethod::MethodBased,
             )
@@ -889,6 +890,20 @@ impl GodObjectDetector {
             &thresholds,
         );
 
+        // Build field access tracker for Spec 178 field dependency analysis
+        let field_tracker = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let mut tracker = crate::organization::FieldAccessTracker::new();
+            // Track field access in all impl blocks
+            for item in &ast.items {
+                if let syn::Item::Impl(impl_block) = item {
+                    tracker.analyze_impl(impl_block);
+                }
+            }
+            Some(tracker)
+        } else {
+            None
+        };
+
         // Analyze cross-domain mixing and generate split recommendations
         let (
             recommended_splits,
@@ -904,6 +919,7 @@ impl GodObjectDetector {
             is_god_object,
             path,
             &all_methods,
+            field_tracker.as_ref(),
             &responsibility_groups,
         );
 

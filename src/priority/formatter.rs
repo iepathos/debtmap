@@ -911,9 +911,30 @@ fn format_god_object_steps_with_verbosity(
                 }
             }
 
-            // Show first few methods as examples
-            if !split.methods_to_move.is_empty() {
-                let sample_size = 3.min(split.methods_to_move.len());
+            // Show representative methods first (Spec 178: methods before structs)
+            if !split.representative_methods.is_empty() {
+                let sample_size = 5.min(split.representative_methods.len());
+                let methods_display: Vec<String> = split
+                    .representative_methods
+                    .iter()
+                    .take(sample_size)
+                    .map(|m| format!("{}()", m))
+                    .collect();
+
+                let continuation = if split.representative_methods.len() > sample_size {
+                    writeln!(
+                        output,
+                        "       -> Methods: {}, ... +{} more",
+                        methods_display.join(", "),
+                        split.representative_methods.len() - sample_size
+                    )
+                } else {
+                    writeln!(output, "       -> Methods: {}", methods_display.join(", "))
+                };
+                continuation.unwrap();
+            } else if !split.methods_to_move.is_empty() {
+                // Fallback to methods_to_move if representative_methods not populated
+                let sample_size = 5.min(split.methods_to_move.len());
                 let methods_display: Vec<String> = split
                     .methods_to_move
                     .iter()
@@ -922,7 +943,6 @@ fn format_god_object_steps_with_verbosity(
                     .collect();
 
                 let continuation = if split.methods_to_move.len() > sample_size {
-                    let _branch_prefix = if is_last { " " } else { "│" };
                     writeln!(
                         output,
                         "       -> Methods: {}, ... +{} more",
@@ -930,15 +950,34 @@ fn format_god_object_steps_with_verbosity(
                         split.methods_to_move.len() - sample_size
                     )
                 } else {
-                    let _branch_prefix = if is_last { " " } else { "│" };
                     writeln!(output, "       -> Methods: {}", methods_display.join(", "))
                 };
                 continuation.unwrap();
             }
 
-            // Show structs being moved
+            // Show fields needed (Spec 178: field dependencies)
+            if !split.fields_needed.is_empty() {
+                writeln!(
+                    output,
+                    "       -> Fields needed: {} ({} fields)",
+                    split.fields_needed.join(", "),
+                    split.fields_needed.len()
+                )
+                .unwrap();
+            }
+
+            // Show trait extraction suggestion (Spec 178)
+            if let Some(ref trait_suggestion) = split.trait_suggestion {
+                if verbosity > 0 {
+                    writeln!(output, "       -> Trait extraction:").unwrap();
+                    for line in trait_suggestion.lines() {
+                        writeln!(output, "          {}", line).unwrap();
+                    }
+                }
+            }
+
+            // Show structs being moved (secondary to methods, per Spec 178)
             if !split.structs_to_move.is_empty() {
-                let _branch_prefix = if is_last { " " } else { "│" };
                 writeln!(
                     output,
                     "       -> Structs: {} ({} structs)",
