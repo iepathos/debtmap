@@ -20,25 +20,70 @@ Format, lint, and test Rust code to ensure quality standards, then commit any au
 1. Run `cargo fmt` to format all Rust code
 2. Check if any files were modified by formatting
 
-## Phase 3: Linting & Analysis
+## Phase 3: Linting & Analysis (CRITICAL - Follow Flow Exactly)
+
+### Step 3.1: Initial Clippy Check
 1. Run `cargo clippy -- -D warnings` to catch common issues
-2. If clippy reports errors:
-   a. Capture the error output and identify error types
-   b. Run `cargo clippy --fix --allow-dirty --allow-staged`
-   c. Check git diff to see if any files were modified
-   d. If NO files were modified, auto-fix cannot resolve these issues
-   e. Run clippy again to get fresh error list
-3. If clippy warnings remain after auto-fix, attempt manual fixes for common patterns:
-   - **result_large_err**: Box large error enum variants (>128 bytes) [See manual fix strategies below]
-   - **large_enum_variant**: Box the largest variant
-   - **type_complexity**: Extract complex types into type aliases
-   - **too_many_arguments**: Refactor into config structs
-4. After manual fixes:
-   a. Run `cargo check` to ensure compilation succeeds
-   b. Run `cargo nextest run` to ensure tests still pass
-   c. Run `cargo clippy -- -D warnings` again to verify resolution
-5. If the SAME warning persists after 2 manual fix attempts, stop and report
-6. Note any remaining warnings that cannot be automatically resolved
+2. Capture the full error output if errors are found
+3. **If no errors**: Skip to Phase 4 (Testing)
+4. **If errors found**: Proceed to Step 3.2
+
+### Step 3.2: Attempt Auto-Fix
+1. Run `cargo clippy --fix --allow-dirty --allow-staged`
+2. Run `git status` to check if files were modified
+3. **MANDATORY**: Proceed to Step 3.3 (Verification)
+
+### Step 3.3: Verify Auto-Fix Results
+1. Run `cargo clippy -- -D warnings` again to get current error state
+2. **Decision Point**:
+   - **If no errors**: Auto-fix succeeded → Skip to Phase 4 (Testing)
+   - **If errors persist**: Auto-fix failed or incomplete → **PROCEED TO Step 3.4 (Manual Fixes)**
+
+### Step 3.4: Manual Fix Loop (REQUIRED when auto-fix doesn't resolve all errors)
+
+**IMPORTANT**: You MUST attempt manual fixes for any remaining clippy errors. Do not skip this step.
+
+For each remaining clippy error, identify the error type and apply the appropriate manual fix:
+
+**Supported Error Types:**
+- **too_many_arguments** (>7 parameters) → Create parameter struct [See line 272 for detailed example]
+- **result_large_err** (>128 bytes) → Box the large variant [See line 98]
+- **large_enum_variant** → Box the large variant [See line 282]
+- **type_complexity** → Extract type alias [See line 306]
+- **unused_variables** (test code only) → Prefix with underscore
+
+**Manual Fix Process:**
+
+```
+For each clippy error:
+a. Parse error to identify: error type, file, line number, affected function/type
+b. Read the affected file to understand context
+c. Apply appropriate fix strategy (see detailed examples in sections below)
+d. Run `cargo check` to verify compilation
+e. Run `cargo clippy -- -D warnings` to verify error resolved
+f. Track attempts:
+   - If resolved: Continue to next error
+   - If persists: Increment counter for THIS specific error
+   - If 2 attempts on SAME error: STOP and report (go to Step 3.5)
+g. After fixing all errors OR hitting unfixable error: Proceed to Step 3.5
+```
+
+### Step 3.5: Verify All Fixes
+1. Run `cargo check` to ensure project compiles
+2. Run `cargo nextest run` to ensure tests still pass
+3. Run `cargo clippy -- -D warnings` one final time
+4. **Decision Point**:
+   - **If clippy clean AND tests pass**: Success → Proceed to Step 3.6
+   - **If same errors persist after 2 attempts**: Report unfixable errors and STOP
+   - **If tests fail**: Report test failures and STOP
+
+### Step 3.6: Commit Lint Fixes
+1. Run `git status` to see what was modified
+2. **If changes exist**:
+   - Run `git add .`
+   - Run `git commit -m "style: apply clippy fixes"`
+   - Do NOT add attribution text
+3. **If no changes**: Proceed to Phase 4
 
 ## Phase 4: Testing
 1. Run `cargo nextest run` to ensure all tests pass
@@ -86,12 +131,13 @@ When `PRODIGY_AUTOMATION=true` environment variable is set:
 - If git operations fail: Report error and exit
 
 ## Important Notes
-- Focus on automated fixes AND common structural refactorings (like boxing variants)
+- **CRITICAL**: You MUST attempt manual fixes when auto-fix doesn't resolve all clippy errors. This is not optional.
+- Focus on automated fixes AND common structural refactorings (boxing variants, parameter structs)
 - Do NOT fix logic errors or failing tests
-- Do NOT modify test code unless it's formatting
-- Always check git status before and after
+- Do NOT modify test code unless it's formatting or unused variable warnings
+- Always check git status before and after changes
 - Only commit if actual changes were made by the tools
-- **IMPORTANT**: Do NOT add any attribution text like "🤖 Generated with [Claude Code]" or "Co-Authored-By: Claude" to commit messages. Keep commits clean and focused on the change itself.
+- **CRITICAL**: Do NOT add attribution text like "🤖 Generated with [Claude Code]" or "Co-Authored-By: Claude" to commit messages
 
 ## Manual Fix Strategies for Common Clippy Warnings
 
@@ -227,22 +273,123 @@ fn process(data: ProcessingMap) -> Result<(), Error> { ... }
 ### too_many_arguments (Function has too many arguments)
 **Problem**: Function has more than 7 parameters.
 
-**Solution**: Refactor into a config struct
-```rust
-// Before
-fn create_agent(id: String, name: String, config: Config, timeout: u64, retries: u32) { ... }
+**Solution**: Refactor parameters into a config struct
 
-// After
-pub struct AgentConfig {
-    pub id: String,
-    pub name: String,
-    pub config: Config,
-    pub timeout: u64,
-    pub retries: u32,
+**Detailed Example** (with lifetimes):
+```rust
+// Before (9 parameters - clippy error)
+fn analyze_domains_and_recommend_splits(
+    per_struct_metrics: &[StructMetrics],
+    total_methods: usize,
+    lines_of_code: usize,
+    is_god_object: bool,
+    path: &Path,
+    all_methods: &[String],
+    field_tracker: Option<&FieldAccessTracker>,
+    responsibility_groups: &HashMap<String, Vec<String>>,
+    ast: &syn::File,
+) -> (Vec<ModuleSplit>, SplitAnalysisMethod, Option<RecommendationSeverity>, usize, f64, f64) {
+    // Original function body uses parameters directly
+    let struct_count = per_struct_metrics.len();
+    let domain_count = count_distinct_domains(per_struct_metrics);
+    // ... more code using all the parameters
 }
 
-fn create_agent(config: AgentConfig) { ... }
+// After (fixed with parameter struct)
+struct DomainAnalysisParams<'a> {
+    per_struct_metrics: &'a [StructMetrics],
+    total_methods: usize,
+    lines_of_code: usize,
+    is_god_object: bool,
+    path: &'a Path,
+    all_methods: &'a [String],
+    field_tracker: Option<&'a FieldAccessTracker>,
+    responsibility_groups: &'a HashMap<String, Vec<String>>,
+    ast: &'a syn::File,
+}
+
+fn analyze_domains_and_recommend_splits(
+    params: DomainAnalysisParams,
+) -> (Vec<ModuleSplit>, SplitAnalysisMethod, Option<RecommendationSeverity>, usize, f64, f64) {
+    // Destructure params at the start to preserve original function body
+    let per_struct_metrics = params.per_struct_metrics;
+    let total_methods = params.total_methods;
+    let lines_of_code = params.lines_of_code;
+    let is_god_object = params.is_god_object;
+    let path = params.path;
+    let all_methods = params.all_methods;
+    let field_tracker = params.field_tracker;
+    let responsibility_groups = params.responsibility_groups;
+    let ast = params.ast;
+
+    // Original function body (unchanged)
+    let struct_count = per_struct_metrics.len();
+    let domain_count = count_distinct_domains(per_struct_metrics);
+    // ... rest of original code
+}
+
+// Update call sites:
+// Old:
+let result = analyze_domains_and_recommend_splits(
+    &per_struct_metrics,
+    total_methods,
+    lines_of_code,
+    is_god_object,
+    path,
+    &all_methods,
+    field_tracker.as_ref(),
+    &responsibility_groups,
+    ast,
+);
+
+// New:
+let result = analyze_domains_and_recommend_splits(DomainAnalysisParams {
+    per_struct_metrics: &per_struct_metrics,
+    total_methods,
+    lines_of_code,
+    is_god_object,
+    path,
+    all_methods: &all_methods,
+    field_tracker: field_tracker.as_ref(),
+    responsibility_groups: &responsibility_groups,
+    ast,
+});
 ```
+
+**Step-by-Step Fix Process:**
+1. Parse clippy output to identify function name, file, line number
+2. Read the file and locate the function definition
+3. Count parameters to confirm (>7 means clippy error)
+4. Create a new struct above the function:
+   - Struct name: `{FunctionName}Params` (e.g., `DomainAnalysisParams`)
+   - Add lifetime `<'a>` if ANY parameters have references
+   - One field per parameter with same name and type
+5. Replace function signature: `fn func_name(params: StructName<'a>)`
+6. At start of function body, destructure params:
+   ```rust
+   let param1 = params.param1;
+   let param2 = params.param2;
+   // ... for each parameter
+   ```
+   This preserves the original function body unchanged
+7. Find ALL call sites: `grep -rn "function_name(" --include="*.rs"`
+8. For each call site, replace:
+   ```rust
+   // Old: function_name(arg1, arg2, arg3, ...)
+   // New: function_name(StructName { param1: arg1, param2: arg2, ... })
+   ```
+9. Run `cargo check` to verify compilation
+10. Run `cargo clippy -- -D warnings` to verify error resolved
+11. If errors remain, check for:
+    - Missed call sites (use grep again)
+    - Incorrect field names in struct construction
+    - Missing or incorrect lifetime parameters
+
+**Common Pitfalls:**
+- Forgetting lifetime parameter `<'a>` when references are present
+- Missing call sites (always use grep to find ALL occurrences)
+- Not destructuring params in function body (breaks all variable usage)
+- Mismatched field names between struct definition and usage
 
 ## Workflow for Manual Fixes
 1. **Identify the pattern**: Read clippy error message carefully
