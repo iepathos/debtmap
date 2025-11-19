@@ -147,6 +147,7 @@ impl ValidationLimits {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         }];
 
         let enhanced =
@@ -193,6 +194,7 @@ impl ValidationLimits {
                 fields_needed: vec![],
                 trait_suggestion: None,
                 behavior_category: None,
+                ..Default::default()
             },
             ModuleSplit {
                 suggested_name: "validation".to_string(),
@@ -216,6 +218,7 @@ impl ValidationLimits {
                 fields_needed: vec![],
                 trait_suggestion: None,
                 behavior_category: None,
+                ..Default::default()
             },
         ];
 
@@ -256,6 +259,7 @@ impl ValidationLimits {
             fields_needed: vec![],
             trait_suggestion: None,
             behavior_category: None,
+            ..Default::default()
         }];
 
         let enhanced =

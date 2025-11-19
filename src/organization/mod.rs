@@ -35,6 +35,7 @@ pub mod split_validator;
 pub mod struct_initialization;
 pub mod struct_ownership;
 pub mod trait_pattern_analyzer;
+pub mod type_based_clustering;
 
 pub use god_object_analysis::{
     calculate_domain_diversity_from_structs, calculate_god_object_score,
@@ -89,6 +90,10 @@ pub use boilerplate_detector::{
 };
 
 pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
+
+pub use type_based_clustering::{
+    MethodSignature, TypeAffinityAnalyzer, TypeCluster, TypeInfo, TypeSignatureAnalyzer,
+};
 
 pub use macro_recommendations::MacroRecommendationEngine;
 

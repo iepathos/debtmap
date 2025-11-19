@@ -724,6 +724,7 @@ impl GodObjectDetector {
 
         // Determine analysis method and generate recommendations
         // Spec 178: Prioritize behavioral decomposition for method-heavy god objects
+        // Spec 181: Use type-based clustering when behavioral produces utilities modules
         let (recommended_splits, analysis_method) =
             if params.total_methods > 50 && params.lines_of_code > 500 {
                 // PRIORITY 1: Behavioral method clustering for substantial method-heavy files (Spec 178)
@@ -742,6 +743,30 @@ impl GodObjectDetector {
                     params.ast,
                     file_name,
                 );
+
+                // Spec 181: If behavioral clustering produces utilities modules, try type-based clustering
+                let has_utilities = splits.iter().any(|s| {
+                    s.suggested_name.contains("utilities")
+                        || s.suggested_name.contains("helpers")
+                        || s.suggested_name.contains("utils")
+                });
+
+                if has_utilities || splits.is_empty() {
+                    // Try type-based clustering as a better alternative (Spec 181)
+                    let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+
+                    // Use type-based if it produces better quality results
+                    if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                        return (
+                            type_splits,
+                            crate::organization::SplitAnalysisMethod::TypeBased,
+                            cross_domain_severity,
+                            domain_count,
+                            domain_diversity,
+                            struct_ratio,
+                        );
+                    }
+                }
 
                 // If behavioral clustering doesn't produce results, fall back to responsibility-based
                 if splits.is_empty() {
@@ -802,6 +827,30 @@ impl GodObjectDetector {
                     params.ast,
                     file_name,
                 );
+
+                // Spec 181: Try type-based clustering for parameter-heavy or utilities-heavy files
+                let has_utilities = splits.iter().any(|s| {
+                    s.suggested_name.contains("utilities")
+                        || s.suggested_name.contains("helpers")
+                        || s.suggested_name.contains("utils")
+                });
+
+                if has_utilities || splits.is_empty() {
+                    // Try type-based clustering (Spec 181)
+                    let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+
+                    // Use type-based if it produces better quality results
+                    if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                        return (
+                            type_splits,
+                            crate::organization::SplitAnalysisMethod::TypeBased,
+                            cross_domain_severity,
+                            domain_count,
+                            domain_diversity,
+                            struct_ratio,
+                        );
+                    }
+                }
 
                 if splits.is_empty() {
                     splits = crate::organization::recommend_module_splits_enhanced(
@@ -965,6 +1014,200 @@ impl GodObjectDetector {
             None => String::new(),
             Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
         }
+    }
+
+    /// Generate type-based splits using type affinity clustering (Spec 181)
+    ///
+    /// Analyzes method signatures to group methods by the data types they operate on,
+    /// following idiomatic Rust principles where data owns its behavior.
+    fn generate_type_based_splits(ast: &syn::File, base_name: &str) -> Vec<ModuleSplit> {
+        use crate::organization::{TypeAffinityAnalyzer, TypeSignatureAnalyzer};
+
+        let type_analyzer = TypeSignatureAnalyzer;
+
+        // Extract signatures from impl blocks
+        let impl_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(impl_block) => Some(impl_block),
+                _ => None,
+            })
+            .flat_map(|impl_block| &impl_block.items)
+            .filter_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(type_analyzer.analyze_method(method)),
+                _ => None,
+            })
+            .collect();
+
+        // Extract signatures from standalone functions
+        let fn_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(func) => Some(type_analyzer.analyze_function(func)),
+                _ => None,
+            })
+            .collect();
+
+        // Combine all signatures
+        let mut all_signatures = impl_signatures;
+        all_signatures.extend(fn_signatures);
+
+        if all_signatures.is_empty() {
+            return vec![];
+        }
+
+        // Cluster by type affinity
+        let affinity_analyzer = TypeAffinityAnalyzer;
+        let type_clusters = affinity_analyzer.cluster_by_type_affinity(&all_signatures);
+
+        // Filter clusters with too few methods
+        let type_clusters: Vec<_> = type_clusters
+            .into_iter()
+            .filter(|cluster| cluster.methods.len() >= 3)
+            .collect();
+
+        // Convert to ModuleSplit recommendations
+        type_clusters
+            .into_iter()
+            .map(|cluster| {
+                let core_type_name = cluster.primary_type.name.clone();
+                let suggested_name = format!("{}/{}", base_name, core_type_name.to_lowercase());
+
+                // Generate example type definition with impl blocks (Spec 181)
+                let input_types_vec: Vec<String> = cluster.input_types.iter().cloned().collect();
+                let output_types_vec: Vec<String> = cluster.output_types.iter().cloned().collect();
+                let suggested_type_definition = Self::generate_type_definition_example(
+                    &core_type_name,
+                    &cluster.methods,
+                    &input_types_vec,
+                    &output_types_vec,
+                );
+
+                ModuleSplit {
+                    suggested_name,
+                    responsibility: format!(
+                        "Manage {} data and its transformations",
+                        core_type_name
+                    ),
+                    methods_to_move: cluster.methods.clone(),
+                    method_count: cluster.methods.len(),
+                    estimated_lines: cluster.methods.len() * 15, // Rough estimate
+                    core_type: Some(core_type_name),
+                    data_flow: cluster
+                        .input_types
+                        .into_iter()
+                        .chain(cluster.output_types)
+                        .collect(),
+                    cohesion_score: Some(cluster.type_affinity_score),
+                    method: crate::organization::SplitAnalysisMethod::TypeBased,
+                    representative_methods: cluster.methods.iter().take(8).cloned().collect(),
+                    suggested_type_definition: Some(suggested_type_definition),
+                    ..Default::default()
+                }
+            })
+            .collect()
+    }
+
+    /// Generate example type definition with impl blocks (Spec 181)
+    ///
+    /// Creates an example showing idiomatic Rust type ownership pattern
+    fn generate_type_definition_example(
+        core_type_name: &str,
+        methods: &[String],
+        input_types: &[String],
+        _output_types: &[String],
+    ) -> String {
+        let mut example = String::new();
+
+        // Generate struct definition
+        example.push_str(&format!("pub struct {} {{\n", core_type_name));
+        example.push_str("    // Core fields based on data flow analysis\n");
+
+        // Infer fields from input/output types
+        let mut added_fields = std::collections::HashSet::new();
+        for input_type in input_types.iter().take(3) {
+            let field_name = input_type
+                .to_lowercase()
+                .replace("&", "")
+                .trim()
+                .to_string();
+            if !field_name.is_empty() && added_fields.insert(field_name.clone()) {
+                example.push_str(&format!("    {}: {},\n", field_name, input_type));
+            }
+        }
+
+        if added_fields.is_empty() {
+            example.push_str("    // Add relevant fields here\n");
+        }
+
+        example.push_str("}\n\n");
+
+        // Generate impl block
+        example.push_str(&format!("impl {} {{\n", core_type_name));
+
+        // Add example constructor
+        example.push_str("    pub fn new(/* parameters */) -> Self {\n");
+        example.push_str(&format!("        {} {{\n", core_type_name));
+        example.push_str("            // Initialize fields\n");
+        example.push_str("        }\n");
+        example.push_str("    }\n\n");
+
+        // Add example methods based on naming patterns
+        let sample_methods: Vec<_> = methods.iter().take(3).collect();
+        for method in sample_methods {
+            // Categorize method by prefix
+            if method.starts_with("new_") || method.starts_with("create_") {
+                example.push_str(&format!("    pub fn {}(/* params */) -> Self {{\n", method));
+                example.push_str("        // Construction logic\n");
+                example.push_str("        todo!()\n");
+                example.push_str("    }\n\n");
+            } else if method.starts_with("is_")
+                || method.starts_with("has_")
+                || method.starts_with("can_")
+            {
+                example.push_str(&format!("    pub fn {}(&self) -> bool {{\n", method));
+                example.push_str("        // Query logic\n");
+                example.push_str("        todo!()\n");
+                example.push_str("    }\n\n");
+            } else if method.starts_with("get_") || method.starts_with("compute_") {
+                example.push_str(&format!(
+                    "    pub fn {}(&self) -> /* ReturnType */ {{\n",
+                    method
+                ));
+                example.push_str("        // Computation logic\n");
+                example.push_str("        todo!()\n");
+                example.push_str("    }\n\n");
+            } else if method.starts_with("set_") || method.starts_with("update_") {
+                example.push_str(&format!(
+                    "    pub fn {}(&mut self, /* params */) {{\n",
+                    method
+                ));
+                example.push_str("        // Mutation logic\n");
+                example.push_str("        todo!()\n");
+                example.push_str("    }\n\n");
+            } else {
+                example.push_str(&format!(
+                    "    pub fn {}(&self, /* params */) -> /* ReturnType */ {{\n",
+                    method
+                ));
+                example.push_str("        // Method logic\n");
+                example.push_str("        todo!()\n");
+                example.push_str("    }\n\n");
+            }
+        }
+
+        if methods.len() > 3 {
+            example.push_str(&format!(
+                "    // ... and {} more methods\n",
+                methods.len() - 3
+            ));
+        }
+
+        example.push_str("}\n");
+
+        example
     }
 
     /// Enrich existing splits with behavioral analysis (Spec 178)

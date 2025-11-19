@@ -23,6 +23,9 @@ fn convert_split_analysis_method(
         crate::organization::SplitAnalysisMethod::Hybrid => {
             crate::priority::file_metrics::SplitAnalysisMethod::Hybrid
         }
+        crate::organization::SplitAnalysisMethod::TypeBased => {
+            crate::priority::file_metrics::SplitAnalysisMethod::TypeBased
+        }
     }
 }
 
