@@ -395,6 +395,58 @@ grep -A 20 "Advanced Features\|Advanced Topics" mkdocs.yml | while IFS= read -r 
 done
 ```
 
+#### Anti-Pattern 8: "Subpages" Labels in Navigation
+
+**Issue**: mkdocs.yml navigation contains intermediate labels like "Basics Subpages:", "Advanced Patterns Subpages:", etc. which create unnecessary navigation items instead of nesting pages directly under their parent.
+
+**CRITICAL**: This is a common mistake that makes navigation clunky and unprofessional.
+
+**Detection Logic:**
+```bash
+# Check mkdocs.yml for "Subpages" labels in navigation
+if grep -qi "Subpages:" mkdocs.yml; then
+  echo "❌ CRITICAL: Found 'Subpages' labels in mkdocs.yml navigation"
+  grep -n "Subpages:" mkdocs.yml | while IFS=: read -r LINENO LINE; do
+    echo "  Line $LINENO: $LINE"
+  done
+
+  SUBPAGE_COUNT=$(grep -c "Subpages:" mkdocs.yml)
+  echo "  Total occurrences: $SUBPAGE_COUNT"
+  echo ""
+  echo "  ❌ BAD PATTERN:"
+  echo "    - Basics: basics/index.md"
+  echo "    - Basics Subpages:        ← WRONG! Creates visible nav item"
+  echo "        - Page 1: basics/page1.md"
+  echo ""
+  echo "  ✓ CORRECT PATTERN:"
+  echo "    - Basics:"
+  echo "        - basics/index.md"
+  echo "        - Page 1: basics/page1.md"
+fi
+```
+
+**Report Format:**
+```json
+{
+  "type": "subpages_navigation_labels",
+  "severity": "critical",
+  "description": "'Subpages' labels found in navigation structure",
+  "files": [{
+    "file": "mkdocs.yml",
+    "lines": [77, 94, 103, 115, 128],
+    "occurrences": 5,
+    "labels_found": [
+      "Basics Subpages:",
+      "Binary Data Subpages:",
+      "Common Options Subpages:",
+      "Advanced Patterns Subpages:",
+      "Troubleshooting Subpages:"
+    ],
+    "recommendation": "Replace 'Section Subpages:' with nested structure under 'Section:'"
+  }],
+  "auto_fixable": true
+}
+
 ### Phase 6: Generate Structural Validation Report
 
 **Compile All Findings:**
@@ -575,6 +627,78 @@ jq -r '.issues[] | select(.type == "meta_sections_in_feature_chapters") | .files
 
   echo "  ✓ Updated mkdocs.yml to remove $META_BASENAME"
 done
+```
+
+#### Fix 5: Remove "Subpages" Navigation Labels
+
+**CRITICAL FIX**: This automatically restructures the navigation to remove "Subpages" labels.
+
+```bash
+# Check if mkdocs.yml has "Subpages:" labels
+if grep -qi "Subpages:" mkdocs.yml; then
+  echo "  🔧 Fixing 'Subpages' navigation labels..."
+
+  # Backup mkdocs.yml
+  cp mkdocs.yml mkdocs.yml.bak
+
+  # Create temporary Python script to fix YAML structure
+  python3 <<'PYTHON_SCRIPT'
+import re
+import sys
+
+with open('mkdocs.yml', 'r') as f:
+    lines = f.readlines()
+
+output_lines = []
+i = 0
+while i < len(lines):
+    line = lines[i]
+
+    # Check if this line contains a "Subpages:" label
+    if re.match(r'\s*-\s+\w+.*Subpages:\s*$', line):
+        # Get the indentation level of the Subpages line
+        subpages_indent = len(line) - len(line.lstrip())
+
+        # Find the parent section line (one level up)
+        # Look backwards to find the parent
+        parent_idx = i - 1
+        while parent_idx >= 0:
+            parent_line = lines[parent_idx]
+            parent_indent = len(parent_line) - len(parent_line.lstrip())
+
+            # Found parent if it's at the same or less indentation and is a section header
+            if parent_indent < subpages_indent and re.match(r'\s*-\s+[\w\s]+:', parent_line):
+                # Extract parent section name
+                parent_match = re.match(r'(\s*-\s+)([\w\s]+):\s*(.*)$', parent_line)
+                if parent_match:
+                    indent, section_name, rest = parent_match.groups()
+
+                    # If parent has a file reference like "Section: file.md", convert to nested structure
+                    if rest.strip():
+                        # Replace parent with nested structure
+                        output_lines[parent_idx] = f"{indent}{section_name}:\n"
+                        output_lines.append(f"{indent}    - {rest.strip()}\n")
+
+                break
+            parent_idx -= 1
+
+        # Skip the "Subpages:" line itself
+        i += 1
+        continue
+
+    output_lines.append(line)
+    i += 1
+
+# Write the fixed YAML
+with open('mkdocs.yml', 'w') as f:
+    f.writelines(output_lines)
+
+print("✓ Fixed 'Subpages' navigation structure")
+PYTHON_SCRIPT
+
+  SUBPAGE_COUNT=$(grep -c "Subpages:" mkdocs.yml.bak)
+  echo "  ✓ Removed $SUBPAGE_COUNT 'Subpages' labels from navigation"
+fi
 ```
 
 **Cleanup Backups:**

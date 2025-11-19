@@ -112,15 +112,21 @@ After analyzing content about "Setup → Map → Reduce" phases:
 
 ```mermaid
 graph TD
-    Start[Start Workflow] --> Setup[Setup Phase<br/>Generate work items]
-    Setup --> Map[Map Phase<br/>Parallel Processing]
-    Map --> A1[Agent 1<br/>Item 0]
-    Map --> A2[Agent 2<br/>Item 1]
-    Map --> AN[Agent N<br/>Item N]
+    Start[Start Workflow] --> Setup["Setup Phase
+    Generate work items"]
+    Setup --> Map["Map Phase
+    Parallel Processing"]
+    Map --> A1["Agent 1
+    Item 0"]
+    Map --> A2["Agent 2
+    Item 1"]
+    Map --> AN["Agent N
+    Item N"]
     A1 --> Merge[Merge Results]
     A2 --> Merge
     AN --> Merge
-    Merge --> Reduce[Reduce Phase<br/>Aggregate & Report]
+    Merge --> Reduce["Reduce Phase
+    Aggregate and Report"]
     Reduce --> End[Complete]
 
     style Setup fill:#e1f5ff
@@ -144,10 +150,15 @@ After analyzing content about worktree branching:
 
 ```mermaid
 graph TD
-    Main[Main Branch<br/>main/master] --> Parent[Parent Worktree<br/>session-xxx]
-    Parent --> A1[Agent Worktree 1<br/>agent-1-item-1]
-    Parent --> A2[Agent Worktree 2<br/>agent-2-item-2]
-    Parent --> AN[Agent Worktree N<br/>agent-n-item-n]
+    Main["Main Branch
+    main/master"] --> Parent["Parent Worktree
+    session-xxx"]
+    Parent --> A1["Agent Worktree 1
+    agent-1-item-1"]
+    Parent --> A2["Agent Worktree 2
+    agent-2-item-2"]
+    Parent --> AN["Agent Worktree N
+    agent-n-item-n"]
 
     A1 -->|Merge Changes| Parent
     A2 -->|Merge Changes| Parent
@@ -219,14 +230,17 @@ After analyzing content about on_failure behavior:
 flowchart TD
     Start[Execute Command] --> Success{Success?}
     Success -->|Yes| Next[Next Command]
-    Success -->|No| Handler{on_failure<br/>defined?}
+    Success -->|No| Handler{"on_failure
+    defined?"}
 
     Handler -->|No| Fail[Fail Workflow]
     Handler -->|Yes| RunHandler[Execute Handler]
 
-    RunHandler --> Retry{max_attempts<br/>> 1?}
+    RunHandler --> Retry{"max_attempts
+    > 1?"}
     Retry -->|Yes| RetryCmd[Retry Command]
-    RetryCmd --> AttemptCheck{Attempts<br/>exhausted?}
+    RetryCmd --> AttemptCheck{"Attempts
+    exhausted?"}
     AttemptCheck -->|No| Start
     AttemptCheck -->|Yes| FailCheck{fail_workflow?}
 
@@ -242,6 +256,110 @@ flowchart TD
 
 **Figure**: Error handling flow showing retry logic and failure propagation.
 ```
+
+**Diagram Layout Best Practices:**
+
+Choose the appropriate layout direction based on content structure:
+
+**Use Horizontal Layout (`graph LR` or `flowchart LR`) when:**
+- Showing sequential/linear processes (Step 1 → Step 2 → Step 3)
+- Displaying algorithm execution steps
+- Showing before/after transformations
+- Content is primarily sequential with few branches
+
+```mermaid
+graph LR
+    Input[Input Data] --> Process[Process] --> Transform[Transform] --> Output[Output]
+```
+
+**Use Vertical Layout (`graph TD` or `flowchart TD`) when:**
+- Showing hierarchical structures (parent → children)
+- Decision trees with multiple branches
+- Workflows with conditional logic
+- Component hierarchies
+- **BUT: Keep it narrow** (max 3-4 branches wide)
+
+```mermaid
+flowchart TD
+    Start[Start] --> Decision{Condition?}
+    Decision -->|Yes| Path1[Action A]
+    Decision -->|No| Path2[Action B]
+    Path1 --> End[Complete]
+    Path2 --> End
+```
+
+**Avoid These Layout Mistakes:**
+
+❌ **Multiple vertical subgraphs with linear content** - renders too small:
+```mermaid
+graph TD
+    subgraph "Process 1"
+        A1[Step 1] --> A2[Step 2] --> A3[Step 3]
+    end
+    subgraph "Process 2"
+        B1[Step 1] --> B2[Step 2] --> B3[Step 3]
+    end
+    subgraph "Process 3"
+        C1[Step 1] --> C2[Step 2] --> C3[Step 3]
+    end
+```
+This stacks narrow sequences vertically, making them unreadable.
+
+✅ **Instead, use horizontal subgraphs:**
+```mermaid
+graph LR
+    subgraph Process1["Process 1"]
+        direction LR
+        A1[Step 1] --> A2[Step 2] --> A3[Step 3]
+    end
+    subgraph Process2["Process 2"]
+        direction LR
+        B1[Step 1] --> B2[Step 2] --> B3[Step 3]
+    end
+```
+This makes better use of screen width and improves readability.
+
+❌ **Wide hierarchical diagram with graph TD** - text becomes unreadable:
+```mermaid
+graph TD
+    Root[Root] --> Cat1[Category 1]
+    Root --> Cat2[Category 2]
+    Root --> Cat3[Category 3]
+    Root --> Cat4[Category 4]
+    Cat1 --> Item1A[Item A]
+    Cat1 --> Item1B[Item B]
+    Cat1 --> Item1C[Item C]
+    Cat2 --> Item2A[Item A]
+    Cat2 --> Item2B[Item B]
+    Cat2 --> Item2C[Item C]
+    %% Creates 12+ leaf nodes spread horizontally
+    %% MkDocs scales down entire diagram, making text tiny
+```
+
+✅ **Instead, use graph LR for wide hierarchies:**
+```mermaid
+graph LR
+    Root[Root] --> Cat1[Category 1]
+    Root --> Cat2[Category 2]
+    Cat1 --> Item1A[Item A]
+    Cat1 --> Item1B[Item B]
+    Cat2 --> Item2A[Item A]
+    Cat2 --> Item2B[Item B]
+    %% Horizontal layout uses page width better
+    %% Keeps text readable at normal size
+```
+
+✅ **Or break into focused sub-diagrams:**
+Instead of one massive hierarchy, create separate diagrams for each category.
+Each diagram stays readable and focused on one concept.
+
+**Critical Readability Rules:**
+
+1. **Maximum width for TD/TB layouts**: 4 branches at widest point
+2. **Maximum leaf nodes**: 8 nodes spread horizontally (2x4 grid max)
+3. **For wide hierarchies (>4 branches)**: Use `graph LR` instead
+4. **For deep + wide diagrams**: Split into multiple focused diagrams
+5. **Test diagram readability**: If you need to zoom in to read labels, it's too complex
 
 #### B. Admonition Placement (strategic locations)
 
@@ -499,12 +617,25 @@ fi
 - ✅ Admonitions appear at decision points or gotchas
 - ✅ Code annotations explain non-obvious parameters
 - ✅ Tabs used for genuine alternatives or platform differences
+- ✅ Diagram labels use proper spacing (e.g., "Search and Suppress" not "SearchAndSuppress")
+- ✅ Multi-line labels use quoted syntax with actual newlines, not HTML `<br/>` tags
+- ✅ Horizontal layout (`graph LR` or `flowchart LR`) for sequential/linear processes
+- ✅ Horizontal layout for wide hierarchies (>4 branches)
+- ✅ Vertical layout (`graph TD` or `flowchart TD`) only for narrow hierarchies (≤4 branches wide)
+- ✅ Text remains readable without zooming (test before committing)
 
 **Bad Enhancements:**
 - ❌ Generic diagram that doesn't match page content
 - ❌ Too many admonitions (cluttered page)
 - ❌ Annotations stating the obvious
 - ❌ Tabs for single-variant content
+- ❌ Compound words without spaces in diagram labels (e.g., "SearchAndSuppress")
+- ❌ HTML tags like `<br/>` or HTML entities like `&#40;` in Mermaid diagrams
+- ❌ Vertical layout for linear sequences (renders too small and narrow)
+- ❌ Multiple subgraphs stacked vertically with sequential content (unreadable)
+- ❌ Wide hierarchies with `graph TD` (>4 branches = unreadable text)
+- ❌ Deep + wide diagrams (>8 leaf nodes = needs splitting or `graph LR`)
+- ❌ Diagrams where you need to zoom to read the text
 
 ### Examples of Context-Aware Enhancement
 

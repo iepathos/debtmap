@@ -1,17 +1,17 @@
-# /prodigy-create-chapter-subsections
+# /prodigy-create-page-subpages
 
-Migrate a single-file chapter to multi-subsection format by splitting it into an index.md file and individual subsection files. This command handles the structural migration while preserving all content.
+Migrate a single-file page to multi-subpage format by splitting it into an index.md file and individual subpage files. This command handles the structural migration while preserving all content.
 
 ## Purpose
 
-This command performs **structure migration** - converting a flat single-file chapter into an organized multi-subsection structure. It should be run based on recommendations from `/prodigy-analyze-chapter-structure`.
+This command performs **structure migration** - converting a flat single-file page into an organized multi-subpage structure. It should be run based on recommendations from `/prodigy-analyze-page-structure`.
 
 ## Variables
 
 - `--project <name>` - Project name (e.g., "Debtmap")
-- `--chapter <id>` - Chapter ID to migrate (e.g., "configuration")
-- `--chapters <path>` - Path to chapter definitions JSON (e.g., "workflows/data/prodigy-chapters.json")
-- `--book-dir <path>` - Book directory path (e.g., "book")
+- `--page <id>` - Page ID to migrate (e.g., "configuration")
+- `--pages <path>` - Path to page definitions JSON (e.g., "workflows/data/prodigy-pages.json")
+- `--docs-dir <path>` - MkDocs directory path (e.g., "docs")
 - `--structure-report <path>` - Optional path to structure report from analysis command
 - `--dry-run` - Preview changes without modifying files (default: false)
 
@@ -22,32 +22,32 @@ This command performs **structure migration** - converting a flat single-file ch
 **Parse Command Arguments:**
 Extract all required parameters:
 - `--project`: Project name for output messages
-- `--chapter`: Chapter ID to migrate
-- `--chapters`: Path to chapter definitions JSON
-- `--book-dir`: Book directory path (default: "book")
+- `--page`: Page ID to migrate
+- `--pages`: Path to page definitions JSON
+- `--docs-dir`: MkDocs directory path (default: "docs")
 - `--structure-report`: Optional path to structure analysis report
 - `--dry-run`: If true, show what would be done without modifying files
 
 **Validate Parameters:**
-- Ensure `--chapter` is provided and not empty
-- Verify chapter exists in chapters.json
-- Check that chapter is currently `type: "single-file"` or has no type
-- Error if chapter is already `type: "multi-subsection"`
+- Ensure `--page` is provided and not empty
+- Verify page exists in pages.json
+- Check that page is currently `type: "single-file"` or has no type
+- Error if page is already `type: "multi-subpage"`
 
 **Load Configuration Files:**
-1. Read `--chapters` file to get chapter definition
+1. Read `--pages` file to get page definition
 2. If `--structure-report` provided, read it for recommendations
-3. Verify source chapter file exists
+3. Verify source page file exists
 
-### Phase 2: Analyze Source Chapter Structure
+### Phase 2: Analyze Source Page Structure
 
 **Read and Parse Source File:**
 
-1. **Load Chapter Content:**
-   - Read the entire source chapter file
+1. **Load Page Content:**
+   - Read the entire source page file
    - Preserve original content exactly (no modifications yet)
 
-2. **Extract Chapter Metadata:**
+2. **Extract Page Metadata:**
    - Extract H1 title (first # heading)
    - Extract introduction (content before first H2)
    - Record file metadata (creation date, etc.)
@@ -58,14 +58,14 @@ Extract all required parameters:
      - Extract section title
      - Extract section slug (for file naming)
      - Capture all content from H2 to next H2 or EOF
-     - Identify subsections (H3+ content under this H2)
+     - Identify subpages (H3+ content under this H2)
      - Record line numbers for extraction
 
 4. **Build Section Map:**
    Create data structure:
    ```json
    {
-     "chapter_title": "Configuration",
+     "page_title": "Configuration",
      "introduction": "Content before first H2...",
      "sections": [
        {
@@ -85,43 +85,43 @@ Extract all required parameters:
 
 **If structure-report Provided:**
 
-1. **Find Recommendations for This Chapter:**
-   - Look up chapter in recommendations array
-   - Extract proposed subsection structure
+1. **Find Recommendations for This Page:**
+   - Look up page in recommendations array
+   - Extract proposed subpage structure
 
 2. **Validate Recommendations Match Reality:**
-   - Verify proposed subsections match actual H2 sections
+   - Verify proposed subpages match actual H2 sections
    - Check that source_sections exist in parsed content
    - Warn if mismatches found (file may have changed since analysis)
 
 3. **Use Recommended Structure:**
-   - Follow proposed subsection grouping
+   - Follow proposed subpage grouping
    - Use recommended file names and IDs
    - Apply suggested organization
 
 **If No structure-report:**
 
 1. **Generate Default Subsection Structure:**
-   - Each H2 section becomes one subsection
-   - Use H2 title for subsection title
+   - Each H2 section becomes one subpage
+   - Use H2 title for subpage title
    - Generate kebab-case ID from title
-   - Create file path: `book/src/{chapter-id}/{subsection-id}.md`
+   - Create file path: `docs/src/{page-id}/{subpage-id}.md`
 
 2. **Filter Meta-Sections:**
-   - Do NOT create subsections for: "Best Practices", "Troubleshooting", "Examples", "Common Patterns"
+   - Do NOT create subpages for: "Best Practices", "Troubleshooting", "Examples", "Common Patterns"
    - These should stay in index.md as H2 sections
 
 3. **Validate Subsection Viability:**
-   - Only create subsections for sections >50 lines
-   - Ensure at least 3 subsections (otherwise not worth splitting)
-   - Warn if too many subsections (>12 may be over-fragmented)
+   - Only create subpages for sections >50 lines
+   - Ensure at least 3 subpages (otherwise not worth splitting)
+   - Warn if too many subpages (>12 may be over-fragmented)
 
 ### Phase 4: Generate New File Structure
 
 **Create Directory Structure:**
 
-1. **Create Chapter Directory:**
-   - Path: `book/src/{chapter-id}/`
+1. **Create Page Directory:**
+   - Path: `docs/src/{page-id}/`
    - Create if doesn't exist
    - Verify write permissions
 
@@ -129,34 +129,28 @@ Extract all required parameters:
 
 1. **Build Index Content:**
    ```markdown
-   # {Chapter Title}
+   # {Page Title}
 
    {Introduction content from before first H2}
 
-   ## Subsections
-
-   This chapter is organized into the following subsections:
-
-   - [{Subsection 1 Title}](./{subsection-1-id}.md) - {Brief description}
-   - [{Subsection 2 Title}](./{subsection-2-id}.md) - {Brief description}
-   ...
-
-   {Include meta-sections like "Best Practices" as H2s here}
+   {Include meta-sections like "Best Practices" as H2s here if they exist}
 
    ## Best Practices
 
    {Content from Best Practices section if it existed}
    ```
 
+   **IMPORTANT:** Do NOT include a "Subsections" section listing subpages. MkDocs Material automatically displays all subpages in the left navigation sidebar, making this redundant and creating a poor user experience.
+
 2. **Write index.md:**
-   - Path: `book/src/{chapter-id}/index.md`
+   - Path: `docs/src/{page-id}/index.md`
    - Use original introduction content
-   - Add subsection navigation
-   - Include any meta-sections that shouldn't be separate files
+   - Include any meta-sections that shouldn't be separate files (e.g., "Best Practices", "Troubleshooting", "Common Patterns")
+   - Do NOT add subpage navigation links (handled by MkDocs sidebar)
 
 **Generate Subsection Files:**
 
-For each subsection:
+For each subpage:
 
 1. **Extract Subsection Content:**
    - Get content from H2 to next H2
@@ -170,29 +164,29 @@ For each subsection:
    {Subsection content starts here...}
    ```
 
-   **IMPORTANT:** Do NOT add a "Part of the [Parent](./index.md)" blockquote. This is an anti-pattern that clutters the documentation. mdBook already provides breadcrumb navigation showing the chapter hierarchy.
+   **IMPORTANT:** Do NOT add a "Part of the [Parent](./index.md)" blockquote. This is an anti-pattern that clutters the documentation. MkDocs Material already provides breadcrumb navigation showing the page hierarchy.
 
 3. **Fix Internal Links:**
    - Relative links that worked in single file may break
    - Update anchor links (e.g., `#basic-config` → `./basic-configuration.md`)
-   - Fix cross-references to other subsections
+   - Fix cross-references to other subpages
    - Update image paths if needed
 
 4. **Write Subsection File:**
-   - Path: `book/src/{chapter-id}/{subsection-id}.md`
+   - Path: `docs/src/{page-id}/{subpage-id}.md`
    - Preserve formatting exactly
    - Ensure proper markdown syntax
 
-### Phase 5: Update Chapter Definitions (chapters.json)
+### Phase 5: Update Page Definitions (pages.json)
 
-**Modify Chapter Definition:**
+**Modify Page Definition:**
 
 Transform from:
 ```json
 {
   "id": "configuration",
   "title": "Configuration",
-  "file": "book/src/configuration.md",
+  "file": "docs/src/configuration.md",
   "topics": [...],
   "validation": "..."
 }
@@ -203,15 +197,15 @@ To:
 {
   "id": "configuration",
   "title": "Configuration",
-  "type": "multi-subsection",
-  "index_file": "book/src/configuration/index.md",
+  "type": "multi-subpage",
+  "index_file": "docs/src/configuration/index.md",
   "topics": [...],
   "validation": "...",
-  "subsections": [
+  "subpages": [
     {
       "id": "basic-configuration",
       "title": "Basic Configuration",
-      "file": "book/src/configuration/basic-configuration.md",
+      "file": "docs/src/configuration/basic-configuration.md",
       "topics": ["Config files", "Basic options"],
       "validation": "Check basic configuration options are documented"
     },
@@ -222,22 +216,22 @@ To:
 
 **Generate Subsection Metadata:**
 
-For each subsection:
-- Extract topics from subsection content (H3 headings)
+For each subpage:
+- Extract topics from subpage content (H3 headings)
 - Generate validation criteria based on content
 - Preserve any manual annotations
 
-**Write Updated chapters.json:**
+**Write Updated pages.json:**
 - Maintain JSON formatting (2-space indent)
-- Preserve all other chapters unchanged
+- Preserve all other pages unchanged
 - Keep logical ordering
 
-### Phase 6: Update SUMMARY.md
+### Phase 6: Update mkdocs.yml
 
-**Parse Current SUMMARY.md:**
+**Parse Current mkdocs.yml:**
 
-1. **Find Chapter Entry:**
-   - Locate line with chapter reference
+1. **Find Page Entry:**
+   - Locate line with page reference
    - Example: `- [Configuration](configuration.md)`
 
 2. **Replace with Multi-Level Structure:**
@@ -251,10 +245,10 @@ For each subsection:
 
 3. **Maintain Indentation:**
    - Use consistent indentation (2 or 4 spaces)
-   - Match existing SUMMARY.md style
+   - Match existing mkdocs.yml style
    - Preserve section groupings
 
-4. **Write Updated SUMMARY.md:**
+4. **Write Updated mkdocs.yml:**
    - Preserve all other entries unchanged
    - Keep proper ordering
    - Ensure valid markdown list syntax
@@ -264,13 +258,13 @@ For each subsection:
 **Preserve Original for Safety:**
 
 1. **Create Backup:**
-   - Move original file to: `book/src/{chapter-id}.md.bak`
-   - Or copy to: `book/src/.archive/{chapter-id}-{timestamp}.md`
+   - Move original file to: `docs/src/{page-id}.md.bak`
+   - Or copy to: `docs/src/.archive/{page-id}-{timestamp}.md`
    - Preserve for rollback if needed
 
 2. **Record Migration:**
    - Log migration in `.prodigy/migrations.log`
-   - Include timestamp, chapter ID, file count
+   - Include timestamp, page ID, file count
    - Note any warnings or issues
 
 ### Phase 8: Validation and Quality Checks
@@ -279,13 +273,13 @@ For each subsection:
 
 1. **Content Preservation:**
    - Count lines in original file
-   - Count total lines in new index.md + subsections
+   - Count total lines in new index.md + subpages
    - Verify counts match (within reason for added headers)
    - Ensure no content was lost
 
 2. **Link Validation:**
    - Test all internal links work
-   - Check cross-references between subsections
+   - Check cross-references between subpages
    - Verify external links preserved
 
 3. **Markdown Validity:**
@@ -294,7 +288,7 @@ For each subsection:
    - Verify heading hierarchy
 
 4. **Build Test:**
-   - Run `mdbook build` to ensure book compiles
+   - Run `mddocs build` to ensure docs compiles
    - Check for broken links
    - Verify no errors in output
 
@@ -312,30 +306,30 @@ For each subsection:
 {
   "migration_date": "<timestamp>",
   "project": "<project-name>",
-  "chapter_id": "<chapter-id>",
-  "chapter_title": "<title>",
-  "migration_type": "single-file → multi-subsection",
+  "page_id": "<page-id>",
+  "page_title": "<title>",
+  "migration_type": "single-file → multi-subpage",
   "dry_run": true|false,
-  "source_file": "book/src/configuration.md",
-  "destination_directory": "book/src/configuration/",
+  "source_file": "docs/src/configuration.md",
+  "destination_directory": "docs/src/configuration/",
   "metrics": {
     "original_lines": 1843,
     "index_lines": 150,
-    "subsections_created": 8,
-    "total_subsection_lines": 1693,
+    "subpages_created": 8,
+    "total_subpage_lines": 1693,
     "content_preservation": "100%"
   },
   "files_created": [
-    "book/src/configuration/index.md",
-    "book/src/configuration/basic-configuration.md",
+    "docs/src/configuration/index.md",
+    "docs/src/configuration/basic-configuration.md",
     ...
   ],
   "files_modified": [
-    "workflows/data/prodigy-chapters.json",
-    "book/src/SUMMARY.md"
+    "workflows/data/prodigy-pages.json",
+    "docs/src/mkdocs.yml"
   ],
   "files_archived": [
-    "book/src/configuration.md → book/src/configuration.md.bak"
+    "docs/src/configuration.md → docs/src/configuration.md.bak"
   ],
   "validation": {
     "content_preserved": true,
@@ -353,17 +347,17 @@ For each subsection:
 **Print User-Friendly Summary:**
 
 ```
-📁 Chapter Subsection Migration
+📁 Page Subsection Migration
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Chapter: Configuration
+Page: Configuration
 Status: ✅ Migration successful
 
 📊 Migration Summary:
   Original: 1 file (1843 lines)
   New Structure:
     - index.md (150 lines)
-    - 8 subsections (1693 lines total)
+    - 8 subpages (1693 lines total)
 
 📝 Subsections Created:
   ✓ Basic Configuration (200 lines)
@@ -379,18 +373,18 @@ Status: ✅ Migration successful
   ✓ Content preservation: 100%
   ✓ Links verified
   ✓ Markdown valid
-  ✓ mdbook build successful
+  ✓ mddocs build successful
 
 📂 Files Modified:
-  ✓ Created book/src/configuration/ directory
+  ✓ Created docs/src/configuration/ directory
   ✓ Created 9 markdown files
-  ✓ Updated workflows/data/prodigy-chapters.json
-  ✓ Updated book/src/SUMMARY.md
-  ✓ Archived book/src/configuration.md
+  ✓ Updated workflows/data/prodigy-pages.json
+  ✓ Updated docs/src/mkdocs.yml
+  ✓ Archived docs/src/configuration.md
 
 📝 Next Steps:
-  1. Review new structure in book/src/configuration/
-  2. Run drift detection on subsections
+  1. Review new structure in docs/src/configuration/
+  2. Run drift detection on subpages
   3. Commit changes when satisfied
 ```
 
@@ -399,21 +393,21 @@ Status: ✅ Migration successful
 If running in automation mode (PRODIGY_AUTOMATION=true) and not dry-run:
 
 1. **Stage All Files:**
-   - New directory and all subsection files
-   - Updated chapters.json
-   - Updated SUMMARY.md
+   - New directory and all subpage files
+   - Updated pages.json
+   - Updated mkdocs.yml
    - Backup of original file
 
 2. **Create Commit:**
    ```
-   docs: migrate {Chapter Title} to multi-subsection format
+   docs: migrate {Page Title} to multi-subpage format
 
-   Split {chapter-id}.md (1843 lines) into:
-   - index.md with chapter overview
-   - 8 subsections for better organization
+   Split {page-id}.md (1843 lines) into:
+   - index.md with page overview
+   - 8 subpages for better organization
 
    This improves navigability and allows focused drift detection
-   per subsection instead of entire chapter.
+   per subpage instead of entire page.
 
    Subsections:
    - Basic Configuration
@@ -429,9 +423,9 @@ If running in automation mode (PRODIGY_AUTOMATION=true) and not dry-run:
 ### Error Handling
 
 **Handle Missing Files:**
-- If source chapter file doesn't exist, error and exit
-- If chapters.json missing, error and exit
-- If SUMMARY.md missing, error and exit
+- If source page file doesn't exist, error and exit
+- If pages.json missing, error and exit
+- If mkdocs.yml missing, error and exit
 
 **Handle Migration Failures:**
 - If directory creation fails, roll back and error
@@ -442,13 +436,13 @@ If running in automation mode (PRODIGY_AUTOMATION=true) and not dry-run:
 - Empty sections → skip or include in index.md
 - Duplicate section titles → append numeric suffix
 - Very large sections → warn but proceed
-- No suitable sections for subsections → error (chapter should stay single-file)
+- No suitable sections for subpages → error (page should stay single-file)
 
 **Rollback on Failure:**
 - Restore original file from backup
 - Delete newly created directory
-- Revert chapters.json changes
-- Revert SUMMARY.md changes
+- Revert pages.json changes
+- Revert mkdocs.yml changes
 - Log rollback action
 
 ### Quality Guidelines
@@ -475,8 +469,8 @@ If running in automation mode (PRODIGY_AUTOMATION=true) and not dry-run:
 ```json
 {
   "min_section_lines": 50,
-  "min_subsections": 3,
-  "max_subsections": 12,
+  "min_subpages": 3,
+  "max_subpages": 12,
   "backup_originals": true,
   "validate_before_commit": true
 }
@@ -496,16 +490,16 @@ When `--dry-run` is true:
 Migration is successful when:
 - All content preserved (verified)
 - All links working (verified)
-- mdbook builds successfully
-- chapters.json updated correctly
-- SUMMARY.md updated correctly
+- mddocs builds successfully
+- pages.json updated correctly
+- mkdocs.yml updated correctly
 - No validation errors
 - User can navigate new structure
 
 ## Scope Notes
 
-This command does ONE thing: migrate a chapter structure. It does NOT:
-- ❌ Analyze chapter sizes (use `/prodigy-analyze-chapter-structure`)
+This command does ONE thing: migrate a page structure. It does NOT:
+- ❌ Analyze page sizes (use `/prodigy-analyze-page-structure`)
 - ❌ Detect documentation gaps (use `/prodigy-detect-documentation-gaps`)
 - ❌ Fix content drift (that happens in map phase after migration)
 
@@ -513,35 +507,35 @@ This command does ONE thing: migrate a chapter structure. It does NOT:
 
 ```bash
 # Preview migration
-/prodigy-create-chapter-subsections \
+/prodigy-create-page-subpages \
   --project Debtmap \
-  --chapter configuration \
-  --chapters workflows/data/prodigy-chapters.json \
-  --book-dir book \
+  --page configuration \
+  --pages workflows/data/prodigy-pages.json \
+  --docs-dir docs \
   --dry-run
 
 # Execute migration
-/prodigy-create-chapter-subsections \
+/prodigy-create-page-subpages \
   --project Debtmap \
-  --chapter configuration \
-  --chapters workflows/data/prodigy-chapters.json \
-  --book-dir book
+  --page configuration \
+  --pages workflows/data/prodigy-pages.json \
+  --docs-dir docs
 
 # Use structure analysis recommendations
-/prodigy-create-chapter-subsections \
+/prodigy-create-page-subpages \
   --project Debtmap \
-  --chapter configuration \
-  --chapters workflows/data/prodigy-chapters.json \
-  --book-dir book \
-  --structure-report .prodigy/book-analysis/structure-report.json
+  --page configuration \
+  --pages workflows/data/prodigy-pages.json \
+  --docs-dir docs \
+  --structure-report .prodigy/docs-analysis/structure-report.json
 ```
 
 ## Integration with Workflow
 
-This command should be run AFTER analyzing chapter structure:
+This command should be run AFTER analyzing page structure:
 
-1. `/prodigy-analyze-chapter-structure` - Identifies oversized chapters
+1. `/prodigy-analyze-page-structure` - Identifies oversized pages
 2. Review recommendations
-3. **`/prodigy-create-chapter-subsections`** - Migrate each oversized chapter ← THIS COMMAND
+3. **`/prodigy-create-page-subpages`** - Migrate each oversized page ← THIS COMMAND
 4. `/prodigy-detect-documentation-gaps` - Regenerate flattened items with new structure
-5. Run drift detection on new subsections
+5. Run drift detection on new subpages
