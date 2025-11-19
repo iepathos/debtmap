@@ -158,7 +158,7 @@ fn test_type_based_clustering_quality() {
 
     let file = syn::parse_file(code).expect("Failed to parse");
     let detector = GodObjectDetector::with_source_content(code);
-    let analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
+    let _analysis = detector.analyze_comprehensive(Path::new("test.rs"), &file);
 
     // This code should be analyzed without errors
     // The exact behavior depends on the god object detection thresholds
@@ -166,8 +166,7 @@ fn test_type_based_clustering_quality() {
     // but we can verify the analysis completes successfully
 
     // Analysis completes successfully - no panics
-    // Just verify the analysis ran without errors (always true, just checking it doesn't panic)
-    assert!(true, "Analysis completed successfully");
+    // The test passes if we reach here without panicking
 }
 
 /// Test that utilities modules trigger type-based clustering fallback
