@@ -99,6 +99,10 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             severity: None,
             interface_estimate: None,
             classification_evidence: split.classification_evidence.clone(),
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -118,6 +122,10 @@ fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
             severity: None,
             interface_estimate: None,
             classification_evidence: split.classification_evidence,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         },
     ]
 }
@@ -149,6 +157,10 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             severity: None,
             interface_estimate: None,
             classification_evidence: split.classification_evidence.clone(),
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
@@ -168,6 +180,10 @@ fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
             severity: None,
             interface_estimate: None,
             classification_evidence: split.classification_evidence,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         },
     ]
 }
@@ -200,6 +216,10 @@ mod tests {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         }
     }
 
@@ -223,6 +243,10 @@ mod tests {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         };
 
         let validated = validate_and_refine_splits(vec![split]);

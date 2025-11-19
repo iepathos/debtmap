@@ -3,7 +3,7 @@ use super::{
     god_object::{metrics, TypeAnalysis, TypeVisitor},
     group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
     EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectThresholds, GodObjectType,
-    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector,
+    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector, Priority,
     RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
@@ -39,6 +39,19 @@ struct GodObjectClassificationParams<'a> {
     file_path: &'a Path,
     ast: &'a syn::File,
     visitor: &'a super::god_object::TypeVisitor,
+}
+
+/// Parameters for domain analysis and split recommendations
+struct DomainAnalysisParams<'a> {
+    per_struct_metrics: &'a [StructMetrics],
+    total_methods: usize,
+    lines_of_code: usize,
+    is_god_object: bool,
+    path: &'a Path,
+    all_methods: &'a [String],
+    field_tracker: Option<&'a crate::organization::FieldAccessTracker>,
+    responsibility_groups: &'a HashMap<String, Vec<String>>,
+    ast: &'a syn::File,
 }
 
 pub struct GodObjectDetector {
@@ -633,25 +646,13 @@ impl GodObjectDetector {
     /// Analyzes cross-domain struct mixing and generates module split recommendations
     ///
     /// # Arguments
-    /// * `per_struct_metrics` - Metrics for each struct in the file
-    /// * `total_methods` - Total number of methods
-    /// * `lines_of_code` - Estimated lines of code
-    /// * `is_god_object` - Whether this is classified as a god object
-    /// * `path` - File path for generating split names
-    /// * `all_methods` - All method names
-    /// * `responsibility_groups` - Methods grouped by responsibility
+    /// * `params` - Domain analysis parameters
     ///
     /// # Returns
     /// Tuple of (recommended_splits, analysis_method, cross_domain_severity, domain_count, domain_diversity, struct_ratio)
     #[allow(clippy::type_complexity)]
     fn analyze_domains_and_recommend_splits(
-        per_struct_metrics: &[StructMetrics],
-        total_methods: usize,
-        lines_of_code: usize,
-        is_god_object: bool,
-        path: &Path,
-        all_methods: &[String],
-        responsibility_groups: &HashMap<String, Vec<String>>,
+        params: &DomainAnalysisParams,
     ) -> (
         Vec<ModuleSplit>,
         crate::organization::SplitAnalysisMethod,
@@ -661,21 +662,22 @@ impl GodObjectDetector {
         f64,
     ) {
         // Cross-domain struct mixing analysis (Spec 140)
-        let struct_count = per_struct_metrics.len();
+        let struct_count = params.per_struct_metrics.len();
         let domain_count = if struct_count >= 5 {
-            crate::organization::count_distinct_domains(per_struct_metrics)
+            crate::organization::count_distinct_domains(params.per_struct_metrics)
         } else {
             0
         };
-        let struct_ratio = crate::organization::calculate_struct_ratio(struct_count, total_methods);
+        let struct_ratio =
+            crate::organization::calculate_struct_ratio(struct_count, params.total_methods);
 
         // Determine cross-domain severity
         let cross_domain_severity = if domain_count >= 3 {
             Some(crate::organization::determine_cross_domain_severity(
                 struct_count,
                 domain_count,
-                lines_of_code,
-                is_god_object,
+                params.lines_of_code,
+                params.is_god_object,
             ))
         } else {
             None
@@ -692,7 +694,7 @@ impl GodObjectDetector {
         let (recommended_splits, analysis_method) = if struct_count >= 5 && domain_count >= 3 {
             // PRIORITY 1: Cross-domain mixing analysis (primary strategy)
             let mut splits =
-                crate::organization::suggest_module_splits_by_domain(per_struct_metrics);
+                crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
 
             // Attach severity to all splits
             if let Some(severity) = cross_domain_severity {
@@ -701,22 +703,45 @@ impl GodObjectDetector {
                 }
             }
 
+            // Spec 178: Integrate behavioral decomposition to enrich splits
+            Self::enrich_splits_with_behavioral_analysis(
+                &mut splits,
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+            );
+
             (
                 splits,
                 crate::organization::SplitAnalysisMethod::CrossDomain,
             )
-        } else if is_god_object {
-            // PRIORITY 2: Method-based analysis (fallback for god objects)
-            let file_name = path
+        } else if params.is_god_object {
+            // PRIORITY 2: Method-based analysis with behavioral clustering (Spec 178)
+            let file_name = params
+                .path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("module");
-            (
-                crate::organization::recommend_module_splits(
+
+            // Use behavioral clustering for god objects
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
+
+            // If behavioral clustering doesn't produce results, fall back to method-based
+            if splits.is_empty() {
+                splits = crate::organization::recommend_module_splits_enhanced(
                     file_name,
-                    all_methods,
-                    responsibility_groups,
-                ),
+                    params.responsibility_groups,
+                    params.field_tracker,
+                );
+            }
+
+            (
+                splits,
                 crate::organization::SplitAnalysisMethod::MethodBased,
             )
         } else {
@@ -731,6 +756,182 @@ impl GodObjectDetector {
             domain_diversity,
             struct_ratio,
         )
+    }
+
+    /// Generate behavioral splits using community detection (Spec 178)
+    fn generate_behavioral_splits(
+        all_methods: &[String],
+        field_tracker: Option<&crate::organization::FieldAccessTracker>,
+        ast: &syn::File,
+        base_name: &str,
+    ) -> Vec<ModuleSplit> {
+        use crate::organization::behavioral_decomposition::{
+            apply_community_detection, build_method_call_adjacency_matrix,
+            detect_service_candidates, recommend_service_extraction, suggest_trait_extraction,
+        };
+
+        // Collect impl blocks for adjacency matrix
+        let impl_blocks: Vec<&syn::ItemImpl> = ast
+            .items
+            .iter()
+            .filter_map(|item| {
+                if let syn::Item::Impl(impl_block) = item {
+                    Some(impl_block)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if impl_blocks.is_empty() || all_methods.is_empty() {
+            return Vec::new();
+        }
+
+        // Build method call adjacency matrix
+        let adjacency = build_method_call_adjacency_matrix(&impl_blocks);
+
+        // Apply community detection to cluster methods
+        let clusters = apply_community_detection(all_methods, &adjacency);
+
+        // Convert clusters to ModuleSplit recommendations
+        let mut splits: Vec<ModuleSplit> = clusters
+            .into_iter()
+            .map(|cluster| {
+                let category_name = cluster.category.module_name();
+                let suggested_name = format!("{}/{}", base_name, category_name);
+
+                // Get representative methods (top 5-8)
+                let representative_methods: Vec<String> =
+                    cluster.methods.iter().take(8).cloned().collect();
+
+                // Get fields needed for this cluster
+                let fields_needed = if let Some(tracker) = field_tracker {
+                    tracker.get_minimal_field_set(&cluster.methods)
+                } else {
+                    vec![]
+                };
+
+                // Generate trait suggestion
+                let trait_suggestion = Some(suggest_trait_extraction(&cluster, base_name));
+
+                ModuleSplit {
+                    suggested_name,
+                    methods_to_move: cluster.methods.clone(),
+                    structs_to_move: vec![],
+                    responsibility: cluster.category.display_name(),
+                    estimated_lines: cluster.methods.len() * 15,
+                    method_count: cluster.methods.len(),
+                    warning: None,
+                    priority: if cluster.cohesion_score > 0.7 {
+                        Priority::High
+                    } else if cluster.cohesion_score > 0.5 {
+                        Priority::Medium
+                    } else {
+                        Priority::Low
+                    },
+                    cohesion_score: Some(cluster.cohesion_score),
+                    representative_methods,
+                    fields_needed,
+                    trait_suggestion,
+                    behavior_category: Some(cluster.category.display_name()),
+                    ..Default::default()
+                }
+            })
+            .collect();
+
+        // Detect service object candidates (Spec 178)
+        let service_candidates = if let Some(tracker) = field_tracker {
+            detect_service_candidates(tracker, all_methods)
+        } else {
+            vec![]
+        };
+
+        // If we have service candidates, add them as a separate split
+        if !service_candidates.is_empty() {
+            let service_recommendation = recommend_service_extraction(
+                &service_candidates,
+                &format!("{}Service", Self::capitalize_first(base_name)),
+            );
+
+            let service_methods: Vec<String> = service_candidates
+                .iter()
+                .map(|(method, _, _)| method.clone())
+                .collect();
+
+            let service_split = ModuleSplit {
+                suggested_name: format!("{}/service", base_name),
+                methods_to_move: service_methods.clone(),
+                structs_to_move: vec![],
+                responsibility: "Service Object - Low coupling methods".to_string(),
+                estimated_lines: service_methods.len() * 12,
+                method_count: service_methods.len(),
+                warning: None,
+                priority: Priority::High,
+                cohesion_score: Some(0.3), // Low coupling by design
+                representative_methods: service_methods.iter().take(8).cloned().collect(),
+                fields_needed: vec![],
+                trait_suggestion: Some(service_recommendation),
+                behavior_category: Some("Service Object".to_string()),
+                rationale: Some(
+                    "These methods have minimal field dependencies and can be extracted to a service object".to_string()
+                ),
+                ..Default::default()
+            };
+
+            splits.push(service_split);
+        }
+
+        splits
+    }
+
+    /// Helper to capitalize first character
+    fn capitalize_first(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        }
+    }
+
+    /// Enrich existing splits with behavioral analysis (Spec 178)
+    fn enrich_splits_with_behavioral_analysis(
+        splits: &mut [ModuleSplit],
+        _all_methods: &[String],
+        field_tracker: Option<&crate::organization::FieldAccessTracker>,
+        _ast: &syn::File,
+    ) {
+        use crate::organization::BehavioralCategorizer;
+
+        for split in splits {
+            // Populate representative_methods (top 5-8 methods)
+            if split.representative_methods.is_empty() && !split.methods_to_move.is_empty() {
+                split.representative_methods =
+                    split.methods_to_move.iter().take(8).cloned().collect();
+            }
+
+            // Populate fields_needed using FieldAccessTracker
+            if split.fields_needed.is_empty() {
+                if let Some(tracker) = field_tracker {
+                    split.fields_needed = tracker.get_minimal_field_set(&split.methods_to_move);
+                }
+            }
+
+            // Infer behavior category if not already set
+            if split.behavior_category.is_none() && !split.methods_to_move.is_empty() {
+                // Categorize based on method names
+                let mut category_counts: HashMap<String, usize> = HashMap::new();
+                for method in &split.methods_to_move {
+                    let category = BehavioralCategorizer::categorize_method(method);
+                    *category_counts.entry(category.display_name()).or_insert(0) += 1;
+                }
+
+                // Use most common category
+                if let Some((category, _)) = category_counts.iter().max_by_key(|(_, count)| *count)
+                {
+                    split.behavior_category = Some(category.clone());
+                }
+            }
+        }
     }
 
     /// Analyzes module structure and visibility breakdown for Rust files
@@ -889,7 +1090,33 @@ impl GodObjectDetector {
             &thresholds,
         );
 
+        // Build field access tracker for Spec 178 field dependency analysis
+        let field_tracker = if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+            let mut tracker = crate::organization::FieldAccessTracker::new();
+            // Track field access in all impl blocks
+            for item in &ast.items {
+                if let syn::Item::Impl(impl_block) = item {
+                    tracker.analyze_impl(impl_block);
+                }
+            }
+            Some(tracker)
+        } else {
+            None
+        };
+
         // Analyze cross-domain mixing and generate split recommendations
+        let domain_params = DomainAnalysisParams {
+            per_struct_metrics: &per_struct_metrics,
+            total_methods,
+            lines_of_code,
+            is_god_object,
+            path,
+            all_methods: &all_methods,
+            field_tracker: field_tracker.as_ref(),
+            responsibility_groups: &responsibility_groups,
+            ast,
+        };
+
         let (
             recommended_splits,
             analysis_method,
@@ -897,15 +1124,7 @@ impl GodObjectDetector {
             domain_count,
             domain_diversity,
             struct_ratio,
-        ) = Self::analyze_domains_and_recommend_splits(
-            &per_struct_metrics,
-            total_methods,
-            lines_of_code,
-            is_god_object,
-            path,
-            &all_methods,
-            &responsibility_groups,
-        );
+        ) = Self::analyze_domains_and_recommend_splits(&domain_params);
 
         let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
 

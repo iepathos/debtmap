@@ -91,7 +91,7 @@ impl UnifiedFileAnalyzer {
                 let detector = GodObjectDetector::with_source_content(content);
                 let enhanced_analysis = detector.analyze_enhanced(path, &ast);
 
-                // Convert recommended splits to our format
+                // Convert recommended splits to our format (Spec 178: including behavioral fields)
                 let recommended_splits: Vec<ModuleSplit> = enhanced_analysis
                     .file_metrics
                     .recommended_splits
@@ -110,6 +110,10 @@ impl UnifiedFileAnalyzer {
                         method: convert_split_analysis_method(split.method),
                         severity: split.severity.map(convert_recommendation_severity),
                         classification_evidence: split.classification_evidence.clone(),
+                        representative_methods: split.representative_methods.clone(),
+                        fields_needed: split.fields_needed.clone(),
+                        trait_suggestion: split.trait_suggestion.clone(),
+                        behavior_category: split.behavior_category.clone(),
                     })
                     .collect();
 

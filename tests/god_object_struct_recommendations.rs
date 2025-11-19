@@ -101,3 +101,133 @@ fn test_god_object_analysis_includes_new_fields() {
     // cross_domain_severity is optional
     let _ = analysis.cross_domain_severity;
 }
+
+/// Test behavioral decomposition fields (Spec 178)
+#[test]
+fn test_behavioral_decomposition_fields_populated() {
+    use debtmap::organization::recommend_module_splits;
+    use std::collections::HashMap;
+
+    // Create test responsibility groups
+    let mut responsibility_groups = HashMap::new();
+    responsibility_groups.insert(
+        "rendering".to_string(),
+        vec![
+            "render".to_string(),
+            "draw".to_string(),
+            "paint".to_string(),
+            "display".to_string(),
+            "show".to_string(),
+            "update_view".to_string(),
+        ],
+    );
+    responsibility_groups.insert(
+        "event_handling".to_string(),
+        vec![
+            "handle_click".to_string(),
+            "on_mouse_down".to_string(),
+            "on_key_press".to_string(),
+            "handle_input".to_string(),
+            "dispatch_event".to_string(),
+            "process_event".to_string(),
+        ],
+    );
+
+    let splits = recommend_module_splits("Editor", &[], &responsibility_groups);
+
+    // Verify we got splits
+    assert!(
+        !splits.is_empty(),
+        "Should generate module splits from responsibility groups"
+    );
+
+    for split in &splits {
+        // Verify new Spec 178 fields are populated
+        assert!(
+            !split.representative_methods.is_empty(),
+            "representative_methods should be populated"
+        );
+        assert!(
+            split.representative_methods.len() <= 8,
+            "Should have at most 8 representative methods"
+        );
+
+        assert!(
+            split.behavior_category.is_some(),
+            "behavior_category should be populated"
+        );
+
+        // Verify responsibility name is not "misc"
+        assert!(
+            !split.responsibility.to_lowercase().contains("misc"),
+            "Should not use 'misc' category - got: {}",
+            split.responsibility
+        );
+
+        // Verify suggested name is not "misc"
+        assert!(
+            !split.suggested_name.to_lowercase().contains("misc"),
+            "Module name should not contain 'misc' - got: {}",
+            split.suggested_name
+        );
+
+        // Verify method_count matches methods_to_move length
+        assert_eq!(
+            split.method_count,
+            split.methods_to_move.len(),
+            "method_count should match methods_to_move length"
+        );
+    }
+}
+
+/// Test that "misc" category is eliminated from recommendations (Spec 178)
+#[test]
+fn test_misc_category_eliminated() {
+    use debtmap::organization::recommend_module_splits;
+    use std::collections::HashMap;
+
+    // Create various responsibility groups
+    let mut responsibility_groups = HashMap::new();
+    responsibility_groups.insert(
+        "validation".to_string(),
+        vec![
+            "validate".to_string(),
+            "check".to_string(),
+            "verify".to_string(),
+            "ensure".to_string(),
+            "assert".to_string(),
+            "confirm".to_string(),
+        ],
+    );
+    responsibility_groups.insert(
+        "persistence".to_string(),
+        vec![
+            "save".to_string(),
+            "load".to_string(),
+            "store".to_string(),
+            "retrieve".to_string(),
+            "persist".to_string(),
+            "restore".to_string(),
+        ],
+    );
+
+    let splits = recommend_module_splits("Service", &[], &responsibility_groups);
+
+    // Verify no "misc" category in any recommendation
+    for split in &splits {
+        assert!(
+            !split.responsibility.eq_ignore_ascii_case("misc"),
+            "Should not have 'misc' responsibility"
+        );
+        assert!(
+            !split.suggested_name.to_lowercase().contains("misc"),
+            "Should not have 'misc' in module name"
+        );
+        if let Some(category) = &split.behavior_category {
+            assert!(
+                !category.eq_ignore_ascii_case("misc"),
+                "Should not have 'misc' behavior category"
+            );
+        }
+    }
+}

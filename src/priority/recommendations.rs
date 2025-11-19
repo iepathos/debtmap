@@ -45,16 +45,59 @@ pub fn generate_god_object_recommendation(
     let mut action_items = vec![
         "Break into smaller, focused modules:".to_string(),
     ];
-    
+
     for split in &analysis.recommended_splits {
-        action_items.push(format!(
+        let mut split_desc = format!(
             "  - {} ({} methods, ~{} lines)",
             split.suggested_name,
             split.methods_to_move.len(),
             split.estimated_lines
-        ));
+        );
+
+        // Add behavior category if available
+        if let Some(ref category) = split.behavior_category {
+            split_desc.push_str(&format!(" [{}]", category));
+        }
+
+        action_items.push(split_desc);
+
+        // Add representative methods if available
+        if !split.representative_methods.is_empty() {
+            let methods_preview = split.representative_methods
+                .iter()
+                .take(3)
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            action_items.push(format!("    Methods: {}, ...", methods_preview));
+        }
+
+        // Add fields needed if available
+        if !split.fields_needed.is_empty() {
+            let fields_preview = split.fields_needed
+                .iter()
+                .take(5)
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            action_items.push(format!("    Fields: {}", fields_preview));
+        }
+
+        // Add trait suggestion if available
+        if let Some(ref trait_suggestion) = split.trait_suggestion {
+            let first_line = trait_suggestion.lines().next().unwrap_or("");
+            action_items.push(format!("    Suggested trait: {}", first_line));
+        }
     }
-    
+
+    // Add incremental refactoring guidance (Spec 178)
+    action_items.push("".to_string());
+    action_items.push("Incremental Refactoring Order:".to_string());
+    action_items.push("  1. Extract pure functions first (no state dependencies)".to_string());
+    action_items.push("  2. Extract rendering/display methods (low coupling)".to_string());
+    action_items.push("  3. Extract service objects with minimal field dependencies".to_string());
+    action_items.push("  4. Move stateful operations last (high coupling)".to_string());
+    action_items.push("".to_string());
     action_items.push("Apply SOLID principles, especially Single Responsibility".to_string());
     action_items.push("Create interfaces/traits for better abstraction".to_string());
     action_items.push("Add comprehensive tests before refactoring".to_string());
@@ -148,18 +191,69 @@ pub fn format_god_object_display(
     if !analysis.recommended_splits.is_empty() {
         output.push_str("\n   [INFO] RECOMMENDED REFACTORING:\n");
         output.push_str("   Split into focused modules:\n");
-        
-        for split in &analysis.recommended_splits {
-            output.push_str(&format!(
-                "   ├─ {} (~{} lines, {} methods)\n",
+
+        for (i, split) in analysis.recommended_splits.iter().enumerate() {
+            let is_last = i == analysis.recommended_splits.len() - 1;
+            let prefix = if is_last { "└─" } else { "├─" };
+
+            // Module header with behavior category
+            let mut header = format!(
+                "   {} {} (~{} lines, {} methods)",
+                prefix,
                 split.suggested_name,
                 split.estimated_lines,
                 split.methods_to_move.len()
-            ));
+            );
+            if let Some(ref category) = split.behavior_category {
+                header.push_str(&format!(" [{}]", category));
+            }
+            output.push_str(&format!("{}\n", header));
+
+            let sub_prefix = if is_last { "  " } else { "│ " };
+
+            // Responsibility
             output.push_str(&format!(
-                "   │  └─ {}\n",
-                split.responsibility
+                "   {}  └─ {}\n",
+                sub_prefix, split.responsibility
             ));
+
+            // Representative methods
+            if !split.representative_methods.is_empty() {
+                let methods = split.representative_methods
+                    .iter()
+                    .take(3)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                output.push_str(&format!(
+                    "   {}     Methods: {}{}\n",
+                    sub_prefix,
+                    methods,
+                    if split.representative_methods.len() > 3 {
+                        ", ..."
+                    } else {
+                        ""
+                    }
+                ));
+            }
+
+            // Fields needed
+            if !split.fields_needed.is_empty() {
+                let fields = split.fields_needed
+                    .iter()
+                    .take(5)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                output.push_str(&format!("   {}     Fields: {}\n", sub_prefix, fields));
+            }
+
+            // Trait suggestion (first line only)
+            if let Some(ref trait_suggestion) = split.trait_suggestion {
+                if let Some(first_line) = trait_suggestion.lines().next() {
+                    output.push_str(&format!("   {}     {}\n", sub_prefix, first_line));
+                }
+            }
         }
     }
     

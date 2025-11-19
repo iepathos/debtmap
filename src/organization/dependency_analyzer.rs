@@ -157,6 +157,10 @@ mod tests {
             severity: None,
             interface_estimate: None,
             classification_evidence: None,
+            representative_methods: vec![],
+            fields_needed: vec![],
+            trait_suggestion: None,
+            behavior_category: None,
         }
     }
 
