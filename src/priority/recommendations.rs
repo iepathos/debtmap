@@ -90,6 +90,14 @@ pub fn generate_god_object_recommendation(
         }
     }
 
+    // Add incremental refactoring guidance (Spec 178)
+    action_items.push("".to_string());
+    action_items.push("Incremental Refactoring Order:".to_string());
+    action_items.push("  1. Extract pure functions first (no state dependencies)".to_string());
+    action_items.push("  2. Extract rendering/display methods (low coupling)".to_string());
+    action_items.push("  3. Extract service objects with minimal field dependencies".to_string());
+    action_items.push("  4. Move stateful operations last (high coupling)".to_string());
+    action_items.push("".to_string());
     action_items.push("Apply SOLID principles, especially Single Responsibility".to_string());
     action_items.push("Create interfaces/traits for better abstraction".to_string());
     action_items.push("Add comprehensive tests before refactoring".to_string());
