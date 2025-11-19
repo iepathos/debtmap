@@ -12,6 +12,7 @@ pub(crate) struct FormattedSections {
     pub impact: String,
     pub evidence: Option<String>, // New: combines complexity + metrics
     pub complexity: Option<String>,
+    pub coverage: Option<String>,
     pub dependencies: Option<String>,
     pub debt_specific: Option<String>,
     pub rationale: String,
@@ -26,6 +27,7 @@ pub(crate) fn generate_formatted_sections(context: &FormatContext) -> FormattedS
         impact: format_impact_section(context),
         evidence: format_evidence_section(context), // New
         complexity: format_complexity_section(context),
+        coverage: format_coverage_section(context),
         dependencies: format_dependencies_section(context),
         debt_specific: format_debt_specific_section(context),
         rationale: format_rationale_section(context),
@@ -122,6 +124,29 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
             format!("{}", context.complexity_info.branch_count).yellow(),
             format!("{}", context.complexity_info.cognitive).yellow(),
             format!("{}", context.complexity_info.nesting).yellow()
+        ))
+    }
+}
+
+// Pure function to format coverage section (spec 180)
+// Shows coverage status when has_coverage_data=true
+fn format_coverage_section(context: &FormatContext) -> Option<String> {
+    // Only show coverage section if coverage data is being tracked
+    let coverage_info = context.coverage_info.as_ref()?;
+
+    // If we have actual transitive coverage data with a percentage, show it
+    if let Some(coverage_pct) = coverage_info.coverage_percentage {
+        Some(format!(
+            "{} {:.1}%",
+            "├─ COVERAGE:".bright_blue(),
+            coverage_pct
+        ))
+    } else {
+        // LCOV was provided but this function was not found in it
+        Some(format!(
+            "{} {}",
+            "├─ COVERAGE:".bright_blue(),
+            "no coverage data"
         ))
     }
 }
@@ -306,16 +331,21 @@ pub(crate) fn apply_formatted_sections(output: &mut String, sections: FormattedS
         writeln!(output, "{}", evidence).unwrap();
     }
 
+    // Keep legacy complexity for backward compatibility
+    if let Some(complexity) = sections.complexity {
+        writeln!(output, "{}", complexity).unwrap();
+    }
+
+    // Coverage section (spec 180)
+    if let Some(coverage) = sections.coverage {
+        writeln!(output, "{}", coverage).unwrap();
+    }
+
     // WHY section - rationale explaining why evidence matters
     writeln!(output, "{}", sections.rationale).unwrap();
 
     // Action comes after WHY (spec 139 ordering)
     writeln!(output, "{}", sections.action).unwrap();
-
-    // Keep legacy complexity for backward compatibility
-    if let Some(complexity) = sections.complexity {
-        writeln!(output, "{}", complexity).unwrap();
-    }
 
     if let Some(dependencies) = sections.dependencies {
         writeln!(output, "{}", dependencies).unwrap();

@@ -150,6 +150,7 @@ fn format_visibility(visibility: &FunctionVisibility) -> &'static str {
 pub(crate) struct CoverageInfo {
     pub tag: String,
     pub color: colored::Color,
+    pub coverage_percentage: Option<f64>,
 }
 
 impl CoverageInfo {
@@ -165,6 +166,7 @@ impl CoverageInfo {
             Some(Self {
                 tag: "[ERROR UNTESTED]".to_string(),
                 color: colored::Color::BrightRed,
+                coverage_percentage: None,
             })
         } else {
             None
@@ -172,31 +174,19 @@ impl CoverageInfo {
     }
 
     fn from_coverage_percentage(coverage_pct: f64) -> Self {
-        match coverage_pct {
-            0.0 => Self {
-                tag: "[ERROR UNTESTED]".to_string(),
-                color: colored::Color::BrightRed,
-            },
-            c if c < 20.0 => Self {
-                tag: "[WARN LOW]".to_string(),
-                color: colored::Color::Yellow,
-            },
-            c if c < 50.0 => Self {
-                tag: "[WARN PARTIAL]".to_string(),
-                color: colored::Color::Yellow,
-            },
-            c if c < 80.0 => Self {
-                tag: "[INFO MODERATE]".to_string(),
-                color: colored::Color::Cyan,
-            },
-            c if c < 95.0 => Self {
-                tag: "[OK GOOD]".to_string(),
-                color: colored::Color::Green,
-            },
-            _ => Self {
-                tag: "[OK EXCELLENT]".to_string(),
-                color: colored::Color::BrightGreen,
-            },
+        let (tag, color) = match coverage_pct {
+            0.0 => ("[ERROR UNTESTED]".to_string(), colored::Color::BrightRed),
+            c if c < 20.0 => ("[WARN LOW]".to_string(), colored::Color::Yellow),
+            c if c < 50.0 => ("[WARN PARTIAL]".to_string(), colored::Color::Yellow),
+            c if c < 80.0 => ("[INFO MODERATE]".to_string(), colored::Color::Cyan),
+            c if c < 95.0 => ("[OK GOOD]".to_string(), colored::Color::Green),
+            _ => ("[OK EXCELLENT]".to_string(), colored::Color::BrightGreen),
+        };
+
+        Self {
+            tag,
+            color,
+            coverage_percentage: Some(coverage_pct),
         }
     }
 }
