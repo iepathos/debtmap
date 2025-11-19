@@ -1171,38 +1171,38 @@ fn format_language_specific_advice(
         "py" => {
             writeln!(
                 output,
-                "  -  - Use dataclasses/attrs for data-heavy classes"
+                "      - Use dataclasses/attrs for data-heavy classes"
             )
             .unwrap();
-            writeln!(output, "  -  - Extract interfaces with Protocol/ABC").unwrap();
-            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
+            writeln!(output, "      - Extract interfaces with Protocol/ABC").unwrap();
+            writeln!(output, "      - Prefer composition over inheritance").unwrap();
         }
         "rs" => {
-            writeln!(output, "  -  - Extract traits for shared behavior").unwrap();
-            writeln!(output, "  -  - Use newtype pattern for domain types").unwrap();
+            writeln!(output, "      - Extract traits for shared behavior").unwrap();
+            writeln!(output, "      - Use newtype pattern for domain types").unwrap();
             writeln!(
                 output,
-                "  -  - Consider builder pattern for complex construction"
+                "      - Consider builder pattern for complex construction"
             )
             .unwrap();
         }
         "js" | "jsx" => {
-            writeln!(output, "  -  - Decompose into smaller classes/modules").unwrap();
-            writeln!(output, "  -  - Use functional composition where possible").unwrap();
-            writeln!(output, "  -  - Extract hooks for React components").unwrap();
+            writeln!(output, "      - Decompose into smaller classes/modules").unwrap();
+            writeln!(output, "      - Use functional composition where possible").unwrap();
+            writeln!(output, "      - Extract hooks for React components").unwrap();
         }
         "ts" | "tsx" => {
-            writeln!(output, "  -  - Extract interfaces for contracts").unwrap();
-            writeln!(output, "  -  - Use type guards for domain logic").unwrap();
-            writeln!(output, "  -  - Leverage discriminated unions").unwrap();
+            writeln!(output, "      - Extract interfaces for contracts").unwrap();
+            writeln!(output, "      - Use type guards for domain logic").unwrap();
+            writeln!(output, "      - Leverage discriminated unions").unwrap();
         }
         _ => {
             writeln!(
                 output,
-                "  -  - Extract interfaces/protocols for shared behavior"
+                "      - Extract interfaces/protocols for shared behavior"
             )
             .unwrap();
-            writeln!(output, "  -  - Prefer composition over inheritance").unwrap();
+            writeln!(output, "      - Prefer composition over inheritance").unwrap();
         }
     }
 }
