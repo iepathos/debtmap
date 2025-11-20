@@ -639,7 +639,10 @@ fn generate_standard_recommendation(
             function_count,
             ..
         } => (
-            format!("Convert {} functions to {} methods", function_count, target_type),
+            format!(
+                "Convert {} functions to {} methods",
+                function_count, target_type
+            ),
             format!(
                 "{} standalone functions should be methods on {}",
                 function_count, target_type
