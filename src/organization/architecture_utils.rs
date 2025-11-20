@@ -1,23 +1,3 @@
-# Spec 180: Shared Utilities for Architecture Analysis
-
-**Status**: Draft
-**Priority**: Foundation
-**Used By**: [181, 182, 183, 184, 185]
-**Created**: 2025-01-19
-
-## Context
-
-Specs 181-184 duplicate several utility functions (case conversion, type analysis, noun extraction). This creates maintenance burden and risks inconsistency.
-
-## Objective
-
-Create a shared utilities module with common functions used across all architecture analysis specs.
-
-## Implementation
-
-```rust
-// src/organization/architecture_utils.rs
-
 /// Shared utilities for architecture analysis (Specs 181-185)
 use std::collections::HashMap;
 
@@ -105,7 +85,10 @@ pub fn extract_base_type(type_name: &str) -> String {
     let mut working = type_name;
 
     // Strip references
-    working = working.trim_start_matches('&').trim_start_matches("mut ").trim();
+    working = working
+        .trim_start_matches('&')
+        .trim_start_matches("mut ")
+        .trim();
 
     // Extract from generics
     if let Some(start) = working.find('<') {
@@ -158,8 +141,8 @@ fn normalize_type_for_comparison(type_name: &str) -> String {
 /// Extract core noun from compound type names
 ///
 /// Examples:
-/// - `SourceLocation` → `Location`
-/// - `FileMetrics` → `Metrics`
+/// - `SourceLocation` → `Source`
+/// - `FileMetrics` → `File`
 /// - `HttpRequestHandler` → `Request`
 /// - `UserData` → `User`
 ///
@@ -167,10 +150,24 @@ fn normalize_type_for_comparison(type_name: &str) -> String {
 pub fn extract_noun(type_name: &str) -> String {
     // Common suffixes to remove
     const SUFFIXES: &[&str] = &[
-        "Location", "Metrics", "Data", "Info", "Details",
-        "Handler", "Manager", "Service", "Provider", "Factory",
-        "Builder", "Analyzer", "Processor", "Controller",
-        "Context", "Config", "Settings", "Result"
+        "Location",
+        "Metrics",
+        "Data",
+        "Info",
+        "Details",
+        "Handler",
+        "Manager",
+        "Service",
+        "Provider",
+        "Factory",
+        "Builder",
+        "Analyzer",
+        "Processor",
+        "Controller",
+        "Context",
+        "Config",
+        "Settings",
+        "Result",
     ];
 
     for suffix in SUFFIXES {
@@ -238,7 +235,8 @@ pub fn most_common<T: std::hash::Hash + Eq + Clone>(items: &[T]) -> Option<T> {
     for item in items {
         *counts.entry(item.clone()).or_insert(0) += 1;
     }
-    counts.into_iter()
+    counts
+        .into_iter()
         .max_by_key(|(_, count)| *count)
         .map(|(item, _)| item)
 }
@@ -317,67 +315,3 @@ mod tests {
         assert_eq!(most_common(&empty), None);
     }
 }
-```
-
-## Integration
-
-### Update Spec 181
-
-Replace inline implementations with:
-
-```rust
-use crate::organization::architecture_utils::{
-    to_pascal_case, to_snake_case, extract_base_type,
-    is_domain_type, types_equivalent
-};
-```
-
-### Update Spec 183
-
-Replace inline implementations with:
-
-```rust
-use crate::organization::architecture_utils::{
-    to_pascal_case, is_likely_verb, is_domain_term,
-    most_common, is_primitive_type
-};
-```
-
-### Update Spec 184
-
-Replace inline implementations with:
-
-```rust
-use crate::organization::architecture_utils::{
-    to_pascal_case, extract_noun, extract_base_type,
-    is_domain_term
-};
-```
-
-## Module Structure
-
-```
-src/organization/
-├── architecture_utils.rs         # This spec
-├── type_based_clustering.rs      # Spec 181
-├── data_flow_analyzer.rs          # Spec 182
-├── anti_pattern_detector.rs       # Spec 183
-├── hidden_type_extractor.rs       # Spec 184
-└── integrated_analyzer.rs         # Spec 185
-```
-
-## Benefits
-
-1. **DRY Principle**: Single source of truth for common operations
-2. **Consistency**: All specs use same case conversion logic
-3. **Testability**: Centralized tests for utilities
-4. **Maintainability**: Fix once, benefit everywhere
-5. **Performance**: Potential for caching/memoization in one place
-
-## Migration Path
-
-1. Create `architecture_utils.rs` with all shared functions
-2. Add comprehensive unit tests
-3. Update specs 181-184 to use shared functions
-4. Remove duplicated code
-5. Verify all tests still pass
