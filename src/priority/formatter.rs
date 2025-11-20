@@ -1811,6 +1811,10 @@ pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "ASYNC MISUSE",
         DebtType::ResourceLeak { .. } => "RESOURCE LEAK",
         DebtType::CollectionInefficiency { .. } => "COLLECTION INEFFICIENCY",
+        // Type organization (Spec 187)
+        DebtType::ScatteredType { .. } => "SCATTERED TYPE",
+        DebtType::OrphanedFunctions { .. } => "ORPHANED FUNCTIONS",
+        DebtType::UtilitiesSprawl { .. } => "UTILITIES SPRAWL",
     }
 }
 

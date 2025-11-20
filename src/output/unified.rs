@@ -393,6 +393,10 @@ fn categorize_function_debt(debt_type: &DebtType) -> String {
         DebtType::AsyncMisuse { .. } => "ResourceManagement".to_string(),
         DebtType::ResourceLeak { .. } => "ResourceManagement".to_string(),
         DebtType::CollectionInefficiency { .. } => "Performance".to_string(),
+        // Type organization (Spec 187)
+        DebtType::ScatteredType { .. } => "TypeOrganization".to_string(),
+        DebtType::OrphanedFunctions { .. } => "TypeOrganization".to_string(),
+        DebtType::UtilitiesSprawl { .. } => "TypeOrganization".to_string(),
     }
 }
 

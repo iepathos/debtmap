@@ -192,6 +192,10 @@ pub fn identify_quick_wins(items: &[UnifiedDebtItem]) -> QuickWins {
             DebtType::AsyncMisuse { .. } => "Async Issues",
             DebtType::ResourceLeak { .. } => "Resource Leaks",
             DebtType::CollectionInefficiency { .. } => "Collection Issues",
+            // Type organization (Spec 187)
+            DebtType::ScatteredType { .. } => "Scattered Types",
+            DebtType::OrphanedFunctions { .. } => "Orphaned Functions",
+            DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl",
         };
         by_type.entry(type_key.to_string()).or_default().push(item);
     }
@@ -416,6 +420,22 @@ fn generate_business_impact(item: &UnifiedDebtItem) -> String {
         }
         DebtType::CollectionInefficiency { .. } => {
             "Improves collection performance, reduces memory usage".to_string()
+        }
+        // Type organization (Spec 187)
+        DebtType::ScatteredType { type_name, .. } => {
+            format!(
+                "Consolidates {} behavior, improves discoverability and maintainability",
+                type_name
+            )
+        }
+        DebtType::OrphanedFunctions { target_type, .. } => {
+            format!(
+                "Improves {} API discoverability, enables better IDE autocomplete",
+                target_type
+            )
+        }
+        DebtType::UtilitiesSprawl { .. } => {
+            "Improves module cohesion, reduces cognitive load when navigating codebase".to_string()
         }
         _ => "Improves overall codebase health and maintainability".to_string(),
     }
@@ -693,6 +713,19 @@ pub fn estimate_effort_hours(item: &UnifiedDebtItem) -> u32 {
         DebtType::CollectionInefficiency { .. } => {
             // Collection optimization
             4
+        }
+        // Type organization (Spec 187)
+        DebtType::ScatteredType { file_count, .. } => {
+            // Consolidating scattered methods scales with file count
+            (file_count * 2).clamp(3, 10) as u32
+        }
+        DebtType::OrphanedFunctions { function_count, .. } => {
+            // Converting functions to methods is straightforward
+            (function_count / 4).clamp(1, 3) as u32
+        }
+        DebtType::UtilitiesSprawl { distinct_types, .. } => {
+            // Breaking up utilities module is moderate effort
+            (distinct_types * 2).clamp(5, 10) as u32
         }
         _ => 8, // Default estimate
     }

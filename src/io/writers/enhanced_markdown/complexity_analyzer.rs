@@ -113,6 +113,19 @@ fn calculate_base_effort(debt_type: &crate::priority::DebtType) -> u32 {
         crate::priority::DebtType::AsyncMisuse { .. } => 8,
         crate::priority::DebtType::ResourceLeak { .. } => 10,
         crate::priority::DebtType::CollectionInefficiency { .. } => 4,
+        // Type organization debt types (Spec 187)
+        crate::priority::DebtType::ScatteredType { file_count, .. } => {
+            // Effort scales with number of files to consolidate
+            (file_count * 2).min(10) as u32
+        }
+        crate::priority::DebtType::OrphanedFunctions { function_count, .. } => {
+            // Simple refactoring, scales with function count
+            (function_count / 4).clamp(1, 4) as u32
+        }
+        crate::priority::DebtType::UtilitiesSprawl { distinct_types, .. } => {
+            // Breaking up utilities is moderate effort
+            (distinct_types / 2).clamp(4, 12) as u32
+        }
     }
 }
 
