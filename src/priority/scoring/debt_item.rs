@@ -616,6 +616,58 @@ fn generate_standard_recommendation(
             collection_type,
             inefficiency_type,
         } => generate_collection_inefficiency_recommendation(collection_type, inefficiency_type),
+        // Type organization debt types (Spec 187)
+        DebtType::ScatteredType {
+            type_name,
+            total_methods,
+            file_count,
+            ..
+        } => (
+            format!("Consolidate {} methods into impl block", type_name),
+            format!(
+                "{} methods scattered across {} files",
+                total_methods, file_count
+            ),
+            vec![
+                format!("Move all methods to {}'s definition file", type_name),
+                "Update call sites to use methods instead of free functions".to_string(),
+                "Run tests to verify behavior is preserved".to_string(),
+            ],
+        ),
+        DebtType::OrphanedFunctions {
+            target_type,
+            function_count,
+            ..
+        } => (
+            format!(
+                "Convert {} functions to {} methods",
+                function_count, target_type
+            ),
+            format!(
+                "{} standalone functions should be methods on {}",
+                function_count, target_type
+            ),
+            vec![
+                format!("Move functions into impl block for {}", target_type),
+                "Change function signatures to use &self or &mut self".to_string(),
+                "Update call sites to use method syntax".to_string(),
+            ],
+        ),
+        DebtType::UtilitiesSprawl {
+            function_count,
+            distinct_types,
+        } => (
+            "Break up utilities module".to_string(),
+            format!(
+                "{} functions operating on {} distinct types",
+                function_count, distinct_types
+            ),
+            vec![
+                "Move type-specific functions to appropriate modules".to_string(),
+                "Create focused utility modules for truly generic functions".to_string(),
+                "Consider deleting the utilities module once empty".to_string(),
+            ],
+        ),
     }
 }
 

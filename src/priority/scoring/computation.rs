@@ -130,6 +130,10 @@ pub(super) fn calculate_risk_factor(debt_type: &DebtType) -> f64 {
         DebtType::ResourceLeak { .. } => 0.5,
         DebtType::AsyncMisuse { .. } => 0.4,
         DebtType::CollectionInefficiency { .. } => 0.2,
+        // Type organization debt types (Spec 187) - low to medium risk
+        DebtType::ScatteredType { .. } => 0.25,
+        DebtType::OrphanedFunctions { .. } => 0.15,
+        DebtType::UtilitiesSprawl { .. } => 0.3,
     }
 }
 

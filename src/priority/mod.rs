@@ -265,6 +265,22 @@ pub enum DebtType {
         collection_type: String,
         inefficiency_type: String,
     },
+    // Type organization debt types (Spec 187)
+    ScatteredType {
+        type_name: String,
+        total_methods: usize,
+        file_count: usize,
+        severity: String,
+    },
+    OrphanedFunctions {
+        target_type: String,
+        function_count: usize,
+        file_count: usize,
+    },
+    UtilitiesSprawl {
+        function_count: usize,
+        distinct_types: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize, Deserialize)]
@@ -283,6 +299,9 @@ impl DebtCategory {
             DebtType::GodModule { .. } => DebtCategory::Architecture,
             DebtType::FeatureEnvy { .. } => DebtCategory::Architecture,
             DebtType::PrimitiveObsession { .. } => DebtCategory::Architecture,
+            DebtType::ScatteredType { .. } => DebtCategory::Architecture,
+            DebtType::OrphanedFunctions { .. } => DebtCategory::Architecture,
+            DebtType::UtilitiesSprawl { .. } => DebtCategory::Architecture,
 
             // Testing Gaps
             DebtType::TestingGap { .. } => DebtCategory::Testing,

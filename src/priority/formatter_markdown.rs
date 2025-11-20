@@ -886,6 +886,10 @@ fn format_debt_type(debt_type: &DebtType) -> &'static str {
         DebtType::AsyncMisuse { .. } => "Async Misuse",
         DebtType::ResourceLeak { .. } => "Resource Leak",
         DebtType::CollectionInefficiency { .. } => "Collection Inefficiency",
+        // Type organization (Spec 187)
+        DebtType::ScatteredType { .. } => "Scattered Type",
+        DebtType::OrphanedFunctions { .. } => "Orphaned Functions",
+        DebtType::UtilitiesSprawl { .. } => "Utilities Sprawl",
     }
 }
 
