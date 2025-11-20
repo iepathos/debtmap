@@ -186,6 +186,10 @@ impl ModuleFunctionClassifier {
                 core_type: None,
                 data_flow: vec![],
                 suggested_type_definition: None,
+                data_flow_stage: None,
+                pipeline_position: None,
+                input_types: vec![],
+                output_types: vec![],
             };
 
             splits.push(split);

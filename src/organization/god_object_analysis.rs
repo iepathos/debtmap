@@ -288,6 +288,28 @@ pub struct ModuleSplit {
     /// Example type definition with impl blocks showing idiomatic Rust patterns (Spec 181)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggested_type_definition: Option<String>,
+    /// Pipeline stage type (Source, Transform, Validate, Aggregate, Sink) (Spec 182)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_flow_stage: Option<StageType>,
+    /// Position in pipeline (0 = input, N = output) (Spec 182)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipeline_position: Option<usize>,
+    /// Input types consumed by this module (Spec 182)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub input_types: Vec<String>,
+    /// Output types produced by this module (Spec 182)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_types: Vec<String>,
+}
+
+/// Stage type in data transformation pipeline (Spec 182)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum StageType {
+    Source,
+    Transform,
+    Validate,
+    Aggregate,
+    Sink,
 }
 
 /// Helper to create ModuleSplit with behavioral defaults
@@ -318,6 +340,10 @@ impl Default for ModuleSplit {
             core_type: None,
             data_flow: vec![],
             suggested_type_definition: None,
+            data_flow_stage: None,
+            pipeline_position: None,
+            input_types: vec![],
+            output_types: vec![],
         }
     }
 }
@@ -348,6 +374,10 @@ impl PartialEq for ModuleSplit {
             && self.core_type == other.core_type
             && self.data_flow == other.data_flow
             && self.suggested_type_definition == other.suggested_type_definition
+            && self.data_flow_stage == other.data_flow_stage
+            && self.pipeline_position == other.pipeline_position
+            && self.input_types == other.input_types
+            && self.output_types == other.output_types
         // Skip classification_evidence in equality comparison
     }
 }
@@ -1244,6 +1274,10 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 core_type: None,
                 data_flow: vec![],
                 suggested_type_definition: None,
+                data_flow_stage: None,
+                pipeline_position: None,
+                input_types: vec![],
+                output_types: vec![],
             });
         }
     }
@@ -1327,6 +1361,10 @@ pub fn recommend_module_splits_with_evidence(
                 core_type: None,
                 data_flow: vec![],
                 suggested_type_definition: None,
+                data_flow_stage: None,
+                pipeline_position: None,
+                input_types: vec![],
+                output_types: vec![],
             });
         }
     }
@@ -1440,6 +1478,10 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 core_type: None,
                 data_flow: vec![],
                 suggested_type_definition: None,
+                data_flow_stage: None,
+                pipeline_position: None,
+                input_types: vec![],
+                output_types: vec![],
             }
         })
         .collect()
@@ -1818,6 +1860,10 @@ pub fn suggest_splits_by_struct_grouping(
                 core_type: None,
                 data_flow: vec![],
                 suggested_type_definition: None,
+                data_flow_stage: None,
+                pipeline_position: None,
+                input_types: vec![],
+                output_types: vec![],
             }
         })
         .collect();

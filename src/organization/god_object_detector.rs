@@ -725,154 +725,187 @@ impl GodObjectDetector {
         // Determine analysis method and generate recommendations
         // Spec 178: Prioritize behavioral decomposition for method-heavy god objects
         // Spec 181: Use type-based clustering when behavioral produces utilities modules
-        let (recommended_splits, analysis_method) =
-            if params.total_methods > 50 && params.lines_of_code > 500 {
-                // PRIORITY 1: Behavioral method clustering for substantial method-heavy files (Spec 178)
-                // When a file has 50+ methods AND substantial LOC, the method impl is the problem.
-                // Use call graph analysis and community detection to find behavioral cohesion.
-                // LOC check prevents wasting time on trivial files (auto-generated, test stubs, etc.)
-                let file_name = params
-                    .path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("module");
+        let (recommended_splits, analysis_method) = if params.total_methods > 50
+            && params.lines_of_code > 500
+        {
+            // PRIORITY 1: Behavioral method clustering for substantial method-heavy files (Spec 178)
+            // When a file has 50+ methods AND substantial LOC, the method impl is the problem.
+            // Use call graph analysis and community detection to find behavioral cohesion.
+            // LOC check prevents wasting time on trivial files (auto-generated, test stubs, etc.)
+            let file_name = params
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
 
-                let mut splits = Self::generate_behavioral_splits(
-                    params.all_methods,
-                    params.field_tracker,
-                    params.ast,
-                    file_name,
-                );
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
 
-                // Spec 181: If behavioral clustering produces utilities modules, try type-based clustering
-                let has_utilities = splits.iter().any(|s| {
-                    s.suggested_name.contains("utilities")
-                        || s.suggested_name.contains("helpers")
-                        || s.suggested_name.contains("utils")
-                });
+            // Spec 181: If behavioral clustering produces utilities modules, try type-based clustering
+            let has_utilities = splits.iter().any(|s| {
+                s.suggested_name.contains("utilities")
+                    || s.suggested_name.contains("helpers")
+                    || s.suggested_name.contains("utils")
+            });
 
-                if has_utilities || splits.is_empty() {
-                    // Try type-based clustering as a better alternative (Spec 181)
-                    let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+            if has_utilities || splits.is_empty() {
+                // Try pipeline-based clustering first (Spec 182)
+                let pipeline_splits =
+                    Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
 
-                    // Use type-based if it produces better quality results
-                    if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
-                        return (
-                            type_splits,
-                            crate::organization::SplitAnalysisMethod::TypeBased,
-                            cross_domain_severity,
-                            domain_count,
-                            domain_diversity,
-                            struct_ratio,
-                        );
-                    }
-                }
-
-                // If behavioral clustering doesn't produce results, fall back to responsibility-based
-                if splits.is_empty() {
-                    splits = crate::organization::recommend_module_splits_enhanced(
-                        file_name,
-                        params.responsibility_groups,
-                        params.field_tracker,
+                // Use pipeline-based if detected (indicates functional pipeline architecture)
+                if !pipeline_splits.is_empty() {
+                    return (
+                        pipeline_splits,
+                        crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
+                        cross_domain_severity,
+                        domain_count,
+                        domain_diversity,
+                        struct_ratio,
                     );
-
-                    // If fallback also produces <=1 split, treat as "no actionable splits"
-                    // A single split is not really a "split" - it's just renaming the file
-                    if splits.len() <= 1 {
-                        splits = Vec::new();
-                    }
                 }
 
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::MethodBased,
-                )
-            } else if struct_count >= 5 && domain_count >= 3 {
-                // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
-                // For files with many structs but manageable methods (<= 50),
-                // struct-based domain grouping is appropriate.
-                let mut splits =
-                    crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
+                // Try type-based clustering as a fallback alternative (Spec 181)
+                let type_splits = Self::generate_type_based_splits(params.ast, file_name);
 
-                // Attach severity to all splits
-                if let Some(severity) = cross_domain_severity {
-                    for split in &mut splits {
-                        split.severity = Some(severity);
-                    }
-                }
-
-                // Enrich with behavioral analysis for method information
-                Self::enrich_splits_with_behavioral_analysis(
-                    &mut splits,
-                    params.all_methods,
-                    params.field_tracker,
-                    params.ast,
-                );
-
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::CrossDomain,
-                )
-            } else if params.is_god_object {
-                // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
-                let file_name = params
-                    .path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("module");
-
-                let mut splits = Self::generate_behavioral_splits(
-                    params.all_methods,
-                    params.field_tracker,
-                    params.ast,
-                    file_name,
-                );
-
-                // Spec 181: Try type-based clustering for parameter-heavy or utilities-heavy files
-                let has_utilities = splits.iter().any(|s| {
-                    s.suggested_name.contains("utilities")
-                        || s.suggested_name.contains("helpers")
-                        || s.suggested_name.contains("utils")
-                });
-
-                if has_utilities || splits.is_empty() {
-                    // Try type-based clustering (Spec 181)
-                    let type_splits = Self::generate_type_based_splits(params.ast, file_name);
-
-                    // Use type-based if it produces better quality results
-                    if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
-                        return (
-                            type_splits,
-                            crate::organization::SplitAnalysisMethod::TypeBased,
-                            cross_domain_severity,
-                            domain_count,
-                            domain_diversity,
-                            struct_ratio,
-                        );
-                    }
-                }
-
-                if splits.is_empty() {
-                    splits = crate::organization::recommend_module_splits_enhanced(
-                        file_name,
-                        params.responsibility_groups,
-                        params.field_tracker,
+                // Use type-based if it produces better quality results
+                if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                    return (
+                        type_splits,
+                        crate::organization::SplitAnalysisMethod::TypeBased,
+                        cross_domain_severity,
+                        domain_count,
+                        domain_diversity,
+                        struct_ratio,
                     );
+                }
+            }
 
-                    // If fallback also produces <=1 split, treat as "no actionable splits"
-                    // A single split is not really a "split" - it's just renaming the file
-                    if splits.len() <= 1 {
-                        splits = Vec::new();
-                    }
+            // If behavioral clustering doesn't produce results, fall back to responsibility-based
+            if splits.is_empty() {
+                splits = crate::organization::recommend_module_splits_enhanced(
+                    file_name,
+                    params.responsibility_groups,
+                    params.field_tracker,
+                );
+
+                // If fallback also produces <=1 split, treat as "no actionable splits"
+                // A single split is not really a "split" - it's just renaming the file
+                if splits.len() <= 1 {
+                    splits = Vec::new();
+                }
+            }
+
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::MethodBased,
+            )
+        } else if struct_count >= 5 && domain_count >= 3 {
+            // PRIORITY 2: Cross-domain struct mixing analysis (Spec 140)
+            // For files with many structs but manageable methods (<= 50),
+            // struct-based domain grouping is appropriate.
+            let mut splits =
+                crate::organization::suggest_module_splits_by_domain(params.per_struct_metrics);
+
+            // Attach severity to all splits
+            if let Some(severity) = cross_domain_severity {
+                for split in &mut splits {
+                    split.severity = Some(severity);
+                }
+            }
+
+            // Enrich with behavioral analysis for method information
+            Self::enrich_splits_with_behavioral_analysis(
+                &mut splits,
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+            );
+
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::CrossDomain,
+            )
+        } else if params.is_god_object {
+            // PRIORITY 3: Small god objects (< 50 methods) with behavioral clustering
+            let file_name = params
+                .path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("module");
+
+            let mut splits = Self::generate_behavioral_splits(
+                params.all_methods,
+                params.field_tracker,
+                params.ast,
+                file_name,
+            );
+
+            // Spec 181/182: Try type-based clustering for parameter-heavy or utilities-heavy files
+            let has_utilities = splits.iter().any(|s| {
+                s.suggested_name.contains("utilities")
+                    || s.suggested_name.contains("helpers")
+                    || s.suggested_name.contains("utils")
+            });
+
+            if has_utilities || splits.is_empty() {
+                // Try pipeline-based clustering first (Spec 182)
+                let pipeline_splits =
+                    Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
+
+                // Use pipeline-based if detected (indicates functional pipeline architecture)
+                if !pipeline_splits.is_empty() {
+                    return (
+                        pipeline_splits,
+                        crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
+                        cross_domain_severity,
+                        domain_count,
+                        domain_diversity,
+                        struct_ratio,
+                    );
                 }
 
-                (
-                    splits,
-                    crate::organization::SplitAnalysisMethod::MethodBased,
-                )
-            } else {
-                (Vec::new(), crate::organization::SplitAnalysisMethod::None)
-            };
+                // Try type-based clustering as fallback (Spec 181)
+                let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+
+                // Use type-based if it produces better quality results
+                if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                    return (
+                        type_splits,
+                        crate::organization::SplitAnalysisMethod::TypeBased,
+                        cross_domain_severity,
+                        domain_count,
+                        domain_diversity,
+                        struct_ratio,
+                    );
+                }
+            }
+
+            if splits.is_empty() {
+                splits = crate::organization::recommend_module_splits_enhanced(
+                    file_name,
+                    params.responsibility_groups,
+                    params.field_tracker,
+                );
+
+                // If fallback also produces <=1 split, treat as "no actionable splits"
+                // A single split is not really a "split" - it's just renaming the file
+                if splits.len() <= 1 {
+                    splits = Vec::new();
+                }
+            }
+
+            (
+                splits,
+                crate::organization::SplitAnalysisMethod::MethodBased,
+            )
+        } else {
+            (Vec::new(), crate::organization::SplitAnalysisMethod::None)
+        };
 
         (
             recommended_splits,
@@ -1208,6 +1241,77 @@ impl GodObjectDetector {
         example.push_str("}\n");
 
         example
+    }
+
+    /// Generate pipeline-based splits using data flow analysis (Spec 182)
+    ///
+    /// Detects functional transformation pipelines and recommends modules
+    /// organized by pipeline stages (Input → Transform → Output).
+    fn generate_pipeline_based_splits(
+        ast: &syn::File,
+        call_graph: &HashMap<String, Vec<String>>,
+        base_name: &str,
+    ) -> Vec<ModuleSplit> {
+        use crate::organization::{DataFlowAnalyzer, TypeSignatureAnalyzer};
+
+        let type_analyzer = TypeSignatureAnalyzer;
+
+        // Extract signatures from impl blocks
+        let impl_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(impl_block) => Some(impl_block),
+                _ => None,
+            })
+            .flat_map(|impl_block| &impl_block.items)
+            .filter_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(type_analyzer.analyze_method(method)),
+                _ => None,
+            })
+            .collect();
+
+        // Extract signatures from standalone functions
+        let fn_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(func) => Some(type_analyzer.analyze_function(func)),
+                _ => None,
+            })
+            .collect();
+
+        // Combine all signatures
+        let mut all_signatures = impl_signatures;
+        all_signatures.extend(fn_signatures);
+
+        if all_signatures.is_empty() {
+            return vec![];
+        }
+
+        // Build type flow graph
+        let flow_analyzer = DataFlowAnalyzer;
+        let flow_graph = flow_analyzer.build_type_flow_graph(&all_signatures, call_graph);
+
+        // Detect pipeline stages
+        let stages = match flow_analyzer.detect_pipeline_stages(&flow_graph, &all_signatures) {
+            Ok(stages) => stages,
+            Err(_) => return vec![],
+        };
+
+        // Filter out single-method stages (not meaningful pipelines)
+        let stages: Vec<_> = stages
+            .into_iter()
+            .filter(|stage| stage.methods.len() >= 2)
+            .collect();
+
+        if stages.len() < 2 {
+            // Not a meaningful pipeline (need at least 2 stages)
+            return vec![];
+        }
+
+        // Generate recommendations
+        flow_analyzer.generate_pipeline_recommendations(&stages, base_name)
     }
 
     /// Enrich existing splits with behavioral analysis (Spec 178)
