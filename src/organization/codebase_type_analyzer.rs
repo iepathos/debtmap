@@ -1,123 +1,13 @@
-# Spec 186: Codebase-Wide Type Organization Analysis
+//! Codebase-wide type organization analysis (Spec 186)
+//!
+//! Detects type scattering, orphaned functions, and utilities sprawl across
+//! the entire codebase to recommend idiomatic Rust organization patterns.
 
-**Status**: Draft
-**Priority**: High
-**Dependencies**: [180, 181, 183]
-**Related**: [187 - Presentation Format]
-**Created**: 2025-01-19
-
-## Context
-
-Current analysis (specs 181-185) focuses on **individual god objects**, but type-based organization issues exist at the **codebase level**:
-
-### Problem 1: Type Scattering
-Methods for the same type scattered across multiple files:
-
-```
-src/
-├── priority_item.rs        # struct PriorityItem { ... }
-├── utils.rs                # fn format_priority(item: &PriorityItem)
-├── validation.rs           # fn validate_priority(item: &PriorityItem)
-└── processing.rs           # fn process_priority(item: &PriorityItem)
-```
-
-**Issue**: PriorityItem's behavior is split across 4 files instead of being cohesive.
-
-### Problem 2: Orphaned Functions
-Standalone functions that should be methods:
-
-```rust
-// src/analysis.rs
-pub struct FileMetrics { ... }
-
-// src/utils.rs  ❌ Wrong location
-pub fn calculate_complexity(metrics: &FileMetrics) -> u32 { }
-pub fn is_high_complexity(metrics: &FileMetrics) -> bool { }
-
-// Should be:
-impl FileMetrics {
-    pub fn complexity(&self) -> u32 { }
-    pub fn is_high_complexity(&self) -> bool { }
-}
-```
-
-### Problem 3: Utilities Sprawl
-Multiple utility modules with mixed responsibilities:
-
-```
-src/
-├── utils.rs                # 50 functions, 10 different types
-├── helpers.rs              # 40 functions, 8 different types
-├── common.rs               # 30 functions, 6 different types
-└── shared.rs               # 25 functions, 5 different types
-```
-
-### Problem 4: Cross-File Technical Grouping
-Verb-based organization across codebase:
-
-```
-src/
-├── formatting/
-│   ├── format_metrics.rs   # Formats FileMetrics
-│   ├── format_debt.rs      # Formats DebtItem
-│   └── format_god.rs       # Formats GodObject
-├── validation/
-│   ├── validate_metrics.rs # Validates FileMetrics
-│   ├── validate_debt.rs    # Validates DebtItem
-│   └── validate_god.rs     # Validates GodObject
-└── calculation/
-    ├── calc_metrics.rs     # Calculates FileMetrics
-    ├── calc_debt.rs        # Calculates DebtItem
-    └── calc_god.rs         # Calculates GodObject
-```
-
-**Issue**: Each type's behavior is split across 3+ directories by verb.
-
-## Objective
-
-Analyze entire codebase to detect type-based organization issues and recommend consolidation following idiomatic Rust principles.
-
-## Requirements
-
-### 1. Cross-File Type Analysis
-
-```rust
-// src/organization/codebase_type_analyzer.rs
-
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use crate::organization::type_based_clustering::MethodSignature;
 use crate::organization::architecture_utils::*;
-
-pub struct CodebaseTypeAnalyzer {
-    config: CodebaseAnalysisConfig,
-}
-
-#[derive(Clone, Debug)]
-pub struct CodebaseAnalysisConfig {
-    /// Minimum methods scattered to report (default: 3)
-    pub min_scattered_methods: usize,
-
-    /// Minimum files a type appears in to report scattering (default: 2)
-    pub min_file_scattering: usize,
-
-    /// Minimum orphaned functions to report (default: 3)
-    pub min_orphaned_functions: usize,
-
-    /// Detect utilities sprawl (default: true)
-    pub detect_utilities_sprawl: bool,
-}
-
-impl Default for CodebaseAnalysisConfig {
-    fn default() -> Self {
-        Self {
-            min_scattered_methods: 3,
-            min_file_scattering: 2,
-            min_orphaned_functions: 3,
-            detect_utilities_sprawl: true,
-        }
-    }
-}
+use crate::organization::type_based_clustering::MethodSignature;
+use crate::organization::RecommendationSeverity;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 /// Analysis result for entire codebase
 #[derive(Clone, Debug)]
@@ -130,9 +20,6 @@ pub struct CodebaseTypeAnalysis {
 
     /// Utilities modules with mixed responsibilities
     pub utilities_sprawl: Vec<UtilitiesModule>,
-
-    /// Cross-file technical groupings (verb-based)
-    pub technical_groupings: Vec<TechnicalGrouping>,
 
     /// Recommended reorganization
     pub recommendations: Vec<CodebaseRecommendation>,
@@ -162,9 +49,9 @@ pub struct ScatteredType {
 
 #[derive(Clone, Debug, PartialEq, Ord, PartialOrd, Eq)]
 pub enum ScatteringSeverity {
-    Low,      // 2 files
-    Medium,   // 3-5 files
-    High,     // 6+ files
+    Low,    // 2 files
+    Medium, // 3-5 files
+    High,   // 6+ files
 }
 
 /// Group of orphaned functions that should belong to a type
@@ -192,22 +79,6 @@ pub struct UtilitiesModule {
     pub type_distribution: HashMap<String, usize>,
 }
 
-/// Cross-file technical grouping
-#[derive(Clone, Debug)]
-pub struct TechnicalGrouping {
-    /// Technical category (formatting, validation, calculation, etc.)
-    pub category: String,
-
-    /// Files involved in this grouping
-    pub files: Vec<PathBuf>,
-
-    /// Types affected
-    pub types: HashSet<String>,
-
-    /// Suggested reorganization
-    pub suggestion: String,
-}
-
 /// Codebase-level recommendation
 #[derive(Clone, Debug)]
 pub struct CodebaseRecommendation {
@@ -216,14 +87,6 @@ pub struct CodebaseRecommendation {
     pub description: String,
     pub actions: Vec<RefactoringAction>,
     pub estimated_effort: EffortEstimate,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum RecommendationSeverity {
-    Critical,  // Major architecture issue
-    High,      // Significant improvement needed
-    Medium,    // Moderate improvement
-    Low,       // Nice to have
 }
 
 #[derive(Clone, Debug)]
@@ -251,29 +114,101 @@ pub struct EffortEstimate {
 
 #[derive(Clone, Debug)]
 pub enum ComplexityLevel {
-    Simple,    // < 1 hour
-    Moderate,  // 1-4 hours
-    Complex,   // 4-8 hours
+    Simple,      // < 1 hour
+    Moderate,    // 1-4 hours
+    Complex,     // 4-8 hours
     VeryComplex, // > 8 hours
 }
 
 #[derive(Clone, Debug)]
 pub enum RiskLevel {
-    Low,       // Safe refactoring
-    Medium,    // Some dependencies
-    High,      // Major changes
+    Low,    // Safe refactoring
+    Medium, // Some dependencies
+    High,   // Major changes
 }
-```
 
-### 2. Type Scattering Detection
+/// Configuration for codebase analysis
+#[derive(Clone, Debug)]
+pub struct CodebaseAnalysisConfig {
+    /// Minimum methods scattered to report (default: 3)
+    pub min_scattered_methods: usize,
 
-```rust
+    /// Minimum files a type appears in to report scattering (default: 2)
+    pub min_file_scattering: usize,
+
+    /// Minimum orphaned functions to report (default: 3)
+    pub min_orphaned_functions: usize,
+
+    /// Detect utilities sprawl (default: true)
+    pub detect_utilities_sprawl: bool,
+}
+
+impl Default for CodebaseAnalysisConfig {
+    fn default() -> Self {
+        Self {
+            min_scattered_methods: 3,
+            min_file_scattering: 2,
+            min_orphaned_functions: 3,
+            detect_utilities_sprawl: true,
+        }
+    }
+}
+
+/// Snapshot of entire codebase
+pub struct CodebaseSnapshot {
+    pub files: Vec<FileSnapshot>,
+    pub root_path: PathBuf,
+}
+
+/// Snapshot of a single file
+pub struct FileSnapshot {
+    pub path: PathBuf,
+    pub ast: syn::File,
+    pub content: String,
+}
+
+impl CodebaseSnapshot {
+    /// Create snapshot of entire codebase
+    pub fn from_directory(root: &Path) -> Result<Self, String> {
+        let mut files = Vec::new();
+
+        for entry in walkdir::WalkDir::new(root)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("rs"))
+        {
+            let content = std::fs::read_to_string(entry.path())
+                .map_err(|e| format!("Failed to read {}: {}", entry.path().display(), e))?;
+
+            let ast = syn::parse_file(&content)
+                .map_err(|e| format!("Failed to parse {}: {}", entry.path().display(), e))?;
+
+            files.push(FileSnapshot {
+                path: entry.path().to_path_buf(),
+                ast,
+                content,
+            });
+        }
+
+        Ok(Self {
+            files,
+            root_path: root.to_path_buf(),
+        })
+    }
+}
+
+/// Analyzes entire codebase for type organization issues
+pub struct CodebaseTypeAnalyzer {
+    config: CodebaseAnalysisConfig,
+}
+
 impl CodebaseTypeAnalyzer {
+    pub fn new(config: CodebaseAnalysisConfig) -> Self {
+        Self { config }
+    }
+
     /// Analyze entire codebase for type scattering
-    pub fn analyze_codebase(
-        &self,
-        codebase: &CodebaseSnapshot,
-    ) -> CodebaseTypeAnalysis {
+    pub fn analyze_codebase(&self, codebase: &CodebaseSnapshot) -> CodebaseTypeAnalysis {
         // 1. Build type-to-methods mapping across all files
         let type_methods = self.build_type_method_map(codebase);
 
@@ -290,22 +225,13 @@ impl CodebaseTypeAnalyzer {
             vec![]
         };
 
-        // 5. Detect technical groupings
-        let technical = self.detect_technical_groupings(codebase);
-
-        // 6. Generate recommendations
-        let recommendations = self.generate_recommendations(
-            &scattered,
-            &orphaned,
-            &utilities,
-            &technical,
-        );
+        // 5. Generate recommendations
+        let recommendations = self.generate_recommendations(&scattered, &orphaned, &utilities);
 
         CodebaseTypeAnalysis {
             scattered_types: scattered,
             orphaned_functions: orphaned,
             utilities_sprawl: utilities,
-            technical_groupings: technical,
             recommendations,
         }
     }
@@ -319,14 +245,15 @@ impl CodebaseTypeAnalyzer {
 
         for file in &codebase.files {
             // Extract all method signatures from this file
-            let signatures = extract_method_signatures(&file.ast).unwrap_or_default();
+            let signatures = extract_method_signatures(&file.ast);
 
             // Group by parameter types
             for sig in signatures {
                 // Check if this is an impl method or standalone function
                 if let Some(self_type) = &sig.self_type {
                     // impl method - belongs to self_type
-                    type_map.entry(self_type.name.clone())
+                    type_map
+                        .entry(self_type.name.clone())
                         .or_insert_with(|| TypeMethodLocations::new(self_type.name.clone()))
                         .add_method(file.path.clone(), sig.name.clone(), true);
                 } else {
@@ -334,7 +261,8 @@ impl CodebaseTypeAnalyzer {
                     for param in &sig.param_types {
                         let base_type = extract_base_type(&param.name);
                         if is_domain_type(&base_type) {
-                            type_map.entry(base_type.clone())
+                            type_map
+                                .entry(base_type.clone())
                                 .or_insert_with(|| TypeMethodLocations::new(base_type))
                                 .add_method(file.path.clone(), sig.name.clone(), false);
                         }
@@ -363,16 +291,15 @@ impl CodebaseTypeAnalyzer {
             }
 
             // Only report if has min_scattered_methods+ methods
-            let total_methods: usize = locations.files.values()
-                .map(|methods| methods.len())
-                .sum();
+            let total_methods: usize = locations.files.values().map(|methods| methods.len()).sum();
 
             if total_methods < self.config.min_scattered_methods {
                 continue;
             }
 
             // Find where type is defined
-            let definition_file = self.find_type_definition(type_name, codebase)
+            let definition_file = self
+                .find_type_definition(type_name, codebase)
                 .unwrap_or_else(|| PathBuf::from("unknown"));
 
             // Determine severity
@@ -396,7 +323,8 @@ impl CodebaseTypeAnalyzer {
 
         // Sort by severity, then by total methods
         scattered.sort_by(|a, b| {
-            b.severity.cmp(&a.severity)
+            b.severity
+                .cmp(&a.severity)
                 .then(b.total_methods.cmp(&a.total_methods))
         });
 
@@ -424,46 +352,13 @@ impl CodebaseTypeAnalyzer {
         }
         None
     }
-}
 
-#[derive(Clone, Debug)]
-struct TypeMethodLocations {
-    type_name: String,
-    /// Map of file path to methods in that file
-    files: HashMap<PathBuf, Vec<String>>,
-    /// Whether each method is impl (true) or standalone (false)
-    method_impl_status: HashMap<String, bool>,
-}
-
-impl TypeMethodLocations {
-    fn new(type_name: String) -> Self {
-        Self {
-            type_name,
-            files: HashMap::new(),
-            method_impl_status: HashMap::new(),
-        }
-    }
-
-    fn add_method(&mut self, file: PathBuf, method: String, is_impl: bool) {
-        self.files.entry(file).or_default().push(method.clone());
-        self.method_impl_status.insert(method, is_impl);
-    }
-}
-```
-
-### 3. Orphaned Function Detection
-
-```rust
-impl CodebaseTypeAnalyzer {
     /// Detect standalone functions that should be methods
-    fn detect_orphaned_functions(
-        &self,
-        codebase: &CodebaseSnapshot,
-    ) -> Vec<OrphanedFunctionGroup> {
+    fn detect_orphaned_functions(&self, codebase: &CodebaseSnapshot) -> Vec<OrphanedFunctionGroup> {
         let mut orphaned_map: HashMap<String, Vec<(PathBuf, String)>> = HashMap::new();
 
         for file in &codebase.files {
-            let signatures = extract_method_signatures(&file.ast).unwrap_or_default();
+            let signatures = extract_method_signatures(&file.ast);
 
             for sig in signatures {
                 // Skip if already an impl method
@@ -490,16 +385,13 @@ impl CodebaseTypeAnalyzer {
                 continue;
             }
 
-            let source_files: HashSet<_> = functions.iter()
-                .map(|(path, _)| path.clone())
-                .collect();
+            let source_files: HashSet<_> = functions.iter().map(|(path, _)| path.clone()).collect();
 
-            let function_names: Vec<_> = functions.iter()
-                .map(|(_, name)| name.clone())
-                .collect();
+            let function_names: Vec<_> = functions.iter().map(|(_, name)| name.clone()).collect();
 
             // Suggest moving to type's definition file
-            let suggested_location = self.find_type_definition(&type_name, codebase)
+            let suggested_location = self
+                .find_type_definition(&type_name, codebase)
                 .unwrap_or_else(|| PathBuf::from(format!("src/{}.rs", to_snake_case(&type_name))));
 
             groups.push(OrphanedFunctionGroup {
@@ -537,37 +429,27 @@ impl CodebaseTypeAnalyzer {
         // Return type with highest count (must be dominant, not tied)
         let total_types: usize = type_counts.values().sum();
 
-        type_counts.into_iter()
+        type_counts
+            .into_iter()
             .max_by_key(|(_, count)| *count)
             .filter(|(_, count)| *count >= total_types / 2) // At least 50% of types
             .map(|(name, _)| name)
     }
-}
-```
 
-### 4. Utilities Sprawl Detection
-
-```rust
-impl CodebaseTypeAnalyzer {
     /// Detect utilities modules with mixed responsibilities
-    fn detect_utilities_sprawl(
-        &self,
-        codebase: &CodebaseSnapshot,
-    ) -> Vec<UtilitiesModule> {
+    fn detect_utilities_sprawl(&self, codebase: &CodebaseSnapshot) -> Vec<UtilitiesModule> {
         let mut utilities = Vec::new();
 
         for file in &codebase.files {
             // Check if file is utilities-like
-            let file_name = file.path.file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let file_name = file.path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
             if !self.is_utilities_file(file_name) {
                 continue;
             }
 
             // Analyze type distribution in this file
-            let signatures = extract_method_signatures(&file.ast).unwrap_or_default();
+            let signatures = extract_method_signatures(&file.ast);
             let mut type_distribution: HashMap<String, usize> = HashMap::new();
 
             for sig in &signatures {
@@ -597,23 +479,23 @@ impl CodebaseTypeAnalyzer {
     fn is_utilities_file(&self, file_name: &str) -> bool {
         matches!(
             file_name,
-            "utils" | "util" | "utilities" | "helpers" | "helper" |
-            "common" | "shared" | "misc" | "miscellaneous"
+            "utils"
+                | "util"
+                | "utilities"
+                | "helpers"
+                | "helper"
+                | "common"
+                | "shared"
+                | "misc"
+                | "miscellaneous"
         )
     }
-}
-```
 
-### 5. Recommendation Generation
-
-```rust
-impl CodebaseTypeAnalyzer {
     fn generate_recommendations(
         &self,
         scattered: &[ScatteredType],
         orphaned: &[OrphanedFunctionGroup],
         utilities: &[UtilitiesModule],
-        technical: &[TechnicalGrouping],
     ) -> Vec<CodebaseRecommendation> {
         let mut recommendations = Vec::new();
 
@@ -649,7 +531,10 @@ impl CodebaseTypeAnalyzer {
         // Recommendation 2: Convert orphaned functions to methods
         for orphaned_group in orphaned {
             recommendations.push(CodebaseRecommendation {
-                title: format!("Convert {} functions to methods", orphaned_group.target_type),
+                title: format!(
+                    "Convert {} functions to methods",
+                    orphaned_group.target_type
+                ),
                 severity: RecommendationSeverity::High,
                 description: format!(
                     "{} standalone functions operate on {}. Convert to impl methods.",
@@ -690,7 +575,7 @@ impl CodebaseTypeAnalyzer {
             });
         }
 
-        recommendations.sort_by_key(|r| std::cmp::Reverse(r.severity.clone()));
+        recommendations.sort_by_key(|r| std::cmp::Reverse(r.severity));
         recommendations
     }
 
@@ -728,186 +613,124 @@ impl CodebaseTypeAnalyzer {
         actions
     }
 }
-```
 
-## Integration as Technical Debt Issues
-
-Type organization problems are detected as **technical debt issues** alongside god objects, complexity hotspots, etc. No separate commands - just another issue type in standard analysis.
-
-See **Spec 187** for detailed output format examples showing how these issues appear in terminal, markdown, and JSON output.
-
-## Integration with Existing Analysis
-
-### Codebase Snapshot Structure
-
-```rust
-pub struct CodebaseSnapshot {
-    pub files: Vec<FileSnapshot>,
-    pub root_path: PathBuf,
+impl Default for CodebaseTypeAnalyzer {
+    fn default() -> Self {
+        Self::new(CodebaseAnalysisConfig::default())
+    }
 }
 
-pub struct FileSnapshot {
-    pub path: PathBuf,
-    pub ast: syn::File,
-    pub content: String,
+#[derive(Clone, Debug)]
+struct TypeMethodLocations {
+    #[allow(dead_code)]
+    type_name: String,
+    /// Map of file path to methods in that file
+    files: HashMap<PathBuf, Vec<String>>,
+    /// Whether each method is impl (true) or standalone (false)
+    method_impl_status: HashMap<String, bool>,
 }
 
-impl CodebaseSnapshot {
-    /// Create snapshot of entire codebase
-    pub fn from_directory(root: &Path) -> Result<Self, String> {
-        let mut files = Vec::new();
-
-        for entry in walkdir::WalkDir::new(root)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("rs"))
-        {
-            let content = std::fs::read_to_string(entry.path())
-                .map_err(|e| format!("Failed to read {}: {}", entry.path().display(), e))?;
-
-            let ast = syn::parse_file(&content)
-                .map_err(|e| format!("Failed to parse {}: {}", entry.path().display(), e))?;
-
-            files.push(FileSnapshot {
-                path: entry.path().to_path_buf(),
-                ast,
-                content,
-            });
+impl TypeMethodLocations {
+    fn new(type_name: String) -> Self {
+        Self {
+            type_name,
+            files: HashMap::new(),
+            method_impl_status: HashMap::new(),
         }
-
-        Ok(Self {
-            files,
-            root_path: root.to_path_buf(),
-        })
-    }
-}
-```
-
-### Integration with debtmap analyze
-
-The `CodebaseTypeAnalyzer` runs automatically as part of `debtmap analyze`:
-
-```rust
-// In main analysis pipeline
-pub fn run_analysis(config: &AnalysisConfig) -> AnalysisResult {
-    let mut issues = vec![];
-
-    // 1. God object detection (existing)
-    issues.extend(detect_god_objects(codebase));
-
-    // 2. Type organization analysis (NEW)
-    let type_analyzer = CodebaseTypeAnalyzer::default();
-    let type_analysis = type_analyzer.analyze_codebase(&codebase);
-
-    // Convert to standard issue format
-    issues.extend(convert_to_issues(type_analysis));
-
-    // 3. Other analyses (complexity, coverage, etc.)
-    // ...
-
-    AnalysisResult { issues }
-}
-```
-
-Configuration options in `debtmap.toml`:
-
-```toml
-[analysis.type_organization]
-enabled = true
-min_scattered_methods = 3
-min_file_scattering = 2
-min_orphaned_functions = 3
-detect_utilities_sprawl = true
-```
-
-### Converting to Standard Issue Format
-
-```rust
-/// Convert type organization analysis to standard debtmap issues
-fn convert_to_issues(analysis: CodebaseTypeAnalysis) -> Vec<Issue> {
-    let mut issues = vec![];
-
-    // 1. Scattered types → SCATTERED_TYPE issues
-    for scattered in analysis.scattered_types {
-        issues.push(Issue {
-            issue_type: IssueType::ScatteredType,
-            severity: match scattered.severity {
-                ScatteringSeverity::High => Severity::Critical,
-                ScatteringSeverity::Medium => Severity::High,
-                ScatteringSeverity::Low => Severity::Medium,
-            },
-            title: format!("Scattered Type: {}", scattered.type_name),
-            location: scattered.definition_file,
-            metadata: serde_json::to_value(&scattered).ok(),
-        });
     }
 
-    // 2. Orphaned functions → ORPHANED_FUNCTIONS issues
-    for orphaned in analysis.orphaned_functions {
-        issues.push(Issue {
-            issue_type: IssueType::OrphanedFunctions,
-            severity: Severity::High,
-            title: format!("Orphaned Functions: {}", orphaned.target_type),
-            location: orphaned.suggested_location,
-            metadata: serde_json::to_value(&orphaned).ok(),
-        });
+    fn add_method(&mut self, file: PathBuf, method: String, is_impl: bool) {
+        self.files.entry(file).or_default().push(method.clone());
+        self.method_impl_status.insert(method, is_impl);
     }
-
-    // 3. Utilities sprawl → UTILITIES_SPRAWL issues
-    for util in analysis.utilities_sprawl {
-        issues.push(Issue {
-            issue_type: IssueType::UtilitiesSprawl,
-            severity: Severity::High,
-            title: format!("Utilities Sprawl: {}", util.file_path.display()),
-            location: util.file_path,
-            metadata: serde_json::to_value(&util).ok(),
-        });
-    }
-
-    issues
 }
 
-/// New issue types added to existing enum
-pub enum IssueType {
-    // Existing types
-    GodObject,
-    HighComplexity,
-    LowCoverage,
-    // ... other existing types
+/// Extract method signatures from a file AST
+fn extract_method_signatures(ast: &syn::File) -> Vec<MethodSignature> {
+    use crate::organization::type_based_clustering::TypeSignatureAnalyzer;
 
-    // NEW: Type organization issues
-    ScatteredType,
-    OrphanedFunctions,
-    UtilitiesSprawl,
+    let analyzer = TypeSignatureAnalyzer;
+    let mut signatures = Vec::new();
+
+    for item in &ast.items {
+        match item {
+            // Impl blocks
+            syn::Item::Impl(impl_item) => {
+                // Extract self type
+                let self_type = if let syn::Type::Path(type_path) = &*impl_item.self_ty {
+                    type_path.path.segments.last().map(|seg| {
+                        crate::organization::type_based_clustering::TypeInfo {
+                            name: seg.ident.to_string(),
+                            is_reference: false,
+                            is_mutable: false,
+                            generics: vec![],
+                        }
+                    })
+                } else {
+                    None
+                };
+
+                for impl_item in &impl_item.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        let mut sig = analyzer.analyze_method(method);
+                        sig.self_type = self_type.clone();
+                        signatures.push(sig);
+                    }
+                }
+            }
+            // Standalone functions
+            syn::Item::Fn(func) => {
+                signatures.push(analyzer.analyze_function(func));
+            }
+            _ => {}
+        }
+    }
+
+    signatures
 }
-```
 
-## Dependencies
-
-- **Spec 180**: Shared utilities (case conversion, type analysis)
-- **Spec 181**: Type-based clustering (method signature extraction)
-- **Spec 183**: Anti-pattern detection (utilities detection, verb analysis)
-- `walkdir` crate for directory traversal
-- `syn` crate for AST parsing
-
-## Testing Strategy
-
-### Unit Tests
-
-```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn create_test_snapshot(files: &[(&str, &str)]) -> CodebaseSnapshot {
+        let file_snapshots: Vec<_> = files
+            .iter()
+            .map(|(path, content)| {
+                let ast = syn::parse_file(content).expect("Failed to parse test file");
+                FileSnapshot {
+                    path: PathBuf::from(path),
+                    ast,
+                    content: content.to_string(),
+                }
+            })
+            .collect();
+
+        CodebaseSnapshot {
+            files: file_snapshots,
+            root_path: PathBuf::from("test"),
+        }
+    }
+
     #[test]
     fn test_scattered_type_detection() {
         let snapshot = create_test_snapshot(&[
-            ("src/metrics.rs", "struct FileMetrics { }"),
-            ("src/utils.rs", "fn calculate(m: &FileMetrics) { }"),
-            ("src/helpers.rs", "fn validate(m: &FileMetrics) { }"),
+            ("src/metrics.rs", "pub struct FileMetrics { }"),
+            (
+                "src/utils.rs",
+                "pub fn calculate(m: &FileMetrics) -> u32 { 0 }",
+            ),
+            (
+                "src/helpers.rs",
+                "pub fn validate(m: &FileMetrics) -> bool { true }",
+            ),
+            (
+                "src/more.rs",
+                "pub fn format(m: &FileMetrics) -> String { String::new() }",
+            ),
         ]);
 
-        let analyzer = CodebaseTypeAnalyzer::new();
+        let analyzer = CodebaseTypeAnalyzer::default();
         let analysis = analyzer.analyze_codebase(&snapshot);
 
         assert_eq!(analysis.scattered_types.len(), 1);
@@ -916,53 +739,88 @@ mod tests {
     }
 
     #[test]
-    fn test_orphaned_function_detection() {
-        // Test detecting functions that should be methods
+    fn test_no_scattering_below_threshold() {
+        let snapshot = create_test_snapshot(&[
+            ("src/metrics.rs", "pub struct FileMetrics { }"),
+            (
+                "src/utils.rs",
+                "pub fn calculate(m: &FileMetrics) -> u32 { 0 }",
+            ),
+        ]);
+
+        let analyzer = CodebaseTypeAnalyzer::default();
+        let analysis = analyzer.analyze_codebase(&snapshot);
+
+        // Should not report scattering with only 1 additional file
+        assert!(analysis.scattered_types.is_empty());
     }
 
     #[test]
     fn test_utilities_sprawl_detection() {
-        // Test detecting utilities modules
+        let snapshot = create_test_snapshot(&[(
+            "src/utils.rs",
+            r#"
+                pub fn process_a(a: &TypeA) -> u32 { 0 }
+                pub fn process_b(b: &TypeB) -> u32 { 0 }
+                pub fn process_c(c: &TypeC) -> u32 { 0 }
+                pub fn process_d(d: &TypeD) -> u32 { 0 }
+            "#,
+        )]);
+
+        let analyzer = CodebaseTypeAnalyzer::default();
+        let analysis = analyzer.analyze_codebase(&snapshot);
+
+        assert_eq!(analysis.utilities_sprawl.len(), 1);
+        assert!(analysis.utilities_sprawl[0].distinct_types.len() >= 3);
+    }
+
+    #[test]
+    fn test_orphaned_function_detection() {
+        let snapshot = create_test_snapshot(&[
+            ("src/metrics.rs", "pub struct FileMetrics { }"),
+            (
+                "src/utils.rs",
+                r#"
+                    pub fn calculate(m: &FileMetrics) -> u32 { 0 }
+                    pub fn validate(m: &FileMetrics) -> bool { true }
+                    pub fn format(m: &FileMetrics) -> String { String::new() }
+                "#,
+            ),
+        ]);
+
+        let analyzer = CodebaseTypeAnalyzer::default();
+        let analysis = analyzer.analyze_codebase(&snapshot);
+
+        assert_eq!(analysis.orphaned_functions.len(), 1);
+        assert_eq!(analysis.orphaned_functions[0].target_type, "FileMetrics");
+        assert_eq!(analysis.orphaned_functions[0].functions.len(), 3);
+    }
+
+    #[test]
+    fn test_recommendation_generation() {
+        let snapshot = create_test_snapshot(&[
+            ("src/metrics.rs", "pub struct FileMetrics { }"),
+            (
+                "src/utils.rs",
+                "pub fn calculate(m: &FileMetrics) -> u32 { 0 }",
+            ),
+            (
+                "src/helpers.rs",
+                "pub fn validate(m: &FileMetrics) -> bool { true }",
+            ),
+            (
+                "src/more.rs",
+                "pub fn format(m: &FileMetrics) -> String { String::new() }",
+            ),
+        ]);
+
+        let analyzer = CodebaseTypeAnalyzer::default();
+        let analysis = analyzer.analyze_codebase(&snapshot);
+
+        assert!(!analysis.recommendations.is_empty());
+        assert!(analysis
+            .recommendations
+            .iter()
+            .any(|r| r.title.contains("FileMetrics")));
     }
 }
-```
-
-### Integration Tests
-
-```rust
-// Test on real codebases
-#[test]
-fn test_analyze_debtmap_codebase() {
-    let snapshot = CodebaseSnapshot::from_directory(Path::new("src")).unwrap();
-    let analyzer = CodebaseTypeAnalyzer::new();
-    let analysis = analyzer.analyze_codebase(&snapshot);
-
-    // Should detect actual scattering in debtmap
-    assert!(analysis.scattered_types.len() > 0);
-}
-```
-
-## Success Metrics
-
-- Detect 90%+ of scattered types (manual validation)
-- Identify orphaned functions with 85%+ accuracy
-- Generate actionable recommendations (user feedback)
-- Analysis completes in < 5 seconds for 100-file codebase
-- Zero false positives for well-organized codebases
-
-## Future Enhancements
-
-1. **Auto-refactoring**: Generate suggested code changes with `debtmap fix`
-2. **Incremental analysis**: Only analyze changed files for faster CI
-3. **Quality gates**: Track and prevent increases in type scattering
-4. **Visualization**: Generate graphs showing type organization patterns
-5. **Smart recommendations**: Use ML to learn project-specific organization patterns
-
-## Migration Path
-
-1. **Week 1**: Implement scattered type detection
-2. **Week 2**: Add orphaned function detection
-3. **Week 3**: Add utilities sprawl detection
-4. **Week 4**: Add recommendation generation and output formatting
-5. **Week 5**: CLI integration and testing
-6. **Week 6**: Documentation and polish

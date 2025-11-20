@@ -4,6 +4,7 @@ use syn;
 pub mod anti_pattern_detector;
 pub mod architecture_utils;
 pub mod behavioral_decomposition;
+pub mod codebase_type_analyzer;
 pub use behavioral_decomposition::{
     apply_hybrid_clustering, apply_production_ready_clustering,
     build_method_call_adjacency_matrix_with_functions, cluster_methods_by_behavior,
@@ -106,6 +107,13 @@ pub use anti_pattern_detector::{
 pub use architecture_utils::{
     extract_base_type, extract_noun, is_domain_term, is_domain_type, is_likely_verb,
     is_primitive_type, most_common, to_pascal_case, to_snake_case, types_equivalent,
+};
+
+pub use codebase_type_analyzer::{
+    ActionType, CodebaseAnalysisConfig, CodebaseRecommendation, CodebaseSnapshot,
+    CodebaseTypeAnalysis, CodebaseTypeAnalyzer, ComplexityLevel, EffortEstimate, FileSnapshot,
+    OrphanedFunctionGroup, RefactoringAction, RiskLevel, ScatteredType, ScatteringSeverity,
+    UtilitiesModule,
 };
 
 pub use file_classifier::{

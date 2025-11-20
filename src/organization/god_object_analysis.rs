@@ -396,7 +396,7 @@ pub enum SplitAnalysisMethod {
     TypeBased,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RecommendationSeverity {
     Critical,
     High,
