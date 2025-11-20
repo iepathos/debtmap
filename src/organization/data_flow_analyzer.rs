@@ -39,9 +39,9 @@ pub enum TransformationType {
     Aggregation,
     /// A → (B, C) (decomposition)
     Decomposition,
-    /// A → Result<B> (validation/enrichment)
+    /// A → `Result<B>` (validation/enrichment)
     Enrichment,
-    /// A → Vec<B> (expansion)
+    /// A → `Vec<B>` (expansion)
     Expansion,
 }
 
