@@ -253,11 +253,8 @@ impl HiddenTypeExtractor {
                         if let syn::ReturnType::Type(_, ty) = &method.sig.output {
                             if let syn::Type::Tuple(tuple_type) = ty.as_ref() {
                                 // Found a tuple return
-                                let components = tuple_type
-                                    .elems
-                                    .iter()
-                                    .map(Self::type_to_string)
-                                    .collect();
+                                let components =
+                                    tuple_type.elems.iter().map(Self::type_to_string).collect();
 
                                 tuple_returns.push(TupleReturn {
                                     method_name: method.sig.ident.to_string(),
