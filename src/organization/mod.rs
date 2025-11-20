@@ -27,6 +27,7 @@ pub mod file_classifier;
 pub mod god_object;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
+pub mod hidden_type_extractor;
 pub mod javascript;
 pub mod language;
 pub mod macro_recommendations;
@@ -96,6 +97,11 @@ pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 
 pub use type_based_clustering::{
     MethodSignature, TypeAffinityAnalyzer, TypeCluster, TypeInfo, TypeSignatureAnalyzer,
+};
+
+pub use hidden_type_extractor::{
+    HiddenType, HiddenTypeConfig, HiddenTypeExtractor, MethodPurpose, ParameterClump, TupleReturn,
+    TypeField, TypeMethod, Visibility,
 };
 
 pub use data_flow_analyzer::{

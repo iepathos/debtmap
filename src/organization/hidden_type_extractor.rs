@@ -1,66 +1,11 @@
-# Spec 184: Hidden Type Extraction for Domain Modeling
+//! Hidden type extraction for god object refactoring.
+//!
+//! This module analyzes parameter patterns and tuple returns to identify missing
+//! domain types that should be extracted. It provides concrete refactoring guidance
+//! by generating complete type definitions with methods.
 
-**Status**: Draft
-**Dependencies**: [181, 182, 183]
-**Related**: [178, 179, 180]
-
-## Problem
-
-God objects often reveal missing domain types through parameter patterns and data relationships. Current recommendations don't suggest what new types to create, only how to split existing code. This leaves developers without guidance on proper domain modeling.
-
-**Examples of hidden types in current code**:
-
-```rust
-// Parameter clump appears 5 times - hidden type!
-fn format_header(score: f64, location: SourceLocation, metrics: &Metrics, verbosity: Verbosity)
-fn render_section(score: f64, location: SourceLocation, metrics: &Metrics, verbosity: Verbosity)
-fn validate_item(score: f64, location: SourceLocation, metrics: &Metrics)
-
-// Hidden type: PriorityItem
-pub struct PriorityItem {
-    pub score: f64,
-    pub location: SourceLocation,
-    pub metrics: Metrics,
-}
-
-impl PriorityItem {
-    pub fn format(&self, verbosity: Verbosity) -> String { ... }
-    pub fn render(&self, verbosity: Verbosity) -> String { ... }
-    pub fn validate(&self) -> Result<()> { ... }
-}
-```
-
-```rust
-// Tuple returns - hidden type!
-fn analyze_struct(data: &StructData) -> (f64, Vec<String>, DomainDiversity)
-
-// Hidden type: StructAnalysisResult
-pub struct StructAnalysisResult {
-    pub score: f64,
-    pub domains: Vec<String>,
-    pub diversity: DomainDiversity,
-}
-```
-
-## Objective
-
-Implement hidden type extraction that analyzes god objects to discover missing domain types through parameter patterns, tuple returns, and data relationships, then generates full type definitions with methods as refactoring guidance.
-
-## Requirements
-
-### 1. Parameter Clump Analysis
-
-Detect repeated parameter patterns that should be structs:
-
-```rust
-// src/organization/hidden_type_extractor.rs
-
-use std::collections::{HashMap, HashSet};
 use crate::organization::type_based_clustering::{MethodSignature, TypeInfo};
-
-pub struct HiddenTypeExtractor {
-    config: HiddenTypeConfig,
-}
+use std::collections::HashSet;
 
 /// Configuration for hidden type extraction
 #[derive(Clone, Debug)]
@@ -85,6 +30,12 @@ impl Default for HiddenTypeConfig {
     }
 }
 
+/// Extractor for discovering hidden types from god objects
+pub struct HiddenTypeExtractor {
+    config: HiddenTypeConfig,
+}
+
+/// A discovered hidden type with refactoring guidance
 #[derive(Clone, Debug)]
 pub struct HiddenType {
     pub suggested_name: String,
@@ -96,6 +47,7 @@ pub struct HiddenType {
     pub example_definition: String,
 }
 
+/// Field in a hidden type
 #[derive(Clone, Debug)]
 pub struct TypeField {
     pub name: String,
@@ -103,6 +55,7 @@ pub struct TypeField {
     pub visibility: Visibility,
 }
 
+/// Method to be moved to hidden type
 #[derive(Clone, Debug)]
 pub struct TypeMethod {
     pub name: String,
@@ -110,6 +63,7 @@ pub struct TypeMethod {
     pub purpose: MethodPurpose,
 }
 
+/// Purpose of a method (for categorization)
 #[derive(Clone, Debug, PartialEq)]
 pub enum MethodPurpose {
     Constructor,
@@ -119,11 +73,33 @@ pub enum MethodPurpose {
     Display,
 }
 
+/// Visibility modifier for fields
 #[derive(Clone, Debug, PartialEq)]
 pub enum Visibility {
     Public,
     Private,
     PubCrate,
+}
+
+/// Parameter clump pattern
+#[derive(Clone, Debug)]
+pub struct ParameterClump {
+    pub params: Vec<TypeInfo>,
+    pub methods: Vec<String>,
+}
+
+/// Tuple return pattern
+#[derive(Clone, Debug)]
+pub struct TupleReturn {
+    pub method_name: String,
+    pub tuple_type: String,
+    pub components: Vec<String>,
+}
+
+/// Normalized parameter signature for fuzzy matching
+#[derive(Clone, Debug)]
+struct NormalizedParamSignature {
+    types: Vec<TypeInfo>,
 }
 
 impl HiddenTypeExtractor {
@@ -173,7 +149,8 @@ impl HiddenTypeExtractor {
         }
 
         // Filter for clumps that appear min_occurrences times
-        clump_groups.into_iter()
+        clump_groups
+            .into_iter()
             .filter(|(_, methods)| methods.len() >= min_occurrences)
             .map(|(normalized_sig, methods)| ParameterClump {
                 params: normalized_sig.types,
@@ -184,7 +161,8 @@ impl HiddenTypeExtractor {
 
     fn create_normalized_signature(&self, params: &[TypeInfo]) -> NormalizedParamSignature {
         NormalizedParamSignature {
-            types: params.iter()
+            types: params
+                .iter()
                 .map(|t| self.normalize_type_for_matching(t))
                 .collect(),
         }
@@ -249,7 +227,8 @@ impl HiddenTypeExtractor {
             return false;
         }
 
-        sig1.types.iter()
+        sig1.types
+            .iter()
             .zip(&sig2.types)
             .all(|(t1, t2)| self.types_fuzzy_match(t1, t2))
     }
@@ -258,42 +237,12 @@ impl HiddenTypeExtractor {
         // After normalization, should be exact match
         t1.name == t2.name
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct ParameterClump {
-    pub params: Vec<TypeInfo>,
-    pub methods: Vec<String>,
-}
-
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct ParamSignature {
-    types: Vec<TypeInfo>,
-}
-
-#[derive(Clone, Debug)]
-struct NormalizedParamSignature {
-    types: Vec<TypeInfo>,
-}
-
-// Note: TypeInfo Hash/Eq/PartialEq are derived in Spec 181
-// This ensures all fields (including generics) are included in equality/hashing
-```
-
-### 2. Tuple Return Detection
-
-Identify tuple returns that should be named structs:
-
-```rust
-impl HiddenTypeExtractor {
     /// Detect tuple returns that should be structs
     ///
     /// Analyzes return types from method signatures to find tuples.
     /// Uses syn AST instead of string parsing for correctness.
-    pub fn find_tuple_returns(
-        &self,
-        ast: &syn::File,
-    ) -> Vec<TupleReturn> {
+    pub fn find_tuple_returns(&self, ast: &syn::File) -> Vec<TupleReturn> {
         let mut tuple_returns = Vec::new();
 
         // Extract from impl blocks
@@ -304,15 +253,20 @@ impl HiddenTypeExtractor {
                         if let syn::ReturnType::Type(_, ty) = &method.sig.output {
                             if let syn::Type::Tuple(tuple_type) = ty.as_ref() {
                                 // Found a tuple return
-                                let components = tuple_type.elems.iter()
-                                    .map(|elem| self.type_to_string(elem))
+                                let components = tuple_type
+                                    .elems
+                                    .iter()
+                                    .map(Self::type_to_string)
                                     .collect();
 
                                 tuple_returns.push(TupleReturn {
                                     method_name: method.sig.ident.to_string(),
-                                    tuple_type: format!("({})",
-                                        tuple_type.elems.iter()
-                                            .map(|t| self.type_to_string(t))
+                                    tuple_type: format!(
+                                        "({})",
+                                        tuple_type
+                                            .elems
+                                            .iter()
+                                            .map(Self::type_to_string)
                                             .collect::<Vec<_>>()
                                             .join(", ")
                                     ),
@@ -329,19 +283,24 @@ impl HiddenTypeExtractor {
     }
 
     /// Convert syn::Type to string representation
-    fn type_to_string(&self, ty: &syn::Type) -> String {
+    fn type_to_string(ty: &syn::Type) -> String {
         match ty {
-            syn::Type::Path(type_path) => {
-                quote::quote!(#type_path).to_string()
-            }
+            syn::Type::Path(type_path) => quote::quote!(#type_path).to_string(),
             syn::Type::Reference(type_ref) => {
-                let mutability = if type_ref.mutability.is_some() { "mut " } else { "" };
-                format!("&{}{}", mutability, self.type_to_string(&type_ref.elem))
+                let mutability = if type_ref.mutability.is_some() {
+                    "mut "
+                } else {
+                    ""
+                };
+                format!("&{}{}", mutability, Self::type_to_string(&type_ref.elem))
             }
             syn::Type::Tuple(tuple) => {
-                format!("({})",
-                    tuple.elems.iter()
-                        .map(|t| self.type_to_string(t))
+                format!(
+                    "({})",
+                    tuple
+                        .elems
+                        .iter()
+                        .map(Self::type_to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -349,22 +308,7 @@ impl HiddenTypeExtractor {
             _ => quote::quote!(#ty).to_string(),
         }
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct TupleReturn {
-    pub method_name: String,
-    pub tuple_type: String,
-    pub components: Vec<String>,
-}
-```
-
-### 3. Hidden Type Synthesis
-
-Combine clumps and tuples into complete type definitions:
-
-```rust
-impl HiddenTypeExtractor {
     /// Extract hidden types from god object analysis
     pub fn extract_hidden_types(
         &self,
@@ -390,14 +334,12 @@ impl HiddenTypeExtractor {
         self.deduplicate_types(hidden_types)
     }
 
-    fn synthesize_type_from_clump(
-        &self,
-        clump: &ParameterClump,
-        module_name: &str,
-    ) -> HiddenType {
+    fn synthesize_type_from_clump(&self, clump: &ParameterClump, module_name: &str) -> HiddenType {
         let suggested_name = self.suggest_type_name_from_params(&clump.params, module_name);
 
-        let fields = clump.params.iter()
+        let fields: Vec<TypeField> = clump
+            .params
+            .iter()
             .enumerate()
             .map(|(i, type_info)| TypeField {
                 name: self.suggest_field_name(type_info, i),
@@ -406,7 +348,9 @@ impl HiddenTypeExtractor {
             })
             .collect();
 
-        let methods = clump.methods.iter()
+        let methods: Vec<TypeMethod> = clump
+            .methods
+            .iter()
             .map(|method_name| TypeMethod {
                 name: method_name.clone(),
                 signature: format!("pub fn {}(&self, ...) -> ...", method_name),
@@ -414,11 +358,8 @@ impl HiddenTypeExtractor {
             })
             .collect();
 
-        let example_definition = self.generate_struct_definition(
-            &suggested_name,
-            &fields,
-            &methods,
-        );
+        let example_definition =
+            self.generate_struct_definition(&suggested_name, &fields, &methods);
 
         HiddenType {
             suggested_name: suggested_name.clone(),
@@ -436,14 +377,12 @@ impl HiddenTypeExtractor {
         }
     }
 
-    fn synthesize_type_from_tuple(
-        &self,
-        tuple: &TupleReturn,
-        module_name: &str,
-    ) -> HiddenType {
+    fn synthesize_type_from_tuple(&self, tuple: &TupleReturn, module_name: &str) -> HiddenType {
         let suggested_name = self.suggest_type_name_from_method(&tuple.method_name, module_name);
 
-        let fields: Vec<_> = tuple.components.iter()
+        let fields: Vec<_> = tuple
+            .components
+            .iter()
             .enumerate()
             .map(|(i, component_type)| TypeField {
                 name: format!("field_{}", i),
@@ -457,25 +396,21 @@ impl HiddenTypeExtractor {
             })
             .collect();
 
-        let methods = vec![
-            TypeMethod {
-                name: "new".to_string(),
-                signature: format!(
-                    "pub fn new({}) -> Self",
-                    fields.iter()
-                        .map(|f| format!("{}: {}", f.name, f.type_info.name))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-                purpose: MethodPurpose::Constructor,
-            }
-        ];
+        let methods = vec![TypeMethod {
+            name: "new".to_string(),
+            signature: format!(
+                "pub fn new({}) -> Self",
+                fields
+                    .iter()
+                    .map(|f| format!("{}: {}", f.name, f.type_info.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            purpose: MethodPurpose::Constructor,
+        }];
 
-        let example_definition = self.generate_struct_definition(
-            &suggested_name,
-            &fields,
-            &methods,
-        );
+        let example_definition =
+            self.generate_struct_definition(&suggested_name, &fields, &methods);
 
         HiddenType {
             suggested_name: suggested_name.clone(),
@@ -486,8 +421,7 @@ impl HiddenTypeExtractor {
             rationale: format!(
                 "Method '{}' returns unnamed tuple {}. \
                  Named struct provides better documentation and type safety.",
-                tuple.method_name,
-                tuple.tuple_type
+                tuple.method_name, tuple.tuple_type
             ),
             example_definition,
         }
@@ -501,9 +435,7 @@ impl HiddenTypeExtractor {
     /// 3. Generate meaningful name based on domain
     fn suggest_type_name_from_params(&self, params: &[TypeInfo], module_name: &str) -> String {
         // Extract nouns from type names
-        let nouns: Vec<_> = params.iter()
-            .map(|p| extract_noun(&p.name))
-            .collect();
+        let nouns: Vec<_> = params.iter().map(|p| extract_noun(&p.name)).collect();
 
         // Identify domain
         let domain = self.identify_domain(&nouns, module_name);
@@ -516,9 +448,7 @@ impl HiddenTypeExtractor {
             "config" | "settings" => {
                 format!("{}Config", to_pascal_case(module_name))
             }
-            "analysis" | "analyzer" => {
-                "AnalysisContext".to_string()
-            }
+            "analysis" | "analyzer" => "AnalysisContext".to_string(),
             _ => {
                 // Combine most meaningful nouns
                 if nouns.len() == 2 {
@@ -562,7 +492,7 @@ impl HiddenTypeExtractor {
         // Common verb → suffix mappings
         let (verb, remainder) = self.split_method_verb(method_name);
 
-        match verb {
+        match verb.as_str() {
             "analyze" => format!("{}Result", to_pascal_case(&remainder)),
             "calculate" | "compute" => format!("{}Metrics", to_pascal_case(&remainder)),
             "validate" | "check" => format!("{}Validation", to_pascal_case(&remainder)),
@@ -591,7 +521,7 @@ impl HiddenTypeExtractor {
         }
     }
 
-    fn suggest_field_name(&self, type_info: &TypeInfo, index: usize) -> String {
+    fn suggest_field_name(&self, type_info: &TypeInfo, _index: usize) -> String {
         let type_name = &type_info.name;
 
         // Common type mappings
@@ -686,58 +616,14 @@ impl HiddenTypeExtractor {
     }
 
     fn type_signature(&self, hidden_type: &HiddenType) -> String {
-        hidden_type.fields.iter()
+        hidden_type
+            .fields
+            .iter()
             .map(|f| f.type_info.name.clone())
             .collect::<Vec<_>>()
             .join(",")
     }
-}
 
-/// Extract core noun from compound type names
-///
-/// Examples:
-/// - "SourceLocation" -> "Location"
-/// - "FileMetrics" -> "Metrics"
-/// - "HttpRequestHandler" -> "HttpRequest"
-/// - "UserData" -> "User"
-fn extract_noun(type_name: &str) -> String {
-    // Common suffixes to remove
-    const SUFFIXES: &[&str] = &[
-        "Location", "Metrics", "Data", "Info", "Details",
-        "Handler", "Manager", "Service", "Provider", "Factory",
-        "Builder", "Analyzer", "Processor", "Controller"
-    ];
-
-    for suffix in SUFFIXES {
-        if type_name.ends_with(suffix) && type_name.len() > suffix.len() {
-            return type_name[..type_name.len() - suffix.len()].to_string();
-        }
-    }
-
-    // No suffix found, return as-is
-    type_name.to_string()
-}
-
-// Note: to_pascal_case is shared with Spec 183 (see Shared Utilities section)
-fn to_pascal_case(s: &str) -> String {
-    s.split('_')
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().chain(chars).collect(),
-            }
-        })
-        .collect()
-}
-```
-
-### 4. Code Generation
-
-Generate complete struct definitions with documentation:
-
-```rust
-impl HiddenTypeExtractor {
     fn generate_struct_definition(
         &self,
         type_name: &str,
@@ -759,8 +645,7 @@ impl HiddenTypeExtractor {
         for field in fields {
             code.push_str(&format!(
                 "    pub {}: {},\n",
-                field.name,
-                field.type_info.name
+                field.name, field.type_info.name
             ));
         }
 
@@ -772,7 +657,8 @@ impl HiddenTypeExtractor {
         // Constructor
         code.push_str("    /// Create a new instance\n");
         code.push_str("    pub fn new(");
-        let params: Vec<_> = fields.iter()
+        let params: Vec<_> = fields
+            .iter()
             .map(|f| format!("{}: {}", f.name, f.type_info.name))
             .collect();
         code.push_str(&params.join(", "));
@@ -797,192 +683,93 @@ impl HiddenTypeExtractor {
         code
     }
 }
-```
 
-## Enhanced Output Format
-
-```
-#4 SCORE: 62.0 [CRITICAL] god_object_analysis.rs (27 methods, 15 structs)
-
-Hidden Type Extraction:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-3 Hidden Types Discovered:
-
-[HIGH CONFIDENCE: 0.95] StructAnalysisContext
-  Rationale: Parameter clump (4 parameters) appears in 8 methods.
-             Encapsulating these parameters in a struct improves cohesion and reduces coupling.
-
-  Current Usage (Parameter Clump):
-    ✗ analyze_struct(data: &StructData, metrics: &Metrics, config: &Config, verbosity: Verbosity)
-    ✗ validate_struct(data: &StructData, metrics: &Metrics, config: &Config, verbosity: Verbosity)
-    ✗ format_struct(data: &StructData, metrics: &Metrics, config: &Config, verbosity: Verbosity)
-    ... 5 more methods
-
-  Suggested Definition:
-
-    /// Extracted type representing StructAnalysisContext
-    ///
-    /// This type was identified from repeated parameter patterns.
-    /// Encapsulating these fields improves cohesion and testability.
-    #[derive(Debug, Clone)]
-    pub struct StructAnalysisContext {
-        pub data: StructData,
-        pub metrics: Metrics,
-        pub config: Config,
-        pub verbosity: Verbosity,
+impl Default for HiddenTypeExtractor {
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    impl StructAnalysisContext {
-        /// Create a new instance
-        pub fn new(data: StructData, metrics: Metrics, config: Config, verbosity: Verbosity) -> Self {
-            Self { data, metrics, config, verbosity }
-        }
+/// Extract core noun from compound type names
+///
+/// Examples:
+/// - "SourceLocation" -> "Location"
+/// - "FileMetrics" -> "Metrics"
+/// - "HttpRequestHandler" -> "HttpRequest"
+/// - "UserData" -> "User"
+fn extract_noun(type_name: &str) -> String {
+    // Common suffixes to remove
+    const SUFFIXES: &[&str] = &[
+        "Location",
+        "Metrics",
+        "Data",
+        "Info",
+        "Details",
+        "Handler",
+        "Manager",
+        "Service",
+        "Provider",
+        "Factory",
+        "Builder",
+        "Analyzer",
+        "Processor",
+        "Controller",
+    ];
 
-        /// Analyze the struct in this context
-        pub fn analyze(&self) -> AnalysisResult {
-            todo!("Migrate logic from analyze_struct")
-        }
-
-        /// Validate the struct
-        pub fn validate(&self) -> Result<()> {
-            todo!("Migrate logic from validate_struct")
-        }
-
-        /// Format for display
-        pub fn format(&self) -> String {
-            todo!("Migrate logic from format_struct")
+    for suffix in SUFFIXES {
+        if type_name.ends_with(suffix) && type_name.len() > suffix.len() {
+            return type_name[..type_name.len() - suffix.len()].to_string();
         }
     }
 
-  Migration Path:
-    1. Create StructAnalysisContext in new file: struct_analysis_context.rs
-    2. Update method signatures to accept &StructAnalysisContext
-    3. Move logic from static functions to impl methods
-    4. Remove individual parameters from call sites
+    // No suffix found, return as-is
+    type_name.to_string()
+}
 
-[MEDIUM CONFIDENCE: 0.75] DiversityAnalysisResult
-  Rationale: Method 'analyze_diversity' returns unnamed tuple (f64, Vec<String>, DomainDiversity).
-             Named struct provides better documentation and type safety.
+/// Convert snake_case to PascalCase
+fn to_pascal_case(s: &str) -> String {
+    s.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect()
+}
 
-  Current Usage (Tuple Return):
-    ✗ fn analyze_diversity(...) -> (f64, Vec<String>, DomainDiversity)
-
-  Suggested Definition:
-
-    /// Result of domain diversity analysis
-    #[derive(Debug, Clone)]
-    pub struct DiversityAnalysisResult {
-        pub diversity_score: f64,
-        pub domains: Vec<String>,
-        pub diversity_metrics: DomainDiversity,
-    }
-
-    impl DiversityAnalysisResult {
-        /// Create a new instance
-        pub fn new(diversity_score: f64, domains: Vec<String>, diversity_metrics: DomainDiversity) -> Self {
-            Self { diversity_score, domains, diversity_metrics }
-        }
-
-        /// Check if diversity indicates god object
-        pub fn is_god_object(&self, threshold: f64) -> bool {
-            self.diversity_score > threshold
-        }
-    }
-
-  Migration Path:
-    1. Create DiversityAnalysisResult in diversity.rs
-    2. Update analyze_diversity to return DiversityAnalysisResult
-    3. Update call sites to use named fields instead of tuple destructuring
-
-[MEDIUM CONFIDENCE: 0.70] PriorityItem
-  Rationale: Parameter clump (3 parameters) appears in 5 methods.
-             Encapsulating these parameters in a struct improves cohesion and reduces coupling.
-
-  Current Usage (Parameter Clump):
-    ✗ format_header(score: f64, location: SourceLocation, metrics: &Metrics)
-    ✗ render_section(score: f64, location: SourceLocation, metrics: &Metrics)
-    ✗ validate_item(score: f64, location: SourceLocation, metrics: &Metrics)
-    ... 2 more methods
-
-  Suggested Definition:
-
-    /// Priority item for formatting and display
-    #[derive(Debug, Clone)]
-    pub struct PriorityItem {
-        pub score: f64,
-        pub location: SourceLocation,
-        pub metrics: Metrics,
-    }
-
-    impl PriorityItem {
-        pub fn new(score: f64, location: SourceLocation, metrics: Metrics) -> Self {
-            Self { score, location, metrics }
-        }
-
-        pub fn format_header(&self) -> String {
-            todo!("Migrate logic from format_header")
-        }
-
-        pub fn render_section(&self) -> String {
-            todo!("Migrate logic from render_section")
-        }
-    }
-
-    impl fmt::Display for PriorityItem {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}", self.format_header())
-        }
-    }
-
-Refactoring Priority:
-  1. ✅ StructAnalysisContext (High confidence, 8 methods affected)
-  2. ✅ DiversityAnalysisResult (Improves type safety, single method)
-  3. ⚠ PriorityItem (Medium confidence, 5 methods affected)
-```
-
-## Testing Strategy
-
-### Unit Tests
-
-```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn simple_type(name: &str) -> TypeInfo {
+        TypeInfo {
+            name: name.to_string(),
+            is_reference: false,
+            is_mutable: false,
+            generics: vec![],
+        }
+    }
+
+    fn method_sig(name: &str, params: Vec<TypeInfo>) -> MethodSignature {
+        MethodSignature {
+            name: name.to_string(),
+            param_types: params,
+            return_type: None,
+            self_type: None,
+        }
+    }
+
     #[test]
     fn test_find_parameter_clumps() {
         let signatures = vec![
-            MethodSignature {
-                name: "foo".to_string(),
-                param_types: vec![
-                    TypeInfo { name: "String".to_string(), .. },
-                    TypeInfo { name: "usize".to_string(), .. },
-                ],
-                return_type: None,
-                self_type: None,
-            },
-            MethodSignature {
-                name: "bar".to_string(),
-                param_types: vec![
-                    TypeInfo { name: "String".to_string(), .. },
-                    TypeInfo { name: "usize".to_string(), .. },
-                ],
-                return_type: None,
-                self_type: None,
-            },
-            MethodSignature {
-                name: "baz".to_string(),
-                param_types: vec![
-                    TypeInfo { name: "String".to_string(), .. },
-                    TypeInfo { name: "usize".to_string(), .. },
-                ],
-                return_type: None,
-                self_type: None,
-            },
+            method_sig("foo", vec![simple_type("String"), simple_type("usize")]),
+            method_sig("bar", vec![simple_type("String"), simple_type("usize")]),
+            method_sig("baz", vec![simple_type("String"), simple_type("usize")]),
         ];
 
-        let extractor = HiddenTypeExtractor;
+        let extractor = HiddenTypeExtractor::new();
         let clumps = extractor.find_parameter_clumps(&signatures, 3);
 
         assert_eq!(clumps.len(), 1);
@@ -991,31 +778,8 @@ mod tests {
     }
 
     #[test]
-    fn test_find_tuple_returns() {
-        let signatures = vec![
-            MethodSignature {
-                name: "analyze".to_string(),
-                param_types: vec![],
-                return_type: Some(TypeInfo {
-                    name: "(f64, Vec<String>)".to_string(),
-                    is_reference: false,
-                    is_mutable: false,
-                    generics: vec![],
-                }),
-                self_type: None,
-            },
-        ];
-
-        let extractor = HiddenTypeExtractor;
-        let tuples = extractor.find_tuple_returns(&signatures);
-
-        assert_eq!(tuples.len(), 1);
-        assert_eq!(tuples[0].components.len(), 2);
-    }
-
-    #[test]
     fn test_hidden_type_confidence() {
-        let extractor = HiddenTypeExtractor;
+        let extractor = HiddenTypeExtractor::new();
 
         // High occurrences + many params = high confidence
         let conf1 = extractor.calculate_confidence(10, 5);
@@ -1025,77 +789,111 @@ mod tests {
         let conf2 = extractor.calculate_confidence(2, 2);
         assert!(conf2 < 0.5);
     }
+
+    #[test]
+    fn test_extract_noun() {
+        assert_eq!(extract_noun("SourceLocation"), "Source");
+        assert_eq!(extract_noun("FileMetrics"), "File");
+        assert_eq!(extract_noun("UserData"), "User");
+        assert_eq!(extract_noun("Simple"), "Simple");
+    }
+
+    #[test]
+    fn test_to_pascal_case() {
+        assert_eq!(to_pascal_case("format_item"), "FormatItem");
+        assert_eq!(to_pascal_case("analyze_code"), "AnalyzeCode");
+        assert_eq!(to_pascal_case("simple"), "Simple");
+    }
+
+    #[test]
+    fn test_normalize_type_for_matching() {
+        let extractor = HiddenTypeExtractor::new();
+
+        // Reference normalization
+        let ref_type = TypeInfo {
+            name: "Metrics".to_string(),
+            is_reference: true,
+            is_mutable: false,
+            generics: vec![],
+        };
+        let normalized = extractor.normalize_type_for_matching(&ref_type);
+        assert!(!normalized.is_reference);
+        assert_eq!(normalized.name, "Metrics");
+
+        // str -> String normalization
+        let str_type = simple_type("str");
+        let normalized = extractor.normalize_type_for_matching(&str_type);
+        assert_eq!(normalized.name, "String");
+    }
+
+    #[test]
+    fn test_fuzzy_matching_with_references() {
+        let extractor = HiddenTypeExtractor::new();
+
+        let sig1 = vec![
+            TypeInfo {
+                name: "Metrics".to_string(),
+                is_reference: true,
+                is_mutable: false,
+                generics: vec![],
+            },
+            simple_type("usize"),
+        ];
+
+        let sig2 = vec![simple_type("Metrics"), simple_type("usize")];
+
+        let norm1 = extractor.create_normalized_signature(&sig1);
+        let norm2 = extractor.create_normalized_signature(&sig2);
+
+        assert!(extractor.signatures_match_fuzzy(&norm1, &norm2));
+    }
+
+    #[test]
+    fn test_suggest_field_name() {
+        let extractor = HiddenTypeExtractor::new();
+
+        assert_eq!(
+            extractor.suggest_field_name(&simple_type("SourceLocation"), 0),
+            "location"
+        );
+        assert_eq!(
+            extractor.suggest_field_name(&simple_type("FileMetrics"), 0),
+            "metrics"
+        );
+        assert_eq!(
+            extractor.suggest_field_name(&simple_type("Config"), 0),
+            "config"
+        );
+    }
+
+    #[test]
+    fn test_infer_method_purpose() {
+        let extractor = HiddenTypeExtractor::new();
+
+        assert_eq!(
+            extractor.infer_method_purpose("format_header"),
+            MethodPurpose::Display
+        );
+        assert_eq!(
+            extractor.infer_method_purpose("validate_item"),
+            MethodPurpose::Validation
+        );
+        assert_eq!(
+            extractor.infer_method_purpose("new_instance"),
+            MethodPurpose::Constructor
+        );
+        assert_eq!(
+            extractor.infer_method_purpose("get_value"),
+            MethodPurpose::Query
+        );
+    }
+
+    #[test]
+    fn test_to_snake_case() {
+        let extractor = HiddenTypeExtractor::new();
+
+        assert_eq!(extractor.to_snake_case("PriorityItem"), "priority_item");
+        assert_eq!(extractor.to_snake_case("HTTPRequest"), "h_t_t_p_request");
+        assert_eq!(extractor.to_snake_case("simple"), "simple");
+    }
 }
-```
-
-### Integration Tests
-
-```rust
-// tests/hidden_type_extraction_integration.rs
-
-#[test]
-fn test_extract_priority_item_from_formatter() {
-    let code = r#"
-        impl Formatter {
-            fn format_header(score: f64, location: SourceLocation, metrics: &Metrics) -> String {
-                todo!()
-            }
-
-            fn render_section(score: f64, location: SourceLocation, metrics: &Metrics) -> String {
-                todo!()
-            }
-
-            fn validate_item(score: f64, location: SourceLocation, metrics: &Metrics) -> Result<()> {
-                todo!()
-            }
-        }
-    "#;
-
-    let ast = syn::parse_file(code).unwrap();
-    let extractor = HiddenTypeExtractor;
-    let signatures = extract_method_signatures(&ast);
-
-    let hidden_types = extractor.extract_hidden_types(&signatures, "formatter");
-
-    assert_eq!(hidden_types.len(), 1);
-    assert_eq!(hidden_types[0].fields.len(), 3);
-    assert_eq!(hidden_types[0].occurrences, 3);
-    assert!(hidden_types[0].confidence > 0.6);
-}
-```
-
-## Dependencies
-
-- **Spec 181**: Type signature extraction for parameter analysis
-- **Spec 183**: Anti-pattern detection for parameter passing and shared utilities
-- Rust `syn` crate for AST parsing
-- Rust `quote` crate for type-to-string conversion
-- Rust `serde` crate for serialization
-
-### External Crate Additions
-
-```toml
-[dependencies]
-syn = { version = "2.0", features = ["full", "parsing", "visit"] }
-quote = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-```
-
-## Migration Path
-
-1. **Phase 1**: Implement parameter clump detection
-2. **Phase 2**: Add tuple return detection
-3. **Phase 3**: Implement type synthesis and naming
-4. **Phase 4**: Add code generation for struct definitions
-5. **Phase 5**: Integrate with god object detector output
-6. **Phase 6**: Validate on debtmap's own codebase
-
-## Success Criteria
-
-- Detects parameter clumps appearing 3+ times with 95% accuracy
-- Identifies all tuple returns
-- Generates valid, compilable struct definitions
-- Suggests meaningful type and field names
-- Provides migration path for each hidden type
-- Confidence scores accurately reflect type validity
-- Output includes before/after code examples
