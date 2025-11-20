@@ -2,6 +2,7 @@ use crate::common::SourceLocation;
 use syn;
 
 pub mod anti_pattern_detector;
+pub mod architecture_utils;
 pub mod behavioral_decomposition;
 pub use behavioral_decomposition::{
     apply_hybrid_clustering, apply_production_ready_clustering,
@@ -98,8 +99,13 @@ pub use type_based_clustering::{
 pub use macro_recommendations::MacroRecommendationEngine;
 
 pub use anti_pattern_detector::{
-    is_primitive, to_pascal_case, AntiPattern, AntiPatternConfig, AntiPatternDetector,
-    AntiPatternSeverity, AntiPatternType, SplitQualityReport,
+    is_primitive, AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity,
+    AntiPatternType, SplitQualityReport,
+};
+
+pub use architecture_utils::{
+    extract_base_type, extract_noun, is_domain_term, is_domain_type, is_likely_verb,
+    is_primitive_type, most_common, to_pascal_case, to_snake_case, types_equivalent,
 };
 
 pub use file_classifier::{
