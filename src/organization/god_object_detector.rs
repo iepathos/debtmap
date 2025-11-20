@@ -752,7 +752,23 @@ impl GodObjectDetector {
                 });
 
                 if has_utilities || splits.is_empty() {
-                    // Try type-based clustering as a better alternative (Spec 181)
+                    // Try pipeline-based clustering first (Spec 182)
+                    let pipeline_splits =
+                        Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
+
+                    // Use pipeline-based if detected (indicates functional pipeline architecture)
+                    if !pipeline_splits.is_empty() {
+                        return (
+                            pipeline_splits,
+                            crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
+                            cross_domain_severity,
+                            domain_count,
+                            domain_diversity,
+                            struct_ratio,
+                        );
+                    }
+
+                    // Try type-based clustering as a fallback alternative (Spec 181)
                     let type_splits = Self::generate_type_based_splits(params.ast, file_name);
 
                     // Use type-based if it produces better quality results
@@ -828,7 +844,7 @@ impl GodObjectDetector {
                     file_name,
                 );
 
-                // Spec 181: Try type-based clustering for parameter-heavy or utilities-heavy files
+                // Spec 181/182: Try type-based clustering for parameter-heavy or utilities-heavy files
                 let has_utilities = splits.iter().any(|s| {
                     s.suggested_name.contains("utilities")
                         || s.suggested_name.contains("helpers")
@@ -836,7 +852,23 @@ impl GodObjectDetector {
                 });
 
                 if has_utilities || splits.is_empty() {
-                    // Try type-based clustering (Spec 181)
+                    // Try pipeline-based clustering first (Spec 182)
+                    let pipeline_splits =
+                        Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
+
+                    // Use pipeline-based if detected (indicates functional pipeline architecture)
+                    if !pipeline_splits.is_empty() {
+                        return (
+                            pipeline_splits,
+                            crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
+                            cross_domain_severity,
+                            domain_count,
+                            domain_diversity,
+                            struct_ratio,
+                        );
+                    }
+
+                    // Try type-based clustering as fallback (Spec 181)
                     let type_splits = Self::generate_type_based_splits(params.ast, file_name);
 
                     // Use type-based if it produces better quality results
@@ -1208,6 +1240,77 @@ impl GodObjectDetector {
         example.push_str("}\n");
 
         example
+    }
+
+    /// Generate pipeline-based splits using data flow analysis (Spec 182)
+    ///
+    /// Detects functional transformation pipelines and recommends modules
+    /// organized by pipeline stages (Input → Transform → Output).
+    fn generate_pipeline_based_splits(
+        ast: &syn::File,
+        call_graph: &HashMap<String, Vec<String>>,
+        base_name: &str,
+    ) -> Vec<ModuleSplit> {
+        use crate::organization::{DataFlowAnalyzer, TypeSignatureAnalyzer};
+
+        let type_analyzer = TypeSignatureAnalyzer;
+
+        // Extract signatures from impl blocks
+        let impl_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Impl(impl_block) => Some(impl_block),
+                _ => None,
+            })
+            .flat_map(|impl_block| &impl_block.items)
+            .filter_map(|item| match item {
+                syn::ImplItem::Fn(method) => Some(type_analyzer.analyze_method(method)),
+                _ => None,
+            })
+            .collect();
+
+        // Extract signatures from standalone functions
+        let fn_signatures: Vec<_> = ast
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                syn::Item::Fn(func) => Some(type_analyzer.analyze_function(func)),
+                _ => None,
+            })
+            .collect();
+
+        // Combine all signatures
+        let mut all_signatures = impl_signatures;
+        all_signatures.extend(fn_signatures);
+
+        if all_signatures.is_empty() {
+            return vec![];
+        }
+
+        // Build type flow graph
+        let flow_analyzer = DataFlowAnalyzer;
+        let flow_graph = flow_analyzer.build_type_flow_graph(&all_signatures, call_graph);
+
+        // Detect pipeline stages
+        let stages = match flow_analyzer.detect_pipeline_stages(&flow_graph, &all_signatures) {
+            Ok(stages) => stages,
+            Err(_) => return vec![],
+        };
+
+        // Filter out single-method stages (not meaningful pipelines)
+        let stages: Vec<_> = stages
+            .into_iter()
+            .filter(|stage| stage.methods.len() >= 2)
+            .collect();
+
+        if stages.len() < 2 {
+            // Not a meaningful pipeline (need at least 2 stages)
+            return vec![];
+        }
+
+        // Generate recommendations
+        flow_analyzer.generate_pipeline_recommendations(&stages, base_name)
     }
 
     /// Enrich existing splits with behavioral analysis (Spec 178)

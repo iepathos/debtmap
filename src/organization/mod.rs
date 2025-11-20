@@ -5,6 +5,7 @@ pub mod anti_pattern_detector;
 pub mod architecture_utils;
 pub mod behavioral_decomposition;
 pub mod codebase_type_analyzer;
+pub mod data_flow_analyzer;
 pub use behavioral_decomposition::{
     apply_hybrid_clustering, apply_production_ready_clustering,
     build_method_call_adjacency_matrix_with_functions, cluster_methods_by_behavior,
@@ -46,7 +47,7 @@ pub use god_object_analysis::{
     recommend_module_splits, recommend_module_splits_enhanced, suggest_module_splits_by_domain,
     suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
     GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
-    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StructMetrics,
+    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StageType, StructMetrics,
     StructWithMethods,
 };
 
@@ -95,6 +96,10 @@ pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 
 pub use type_based_clustering::{
     MethodSignature, TypeAffinityAnalyzer, TypeCluster, TypeInfo, TypeSignatureAnalyzer,
+};
+
+pub use data_flow_analyzer::{
+    DataFlowAnalyzer, PipelineStage, TransformationType, TypeFlowEdge, TypeFlowGraph,
 };
 
 pub use macro_recommendations::MacroRecommendationEngine;
