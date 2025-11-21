@@ -952,6 +952,117 @@ pub fn group_methods_by_responsibility_with_evidence(
     (groups, evidence_map)
 }
 
+/// Group methods by responsibility with domain pattern detection first (Spec 175).
+///
+/// This function implements a two-phase classification:
+/// 1. First pass: Detect semantic domain patterns (observer, callback, etc.)
+/// 2. Second pass: Classify remaining methods by responsibility
+///
+/// This prevents methods from being lumped into generic "Utilities" when they
+/// actually form cohesive domain-specific clusters.
+///
+/// # Arguments
+///
+/// * `methods` - Method names with optional bodies for analysis
+/// * `language` - Programming language for I/O pattern detection
+/// * `structures` - Available data structures in the file for pattern detection
+///
+/// # Returns
+///
+/// Tuple of (responsibility groups, classification evidence)
+pub fn group_methods_by_responsibility_with_domain_patterns(
+    methods: &[(String, Option<String>)],
+    language: crate::analysis::io_detection::Language,
+    structures: &[String],
+) -> (
+    HashMap<String, Vec<String>>,
+    HashMap<String, crate::analysis::multi_signal_aggregation::AggregatedClassification>,
+) {
+    use crate::organization::domain_patterns::{
+        cluster_methods_by_domain, DomainPatternDetector, FileContext, MethodInfo,
+        MIN_DOMAIN_CLUSTER_SIZE,
+    };
+    use std::collections::HashSet;
+
+    let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+    let mut evidence_map: HashMap<
+        String,
+        crate::analysis::multi_signal_aggregation::AggregatedClassification,
+    > = HashMap::new();
+
+    // Phase 1: Domain pattern detection
+    let detector = DomainPatternDetector::new();
+
+    // Build file context for pattern detection
+    let context_methods: Vec<MethodInfo> = methods
+        .iter()
+        .map(|(name, body)| MethodInfo {
+            name: name.clone(),
+            body: body.clone().unwrap_or_default(),
+            doc_comment: None,
+        })
+        .collect();
+
+    let context = FileContext {
+        methods: context_methods,
+        structures: structures.iter().cloned().collect::<HashSet<_>>(),
+        call_edges: vec![], // Call graph analysis would go here in future
+    };
+
+    // Detect domain patterns and cluster methods
+    let domain_clusters = cluster_methods_by_domain(&context.methods, &context, &detector);
+
+    // Track which methods were assigned to domain clusters
+    let mut clustered_methods: HashSet<String> = HashSet::new();
+
+    for (pattern, cluster_methods) in domain_clusters {
+        if cluster_methods.len() >= MIN_DOMAIN_CLUSTER_SIZE {
+            let category = pattern.description();
+            let method_names: Vec<String> =
+                cluster_methods.iter().map(|m| m.name.clone()).collect();
+
+            // Mark these methods as clustered
+            for method_name in &method_names {
+                clustered_methods.insert(method_name.clone());
+            }
+
+            // Create evidence for domain pattern
+            let evidence = crate::analysis::multi_signal_aggregation::AggregatedClassification {
+                primary: crate::analysis::multi_signal_aggregation::ResponsibilityCategory::Unknown,
+                confidence: 0.70, // Domain patterns have good confidence
+                evidence: vec![],
+                alternatives: vec![],
+            };
+
+            evidence_map.insert(category.clone(), evidence);
+            groups.insert(category, method_names);
+        }
+    }
+
+    // Phase 2: Classify remaining methods by responsibility
+    for (method_name, method_body) in methods {
+        // Skip methods already assigned to domain clusters
+        if clustered_methods.contains(method_name) {
+            continue;
+        }
+
+        let (responsibility, _confidence, evidence) =
+            infer_responsibility_multi_signal(method_name, method_body.as_deref(), language);
+
+        // Store evidence for this responsibility (use first occurrence)
+        evidence_map
+            .entry(responsibility.clone())
+            .or_insert(evidence);
+
+        groups
+            .entry(responsibility)
+            .or_default()
+            .push(method_name.clone());
+    }
+
+    (groups, evidence_map)
+}
+
 /// Result of responsibility classification with confidence scoring.
 ///
 /// This struct represents the outcome of attempting to classify a method's

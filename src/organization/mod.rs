@@ -24,6 +24,7 @@ pub mod cycle_detector;
 pub mod dependency_analyzer;
 pub mod domain_classifier;
 pub mod domain_diversity;
+pub mod domain_patterns;
 pub mod file_classifier;
 pub mod god_object;
 pub mod god_object_analysis;
@@ -47,13 +48,13 @@ pub use god_object_analysis::{
     calculate_domain_diversity_from_structs, calculate_god_object_score,
     calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
     determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
-    infer_responsibility_with_confidence, recommend_module_splits,
-    recommend_module_splits_enhanced, recommend_module_splits_with_evidence,
-    suggest_module_splits_by_domain, suggest_splits_by_struct_grouping, ClassificationResult,
-    DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence,
-    GodObjectThresholds, GodObjectType, ModuleSplit, Priority, PurityDistribution,
-    RecommendationSeverity, SignalType, SplitAnalysisMethod, StageType, StructMetrics,
-    StructWithMethods,
+    group_methods_by_responsibility_with_domain_patterns, infer_responsibility_with_confidence,
+    recommend_module_splits, recommend_module_splits_enhanced,
+    recommend_module_splits_with_evidence, suggest_module_splits_by_domain,
+    suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
+    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
+    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
+    SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;
@@ -108,6 +109,11 @@ pub use trait_pattern_analyzer::{TraitPatternAnalyzer, TraitPatternMetrics};
 
 pub use type_based_clustering::{
     MethodSignature, TypeAffinityAnalyzer, TypeCluster, TypeInfo, TypeSignatureAnalyzer,
+};
+
+pub use domain_patterns::{
+    cluster_methods_by_domain, DomainPattern, DomainPatternDetector, DomainPatternMatch,
+    PatternEvidence, DOMAIN_PATTERN_THRESHOLD, MIN_DOMAIN_CLUSTER_SIZE,
 };
 
 pub use hidden_type_extractor::{
