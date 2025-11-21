@@ -819,11 +819,14 @@ impl GodObjectDetector {
 
             if has_utilities || splits.is_empty() {
                 // Try pipeline-based clustering first (Spec 182)
-                let pipeline_splits =
+                let mut pipeline_splits =
                     Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
 
                 // Use pipeline-based if detected (indicates functional pipeline architecture)
                 if !pipeline_splits.is_empty() {
+                    // Apply semantic naming (Fix for Issue #2)
+                    Self::apply_semantic_naming_to_splits(&mut pipeline_splits, params.path);
+
                     return (
                         pipeline_splits,
                         crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
@@ -835,11 +838,14 @@ impl GodObjectDetector {
                 }
 
                 // Try type-based clustering as a fallback alternative (Spec 181)
-                let type_splits =
+                let mut type_splits =
                     Self::generate_type_based_splits(params.ast, file_name, params.path);
 
                 // Use type-based if it produces better quality results
                 if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                    // Apply semantic naming (Fix for Issue #2)
+                    Self::apply_semantic_naming_to_splits(&mut type_splits, params.path);
+
                     return (
                         type_splits,
                         crate::organization::SplitAnalysisMethod::TypeBased,
@@ -858,6 +864,9 @@ impl GodObjectDetector {
                     params.responsibility_groups,
                     params.field_tracker,
                 );
+
+                // Apply semantic naming to responsibility-based fallback (Fix for Issue #2)
+                Self::apply_semantic_naming_to_splits(&mut splits, params.path);
 
                 // If fallback also produces <=1 split, treat as "no actionable splits"
                 // A single split is not really a "split" - it's just renaming the file
@@ -892,6 +901,9 @@ impl GodObjectDetector {
                 params.ast,
             );
 
+            // Apply semantic naming (Fix for Issue #2)
+            Self::apply_semantic_naming_to_splits(&mut splits, params.path);
+
             (
                 splits,
                 crate::organization::SplitAnalysisMethod::CrossDomain,
@@ -921,11 +933,14 @@ impl GodObjectDetector {
 
             if has_utilities || splits.is_empty() {
                 // Try pipeline-based clustering first (Spec 182)
-                let pipeline_splits =
+                let mut pipeline_splits =
                     Self::generate_pipeline_based_splits(params.ast, &HashMap::new(), file_name);
 
                 // Use pipeline-based if detected (indicates functional pipeline architecture)
                 if !pipeline_splits.is_empty() {
+                    // Apply semantic naming (Fix for Issue #2)
+                    Self::apply_semantic_naming_to_splits(&mut pipeline_splits, params.path);
+
                     return (
                         pipeline_splits,
                         crate::organization::SplitAnalysisMethod::TypeBased, // Use TypeBased for now
@@ -937,11 +952,14 @@ impl GodObjectDetector {
                 }
 
                 // Try type-based clustering as fallback (Spec 181)
-                let type_splits =
+                let mut type_splits =
                     Self::generate_type_based_splits(params.ast, file_name, params.path);
 
                 // Use type-based if it produces better quality results
                 if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
+                    // Apply semantic naming (Fix for Issue #2)
+                    Self::apply_semantic_naming_to_splits(&mut type_splits, params.path);
+
                     return (
                         type_splits,
                         crate::organization::SplitAnalysisMethod::TypeBased,
@@ -959,6 +977,9 @@ impl GodObjectDetector {
                     params.responsibility_groups,
                     params.field_tracker,
                 );
+
+                // Apply semantic naming to responsibility-based fallback (Fix for Issue #2)
+                Self::apply_semantic_naming_to_splits(&mut splits, params.path);
 
                 // If fallback also produces <=1 split, treat as "no actionable splits"
                 // A single split is not really a "split" - it's just renaming the file
@@ -1078,13 +1099,25 @@ impl GodObjectDetector {
         // Convert clusters to ModuleSplit recommendations
         let mut splits: Vec<ModuleSplit> = Vec::new();
 
+        // Adaptive cluster size threshold based on file size (Fix for Issue #1)
+        // Large files (>100 methods): require 3+ methods per cluster
+        // Medium files (50-100 methods): require 2+ methods per cluster
+        // Small files (<50 methods): accept 1+ methods per cluster
+        let min_cluster_size = if production_methods.len() > 100 {
+            3
+        } else if production_methods.len() > 50 {
+            2
+        } else {
+            1 // For small files, keep all clusters to ensure we generate splits
+        };
+
         for cluster in clusters {
-            if cluster.methods.len() < 3 {
-                continue; // Skip tiny clusters
+            if cluster.methods.len() < min_cluster_size {
+                continue; // Skip clusters below adaptive threshold
             }
 
             // Infer responsibility from cluster
-            let responsibility = Self::infer_responsibility_from_cluster(&cluster);
+            let responsibility = Self::infer_responsibility_from_cluster(&cluster, ast, adjacency);
             let category_name = Self::sanitize_module_name(&responsibility);
             let suggested_name = format!("{}/{}", base_name, category_name);
 
@@ -1137,11 +1170,8 @@ impl GodObjectDetector {
             });
         }
 
-        // Apply semantic naming to all splits
-        let mut name_generator = SemanticNameGenerator::new();
-        for split in &mut splits {
-            Self::apply_semantic_naming(split, &mut name_generator, file_path);
-        }
+        // Apply semantic naming to all splits (unified entry point)
+        Self::apply_semantic_naming_to_splits(&mut splits, file_path);
 
         // Return splits if we have multiple good clusters
         if splits.len() > 1 {
@@ -1152,12 +1182,88 @@ impl GodObjectDetector {
     }
 
     /// Infer responsibility name from cluster characteristics
-    fn infer_responsibility_from_cluster(cluster: &super::clustering::Cluster) -> String {
+    ///
+    /// Priority order:
+    /// 1. Domain pattern detection (Observer, Builder, Registry, etc.)
+    /// 2. Simple behavioral patterns (IO, Validation, Formatting)
+    /// 3. Common prefix extraction
+    fn infer_responsibility_from_cluster(
+        cluster: &super::clustering::Cluster,
+        ast: &syn::File,
+        adjacency: &HashMap<(String, String), usize>,
+    ) -> String {
+        use crate::organization::domain_patterns::{
+            CallEdge, DomainPattern, DomainPatternDetector, FileContext, MethodInfo,
+        };
+
         // Sort methods by name for deterministic processing
         let mut sorted_methods = cluster.methods.clone();
         sorted_methods.sort_by(|a, b| a.name.cmp(&b.name));
 
-        // Analyze method name patterns
+        // PRIORITY 1: Try domain pattern detection (Spec 175 integration - Fix for Issue #3)
+        let method_infos: Vec<MethodInfo> = sorted_methods
+            .iter()
+            .map(|m| {
+                // Extract method body and doc comments from AST
+                let (body, doc_comment) = Self::extract_method_details(ast, &m.name);
+                MethodInfo {
+                    name: m.name.clone(),
+                    body,
+                    doc_comment,
+                }
+            })
+            .collect();
+
+        // Build file context for pattern detection
+        let call_edges: Vec<CallEdge> = adjacency
+            .iter()
+            .map(|((caller, callee), _)| CallEdge {
+                caller: caller.clone(),
+                callee: callee.clone(),
+            })
+            .collect();
+
+        let structures = Self::extract_struct_names(ast);
+        let context = FileContext {
+            methods: method_infos.clone(),
+            structures,
+            call_edges,
+        };
+
+        // Detect domain patterns
+        let detector = DomainPatternDetector::new();
+        let mut pattern_scores: HashMap<DomainPattern, (usize, f64)> = HashMap::new();
+
+        for method_info in &method_infos {
+            if let Some(pattern_match) = detector.detect_method_domain(method_info, &context) {
+                let entry = pattern_scores
+                    .entry(pattern_match.pattern)
+                    .or_insert((0, 0.0));
+                entry.0 += 1; // Count methods matching this pattern
+                entry.1 += pattern_match.confidence; // Sum confidence scores
+            }
+        }
+
+        // If we have a dominant pattern (3+ methods with avg confidence > 0.4), use it
+        if let Some((pattern, (count, total_confidence))) = pattern_scores
+            .iter()
+            .filter(|(_, (count, _))| *count >= 3)
+            .max_by_key(|(_, (count, _))| *count)
+        {
+            let avg_confidence = total_confidence / (*count as f64);
+            if avg_confidence >= 0.40 {
+                return match pattern {
+                    DomainPattern::ObserverPattern => "Observer Pattern".to_string(),
+                    DomainPattern::CallbackPattern => "Callback Pattern".to_string(),
+                    DomainPattern::RegistryPattern => "Registry Pattern".to_string(),
+                    DomainPattern::BuilderPattern => "Builder Pattern".to_string(),
+                    DomainPattern::TypeInferencePattern => "Type Inference".to_string(),
+                    DomainPattern::AstTraversalPattern => "AST Traversal".to_string(),
+                };
+            }
+        }
+
+        // PRIORITY 2: Simple behavioral pattern analysis (fallback)
         let has_io = sorted_methods
             .iter()
             .any(|m| m.has_io || m.name.contains("read") || m.name.contains("write"));
@@ -1172,7 +1278,6 @@ impl GodObjectDetector {
             .iter()
             .all(|m| m.visibility == ClusterVisibility::Public);
 
-        // Infer category based on patterns
         if has_io {
             "IO".to_string()
         } else if has_validation {
@@ -1184,9 +1289,84 @@ impl GodObjectDetector {
         } else if all_public {
             "API".to_string()
         } else {
-            // Extract common prefix from method names
+            // PRIORITY 3: Extract common prefix from method names
             Self::extract_common_prefix(&sorted_methods).unwrap_or_else(|| "Domain".to_string())
         }
+    }
+
+    /// Extract method body and doc comments from AST
+    fn extract_method_details(ast: &syn::File, method_name: &str) -> (String, Option<String>) {
+        use quote::ToTokens;
+
+        for item in &ast.items {
+            if let syn::Item::Impl(impl_block) = item {
+                for impl_item in &impl_block.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        if method.sig.ident == method_name {
+                            // Extract method body
+                            let body = method.block.to_token_stream().to_string();
+
+                            // Extract doc comments
+                            let doc_comment = method
+                                .attrs
+                                .iter()
+                                .filter_map(|attr| {
+                                    if attr.path().is_ident("doc") {
+                                        attr.meta.require_name_value().ok().and_then(|nv| {
+                                            if let syn::Expr::Lit(lit) = &nv.value {
+                                                if let syn::Lit::Str(s) = &lit.lit {
+                                                    return Some(s.value());
+                                                }
+                                            }
+                                            None
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
+
+                            return (
+                                body,
+                                if doc_comment.is_empty() {
+                                    None
+                                } else {
+                                    Some(doc_comment)
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Return empty if not found
+        (String::new(), None)
+    }
+
+    /// Extract struct names from AST for pattern detection
+    fn extract_struct_names(ast: &syn::File) -> HashSet<String> {
+        use std::collections::HashSet;
+
+        let mut structures = HashSet::new();
+
+        for item in &ast.items {
+            match item {
+                syn::Item::Struct(s) => {
+                    structures.insert(s.ident.to_string());
+                }
+                syn::Item::Enum(e) => {
+                    structures.insert(e.ident.to_string());
+                }
+                syn::Item::Type(t) => {
+                    structures.insert(t.ident.to_string());
+                }
+                _ => {}
+            }
+        }
+
+        structures
     }
 
     /// Extract common prefix from method names
@@ -1444,11 +1624,8 @@ impl GodObjectDetector {
             });
         }
 
-        // Apply semantic naming to all splits (Spec 191)
-        let mut name_generator = SemanticNameGenerator::new();
-        for split in &mut splits {
-            Self::apply_semantic_naming(split, &mut name_generator, file_path);
-        }
+        // Apply semantic naming to all splits (unified entry point)
+        Self::apply_semantic_naming_to_splits(&mut splits, file_path);
 
         // REMOVED: Service object detection (Phase 1 - Spec 178 refinement)
         //
@@ -2359,6 +2536,27 @@ impl GodObjectDetector {
             .collect();
 
         (improved_splits, report)
+    }
+
+    /// Apply semantic naming to all splits (Spec 191 - Fix for Issue #2)
+    ///
+    /// This is the unified entry point for semantic naming that should be called
+    /// for ALL split generation paths (behavioral, type-based, responsibility-based)
+    /// to ensure consistent, high-quality module names.
+    ///
+    /// # Arguments
+    ///
+    /// * `splits` - Vector of module splits to apply naming to
+    /// * `file_path` - File path for uniqueness validation
+    fn apply_semantic_naming_to_splits(splits: &mut Vec<ModuleSplit>, file_path: &Path) {
+        if splits.is_empty() {
+            return;
+        }
+
+        let mut name_generator = SemanticNameGenerator::new();
+        for split in splits {
+            Self::apply_semantic_naming(split, &mut name_generator, file_path);
+        }
     }
 
     /// Apply semantic naming to a module split (Spec 191)
