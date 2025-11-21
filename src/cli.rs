@@ -221,6 +221,14 @@ pub enum Commands {
         #[arg(long = "no-god-object")]
         no_god_object: bool,
 
+        /// Minimum methods per god object split recommendation (Spec 190)
+        #[arg(long = "min-split-methods", default_value = "10")]
+        min_split_methods: usize,
+
+        /// Minimum lines per god object split recommendation (Spec 190)
+        #[arg(long = "min-split-lines", default_value = "150")]
+        min_split_lines: usize,
+
         /// Maximum number of files to analyze (0 = no limit, default: no limit)
         #[arg(long = "max-files")]
         max_files: Option<usize>,

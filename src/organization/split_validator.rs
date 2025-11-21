@@ -1,195 +1,442 @@
-/// Size validation and refinement for module splits.
+/// Size validation and refinement for module splits (Spec 190).
 ///
 /// This module ensures that recommended module splits are appropriately sized:
-/// - Filters out undersized splits (<5 methods)
-/// - Warns about borderline splits (20-40 methods)
-/// - Splits oversized groups (>40 methods) into smaller chunks
-use super::god_object_analysis::{ModuleSplit, Priority};
+/// - Enforces minimum size thresholds (10 methods OR 150 lines by default)
+/// - Merges undersized splits with semantically similar clusters
+/// - Validates cohesion scores to prevent low-quality splits
+/// - Ensures balanced distribution across splits
+use super::god_object_analysis::{MergeRecord, ModuleSplit, Priority};
 
-/// Validate and refine module splits to ensure proper sizing.
+/// Configuration for split size validation (Spec 190)
+#[derive(Debug, Clone)]
+pub struct SplitSizeConfig {
+    /// Minimum methods for a standard split
+    pub min_methods: usize,
+    /// Minimum lines for a standard split
+    pub min_lines: usize,
+    /// Minimum methods for high-cohesion utility modules
+    pub utility_min_methods: usize,
+    /// Cohesion threshold for utility module exception
+    pub utility_cohesion_threshold: f64,
+    /// Maximum size ratio between largest and smallest splits
+    pub max_size_ratio: f64,
+    /// Minimum cohesion score to accept a split
+    pub min_cohesion_score: f64,
+    /// Minimum similarity score required to merge clusters
+    pub min_merge_similarity: f64,
+}
+
+impl Default for SplitSizeConfig {
+    fn default() -> Self {
+        Self {
+            min_methods: 10,
+            min_lines: 150,
+            utility_min_methods: 5,
+            utility_cohesion_threshold: 0.7,
+            max_size_ratio: 2.0,
+            min_cohesion_score: 0.3,
+            min_merge_similarity: 0.4,
+        }
+    }
+}
+
+impl SplitSizeConfig {
+    /// Check if a split meets minimum size requirements
+    pub fn is_viable_split(&self, split: &ModuleSplit) -> bool {
+        // Exception: high-cohesion utility modules
+        if is_utility_module(split) {
+            let cohesion = split.cohesion_score.unwrap_or(0.0);
+            if cohesion > self.utility_cohesion_threshold {
+                return split.method_count >= self.utility_min_methods;
+            }
+        }
+
+        // Standard: must meet either method count OR line count threshold
+        split.method_count >= self.min_methods || split.estimated_lines >= self.min_lines
+    }
+
+    /// Check if a split meets minimum cohesion requirements
+    pub fn has_sufficient_cohesion(&self, split: &ModuleSplit) -> bool {
+        split
+            .cohesion_score
+            .map(|score| score >= self.min_cohesion_score)
+            .unwrap_or(true) // If no cohesion score, assume acceptable
+    }
+}
+
+/// Validate and refine module splits with comprehensive size and quality checks.
 ///
-/// Filters out splits that are too small (<5 methods) or too large (>40 methods).
-/// For oversized splits, uses a simple 2-level strategy to divide them.
-///
-/// # Arguments
-///
-/// * `splits` - Vector of module splits to validate
-///
-/// # Returns
-///
-/// Filtered and refined vector of module splits with appropriate sizing
+/// Implements Spec 190 requirements:
+/// 1. Filter out undersized splits
+/// 2. Merge undersized splits with semantically similar clusters
+/// 3. Validate cohesion scores
+/// 4. Ensure balanced distribution
 pub fn validate_and_refine_splits(splits: Vec<ModuleSplit>) -> Vec<ModuleSplit> {
-    splits
+    validate_and_refine_splits_with_config(splits, &SplitSizeConfig::default())
+}
+
+/// Validate splits with custom configuration
+pub fn validate_and_refine_splits_with_config(
+    splits: Vec<ModuleSplit>,
+    config: &SplitSizeConfig,
+) -> Vec<ModuleSplit> {
+    if splits.is_empty() {
+        return splits;
+    }
+
+    // Step 1: Calculate cohesion scores for all splits (if not already set)
+    let splits_with_cohesion = splits
         .into_iter()
-        .flat_map(|split| {
-            let method_count = split.method_count;
+        .map(calculate_split_cohesion)
+        .collect::<Vec<_>>();
 
-            // Too small - skip
-            if method_count < 5 {
-                return vec![];
-            }
+    // Step 2: Partition into viable and undersized splits
+    let (mut viable, undersized): (Vec<_>, Vec<_>) = splits_with_cohesion
+        .into_iter()
+        .partition(|s| config.is_viable_split(s));
 
-            // Perfect size (5-20 methods) - prioritize high
-            if method_count <= 20 {
-                return vec![ModuleSplit {
-                    priority: Priority::High,
-                    ..split
-                }];
-            }
+    // Step 3: Merge undersized splits with viable ones
+    for undersized_split in undersized {
+        if let Some(merge_target_idx) = find_best_merge_target(&undersized_split, &viable, config) {
+            // Merge into the target
+            viable[merge_target_idx] = merge_splits(
+                viable[merge_target_idx].clone(),
+                undersized_split,
+                config.min_merge_similarity,
+            );
+        }
+        // If no viable merge target, drop the split
+    }
 
-            // Borderline (20-40 methods) - warn but allow
-            if method_count <= 40 {
-                return vec![ModuleSplit {
-                    warning: Some(format!(
-                        "{} methods is borderline - consider further splitting",
-                        method_count
-                    )),
-                    priority: Priority::Medium,
-                    ..split
-                }];
-            }
+    // Step 4: Filter by cohesion
+    viable.retain(|s| config.has_sufficient_cohesion(s));
 
-            // Too large (>40 methods) - use simple 2-level split
-            split_into_two_levels(split)
-        })
+    // Step 5: Ensure balanced distribution
+    let balanced = ensure_balanced_distribution(viable, config);
+
+    // Step 6: Set priorities based on final sizes
+    balanced
+        .into_iter()
+        .map(|split| prioritize_by_size(split, config))
         .collect()
 }
 
-/// Simple 2-level splitting for oversized modules.
-///
-/// Divides structs into two roughly equal groups when a module exceeds 40 methods.
-///
-/// # Arguments
-///
-/// * `split` - The oversized module split to divide
-///
-/// # Returns
-///
-/// Two module splits, each with approximately half the structs
-fn split_into_two_levels(split: ModuleSplit) -> Vec<ModuleSplit> {
-    if split.structs_to_move.is_empty() {
-        // No structs to split - fall back to method-based split
-        return split_methods_into_two(split);
+/// Calculate cohesion score for a split based on method relationships
+fn calculate_split_cohesion(mut split: ModuleSplit) -> ModuleSplit {
+    // If cohesion already calculated, keep it
+    if split.cohesion_score.is_some() {
+        return split;
     }
 
-    // Divide structs into two roughly equal groups
-    let mid = split.structs_to_move.len() / 2;
-    let (first_half_structs, second_half_structs) = split.structs_to_move.split_at(mid);
+    // Simple heuristic: cohesion based on method naming similarity
+    let cohesion = if split.methods_to_move.len() < 2 {
+        1.0 // Single method is trivially cohesive
+    } else {
+        calculate_naming_cohesion(&split.methods_to_move)
+    };
 
-    // For method count, split roughly evenly
-    let first_half_methods = split.method_count / 2;
-    let second_half_methods = split.method_count - first_half_methods;
-
-    vec![
-        ModuleSplit {
-            suggested_name: format!("{}_part1", split.suggested_name),
-            structs_to_move: first_half_structs.to_vec(),
-            method_count: first_half_methods,
-            estimated_lines: split.estimated_lines / 2,
-            priority: Priority::Medium,
-            warning: Some("Auto-split due to size".to_string()),
-            responsibility: split.responsibility.clone(),
-            methods_to_move: vec![], // Methods grouped by struct
-            cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: split.classification_evidence.clone(),
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
-            ..Default::default()
-        },
-        ModuleSplit {
-            suggested_name: format!("{}_part2", split.suggested_name),
-            structs_to_move: second_half_structs.to_vec(),
-            method_count: second_half_methods,
-            estimated_lines: split.estimated_lines - (split.estimated_lines / 2),
-            priority: Priority::Medium,
-            warning: Some("Auto-split due to size".to_string()),
-            responsibility: split.responsibility,
-            methods_to_move: vec![],
-            cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: split.classification_evidence,
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
-            ..Default::default()
-        },
-    ]
+    split.cohesion_score = Some(cohesion);
+    split
 }
 
-/// Split methods into two groups when no struct information is available.
-fn split_methods_into_two(split: ModuleSplit) -> Vec<ModuleSplit> {
+/// Calculate cohesion based on method naming patterns
+fn calculate_naming_cohesion(methods: &[String]) -> f64 {
+    if methods.len() < 2 {
+        return 1.0;
+    }
+
+    // Extract common prefixes and patterns
+    let prefixes: Vec<String> = methods
+        .iter()
+        .filter_map(|m| extract_method_prefix(m))
+        .collect();
+
+    if prefixes.is_empty() {
+        return 0.5; // No clear pattern = moderate cohesion
+    }
+
+    // Calculate how many methods share common prefixes
+    let unique_prefixes: std::collections::HashSet<_> = prefixes.iter().collect();
+    let sharing_ratio = 1.0 - (unique_prefixes.len() as f64 / methods.len() as f64);
+
+    // Scale to 0.4-1.0 range (avoid very low scores for naming-based cohesion)
+    0.4 + (sharing_ratio * 0.6)
+}
+
+/// Extract method prefix (first word before underscore or camelCase boundary)
+fn extract_method_prefix(method: &str) -> Option<String> {
+    // Handle snake_case
+    if method.contains('_') {
+        return method.split('_').next().map(|s| s.to_lowercase());
+    }
+
+    // Handle camelCase - find first uppercase after start
+    for (i, c) in method.char_indices() {
+        if i > 0 && c.is_uppercase() {
+            return Some(method[..i].to_lowercase());
+        }
+    }
+
+    // Single word method
+    Some(method.to_lowercase())
+}
+
+/// Find the best merge target for an undersized split
+fn find_best_merge_target(
+    undersized: &ModuleSplit,
+    viable_splits: &[ModuleSplit],
+    config: &SplitSizeConfig,
+) -> Option<usize> {
+    if viable_splits.is_empty() {
+        return None;
+    }
+
+    viable_splits
+        .iter()
+        .enumerate()
+        .map(|(idx, split)| {
+            let similarity = calculate_semantic_similarity(undersized, split);
+            (idx, similarity)
+        })
+        .filter(|(_, sim)| *sim >= config.min_merge_similarity)
+        .max_by(|(_, sim1), (_, sim2)| sim1.partial_cmp(sim2).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(idx, _)| idx)
+}
+
+/// Calculate semantic similarity between two splits
+fn calculate_semantic_similarity(split1: &ModuleSplit, split2: &ModuleSplit) -> f64 {
+    // Weighted combination of different similarity signals
+    let naming_sim = method_naming_similarity(split1, split2);
+    let responsibility_sim = responsibility_similarity(split1, split2);
+    let domain_sim = domain_similarity(split1, split2);
+
+    // Weights: naming 30%, responsibility 40%, domain 30%
+    0.3 * naming_sim + 0.4 * responsibility_sim + 0.3 * domain_sim
+}
+
+/// Calculate similarity based on method naming patterns
+fn method_naming_similarity(split1: &ModuleSplit, split2: &ModuleSplit) -> f64 {
+    let prefixes1: Vec<_> = split1
+        .methods_to_move
+        .iter()
+        .filter_map(|m| extract_method_prefix(m))
+        .collect();
+
+    let prefixes2: Vec<_> = split2
+        .methods_to_move
+        .iter()
+        .filter_map(|m| extract_method_prefix(m))
+        .collect();
+
+    if prefixes1.is_empty() || prefixes2.is_empty() {
+        return 0.0;
+    }
+
+    // Calculate Jaccard similarity of prefixes
+    let set1: std::collections::HashSet<_> = prefixes1.iter().collect();
+    let set2: std::collections::HashSet<_> = prefixes2.iter().collect();
+
+    let intersection = set1.intersection(&set2).count();
+    let union = set1.union(&set2).count();
+
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
+}
+
+/// Calculate similarity based on responsibility categories
+fn responsibility_similarity(split1: &ModuleSplit, split2: &ModuleSplit) -> f64 {
+    let resp1 = split1.responsibility.to_lowercase();
+    let resp2 = split2.responsibility.to_lowercase();
+
+    if resp1 == resp2 {
+        1.0
+    } else if resp1.contains(&resp2) || resp2.contains(&resp1) {
+        0.7
+    } else {
+        0.0
+    }
+}
+
+/// Calculate similarity based on domain classification
+fn domain_similarity(split1: &ModuleSplit, split2: &ModuleSplit) -> f64 {
+    if split1.domain.is_empty() || split2.domain.is_empty() {
+        return 0.5; // Unknown domains = neutral similarity
+    }
+
+    let domain1 = split1.domain.to_lowercase();
+    let domain2 = split2.domain.to_lowercase();
+
+    if domain1 == domain2 {
+        1.0
+    } else if domain1.contains(&domain2) || domain2.contains(&domain1) {
+        0.6
+    } else {
+        0.0
+    }
+}
+
+/// Merge two splits together
+fn merge_splits(
+    mut target: ModuleSplit,
+    source: ModuleSplit,
+    similarity_score: f64,
+) -> ModuleSplit {
+    // Combine methods
+    target
+        .methods_to_move
+        .extend(source.methods_to_move.clone());
+
+    // Combine structs
+    target.structs_to_move.extend(source.structs_to_move);
+
+    // Update counts
+    target.method_count += source.method_count;
+    target.estimated_lines += source.estimated_lines;
+
+    // Record merge history
+    target.merge_history.push(MergeRecord {
+        merged_from: source.suggested_name.clone(),
+        reason: format!(
+            "Merged {} ({} methods) due to size constraint",
+            source.suggested_name, source.method_count
+        ),
+        similarity_score,
+    });
+
+    // Update responsibility if source had one
+    if !source.responsibility.is_empty() && target.responsibility != source.responsibility {
+        target.responsibility = format!("{} & {}", target.responsibility, source.responsibility);
+    }
+
+    // Recalculate cohesion for merged split
+    target.cohesion_score = None;
+    calculate_split_cohesion(target)
+}
+
+/// Ensure balanced distribution of split sizes
+fn ensure_balanced_distribution(
+    mut splits: Vec<ModuleSplit>,
+    config: &SplitSizeConfig,
+) -> Vec<ModuleSplit> {
+    if splits.len() < 2 {
+        return splits;
+    }
+
+    // Iterate until distribution is balanced
+    for _ in 0..10 {
+        // Max 10 iterations to prevent infinite loops
+        let sizes: Vec<_> = splits.iter().map(|s| s.method_count).collect();
+        let max_size = *sizes.iter().max().unwrap_or(&0);
+        let min_size = *sizes.iter().min().unwrap_or(&0);
+
+        if min_size == 0 || max_size as f64 / min_size as f64 <= config.max_size_ratio {
+            break; // Distribution is balanced
+        }
+
+        // Find largest split
+        let largest_idx = splits
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, s)| s.method_count)
+            .map(|(idx, _)| idx);
+
+        if let Some(idx) = largest_idx {
+            // Try to split the largest cluster
+            if let Some(sub_splits) = split_into_two(&splits[idx]) {
+                splits.remove(idx);
+                splits.extend(sub_splits);
+            } else {
+                break; // Can't split further
+            }
+        } else {
+            break;
+        }
+    }
+
+    splits
+}
+
+/// Split a module into two roughly equal parts
+fn split_into_two(split: &ModuleSplit) -> Option<Vec<ModuleSplit>> {
+    if split.method_count < 20 {
+        return None; // Too small to split
+    }
+
     let mid = split.methods_to_move.len() / 2;
     let (first_half, second_half) = split.methods_to_move.split_at(mid);
 
-    let first_half_count = split.method_count / 2;
-    let second_half_count = split.method_count - first_half_count;
+    let first_count = split.method_count / 2;
+    let second_count = split.method_count - first_count;
 
-    vec![
+    Some(vec![
         ModuleSplit {
             suggested_name: format!("{}_part1", split.suggested_name),
             methods_to_move: first_half.to_vec(),
             structs_to_move: vec![],
-            method_count: first_half_count,
+            method_count: first_count,
             estimated_lines: split.estimated_lines / 2,
             priority: Priority::Medium,
-            warning: Some("Auto-split due to size".to_string()),
+            warning: Some("Auto-split for balanced distribution".to_string()),
             responsibility: split.responsibility.clone(),
             cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: split.classification_evidence.clone(),
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
+            merge_history: vec![],
             ..Default::default()
         },
         ModuleSplit {
             suggested_name: format!("{}_part2", split.suggested_name),
             methods_to_move: second_half.to_vec(),
             structs_to_move: vec![],
-            method_count: second_half_count,
+            method_count: second_count,
             estimated_lines: split.estimated_lines - (split.estimated_lines / 2),
             priority: Priority::Medium,
-            warning: Some("Auto-split due to size".to_string()),
-            responsibility: split.responsibility,
+            warning: Some("Auto-split for balanced distribution".to_string()),
+            responsibility: split.responsibility.clone(),
             cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: split.classification_evidence,
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
+            merge_history: vec![],
             ..Default::default()
         },
-    ]
+    ])
+}
+
+/// Check if a split represents a utility module
+fn is_utility_module(split: &ModuleSplit) -> bool {
+    let responsibility = split.responsibility.to_lowercase();
+    let domain = split.domain.to_lowercase();
+
+    responsibility.contains("data structure")
+        || responsibility.contains("utilities")
+        || responsibility.contains("helper")
+        || domain.contains("utilities")
+}
+
+/// Set priority based on split size
+fn prioritize_by_size(mut split: ModuleSplit, _config: &SplitSizeConfig) -> ModuleSplit {
+    let method_count = split.method_count;
+
+    split.priority = if method_count <= 20 {
+        Priority::High // Perfect size
+    } else if method_count <= 40 {
+        if split.warning.is_none() {
+            split.warning = Some(format!(
+                "{} methods is borderline - consider further splitting",
+                method_count
+            ));
+        }
+        Priority::Medium
+    } else {
+        if split.warning.is_none() {
+            split.warning = Some(format!(
+                "{} methods is large for a single module",
+                method_count
+            ));
+        }
+        Priority::Low
+    };
+
+    split
 }
 
 #[cfg(test)]
@@ -199,157 +446,225 @@ mod tests {
     fn make_split(
         name: &str,
         method_count: usize,
-        structs: Vec<&str>,
-        priority: Priority,
+        methods: Vec<&str>,
+        responsibility: &str,
     ) -> ModuleSplit {
         ModuleSplit {
             suggested_name: name.to_string(),
-            methods_to_move: vec![],
-            structs_to_move: structs.into_iter().map(|s| s.to_string()).collect(),
-            responsibility: "test".to_string(),
-            estimated_lines: method_count * 20,
+            methods_to_move: methods.into_iter().map(|s| s.to_string()).collect(),
+            structs_to_move: vec![],
+            responsibility: responsibility.to_string(),
+            estimated_lines: method_count * 15,
             method_count,
             warning: None,
-            priority,
+            priority: Priority::Medium,
             cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: None,
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
+            merge_history: vec![],
             ..Default::default()
         }
     }
 
     #[test]
     fn test_reject_undersized_splits() {
-        let split = ModuleSplit {
-            suggested_name: "undersized".to_string(),
-            methods_to_move: vec!["m1".into(), "m2".into()],
-            structs_to_move: vec![],
-            responsibility: "test".to_string(),
-            estimated_lines: 50,
-            method_count: 3,
-            warning: None,
-            priority: Priority::Low,
-            cohesion_score: None,
-            dependencies_in: vec![],
-            dependencies_out: vec![],
-            domain: String::new(),
-            rationale: None,
-            method: crate::organization::SplitAnalysisMethod::None,
-            severity: None,
-            interface_estimate: None,
-            classification_evidence: None,
-            representative_methods: vec![],
-            fields_needed: vec![],
-            trait_suggestion: None,
-            behavior_category: None,
-            ..Default::default()
-        };
+        let config = SplitSizeConfig::default();
+        let split = make_split("undersized", 3, vec!["m1", "m2", "m3"], "test");
 
-        let validated = validate_and_refine_splits(vec![split]);
-        assert_eq!(validated.len(), 0); // Too small, filtered out
+        assert!(!config.is_viable_split(&split));
     }
 
     #[test]
     fn test_accept_valid_splits() {
-        let split = make_split("valid", 15, vec!["S1", "S2"], Priority::Medium);
-
-        let validated = validate_and_refine_splits(vec![split.clone()]);
-        assert_eq!(validated.len(), 1);
-        assert_eq!(validated[0].method_count, 15);
-        assert_eq!(validated[0].priority, Priority::High); // Upgraded to high
-        assert_eq!(validated[0].warning, None);
-    }
-
-    #[test]
-    fn test_warn_borderline_splits() {
-        let split = make_split("borderline", 35, vec!["S1", "S2", "S3"], Priority::High);
-
-        let validated = validate_and_refine_splits(vec![split]);
-        assert_eq!(validated.len(), 1);
-        assert_eq!(validated[0].priority, Priority::Medium); // Downgraded
-        assert!(validated[0].warning.is_some());
-        assert!(validated[0]
-            .warning
-            .as_ref()
-            .unwrap()
-            .contains("borderline"));
-    }
-
-    #[test]
-    fn test_split_oversized_modules() {
+        let config = SplitSizeConfig::default();
         let split = make_split(
-            "oversized",
-            60,
-            vec!["S1", "S2", "S3", "S4"],
-            Priority::Medium,
+            "valid",
+            15,
+            vec![
+                "format_a", "format_b", "format_c", "format_d", "format_e", "format_f", "format_g",
+                "format_h", "format_i", "format_j", "format_k", "format_l", "format_m", "format_n",
+                "format_o",
+            ],
+            "formatting",
         );
 
-        let validated = validate_and_refine_splits(vec![split]);
-
-        // Should be split into 2 parts
-        assert_eq!(validated.len(), 2);
-        assert!(validated.iter().all(|s| s.method_count <= 40));
-        assert_eq!(validated[0].suggested_name, "oversized_part1");
-        assert_eq!(validated[1].suggested_name, "oversized_part2");
-        assert!(validated[0].warning.is_some());
-        assert!(validated[1].warning.is_some());
+        assert!(config.is_viable_split(&split));
     }
 
     #[test]
-    fn test_multiple_splits_mixed_sizes() {
-        let splits = vec![
-            make_split("too_small", 2, vec![], Priority::Low),
-            make_split("perfect", 10, vec![], Priority::Medium),
-            make_split("too_large", 50, vec!["S1", "S2"], Priority::High),
+    fn test_utility_module_exception() {
+        let config = SplitSizeConfig::default();
+        let mut split = make_split(
+            "utility",
+            5,
+            vec!["new", "default", "clone", "eq", "hash"],
+            "data structure operations",
+        );
+        split.cohesion_score = Some(0.85);
+
+        assert!(config.is_viable_split(&split));
+    }
+
+    #[test]
+    fn test_semantic_similarity_high() {
+        let split1 = make_split(
+            "format_module",
+            10,
+            vec![
+                "format_item",
+                "format_header",
+                "format_footer",
+                "format_details",
+            ],
+            "formatting",
+        );
+        let split2 = make_split(
+            "display_module",
+            10,
+            vec!["format_output", "format_table", "format_row"],
+            "formatting",
+        );
+
+        let similarity = calculate_semantic_similarity(&split1, &split2);
+        assert!(
+            similarity > 0.5,
+            "Expected high similarity, got {}",
+            similarity
+        );
+    }
+
+    #[test]
+    fn test_semantic_similarity_low() {
+        let split1 = make_split(
+            "format_module",
+            10,
+            vec!["format_item", "format_header"],
+            "formatting",
+        );
+        let split2 = make_split(
+            "validate_module",
+            10,
+            vec!["validate_input", "check_errors"],
+            "validation",
+        );
+
+        let similarity = calculate_semantic_similarity(&split1, &split2);
+        assert!(
+            similarity < 0.5,
+            "Expected low similarity, got {}",
+            similarity
+        );
+    }
+
+    #[test]
+    fn test_merge_splits() {
+        let target = make_split("target", 15, vec!["format_a", "format_b"], "formatting");
+        let source = make_split("source", 5, vec!["format_c"], "formatting");
+
+        let merged = merge_splits(target, source, 0.8);
+
+        assert_eq!(merged.method_count, 20);
+        assert_eq!(merged.methods_to_move.len(), 3);
+        assert_eq!(merged.merge_history.len(), 1);
+        assert_eq!(merged.merge_history[0].merged_from, "source");
+        assert_eq!(merged.merge_history[0].similarity_score, 0.8);
+    }
+
+    #[test]
+    fn test_naming_cohesion_high() {
+        let methods = vec![
+            "format_item".to_string(),
+            "format_header".to_string(),
+            "format_footer".to_string(),
         ];
 
-        let validated = validate_and_refine_splits(splits);
-
-        // Should have: filtered out too_small, kept perfect, split too_large into 2
-        assert_eq!(validated.len(), 3);
-
-        // Perfect should be prioritized high
-        let perfect = validated.iter().find(|s| s.suggested_name == "perfect");
-        assert!(perfect.is_some());
-        assert_eq!(perfect.unwrap().priority, Priority::High);
-
-        // Too large should be split
-        let has_part1 = validated
-            .iter()
-            .any(|s| s.suggested_name == "too_large_part1");
-        let has_part2 = validated
-            .iter()
-            .any(|s| s.suggested_name == "too_large_part2");
-        assert!(has_part1);
-        assert!(has_part2);
+        let cohesion = calculate_naming_cohesion(&methods);
+        assert!(cohesion > 0.7, "Expected high cohesion, got {}", cohesion);
     }
 
     #[test]
-    fn test_edge_case_exactly_5_methods() {
-        let split = make_split("minimum", 5, vec![], Priority::Low);
+    fn test_naming_cohesion_low() {
+        let methods = vec![
+            "format_item".to_string(),
+            "validate_input".to_string(),
+            "parse_data".to_string(),
+        ];
 
-        let validated = validate_and_refine_splits(vec![split]);
-        assert_eq!(validated.len(), 1); // Should be kept
-        assert_eq!(validated[0].priority, Priority::High); // Prioritized
+        let cohesion = calculate_naming_cohesion(&methods);
+        assert!(cohesion < 0.7, "Expected low cohesion, got {}", cohesion);
     }
 
     #[test]
-    fn test_edge_case_exactly_40_methods() {
-        let split = make_split("maximum", 40, vec![], Priority::High);
+    fn test_validate_and_refine_merges_undersized() {
+        let splits = vec![
+            make_split(
+                "large",
+                15,
+                vec!["format_a", "format_b", "format_c"],
+                "formatting",
+            ),
+            make_split("tiny", 3, vec!["format_d"], "formatting"),
+        ];
 
-        let validated = validate_and_refine_splits(vec![split]);
-        assert_eq!(validated.len(), 1); // Should be kept
-        assert_eq!(validated[0].priority, Priority::Medium); // Downgraded
-        assert!(validated[0].warning.is_some()); // Warning added
+        let config = SplitSizeConfig::default();
+        let refined = validate_and_refine_splits_with_config(splits, &config);
+
+        // Should have 1 split (tiny merged into large)
+        assert_eq!(refined.len(), 1);
+        assert!(refined[0].method_count >= 15);
+        assert!(!refined[0].merge_history.is_empty());
+    }
+
+    #[test]
+    fn test_balanced_distribution() {
+        let config = SplitSizeConfig::default();
+        let splits = vec![
+            make_split("huge", 80, vec![], "test"),
+            make_split("small", 10, vec![], "test"),
+        ];
+
+        let balanced = ensure_balanced_distribution(splits, &config);
+
+        // Should split the huge one
+        let sizes: Vec<_> = balanced.iter().map(|s| s.method_count).collect();
+        let max = *sizes.iter().max().unwrap();
+        let min = *sizes.iter().min().unwrap();
+
+        assert!(max as f64 / min as f64 <= config.max_size_ratio * 1.5); // Allow some tolerance
+    }
+
+    #[test]
+    fn test_extract_method_prefix() {
+        assert_eq!(
+            extract_method_prefix("format_output"),
+            Some("format".to_string())
+        );
+        assert_eq!(
+            extract_method_prefix("validateInput"),
+            Some("validate".to_string())
+        );
+        assert_eq!(extract_method_prefix("simple"), Some("simple".to_string()));
+    }
+
+    #[test]
+    fn test_is_utility_module() {
+        let mut split = make_split("util", 5, vec![], "data structure operations");
+        assert!(is_utility_module(&split));
+
+        split.responsibility = "formatting".to_string();
+        assert!(!is_utility_module(&split));
+
+        split.responsibility = "helper functions".to_string();
+        assert!(is_utility_module(&split));
+    }
+
+    #[test]
+    fn test_cohesion_validation() {
+        let config = SplitSizeConfig::default();
+        let mut split = make_split("low_cohesion", 15, vec![], "test");
+        split.cohesion_score = Some(0.2);
+
+        assert!(!config.has_sufficient_cohesion(&split));
+
+        split.cohesion_score = Some(0.5);
+        assert!(config.has_sufficient_cohesion(&split));
     }
 }
