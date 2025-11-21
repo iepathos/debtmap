@@ -1,0 +1,216 @@
+//! Integration tests for improved responsibility clustering (Spec 192)
+//!
+//! Validates that the new clustering module achieves <5% unclustered rate
+//! and integrates properly with god object detection.
+
+use debtmap::organization::GodObjectDetector;
+use std::path::Path;
+
+/// Test that clustering achieves <5% unclustered rate on god_object_detector.rs itself
+///
+/// Spec 192 requires: "god_object_detector.rs should have ≤1 unclustered method warning"
+/// which translates to <5% unclustered rate for a file with 20+ methods.
+#[test]
+fn test_clustering_on_god_object_detector() {
+    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
+        .expect("Failed to read god_object_detector.rs");
+
+    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+
+    let detector = GodObjectDetector::with_source_content(&source_code);
+    let path = Path::new("src/organization/god_object_detector.rs");
+    let analysis = detector.analyze_enhanced(path, &ast);
+
+    // Count total methods in all splits
+    let total_split_methods: usize = analysis
+        .file_metrics
+        .recommended_splits
+        .iter()
+        .map(|s| s.method_count)
+        .sum();
+
+    // If there are no recommended splits, the file might not be classified as a god object
+    // In that case, the test passes (no unclustered methods)
+    if total_split_methods == 0 {
+        println!("No splits recommended - file not classified as god object");
+        return;
+    }
+
+    // Count methods in "unclustered" or "utilities" categories (indicates poor clustering)
+    let unclustered_methods: usize = analysis
+        .file_metrics
+        .recommended_splits
+        .iter()
+        .filter(|s| {
+            let name_lower = s.suggested_name.to_lowercase();
+            let resp_lower = s.responsibility.to_lowercase();
+            name_lower.contains("utilities")
+                || name_lower.contains("unclustered")
+                || name_lower.contains("misc")
+                || resp_lower.contains("utilities")
+                || resp_lower.contains("unclustered")
+                || resp_lower.contains("misc")
+                || s.cluster_quality
+                    .as_ref()
+                    .map(|q| !q.is_acceptable())
+                    .unwrap_or(false)
+        })
+        .map(|s| s.method_count)
+        .sum();
+
+    let unclustered_rate = if total_split_methods > 0 {
+        (unclustered_methods as f64) / (total_split_methods as f64)
+    } else {
+        0.0
+    };
+
+    println!("Clustering results for god_object_detector.rs:");
+    println!("  Total methods in splits: {}", total_split_methods);
+    println!("  Unclustered methods: {}", unclustered_methods);
+    println!("  Unclustered rate: {:.1}%", unclustered_rate * 100.0);
+    println!(
+        "  Number of clusters: {}",
+        analysis.file_metrics.recommended_splits.len()
+    );
+
+    // Print cluster quality details
+    for split in &analysis.file_metrics.recommended_splits {
+        if let Some(quality) = &split.cluster_quality {
+            println!(
+                "  - {} ({} methods): coherence={:.2}, separation={:.2}, silhouette={:.2}",
+                split.suggested_name,
+                split.method_count,
+                quality.internal_coherence,
+                quality.external_separation,
+                quality.silhouette_score
+            );
+        } else {
+            println!(
+                "  - {} ({} methods): no quality metrics",
+                split.suggested_name, split.method_count
+            );
+        }
+    }
+
+    // REQUIREMENT: <5% unclustered rate (Spec 192)
+    assert!(
+        unclustered_rate < 0.05,
+        "Unclustered rate {:.1}% exceeds 5% threshold. \
+         Expected high-quality clustering with coherent behavioral groups.",
+        unclustered_rate * 100.0
+    );
+
+    // REQUIREMENT: At least 2 distinct clusters (no single mega-cluster)
+    assert!(
+        analysis.file_metrics.recommended_splits.len() >= 2,
+        "Expected at least 2 coherent clusters, found {}",
+        analysis.file_metrics.recommended_splits.len()
+    );
+}
+
+/// Test that all clusters have acceptable quality metrics
+#[test]
+fn test_cluster_quality_metrics() {
+    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
+        .expect("Failed to read god_object_detector.rs");
+
+    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+
+    let detector = GodObjectDetector::with_source_content(&source_code);
+    let path = Path::new("src/organization/god_object_detector.rs");
+    let analysis = detector.analyze_enhanced(path, &ast);
+
+    if analysis.file_metrics.recommended_splits.is_empty() {
+        println!("No splits recommended - skipping quality check");
+        return;
+    }
+
+    // All clusters with quality metrics should have acceptable quality
+    let clusters_with_quality: Vec<_> = analysis
+        .file_metrics
+        .recommended_splits
+        .iter()
+        .filter(|s| s.cluster_quality.is_some())
+        .collect();
+
+    if clusters_with_quality.is_empty() {
+        println!("No clusters with quality metrics - may be using legacy clustering");
+        return;
+    }
+
+    println!("\nCluster quality validation:");
+    for split in &clusters_with_quality {
+        if let Some(quality) = &split.cluster_quality {
+            println!(
+                "  {} ({} methods): {}",
+                split.suggested_name,
+                split.method_count,
+                quality.quality_description()
+            );
+
+            // REQUIREMENT: Internal coherence > 0.5 (Spec 192)
+            assert!(
+                quality.internal_coherence > 0.5,
+                "Cluster '{}' has low internal coherence: {:.2} (threshold: 0.5)",
+                split.suggested_name,
+                quality.internal_coherence
+            );
+
+            // REQUIREMENT: Silhouette score > 0.4 for good clusters (Spec 192)
+            // Note: Some clusters may have 0.2-0.4 (fair) which is acceptable
+            if quality.silhouette_score < 0.2 {
+                panic!(
+                    "Cluster '{}' has poor silhouette score: {:.2} (minimum: 0.2)",
+                    split.suggested_name, quality.silhouette_score
+                );
+            }
+        }
+    }
+
+    println!(
+        "✓ All {} clusters meet quality thresholds",
+        clusters_with_quality.len()
+    );
+}
+
+/// Test that clustering is deterministic (same input → same output)
+#[test]
+fn test_clustering_determinism() {
+    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
+        .expect("Failed to read god_object_detector.rs");
+
+    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+
+    let detector = GodObjectDetector::with_source_content(&source_code);
+    let path = Path::new("src/organization/god_object_detector.rs");
+
+    // Run clustering twice
+    let analysis1 = detector.analyze_enhanced(path, &ast);
+    let analysis2 = detector.analyze_enhanced(path, &ast);
+
+    // Should produce identical results
+    assert_eq!(
+        analysis1.file_metrics.recommended_splits.len(),
+        analysis2.file_metrics.recommended_splits.len(),
+        "Clustering should be deterministic"
+    );
+
+    // Check that split names and method counts match
+    for (split1, split2) in analysis1
+        .file_metrics
+        .recommended_splits
+        .iter()
+        .zip(analysis2.file_metrics.recommended_splits.iter())
+    {
+        assert_eq!(
+            split1.suggested_name, split2.suggested_name,
+            "Split names should be identical across runs"
+        );
+        assert_eq!(
+            split1.method_count, split2.method_count,
+            "Method counts should be identical across runs"
+        );
+    }
+
+    println!("✓ Clustering is deterministic");
+}

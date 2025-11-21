@@ -1,7 +1,9 @@
 //! Cluster quality metrics for evaluating clustering results
 
+use serde::{Deserialize, Serialize};
+
 /// Quality metrics for a cluster
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ClusterQuality {
     /// Internal coherence: how similar methods within the cluster are (0-1, higher is better)
     pub internal_coherence: f64,
