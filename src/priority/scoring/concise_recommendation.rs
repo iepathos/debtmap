@@ -306,6 +306,18 @@ fn generate_complexity_steps(
         } => {
             generate_coordinator_recommendation(action_count, comparison_count, cyclo, cog, metrics)
         }
+        ComplexityPattern::Dispatcher {
+            branch_count,
+            cognitive_ratio,
+            inline_logic_branches,
+        } => generate_dispatcher_recommendation(
+            branch_count,
+            cognitive_ratio,
+            inline_logic_branches,
+            cyclomatic,
+            cognitive,
+            metrics,
+        ),
         ComplexityPattern::RepetitiveValidation {
             validation_count,
             entropy,
@@ -746,6 +758,118 @@ fn generate_coordinator_recommendation(
         related_items: vec![],
         steps: Some(steps),
         estimated_effort_hours: Some(estimated_effort),
+    }
+}
+
+/// Generate recommendation for dispatcher pattern (spec 189)
+fn generate_dispatcher_recommendation(
+    branch_count: u32,
+    cognitive_ratio: f64,
+    inline_logic_branches: u32,
+    cyclomatic: u32,
+    cognitive: u32,
+    metrics: &FunctionMetrics,
+) -> ActionableRecommendation {
+    let language = crate::core::Language::from_path(&metrics.file);
+
+    // Clean dispatcher (no inline logic) gets Info-level recommendation
+    if inline_logic_branches == 0 {
+        let steps = vec![ActionStep {
+            description: "Monitor branch count if it exceeds 25 (maintainability concern)"
+                .to_string(),
+            impact: "Acceptable dispatcher complexity for router".to_string(),
+            difficulty: Difficulty::Easy,
+            commands: vec![
+                "# This is a clean dispatcher pattern".to_string(),
+                "# Each branch is simple delegation (1-2 lines)".to_string(),
+            ],
+        }];
+
+        return ActionableRecommendation {
+            primary_action: format!(
+                "Clean dispatcher pattern ({} branches, ratio: {:.2}) - no action needed",
+                branch_count, cognitive_ratio
+            ),
+            rationale: format!(
+                "Dispatcher pattern with {} branches and cognitive/cyclomatic ratio of {:.2}. \
+                 Low ratio confirms shallow branching. This is acceptable complexity for a router.",
+                branch_count, cognitive_ratio
+            ),
+            implementation_steps: vec![],
+            related_items: vec![],
+            steps: Some(steps),
+            estimated_effort_hours: Some(0.0),
+        };
+    }
+
+    // Dispatcher with inline logic - recommend extraction
+    let extraction_impact = RefactoringImpact::extract_function(inline_logic_branches);
+
+    let steps = vec![
+        ActionStep {
+            description: format!(
+                "Extract inline logic from {} branches into helper functions",
+                inline_logic_branches
+            ),
+            impact: format!(
+                "-{} cognitive complexity ({} impact)",
+                extraction_impact.complexity_reduction,
+                extraction_impact.confidence.as_str()
+            ),
+            difficulty: Difficulty::Medium,
+            commands: vec![
+                "# Identify branches with >2 lines of logic".to_string(),
+                "# Extract into focused helper functions".to_string(),
+                "# Keep dispatcher as thin router (1-2 lines per branch)".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Maintain shallow dispatcher structure".to_string(),
+            impact: format!(
+                "Target: {} branches with simple delegation only",
+                branch_count
+            ),
+            difficulty: Difficulty::Easy,
+            commands: vec![
+                "# Each branch should be: Some(Cmd) => handle_cmd()".to_string(),
+                "# No conditionals or loops within branches".to_string(),
+            ],
+        },
+        ActionStep {
+            description: "Verify cognitive complexity reduced".to_string(),
+            impact: format!(
+                "Target: cognitive < {} (from {})",
+                (branch_count as f64 * 0.4) as u32,
+                cognitive
+            ),
+            difficulty: Difficulty::Easy,
+            commands: add_language_verification_commands(&language),
+        },
+    ];
+
+    let estimated_effort = (inline_logic_branches as f32) * 0.3; // ~20min per extraction
+
+    let severity = match inline_logic_branches {
+        1..=3 => "Low",
+        4..=8 => "Medium",
+        _ => "High",
+    };
+
+    ActionableRecommendation {
+        primary_action: format!(
+            "Extract inline logic from {} branches (dispatcher pattern)",
+            inline_logic_branches
+        ),
+        rationale: format!(
+            "Dispatcher pattern detected with {} branches (ratio: {:.2}). \
+             {} branches have inline logic that should be extracted into helper functions. \
+             Dispatcher complexity: {}/{} (severity: {}).",
+            branch_count, cognitive_ratio, inline_logic_branches, cyclomatic, cognitive, severity
+        ),
+        implementation_steps: vec![],
+        related_items: vec![],
+        steps: Some(steps),
+        estimated_effort_hours: Some(estimated_effort.max(0.5)),
     }
 }
 
