@@ -219,6 +219,7 @@ impl DomainTermExtractor {
             // 2. Next is lowercase (handles acronyms like "APIKey" -> "API", "Key")
             if is_upper && (!current.is_empty() && (prev_was_lower || next_is_lower)) {
                 // For acronyms, keep all caps together except last letter
+                #[allow(clippy::if_same_then_else, clippy::len_zero)]
                 if !prev_was_lower && next_is_lower && current.len() > 0 {
                     result.push(current.clone());
                     current.clear();

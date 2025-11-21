@@ -103,7 +103,7 @@ impl SpecificityScorer {
         let mut score: f64 = 0.5; // Base score for non-generic names
 
         // Bonus: Domain-specific terms get a boost
-        if self.domain_terms.iter().any(|term| name_lower == *term) {
+        if self.domain_terms.contains(&name_lower) {
             score += 0.12; // Direct domain term match
         } else if self
             .domain_terms

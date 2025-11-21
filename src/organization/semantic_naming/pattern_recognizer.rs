@@ -268,7 +268,7 @@ impl PatternRecognizer {
                                     return true; // getformat - verb at end
                                 }
                                 let next_char = method.chars().nth(after_verb);
-                                if let Some(next) = next_char {
+                                if let Some(_next) = next_char {
                                     // Accept any character after verb in camelCase context
                                     // This handles both "getFormat" and "getformat"
                                     return true;
