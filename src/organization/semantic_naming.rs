@@ -23,7 +23,7 @@
 //!     "calculate_coverage_percentage".to_string(),
 //! ];
 //!
-//! let candidates = generator.generate_names(&methods);
+//! let candidates = generator.generate_names(&methods, None);
 //! // Returns candidates like: "coverage" (0.85 confidence), "formatting" (0.75 confidence)
 //! ```
 

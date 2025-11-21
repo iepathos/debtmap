@@ -99,16 +99,25 @@ impl DomainTermExtractor {
             *freq_map.entry(token.clone()).or_insert(0) += 1;
         }
 
-        // Find most frequent significant term, prioritizing nouns over gerunds
+        // Find most frequent significant term, prioritizing specificity and non-gerunds
         let mut terms: Vec<_> = freq_map.into_iter().collect();
 
-        // Sort by frequency first, then prioritize non-gerund terms (not ending in "ing")
+        // Sort by frequency first, then by specificity, then prioritize non-gerund terms
         terms.sort_by(|a, b| {
             let freq_cmp = b.1.cmp(&a.1);
             if freq_cmp != std::cmp::Ordering::Equal {
                 return freq_cmp;
             }
-            // If frequencies are equal, prefer non-gerunds
+            // If frequencies are equal, prefer terms with higher specificity
+            let a_specificity = self.calculate_term_specificity(&a.0);
+            let b_specificity = self.calculate_term_specificity(&b.0);
+            let specificity_cmp = b_specificity
+                .partial_cmp(&a_specificity)
+                .unwrap_or(std::cmp::Ordering::Equal);
+            if specificity_cmp != std::cmp::Ordering::Equal {
+                return specificity_cmp;
+            }
+            // If specificities are equal, prefer non-gerunds
             let a_is_gerund = a.0.ends_with("ing");
             let b_is_gerund = b.0.ends_with("ing");
             match (a_is_gerund, b_is_gerund) {
