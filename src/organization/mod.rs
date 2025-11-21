@@ -111,6 +111,12 @@ pub use data_flow_analyzer::{
 
 pub use macro_recommendations::MacroRecommendationEngine;
 
+pub mod module_recommendations;
+pub use module_recommendations::{
+    generate_decomposition_plan, is_generic_name, DecompositionLevel, DecompositionPlan,
+    ModuleRecommendation,
+};
+
 pub use anti_pattern_detector::{
     is_primitive, AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity,
     AntiPatternType, SplitQualityReport,

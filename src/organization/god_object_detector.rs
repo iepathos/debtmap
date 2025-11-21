@@ -973,51 +973,76 @@ impl GodObjectDetector {
         // Apply production-ready clustering (filters tests, subdivides oversized clusters, merges tiny ones)
         let clusters = apply_production_ready_clustering(all_methods, &adjacency);
 
-        // Convert clusters to ModuleSplit recommendations
-        let splits: Vec<ModuleSplit> = clusters
-            .into_iter()
-            .map(|cluster| {
-                let category_name = cluster.category.module_name();
-                let suggested_name = format!("{}/{}", base_name, category_name);
+        // Convert clusters to ModuleSplit recommendations with quality validation (Spec 188)
+        let mut splits: Vec<ModuleSplit> = Vec::new();
 
-                // Get representative methods (top 5-8)
-                let representative_methods: Vec<String> =
-                    cluster.methods.iter().take(8).cloned().collect();
+        for cluster in clusters {
+            use crate::organization::module_recommendations::ModuleRecommendation;
 
-                // Get fields needed for this cluster
-                let fields_needed = if let Some(tracker) = field_tracker {
-                    tracker.get_minimal_field_set(&cluster.methods)
+            let category_name = cluster.category.module_name();
+            let suggested_name = format!("{}/{}", base_name, category_name);
+
+            // Get representative methods (top 5-8)
+            let representative_methods: Vec<String> =
+                cluster.methods.iter().take(8).cloned().collect();
+
+            // Get fields needed for this cluster
+            let fields_needed = if let Some(tracker) = field_tracker {
+                tracker.get_minimal_field_set(&cluster.methods)
+            } else {
+                vec![]
+            };
+
+            // Generate trait suggestion
+            let trait_suggestion = Some(suggest_trait_extraction(&cluster, base_name));
+
+            // Create module recommendation for quality validation
+            let mut recommendation = ModuleRecommendation {
+                name: category_name.clone(),
+                responsibility: cluster.category.display_name(),
+                methods: cluster.methods.clone(),
+                line_count_estimate: cluster.methods.len() * 15,
+                method_count: cluster.methods.len(),
+                public_interface: representative_methods.clone(),
+                quality_score: 0.0,
+                warnings: Vec::new(),
+                category: cluster.category.clone(),
+                fields_needed: fields_needed.clone(),
+            };
+
+            // Validate module quality (Spec 188)
+            recommendation.validate();
+
+            // Add warnings to module split if quality issues detected
+            let warning = if !recommendation.warnings.is_empty() {
+                Some(recommendation.warnings.join("; "))
+            } else {
+                None
+            };
+
+            splits.push(ModuleSplit {
+                suggested_name,
+                methods_to_move: cluster.methods.clone(),
+                structs_to_move: vec![],
+                responsibility: cluster.category.display_name(),
+                estimated_lines: cluster.methods.len() * 15,
+                method_count: cluster.methods.len(),
+                warning,
+                priority: if cluster.cohesion_score > 0.7 {
+                    Priority::High
+                } else if cluster.cohesion_score > 0.5 {
+                    Priority::Medium
                 } else {
-                    vec![]
-                };
-
-                // Generate trait suggestion
-                let trait_suggestion = Some(suggest_trait_extraction(&cluster, base_name));
-
-                ModuleSplit {
-                    suggested_name,
-                    methods_to_move: cluster.methods.clone(),
-                    structs_to_move: vec![],
-                    responsibility: cluster.category.display_name(),
-                    estimated_lines: cluster.methods.len() * 15,
-                    method_count: cluster.methods.len(),
-                    warning: None,
-                    priority: if cluster.cohesion_score > 0.7 {
-                        Priority::High
-                    } else if cluster.cohesion_score > 0.5 {
-                        Priority::Medium
-                    } else {
-                        Priority::Low
-                    },
-                    cohesion_score: Some(cluster.cohesion_score),
-                    representative_methods,
-                    fields_needed,
-                    trait_suggestion,
-                    behavior_category: Some(cluster.category.display_name()),
-                    ..Default::default()
-                }
-            })
-            .collect();
+                    Priority::Low
+                },
+                cohesion_score: Some(cluster.cohesion_score),
+                representative_methods,
+                fields_needed,
+                trait_suggestion,
+                behavior_category: Some(cluster.category.display_name()),
+                ..Default::default()
+            });
+        }
 
         // REMOVED: Service object detection (Phase 1 - Spec 178 refinement)
         //
