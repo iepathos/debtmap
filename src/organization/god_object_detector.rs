@@ -1577,6 +1577,108 @@ impl GodObjectDetector {
         }
     }
 
+    /// Enhance god object analysis with integrated architecture analysis (Spec 185)
+    ///
+    /// Applies type-based clustering, data flow analysis, anti-pattern detection,
+    /// and hidden type extraction to produce coherent, non-conflicting recommendations.
+    pub fn analyze_with_integrated_architecture(
+        &self,
+        path: &Path,
+        ast: &syn::File,
+    ) -> GodObjectAnalysis {
+        // Get basic god object analysis
+        let mut analysis = self.analyze_comprehensive(path, ast);
+
+        // Only apply integrated architecture analysis for significant god objects
+        if !analysis.is_god_object || analysis.god_object_score < 50.0 {
+            return analysis;
+        }
+
+        // Build call graph for data flow analysis
+        let call_graph = self.build_call_graph(ast);
+
+        // Apply integrated architecture analysis
+        let integrated_analyzer = crate::organization::IntegratedArchitectureAnalyzer::new();
+
+        match integrated_analyzer.analyze(&analysis, ast, &call_graph) {
+            Ok(result) => {
+                // Replace splits with integrated results
+                analysis.recommended_splits = result.unified_splits;
+
+                // Store analysis metadata (if we had fields for it)
+                // analysis.analysis_time = Some(result.analysis_metadata.total_time);
+
+                analysis
+            }
+            Err(e) => {
+                // Fallback to basic analysis on error
+                eprintln!("Integrated analysis failed: {:?}", e);
+                analysis
+            }
+        }
+    }
+
+    /// Build a simple call graph from AST for data flow analysis
+    fn build_call_graph(&self, ast: &syn::File) -> HashMap<String, Vec<String>> {
+        use syn::visit::Visit;
+
+        struct CallGraphVisitor {
+            call_graph: HashMap<String, Vec<String>>,
+            current_function: Option<String>,
+        }
+
+        impl<'ast> Visit<'ast> for CallGraphVisitor {
+            fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
+                let fn_name = node.sig.ident.to_string();
+                self.current_function = Some(fn_name.clone());
+                self.call_graph.entry(fn_name).or_default();
+                syn::visit::visit_impl_item_fn(self, node);
+                self.current_function = None;
+            }
+
+            fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
+                let fn_name = node.sig.ident.to_string();
+                self.current_function = Some(fn_name.clone());
+                self.call_graph.entry(fn_name).or_default();
+                syn::visit::visit_item_fn(self, node);
+                self.current_function = None;
+            }
+
+            fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
+                if let Some(current_fn) = &self.current_function {
+                    if let syn::Expr::Path(path) = &*node.func {
+                        if let Some(segment) = path.path.segments.last() {
+                            let called_fn = segment.ident.to_string();
+                            self.call_graph
+                                .entry(current_fn.clone())
+                                .or_default()
+                                .push(called_fn);
+                        }
+                    }
+                }
+                syn::visit::visit_expr_call(self, node);
+            }
+
+            fn visit_expr_method_call(&mut self, node: &'ast syn::ExprMethodCall) {
+                if let Some(current_fn) = &self.current_function {
+                    let called_fn = node.method.to_string();
+                    self.call_graph
+                        .entry(current_fn.clone())
+                        .or_default()
+                        .push(called_fn);
+                }
+                syn::visit::visit_expr_method_call(self, node);
+            }
+        }
+
+        let mut visitor = CallGraphVisitor {
+            call_graph: HashMap::new(),
+            current_function: None,
+        };
+        visitor.visit_file(ast);
+        visitor.call_graph
+    }
+
     #[allow(dead_code)]
     fn analyze_type(&self, item_struct: &syn::ItemStruct) -> TypeAnalysis {
         let location = if let Some(ref extractor) = self.location_extractor {

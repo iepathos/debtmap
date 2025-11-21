@@ -28,6 +28,7 @@ pub mod god_object;
 pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod hidden_type_extractor;
+pub mod integrated_analyzer;
 pub mod javascript;
 pub mod language;
 pub mod macro_recommendations;
@@ -113,6 +114,11 @@ pub use macro_recommendations::MacroRecommendationEngine;
 pub use anti_pattern_detector::{
     is_primitive, AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity,
     AntiPatternType, SplitQualityReport,
+};
+
+pub use integrated_analyzer::{
+    AnalysisConfig, AnalysisError, AnalysisMetadata, AntiPatternReport, ConflictResolutionStrategy,
+    EnabledAnalyzers, IntegratedAnalysisResult, IntegratedArchitectureAnalyzer,
 };
 
 pub use architecture_utils::{
