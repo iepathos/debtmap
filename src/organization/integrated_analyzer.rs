@@ -147,10 +147,7 @@ impl IntegratedArchitectureAnalyzer {
 
         // Phase 5: Hidden type enrichment
         let enriched_splits = if self.config.enabled_analyzers.hidden_types {
-            self.enrich_with_hidden_types(
-                validated_splits,
-                advanced_results.hidden_types.clone(),
-            )
+            self.enrich_with_hidden_types(validated_splits, advanced_results.hidden_types.clone())
         } else {
             validated_splits
         };
@@ -179,16 +176,13 @@ impl IntegratedArchitectureAnalyzer {
         let signatures = extract_method_signatures(ast)?;
 
         // Convert to type_registry::MethodSignature for anti-pattern detection
-        let registry_signatures: Vec<crate::analyzers::type_registry::MethodSignature> =
-            signatures
-                .iter()
-                .map(convert_to_registry_signature)
-                .collect();
+        let registry_signatures: Vec<crate::analyzers::type_registry::MethodSignature> = signatures
+            .iter()
+            .map(convert_to_registry_signature)
+            .collect();
 
-        let quality_report = detector.calculate_split_quality(
-            &god_object.recommended_splits,
-            &registry_signatures,
-        );
+        let quality_report =
+            detector.calculate_split_quality(&god_object.recommended_splits, &registry_signatures);
 
         Ok(Some(AntiPatternReport {
             quality_score: quality_report.quality_score,
@@ -310,10 +304,7 @@ impl IntegratedArchitectureAnalyzer {
 
             BestConfidence => {
                 // Choose approach with higher average cohesion
-                let type_avg = type_based
-                    .as_ref()
-                    .map(|s| avg_cohesion(s))
-                    .unwrap_or(0.0);
+                let type_avg = type_based.as_ref().map(|s| avg_cohesion(s)).unwrap_or(0.0);
                 let flow_avg = data_flow.as_ref().map(|s| avg_cohesion(s)).unwrap_or(0.0);
 
                 if type_avg >= flow_avg {
@@ -514,20 +505,17 @@ fn extract_method_signatures(ast: &syn::File) -> Result<Vec<MethodSignature>, An
 fn convert_to_registry_signature(
     sig: &MethodSignature,
 ) -> crate::analyzers::type_registry::MethodSignature {
-    let self_param = sig.self_type.as_ref().map(|t| {
-        crate::analyzers::type_registry::SelfParam {
+    let self_param = sig
+        .self_type
+        .as_ref()
+        .map(|t| crate::analyzers::type_registry::SelfParam {
             is_reference: t.is_reference,
             is_mutable: t.is_mutable,
-        }
-    });
+        });
 
     let return_type = sig.return_type.as_ref().map(|t| t.name.clone());
 
-    let param_types = sig
-        .param_types
-        .iter()
-        .map(|t| t.name.clone())
-        .collect();
+    let param_types = sig.param_types.iter().map(|t| t.name.clone()).collect();
 
     crate::analyzers::type_registry::MethodSignature {
         name: sig.name.clone(),
