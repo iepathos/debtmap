@@ -5,6 +5,7 @@ pub mod anti_pattern_detector;
 pub mod architecture_utils;
 pub mod behavioral_decomposition;
 pub mod codebase_type_analyzer;
+pub mod confidence;
 pub mod data_flow_analyzer;
 pub use behavioral_decomposition::{
     apply_hybrid_clustering, apply_production_ready_clustering,
@@ -46,11 +47,12 @@ pub use god_object_analysis::{
     calculate_domain_diversity_from_structs, calculate_god_object_score,
     calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
     determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
-    recommend_module_splits, recommend_module_splits_enhanced, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis,
-    GodObjectConfidence, GodObjectThresholds, GodObjectType, ModuleSplit, Priority,
-    PurityDistribution, RecommendationSeverity, SplitAnalysisMethod, StageType, StructMetrics,
-    StructWithMethods,
+    infer_responsibility_with_confidence, recommend_module_splits,
+    recommend_module_splits_enhanced, suggest_module_splits_by_domain,
+    suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
+    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
+    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
+    SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;
@@ -71,6 +73,10 @@ pub use complexity_weighting::{
     aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_penalty,
     calculate_complexity_weight, ComplexityWeight, ComplexityWeightedAnalysis,
     FunctionComplexityInfo,
+};
+
+pub use confidence::{
+    MINIMUM_CONFIDENCE, MIN_METHODS_FOR_SPLIT, MODULE_SPLIT_CONFIDENCE, UTILITIES_THRESHOLD,
 };
 
 pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};

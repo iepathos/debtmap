@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::confidence::{MINIMUM_CONFIDENCE, UTILITIES_THRESHOLD};
+
 /// Type of god object detection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DetectionType {
@@ -937,6 +939,60 @@ pub fn group_methods_by_responsibility_with_evidence(
     (groups, evidence_map)
 }
 
+/// Result of responsibility classification with confidence scoring.
+///
+/// This struct represents the outcome of attempting to classify a method's
+/// responsibility. The `category` field is `None` if confidence is below
+/// the minimum threshold.
+///
+/// # Fields
+///
+/// * `category` - The classified responsibility category, or `None` if confidence too low
+/// * `confidence` - Confidence score from 0.0 to 1.0
+/// * `signals_used` - Which signals contributed to this classification
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::{ClassificationResult, SignalType};
+/// let result = ClassificationResult {
+///     category: Some("parsing".to_string()),
+///     confidence: 0.85,
+///     signals_used: vec![SignalType::NameHeuristic, SignalType::IoDetection],
+/// };
+/// assert!(result.category.is_some());
+/// assert!(result.confidence >= 0.50);
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassificationResult {
+    /// The classified responsibility category, or `None` if confidence is too low
+    pub category: Option<String>,
+    /// Confidence score from 0.0 to 1.0
+    pub confidence: f64,
+    /// Signal types that contributed to this classification
+    pub signals_used: Vec<SignalType>,
+}
+
+/// Types of signals used for responsibility classification.
+///
+/// These represent different sources of evidence used to determine
+/// a method's responsibility category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignalType {
+    /// Method name pattern matching
+    NameHeuristic,
+    /// I/O operation detection in method body
+    IoDetection,
+    /// Call graph analysis
+    CallGraph,
+    /// Type signature analysis
+    TypeSignature,
+    /// Purity and side effect analysis
+    PurityAnalysis,
+    /// Framework-specific patterns
+    FrameworkPattern,
+}
+
 /// Responsibility category definition for method name classification.
 ///
 /// This struct defines a single category with its name and the method name
@@ -1130,6 +1186,126 @@ pub fn infer_responsibility_from_method(method_name: &str) -> String {
     use crate::organization::BehavioralCategorizer;
     let category = BehavioralCategorizer::categorize_method(method_name);
     category.display_name()
+}
+
+/// Classify method responsibility with confidence scoring (Spec 174).
+///
+/// This function replaces unconditional "utilities" fallback with confidence-based
+/// classification. It returns `None` for the category when confidence is too low,
+/// preventing poor decomposition recommendations.
+///
+/// # Arguments
+///
+/// * `method_name` - The name of the method to classify
+/// * `method_body` - Optional method body for deeper analysis
+///
+/// # Returns
+///
+/// A `ClassificationResult` with:
+/// - `category`: `Some(name)` if confidence ≥ threshold, `None` otherwise
+/// - `confidence`: Score from 0.0 to 1.0
+/// - `signals_used`: Which signals contributed to the classification
+///
+/// # Confidence Thresholds
+///
+/// - Any category: ≥0.50 (MINIMUM_CONFIDENCE)
+/// - "utilities": ≥0.60 (UTILITIES_THRESHOLD) - higher bar to avoid over-classification
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::infer_responsibility_with_confidence;
+/// // High confidence classification
+/// let result = infer_responsibility_with_confidence("parse_json", None);
+/// assert!(result.category.is_some());
+/// assert!(result.confidence >= 0.50);
+///
+/// // Low confidence - refused classification
+/// let result = infer_responsibility_with_confidence("helper", None);
+/// // May return None if confidence too low
+/// ```
+///
+/// # Implementation
+///
+/// Currently uses name-based heuristics as the primary signal.
+/// Future enhancements will integrate:
+/// - I/O detection (weight: 0.40)
+/// - Call graph analysis (weight: 0.30)
+/// - Type signatures (weight: 0.15)
+/// - Purity analysis (weight: 0.10)
+pub fn infer_responsibility_with_confidence(
+    method_name: &str,
+    _method_body: Option<&str>,
+) -> ClassificationResult {
+    let lower = method_name.to_lowercase();
+
+    // Try responsibility categories first
+    if let Some(cat) = RESPONSIBILITY_CATEGORIES
+        .iter()
+        .find(|cat| cat.matches(&lower))
+    {
+        let category_name = cat.name.to_string();
+
+        // Calculate confidence based on prefix match strength
+        // For now, exact prefix match = high confidence
+        let confidence = if category_name == "utilities" {
+            // "utilities" has no prefixes - should never match here
+            0.0
+        } else {
+            // Matched a specific prefix - high confidence
+            0.85
+        };
+
+        // Apply confidence thresholds
+        if confidence < MINIMUM_CONFIDENCE {
+            return ClassificationResult {
+                category: None,
+                confidence,
+                signals_used: vec![SignalType::NameHeuristic],
+            };
+        }
+
+        if category_name == "utilities" && confidence < UTILITIES_THRESHOLD {
+            return ClassificationResult {
+                category: None,
+                confidence,
+                signals_used: vec![SignalType::NameHeuristic],
+            };
+        }
+
+        return ClassificationResult {
+            category: Some(category_name),
+            confidence,
+            signals_used: vec![SignalType::NameHeuristic],
+        };
+    }
+
+    // Fall back to behavioral categorization
+    use crate::organization::BehavioralCategorizer;
+    let category = BehavioralCategorizer::categorize_method(method_name);
+    let category_name = category.display_name();
+
+    // Behavioral categorization provides medium confidence
+    // Domain-specific categories get lower confidence than recognized patterns
+    let confidence = match category {
+        crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
+        _ => 0.65, // Above threshold for recognized behavioral patterns
+    };
+
+    // Apply confidence thresholds
+    if confidence < MINIMUM_CONFIDENCE {
+        return ClassificationResult {
+            category: None,
+            confidence,
+            signals_used: vec![SignalType::NameHeuristic],
+        };
+    }
+
+    ClassificationResult {
+        category: Some(category_name),
+        confidence,
+        signals_used: vec![SignalType::NameHeuristic],
+    }
 }
 
 /// Map old category names to new names for backward compatibility.
@@ -3121,5 +3297,140 @@ mod tests {
         assert_eq!(splits.len(), 1);
         assert_eq!(splits[0].suggested_name, "mytype_parsing");
         assert!(!splits[0].suggested_name.contains('&'));
+    }
+
+    // Tests for confidence-based classification (Spec 174)
+
+    #[test]
+    fn test_high_confidence_classification() {
+        let result = infer_responsibility_with_confidence("parse_json", None);
+        assert!(result.category.is_some());
+        assert_eq!(result.category.unwrap(), "parsing");
+        assert!(result.confidence >= MINIMUM_CONFIDENCE);
+    }
+
+    #[test]
+    fn test_minimum_confidence_threshold() {
+        // Domain-specific methods get lower confidence
+        let result = infer_responsibility_with_confidence("populate_registry", None);
+        // Should be below threshold if it's domain-specific
+        if result.confidence < MINIMUM_CONFIDENCE {
+            assert!(result.category.is_none());
+        }
+    }
+
+    #[test]
+    fn test_recognized_patterns_have_high_confidence() {
+        let test_cases = vec![
+            ("format_output", "output"),
+            ("parse_input", "parsing"),
+            ("validate_data", "validation"),
+            ("calculate_sum", "computation"),
+        ];
+
+        for (method_name, expected_category) in test_cases {
+            let result = infer_responsibility_with_confidence(method_name, None);
+            assert!(
+                result.category.is_some(),
+                "Expected {} to be classified",
+                method_name
+            );
+            assert_eq!(
+                result.category.unwrap(),
+                expected_category,
+                "Wrong category for {}",
+                method_name
+            );
+            assert!(
+                result.confidence >= 0.85,
+                "Expected high confidence for {}",
+                method_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_utilities_category_avoided() {
+        // "utilities" category should never be returned from the prefix matching
+        // since it has no prefixes and requires higher confidence
+        let result = infer_responsibility_with_confidence("helper_function", None);
+
+        // Either classified to something else or refused (confidence too low)
+        if let Some(category) = result.category {
+            // If classified, should not be "utilities" unless confidence is very high
+            if category.to_lowercase().contains("util") {
+                assert!(
+                    result.confidence >= UTILITIES_THRESHOLD,
+                    "utilities classification requires confidence >= {}",
+                    UTILITIES_THRESHOLD
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classification_result_structure() {
+        let result = infer_responsibility_with_confidence("validate_input", None);
+
+        // Check all fields are populated correctly
+        assert!(!result.signals_used.is_empty());
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
+        if result.category.is_some() {
+            assert!(result.confidence >= MINIMUM_CONFIDENCE);
+        }
+    }
+
+    #[test]
+    fn test_behavioral_categorization_confidence() {
+        // Behavioral patterns should have medium-high confidence
+        let behavioral_methods = vec!["render_ui", "handle_event", "save_data"];
+
+        for method_name in behavioral_methods {
+            let result = infer_responsibility_with_confidence(method_name, None);
+            if result.category.is_some() {
+                // Behavioral patterns should be above minimum but may vary
+                assert!(
+                    result.confidence >= MINIMUM_CONFIDENCE,
+                    "{} confidence too low: {}",
+                    method_name,
+                    result.confidence
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_confidence_thresholds_enforced() {
+        // Test that confidence thresholds are actually enforced
+        let test_methods = vec![
+            "parse_json",
+            "format_output",
+            "helper_method",
+            "do_something",
+        ];
+
+        for method_name in test_methods {
+            let result = infer_responsibility_with_confidence(method_name, None);
+
+            if let Some(_category) = &result.category {
+                // If category is set, confidence must be >= MINIMUM_CONFIDENCE
+                assert!(
+                    result.confidence >= MINIMUM_CONFIDENCE,
+                    "{} classified with confidence {} below minimum {}",
+                    method_name,
+                    result.confidence,
+                    MINIMUM_CONFIDENCE
+                );
+            } else {
+                // If category is None, confidence must be < MINIMUM_CONFIDENCE
+                assert!(
+                    result.confidence < MINIMUM_CONFIDENCE,
+                    "{} refused classification but confidence {} >= minimum {}",
+                    method_name,
+                    result.confidence,
+                    MINIMUM_CONFIDENCE
+                );
+            }
+        }
     }
 }
