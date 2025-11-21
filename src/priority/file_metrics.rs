@@ -43,7 +43,7 @@ pub struct GodObjectIndicators {
     pub responsibilities: usize,
     pub is_god_object: bool,
     pub god_object_score: f64,
-    /// Detailed list of identified responsibilities (e.g., "Data Access", "Validation")
+    /// Detailed list of identified responsibilities (e.g., "data_access", "validation")
     #[serde(default)]
     pub responsibility_names: Vec<String>,
     /// Recommended module splits with methods to move
@@ -881,7 +881,7 @@ mod tests {
                 name: "Config".to_string(),
                 method_count: 50,
                 field_count: 30,
-                responsibilities: vec!["Data Access".to_string()],
+                responsibilities: vec!["data_access".to_string()],
                 line_span: (0, 1000),
             },
             suggested_splits: vec![],
