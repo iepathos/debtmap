@@ -2179,150 +2179,129 @@ pub fn suggest_splits_by_struct_grouping(
 mod tests {
     use super::*;
 
+    // Helper function matching old behavior for backward compatibility with tests
+    // This mimics the deprecated infer_responsibility_from_method function
+    fn infer_category(method_name: &str) -> String {
+        let result = infer_responsibility_with_confidence(method_name, None);
+        result.category.unwrap_or_else(|| {
+            // Fall back to behavioral categorization (like the old function did)
+            use crate::organization::BehavioralCategorizer;
+            let category = BehavioralCategorizer::categorize_method(method_name);
+            category.display_name()
+        })
+    }
+
     #[test]
     fn test_format_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("format_output"), "output");
-        assert_eq!(infer_responsibility_from_method("format_json"), "output");
-        assert_eq!(infer_responsibility_from_method("FORMAT_DATA"), "output");
+        assert_eq!(infer_category("format_output"), "output");
+        assert_eq!(infer_category("format_json"), "output");
+        assert_eq!(infer_category("FORMAT_DATA"), "output");
     }
 
     #[test]
     fn test_render_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("render_table"), "output");
+        assert_eq!(infer_category("render_table"), "output");
     }
 
     #[test]
     fn test_write_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("write_to_file"), "output");
+        assert_eq!(infer_category("write_to_file"), "output");
     }
 
     #[test]
     fn test_print_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("print_results"), "output");
+        assert_eq!(infer_category("print_results"), "output");
     }
 
     #[test]
     fn test_parse_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("parse_input"), "parsing");
-        assert_eq!(infer_responsibility_from_method("parse_json"), "parsing");
+        assert_eq!(infer_category("parse_input"), "parsing");
+        assert_eq!(infer_category("parse_json"), "parsing");
     }
 
     #[test]
     fn test_read_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("read_config"), "parsing");
+        assert_eq!(infer_category("read_config"), "parsing");
     }
 
     #[test]
     fn test_extract_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("extract_data"), "parsing");
+        assert_eq!(infer_category("extract_data"), "parsing");
     }
 
     #[test]
     fn test_filter_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("filter_results"),
-            "filtering"
-        );
+        assert_eq!(infer_category("filter_results"), "filtering");
     }
 
     #[test]
     fn test_select_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("select_items"),
-            "filtering"
-        );
+        assert_eq!(infer_category("select_items"), "filtering");
     }
 
     #[test]
     fn test_find_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("find_element"),
-            "filtering"
-        );
+        assert_eq!(infer_category("find_element"), "filtering");
     }
 
     #[test]
     fn test_transform_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("transform_data"),
-            "transformation"
-        );
+        assert_eq!(infer_category("transform_data"), "transformation");
     }
 
     #[test]
     fn test_convert_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("convert_to_json"),
-            "transformation"
-        );
+        assert_eq!(infer_category("convert_to_json"), "transformation");
     }
 
     #[test]
     fn test_map_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("map_values"),
-            "transformation"
-        );
+        assert_eq!(infer_category("map_values"), "transformation");
     }
 
     #[test]
     fn test_apply_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("apply_mapping"),
-            "transformation"
-        );
+        assert_eq!(infer_category("apply_mapping"), "transformation");
     }
 
     #[test]
     fn test_get_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("get_value"), "data_access");
+        assert_eq!(infer_category("get_value"), "data_access");
     }
 
     #[test]
     fn test_set_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("set_value"), "data_access");
+        assert_eq!(infer_category("set_value"), "data_access");
     }
 
     #[test]
     fn test_is_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("is_valid"), "validation");
-        assert_eq!(infer_responsibility_from_method("is_empty"), "validation");
+        assert_eq!(infer_category("is_valid"), "validation");
+        assert_eq!(infer_category("is_empty"), "validation");
     }
 
     #[test]
     fn test_validate_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("validate_input"),
-            "validation"
-        );
+        assert_eq!(infer_category("validate_input"), "validation");
     }
 
     #[test]
     fn test_check_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("check_constraints"),
-            "validation"
-        );
+        assert_eq!(infer_category("check_constraints"), "validation");
     }
 
     #[test]
     fn test_verify_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("verify_signature"),
-            "validation"
-        );
+        assert_eq!(infer_category("verify_signature"), "validation");
     }
 
     #[test]
     fn test_catch_all_uses_behavioral_categorization() {
         // Spec 178: Avoid "utilities", use behavioral categorization
         // "unknown_function" -> Domain("Unknown") based on first word
-        assert_eq!(
-            infer_responsibility_from_method("unknown_function"),
-            "Unknown"
-        );
+        assert_eq!(infer_category("unknown_function"), "Unknown");
         // "some_helper" -> Domain("Some") based on first word
-        assert_eq!(infer_responsibility_from_method("some_helper"), "Some");
+        assert_eq!(infer_category("some_helper"), "Some");
     }
 
     #[test]
@@ -2353,135 +2332,96 @@ mod tests {
 
     #[test]
     fn test_case_insensitive_matching() {
-        assert_eq!(infer_responsibility_from_method("FORMAT_OUTPUT"), "output");
-        assert_eq!(infer_responsibility_from_method("Parse_Input"), "parsing");
-        assert_eq!(infer_responsibility_from_method("IS_VALID"), "validation");
+        assert_eq!(infer_category("FORMAT_OUTPUT"), "output");
+        assert_eq!(infer_category("Parse_Input"), "parsing");
+        assert_eq!(infer_category("IS_VALID"), "validation");
     }
 
     #[test]
     fn test_calculate_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("calculate_total"),
-            "computation"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("calculate_sum"),
-            "computation"
-        );
+        assert_eq!(infer_category("calculate_total"), "computation");
+        assert_eq!(infer_category("calculate_sum"), "computation");
     }
 
     #[test]
     fn test_compute_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("compute_result"),
-            "computation"
-        );
+        assert_eq!(infer_category("compute_result"), "computation");
     }
 
     #[test]
     fn test_create_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("create_instance"),
-            "construction"
-        );
+        assert_eq!(infer_category("create_instance"), "construction");
     }
 
     #[test]
     fn test_build_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("build_object"),
-            "construction"
-        );
+        assert_eq!(infer_category("build_object"), "construction");
     }
 
     #[test]
     fn test_new_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("new_connection"),
-            "construction"
-        );
+        assert_eq!(infer_category("new_connection"), "construction");
     }
 
     #[test]
     fn test_save_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("save_to_disk"),
-            "persistence"
-        );
+        assert_eq!(infer_category("save_to_disk"), "persistence");
     }
 
     #[test]
     fn test_load_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("load_from_file"),
-            "persistence"
-        );
+        assert_eq!(infer_category("load_from_file"), "persistence");
     }
 
     #[test]
     fn test_store_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("store_data"),
-            "persistence"
-        );
+        assert_eq!(infer_category("store_data"), "persistence");
     }
 
     #[test]
     fn test_process_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("process_request"),
-            "processing"
-        );
+        assert_eq!(infer_category("process_request"), "processing");
     }
 
     #[test]
     fn test_handle_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("handle_event"),
-            "processing"
-        );
+        assert_eq!(infer_category("handle_event"), "processing");
     }
 
     #[test]
     fn test_send_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("send_message"),
-            "communication"
-        );
+        assert_eq!(infer_category("send_message"), "communication");
     }
 
     #[test]
     fn test_receive_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("receive_data"),
-            "communication"
-        );
+        assert_eq!(infer_category("receive_data"), "communication");
     }
 
     #[test]
     fn test_empty_string_returns_operations() {
         // Spec 178: Empty string defaults to "Operations" via Domain fallback
-        assert_eq!(infer_responsibility_from_method(""), "Operations");
+        assert_eq!(infer_category(""), "Operations");
     }
 
     #[test]
     fn test_underscore_only_returns_operations() {
         // Spec 178: Underscores default to "Operations" via Domain fallback
-        assert_eq!(infer_responsibility_from_method("_"), "Operations");
-        assert_eq!(infer_responsibility_from_method("__"), "Operations");
+        assert_eq!(infer_category("_"), "Operations");
+        assert_eq!(infer_category("__"), "Operations");
     }
 
     #[test]
     fn test_special_chars_return_first_word_domain() {
         // Spec 178: Special chars extracted as domain name
-        assert_eq!(infer_responsibility_from_method("@#$%"), "@#$%");
+        assert_eq!(infer_category("@#$%"), "@#$%");
     }
 
     #[test]
     fn test_function_is_deterministic() {
         let input = "calculate_average";
-        let result1 = infer_responsibility_from_method(input);
-        let result2 = infer_responsibility_from_method(input);
+        let result1 = infer_category(input);
+        let result2 = infer_category(input);
         assert_eq!(result1, result2);
     }
 
