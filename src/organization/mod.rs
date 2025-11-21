@@ -48,7 +48,8 @@ pub use god_object_analysis::{
     calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
     determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
     infer_responsibility_with_confidence, recommend_module_splits,
-    recommend_module_splits_enhanced, suggest_module_splits_by_domain,
+    recommend_module_splits_enhanced, recommend_module_splits_with_evidence,
+    suggest_module_splits_by_domain,
     suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
     EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
     GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
@@ -76,7 +77,8 @@ pub use complexity_weighting::{
 };
 
 pub use confidence::{
-    MINIMUM_CONFIDENCE, MIN_METHODS_FOR_SPLIT, MODULE_SPLIT_CONFIDENCE, UTILITIES_THRESHOLD,
+    emit_classification_metrics, ClassificationMetrics, MINIMUM_CONFIDENCE, MIN_METHODS_FOR_SPLIT,
+    MODULE_SPLIT_CONFIDENCE, UTILITIES_THRESHOLD,
 };
 
 pub use purity_analyzer::{PurityAnalyzer, PurityIndicators, PurityLevel};

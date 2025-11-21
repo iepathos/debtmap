@@ -51,6 +51,92 @@ pub const MODULE_SPLIT_CONFIDENCE: f64 = 0.65;
 /// **Rationale**: Splitting off fewer methods creates unnecessary fragmentation.
 pub const MIN_METHODS_FOR_SPLIT: usize = 5;
 
+/// Metrics tracking classification results for observability.
+///
+/// Used to monitor classification quality and identify potential issues
+/// with thresholds or classification logic.
+#[derive(Debug, Clone, Default)]
+pub struct ClassificationMetrics {
+    /// Total number of methods attempted to classify
+    pub total_methods: usize,
+    /// Number of methods successfully classified with confidence above threshold
+    pub classified_methods: usize,
+    /// Number of methods that couldn't be classified (low confidence)
+    pub unclassified_methods: usize,
+    /// Number of methods classified as utilities
+    pub utilities_count: usize,
+}
+
+impl ClassificationMetrics {
+    /// Create a new metrics tracker
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a classification attempt
+    pub fn record_classification(&mut self, category: Option<&str>) {
+        self.total_methods += 1;
+        if let Some(cat) = category {
+            self.classified_methods += 1;
+            if cat == "utilities" {
+                self.utilities_count += 1;
+            }
+        } else {
+            self.unclassified_methods += 1;
+        }
+    }
+
+    /// Calculate the utilities classification rate
+    pub fn utilities_rate(&self) -> f64 {
+        if self.total_methods == 0 {
+            0.0
+        } else {
+            self.utilities_count as f64 / self.total_methods as f64
+        }
+    }
+
+    /// Calculate the classification success rate
+    pub fn classification_rate(&self) -> f64 {
+        if self.total_methods == 0 {
+            0.0
+        } else {
+            self.classified_methods as f64 / self.total_methods as f64
+        }
+    }
+}
+
+/// Emit classification metrics to logs for observability.
+///
+/// This function logs aggregated statistics about classification results,
+/// which is useful for:
+/// - Monitoring utilities classification rate (should be <10%)
+/// - Identifying when thresholds may need tuning
+/// - Detecting anomalies in classification behavior
+pub fn emit_classification_metrics(metrics: &ClassificationMetrics) {
+    log::info!(
+        "Classification metrics: total={}, classified={}, unclassified={}, utilities={} ({:.1}%)",
+        metrics.total_methods,
+        metrics.classified_methods,
+        metrics.unclassified_methods,
+        metrics.utilities_count,
+        metrics.utilities_rate() * 100.0
+    );
+
+    if metrics.utilities_rate() > 0.10 {
+        log::warn!(
+            "High utilities classification rate: {:.1}% (target: <10%)",
+            metrics.utilities_rate() * 100.0
+        );
+    }
+
+    if metrics.total_methods > 0 && metrics.classification_rate() < 0.50 {
+        log::warn!(
+            "Low classification rate: {:.1}% (may need to review thresholds)",
+            metrics.classification_rate() * 100.0
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

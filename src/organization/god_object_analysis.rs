@@ -670,7 +670,12 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
 
     for method in methods {
-        let responsibility = infer_responsibility_from_method(method);
+        let result = infer_responsibility_with_confidence(method, None);
+
+        // If confidence is too low (None category), keep method in original location
+        // by assigning it to "unclassified" group
+        let responsibility = result.category.unwrap_or_else(|| "unclassified".to_string());
+
         groups
             .entry(responsibility)
             .or_default()
@@ -1171,6 +1176,10 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 ///
 /// For more accurate classification, consider `infer_responsibility_with_io_detection`
 /// which analyzes actual I/O operations in the function body rather than just names.
+#[deprecated(
+    since = "0.4.0",
+    note = "Use infer_responsibility_with_confidence for confidence-based classification"
+)]
 pub fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
@@ -1258,6 +1267,13 @@ pub fn infer_responsibility_with_confidence(
 
         // Apply confidence thresholds
         if confidence < MINIMUM_CONFIDENCE {
+            log::debug!(
+                "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}, signals: {:?}",
+                method_name,
+                confidence,
+                MINIMUM_CONFIDENCE,
+                vec![SignalType::NameHeuristic]
+            );
             return ClassificationResult {
                 category: None,
                 confidence,
@@ -1266,6 +1282,13 @@ pub fn infer_responsibility_with_confidence(
         }
 
         if category_name == "utilities" && confidence < UTILITIES_THRESHOLD {
+            log::debug!(
+                "Low confidence utilities classification for method '{}': confidence {:.2} below threshold {:.2}, signals: {:?}",
+                method_name,
+                confidence,
+                UTILITIES_THRESHOLD,
+                vec![SignalType::NameHeuristic]
+            );
             return ClassificationResult {
                 category: None,
                 confidence,
@@ -1531,11 +1554,35 @@ pub fn recommend_module_splits_with_evidence(
         crate::analysis::multi_signal_aggregation::AggregatedClassification,
     >,
 ) -> Vec<ModuleSplit> {
+    use crate::organization::confidence::{MIN_METHODS_FOR_SPLIT, MODULE_SPLIT_CONFIDENCE};
+
     let mut recommendations = Vec::new();
 
     for (responsibility, methods) in responsibility_groups {
-        if methods.len() > 5 {
+        if methods.len() > MIN_METHODS_FOR_SPLIT {
             let classification_evidence = evidence_map.get(responsibility).cloned();
+
+            // Calculate average confidence from evidence map
+            // If evidence_map is provided (not empty), enforce confidence threshold
+            // If evidence_map is empty, allow split for backward compatibility
+            if !evidence_map.is_empty() {
+                let avg_confidence = if let Some(evidence) = &classification_evidence {
+                    evidence.confidence
+                } else {
+                    0.0
+                };
+
+                // Skip splits below confidence threshold
+                if avg_confidence < MODULE_SPLIT_CONFIDENCE {
+                    log::debug!(
+                        "Skipping module split for '{}': confidence {:.2} below threshold {:.2}",
+                        responsibility,
+                        avg_confidence,
+                        MODULE_SPLIT_CONFIDENCE
+                    );
+                    continue;
+                }
+            }
 
             // Sanitize the responsibility name for use in module name
             let sanitized_responsibility = sanitize_module_name(responsibility);

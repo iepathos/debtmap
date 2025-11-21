@@ -66,6 +66,77 @@ This ensures that god objects are properly prioritized in the technical debt ana
 
 ## Responsibility Detection
 
+### Confidence-Based Classification (Spec 174)
+
+DebtMap uses a confidence-based approach to classify method responsibilities, replacing the previous unconditional "utilities" fallback with evidence-based classification. This significantly improves the quality of refactoring recommendations.
+
+#### Classification Strategy
+
+Method responsibilities are inferred using multiple signals:
+
+1. **Name Heuristics**: Pattern matching on method names (e.g., `save_*`, `validate_*`)
+2. **I/O Detection**: Analyzing actual I/O operations in method bodies
+3. **Behavioral Analysis**: Categorizing methods by their behavior patterns
+
+Each classification receives a confidence score (0.0 to 1.0) based on signal strength.
+
+#### Confidence Thresholds
+
+- **Minimum Confidence**: 0.50 (50%)
+  - Classifications below this threshold are rejected
+  - Methods remain in their original location instead of being extracted
+
+- **Utilities Threshold**: 0.60 (60%)
+  - Higher bar for "utilities" classification to prevent over-classification
+  - Reduces utilities classification rate from ~30% to <10%
+
+- **Module Split Confidence**: 0.65 (65%)
+  - Required for recommending structural module splits
+  - Ensures high-confidence evidence before suggesting refactoring
+
+#### Classification Results
+
+When a method is classified, the result includes:
+
+- **Category**: The responsibility category (or `None` if confidence too low)
+- **Confidence Score**: Numeric confidence (0.0-1.0)
+- **Signals Used**: Which signals contributed to the classification
+
+Example:
+```rust
+ClassificationResult {
+    category: Some("data_persistence"),
+    confidence: 0.85,
+    signals_used: vec![SignalType::NameHeuristic, SignalType::IoDetection]
+}
+```
+
+#### Low Confidence Handling
+
+Methods with low confidence are handled conservatively:
+
+- Returned with `category: None`
+- Kept in original location (not extracted)
+- Logged at DEBUG level for analysis and tuning
+- Tracked in classification metrics for monitoring
+
+#### Observability
+
+Classification metrics are tracked and emitted:
+
+- **Total methods**: Number of methods attempted to classify
+- **Classified methods**: Successfully classified above threshold
+- **Unclassified methods**: Rejected due to low confidence
+- **Utilities count**: Methods classified as utilities
+- **Utilities rate**: Should be <10% (warning if higher)
+
+Example metrics output:
+```
+INFO: Classification metrics: total=100, classified=72, unclassified=28, utilities=8 (8.0%)
+```
+
+### Responsibility Categories
+
 Responsibilities are inferred from method names using common prefixes:
 
 - **Data Access**: get, set
@@ -78,6 +149,16 @@ Responsibilities are inferred from method names using common prefixes:
 - **Deletion**: delete, remove, clear, reset
 - **State Query**: is, has, can, should, will
 - **Processing**: process, transform
+
+### Module Split Requirements
+
+Module splits are only recommended when:
+
+1. **Sufficient Methods**: At least 5 methods in the responsibility group
+2. **High Confidence**: Average confidence ≥ 0.65 across all methods
+3. **Clear Responsibility**: Well-defined category (not "unclassified")
+
+This prevents premature or low-confidence refactoring recommendations.
 
 ## Detection Examples
 
