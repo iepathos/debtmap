@@ -1015,14 +1015,12 @@ impl GodObjectDetector {
         // Convert methods to clustering format
         let cluster_methods: Vec<ClusterMethod> = production_methods
             .iter()
-            .map(|method_name| {
-                ClusterMethod {
-                    name: method_name.clone(),
-                    is_pure: Self::check_if_pure_method(method_name),
-                    visibility: Self::detect_visibility(method_name, ast),
-                    complexity: Self::estimate_method_complexity(method_name, ast),
-                    has_io: Self::detect_io_operations(method_name),
-                }
+            .map(|method_name| ClusterMethod {
+                name: method_name.clone(),
+                is_pure: Self::check_if_pure_method(method_name),
+                visibility: Self::detect_visibility(method_name, ast),
+                complexity: Self::estimate_method_complexity(method_name, ast),
+                has_io: Self::detect_io_operations(method_name),
             })
             .collect();
 
