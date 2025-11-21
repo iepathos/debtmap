@@ -17,6 +17,7 @@ pub mod boilerplate_detector;
 pub mod builder_pattern;
 pub mod call_graph_cohesion;
 pub mod class_ownership;
+pub mod clustering;
 pub mod cohesion_calculator;
 pub mod cohesion_priority;
 pub mod complexity_weighting;
