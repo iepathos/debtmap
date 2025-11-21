@@ -194,6 +194,7 @@ impl ModuleFunctionClassifier {
                 alternative_names: vec![],
                 naming_confidence: None,
                 naming_strategy: None,
+                cluster_quality: None,
             };
 
             splits.push(split);

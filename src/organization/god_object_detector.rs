@@ -8,9 +8,72 @@ use super::{
     RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
 use crate::common::{SourceLocation, UnifiedLocationExtractor};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use syn::{self, visit::Visit};
+
+// Import clustering types for improved responsibility detection
+use super::clustering::{
+    CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider, HierarchicalClustering,
+    Method as ClusterMethod, Visibility as ClusterVisibility,
+};
+
+/// Adapter for call graph adjacency matrix to CallGraphProvider trait
+struct CallGraphAdapter {
+    adjacency: HashMap<(String, String), usize>,
+}
+
+impl CallGraphAdapter {
+    fn from_adjacency_matrix(adjacency: HashMap<(String, String), usize>) -> Self {
+        Self { adjacency }
+    }
+}
+
+impl CallGraphProvider for CallGraphAdapter {
+    fn call_count(&self, from: &str, to: &str) -> usize {
+        *self
+            .adjacency
+            .get(&(from.to_string(), to.to_string()))
+            .unwrap_or(&0)
+    }
+
+    fn callees(&self, method: &str) -> HashSet<String> {
+        self.adjacency
+            .keys()
+            .filter(|(caller, _)| caller == method)
+            .map(|(_, callee)| callee.clone())
+            .collect()
+    }
+
+    fn callers(&self, method: &str) -> HashSet<String> {
+        self.adjacency
+            .keys()
+            .filter(|(_, callee)| callee == method)
+            .map(|(caller, _)| caller.clone())
+            .collect()
+    }
+}
+
+/// Adapter for FieldAccessTracker to FieldAccessProvider trait
+struct FieldAccessAdapter<'a> {
+    tracker: &'a crate::organization::FieldAccessTracker,
+}
+
+impl<'a> FieldAccessAdapter<'a> {
+    fn new(tracker: &'a crate::organization::FieldAccessTracker) -> Self {
+        Self { tracker }
+    }
+}
+
+impl<'a> FieldAccessProvider for FieldAccessAdapter<'a> {
+    fn fields_accessed_by(&self, method: &str) -> HashSet<String> {
+        self.tracker.fields_for_method(method).unwrap_or_default()
+    }
+
+    fn writes_to_field(&self, method: &str, field: &str) -> bool {
+        self.tracker.method_writes_to_field(method, field)
+    }
+}
 
 /// Minimum standalone functions required to trigger hybrid detection.
 ///
@@ -922,6 +985,323 @@ impl GodObjectDetector {
         )
     }
 
+    /// Try improved clustering using multi-signal similarity (Spec 192)
+    ///
+    /// Uses hierarchical clustering with call graph, data dependencies, naming patterns,
+    /// behavioral patterns, and architectural layers to achieve <5% unclustered rate.
+    fn try_improved_clustering(
+        all_methods: &[String],
+        adjacency: &HashMap<(String, String), usize>,
+        field_tracker: &crate::organization::FieldAccessTracker,
+        ast: &syn::File,
+        base_name: &str,
+        file_path: &Path,
+    ) -> Option<Vec<ModuleSplit>> {
+        use crate::organization::behavioral_decomposition::suggest_trait_extraction;
+
+        // Filter out test methods
+        let production_methods: Vec<String> = all_methods
+            .iter()
+            .filter(|m| {
+                !m.starts_with("test_") && !m.starts_with("mock_") && !m.starts_with("bench_")
+            })
+            .cloned()
+            .collect();
+
+        if production_methods.is_empty() {
+            return None;
+        }
+
+        // Convert methods to clustering format
+        let cluster_methods: Vec<ClusterMethod> = production_methods
+            .iter()
+            .map(|method_name| ClusterMethod {
+                name: method_name.clone(),
+                is_pure: Self::check_if_pure_method(method_name),
+                visibility: Self::detect_visibility(method_name, ast),
+                complexity: Self::estimate_method_complexity(method_name, ast),
+                has_io: Self::detect_io_operations(method_name),
+            })
+            .collect();
+
+        if cluster_methods.is_empty() {
+            return None;
+        }
+
+        // Create adapters for clustering
+        let call_graph_adapter = CallGraphAdapter::from_adjacency_matrix(adjacency.clone());
+        let field_access_adapter = FieldAccessAdapter::new(field_tracker);
+
+        // Create similarity calculator
+        let similarity_calc =
+            ClusteringSimilarityCalculator::new(call_graph_adapter, field_access_adapter);
+
+        // Create hierarchical clustering with quality thresholds
+        let clusterer = HierarchicalClustering::new(
+            similarity_calc,
+            0.3, // min_similarity_threshold
+            0.5, // min_coherence
+        );
+
+        // Perform clustering
+        let clusters = clusterer.cluster_methods(cluster_methods);
+
+        // Calculate unclustered rate
+        let total_methods = production_methods.len();
+        let clustered_methods: usize = clusters.iter().map(|c| c.methods.len()).sum();
+        let unclustered_rate = if total_methods > 0 {
+            1.0 - (clustered_methods as f64 / total_methods as f64)
+        } else {
+            0.0
+        };
+
+        // Log clustering quality
+        if unclustered_rate < 0.05 {
+            eprintln!(
+                "✓ Clustering complete: {} coherent clusters identified",
+                clusters.len()
+            );
+            eprintln!(
+                "  Unclustered methods: {} ({:.1}%)",
+                total_methods - clustered_methods,
+                unclustered_rate * 100.0
+            );
+        } else {
+            // If unclustered rate is too high, fall back to legacy clustering
+            eprintln!(
+                "⚠ High unclustered rate ({:.1}%), falling back to legacy clustering",
+                unclustered_rate * 100.0
+            );
+            return None;
+        }
+
+        // Convert clusters to ModuleSplit recommendations
+        let mut splits: Vec<ModuleSplit> = Vec::new();
+
+        for cluster in clusters {
+            if cluster.methods.len() < 3 {
+                continue; // Skip tiny clusters
+            }
+
+            // Infer responsibility from cluster
+            let responsibility = Self::infer_responsibility_from_cluster(&cluster);
+            let category_name = Self::sanitize_module_name(&responsibility);
+            let suggested_name = format!("{}/{}", base_name, category_name);
+
+            // Get fields needed for this cluster
+            let method_names: Vec<String> =
+                cluster.methods.iter().map(|m| m.name.clone()).collect();
+            let fields_needed = field_tracker.get_minimal_field_set(&method_names);
+
+            // Extract quality metrics (use coherence as fallback)
+            let (internal_coherence, silhouette_score) = if let Some(quality) = &cluster.quality {
+                (quality.internal_coherence, quality.silhouette_score)
+            } else {
+                (cluster.coherence, cluster.coherence) // Use coherence as fallback
+            };
+
+            // Generate trait suggestion using legacy function
+            let legacy_cluster = crate::organization::behavioral_decomposition::MethodCluster {
+                methods: method_names.clone(),
+                category: crate::organization::behavioral_decomposition::BehaviorCategory::Domain(
+                    responsibility.clone(),
+                ),
+                fields_accessed: fields_needed.clone(),
+                internal_calls: 0, // Not calculated in new clustering
+                external_calls: 0, // Not calculated in new clustering
+                cohesion_score: internal_coherence,
+            };
+            let trait_suggestion = Some(suggest_trait_extraction(&legacy_cluster, base_name));
+
+            splits.push(ModuleSplit {
+                suggested_name,
+                methods_to_move: method_names.clone(),
+                structs_to_move: vec![],
+                responsibility: responsibility.clone(),
+                estimated_lines: method_names.len() * 15,
+                method_count: method_names.len(),
+                priority: if silhouette_score > 0.6 {
+                    Priority::High
+                } else if silhouette_score > 0.4 {
+                    Priority::Medium
+                } else {
+                    Priority::Low
+                },
+                cohesion_score: Some(internal_coherence),
+                representative_methods: method_names.iter().take(8).cloned().collect(),
+                fields_needed,
+                trait_suggestion,
+                behavior_category: Some(responsibility),
+                cluster_quality: cluster.quality,
+                ..Default::default()
+            });
+        }
+
+        // Apply semantic naming to all splits
+        let mut name_generator = SemanticNameGenerator::new();
+        for split in &mut splits {
+            Self::apply_semantic_naming(split, &mut name_generator, file_path);
+        }
+
+        // Return splits if we have multiple good clusters
+        if splits.len() > 1 {
+            Some(splits)
+        } else {
+            None
+        }
+    }
+
+    /// Infer responsibility name from cluster characteristics
+    fn infer_responsibility_from_cluster(cluster: &super::clustering::Cluster) -> String {
+        // Sort methods by name for deterministic processing
+        let mut sorted_methods = cluster.methods.clone();
+        sorted_methods.sort_by(|a, b| a.name.cmp(&b.name));
+
+        // Analyze method name patterns
+        let has_io = sorted_methods
+            .iter()
+            .any(|m| m.has_io || m.name.contains("read") || m.name.contains("write"));
+        let has_validation = sorted_methods
+            .iter()
+            .any(|m| m.name.contains("validate") || m.name.contains("check"));
+        let has_formatting = sorted_methods
+            .iter()
+            .any(|m| m.name.contains("format") || m.name.contains("display"));
+        let has_parsing = sorted_methods.iter().any(|m| m.name.contains("parse"));
+        let all_public = sorted_methods
+            .iter()
+            .all(|m| m.visibility == ClusterVisibility::Public);
+
+        // Infer category based on patterns
+        if has_io {
+            "IO".to_string()
+        } else if has_validation {
+            "Validation".to_string()
+        } else if has_formatting {
+            "Formatting".to_string()
+        } else if has_parsing {
+            "Parsing".to_string()
+        } else if all_public {
+            "API".to_string()
+        } else {
+            // Extract common prefix from method names
+            Self::extract_common_prefix(&sorted_methods).unwrap_or_else(|| "Domain".to_string())
+        }
+    }
+
+    /// Extract common prefix from method names
+    fn extract_common_prefix(methods: &[ClusterMethod]) -> Option<String> {
+        if methods.is_empty() {
+            return None;
+        }
+
+        // Tokenize first method name
+        let first_tokens: Vec<&str> = methods[0].name.split('_').collect();
+        if first_tokens.is_empty() {
+            return None;
+        }
+
+        // Find longest common prefix among all methods
+        for prefix_len in (1..=first_tokens.len()).rev() {
+            let prefix = &first_tokens[..prefix_len];
+            if methods.iter().all(|m| {
+                let tokens: Vec<&str> = m.name.split('_').collect();
+                tokens.len() >= prefix_len && &tokens[..prefix_len] == prefix
+            }) {
+                let result = prefix.join("_");
+                // Capitalize first letter
+                return Some(
+                    result
+                        .chars()
+                        .next()
+                        .unwrap()
+                        .to_uppercase()
+                        .chain(result.chars().skip(1))
+                        .collect(),
+                );
+            }
+        }
+
+        None
+    }
+
+    /// Sanitize module name to be valid Rust identifier
+    fn sanitize_module_name(name: &str) -> String {
+        name.to_lowercase()
+            .replace(' ', "_")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect()
+    }
+
+    /// Check if method is likely pure (no side effects)
+    fn check_if_pure_method(method_name: &str) -> bool {
+        let pure_prefixes = [
+            "get_",
+            "is_",
+            "has_",
+            "can_",
+            "should_",
+            "calculate_",
+            "compute_",
+        ];
+        pure_prefixes
+            .iter()
+            .any(|prefix| method_name.starts_with(prefix))
+    }
+
+    /// Detect visibility of a method in the AST
+    fn detect_visibility(method_name: &str, ast: &syn::File) -> ClusterVisibility {
+        for item in &ast.items {
+            if let syn::Item::Impl(impl_block) = item {
+                for impl_item in &impl_block.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        if method.sig.ident == method_name {
+                            return match &method.vis {
+                                syn::Visibility::Public(_) => ClusterVisibility::Public,
+                                syn::Visibility::Restricted(_) => ClusterVisibility::Crate,
+                                _ => ClusterVisibility::Private,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        ClusterVisibility::Private
+    }
+
+    /// Estimate method complexity from AST
+    fn estimate_method_complexity(method_name: &str, ast: &syn::File) -> u32 {
+        for item in &ast.items {
+            if let syn::Item::Impl(impl_block) = item {
+                for impl_item in &impl_block.items {
+                    if let syn::ImplItem::Fn(method) = impl_item {
+                        if method.sig.ident == method_name {
+                            // Simple heuristic: count statements and expressions
+                            return Self::count_statements(&method.block);
+                        }
+                    }
+                }
+            }
+        }
+        5 // Default complexity
+    }
+
+    /// Count statements in a block as a complexity proxy
+    fn count_statements(block: &syn::Block) -> u32 {
+        block.stmts.len() as u32
+    }
+
+    /// Detect if method performs I/O operations
+    fn detect_io_operations(method_name: &str) -> bool {
+        let io_keywords = [
+            "read", "write", "print", "open", "close", "fetch", "load", "save",
+        ];
+        io_keywords
+            .iter()
+            .any(|keyword| method_name.contains(keyword))
+    }
+
     /// Generate behavioral splits using production-ready clustering (Spec 178)
     ///
     /// Uses a multi-pass refinement pipeline that:
@@ -976,7 +1356,21 @@ impl GodObjectDetector {
         let adjacency =
             build_method_call_adjacency_matrix_with_functions(&impl_blocks, &standalone_functions);
 
-        // Apply production-ready clustering (filters tests, subdivides oversized clusters, merges tiny ones)
+        // Try improved clustering first (Spec 192) if field tracker is available
+        if let Some(tracker) = field_tracker {
+            if let Some(splits) = Self::try_improved_clustering(
+                all_methods,
+                &adjacency,
+                tracker,
+                ast,
+                base_name,
+                file_path,
+            ) {
+                return splits;
+            }
+        }
+
+        // Fallback to production-ready clustering (legacy path)
         let clusters = apply_production_ready_clustering(all_methods, &adjacency);
 
         // Convert clusters to ModuleSplit recommendations with quality validation (Spec 188)

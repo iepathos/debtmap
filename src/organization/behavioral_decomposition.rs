@@ -1588,6 +1588,24 @@ impl FieldAccessTracker {
 
         stats
     }
+
+    /// Get fields accessed by a method as a HashSet (for clustering integration)
+    pub fn fields_for_method(&self, method: &str) -> Option<HashSet<String>> {
+        self.method_fields.get(method).cloned()
+    }
+
+    /// Check if a method writes to a specific field
+    ///
+    /// Note: Currently this is a conservative approximation - we treat all field
+    /// accesses as potential writes since detecting true writes requires deeper
+    /// analysis of assignment contexts. This is acceptable for clustering purposes
+    /// where we weight shared field usage.
+    pub fn method_writes_to_field(&self, method: &str, field: &str) -> bool {
+        self.method_fields
+            .get(method)
+            .map(|fields| fields.contains(field))
+            .unwrap_or(false)
+    }
 }
 
 /// Statistics about field access patterns

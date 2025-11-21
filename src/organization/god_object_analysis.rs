@@ -325,6 +325,9 @@ pub struct ModuleSplit {
     /// Strategy used to generate the module name (Spec 191)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub naming_strategy: Option<crate::organization::semantic_naming::NamingStrategy>,
+    /// Cluster quality metrics from improved clustering (Spec 192)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster_quality: Option<crate::organization::clustering::ClusterQuality>,
 }
 
 /// Stage type in data transformation pipeline (Spec 182)
@@ -373,6 +376,7 @@ impl Default for ModuleSplit {
             alternative_names: vec![],
             naming_confidence: None,
             naming_strategy: None,
+            cluster_quality: None,
         }
     }
 }
@@ -1676,6 +1680,7 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 alternative_names: vec![],
                 naming_confidence: None,
                 naming_strategy: None,
+                cluster_quality: None,
             });
         }
     }
@@ -1791,6 +1796,7 @@ pub fn recommend_module_splits_with_evidence(
                 alternative_names: vec![],
                 naming_confidence: None,
                 naming_strategy: None,
+                cluster_quality: None,
             });
         }
     }
@@ -1912,6 +1918,7 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 alternative_names: vec![],
                 naming_confidence: None,
                 naming_strategy: None,
+                cluster_quality: None,
             }
         })
         .collect()
@@ -2298,6 +2305,7 @@ pub fn suggest_splits_by_struct_grouping(
                 alternative_names: vec![],
                 naming_confidence: None,
                 naming_strategy: None,
+                cluster_quality: None,
             }
         })
         .collect();
