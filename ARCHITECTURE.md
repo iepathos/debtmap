@@ -2145,6 +2145,172 @@ Analyzing: src/processor.rs
   Classification: GOD MODULE
 ```
 
+### Semantic Module Naming (Spec 191)
+
+When splitting god objects, debtmap automatically generates descriptive, meaningful module names based on the methods in each split. This feature ensures that refactored code has clear, domain-appropriate naming without manual intervention.
+
+**Location**: `src/organization/semantic_naming/`
+
+**Design Goal**: Eliminate generic names like `utils`, `misc`, `helpers` and generate specific, confidence-scored names that reflect the actual responsibilities of each split.
+
+#### Architecture
+
+The semantic naming system uses a multi-strategy pipeline:
+
+```rust
+pub struct SemanticNameGenerator {
+    domain_extractor: DomainTermExtractor,      // Strategy 1
+    pattern_recognizer: PatternRecognizer,      // Strategy 2
+    specificity_scorer: SpecificityScorer,      // Validation
+    uniqueness_validator: NameUniquenessValidator, // Uniqueness
+}
+```
+
+#### Naming Strategies
+
+**1. Domain Term Extraction** (`domain_extractor.rs`):
+- Tokenizes method names (handles snake_case, camelCase, PascalCase, and mixed)
+- Counts term frequencies across all methods in a split
+- Identifies dominant domain terms (appear in >30% of methods)
+- Generates verb-noun pairs when appropriate (e.g., "format_coverage")
+
+Example:
+```rust
+Methods: ["format_coverage_status", "format_coverage_factor", "calculate_coverage"]
+Tokens: ["format", "coverage", "status", "factor", "calculate", "coverage"]
+Dominant term: "coverage" (frequency: 0.67)
+Generated name: "coverage" (confidence: 0.85)
+```
+
+**2. Behavioral Pattern Recognition** (`pattern_recognizer.rs`):
+- Recognizes common software patterns across methods
+- Patterns: formatting, validation, parsing, computation, transformation, serialization, persistence, events, lifecycle
+- Uses verb detection with word boundary awareness (avoids false matches like "formatting" matching "format")
+- Requires 60% of methods to match pattern for confidence
+
+Supported patterns:
+- **Formatting**: format, display, render, print, show
+- **Validation**: validate, verify, check, ensure, assert
+- **Parsing**: parse, extract, read, decode, interpret
+- **Computation**: calculate, compute, evaluate, measure, analyze
+- **Transformation**: convert, transform, map, translate
+- **Serialization**: serialize, deserialize, encode, decode
+- **Persistence**: save, load, store, fetch, retrieve
+- **Events**: handle, process, dispatch, trigger, emit
+- **Lifecycle**: initialize, setup, teardown, cleanup, destroy
+
+**3. Specificity Scoring** (`specificity_scorer.rs`):
+- Evaluates name quality on scale of 0.0 (generic) to 1.0 (highly specific)
+- Rejects generic terms: "unknown", "misc", "utils", "helpers", "data", "types"
+- Bonuses for:
+  - Domain-specific terms (+0.12-0.15)
+  - Compound names with underscore (+0.10)
+  - Specific action verbs (+0.10)
+  - Longer descriptive names (+0.04-0.06)
+- Penalties for:
+  - Very short names (-0.15)
+  - Containing generic terms (-0.10)
+  - Fallback names (set to 0.4)
+
+Score thresholds:
+- `>= 0.85`: Excellent
+- `>= 0.60`: Good
+- `>= 0.40`: Acceptable
+- `< 0.40`: Rejected (try alternative)
+
+**4. Uniqueness Validation** (`uniqueness_validator.rs`):
+- Tracks used names per directory to prevent collisions
+- Disambiguates conflicts by appending suffix (e.g., "validation_2")
+- Tries alternative candidates before falling back to numbered suffixes
+- Clears validation state per directory for independent namespacing
+
+#### Name Generation Flow
+
+```rust
+pub fn generate_names(
+    &self,
+    methods: &[String],
+    responsibility: Option<&str>,
+) -> Vec<NameCandidate> {
+    let mut candidates = Vec::new();
+
+    // Strategy 1: Extract from method names
+    if let Some(name) = self.domain_extractor.generate_domain_name(methods) {
+        if self.is_valid_candidate(&name) {
+            candidates.push(name);
+        }
+    }
+
+    // Strategy 2: Recognize behavioral pattern
+    if let Some(name) = self.pattern_recognizer.recognize_pattern(methods) {
+        if self.is_valid_candidate(&name) {
+            candidates.push(name);
+        }
+    }
+
+    // Strategy 3: Extract from responsibility description
+    if let Some(resp) = responsibility {
+        if let Some(name) = self.domain_extractor.extract_from_description(resp) {
+            if self.is_valid_candidate(&name) {
+                candidates.push(name);
+            }
+        }
+    }
+
+    // Fallback: Generate descriptive placeholder
+    if candidates.is_empty() {
+        candidates.push(self.generate_fallback_name(methods));
+    }
+
+    // Sort by confidence and return top 3
+    candidates.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+    candidates.truncate(3);
+    candidates
+}
+```
+
+#### Output Format
+
+Each generated name includes:
+- **module_name**: Proposed name (without `.rs` extension)
+- **confidence**: Score 0.0-1.0 indicating naming confidence
+- **specificity_score**: Quality score 0.0-1.0 (rejects generic terms)
+- **reasoning**: Human-readable explanation of name derivation
+- **strategy**: Which strategy generated the name (DomainTerms, BehavioralPattern, DescriptiveFallback)
+
+Example:
+```rust
+NameCandidate {
+    module_name: "formatting",
+    confidence: 0.85,
+    specificity_score: 0.72,
+    reasoning: "Recognized behavioral pattern: formatting (8/10 methods match)",
+    strategy: NamingStrategy::BehavioralPattern,
+}
+```
+
+#### Performance Impact
+
+- **Target**: <10% overhead on god object analysis
+- **Implementation**: O(n) single-pass tokenization and pattern matching
+- **No external dependencies**: Pure Rust, no NLP libraries
+- **Parallel-safe**: Thread-local validation state per analysis run
+
+#### Testing
+
+**Unit Tests** (`src/organization/semantic_naming/*/tests`):
+- Tokenization accuracy (camelCase, snake_case, mixed, acronyms)
+- Domain term extraction and frequency analysis
+- Pattern recognition with verb boundary detection
+- Specificity scoring for various name types
+- Uniqueness validation and disambiguation
+
+**Integration Tests** (`tests/semantic_naming_integration_test.rs`):
+- No generic names in output (rejects "utils", "misc", etc.)
+- Name uniqueness across multiple splits
+- High-confidence names for clear patterns
+- Real-world method pattern recognition
+
 ### Complexity-Weighted Scoring
 
 **Design Problem**: Traditional god object detection relies on raw method counts, which creates false positives for well-refactored code. A file with 100 simple helper functions (complexity 1-3) should not rank higher than a file with 10 highly complex functions (complexity 17+).

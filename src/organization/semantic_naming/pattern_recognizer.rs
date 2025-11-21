@@ -203,7 +203,7 @@ impl PatternRecognizer {
     ///
     /// Uses word boundary detection to avoid false matches
     fn method_contains_verb(&self, method: &str, verb: &str) -> bool {
-        // Check for verb at start (e.g., "format_item")
+        // Check for verb at start (e.g., "format_item", "formatitem", "formatItem")
         if method.starts_with(verb) {
             if method.len() == verb.len() {
                 return true; // Exact match
@@ -211,28 +211,68 @@ impl PatternRecognizer {
             // Check for word boundary after verb
             let next_char = method.chars().nth(verb.len());
             if let Some(ch) = next_char {
-                if ch == '_' || ch.is_uppercase() {
+                // Accept underscore (format_item)
+                // Accept uppercase following lowercase verb (formatItem)
+                // Accept lowercase following verb if at start (formatitem)
+                // Reject if it's part of a longer word (formatting)
+                if ch == '_' {
+                    return true; // format_item
+                }
+                if ch.is_uppercase() {
+                    return true; // formatItem
+                }
+                // Check if we're at the start and next is lowercase (formatitem)
+                // This is only valid if it looks like a compound word without clear boundary
+                if ch.is_lowercase() && method.len() > verb.len() {
+                    // Only accept if it looks like start of another word (e.g., "formatitem" not "formatting")
+                    // Reject if it looks like a gerund suffix (e.g., "formatting")
+                    if method.ends_with("ing") {
+                        // Reject any word that starts with verb and ends with "ing"
+                        // This catches "formatting", "parsing", etc.
+                        return false;
+                    }
+                    // Accept other lowercase concatenations like "formatitem"
                     return true;
                 }
             }
         }
 
         // Check for verb after underscore (e.g., "get_format")
-        if method.contains(&format!("_{}", verb)) {
-            return true;
+        if let Some(pos) = method.find(&format!("_{}", verb)) {
+            // Make sure it's a complete word after underscore
+            let after_verb_pos = pos + 1 + verb.len();
+            if after_verb_pos >= method.len() {
+                return true; // Ends with _verb
+            }
+            let next_char = method.chars().nth(after_verb_pos);
+            if let Some(ch) = next_char {
+                // Only accept if followed by underscore or end of string
+                if ch == '_' {
+                    return true;
+                }
+            }
         }
 
         // Check for verb in camelCase (e.g., "getFormat")
         if method.len() > verb.len() {
-            for i in 0..method.len() - verb.len() {
+            for i in 0..=method.len() - verb.len() {
                 if method[i..].starts_with(verb) {
-                    // Check if preceded by lowercase and followed by uppercase (camelCase boundary)
+                    // Check if preceded by lowercase and followed by uppercase or end (camelCase boundary)
                     if i > 0 {
                         let prev_char = method.chars().nth(i - 1);
-                        let next_char = method.chars().nth(i + verb.len());
-                        if let (Some(prev), Some(next)) = (prev_char, next_char) {
-                            if prev.is_lowercase() && next.is_uppercase() {
-                                return true;
+                        if let Some(prev) = prev_char {
+                            if prev.is_lowercase() {
+                                // After lowercase, check what follows the verb
+                                let after_verb = i + verb.len();
+                                if after_verb >= method.len() {
+                                    return true; // getformat - verb at end
+                                }
+                                let next_char = method.chars().nth(after_verb);
+                                if let Some(next) = next_char {
+                                    // Accept any character after verb in camelCase context
+                                    // This handles both "getFormat" and "getformat"
+                                    return true;
+                                }
                             }
                         }
                     }

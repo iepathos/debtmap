@@ -9,6 +9,7 @@ use std::collections::HashSet;
 pub struct SpecificityScorer {
     generic_terms: HashSet<String>,
     specific_verbs: Vec<String>,
+    domain_terms: Vec<String>,
 }
 
 impl SpecificityScorer {
@@ -54,9 +55,22 @@ impl SpecificityScorer {
         .map(String::from)
         .collect();
 
+        let domain_terms = vec![
+            "coverage",
+            "complexity",
+            "validation",
+            "formatting",
+            "parsing",
+            "computation",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
         Self {
             generic_terms,
             specific_verbs,
+            domain_terms,
         }
     }
 
@@ -88,27 +102,38 @@ impl SpecificityScorer {
 
         let mut score: f64 = 0.5; // Base score for non-generic names
 
+        // Bonus: Domain-specific terms get a boost
+        if self.domain_terms.iter().any(|term| name_lower == *term) {
+            score += 0.12; // Direct domain term match
+        } else if self
+            .domain_terms
+            .iter()
+            .any(|term| name_lower.contains(term))
+        {
+            score += 0.05; // Contains domain term
+        }
+
         // Bonus: Longer names are typically more specific (up to a point)
         let name_len = name.len();
         if name_len > 8 {
-            score += 0.1;
+            score += 0.04;
         }
         if name_len > 12 {
-            score += 0.05;
+            score += 0.02;
         }
 
         // Bonus: Compound names (with underscore) are more specific
         if name.contains('_') {
-            score += 0.15;
+            score += 0.10;
         }
 
-        // Bonus: Contains specific action verbs
-        if self
+        // Bonus: Contains specific action verbs or their gerund forms
+        let has_verb = self
             .specific_verbs
             .iter()
-            .any(|verb| name_lower.contains(verb))
-        {
-            score += 0.15;
+            .any(|verb| name_lower.contains(verb) || name_lower.contains(&format!("{}ing", verb)));
+        if has_verb {
+            score += 0.10;
         }
 
         // Penalty: Contains generic terms as part of name
@@ -151,7 +176,7 @@ impl SpecificityScorer {
     pub fn assess_quality(&self, name: &str) -> &'static str {
         let score = self.calculate_specificity(name);
 
-        if score >= 0.8 {
+        if score >= 0.85 {
             "Excellent"
         } else if score >= 0.6 {
             "Good"

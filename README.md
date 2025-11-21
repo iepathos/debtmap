@@ -380,6 +380,55 @@ GOD OBJECT DETECTED: src/config.rs (10 structs across 3 domains)
        Estimated lines: ~200
 ```
 
+#### Semantic Module Naming
+
+When splitting god objects, debtmap uses intelligent semantic naming to generate descriptive, meaningful module names based on the methods in each split. This eliminates generic names like `utils`, `misc`, or `helpers` and ensures each split has a clear, specific identity.
+
+**How It Works**:
+- **Domain Term Extraction**: Analyzes method names to find common domain terms (e.g., "coverage", "metrics", "config")
+- **Behavioral Pattern Recognition**: Identifies behavioral patterns like "formatting", "validation", "parsing", "computation"
+- **Specificity Scoring**: Ensures names are descriptive, rejecting generic terms
+- **Uniqueness Validation**: Guarantees no filename collisions across splits
+
+**Naming Strategies**:
+1. **Domain Terms**: Extracts dominant terms from method names
+   - Methods: `format_coverage_status`, `format_coverage_factor`, `calculate_coverage_percentage`
+   - Generated name: `coverage` (confidence: 0.85)
+
+2. **Behavioral Patterns**: Recognizes common software patterns
+   - Methods: `validate_index`, `validate_data`, `validate_config`
+   - Generated name: `validation` (confidence: 0.75)
+
+3. **Descriptive Fallback**: When no clear pattern emerges, generates meaningful placeholders
+   - Methods: `do_something`, `handle_stuff`
+   - Generated name: `needs_review_group_1` (confidence: 0.4)
+
+**Confidence Scoring**:
+- **High (0.7-1.0)**: Clear, unambiguous pattern detected
+- **Medium (0.5-0.7)**: Reasonable pattern with some uncertainty
+- **Low (0.4-0.5)**: Fallback name, manual review recommended
+- **Rejected (<0.4)**: Name too generic, alternative generated
+
+**Example Output**:
+```
+GOD OBJECT DETECTED: src/data_manager.rs (24 methods)
+
+  Suggested splits:
+    1. data_manager/formatting.rs (confidence: 0.85)
+       Methods: format_output, format_summary, format_report
+       Responsibility: Output formatting operations
+
+    2. data_manager/validation.rs (confidence: 0.78)
+       Methods: validate_index, validate_data, validate_config
+       Responsibility: Input validation
+
+    3. data_manager/parsing.rs (confidence: 0.72)
+       Methods: parse_input, parse_config, parse_json
+       Responsibility: Data parsing operations
+```
+
+**Alternative Names**: Each split includes up to 3 name candidates ranked by confidence, allowing you to choose the most appropriate name for your codebase conventions.
+
 ### Framework Pattern Detection
 Debtmap identifies framework-specific code patterns across Rust, Python, JavaScript, and TypeScript, improving the accuracy of responsibility classification and helping distinguish framework boilerplate from application logic.
 

@@ -18,13 +18,13 @@ impl DomainTermExtractor {
         Self {
             common_verbs: vec![
                 "get", "set", "is", "has", "can", "should", "with", "to", "from", "into", "as",
-                "new", "default", "clone", "eq", "ne", "cmp", "hash",
+                "new", "default", "clone", "eq", "ne", "cmp", "hash", "manage",
             ],
             stop_words: vec![
                 "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
                 "by", "from", "as", "is", "was", "are", "were", "be", "been", "being", "have",
                 "has", "had", "do", "does", "did", "will", "would", "should", "could", "may",
-                "might", "must", "can", "this", "that", "these", "those",
+                "might", "must", "can", "this", "that", "these", "those", "data",
             ],
         }
     }
@@ -99,9 +99,24 @@ impl DomainTermExtractor {
             *freq_map.entry(token.clone()).or_insert(0) += 1;
         }
 
-        // Find most frequent significant term
+        // Find most frequent significant term, prioritizing nouns over gerunds
         let mut terms: Vec<_> = freq_map.into_iter().collect();
-        terms.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Sort by frequency first, then prioritize non-gerund terms (not ending in "ing")
+        terms.sort_by(|a, b| {
+            let freq_cmp = b.1.cmp(&a.1);
+            if freq_cmp != std::cmp::Ordering::Equal {
+                return freq_cmp;
+            }
+            // If frequencies are equal, prefer non-gerunds
+            let a_is_gerund = a.0.ends_with("ing");
+            let b_is_gerund = b.0.ends_with("ing");
+            match (a_is_gerund, b_is_gerund) {
+                (false, true) => std::cmp::Ordering::Less,  // a is better
+                (true, false) => std::cmp::Ordering::Greater,  // b is better
+                _ => std::cmp::Ordering::Equal,
+            }
+        });
 
         let (term, count) = &terms[0];
         let freq = *count as f64 / significant_tokens.len() as f64;
@@ -191,15 +206,29 @@ impl DomainTermExtractor {
 
         let mut result = Vec::new();
         let mut current = String::new();
-        let mut prev_was_lower = false;
+        let chars: Vec<char> = s.chars().collect();
 
-        for ch in s.chars() {
-            if ch.is_uppercase() && prev_was_lower && !current.is_empty() {
-                result.push(current.clone());
-                current.clear();
+        for i in 0..chars.len() {
+            let ch = chars[i];
+            let is_upper = ch.is_uppercase();
+            let prev_was_lower = i > 0 && chars[i - 1].is_lowercase();
+            let next_is_lower = i + 1 < chars.len() && chars[i + 1].is_lowercase();
+
+            // Split before uppercase when:
+            // 1. Previous was lowercase (normal camelCase boundary)
+            // 2. Next is lowercase (handles acronyms like "APIKey" -> "API", "Key")
+            if is_upper && (!current.is_empty() && (prev_was_lower || next_is_lower)) {
+                // For acronyms, keep all caps together except last letter
+                if !prev_was_lower && next_is_lower && current.len() > 0 {
+                    result.push(current.clone());
+                    current.clear();
+                } else if prev_was_lower {
+                    result.push(current.clone());
+                    current.clear();
+                }
             }
+
             current.push(ch);
-            prev_was_lower = ch.is_lowercase();
         }
 
         if !current.is_empty() {
