@@ -14,8 +14,8 @@ use syn::{self, visit::Visit};
 
 // Import clustering types for improved responsibility detection
 use super::clustering::{
-    CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider,
-    HierarchicalClustering, Method as ClusterMethod, Visibility as ClusterVisibility,
+    CallGraphProvider, ClusteringSimilarityCalculator, FieldAccessProvider, HierarchicalClustering,
+    Method as ClusterMethod, Visibility as ClusterVisibility,
 };
 
 /// Adapter for call graph adjacency matrix to CallGraphProvider trait
@@ -67,9 +67,7 @@ impl<'a> FieldAccessAdapter<'a> {
 
 impl<'a> FieldAccessProvider for FieldAccessAdapter<'a> {
     fn fields_accessed_by(&self, method: &str) -> HashSet<String> {
-        self.tracker
-            .fields_for_method(method)
-            .unwrap_or_default()
+        self.tracker.fields_for_method(method).unwrap_or_default()
     }
 
     fn writes_to_field(&self, method: &str, field: &str) -> bool {
@@ -1004,7 +1002,9 @@ impl GodObjectDetector {
         // Filter out test methods
         let production_methods: Vec<String> = all_methods
             .iter()
-            .filter(|m| !m.starts_with("test_") && !m.starts_with("mock_") && !m.starts_with("bench_"))
+            .filter(|m| {
+                !m.starts_with("test_") && !m.starts_with("mock_") && !m.starts_with("bench_")
+            })
             .cloned()
             .collect();
 
@@ -1015,14 +1015,14 @@ impl GodObjectDetector {
         // Convert methods to clustering format
         let cluster_methods: Vec<ClusterMethod> = production_methods
             .iter()
-            .filter_map(|method_name| {
-                Some(ClusterMethod {
+            .map(|method_name| {
+                ClusterMethod {
                     name: method_name.clone(),
                     is_pure: Self::check_if_pure_method(method_name),
                     visibility: Self::detect_visibility(method_name, ast),
                     complexity: Self::estimate_method_complexity(method_name, ast),
                     has_io: Self::detect_io_operations(method_name),
-                })
+                }
             })
             .collect();
 
@@ -1091,7 +1091,8 @@ impl GodObjectDetector {
             let suggested_name = format!("{}/{}", base_name, category_name);
 
             // Get fields needed for this cluster
-            let method_names: Vec<String> = cluster.methods.iter().map(|m| m.name.clone()).collect();
+            let method_names: Vec<String> =
+                cluster.methods.iter().map(|m| m.name.clone()).collect();
             let fields_needed = field_tracker.get_minimal_field_set(&method_names);
 
             // Extract quality metrics (use coherence as fallback)
@@ -1169,7 +1170,9 @@ impl GodObjectDetector {
             .iter()
             .any(|m| m.name.contains("format") || m.name.contains("display"));
         let has_parsing = sorted_methods.iter().any(|m| m.name.contains("parse"));
-        let all_public = sorted_methods.iter().all(|m| m.visibility == ClusterVisibility::Public);
+        let all_public = sorted_methods
+            .iter()
+            .all(|m| m.visibility == ClusterVisibility::Public);
 
         // Infer category based on patterns
         if has_io {
@@ -1184,8 +1187,7 @@ impl GodObjectDetector {
             "API".to_string()
         } else {
             // Extract common prefix from method names
-            Self::extract_common_prefix(&sorted_methods)
-                .unwrap_or_else(|| "Domain".to_string())
+            Self::extract_common_prefix(&sorted_methods).unwrap_or_else(|| "Domain".to_string())
         }
     }
 
@@ -1236,8 +1238,18 @@ impl GodObjectDetector {
 
     /// Check if method is likely pure (no side effects)
     fn check_if_pure_method(method_name: &str) -> bool {
-        let pure_prefixes = ["get_", "is_", "has_", "can_", "should_", "calculate_", "compute_"];
-        pure_prefixes.iter().any(|prefix| method_name.starts_with(prefix))
+        let pure_prefixes = [
+            "get_",
+            "is_",
+            "has_",
+            "can_",
+            "should_",
+            "calculate_",
+            "compute_",
+        ];
+        pure_prefixes
+            .iter()
+            .any(|prefix| method_name.starts_with(prefix))
     }
 
     /// Detect visibility of a method in the AST
@@ -1246,7 +1258,7 @@ impl GodObjectDetector {
             if let syn::Item::Impl(impl_block) = item {
                 for impl_item in &impl_block.items {
                     if let syn::ImplItem::Fn(method) = impl_item {
-                        if method.sig.ident.to_string() == method_name {
+                        if method.sig.ident == method_name {
                             return match &method.vis {
                                 syn::Visibility::Public(_) => ClusterVisibility::Public,
                                 syn::Visibility::Restricted(_) => ClusterVisibility::Crate,
@@ -1266,7 +1278,7 @@ impl GodObjectDetector {
             if let syn::Item::Impl(impl_block) = item {
                 for impl_item in &impl_block.items {
                     if let syn::ImplItem::Fn(method) = impl_item {
-                        if method.sig.ident.to_string() == method_name {
+                        if method.sig.ident == method_name {
                             // Simple heuristic: count statements and expressions
                             return Self::count_statements(&method.block);
                         }
@@ -1284,8 +1296,12 @@ impl GodObjectDetector {
 
     /// Detect if method performs I/O operations
     fn detect_io_operations(method_name: &str) -> bool {
-        let io_keywords = ["read", "write", "print", "open", "close", "fetch", "load", "save"];
-        io_keywords.iter().any(|keyword| method_name.contains(keyword))
+        let io_keywords = [
+            "read", "write", "print", "open", "close", "fetch", "load", "save",
+        ];
+        io_keywords
+            .iter()
+            .any(|keyword| method_name.contains(keyword))
     }
 
     /// Generate behavioral splits using production-ready clustering (Spec 178)

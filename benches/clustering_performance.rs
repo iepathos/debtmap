@@ -29,8 +29,7 @@ fn benchmark_clustering_overhead(c: &mut Criterion) {
     // Benchmark: Just AST parsing (baseline)
     group.bench_function("baseline_ast_parsing", |b| {
         b.iter(|| {
-            let ast = syn::parse_file(black_box(&source_code))
-                .expect("Failed to parse file");
+            let ast = syn::parse_file(black_box(&source_code)).expect("Failed to parse file");
             black_box(ast);
         });
     });
