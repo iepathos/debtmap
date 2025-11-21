@@ -112,8 +112,8 @@ impl DomainTermExtractor {
             let a_is_gerund = a.0.ends_with("ing");
             let b_is_gerund = b.0.ends_with("ing");
             match (a_is_gerund, b_is_gerund) {
-                (false, true) => std::cmp::Ordering::Less,  // a is better
-                (true, false) => std::cmp::Ordering::Greater,  // b is better
+                (false, true) => std::cmp::Ordering::Less, // a is better
+                (true, false) => std::cmp::Ordering::Greater, // b is better
                 _ => std::cmp::Ordering::Equal,
             }
         });

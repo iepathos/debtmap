@@ -16,11 +16,16 @@ fn test_no_generic_names_in_output() {
         vec!["format_output".to_string(), "format_summary".to_string()],
         vec!["validate_index".to_string(), "validate_data".to_string()],
         vec!["parse_input".to_string(), "parse_config".to_string()],
-        vec!["calculate_coverage".to_string(), "calculate_total_size".to_string()],
+        vec![
+            "calculate_coverage".to_string(),
+            "calculate_total_size".to_string(),
+        ],
     ];
 
     // Generic terms that should not appear
-    let generic_terms = ["unknown", "misc", "utils", "helpers", "module", "base", "core"];
+    let generic_terms = [
+        "unknown", "misc", "utils", "helpers", "module", "base", "core",
+    ];
 
     for methods in test_cases {
         let candidates = name_generator.generate_names(&methods, None);
@@ -52,14 +57,20 @@ fn test_name_uniqueness_across_splits() {
         vec!["format_output".to_string(), "format_summary".to_string()],
         vec!["validate_index".to_string(), "validate_data".to_string()],
         vec!["parse_input".to_string(), "parse_config".to_string()],
-        vec!["calculate_coverage".to_string(), "calculate_total_size".to_string()],
+        vec![
+            "calculate_coverage".to_string(),
+            "calculate_total_size".to_string(),
+        ],
     ];
 
     let mut all_names = Vec::new();
 
     for methods in method_groups {
         let candidates = name_generator.generate_names(&methods, None);
-        assert!(!candidates.is_empty(), "Should generate at least one candidate");
+        assert!(
+            !candidates.is_empty(),
+            "Should generate at least one candidate"
+        );
 
         // Take the best (first) candidate
         all_names.push(candidates[0].module_name.clone());
@@ -75,7 +86,10 @@ fn test_name_uniqueness_across_splits() {
     );
 
     // Check that names are not just "needs_review_N"
-    let review_names = all_names.iter().filter(|n| n.starts_with("needs_review")).count();
+    let review_names = all_names
+        .iter()
+        .filter(|n| n.starts_with("needs_review"))
+        .count();
     let total_names = all_names.len();
 
     // At most 25% of names should be fallback "needs_review" names
@@ -95,13 +109,13 @@ fn test_high_confidence_names() {
     let name_generator = SemanticNameGenerator::new();
 
     // Test formatting methods
-    let formatting_methods = vec![
-        "format_output".to_string(),
-        "format_summary".to_string(),
-    ];
+    let formatting_methods = vec!["format_output".to_string(), "format_summary".to_string()];
 
     let candidates = name_generator.generate_names(&formatting_methods, None);
-    assert!(!candidates.is_empty(), "Should generate at least one candidate");
+    assert!(
+        !candidates.is_empty(),
+        "Should generate at least one candidate"
+    );
 
     let best_candidate = &candidates[0];
     assert!(
@@ -116,13 +130,13 @@ fn test_high_confidence_names() {
     );
 
     // Test validation methods
-    let validation_methods = vec![
-        "validate_index".to_string(),
-        "validate_data".to_string(),
-    ];
+    let validation_methods = vec!["validate_index".to_string(), "validate_data".to_string()];
 
     let candidates = name_generator.generate_names(&validation_methods, None);
-    assert!(!candidates.is_empty(), "Should generate at least one candidate");
+    assert!(
+        !candidates.is_empty(),
+        "Should generate at least one candidate"
+    );
 
     let best_candidate = &candidates[0];
     assert!(
@@ -146,11 +160,17 @@ fn test_debtmap_self_analysis_naming() {
     // Test cases based on common patterns in debtmap's codebase
     let test_cases = vec![
         (
-            vec!["serialize_report".to_string(), "serialize_metrics".to_string()],
+            vec![
+                "serialize_report".to_string(),
+                "serialize_metrics".to_string(),
+            ],
             "serializ", // Should contain some form of "serialize"
         ),
         (
-            vec!["transform_ast".to_string(), "transform_functions".to_string()],
+            vec![
+                "transform_ast".to_string(),
+                "transform_functions".to_string(),
+            ],
             "transform", // Should contain "transform"
         ),
         (
@@ -163,7 +183,11 @@ fn test_debtmap_self_analysis_naming() {
         let candidates = name_generator.generate_names(&methods, None);
 
         // Verify we get reasonable results
-        assert!(!candidates.is_empty(), "Should generate at least one name candidate for {:?}", methods);
+        assert!(
+            !candidates.is_empty(),
+            "Should generate at least one name candidate for {:?}",
+            methods
+        );
 
         // Check that the best candidate has acceptable quality
         let best = &candidates[0];
