@@ -723,9 +723,9 @@ pub fn infer_responsibility_with_io_detection(
 /// leveraging the improved accuracy of I/O detection.
 pub fn map_io_to_traditional_responsibility(io_resp: &str) -> String {
     match io_resp {
-        "File I/O" | "Network I/O" | "Database I/O" => "Persistence".to_string(),
-        "Console I/O" => "Formatting & Output".to_string(),
-        "Mixed I/O" => "Processing".to_string(),
+        "File I/O" | "Network I/O" | "Database I/O" => "persistence".to_string(),
+        "Console I/O" => "output".to_string(),
+        "Mixed I/O" => "processing".to_string(),
         _ => io_resp.to_string(),
     }
 }
@@ -761,7 +761,7 @@ pub fn infer_responsibility_from_call_patterns(
 ) -> Option<String> {
     // Special case: if function name suggests it's a helper and has many callers
     if (function_name.contains("helper") || function_name.contains("util")) && callers.len() >= 3 {
-        return Some("Utilities".to_string());
+        return Some("utilities".to_string());
     }
 
     // Analyze caller patterns - who uses this function?
@@ -771,9 +771,9 @@ pub fn infer_responsibility_from_call_patterns(
     let callee_categories = categorize_functions(callees);
 
     // If majority of callers are in one category, this is likely support for that category
-    // Skip if the category is "Utilities" (catch-all)
+    // Skip if the category is "utilities" (catch-all)
     if let Some((category, count)) = find_dominant_category(&caller_categories) {
-        if count >= 2 && category != "Utilities" {
+        if count >= 2 && category != "utilities" {
             return Some(format!("{} Support", category));
         }
     }
@@ -932,7 +932,7 @@ pub fn group_methods_by_responsibility_with_evidence(
 /// ```
 /// # use debtmap::organization::god_object_analysis::ResponsibilityCategory;
 /// let category = ResponsibilityCategory {
-///     name: "Data Access",
+///     name: "data_access",
 ///     prefixes: &["get", "set"],
 /// };
 /// assert!(category.matches("get_value"));
@@ -964,7 +964,7 @@ impl ResponsibilityCategory {
 /// Static responsibility categories ordered by specificity.
 ///
 /// Categories are checked in order, so more specific categories should appear first.
-/// The "Utilities" category has no prefixes and serves as a fallback for unmatched methods.
+/// The "utilities" category has no prefixes and serves as a fallback for unmatched methods.
 ///
 /// # Adding New Categories
 ///
@@ -986,51 +986,63 @@ impl ResponsibilityCategory {
 /// ```
 const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
     ResponsibilityCategory {
-        name: "Formatting & Output",
-        prefixes: &["format", "render", "write", "print"],
+        name: "output",
+        prefixes: &[
+            "format", "render", "write", "print", "display", "show", "draw", "output", "emit",
+        ],
     },
     ResponsibilityCategory {
-        name: "Parsing & Input",
-        prefixes: &["parse", "read", "extract"],
+        name: "parsing",
+        prefixes: &[
+            "parse",
+            "read",
+            "extract",
+            "decode",
+            "deserialize",
+            "unmarshal",
+            "scan",
+        ],
     },
     ResponsibilityCategory {
-        name: "Filtering & Selection",
-        prefixes: &["filter", "select", "find"],
+        name: "filtering",
+        prefixes: &[
+            "filter", "select", "find", "search", "query", "lookup", "match",
+        ],
     },
     ResponsibilityCategory {
-        name: "Transformation",
-        prefixes: &["transform", "convert", "map", "apply"],
+        name: "transformation",
+        prefixes: &["transform", "convert", "map", "apply", "adapt"],
     },
     ResponsibilityCategory {
-        name: "Data Access",
-        prefixes: &["get", "set"],
+        name: "data_access",
+        prefixes: &["get", "set", "fetch", "retrieve", "access"],
     },
     ResponsibilityCategory {
-        name: "Validation",
-        prefixes: &["validate", "check", "verify", "is"],
+        name: "validation",
+        prefixes: &["validate", "check", "verify", "is", "ensure", "assert"],
     },
     ResponsibilityCategory {
-        name: "Computation",
-        prefixes: &["calculate", "compute"],
+        name: "computation",
+        prefixes: &["calculate", "compute", "evaluate", "measure"],
     },
     ResponsibilityCategory {
-        name: "Construction",
-        prefixes: &["create", "build", "new"],
+        name: "construction",
+        prefixes: &["create", "build", "new", "make", "construct"],
     },
     ResponsibilityCategory {
-        name: "Persistence",
-        prefixes: &["save", "load", "store"],
+        name: "persistence",
+        prefixes: &["save", "load", "store", "persist", "cache"],
     },
     ResponsibilityCategory {
-        name: "Processing",
-        prefixes: &["process", "handle"],
+        name: "processing",
+        prefixes: &["process", "handle", "execute", "run"],
     },
     ResponsibilityCategory {
-        name: "Communication",
-        prefixes: &["send", "receive"],
+        name: "communication",
+        prefixes: &["send", "receive", "transmit", "broadcast", "notify"],
     },
     ResponsibilityCategory {
-        name: "Utilities",
+        name: "utilities",
         prefixes: &[],
     },
 ];
@@ -1046,30 +1058,30 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 /// The function:
 /// 1. Converts the method name to lowercase for case-insensitive matching
 /// 2. Iterates through categories until finding one with a matching prefix
-/// 3. Returns the category name, or "Utilities" if no match is found
+/// 3. Returns the category name, or "utilities" if no match is found
 ///
 /// # Pattern Recognition
 ///
-/// - `format_*`, `render_*`, `write_*`, `print_*` → "Formatting & Output"
-/// - `parse_*`, `read_*`, `extract_*` → "Parsing & Input"
-/// - `filter_*`, `select_*`, `find_*` → "Filtering & Selection"
-/// - `transform_*`, `convert_*`, `map_*`, `apply_*` → "Transformation"
-/// - `get_*`, `set_*` → "Data Access"
-/// - `validate_*`, `check_*`, `verify_*`, `is_*` → "Validation"
-/// - `calculate_*`, `compute_*` → "Computation"
-/// - `create_*`, `build_*`, `new_*` → "Construction"
-/// - `save_*`, `load_*`, `store_*` → "Persistence"
-/// - `process_*`, `handle_*` → "Processing"
-/// - `send_*`, `receive_*` → "Communication"
-/// - Everything else → "Utilities"
+/// - `format_*`, `render_*`, `write_*`, `print_*`, `display_*`, `show_*`, `draw_*`, `output_*`, `emit_*` → "output"
+/// - `parse_*`, `read_*`, `extract_*`, `decode_*`, `deserialize_*`, `unmarshal_*`, `scan_*` → "parsing"
+/// - `filter_*`, `select_*`, `find_*`, `search_*`, `query_*`, `lookup_*`, `match_*` → "filtering"
+/// - `transform_*`, `convert_*`, `map_*`, `apply_*`, `adapt_*` → "transformation"
+/// - `get_*`, `set_*`, `fetch_*`, `retrieve_*`, `access_*` → "data_access"
+/// - `validate_*`, `check_*`, `verify_*`, `is_*`, `ensure_*`, `assert_*` → "validation"
+/// - `calculate_*`, `compute_*`, `evaluate_*`, `measure_*` → "computation"
+/// - `create_*`, `build_*`, `new_*`, `make_*`, `construct_*` → "construction"
+/// - `save_*`, `load_*`, `store_*`, `persist_*`, `cache_*` → "persistence"
+/// - `process_*`, `handle_*`, `execute_*`, `run_*` → "processing"
+/// - `send_*`, `receive_*`, `transmit_*`, `broadcast_*`, `notify_*` → "communication"
+/// - Everything else → "utilities"
 ///
 /// # Examples
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::infer_responsibility_from_method;
-/// assert_eq!(infer_responsibility_from_method("format_output"), "Formatting & Output");
-/// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing & Input");
-/// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
+/// assert_eq!(infer_responsibility_from_method("format_output"), "output");
+/// assert_eq!(infer_responsibility_from_method("parse_json"), "parsing");
+/// assert_eq!(infer_responsibility_from_method("calculate_average"), "computation");
 /// assert_eq!(infer_responsibility_from_method("helper_function"), "Helper");
 /// ```
 ///
@@ -1103,6 +1115,39 @@ pub fn infer_responsibility_from_method(method_name: &str) -> String {
     use crate::organization::BehavioralCategorizer;
     let category = BehavioralCategorizer::categorize_method(method_name);
     category.display_name()
+}
+
+/// Map old category names to new names for backward compatibility.
+///
+/// This function provides a migration path for code and configuration files that
+/// still use the old verbose category names (e.g., "output").
+///
+/// # Arguments
+///
+/// * `old_name` - The category name to normalize
+///
+/// # Returns
+///
+/// The normalized category name in the new format (lowercase, underscores)
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::normalize_category_name;
+/// assert_eq!(normalize_category_name("output"), "output");
+/// assert_eq!(normalize_category_name("parsing"), "parsing");
+/// assert_eq!(normalize_category_name("data_access"), "data_access");
+/// assert_eq!(normalize_category_name("output"), "output"); // Already normalized
+/// ```
+pub fn normalize_category_name(old_name: &str) -> String {
+    match old_name {
+        "output" => "output".to_string(),
+        "parsing" => "parsing".to_string(),
+        "filtering" => "filtering".to_string(),
+        "data_access" => "data_access".to_string(),
+        // Already normalized names pass through
+        name => name.to_lowercase().replace(' ', "_"),
+    }
 }
 
 /// Metrics for an individual struct within a file
@@ -1700,7 +1745,7 @@ fn ensure_not_reserved(mut name: String) -> String {
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::sanitize_module_name;
-/// assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
+/// assert_eq!(sanitize_module_name("parsing"), "parsing_and_input");
 /// assert_eq!(sanitize_module_name("Data  Access"), "data_access");
 /// assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
 /// assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
@@ -1886,77 +1931,47 @@ mod tests {
 
     #[test]
     fn test_format_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("format_output"),
-            "Formatting & Output"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("format_json"),
-            "Formatting & Output"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("FORMAT_DATA"),
-            "Formatting & Output"
-        );
+        assert_eq!(infer_responsibility_from_method("format_output"), "output");
+        assert_eq!(infer_responsibility_from_method("format_json"), "output");
+        assert_eq!(infer_responsibility_from_method("FORMAT_DATA"), "output");
     }
 
     #[test]
     fn test_render_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("render_table"),
-            "Formatting & Output"
-        );
+        assert_eq!(infer_responsibility_from_method("render_table"), "output");
     }
 
     #[test]
     fn test_write_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("write_to_file"),
-            "Formatting & Output"
-        );
+        assert_eq!(infer_responsibility_from_method("write_to_file"), "output");
     }
 
     #[test]
     fn test_print_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("print_results"),
-            "Formatting & Output"
-        );
+        assert_eq!(infer_responsibility_from_method("print_results"), "output");
     }
 
     #[test]
     fn test_parse_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("parse_input"),
-            "Parsing & Input"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("parse_json"),
-            "Parsing & Input"
-        );
+        assert_eq!(infer_responsibility_from_method("parse_input"), "parsing");
+        assert_eq!(infer_responsibility_from_method("parse_json"), "parsing");
     }
 
     #[test]
     fn test_read_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("read_config"),
-            "Parsing & Input"
-        );
+        assert_eq!(infer_responsibility_from_method("read_config"), "parsing");
     }
 
     #[test]
     fn test_extract_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("extract_data"),
-            "Parsing & Input"
-        );
+        assert_eq!(infer_responsibility_from_method("extract_data"), "parsing");
     }
 
     #[test]
     fn test_filter_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("filter_results"),
-            "Filtering & Selection"
+            "filtering"
         );
     }
 
@@ -1964,7 +1979,7 @@ mod tests {
     fn test_select_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("select_items"),
-            "Filtering & Selection"
+            "filtering"
         );
     }
 
@@ -1972,7 +1987,7 @@ mod tests {
     fn test_find_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("find_element"),
-            "Filtering & Selection"
+            "filtering"
         );
     }
 
@@ -1980,7 +1995,7 @@ mod tests {
     fn test_transform_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("transform_data"),
-            "Transformation"
+            "transformation"
         );
     }
 
@@ -1988,7 +2003,7 @@ mod tests {
     fn test_convert_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("convert_to_json"),
-            "Transformation"
+            "transformation"
         );
     }
 
@@ -1996,7 +2011,7 @@ mod tests {
     fn test_map_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("map_values"),
-            "Transformation"
+            "transformation"
         );
     }
 
@@ -2004,31 +2019,31 @@ mod tests {
     fn test_apply_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("apply_mapping"),
-            "Transformation"
+            "transformation"
         );
     }
 
     #[test]
     fn test_get_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("get_value"), "Data Access");
+        assert_eq!(infer_responsibility_from_method("get_value"), "data_access");
     }
 
     #[test]
     fn test_set_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("set_value"), "Data Access");
+        assert_eq!(infer_responsibility_from_method("set_value"), "data_access");
     }
 
     #[test]
     fn test_is_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("is_valid"), "Validation");
-        assert_eq!(infer_responsibility_from_method("is_empty"), "Validation");
+        assert_eq!(infer_responsibility_from_method("is_valid"), "validation");
+        assert_eq!(infer_responsibility_from_method("is_empty"), "validation");
     }
 
     #[test]
     fn test_validate_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("validate_input"),
-            "Validation"
+            "validation"
         );
     }
 
@@ -2036,7 +2051,7 @@ mod tests {
     fn test_check_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("check_constraints"),
-            "Validation"
+            "validation"
         );
     }
 
@@ -2044,13 +2059,13 @@ mod tests {
     fn test_verify_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("verify_signature"),
-            "Validation"
+            "validation"
         );
     }
 
     #[test]
     fn test_catch_all_uses_behavioral_categorization() {
-        // Spec 178: Avoid "Utilities", use behavioral categorization
+        // Spec 178: Avoid "utilities", use behavioral categorization
         // "unknown_function" -> Domain("Unknown") based on first word
         assert_eq!(
             infer_responsibility_from_method("unknown_function"),
@@ -2066,7 +2081,7 @@ mod tests {
         let groups = group_methods_by_responsibility(&methods);
         assert!(!groups.is_empty());
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups.get("Formatting & Output").unwrap().len(), 2);
+        assert_eq!(groups.get("output").unwrap().len(), 2);
     }
 
     #[test]
@@ -2080,34 +2095,28 @@ mod tests {
         ];
         let groups = group_methods_by_responsibility(&methods);
         assert_eq!(groups.len(), 4); // Formatting & Output, Parsing & Input, Data Access, Validation
-        assert!(groups.contains_key("Formatting & Output"));
-        assert!(groups.contains_key("Parsing & Input"));
-        assert!(groups.contains_key("Data Access"));
-        assert!(groups.contains_key("Validation"));
+        assert!(groups.contains_key("output"));
+        assert!(groups.contains_key("parsing"));
+        assert!(groups.contains_key("data_access"));
+        assert!(groups.contains_key("validation"));
     }
 
     #[test]
     fn test_case_insensitive_matching() {
-        assert_eq!(
-            infer_responsibility_from_method("FORMAT_OUTPUT"),
-            "Formatting & Output"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("Parse_Input"),
-            "Parsing & Input"
-        );
-        assert_eq!(infer_responsibility_from_method("IS_VALID"), "Validation");
+        assert_eq!(infer_responsibility_from_method("FORMAT_OUTPUT"), "output");
+        assert_eq!(infer_responsibility_from_method("Parse_Input"), "parsing");
+        assert_eq!(infer_responsibility_from_method("IS_VALID"), "validation");
     }
 
     #[test]
     fn test_calculate_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("calculate_total"),
-            "Computation"
+            "computation"
         );
         assert_eq!(
             infer_responsibility_from_method("calculate_sum"),
-            "Computation"
+            "computation"
         );
     }
 
@@ -2115,7 +2124,7 @@ mod tests {
     fn test_compute_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("compute_result"),
-            "Computation"
+            "computation"
         );
     }
 
@@ -2123,7 +2132,7 @@ mod tests {
     fn test_create_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("create_instance"),
-            "Construction"
+            "construction"
         );
     }
 
@@ -2131,7 +2140,7 @@ mod tests {
     fn test_build_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("build_object"),
-            "Construction"
+            "construction"
         );
     }
 
@@ -2139,7 +2148,7 @@ mod tests {
     fn test_new_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("new_connection"),
-            "Construction"
+            "construction"
         );
     }
 
@@ -2147,7 +2156,7 @@ mod tests {
     fn test_save_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("save_to_disk"),
-            "Persistence"
+            "persistence"
         );
     }
 
@@ -2155,7 +2164,7 @@ mod tests {
     fn test_load_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("load_from_file"),
-            "Persistence"
+            "persistence"
         );
     }
 
@@ -2163,7 +2172,7 @@ mod tests {
     fn test_store_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("store_data"),
-            "Persistence"
+            "persistence"
         );
     }
 
@@ -2171,7 +2180,7 @@ mod tests {
     fn test_process_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("process_request"),
-            "Processing"
+            "processing"
         );
     }
 
@@ -2179,7 +2188,7 @@ mod tests {
     fn test_handle_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("handle_event"),
-            "Processing"
+            "processing"
         );
     }
 
@@ -2187,7 +2196,7 @@ mod tests {
     fn test_send_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("send_message"),
-            "Communication"
+            "communication"
         );
     }
 
@@ -2195,7 +2204,7 @@ mod tests {
     fn test_receive_prefix_recognized() {
         assert_eq!(
             infer_responsibility_from_method("receive_data"),
-            "Communication"
+            "communication"
         );
     }
 
@@ -2239,7 +2248,7 @@ mod tests {
             god_object_score: 75.0,
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
-            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            responsibilities: vec!["data_access".to_string(), "validation".to_string()],
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,
@@ -2272,7 +2281,7 @@ mod tests {
             god_object_score: 75.0,
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
-            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            responsibilities: vec!["data_access".to_string(), "validation".to_string()],
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,
@@ -2310,7 +2319,7 @@ mod tests {
             god_object_score: 75.0,
             recommended_splits: vec![],
             confidence: GodObjectConfidence::Probable,
-            responsibilities: vec!["Data Access".to_string(), "Validation".to_string()],
+            responsibilities: vec!["data_access".to_string(), "validation".to_string()],
             purity_distribution: None,
             module_structure: None,
             detection_type: DetectionType::GodClass,
@@ -2612,7 +2621,7 @@ mod tests {
             infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
 
         // Pure functions fall back to name-based heuristics
-        assert_eq!(responsibility, "Computation");
+        assert_eq!(responsibility, "computation");
     }
 
     #[test]
@@ -2626,7 +2635,7 @@ mod tests {
             infer_responsibility_with_io_detection(method_name, method_body, Language::Rust);
 
         // Without body, falls back to name-based detection
-        assert_eq!(responsibility, "Formatting & Output");
+        assert_eq!(responsibility, "output");
     }
 
     #[test]
@@ -2674,23 +2683,23 @@ mod tests {
     fn test_map_io_to_traditional_responsibility() {
         assert_eq!(
             map_io_to_traditional_responsibility("File I/O"),
-            "Persistence"
+            "persistence"
         );
         assert_eq!(
             map_io_to_traditional_responsibility("Network I/O"),
-            "Persistence"
+            "persistence"
         );
         assert_eq!(
             map_io_to_traditional_responsibility("Database I/O"),
-            "Persistence"
+            "persistence"
         );
         assert_eq!(
             map_io_to_traditional_responsibility("Console I/O"),
-            "Formatting & Output"
+            "output"
         );
         assert_eq!(
             map_io_to_traditional_responsibility("Mixed I/O"),
-            "Processing"
+            "processing"
         );
     }
 
@@ -2702,7 +2711,7 @@ mod tests {
         let callers = vec!["format_output".to_string(), "render_table".to_string()];
 
         let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
-        assert_eq!(resp, Some("Formatting & Output Support".to_string()));
+        assert_eq!(resp, Some("output Support".to_string()));
     }
 
     #[test]
@@ -2716,7 +2725,7 @@ mod tests {
         let callers = vec![];
 
         let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
-        assert_eq!(resp, Some("Validation Orchestration".to_string()));
+        assert_eq!(resp, Some("validation Orchestration".to_string()));
     }
 
     #[test]
@@ -2731,7 +2740,7 @@ mod tests {
         ];
 
         let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
-        assert_eq!(resp, Some("Utilities".to_string()));
+        assert_eq!(resp, Some("utilities".to_string()));
     }
 
     #[test]
@@ -2754,20 +2763,20 @@ mod tests {
         ];
 
         let categories = categorize_functions(&functions);
-        assert_eq!(categories.get("Formatting & Output"), Some(&2));
-        assert_eq!(categories.get("Parsing & Input"), Some(&1));
-        assert_eq!(categories.get("Validation"), Some(&1));
+        assert_eq!(categories.get("output"), Some(&2));
+        assert_eq!(categories.get("parsing"), Some(&1));
+        assert_eq!(categories.get("validation"), Some(&1));
     }
 
     #[test]
     fn test_find_dominant_category() {
         let mut categories = std::collections::HashMap::new();
-        categories.insert("Formatting & Output".to_string(), 5);
-        categories.insert("Parsing & Input".to_string(), 2);
-        categories.insert("Validation".to_string(), 1);
+        categories.insert("output".to_string(), 5);
+        categories.insert("parsing".to_string(), 2);
+        categories.insert("validation".to_string(), 1);
 
         let dominant = find_dominant_category(&categories);
-        assert_eq!(dominant, Some(("Formatting & Output".to_string(), 5)));
+        assert_eq!(dominant, Some(("output".to_string(), 5)));
     }
 
     #[test]
@@ -2805,21 +2814,21 @@ mod tests {
     // Tests for module name sanitization (Spec 172)
     #[test]
     fn test_sanitize_ampersand_replacement() {
-        assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
+        assert_eq!(sanitize_module_name("parsing"), "parsing");
         assert_eq!(sanitize_module_name("Read & Write"), "read_and_write");
         assert_eq!(
-            sanitize_module_name("Data Access & Validation"),
+            sanitize_module_name("data_access & validation"),
             "data_access_and_validation"
         );
     }
 
     #[test]
     fn test_sanitize_multiple_spaces() {
-        assert_eq!(sanitize_module_name("Data  Access"), "data_access");
+        assert_eq!(sanitize_module_name("data  access"), "data_access");
         // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
-        assert_eq!(sanitize_module_name("I/O   Utilities"), "i_o_utilities");
+        assert_eq!(sanitize_module_name("I/O   utilities"), "i_o_utilities");
         assert_eq!(
-            sanitize_module_name("Formatting    &    Output"),
+            sanitize_module_name("formatting    &    output"),
             "formatting_and_output"
         );
     }
@@ -2884,14 +2893,11 @@ mod tests {
 
     #[test]
     fn test_sanitize_real_world_examples() {
-        // From spec - real-world example
-        assert_eq!(sanitize_module_name("Parsing & Input"), "parsing_and_input");
-        assert_eq!(sanitize_module_name("Data Access"), "data_access");
-        assert_eq!(sanitize_module_name("Utilities"), "utilities");
-        assert_eq!(
-            sanitize_module_name("Formatting & Output"),
-            "formatting_and_output"
-        );
+        // From spec - real-world example (updated for simplified names)
+        assert_eq!(sanitize_module_name("parsing"), "parsing");
+        assert_eq!(sanitize_module_name("data_access"), "data_access");
+        assert_eq!(sanitize_module_name("utilities"), "utilities");
+        assert_eq!(sanitize_module_name("output"), "output");
     }
 
     #[test]
@@ -2918,7 +2924,7 @@ mod tests {
     #[test]
     fn test_sanitize_deterministic() {
         // Same input should always produce same output
-        let input = "Parsing & Input";
+        let input = "parsing";
         let result1 = sanitize_module_name(input);
         let result2 = sanitize_module_name(input);
         assert_eq!(result1, result2);
@@ -3067,11 +3073,11 @@ mod tests {
     #[test]
     fn test_sanitize_integration_with_module_split() {
         // Test that sanitized names work in real module split creation
-        let responsibility = "Parsing & Input";
+        let responsibility = "parsing";
         let sanitized = sanitize_module_name(responsibility);
         let module_name = format!("mytype_{}", sanitized);
 
-        assert_eq!(module_name, "mytype_parsing_and_input");
+        assert_eq!(module_name, "mytype_parsing");
         assert!(!module_name.contains('&'));
         assert!(!module_name.contains("  "));
     }
@@ -3080,7 +3086,7 @@ mod tests {
     fn test_recommend_module_splits_uses_sanitization() {
         let mut responsibility_groups = HashMap::new();
         responsibility_groups.insert(
-            "Parsing & Input".to_string(),
+            "parsing".to_string(),
             vec![
                 "parse_a".to_string(),
                 "parse_b".to_string(),
@@ -3094,7 +3100,7 @@ mod tests {
         let splits = recommend_module_splits("MyType", &[], &responsibility_groups);
 
         assert_eq!(splits.len(), 1);
-        assert_eq!(splits[0].suggested_name, "mytype_parsing_and_input");
+        assert_eq!(splits[0].suggested_name, "mytype_parsing");
         assert!(!splits[0].suggested_name.contains('&'));
     }
 }

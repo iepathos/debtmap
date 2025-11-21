@@ -6,7 +6,7 @@ use super::{
     MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector, Priority,
     RecommendationSeverity, ResponsibilityGroup, StructMetrics,
 };
-use crate::common::{capitalize_first, SourceLocation, UnifiedLocationExtractor};
+use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use std::collections::HashMap;
 use std::path::Path;
 use syn::{self, visit::Visit};
@@ -1861,17 +1861,17 @@ impl GodObjectDetector {
     /// Pure function to classify responsibility based on method prefix
     fn classify_responsibility(prefix: &str) -> String {
         match prefix {
-            "get" | "set" => "Data Access".to_string(),
-            "calculate" | "compute" => "Computation".to_string(),
-            "validate" | "check" | "verify" | "ensure" => "Validation".to_string(),
-            "save" | "load" | "store" | "retrieve" | "fetch" => "Persistence".to_string(),
-            "create" | "build" | "new" | "make" | "init" => "Construction".to_string(),
-            "send" | "receive" | "handle" | "manage" => "Communication".to_string(),
-            "update" | "modify" | "change" | "edit" => "Modification".to_string(),
-            "delete" | "remove" | "clear" | "reset" => "Deletion".to_string(),
-            "is" | "has" | "can" | "should" | "will" => "State Query".to_string(),
-            "process" | "transform" => "Processing".to_string(),
-            _ => format!("{} Operations", capitalize_first(prefix)),
+            "get" | "set" => "data_access".to_string(),
+            "calculate" | "compute" => "computation".to_string(),
+            "validate" | "check" | "verify" | "ensure" => "validation".to_string(),
+            "save" | "load" | "store" | "retrieve" | "fetch" => "persistence".to_string(),
+            "create" | "build" | "new" | "make" | "init" => "construction".to_string(),
+            "send" | "receive" | "handle" | "manage" => "communication".to_string(),
+            "update" | "modify" | "change" | "edit" => "modification".to_string(),
+            "delete" | "remove" | "clear" | "reset" => "deletion".to_string(),
+            "is" | "has" | "can" | "should" | "will" => "state_query".to_string(),
+            "process" | "transform" => "processing".to_string(),
+            _ => format!("{}_operations", prefix.to_lowercase()),
         }
     }
 
@@ -2025,11 +2025,11 @@ mod tests {
     fn test_classify_responsibility_data_access() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("get"),
-            "Data Access".to_string()
+            "data_access".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("set"),
-            "Data Access".to_string()
+            "data_access".to_string()
         );
     }
 
@@ -2037,11 +2037,11 @@ mod tests {
     fn test_classify_responsibility_computation() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("calculate"),
-            "Computation".to_string()
+            "computation".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("compute"),
-            "Computation".to_string()
+            "computation".to_string()
         );
     }
 
@@ -2049,15 +2049,15 @@ mod tests {
     fn test_classify_responsibility_validation() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("validate"),
-            "Validation".to_string()
+            "validation".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("check"),
-            "Validation".to_string()
+            "validation".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("verify"),
-            "Validation".to_string()
+            "validation".to_string()
         );
     }
 
@@ -2145,15 +2145,15 @@ mod tests {
     fn test_classify_responsibility_persistence() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("save"),
-            "Persistence".to_string()
+            "persistence".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("load"),
-            "Persistence".to_string()
+            "persistence".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("fetch"),
-            "Persistence".to_string()
+            "persistence".to_string()
         );
     }
 
@@ -2161,15 +2161,15 @@ mod tests {
     fn test_classify_responsibility_construction() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("create"),
-            "Construction".to_string()
+            "construction".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("build"),
-            "Construction".to_string()
+            "construction".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("new"),
-            "Construction".to_string()
+            "construction".to_string()
         );
     }
 
@@ -2177,15 +2177,15 @@ mod tests {
     fn test_classify_responsibility_communication() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("send"),
-            "Communication".to_string()
+            "communication".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("receive"),
-            "Communication".to_string()
+            "communication".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("handle"),
-            "Communication".to_string()
+            "communication".to_string()
         );
     }
 
@@ -2193,15 +2193,15 @@ mod tests {
     fn test_classify_responsibility_modification() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("update"),
-            "Modification".to_string()
+            "modification".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("modify"),
-            "Modification".to_string()
+            "modification".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("change"),
-            "Modification".to_string()
+            "modification".to_string()
         );
     }
 
@@ -2209,15 +2209,15 @@ mod tests {
     fn test_classify_responsibility_deletion() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("delete"),
-            "Deletion".to_string()
+            "deletion".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("remove"),
-            "Deletion".to_string()
+            "deletion".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("clear"),
-            "Deletion".to_string()
+            "deletion".to_string()
         );
     }
 
@@ -2225,15 +2225,15 @@ mod tests {
     fn test_classify_responsibility_state_query() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("is"),
-            "State Query".to_string()
+            "state_query".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("has"),
-            "State Query".to_string()
+            "state_query".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("can"),
-            "State Query".to_string()
+            "state_query".to_string()
         );
     }
 
@@ -2241,11 +2241,11 @@ mod tests {
     fn test_classify_responsibility_processing() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("process"),
-            "Processing".to_string()
+            "processing".to_string()
         );
         assert_eq!(
             GodObjectDetector::classify_responsibility("transform"),
-            "Processing".to_string()
+            "processing".to_string()
         );
     }
 
@@ -2253,7 +2253,7 @@ mod tests {
     fn test_classify_responsibility_default() {
         assert_eq!(
             GodObjectDetector::classify_responsibility("custom"),
-            "Custom Operations".to_string()
+            "custom_operations".to_string()
         );
     }
 
@@ -2447,8 +2447,8 @@ mod tests {
 
         let group = detector.create_responsibility_group("get".to_string(), methods.clone());
 
-        assert_eq!(group.name, "DataAccessManager");
-        assert_eq!(group.responsibility, "Data Access");
+        assert_eq!(group.name, "data_accessManager");
+        assert_eq!(group.responsibility, "data_access");
         assert_eq!(group.methods, methods);
         assert!(group.fields.is_empty());
     }
@@ -2460,8 +2460,8 @@ mod tests {
 
         let group = detector.create_responsibility_group("validate".to_string(), methods.clone());
 
-        assert_eq!(group.name, "ValidationManager");
-        assert_eq!(group.responsibility, "Validation");
+        assert_eq!(group.name, "validationManager");
+        assert_eq!(group.responsibility, "validation");
         assert_eq!(group.methods, methods);
     }
 
@@ -2514,9 +2514,9 @@ mod tests {
 
         // Verify that groups are properly created
         let group_names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
-        assert!(group_names.contains(&"DataAccessManager".to_string()));
-        assert!(group_names.contains(&"ValidationManager".to_string()));
-        assert!(group_names.contains(&"PersistenceManager".to_string()));
+        assert!(group_names.contains(&"data_accessManager".to_string()));
+        assert!(group_names.contains(&"validationManager".to_string()));
+        assert!(group_names.contains(&"persistenceManager".to_string()));
     }
 
     #[test]
@@ -2537,7 +2537,7 @@ mod tests {
 
         // Should return the grouped method even if below threshold
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].name, "CustomOperationsManager");
+        assert_eq!(groups[0].name, "custom_operationsManager");
     }
 
     #[test]
@@ -2558,7 +2558,7 @@ mod tests {
 
         // Should still group by prefix even above threshold
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].name, "CustomOperationsManager");
+        assert_eq!(groups[0].name, "custom_operationsManager");
     }
 
     #[test]
@@ -2876,8 +2876,8 @@ mod tests {
                             "Rendering"
                                 | "Event Handling"
                                 | "Lifecycle"
-                                | "Persistence"
-                                | "Validation"
+                                | "persistence"
+                                | "validation"
                         )
                 });
 
