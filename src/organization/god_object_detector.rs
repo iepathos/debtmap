@@ -1764,11 +1764,36 @@ impl GodObjectDetector {
             })
             .collect();
 
+        // Apply domain-aware naming for type-based splits (Spec 193 Phase 3)
+        Self::apply_domain_aware_naming_to_type_based_splits(&mut splits, ast);
+
         // Apply semantic naming to all splits (Spec 191)
         let mut name_generator = SemanticNameGenerator::new();
         for split in &mut splits {
             Self::apply_semantic_naming(split, &mut name_generator, file_path);
         }
+
+        // Filter out generic names that don't meet type-based threshold (Spec 193)
+        splits.retain(|split| {
+            use crate::organization::semantic_naming::{is_generic_type_name, SpecificityScorer};
+            let specificity_scorer = SpecificityScorer::new();
+
+            // Extract module name without path
+            let module_name = split
+                .suggested_name
+                .split('/')
+                .next_back()
+                .unwrap_or(&split.suggested_name)
+                .replace(".rs", "");
+
+            // Reject if generic type name
+            if is_generic_type_name(&module_name) {
+                return false;
+            }
+
+            // Apply stricter threshold for type-based splits
+            specificity_scorer.is_acceptable_for_type_based(&module_name)
+        });
 
         splits
     }
@@ -2558,6 +2583,129 @@ impl GodObjectDetector {
     ///
     /// * `splits` - Vector of module splits to apply naming to
     /// * `file_path` - File path for uniqueness validation
+    ///
+    /// Apply domain-aware naming to type-based splits (Spec 193 Phase 3)
+    ///
+    /// Type-based splits use Rust type names which are often too generic.
+    /// This function tries to infer better names by:
+    /// 1. Detecting domain patterns in the methods
+    /// 2. Extracting dominant verbs from method names
+    /// 3. Falling back to the original responsibility if nothing better is found
+    ///
+    /// # Arguments
+    ///
+    /// * `splits` - Vector of module splits (modified in-place)
+    /// * `ast` - Parsed AST for domain pattern detection
+    fn apply_domain_aware_naming_to_type_based_splits(
+        splits: &mut Vec<ModuleSplit>,
+        ast: &syn::File,
+    ) {
+        use crate::organization::semantic_naming::extract_dominant_verb;
+
+        for split in splits {
+            let methods = &split.methods_to_move;
+
+            // Try domain pattern detection first
+            if let Some(domain_name) =
+                Self::detect_domain_pattern_for_methods(methods, ast, &split.core_type)
+            {
+                split.responsibility = domain_name;
+                continue;
+            }
+
+            // Fallback to method verb extraction
+            if let Some(verb) = extract_dominant_verb(methods) {
+                split.responsibility = format!("{} Operations", verb);
+            }
+
+            // If still generic, keep the original responsibility
+            // (Semantic naming will handle it in the next step)
+        }
+    }
+
+    /// Detect domain pattern for a set of methods (Spec 193 helper)
+    fn detect_domain_pattern_for_methods(
+        methods: &[String],
+        ast: &syn::File,
+        core_type: &Option<String>,
+    ) -> Option<String> {
+        use crate::organization::domain_patterns::{
+            DomainPattern, DomainPatternDetector, FileContext, MethodInfo,
+        };
+        use std::collections::{HashMap, HashSet};
+
+        // Build method infos from AST
+        let method_infos: Vec<MethodInfo> = methods
+            .iter()
+            .filter_map(|method_name| {
+                let (body, doc_comment) = Self::extract_method_details(ast, method_name);
+                if body.is_empty() && doc_comment.as_ref().is_none_or(|d| d.is_empty()) {
+                    return None;
+                }
+                Some(MethodInfo {
+                    name: method_name.clone(),
+                    body,
+                    doc_comment,
+                })
+            })
+            .collect();
+
+        if method_infos.is_empty() {
+            return None;
+        }
+
+        // Build file context (simplified - no call edges for type-based splits)
+        let structures: HashSet<String> = core_type
+            .as_ref()
+            .map(|t| {
+                let mut set = HashSet::new();
+                set.insert(t.clone());
+                set
+            })
+            .unwrap_or_default();
+        let context = FileContext {
+            methods: method_infos.clone(),
+            structures,
+            call_edges: vec![], // Type-based splits don't have call graph info
+        };
+
+        // Detect domain patterns
+        let detector = DomainPatternDetector::new();
+        let mut pattern_scores: HashMap<DomainPattern, (usize, f64)> = HashMap::new();
+
+        for method_info in &method_infos {
+            if let Some(pattern_match) = detector.detect_method_domain(method_info, &context) {
+                let entry = pattern_scores
+                    .entry(pattern_match.pattern)
+                    .or_insert((0, 0.0));
+                entry.0 += 1;
+                entry.1 += pattern_match.confidence;
+            }
+        }
+
+        // Find dominant pattern (require at least 2 methods and avg confidence > 0.35)
+        // Lower threshold than behavioral clustering since type-based is fallback
+        pattern_scores
+            .iter()
+            .filter(|(_, (count, _))| *count >= 2)
+            .max_by_key(|(_, (count, _))| *count)
+            .and_then(|(pattern, (count, total_confidence))| {
+                let avg_confidence = total_confidence / (*count as f64);
+                if avg_confidence >= 0.35 {
+                    Some(match pattern {
+                        DomainPattern::ObserverPattern => "Observer Pattern".to_string(),
+                        DomainPattern::BuilderPattern => "Builder Pattern".to_string(),
+                        DomainPattern::RegistryPattern => "Registry Pattern".to_string(),
+                        DomainPattern::CallbackPattern => "Callback Handlers".to_string(),
+                        DomainPattern::TypeInferencePattern => "Type Inference".to_string(),
+                        DomainPattern::AstTraversalPattern => "AST Traversal".to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+    }
+
     fn apply_semantic_naming_to_splits(splits: &mut Vec<ModuleSplit>, file_path: &Path) {
         if splits.is_empty() {
             return;

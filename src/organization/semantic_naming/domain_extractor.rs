@@ -355,6 +355,90 @@ impl DomainTermExtractor {
     }
 }
 
+/// Extract dominant verb from method names (Spec 193 Phase 4)
+///
+/// Analyzes method names to find the most common specific verb prefix.
+/// Returns the verb if it covers >30% of methods, indicating a clear pattern.
+///
+/// # Arguments
+///
+/// * `methods` - List of method names to analyze
+///
+/// # Returns
+///
+/// The dominant verb (capitalized) if found, None otherwise
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::semantic_naming::domain_extractor::extract_dominant_verb;
+/// let methods = vec![
+///     "validate_input".to_string(),
+///     "validate_output".to_string(),
+///     "validate_schema".to_string(),
+/// ];
+/// assert_eq!(extract_dominant_verb(&methods), Some("Validate".to_string()));
+/// ```
+pub fn extract_dominant_verb(methods: &[String]) -> Option<String> {
+    use std::collections::HashMap;
+
+    // Specific action verbs to detect (in priority order)
+    // Note: Excludes overly generic verbs like "process", "compute", "handle"
+    // per Spec 193's goal of avoiding generic names
+    let verbs = [
+        "validate",
+        "parse",
+        "format",
+        "calculate",
+        "transform",
+        "convert",
+        "generate",
+        "analyze",
+        "detect",
+        "classify",
+        "build",
+        "create",
+        "update",
+        "delete",
+        "query",
+        "serialize",
+        "deserialize",
+        "encode",
+        "decode",
+        "evaluate",
+        "render",
+        "display",
+    ];
+
+    // Count verb occurrences
+    let mut verb_counts: HashMap<&str, usize> = HashMap::new();
+    for method in methods {
+        let method_lower = method.to_lowercase();
+        for verb in &verbs {
+            if method_lower.starts_with(verb) {
+                *verb_counts.entry(verb).or_default() += 1;
+                break; // Only count first matching verb
+            }
+        }
+    }
+
+    // Return most common verb if it covers >30% of methods
+    verb_counts
+        .into_iter()
+        .filter(|(_, count)| (*count as f64 / methods.len() as f64) > 0.3)
+        .max_by_key(|(_, count)| *count)
+        .map(|(verb, _)| capitalize_first(verb))
+}
+
+/// Capitalize the first letter of a string
+fn capitalize_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+    }
+}
+
 impl Default for DomainTermExtractor {
     fn default() -> Self {
         Self::new()
@@ -468,5 +552,72 @@ mod tests {
         // Generic terms should score low
         assert!(extractor.calculate_term_specificity("data") < 0.5);
         assert!(extractor.calculate_term_specificity("value") < 0.5);
+    }
+
+    // Spec 193: Dominant verb extraction tests
+    #[test]
+    fn test_extract_validation_verb() {
+        let methods = vec![
+            "validate_input".to_string(),
+            "validate_output".to_string(),
+            "validate_schema".to_string(),
+        ];
+        assert_eq!(
+            extract_dominant_verb(&methods),
+            Some("Validate".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_parsing_verb() {
+        let methods = vec![
+            "parse_file".to_string(),
+            "parse_tokens".to_string(),
+            "parse_expression".to_string(),
+            "other_method".to_string(),
+        ];
+        assert_eq!(extract_dominant_verb(&methods), Some("Parse".to_string()));
+    }
+
+    #[test]
+    fn test_no_dominant_verb() {
+        let methods = vec![
+            "process_a".to_string(),
+            "handle_b".to_string(),
+            "compute_c".to_string(),
+        ];
+        // No single verb covers >30%
+        assert_eq!(extract_dominant_verb(&methods), None);
+    }
+
+    #[test]
+    fn test_extract_format_verb() {
+        let methods = vec![
+            "format_output".to_string(),
+            "format_error".to_string(),
+            "format_status".to_string(),
+            "other_method".to_string(),
+        ];
+        assert_eq!(extract_dominant_verb(&methods), Some("Format".to_string()));
+    }
+
+    #[test]
+    fn test_verb_case_insensitive() {
+        let methods = vec![
+            "Validate_Input".to_string(),
+            "VALIDATE_OUTPUT".to_string(),
+            "validate_schema".to_string(),
+        ];
+        assert_eq!(
+            extract_dominant_verb(&methods),
+            Some("Validate".to_string())
+        );
+    }
+
+    #[test]
+    fn test_capitalize_first() {
+        assert_eq!(capitalize_first("hello"), "Hello");
+        assert_eq!(capitalize_first("WORLD"), "WORLD");
+        assert_eq!(capitalize_first(""), "");
     }
 }

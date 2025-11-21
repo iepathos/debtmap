@@ -32,9 +32,9 @@ mod pattern_recognizer;
 mod specificity_scorer;
 mod uniqueness_validator;
 
-pub use domain_extractor::DomainTermExtractor;
+pub use domain_extractor::{extract_dominant_verb, DomainTermExtractor};
 pub use pattern_recognizer::PatternRecognizer;
-pub use specificity_scorer::SpecificityScorer;
+pub use specificity_scorer::{is_generic_type_name, SpecificityScorer};
 pub use uniqueness_validator::NameUniquenessValidator;
 
 use serde::{Deserialize, Serialize};
