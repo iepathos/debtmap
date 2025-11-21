@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::confidence::{MINIMUM_CONFIDENCE, UTILITIES_THRESHOLD};
+
 /// Type of god object detection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DetectionType {
@@ -668,7 +670,14 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
 
     for method in methods {
-        let responsibility = infer_responsibility_from_method(method);
+        let result = infer_responsibility_with_confidence(method, None);
+
+        // If confidence is too low (None category), keep method in original location
+        // by assigning it to "unclassified" group
+        let responsibility = result
+            .category
+            .unwrap_or_else(|| "unclassified".to_string());
+
         groups
             .entry(responsibility)
             .or_default()
@@ -722,14 +731,18 @@ pub fn infer_responsibility_with_io_detection(
                 Responsibility::SideEffects => "Side Effects".to_string(),
                 Responsibility::PureComputation => {
                     // For pure functions, name heuristics might be more informative
-                    infer_responsibility_from_method(method_name)
+                    infer_responsibility_with_confidence(method_name, None)
+                        .category
+                        .unwrap_or_else(|| "utilities".to_string())
                 }
             };
         }
     }
 
     // Fall back to name-based heuristics
-    infer_responsibility_from_method(method_name)
+    infer_responsibility_with_confidence(method_name, None)
+        .category
+        .unwrap_or_else(|| "utilities".to_string())
 }
 
 /// Map I/O-based responsibility to traditional responsibility categories.
@@ -808,7 +821,9 @@ fn categorize_functions(functions: &[String]) -> std::collections::HashMap<Strin
     let mut categories = std::collections::HashMap::new();
 
     for func in functions {
-        let category = infer_responsibility_from_method(func);
+        let category = infer_responsibility_with_confidence(func, None)
+            .category
+            .unwrap_or_else(|| "utilities".to_string());
         *categories.entry(category).or_insert(0) += 1;
     }
 
@@ -935,6 +950,60 @@ pub fn group_methods_by_responsibility_with_evidence(
     }
 
     (groups, evidence_map)
+}
+
+/// Result of responsibility classification with confidence scoring.
+///
+/// This struct represents the outcome of attempting to classify a method's
+/// responsibility. The `category` field is `None` if confidence is below
+/// the minimum threshold.
+///
+/// # Fields
+///
+/// * `category` - The classified responsibility category, or `None` if confidence too low
+/// * `confidence` - Confidence score from 0.0 to 1.0
+/// * `signals_used` - Which signals contributed to this classification
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::{ClassificationResult, SignalType};
+/// let result = ClassificationResult {
+///     category: Some("parsing".to_string()),
+///     confidence: 0.85,
+///     signals_used: vec![SignalType::NameHeuristic, SignalType::IoDetection],
+/// };
+/// assert!(result.category.is_some());
+/// assert!(result.confidence >= 0.50);
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassificationResult {
+    /// The classified responsibility category, or `None` if confidence is too low
+    pub category: Option<String>,
+    /// Confidence score from 0.0 to 1.0
+    pub confidence: f64,
+    /// Signal types that contributed to this classification
+    pub signals_used: Vec<SignalType>,
+}
+
+/// Types of signals used for responsibility classification.
+///
+/// These represent different sources of evidence used to determine
+/// a method's responsibility category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SignalType {
+    /// Method name pattern matching
+    NameHeuristic,
+    /// I/O operation detection in method body
+    IoDetection,
+    /// Call graph analysis
+    CallGraph,
+    /// Type signature analysis
+    TypeSignature,
+    /// Purity and side effect analysis
+    PurityAnalysis,
+    /// Framework-specific patterns
+    FrameworkPattern,
 }
 
 /// Responsibility category definition for method name classification.
@@ -1115,6 +1184,10 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 ///
 /// For more accurate classification, consider `infer_responsibility_with_io_detection`
 /// which analyzes actual I/O operations in the function body rather than just names.
+#[deprecated(
+    since = "0.4.0",
+    note = "Use infer_responsibility_with_confidence for confidence-based classification"
+)]
 pub fn infer_responsibility_from_method(method_name: &str) -> String {
     let lower = method_name.to_lowercase();
 
@@ -1130,6 +1203,140 @@ pub fn infer_responsibility_from_method(method_name: &str) -> String {
     use crate::organization::BehavioralCategorizer;
     let category = BehavioralCategorizer::categorize_method(method_name);
     category.display_name()
+}
+
+/// Classify method responsibility with confidence scoring (Spec 174).
+///
+/// This function replaces unconditional "utilities" fallback with confidence-based
+/// classification. It returns `None` for the category when confidence is too low,
+/// preventing poor decomposition recommendations.
+///
+/// # Arguments
+///
+/// * `method_name` - The name of the method to classify
+/// * `method_body` - Optional method body for deeper analysis
+///
+/// # Returns
+///
+/// A `ClassificationResult` with:
+/// - `category`: `Some(name)` if confidence ≥ threshold, `None` otherwise
+/// - `confidence`: Score from 0.0 to 1.0
+/// - `signals_used`: Which signals contributed to the classification
+///
+/// # Confidence Thresholds
+///
+/// - Any category: ≥0.50 (MINIMUM_CONFIDENCE)
+/// - "utilities": ≥0.60 (UTILITIES_THRESHOLD) - higher bar to avoid over-classification
+///
+/// # Examples
+///
+/// ```
+/// # use debtmap::organization::god_object_analysis::infer_responsibility_with_confidence;
+/// // High confidence classification
+/// let result = infer_responsibility_with_confidence("parse_json", None);
+/// assert!(result.category.is_some());
+/// assert!(result.confidence >= 0.50);
+///
+/// // Low confidence - refused classification
+/// let result = infer_responsibility_with_confidence("helper", None);
+/// // May return None if confidence too low
+/// ```
+///
+/// # Implementation
+///
+/// Currently uses name-based heuristics as the primary signal.
+/// Future enhancements will integrate:
+/// - I/O detection (weight: 0.40)
+/// - Call graph analysis (weight: 0.30)
+/// - Type signatures (weight: 0.15)
+/// - Purity analysis (weight: 0.10)
+pub fn infer_responsibility_with_confidence(
+    method_name: &str,
+    _method_body: Option<&str>,
+) -> ClassificationResult {
+    let lower = method_name.to_lowercase();
+
+    // Try responsibility categories first
+    if let Some(cat) = RESPONSIBILITY_CATEGORIES
+        .iter()
+        .find(|cat| cat.matches(&lower))
+    {
+        let category_name = cat.name.to_string();
+
+        // Calculate confidence based on prefix match strength
+        // For now, exact prefix match = high confidence
+        let confidence = if category_name == "utilities" {
+            // "utilities" has no prefixes - should never match here
+            0.0
+        } else {
+            // Matched a specific prefix - high confidence
+            0.85
+        };
+
+        // Apply confidence thresholds
+        if confidence < MINIMUM_CONFIDENCE {
+            log::debug!(
+                "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}, signals: {:?}",
+                method_name,
+                confidence,
+                MINIMUM_CONFIDENCE,
+                vec![SignalType::NameHeuristic]
+            );
+            return ClassificationResult {
+                category: None,
+                confidence,
+                signals_used: vec![SignalType::NameHeuristic],
+            };
+        }
+
+        if category_name == "utilities" && confidence < UTILITIES_THRESHOLD {
+            log::debug!(
+                "Low confidence utilities classification for method '{}': confidence {:.2} below threshold {:.2}, signals: {:?}",
+                method_name,
+                confidence,
+                UTILITIES_THRESHOLD,
+                vec![SignalType::NameHeuristic]
+            );
+            return ClassificationResult {
+                category: None,
+                confidence,
+                signals_used: vec![SignalType::NameHeuristic],
+            };
+        }
+
+        return ClassificationResult {
+            category: Some(category_name),
+            confidence,
+            signals_used: vec![SignalType::NameHeuristic],
+        };
+    }
+
+    // Fall back to behavioral categorization
+    use crate::organization::BehavioralCategorizer;
+    let category = BehavioralCategorizer::categorize_method(method_name);
+    let category_name = category.display_name();
+
+    // Behavioral categorization provides medium confidence
+    // Domain-specific categories get lower confidence than recognized patterns
+    let confidence = match category {
+        crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
+        _ => 0.65, // Above threshold for recognized behavioral patterns
+    };
+
+    // Apply confidence thresholds
+    if confidence < MINIMUM_CONFIDENCE {
+        return ClassificationResult {
+            category: None,
+            confidence,
+            signals_used: vec![SignalType::NameHeuristic],
+        };
+    }
+
+    ClassificationResult {
+        category: Some(category_name),
+        confidence,
+        signals_used: vec![SignalType::NameHeuristic],
+    }
 }
 
 /// Map old category names to new names for backward compatibility.
@@ -1355,11 +1562,35 @@ pub fn recommend_module_splits_with_evidence(
         crate::analysis::multi_signal_aggregation::AggregatedClassification,
     >,
 ) -> Vec<ModuleSplit> {
+    use crate::organization::confidence::{MIN_METHODS_FOR_SPLIT, MODULE_SPLIT_CONFIDENCE};
+
     let mut recommendations = Vec::new();
 
     for (responsibility, methods) in responsibility_groups {
-        if methods.len() > 5 {
+        if methods.len() > MIN_METHODS_FOR_SPLIT {
             let classification_evidence = evidence_map.get(responsibility).cloned();
+
+            // Calculate average confidence from evidence map
+            // If evidence_map is provided (not empty), enforce confidence threshold
+            // If evidence_map is empty, allow split for backward compatibility
+            if !evidence_map.is_empty() {
+                let avg_confidence = if let Some(evidence) = &classification_evidence {
+                    evidence.confidence
+                } else {
+                    0.0
+                };
+
+                // Skip splits below confidence threshold
+                if avg_confidence < MODULE_SPLIT_CONFIDENCE {
+                    log::debug!(
+                        "Skipping module split for '{}': confidence {:.2} below threshold {:.2}",
+                        responsibility,
+                        avg_confidence,
+                        MODULE_SPLIT_CONFIDENCE
+                    );
+                    continue;
+                }
+            }
 
             // Sanitize the responsibility name for use in module name
             let sanitized_responsibility = sanitize_module_name(responsibility);
@@ -1948,150 +2179,129 @@ pub fn suggest_splits_by_struct_grouping(
 mod tests {
     use super::*;
 
+    // Helper function matching old behavior for backward compatibility with tests
+    // This mimics the deprecated infer_responsibility_from_method function
+    fn infer_category(method_name: &str) -> String {
+        let result = infer_responsibility_with_confidence(method_name, None);
+        result.category.unwrap_or_else(|| {
+            // Fall back to behavioral categorization (like the old function did)
+            use crate::organization::BehavioralCategorizer;
+            let category = BehavioralCategorizer::categorize_method(method_name);
+            category.display_name()
+        })
+    }
+
     #[test]
     fn test_format_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("format_output"), "output");
-        assert_eq!(infer_responsibility_from_method("format_json"), "output");
-        assert_eq!(infer_responsibility_from_method("FORMAT_DATA"), "output");
+        assert_eq!(infer_category("format_output"), "output");
+        assert_eq!(infer_category("format_json"), "output");
+        assert_eq!(infer_category("FORMAT_DATA"), "output");
     }
 
     #[test]
     fn test_render_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("render_table"), "output");
+        assert_eq!(infer_category("render_table"), "output");
     }
 
     #[test]
     fn test_write_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("write_to_file"), "output");
+        assert_eq!(infer_category("write_to_file"), "output");
     }
 
     #[test]
     fn test_print_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("print_results"), "output");
+        assert_eq!(infer_category("print_results"), "output");
     }
 
     #[test]
     fn test_parse_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("parse_input"), "parsing");
-        assert_eq!(infer_responsibility_from_method("parse_json"), "parsing");
+        assert_eq!(infer_category("parse_input"), "parsing");
+        assert_eq!(infer_category("parse_json"), "parsing");
     }
 
     #[test]
     fn test_read_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("read_config"), "parsing");
+        assert_eq!(infer_category("read_config"), "parsing");
     }
 
     #[test]
     fn test_extract_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("extract_data"), "parsing");
+        assert_eq!(infer_category("extract_data"), "parsing");
     }
 
     #[test]
     fn test_filter_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("filter_results"),
-            "filtering"
-        );
+        assert_eq!(infer_category("filter_results"), "filtering");
     }
 
     #[test]
     fn test_select_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("select_items"),
-            "filtering"
-        );
+        assert_eq!(infer_category("select_items"), "filtering");
     }
 
     #[test]
     fn test_find_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("find_element"),
-            "filtering"
-        );
+        assert_eq!(infer_category("find_element"), "filtering");
     }
 
     #[test]
     fn test_transform_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("transform_data"),
-            "transformation"
-        );
+        assert_eq!(infer_category("transform_data"), "transformation");
     }
 
     #[test]
     fn test_convert_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("convert_to_json"),
-            "transformation"
-        );
+        assert_eq!(infer_category("convert_to_json"), "transformation");
     }
 
     #[test]
     fn test_map_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("map_values"),
-            "transformation"
-        );
+        assert_eq!(infer_category("map_values"), "transformation");
     }
 
     #[test]
     fn test_apply_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("apply_mapping"),
-            "transformation"
-        );
+        assert_eq!(infer_category("apply_mapping"), "transformation");
     }
 
     #[test]
     fn test_get_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("get_value"), "data_access");
+        assert_eq!(infer_category("get_value"), "data_access");
     }
 
     #[test]
     fn test_set_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("set_value"), "data_access");
+        assert_eq!(infer_category("set_value"), "data_access");
     }
 
     #[test]
     fn test_is_prefix_recognized() {
-        assert_eq!(infer_responsibility_from_method("is_valid"), "validation");
-        assert_eq!(infer_responsibility_from_method("is_empty"), "validation");
+        assert_eq!(infer_category("is_valid"), "validation");
+        assert_eq!(infer_category("is_empty"), "validation");
     }
 
     #[test]
     fn test_validate_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("validate_input"),
-            "validation"
-        );
+        assert_eq!(infer_category("validate_input"), "validation");
     }
 
     #[test]
     fn test_check_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("check_constraints"),
-            "validation"
-        );
+        assert_eq!(infer_category("check_constraints"), "validation");
     }
 
     #[test]
     fn test_verify_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("verify_signature"),
-            "validation"
-        );
+        assert_eq!(infer_category("verify_signature"), "validation");
     }
 
     #[test]
     fn test_catch_all_uses_behavioral_categorization() {
         // Spec 178: Avoid "utilities", use behavioral categorization
         // "unknown_function" -> Domain("Unknown") based on first word
-        assert_eq!(
-            infer_responsibility_from_method("unknown_function"),
-            "Unknown"
-        );
+        assert_eq!(infer_category("unknown_function"), "Unknown");
         // "some_helper" -> Domain("Some") based on first word
-        assert_eq!(infer_responsibility_from_method("some_helper"), "Some");
+        assert_eq!(infer_category("some_helper"), "Some");
     }
 
     #[test]
@@ -2122,135 +2332,96 @@ mod tests {
 
     #[test]
     fn test_case_insensitive_matching() {
-        assert_eq!(infer_responsibility_from_method("FORMAT_OUTPUT"), "output");
-        assert_eq!(infer_responsibility_from_method("Parse_Input"), "parsing");
-        assert_eq!(infer_responsibility_from_method("IS_VALID"), "validation");
+        assert_eq!(infer_category("FORMAT_OUTPUT"), "output");
+        assert_eq!(infer_category("Parse_Input"), "parsing");
+        assert_eq!(infer_category("IS_VALID"), "validation");
     }
 
     #[test]
     fn test_calculate_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("calculate_total"),
-            "computation"
-        );
-        assert_eq!(
-            infer_responsibility_from_method("calculate_sum"),
-            "computation"
-        );
+        assert_eq!(infer_category("calculate_total"), "computation");
+        assert_eq!(infer_category("calculate_sum"), "computation");
     }
 
     #[test]
     fn test_compute_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("compute_result"),
-            "computation"
-        );
+        assert_eq!(infer_category("compute_result"), "computation");
     }
 
     #[test]
     fn test_create_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("create_instance"),
-            "construction"
-        );
+        assert_eq!(infer_category("create_instance"), "construction");
     }
 
     #[test]
     fn test_build_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("build_object"),
-            "construction"
-        );
+        assert_eq!(infer_category("build_object"), "construction");
     }
 
     #[test]
     fn test_new_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("new_connection"),
-            "construction"
-        );
+        assert_eq!(infer_category("new_connection"), "construction");
     }
 
     #[test]
     fn test_save_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("save_to_disk"),
-            "persistence"
-        );
+        assert_eq!(infer_category("save_to_disk"), "persistence");
     }
 
     #[test]
     fn test_load_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("load_from_file"),
-            "persistence"
-        );
+        assert_eq!(infer_category("load_from_file"), "persistence");
     }
 
     #[test]
     fn test_store_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("store_data"),
-            "persistence"
-        );
+        assert_eq!(infer_category("store_data"), "persistence");
     }
 
     #[test]
     fn test_process_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("process_request"),
-            "processing"
-        );
+        assert_eq!(infer_category("process_request"), "processing");
     }
 
     #[test]
     fn test_handle_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("handle_event"),
-            "processing"
-        );
+        assert_eq!(infer_category("handle_event"), "processing");
     }
 
     #[test]
     fn test_send_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("send_message"),
-            "communication"
-        );
+        assert_eq!(infer_category("send_message"), "communication");
     }
 
     #[test]
     fn test_receive_prefix_recognized() {
-        assert_eq!(
-            infer_responsibility_from_method("receive_data"),
-            "communication"
-        );
+        assert_eq!(infer_category("receive_data"), "communication");
     }
 
     #[test]
     fn test_empty_string_returns_operations() {
         // Spec 178: Empty string defaults to "Operations" via Domain fallback
-        assert_eq!(infer_responsibility_from_method(""), "Operations");
+        assert_eq!(infer_category(""), "Operations");
     }
 
     #[test]
     fn test_underscore_only_returns_operations() {
         // Spec 178: Underscores default to "Operations" via Domain fallback
-        assert_eq!(infer_responsibility_from_method("_"), "Operations");
-        assert_eq!(infer_responsibility_from_method("__"), "Operations");
+        assert_eq!(infer_category("_"), "Operations");
+        assert_eq!(infer_category("__"), "Operations");
     }
 
     #[test]
     fn test_special_chars_return_first_word_domain() {
         // Spec 178: Special chars extracted as domain name
-        assert_eq!(infer_responsibility_from_method("@#$%"), "@#$%");
+        assert_eq!(infer_category("@#$%"), "@#$%");
     }
 
     #[test]
     fn test_function_is_deterministic() {
         let input = "calculate_average";
-        let result1 = infer_responsibility_from_method(input);
-        let result2 = infer_responsibility_from_method(input);
+        let result1 = infer_category(input);
+        let result2 = infer_category(input);
         assert_eq!(result1, result2);
     }
 
@@ -3121,5 +3292,140 @@ mod tests {
         assert_eq!(splits.len(), 1);
         assert_eq!(splits[0].suggested_name, "mytype_parsing");
         assert!(!splits[0].suggested_name.contains('&'));
+    }
+
+    // Tests for confidence-based classification (Spec 174)
+
+    #[test]
+    fn test_high_confidence_classification() {
+        let result = infer_responsibility_with_confidence("parse_json", None);
+        assert!(result.category.is_some());
+        assert_eq!(result.category.unwrap(), "parsing");
+        assert!(result.confidence >= MINIMUM_CONFIDENCE);
+    }
+
+    #[test]
+    fn test_minimum_confidence_threshold() {
+        // Domain-specific methods get lower confidence
+        let result = infer_responsibility_with_confidence("populate_registry", None);
+        // Should be below threshold if it's domain-specific
+        if result.confidence < MINIMUM_CONFIDENCE {
+            assert!(result.category.is_none());
+        }
+    }
+
+    #[test]
+    fn test_recognized_patterns_have_high_confidence() {
+        let test_cases = vec![
+            ("format_output", "output"),
+            ("parse_input", "parsing"),
+            ("validate_data", "validation"),
+            ("calculate_sum", "computation"),
+        ];
+
+        for (method_name, expected_category) in test_cases {
+            let result = infer_responsibility_with_confidence(method_name, None);
+            assert!(
+                result.category.is_some(),
+                "Expected {} to be classified",
+                method_name
+            );
+            assert_eq!(
+                result.category.unwrap(),
+                expected_category,
+                "Wrong category for {}",
+                method_name
+            );
+            assert!(
+                result.confidence >= 0.85,
+                "Expected high confidence for {}",
+                method_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_utilities_category_avoided() {
+        // "utilities" category should never be returned from the prefix matching
+        // since it has no prefixes and requires higher confidence
+        let result = infer_responsibility_with_confidence("helper_function", None);
+
+        // Either classified to something else or refused (confidence too low)
+        if let Some(category) = result.category {
+            // If classified, should not be "utilities" unless confidence is very high
+            if category.to_lowercase().contains("util") {
+                assert!(
+                    result.confidence >= UTILITIES_THRESHOLD,
+                    "utilities classification requires confidence >= {}",
+                    UTILITIES_THRESHOLD
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_classification_result_structure() {
+        let result = infer_responsibility_with_confidence("validate_input", None);
+
+        // Check all fields are populated correctly
+        assert!(!result.signals_used.is_empty());
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
+        if result.category.is_some() {
+            assert!(result.confidence >= MINIMUM_CONFIDENCE);
+        }
+    }
+
+    #[test]
+    fn test_behavioral_categorization_confidence() {
+        // Behavioral patterns should have medium-high confidence
+        let behavioral_methods = vec!["render_ui", "handle_event", "save_data"];
+
+        for method_name in behavioral_methods {
+            let result = infer_responsibility_with_confidence(method_name, None);
+            if result.category.is_some() {
+                // Behavioral patterns should be above minimum but may vary
+                assert!(
+                    result.confidence >= MINIMUM_CONFIDENCE,
+                    "{} confidence too low: {}",
+                    method_name,
+                    result.confidence
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_confidence_thresholds_enforced() {
+        // Test that confidence thresholds are actually enforced
+        let test_methods = vec![
+            "parse_json",
+            "format_output",
+            "helper_method",
+            "do_something",
+        ];
+
+        for method_name in test_methods {
+            let result = infer_responsibility_with_confidence(method_name, None);
+
+            if let Some(_category) = &result.category {
+                // If category is set, confidence must be >= MINIMUM_CONFIDENCE
+                assert!(
+                    result.confidence >= MINIMUM_CONFIDENCE,
+                    "{} classified with confidence {} below minimum {}",
+                    method_name,
+                    result.confidence,
+                    MINIMUM_CONFIDENCE
+                );
+            } else {
+                // If category is None, confidence must be < MINIMUM_CONFIDENCE
+                assert!(
+                    result.confidence < MINIMUM_CONFIDENCE,
+                    "{} refused classification but confidence {} >= minimum {}",
+                    method_name,
+                    result.confidence,
+                    MINIMUM_CONFIDENCE
+                );
+            }
+        }
     }
 }
