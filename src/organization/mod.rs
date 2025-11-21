@@ -127,6 +127,12 @@ pub use module_recommendations::{
     ModuleRecommendation,
 };
 
+pub mod semantic_naming;
+pub use semantic_naming::{
+    DomainTermExtractor, NameCandidate, NameUniquenessValidator, NamingStrategy, PatternRecognizer,
+    SemanticNameGenerator, SpecificityScorer,
+};
+
 pub use anti_pattern_detector::{
     is_primitive, AntiPattern, AntiPatternConfig, AntiPatternDetector, AntiPatternSeverity,
     AntiPatternType, SplitQualityReport,
