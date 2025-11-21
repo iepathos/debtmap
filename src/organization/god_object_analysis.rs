@@ -225,7 +225,7 @@ pub enum GodObjectConfidence {
 }
 
 /// Record of a split merge operation (Spec 190)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MergeRecord {
     /// Name of the split that was merged
     pub merged_from: String,
@@ -314,6 +314,15 @@ pub struct ModuleSplit {
     /// History of splits that were merged into this one (Spec 190)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub merge_history: Vec<MergeRecord>,
+    /// Alternative module name suggestions (Spec 191)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub alternative_names: Vec<crate::organization::semantic_naming::NameCandidate>,
+    /// Confidence in the suggested module name (Spec 191)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naming_confidence: Option<f64>,
+    /// Strategy used to generate the module name (Spec 191)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub naming_strategy: Option<crate::organization::semantic_naming::NamingStrategy>,
 }
 
 /// Stage type in data transformation pipeline (Spec 182)
@@ -359,6 +368,9 @@ impl Default for ModuleSplit {
             input_types: vec![],
             output_types: vec![],
             merge_history: vec![],
+            alternative_names: vec![],
+            naming_confidence: None,
+            naming_strategy: None,
         }
     }
 }
@@ -393,6 +405,10 @@ impl PartialEq for ModuleSplit {
             && self.pipeline_position == other.pipeline_position
             && self.input_types == other.input_types
             && self.output_types == other.output_types
+            && self.merge_history == other.merge_history
+            && self.alternative_names == other.alternative_names
+            && self.naming_confidence == other.naming_confidence
+            && self.naming_strategy == other.naming_strategy
         // Skip classification_evidence in equality comparison
     }
 }
@@ -1339,6 +1355,9 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 input_types: vec![],
                 output_types: vec![],
                 merge_history: vec![],
+                alternative_names: vec![],
+                naming_confidence: None,
+                naming_strategy: None,
             });
         }
     }
@@ -1427,6 +1446,9 @@ pub fn recommend_module_splits_with_evidence(
                 input_types: vec![],
                 output_types: vec![],
                 merge_history: vec![],
+                alternative_names: vec![],
+                naming_confidence: None,
+                naming_strategy: None,
             });
         }
     }
@@ -1545,6 +1567,9 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 input_types: vec![],
                 output_types: vec![],
                 merge_history: vec![],
+                alternative_names: vec![],
+                naming_confidence: None,
+                naming_strategy: None,
             }
         })
         .collect()
@@ -1928,6 +1953,9 @@ pub fn suggest_splits_by_struct_grouping(
                 input_types: vec![],
                 output_types: vec![],
                 merge_history: vec![],
+                alternative_names: vec![],
+                naming_confidence: None,
+                naming_strategy: None,
             }
         })
         .collect();

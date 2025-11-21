@@ -191,6 +191,9 @@ impl ModuleFunctionClassifier {
                 input_types: vec![],
                 output_types: vec![],
                 merge_history: vec![],
+                alternative_names: vec![],
+                naming_confidence: None,
+                naming_strategy: None,
             };
 
             splits.push(split);

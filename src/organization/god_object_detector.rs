@@ -1,3 +1,4 @@
+use super::semantic_naming::SemanticNameGenerator;
 use super::{
     calculate_god_object_score, determine_confidence,
     god_object::{metrics, TypeAnalysis, TypeVisitor},
@@ -743,6 +744,7 @@ impl GodObjectDetector {
                 params.field_tracker,
                 params.ast,
                 file_name,
+                params.path,
             );
 
             // Spec 181: If behavioral clustering produces utilities modules, try type-based clustering
@@ -770,7 +772,8 @@ impl GodObjectDetector {
                 }
 
                 // Try type-based clustering as a fallback alternative (Spec 181)
-                let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+                let type_splits =
+                    Self::generate_type_based_splits(params.ast, file_name, params.path);
 
                 // Use type-based if it produces better quality results
                 if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
@@ -843,6 +846,7 @@ impl GodObjectDetector {
                 params.field_tracker,
                 params.ast,
                 file_name,
+                params.path,
             );
 
             // Spec 181/182: Try type-based clustering for parameter-heavy or utilities-heavy files
@@ -870,7 +874,8 @@ impl GodObjectDetector {
                 }
 
                 // Try type-based clustering as fallback (Spec 181)
-                let type_splits = Self::generate_type_based_splits(params.ast, file_name);
+                let type_splits =
+                    Self::generate_type_based_splits(params.ast, file_name, params.path);
 
                 // Use type-based if it produces better quality results
                 if !type_splits.is_empty() && (splits.is_empty() || has_utilities) {
@@ -930,6 +935,7 @@ impl GodObjectDetector {
         field_tracker: Option<&crate::organization::FieldAccessTracker>,
         ast: &syn::File,
         base_name: &str,
+        file_path: &Path,
     ) -> Vec<ModuleSplit> {
         use crate::organization::behavioral_decomposition::{
             apply_production_ready_clustering, build_method_call_adjacency_matrix_with_functions,
@@ -1044,6 +1050,12 @@ impl GodObjectDetector {
             });
         }
 
+        // Apply semantic naming to all splits (Spec 191)
+        let mut name_generator = SemanticNameGenerator::new();
+        for split in &mut splits {
+            Self::apply_semantic_naming(split, &mut name_generator, file_path);
+        }
+
         // REMOVED: Service object detection (Phase 1 - Spec 178 refinement)
         //
         // Service splits are eliminated because:
@@ -1078,7 +1090,11 @@ impl GodObjectDetector {
     ///
     /// Analyzes method signatures to group methods by the data types they operate on,
     /// following idiomatic Rust principles where data owns its behavior.
-    fn generate_type_based_splits(ast: &syn::File, base_name: &str) -> Vec<ModuleSplit> {
+    fn generate_type_based_splits(
+        ast: &syn::File,
+        base_name: &str,
+        file_path: &Path,
+    ) -> Vec<ModuleSplit> {
         use crate::organization::{TypeAffinityAnalyzer, TypeSignatureAnalyzer};
 
         let type_analyzer = TypeSignatureAnalyzer;
@@ -1127,7 +1143,7 @@ impl GodObjectDetector {
             .collect();
 
         // Convert to ModuleSplit recommendations
-        type_clusters
+        let mut splits: Vec<ModuleSplit> = type_clusters
             .into_iter()
             .map(|cluster| {
                 let core_type_name = cluster.primary_type.name.clone();
@@ -1165,7 +1181,15 @@ impl GodObjectDetector {
                     ..Default::default()
                 }
             })
-            .collect()
+            .collect();
+
+        // Apply semantic naming to all splits (Spec 191)
+        let mut name_generator = SemanticNameGenerator::new();
+        for split in &mut splits {
+            Self::apply_semantic_naming(split, &mut name_generator, file_path);
+        }
+
+        splits
     }
 
     /// Generate example type definition with impl blocks (Spec 181)
@@ -1941,6 +1965,61 @@ impl GodObjectDetector {
             .collect();
 
         (improved_splits, report)
+    }
+
+    /// Apply semantic naming to a module split (Spec 191)
+    ///
+    /// Generates intelligent module names using domain terms, behavioral patterns,
+    /// and specificity scoring. Updates the split with naming metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `split` - Module split to apply naming to
+    /// * `name_generator` - Semantic name generator instance
+    /// * `base_path` - Base directory path for uniqueness validation
+    ///
+    /// # Returns
+    ///
+    /// Updated split with semantic name, alternatives, and confidence scores
+    fn apply_semantic_naming(
+        split: &mut ModuleSplit,
+        name_generator: &mut SemanticNameGenerator,
+        base_path: &Path,
+    ) {
+        // Generate name candidates from methods and responsibility
+        let candidates = name_generator.generate_unique_name(
+            base_path,
+            &split.methods_to_move,
+            Some(&split.responsibility),
+        );
+
+        // Extract the base name from suggested_name (e.g., "formatter/unknown" -> "formatter")
+        let base_dir = split
+            .suggested_name
+            .split('/')
+            .next()
+            .unwrap_or("")
+            .to_string();
+
+        // Update the suggested name with the semantic name
+        split.suggested_name = if !base_dir.is_empty() {
+            format!("{}/{}", base_dir, candidates.module_name)
+        } else {
+            candidates.module_name.clone()
+        };
+
+        // Store naming metadata
+        split.naming_confidence = Some(candidates.confidence);
+        split.naming_strategy = Some(candidates.strategy);
+
+        // Generate alternative names for user reference
+        let all_candidates =
+            name_generator.generate_names(&split.methods_to_move, Some(&split.responsibility));
+        split.alternative_names = all_candidates
+            .into_iter()
+            .filter(|c| c.module_name != candidates.module_name)
+            .take(2) // Top 2 alternatives
+            .collect();
     }
 }
 
