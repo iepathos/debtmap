@@ -1099,16 +1099,20 @@ impl GodObjectDetector {
         // Convert clusters to ModuleSplit recommendations
         let mut splits: Vec<ModuleSplit> = Vec::new();
 
-        // Adaptive cluster size threshold based on file size (Fix for Issue #1)
+        // Adaptive cluster size threshold based on file size (Fix for Issue #1, refined in Fix #4)
         // Large files (>100 methods): require 3+ methods per cluster
         // Medium files (50-100 methods): require 2+ methods per cluster
-        // Small files (<50 methods): accept 1+ methods per cluster
+        // Small-medium files (20-50 methods): require 2+ methods per cluster
+        // Very small files (<20 methods): accept 1+ methods per cluster
+        //
+        // Rationale: Single-method "modules" (e.g., formatting_2.rs with 1 method)
+        // provide no organizational benefit and create excessive file proliferation.
         let min_cluster_size = if production_methods.len() > 100 {
             3
-        } else if production_methods.len() > 50 {
-            2
+        } else if production_methods.len() > 20 {
+            2 // Raised from 1 to 2 for files with 20-100 methods
         } else {
-            1 // For small files, keep all clusters to ensure we generate splits
+            1 // Only very small files (<20 methods) get single-method clusters
         };
 
         for cluster in clusters {
@@ -1172,6 +1176,9 @@ impl GodObjectDetector {
 
         // Apply semantic naming to all splits (unified entry point)
         Self::apply_semantic_naming_to_splits(&mut splits, file_path);
+
+        // Apply quality-based limiting to avoid excessive fragmentation
+        Self::apply_split_quality_limiting(&mut splits);
 
         // Return splits if we have multiple good clusters
         if splits.len() > 1 {
@@ -1626,6 +1633,9 @@ impl GodObjectDetector {
 
         // Apply semantic naming to all splits (unified entry point)
         Self::apply_semantic_naming_to_splits(&mut splits, file_path);
+
+        // Apply quality-based limiting (same as improved clustering path)
+        Self::apply_split_quality_limiting(&mut splits);
 
         // REMOVED: Service object detection (Phase 1 - Spec 178 refinement)
         //
@@ -2557,6 +2567,62 @@ impl GodObjectDetector {
         for split in splits {
             Self::apply_semantic_naming(split, &mut name_generator, file_path);
         }
+    }
+
+    /// Apply quality-based limiting to avoid excessive split fragmentation (Fix #4)
+    ///
+    /// Limits splits to top 10 highest-quality recommendations based on cohesion
+    /// score, method count, and priority. This prevents situations like having
+    /// 47 modules (formatting_19.rs) which defeats the purpose of splitting.
+    ///
+    /// # Arguments
+    ///
+    /// * `splits` - Vector of module splits to limit (modified in-place)
+    fn apply_split_quality_limiting(splits: &mut Vec<ModuleSplit>) {
+        const MAX_SPLITS_PER_FILE: usize = 10;
+
+        if splits.len() <= MAX_SPLITS_PER_FILE {
+            return;
+        }
+
+        // Sort by quality metrics (descending):
+        // 1. Cohesion score (primary) - higher cohesion = better split
+        // 2. Method count (secondary) - larger clusters are more valuable
+        // 3. Priority (tertiary) - High > Medium > Low
+        splits.sort_by(|a, b| {
+            // Primary: cohesion score
+            let cohesion_cmp = b
+                .cohesion_score
+                .unwrap_or(0.0)
+                .partial_cmp(&a.cohesion_score.unwrap_or(0.0))
+                .unwrap_or(std::cmp::Ordering::Equal);
+
+            if cohesion_cmp != std::cmp::Ordering::Equal {
+                return cohesion_cmp;
+            }
+
+            // Secondary: method count (larger clusters are more valuable)
+            let count_cmp = b.method_count.cmp(&a.method_count);
+            if count_cmp != std::cmp::Ordering::Equal {
+                return count_cmp;
+            }
+
+            // Tertiary: priority (High=2, Medium=1, Low=0)
+            let priority_value = |p: Priority| match p {
+                Priority::High => 2,
+                Priority::Medium => 1,
+                Priority::Low => 0,
+            };
+            priority_value(b.priority).cmp(&priority_value(a.priority))
+        });
+
+        let original_count = splits.len();
+        splits.truncate(MAX_SPLITS_PER_FILE);
+
+        eprintln!(
+            "  ℹ Limiting to top {} highest-quality splits (from {} total)",
+            MAX_SPLITS_PER_FILE, original_count
+        );
     }
 
     /// Apply semantic naming to a module split (Spec 191)
