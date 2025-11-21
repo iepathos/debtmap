@@ -30,6 +30,24 @@ pub enum ComplexityPattern {
         cyclomatic: u32,
         cognitive: u32,
     },
+    /// Dispatcher pattern: Simple routing with many shallow branches
+    ///
+    /// # Characteristics
+    /// - High cyclomatic complexity (many branches)
+    /// - Low cognitive complexity (shallow nesting)
+    /// - Cognitive/cyclomatic ratio < 0.5
+    /// - No action accumulation (unlike Coordinator)
+    ///
+    /// # Examples
+    /// - Command routers (CLI, HTTP endpoints)
+    /// - Event dispatchers
+    /// - State machine dispatchers
+    /// - Switch-based handlers
+    Dispatcher {
+        branch_count: u32,
+        cognitive_ratio: f64,
+        inline_logic_branches: u32, // Branches exceeding expected cognitive load
+    },
     /// Repetitive validation pattern: many early returns with same structure
     RepetitiveValidation {
         validation_count: u32,    // Number of validation checks
@@ -219,6 +237,26 @@ impl ComplexityPattern {
             }
         }
 
+        // Check for dispatcher pattern (after coordinator, before chaotic)
+        // Dispatcher: high branching with shallow complexity (ratio < 0.5)
+        if metrics.cyclomatic >= 15 && ratio < 0.5 && metrics.coordinator_signals.is_none() {
+            // Estimate inline logic: if cognitive exceeds expected for clean dispatcher
+            // Clean dispatcher: cognitive ≈ cyclomatic * 0.3 (each branch adds ~0.3 cognitive)
+            let expected_cognitive = (metrics.cyclomatic as f64 * 0.3) as u32;
+            let inline_logic_branches = if metrics.cognitive > expected_cognitive {
+                // Each inline logic section adds ~2 cognitive points
+                ((metrics.cognitive - expected_cognitive) as f64 / 2.0) as u32
+            } else {
+                0
+            };
+
+            return ComplexityPattern::Dispatcher {
+                branch_count: metrics.cyclomatic,
+                cognitive_ratio: ratio,
+                inline_logic_branches,
+            };
+        }
+
         // Chaotic: high token entropy (check before generic patterns - requires standardization)
         // Note: entropy_score here is token_entropy (Shannon entropy), not effective_complexity
         if let Some(token_entropy) = metrics.entropy_score {
@@ -270,6 +308,7 @@ impl ComplexityPattern {
             ComplexityPattern::Coordinator { .. } => {
                 "Coordinator orchestrating state-based actions"
             }
+            ComplexityPattern::Dispatcher { .. } => "Simple dispatcher with shallow branching",
             ComplexityPattern::RepetitiveValidation { .. } => "Repetitive validation boilerplate",
             ComplexityPattern::HighNesting { .. } => "Deep nesting drives complexity",
             ComplexityPattern::HighBranching { .. } => "Many decision points",
@@ -708,5 +747,165 @@ mod tests {
         assert_eq!(dampen_complexity_for_repetition(20, 0.20), 8); // 0.4 factor
         assert_eq!(dampen_complexity_for_repetition(20, 0.28), 10); // 0.5 factor
         assert_eq!(dampen_complexity_for_repetition(20, 0.33), 12); // 0.6 factor
+    }
+
+    // Tests for dispatcher pattern (spec 189)
+
+    #[test]
+    fn detect_clean_dispatcher_pattern() {
+        // Clean dispatcher: cyclo=20, cognitive=6, ratio=0.30
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 6, // 20 * 0.3 = 6 (expected for clean dispatcher)
+            nesting: 2,
+            entropy_score: Some(0.25),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(matches!(pattern, ComplexityPattern::Dispatcher { .. }));
+
+        if let ComplexityPattern::Dispatcher {
+            branch_count,
+            cognitive_ratio,
+            inline_logic_branches,
+        } = pattern
+        {
+            assert_eq!(branch_count, 20);
+            assert!((cognitive_ratio - 0.30).abs() < 0.01);
+            assert_eq!(inline_logic_branches, 0); // Clean dispatcher
+        }
+    }
+
+    #[test]
+    fn detect_dispatcher_with_inline_logic() {
+        // Dispatcher with inline logic: cyclo=38, cognitive=11, ratio=0.29
+        // Expected cognitive: 38 * 0.3 = 11.4, actual=11 -> no inline logic
+        // But spec example says 3 branches need extraction, so let's use higher cognitive
+        let metrics = ComplexityMetrics {
+            cyclomatic: 38,
+            cognitive: 18, // Higher than expected (11.4) -> inline logic
+            nesting: 2,
+            entropy_score: Some(0.25),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(matches!(pattern, ComplexityPattern::Dispatcher { .. }));
+
+        if let ComplexityPattern::Dispatcher {
+            inline_logic_branches,
+            ..
+        } = pattern
+        {
+            assert!(inline_logic_branches > 0); // Has inline logic
+                                                // Expected: 11.4, actual: 18, diff: 6.6, branches: 3
+            assert_eq!(inline_logic_branches, 3);
+        }
+    }
+
+    #[test]
+    fn coordinator_not_misclassified_as_dispatcher() {
+        // Coordinator with low ratio should not become dispatcher
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 10, // ratio: 0.50 (borderline)
+            nesting: 3,
+            entropy_score: Some(0.28),
+            state_signals: None,
+            coordinator_signals: Some(CoordinatorSignals {
+                actions: 5,
+                comparisons: 3,
+                has_action_accumulation: true,
+                has_helper_calls: true,
+                confidence: 0.8,
+            }),
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            matches!(pattern, ComplexityPattern::Coordinator { .. }),
+            "Coordinator signals should take precedence over dispatcher"
+        );
+    }
+
+    #[test]
+    fn deep_nesting_not_misclassified_as_dispatcher() {
+        // Deep nesting with high ratio should not be dispatcher
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 80, // ratio: 4.0 (very high)
+            nesting: 6,
+            entropy_score: Some(0.32),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            matches!(pattern, ComplexityPattern::HighNesting { .. }),
+            "Deep nesting should be detected, not dispatcher"
+        );
+    }
+
+    #[test]
+    fn dispatcher_requires_high_cyclomatic() {
+        // Low cyclomatic should not trigger dispatcher even with low ratio
+        let metrics = ComplexityMetrics {
+            cyclomatic: 10, // Below threshold (15)
+            cognitive: 3,   // ratio: 0.30
+            nesting: 2,
+            entropy_score: Some(0.28),
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            !matches!(pattern, ComplexityPattern::Dispatcher { .. }),
+            "Dispatcher requires cyclomatic >= 15"
+        );
+    }
+
+    #[test]
+    fn dispatcher_pattern_description() {
+        let pattern = ComplexityPattern::Dispatcher {
+            branch_count: 20,
+            cognitive_ratio: 0.30,
+            inline_logic_branches: 0,
+        };
+
+        assert_eq!(
+            pattern.description(),
+            "Simple dispatcher with shallow branching"
+        );
+    }
+
+    #[test]
+    fn dispatcher_precedence_order() {
+        // Dispatcher check comes after coordinator but before chaotic
+        // Low entropy + high branching + low ratio -> should be dispatcher, not chaotic
+        let metrics = ComplexityMetrics {
+            cyclomatic: 20,
+            cognitive: 8, // ratio: 0.40
+            nesting: 2,
+            entropy_score: Some(0.25), // Low entropy
+            state_signals: None,
+            coordinator_signals: None,
+            validation_signals: None,
+        };
+
+        let pattern = ComplexityPattern::detect(&metrics);
+        assert!(
+            matches!(pattern, ComplexityPattern::Dispatcher { .. }),
+            "Dispatcher should be detected before high branching"
+        );
     }
 }

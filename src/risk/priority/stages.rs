@@ -98,9 +98,25 @@ impl ComplexityRiskStage {
 impl PrioritizationStage for ComplexityRiskStage {
     fn process(&self, mut targets: Vec<TestTarget>) -> Vec<TestTarget> {
         for target in &mut targets {
-            let complexity_score = (target.complexity.cyclomatic_complexity as f64
-                + target.complexity.cognitive_complexity as f64)
-                / 2.0;
+            let cyclo = target.complexity.cyclomatic_complexity as f64;
+            let cognitive = target.complexity.cognitive_complexity as f64;
+            let ratio = cognitive / cyclo.max(1.0);
+
+            // Apply cognitive ratio weighting to distinguish complexity types
+            // - Dispatcher (ratio < 0.5): Many shallow branches → 70% reduction
+            // - Simple branching (ratio < 1.0): Moderate complexity → 40% reduction
+            // - Balanced (ratio 1.0-2.0): Normal complexity → No adjustment
+            // - Deep nesting (ratio 2.0-3.0): High cognitive load → 30% increase
+            // - Very deep nesting (ratio > 3.0): Critical cognitive load → 50% increase
+            let weight = match ratio {
+                r if r < 0.5 => 0.3, // Dispatcher: 70% reduction
+                r if r < 1.0 => 0.6, // Simple: 40% reduction
+                r if r < 2.0 => 1.0, // Balanced: no change
+                r if r < 3.0 => 1.3, // Nested: 30% increase
+                _ => 1.5,            // Very nested: 50% increase
+            };
+
+            let complexity_score = ((cyclo + cognitive) / 2.0) * weight;
             target.priority_score += complexity_score * target.current_risk / 10.0;
         }
         targets
