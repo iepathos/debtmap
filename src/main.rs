@@ -652,6 +652,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         show_std_lib,
         ast_functional_analysis,
         functional_analysis_profile,
+        min_split_methods,
+        min_split_lines,
     } = command
     {
         // Apply side effects first
@@ -741,6 +743,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             show_std_lib,
             ast_functional_analysis,
             functional_analysis_profile,
+            min_split_methods,
+            min_split_lines,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -964,6 +968,8 @@ fn build_analyze_config(
     show_std_lib: bool,
     ast_functional_analysis: bool,
     functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
+    min_split_methods: usize,
+    min_split_lines: usize,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     // Compute effective verbosity: compact mode sets verbosity to a special low value
     let effective_verbosity = if compact {
@@ -1035,6 +1041,8 @@ fn build_analyze_config(
         show_std_lib,
         ast_functional_analysis,
         functional_analysis_profile,
+        min_split_methods,
+        min_split_lines,
     }
 }
 

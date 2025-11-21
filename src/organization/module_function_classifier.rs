@@ -190,6 +190,7 @@ impl ModuleFunctionClassifier {
                 pipeline_position: None,
                 input_types: vec![],
                 output_types: vec![],
+                merge_history: vec![],
             };
 
             splits.push(split);

@@ -57,7 +57,9 @@ pub use domain_classifier::classify_struct_domain_enhanced;
 pub use domain_diversity::{
     CrossDomainSeverity, DiversityScore, DomainDiversityMetrics, StructDomainClassification,
 };
-pub use split_validator::validate_and_refine_splits;
+pub use split_validator::{
+    validate_and_refine_splits, validate_and_refine_splits_with_config, SplitSizeConfig,
+};
 pub use struct_ownership::StructOwnershipAnalyzer;
 
 pub use god_object_metrics::{

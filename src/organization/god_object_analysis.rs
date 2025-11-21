@@ -224,6 +224,17 @@ pub enum GodObjectConfidence {
     NotGodObject, // Within acceptable limits
 }
 
+/// Record of a split merge operation (Spec 190)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeRecord {
+    /// Name of the split that was merged
+    pub merged_from: String,
+    /// Reason for the merge
+    pub reason: String,
+    /// Similarity score between the splits
+    pub similarity_score: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleSplit {
     /// Suggested module name WITHOUT file extension (e.g., "config/misc", not "config/misc.rs").
@@ -300,6 +311,9 @@ pub struct ModuleSplit {
     /// Output types produced by this module (Spec 182)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub output_types: Vec<String>,
+    /// History of splits that were merged into this one (Spec 190)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub merge_history: Vec<MergeRecord>,
 }
 
 /// Stage type in data transformation pipeline (Spec 182)
@@ -344,6 +358,7 @@ impl Default for ModuleSplit {
             pipeline_position: None,
             input_types: vec![],
             output_types: vec![],
+            merge_history: vec![],
         }
     }
 }
@@ -1323,6 +1338,7 @@ pub fn recommend_module_splits_enhanced_with_evidence(
                 pipeline_position: None,
                 input_types: vec![],
                 output_types: vec![],
+                merge_history: vec![],
             });
         }
     }
@@ -1410,6 +1426,7 @@ pub fn recommend_module_splits_with_evidence(
                 pipeline_position: None,
                 input_types: vec![],
                 output_types: vec![],
+                merge_history: vec![],
             });
         }
     }
@@ -1527,6 +1544,7 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
                 pipeline_position: None,
                 input_types: vec![],
                 output_types: vec![],
+                merge_history: vec![],
             }
         })
         .collect()
@@ -1909,6 +1927,7 @@ pub fn suggest_splits_by_struct_grouping(
                 pipeline_position: None,
                 input_types: vec![],
                 output_types: vec![],
+                merge_history: vec![],
             }
         })
         .collect();

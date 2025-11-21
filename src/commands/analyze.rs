@@ -77,6 +77,8 @@ pub struct AnalyzeConfig {
     pub show_std_lib: bool,
     pub ast_functional_analysis: bool,
     pub functional_analysis_profile: Option<crate::cli::FunctionalAnalysisProfile>,
+    pub min_split_methods: usize,
+    pub min_split_lines: usize,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
