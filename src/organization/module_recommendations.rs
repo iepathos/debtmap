@@ -148,11 +148,12 @@ fn name_matches_responsibility(name: &str, responsibility: &str) -> bool {
     // Check if module name contains any key terms OR vice versa
     // (e.g., "event_handling" contains "handling" from "Handles user...")
     let name_lower = name.to_lowercase();
-    resp_terms.iter().any(|term| {
-        name_lower.contains(term) || term.contains(&name_lower.replace('_', " "))
-    }) || name_lower
-        .split('_')
-        .any(|name_part| resp_lower.contains(name_part) && name_part.len() > 3)
+    resp_terms
+        .iter()
+        .any(|term| name_lower.contains(term) || term.contains(&name_lower.replace('_', " ")))
+        || name_lower
+            .split('_')
+            .any(|name_part| resp_lower.contains(name_part) && name_part.len() > 3)
 }
 
 /// Multi-level decomposition plan for god objects
