@@ -674,7 +674,9 @@ pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Ve
 
         // If confidence is too low (None category), keep method in original location
         // by assigning it to "unclassified" group
-        let responsibility = result.category.unwrap_or_else(|| "unclassified".to_string());
+        let responsibility = result
+            .category
+            .unwrap_or_else(|| "unclassified".to_string());
 
         groups
             .entry(responsibility)
@@ -729,14 +731,18 @@ pub fn infer_responsibility_with_io_detection(
                 Responsibility::SideEffects => "Side Effects".to_string(),
                 Responsibility::PureComputation => {
                     // For pure functions, name heuristics might be more informative
-                    infer_responsibility_from_method(method_name)
+                    infer_responsibility_with_confidence(method_name, None)
+                        .category
+                        .unwrap_or_else(|| "utilities".to_string())
                 }
             };
         }
     }
 
     // Fall back to name-based heuristics
-    infer_responsibility_from_method(method_name)
+    infer_responsibility_with_confidence(method_name, None)
+        .category
+        .unwrap_or_else(|| "utilities".to_string())
 }
 
 /// Map I/O-based responsibility to traditional responsibility categories.
@@ -815,7 +821,9 @@ fn categorize_functions(functions: &[String]) -> std::collections::HashMap<Strin
     let mut categories = std::collections::HashMap::new();
 
     for func in functions {
-        let category = infer_responsibility_from_method(func);
+        let category = infer_responsibility_with_confidence(func, None)
+            .category
+            .unwrap_or_else(|| "utilities".to_string());
         *categories.entry(category).or_insert(0) += 1;
     }
 

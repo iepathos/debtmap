@@ -49,11 +49,11 @@ pub use god_object_analysis::{
     determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
     infer_responsibility_with_confidence, recommend_module_splits,
     recommend_module_splits_enhanced, recommend_module_splits_with_evidence,
-    suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
-    SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
+    suggest_module_splits_by_domain, suggest_splits_by_struct_grouping, ClassificationResult,
+    DetectionType, EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence,
+    GodObjectThresholds, GodObjectType, ModuleSplit, Priority, PurityDistribution,
+    RecommendationSeverity, SignalType, SplitAnalysisMethod, StageType, StructMetrics,
+    StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;

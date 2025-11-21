@@ -6,8 +6,8 @@
 //! - Low-confidence classifications are properly rejected
 
 use debtmap::organization::{
-    infer_responsibility_with_confidence, recommend_module_splits_with_evidence,
-    ClassificationMetrics, emit_classification_metrics,
+    emit_classification_metrics, infer_responsibility_with_confidence,
+    recommend_module_splits_with_evidence, ClassificationMetrics,
 };
 use std::collections::HashMap;
 
@@ -129,8 +129,12 @@ fn test_module_splits_require_high_confidence() {
         },
     );
 
-    let splits_low =
-        recommend_module_splits_with_evidence(type_name, &[], &responsibility_groups, &evidence_map_low);
+    let splits_low = recommend_module_splits_with_evidence(
+        type_name,
+        &[],
+        &responsibility_groups,
+        &evidence_map_low,
+    );
 
     assert_eq!(
         splits_low.len(),
@@ -203,8 +207,12 @@ fn test_module_splits_enforce_minimum_methods() {
         },
     );
 
-    let splits =
-        recommend_module_splits_with_evidence(type_name, &[], &responsibility_groups_small, &evidence_map);
+    let splits = recommend_module_splits_with_evidence(
+        type_name,
+        &[],
+        &responsibility_groups_small,
+        &evidence_map,
+    );
 
     assert_eq!(
         splits.len(),
@@ -225,8 +233,12 @@ fn test_module_splits_enforce_minimum_methods() {
     let mut responsibility_groups_large = HashMap::new();
     responsibility_groups_large.insert("configuration".to_string(), sufficient_methods);
 
-    let splits_large =
-        recommend_module_splits_with_evidence(type_name, &[], &responsibility_groups_large, &evidence_map);
+    let splits_large = recommend_module_splits_with_evidence(
+        type_name,
+        &[],
+        &responsibility_groups_large,
+        &evidence_map,
+    );
 
     assert_eq!(
         splits_large.len(),
