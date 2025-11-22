@@ -202,22 +202,66 @@
         }
 
         // Helper functions for data extraction
-        function extractIssueTypes(data) {
+        function extractIssueTypesAndCounts(data) {
             const types = {};
             data.technical_debt.items.forEach(item => {
                 const type = item.debt_type;
                 types[type] = (types[type] || 0) + 1;
             });
-            return Object.keys(types);
+            // Sort by count descending to assign most distinct colors to largest categories
+            const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
+            return {
+                labels: sorted.map(x => x[0]),
+                counts: sorted.map(x => x[1])
+            };
+        }
+
+        function extractIssueTypes(data) {
+            return extractIssueTypesAndCounts(data).labels;
         }
 
         function extractIssueCounts(data) {
-            const types = {};
-            data.technical_debt.items.forEach(item => {
-                const type = item.debt_type;
-                types[type] = (types[type] || 0) + 1;
-            });
-            return Object.values(types);
+            return extractIssueTypesAndCounts(data).counts;
+        }
+
+        // Generate distinct colors for any number of categories
+        function generateDistinctColors(count) {
+            // Predefined palette optimized for maximum visual contrast between adjacent colors
+            // Colors are ordered to alternate hue/saturation for better visual separation
+            const predefinedColors = [
+                '#EF4444', // Red
+                '#3B82F6', // Blue
+                '#F59E0B', // Orange
+                '#10B981', // Green
+                '#8B5CF6', // Purple
+                '#EAB308', // Yellow
+                '#EC4899', // Pink
+                '#14B8A6', // Teal
+                '#F97316', // Deep Orange
+                '#6366F1', // Indigo
+                '#84CC16', // Lime
+                '#06B6D4', // Cyan
+                '#D946EF', // Fuchsia
+                '#F43F5E', // Rose
+                '#A855F7', // Violet
+            ];
+
+            // If we need more colors than predefined, generate them using HSL
+            if (count <= predefinedColors.length) {
+                return predefinedColors.slice(0, count);
+            }
+
+            const colors = [...predefinedColors];
+            const hueStep = 360 / (count - predefinedColors.length);
+
+            for (let i = predefinedColors.length; i < count; i++) {
+                const hue = (i - predefinedColors.length) * hueStep;
+                const saturation = 65 + (i % 3) * 10; // Vary saturation slightly
+                const lightness = 50 + (i % 2) * 5;   // Vary lightness slightly
+                colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+            }
+
+            return colors;
         }
 
         function extractRootCauses(data) {
@@ -295,13 +339,15 @@
         }
 
         // Issue Distribution Pie Chart
+        const issueData = extractIssueTypesAndCounts(debtData);
+
         new Chart(document.getElementById('issueDistChart'), {
             type: 'doughnut',
             data: {
-                labels: extractIssueTypes(debtData),
+                labels: issueData.labels,
                 datasets: [{
-                    data: extractIssueCounts(debtData),
-                    backgroundColor: ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6']
+                    data: issueData.counts,
+                    backgroundColor: generateDistinctColors(issueData.labels.length)
                 }]
             },
             options: {
@@ -457,13 +503,16 @@
         });
 
         // Recommendations Horizontal Bar Chart
+        const recommendationLabels = extractRecommendations(debtData);
+        const recommendationCounts = extractRecommendationCounts(debtData);
+
         new Chart(document.getElementById('recommendationsChart'), {
             type: 'bar',
             data: {
-                labels: extractRecommendations(debtData),
+                labels: recommendationLabels,
                 datasets: [{
-                    data: extractRecommendationCounts(debtData),
-                    backgroundColor: ['#8B5CF6', '#3B82F6', '#10B981', '#FBBF24', '#F59E0B', '#EF4444']
+                    data: recommendationCounts,
+                    backgroundColor: generateDistinctColors(recommendationLabels.length)
                 }]
             },
             options: {
