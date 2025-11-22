@@ -2,6 +2,7 @@ use crate::core::AnalysisResults;
 use crate::io::output::OutputWriter;
 use crate::risk::RiskInsight;
 use anyhow::Result;
+use html_escape::encode_text;
 use serde_json;
 use std::io::Write;
 
@@ -61,10 +62,11 @@ impl<W: Write> HtmlWriter<W> {
 
     fn render_html(&self, results: &AnalysisResults, metrics: &DashboardMetrics) -> Result<String> {
         let json_data = serde_json::to_string(results)?;
+        let escaped_json = encode_text(&json_data);
 
         let html = self
             .template
-            .replace("{{{JSON_DATA}}}", &json_data)
+            .replace("{{{JSON_DATA}}}", &escaped_json)
             .replace(
                 "{{{TIMESTAMP}}}",
                 &results.timestamp.format("%Y-%m-%d %H:%M:%S").to_string(),

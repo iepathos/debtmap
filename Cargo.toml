@@ -111,6 +111,7 @@ env_logger = "0.11"
 # Graph algorithms for taint analysis
 petgraph = "0.8"
 lazy_static = "1.5.0"
+html-escape = "0.2.13"
 
 [dev-dependencies]
 # Dependency analysis tools

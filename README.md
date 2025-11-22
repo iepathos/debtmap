@@ -64,6 +64,9 @@ debtmap analyze . --lcov target/coverage/lcov.info
 
 # Generate JSON report
 debtmap analyze . --format json --output report.json
+
+# Generate interactive HTML dashboard
+debtmap analyze . --format html > report.html
 ```
 
 ### Review Results
@@ -120,6 +123,45 @@ The new format helps you:
 - **Estimate** how long the work will take
 - **Execute** with specific commands to run
 - **Verify** improvements with measurable impact
+
+### HTML Dashboard Output
+
+Debtmap can generate an interactive HTML dashboard for visualizing code quality metrics, complexity analysis, and technical debt:
+
+```bash
+# Generate HTML dashboard
+debtmap analyze . --format html > debtmap-report.html
+
+# With test coverage integration
+debtmap analyze . --lcov target/coverage/lcov.info --format html > report.html
+```
+
+**Dashboard Features:**
+
+- **Interactive Charts** - Visual representations of issue distribution, root causes, and complexity patterns
+- **Sortable Tables** - Filter and sort complex functions by cyclomatic complexity, cognitive complexity, or nesting depth
+- **Search Functionality** - Quick search across all detected issues and functions
+- **Metrics Overview** - Summary cards showing critical/high/medium/low priority items
+- **Complexity Analysis** - Scatter plot showing relationship between cyclomatic and cognitive complexity
+- **God Object Detection** - Dedicated table for architectural debt items
+- **Responsive Design** - Works on desktop, tablet, and mobile devices
+
+**Opening the Dashboard:**
+
+Simply open the generated HTML file in any modern web browser:
+
+```bash
+# macOS
+open debtmap-report.html
+
+# Linux
+xdg-open debtmap-report.html
+
+# Windows
+start debtmap-report.html
+```
+
+The dashboard is a single self-contained HTML file with no external dependencies (uses CDN for Chart.js and Tailwind CSS), making it easy to share with your team or include in CI/CD artifacts.
 
 📖 See the [Getting Started Guide](https://iepathos.github.io/debtmap/getting-started.html) for detailed installation, examples, and next steps.
 
