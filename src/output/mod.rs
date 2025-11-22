@@ -7,6 +7,7 @@ pub mod pattern_formatter;
 pub mod terminal;
 pub mod unified;
 
+use crate::io::output::OutputWriter;
 use crate::{core::AnalysisResults, formatting::FormattingConfig, io, priority, risk};
 use anyhow::Result;
 use std::path::PathBuf;
@@ -126,11 +127,19 @@ pub fn output_unified_priorities_with_summary(
         Some(crate::cli::OutputFormat::Markdown) => {
             markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
         }
-        Some(crate::cli::OutputFormat::Html) => {
-            let mut writer = io::output::create_writer(io::output::OutputFormat::Html);
-            writer.write_results(results)?;
-            Ok(())
-        }
+        Some(crate::cli::OutputFormat::Html) => match output_file {
+            Some(path) => {
+                let file = std::fs::File::create(&path)?;
+                let mut writer = io::writers::HtmlWriter::new(file);
+                writer.write_results(results)?;
+                Ok(())
+            }
+            None => {
+                let mut writer = io::output::create_writer(io::output::OutputFormat::Html);
+                writer.write_results(results)?;
+                Ok(())
+            }
+        },
         _ => {
             if is_markdown_file(&output_file) {
                 markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
