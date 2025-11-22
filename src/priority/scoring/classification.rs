@@ -58,12 +58,16 @@ fn check_testing_gap(
 /// Uses entropy-adjusted cyclomatic complexity when available (spec 182).
 /// This prevents false positives for functions with repetitive, predictable structure.
 ///
+/// Excludes Low tier functions (spec 180) as they're already maintainable:
+/// - Low tier: cyclo < 8 AND cognitive < 15 → No debt item (maintenance only)
+/// - Moderate+: cyclo >= 8 OR cognitive >= 15 → Report as ComplexityHotspot
+///
 /// # Thresholds
 /// - Cyclomatic (or adjusted): > 10
 /// - Cognitive: > 15
 ///
 /// # Returns
-/// `Some(DebtType::ComplexityHotspot)` if function exceeds thresholds.
+/// `Some(DebtType::ComplexityHotspot)` if function exceeds thresholds and is not Low tier.
 fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
     // Use adjusted complexity if available (spec 182)
     let effective_cyclomatic = func
@@ -71,7 +75,25 @@ fn check_complexity_hotspot(func: &FunctionMetrics) -> Option<DebtType> {
         .map(|adj| adj.round() as u32)
         .unwrap_or(func.cyclomatic);
 
-    (effective_cyclomatic > 10 || func.cognitive > 15).then_some(DebtType::ComplexityHotspot {
+    // Check if function exceeds complexity thresholds
+    let is_complex = effective_cyclomatic > 10 || func.cognitive > 15;
+
+    if !is_complex {
+        return None;
+    }
+
+    // Spec 180: Filter out Low tier complexity (< 8 cyclomatic, < 15 cognitive)
+    // These are maintenance-only recommendations ("Maintain current low complexity")
+    // Only report Moderate+ tier as actual debt requiring action
+    let is_low_tier = effective_cyclomatic < 8 && func.cognitive < 15;
+
+    if is_low_tier {
+        // Low tier - already maintainable, no action needed
+        return None;
+    }
+
+    // Moderate+ tier - report as complexity hotspot requiring attention
+    Some(DebtType::ComplexityHotspot {
         cyclomatic: func.cyclomatic,
         cognitive: func.cognitive,
         adjusted_cyclomatic: func.adjusted_complexity.map(|adj| adj.round() as u32),
@@ -1231,5 +1253,161 @@ mod tests {
                 "Should store adjusted complexity"
             );
         }
+    }
+
+    // Unit tests for spec 180: exclude Low tier maintenance recommendations
+
+    #[test]
+    fn check_complexity_hotspot_excludes_low_tier_low_cyclo_low_cognitive() {
+        // Low tier: cyclomatic < 8 AND cognitive < 15
+        let mut func = create_test_function("simple_func", None);
+        func.cyclomatic = 5;
+        func.cognitive = 10;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "Should NOT flag Low tier (cyclo=5, cognitive=10) as ComplexityHotspot"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_excludes_low_tier_edge_case() {
+        // Edge case: cyclo=7, cognitive=14 (just below Low tier threshold)
+        let mut func = create_test_function("edge_case_func", None);
+        func.cyclomatic = 7;
+        func.cognitive = 14;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "Should NOT flag Low tier edge case (cyclo=7, cognitive=14)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_reports_moderate_tier_cyclo() {
+        // Moderate tier: cyclomatic >= 8 (even if cognitive is low)
+        let mut func = create_test_function("moderate_func", None);
+        func.cyclomatic = 8;
+        func.cognitive = 10;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "cyclo=8, cognitive=10 is below threshold (>10 or >15), should not flag"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_reports_moderate_tier_cognitive() {
+        // Moderate tier: cognitive >= 15 (even if cyclomatic is low)
+        let mut func = create_test_function("moderate_func2", None);
+        func.cyclomatic = 5;
+        func.cognitive = 15;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "cyclo=5, cognitive=15 is below threshold (>10 or >15), should not flag"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_reports_high_tier() {
+        // High tier: cyclomatic >= 15 OR cognitive >= 25
+        let mut func = create_test_function("high_complexity_func", None);
+        func.cyclomatic = 18;
+        func.cognitive = 28;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag High tier (cyclo=18, cognitive=28)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_excludes_low_tier_with_adjusted_complexity() {
+        // Low tier with adjusted complexity still below threshold
+        let mut func = create_test_function("adjusted_low_func", None);
+        func.cyclomatic = 12; // Raw above threshold
+        func.cognitive = 10;
+        func.adjusted_complexity = Some(6.5); // Adjusted below Low tier threshold
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "Should NOT flag when adjusted complexity puts it in Low tier (adjusted=6.5, cognitive=10)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_reports_moderate_with_adjusted_complexity() {
+        // Moderate tier with adjusted complexity
+        let mut func = create_test_function("adjusted_moderate_func", None);
+        func.cyclomatic = 15; // Raw above threshold
+        func.cognitive = 18;
+        func.adjusted_complexity = Some(9.0); // Adjusted still Moderate (8-14 range)
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag Moderate+ tier even with adjusted complexity (adjusted=9, cognitive=18)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_boundary_cyclo_11_cognitive_12() {
+        // This should be flagged as complexity hotspot (cyclo > 10)
+        // BUT filtered as Low tier (cyclo < 8 AND cognitive < 15)
+        // Since cyclo=11 is NOT < 8, this should be reported
+        let mut func = create_test_function("boundary_func", None);
+        func.cyclomatic = 11;
+        func.cognitive = 12;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag cyclo=11 > 10 as complexity hotspot (not Low tier since cyclo >= 8)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_boundary_cyclo_7_cognitive_16() {
+        // cyclo=7 (< 8), cognitive=16 (>= 15) - should be flagged
+        // Not Low tier because cognitive >= 15
+        let mut func = create_test_function("boundary_func2", None);
+        func.cyclomatic = 7;
+        func.cognitive = 16;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_some(),
+            "Should flag cognitive=16 > 15 (not Low tier since cognitive >= 15)"
+        );
+    }
+
+    #[test]
+    fn check_complexity_hotspot_low_tier_no_debt_item() {
+        // Verify that Low tier functions with testing gaps or other issues
+        // don't get ComplexityHotspot debt (but can get other debt types)
+        let mut func = create_test_function("low_complexity_untested", None);
+        func.cyclomatic = 6;
+        func.cognitive = 10;
+        func.adjusted_complexity = None;
+
+        let result = check_complexity_hotspot(&func);
+        assert!(
+            result.is_none(),
+            "Low tier function should not generate ComplexityHotspot debt"
+        );
     }
 }
