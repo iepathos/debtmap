@@ -204,27 +204,19 @@
 
         <!-- Charts Section -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Issue Distribution -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4">Issue Distribution</h2>
-                <div class="chart-container">
-                    <canvas id="issueDistChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Root Causes -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4">Root Causes</h2>
-                <div class="chart-container">
-                    <canvas id="rootCausesChart"></canvas>
-                </div>
-            </div>
-
             <!-- Complexity Scatter -->
             <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4">Complexity Scatter Plot</h2>
+                <h2 class="text-xl font-semibold mb-4">Cyclomatic vs Cognitive Complexity</h2>
                 <div class="chart-container">
                     <canvas id="complexityScatter"></canvas>
+                </div>
+            </div>
+
+            <!-- Adjusted Complexity Scatter -->
+            <div class="bg-white rounded-lg shadow-md p-6" id="adjustedComplexityScatterSection">
+                <h2 class="text-xl font-semibold mb-4">Entropy-Adjusted Cyclomatic vs Cognitive</h2>
+                <div class="chart-container">
+                    <canvas id="adjustedComplexityScatter"></canvas>
                 </div>
             </div>
 
@@ -244,11 +236,27 @@
                 </div>
             </div>
 
+            <!-- Root Causes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Root Causes</h2>
+                <div class="chart-container">
+                    <canvas id="rootCausesChart"></canvas>
+                </div>
+            </div>
+
             <!-- Entropy Distribution -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Entropy Distribution</h2>
                 <div class="chart-container">
                     <canvas id="entropyDistChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Entropy-Adjusted Complexity Distribution -->
+            <div class="bg-white rounded-lg shadow-md p-6" id="adjustedComplexitySection">
+                <h2 class="text-xl font-semibold mb-4">Entropy-Adjusted Complexity</h2>
+                <div class="chart-container">
+                    <canvas id="adjustedComplexityChart"></canvas>
                 </div>
             </div>
         </div>
@@ -397,30 +405,27 @@
             }
         }
 
-        function extractIssueTypesAndCounts(data) {
-            const types = {};
-            const items = getDebtItems(data);
+        // Helper to unwrap items based on format
+        function unwrapItem(item, data) {
+            const isUnifiedFormat = data.format_version !== undefined;
 
-            items.forEach(item => {
-                // Unified format: check item.category or item.debt_type
-                // Legacy format: item.debt_type
-                const type = item.category || item.debt_type || 'Unknown';
-                types[type] = (types[type] || 0) + 1;
-            });
-            // Sort by count descending to assign most distinct colors to largest categories
-            const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
-            return {
-                labels: sorted.map(x => x[0]),
-                counts: sorted.map(x => x[1])
-            };
-        }
-
-        function extractIssueTypes(data) {
-            return extractIssueTypesAndCounts(data).labels;
-        }
-
-        function extractIssueCounts(data) {
-            return extractIssueTypesAndCounts(data).counts;
+            if (isUnifiedFormat) {
+                // Unified format: return item as-is with type info
+                return {
+                    unwrapped: item,
+                    itemType: item.type,
+                    isUnified: true
+                };
+            } else {
+                // Legacy format: check for Function/File wrappers
+                if (item.Function) {
+                    return { unwrapped: item.Function, itemType: 'Function', isUnified: false };
+                } else if (item.File) {
+                    return { unwrapped: item.File, itemType: 'File', isUnified: false };
+                } else {
+                    return { unwrapped: item, itemType: null, isUnified: false };
+                }
+            }
         }
 
         // Generate distinct colors for any number of categories
@@ -469,9 +474,11 @@
             // Extract and categorize issues from debt items
             const items = getDebtItems(data);
             items.forEach(item => {
+                const { unwrapped } = unwrapItem(item, data);
+
                 let cause = 'Other';
                 // Get text from either unified format (recommendation.action) or legacy (message)
-                const text = item.recommendation?.action || item.message || '';
+                const text = unwrapped.recommendation?.action || unwrapped.recommendation?.primary_action || unwrapped.message || '';
 
                 // Categorize based on recommendation/message patterns
                 if (text.includes('nesting') || text.toLowerCase().includes('reduce nesting')) {
@@ -543,7 +550,7 @@
             let functions = [];
 
             if (isUnifiedFormat) {
-                // Unified format: filter items where type === "Function"
+                // Unified format: filter items where type='Function'
                 functions = (data.items || [])
                     .filter(item => item.type === 'Function')
                     .map(item => ({
@@ -586,15 +593,85 @@
             ];
         }
 
+        function extractAdjustedComplexityData(data) {
+            const critical = [];
+            const high = [];
+            const medium = [];
+            const low = [];
+
+            // Get function metrics from either format
+            const isUnifiedFormat = data.format_version !== undefined;
+            let functions = [];
+
+            if (isUnifiedFormat) {
+                // Unified format: filter items where type='Function'
+                functions = (data.items || [])
+                    .filter(item => item.type === 'Function')
+                    .filter(item => item.adjusted_complexity?.dampened_cyclomatic) // Only include functions with adjusted complexity
+                    .map(item => ({
+                        name: item.location?.function || 'unknown',
+                        cyclomatic: item.adjusted_complexity.dampened_cyclomatic,
+                        cognitive: item.metrics?.cognitive_complexity || 0
+                    }));
+            } else {
+                // Legacy format
+                const items = data.items || [];
+                functions = items
+                    .filter(item => item.Function)
+                    .filter(item => item.Function.debt_type?.ComplexityHotspot?.adjusted_cyclomatic)
+                    .map(item => {
+                        const func = item.Function;
+                        return {
+                            name: func.location?.function || func.name || 'unknown',
+                            cyclomatic: func.debt_type.ComplexityHotspot.adjusted_cyclomatic,
+                            cognitive: func.cognitive_complexity || 0
+                        };
+                    });
+            }
+
+            // If no adjusted complexity data, return null
+            if (functions.length === 0) {
+                return null;
+            }
+
+            functions.forEach(func => {
+                const point = {
+                    x: func.cyclomatic,
+                    y: func.cognitive,
+                    name: func.name
+                };
+
+                if (func.cyclomatic >= 20 || func.cognitive >= 50) {
+                    critical.push(point);
+                } else if (func.cyclomatic >= 15 || func.cognitive >= 30) {
+                    high.push(point);
+                } else if (func.cyclomatic >= 10 || func.cognitive >= 20) {
+                    medium.push(point);
+                } else {
+                    low.push(point);
+                }
+            });
+
+            return [
+                { label: 'Critical', data: critical, backgroundColor: '#EF4444' },
+                { label: 'High', data: high, backgroundColor: '#F59E0B' },
+                { label: 'Medium', data: medium, backgroundColor: '#FBBF24' },
+                { label: 'Low', data: low, backgroundColor: '#10B981' }
+            ];
+        }
+
         function extractRecommendations(data) {
             const recommendations = {};
             const items = getDebtItems(data);
 
             items.forEach(item => {
+                const { unwrapped } = unwrapItem(item, data);
+
                 // Try to extract from recommendation.action first, then fall back to message
-                const rec = item.recommendation?.action ||
-                           (item.message?.split(':')[0]) ||
-                           item.category ||
+                const rec = unwrapped.recommendation?.action ||
+                           unwrapped.recommendation?.primary_action ||
+                           (unwrapped.message?.split(':')[0]) ||
+                           unwrapped.category ||
                            'Other';
                 recommendations[rec] = (recommendations[rec] || 0) + 1;
             });
@@ -607,10 +684,13 @@
             const items = getDebtItems(data);
 
             items.forEach(item => {
+                const { unwrapped } = unwrapItem(item, data);
+
                 // Try to extract from recommendation.action first, then fall back to message
-                const rec = item.recommendation?.action ||
-                           (item.message?.split(':')[0]) ||
-                           item.category ||
+                const rec = unwrapped.recommendation?.action ||
+                           unwrapped.recommendation?.primary_action ||
+                           (unwrapped.message?.split(':')[0]) ||
+                           unwrapped.category ||
                            'Other';
                 recommendations[rec] = (recommendations[rec] || 0) + 1;
             });
@@ -621,10 +701,14 @@
         // Populate Top 10 Recommendations
         function populateTop10Recommendations() {
             const items = getDebtItems(debtData)
-                .map(item => ({
-                    ...item,
-                    score: item.score || item.unified_score?.final_score || 0
-                }))
+                .map(item => {
+                    const { unwrapped, itemType } = unwrapItem(item, debtData);
+                    return {
+                        ...unwrapped,
+                        score: unwrapped.score || unwrapped.unified_score?.final_score || 0,
+                        _itemType: itemType  // Track original type
+                    };
+                })
                 .sort((a, b) => b.score - a.score)
                 .slice(0, 10);
 
@@ -636,7 +720,7 @@
 
                 const priorityClass = item.priority.toLowerCase();
                 const recommendation = item.recommendation || {};
-                const impact = item.impact || {};
+                const impact = item.impact || item.expected_impact || {};
                 const metrics = item.metrics || {};
 
                 // Handle both unified and legacy formats for location
@@ -646,8 +730,11 @@
                     locationText = item.location.file || '';
                     if (item.location.line) locationText += `:${item.location.line}`;
                     if (item.location.function) locationText += ` ${item.location.function}()`;
+                } else if (item._itemType === 'File' && metrics.path) {
+                    // Legacy File item
+                    locationText = metrics.path;
                 } else {
-                    // Legacy format
+                    // Legacy Function format
                     locationText = item.file || '';
                     if (item.line) locationText += `:${item.line}`;
                     if (item.function_name) locationText += ` ${item.function_name}()`;
@@ -859,38 +946,6 @@
 
         populateTop10Recommendations();
 
-        // Issue Distribution Pie Chart
-        const issueData = extractIssueTypesAndCounts(debtData);
-
-        new Chart(document.getElementById('issueDistChart'), {
-            type: 'doughnut',
-            data: {
-                labels: issueData.labels,
-                datasets: [{
-                    data: issueData.counts,
-                    backgroundColor: generateDistinctColors(issueData.labels.length)
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return `${label}: ${value} (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
         // Root Causes Bar Chart
         const rootCausesData = extractRootCausesAndCounts(debtData);
 
@@ -972,6 +1027,43 @@
                 }
             }
         });
+
+        // Adjusted Complexity Scatter Plot
+        const adjustedScatterData = extractAdjustedComplexityData(debtData);
+        if (adjustedScatterData) {
+            new Chart(document.getElementById('adjustedComplexityScatter'), {
+                type: 'scatter',
+                data: {
+                    datasets: adjustedScatterData
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Entropy-Adjusted Cyclomatic' },
+                            beginAtZero: true
+                        },
+                        y: {
+                            title: { display: true, text: 'Cognitive Complexity' },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.raw.name}: (${context.parsed.x}, ${context.parsed.y})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            // Hide the section if no adjusted data
+            document.getElementById('adjustedComplexityScatterSection').style.display = 'none';
+        }
 
         // Complexity Distribution Histogram
         function createComplexityHistogram(data) {
@@ -1156,6 +1248,118 @@
             }
         });
 
+        // Entropy-Adjusted Complexity Distribution Chart
+        function createAdjustedComplexityDistribution(data) {
+            const isUnifiedFormat = data.format_version !== undefined;
+            let functions = [];
+
+            if (isUnifiedFormat) {
+                functions = (data.items || [])
+                    .filter(item => item.type === 'Function')
+                    .map(item => ({
+                        cyclomatic: item.metrics?.cyclomatic_complexity || 0,
+                        adjusted: item.adjusted_complexity?.dampened_cyclomatic || null,
+                        entropy: item.metrics?.entropy_score
+                    }));
+            } else {
+                // Legacy format with Function/File wrappers
+                const items = data.items || [];
+                functions = items
+                    .filter(item => item.Function)
+                    .map(item => {
+                        const func = item.Function;
+                        return {
+                            cyclomatic: func.cyclomatic_complexity || 0,
+                            adjusted: func.debt_type?.ComplexityHotspot?.adjusted_cyclomatic || null,
+                            entropy: func.entropy_details?.score || null
+                        };
+                    });
+            }
+
+            // Filter to only functions with adjusted complexity
+            const adjusted = functions.filter(f => f.adjusted !== null && f.adjusted !== undefined);
+
+            // If no adjusted complexity data, hide the section
+            if (adjusted.length === 0) {
+                document.getElementById('adjustedComplexitySection').style.display = 'none';
+                return null;
+            }
+
+            // Create comparison bins
+            const bins = [
+                { label: '0-10', min: 0, max: 10, original: 0, adjusted: 0 },
+                { label: '10-20', min: 10, max: 20, original: 0, adjusted: 0 },
+                { label: '20-30', min: 20, max: 30, original: 0, adjusted: 0 },
+                { label: '30+', min: 30, max: Infinity, original: 0, adjusted: 0 }
+            ];
+
+            adjusted.forEach(func => {
+                for (let bin of bins) {
+                    if (func.cyclomatic >= bin.min && func.cyclomatic < bin.max) {
+                        bin.original++;
+                    }
+                    if (func.adjusted >= bin.min && func.adjusted < bin.max) {
+                        bin.adjusted++;
+                    }
+                }
+            });
+
+            return {
+                labels: bins.map(b => b.label),
+                datasets: [
+                    {
+                        label: 'Original Cyclomatic',
+                        data: bins.map(b => b.original),
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Entropy-Adjusted',
+                        data: bins.map(b => b.adjusted),
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            };
+        }
+
+        const adjustedComplexityData = createAdjustedComplexityDistribution(debtData);
+        if (adjustedComplexityData) {
+            new Chart(document.getElementById('adjustedComplexityChart'), {
+                type: 'bar',
+                data: adjustedComplexityData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Number of Functions' },
+                            ticks: { precision: 0 }
+                        },
+                        x: {
+                            title: { display: true, text: 'Complexity Range' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y} functions`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         // Filter functionality
         let allFunctions = [];
 
@@ -1204,17 +1408,22 @@
         // Populate God Objects Table
         function populateGodObjectsTable() {
             const items = getDebtItems(debtData);
-            const isUnifiedFormat = debtData.format_version !== undefined;
 
             const godObjects = items.filter(item => {
-                if (isUnifiedFormat) {
-                    // Unified format: check category or debt_type
-                    return item.category === 'GodObject' ||
-                           (item.debt_type && typeof item.debt_type === 'object' && item.debt_type.GodObject);
+                const { unwrapped, itemType, isUnified } = unwrapItem(item, debtData);
+
+                if (isUnified) {
+                    // Unified format: check category
+                    return unwrapped.category === 'GodObject' || unwrapped.category === 'GodModule';
                 } else {
-                    // Legacy format
-                    return item.debt_type === 'GodObject' ||
-                           (item.context && item.context.architectural_issues);
+                    // Legacy format: check if File item with god object indicators
+                    if (itemType === 'File') {
+                        const godIndicators = unwrapped.metrics?.god_object_indicators;
+                        return godIndicators && godIndicators.is_god_object;
+                    }
+                    // Or check debt_type for GodObject variant
+                    return unwrapped.debt_type === 'GodObject' ||
+                           (unwrapped.debt_type && typeof unwrapped.debt_type === 'object' && unwrapped.debt_type.GodObject);
                 }
             });
 
@@ -1223,18 +1432,25 @@
                 const tbody = document.getElementById('godObjectsBody');
 
                 godObjects.forEach(item => {
+                    const { unwrapped, itemType } = unwrapItem(item, debtData);
+
                     // Extract location data from either format
-                    const file = item.location?.file || item.file || '-';
-                    const line = item.location?.line || item.line || '-';
-                    const priority = typeof item.priority === 'string' ? item.priority : (item.priority?.toString() || '-');
+                    const file = unwrapped.location?.file || unwrapped.metrics?.path || unwrapped.file || '-';
+                    const line = unwrapped.location?.line || unwrapped.line || '-';
+                    const priority = typeof unwrapped.priority === 'string' ? unwrapped.priority : (unwrapped.priority?.toString() || '-');
+
+                    // Extract god object metrics
+                    const godIndicators = unwrapped.metrics?.god_object_indicators || unwrapped.god_object_indicators;
+                    const methodsCount = godIndicators?.methods_count || '-';
+                    const responsibilities = godIndicators?.responsibilities || '-';
 
                     const row = tbody.insertRow();
                     row.innerHTML = `
                         <td class="px-6 py-4 text-sm font-mono">${file}</td>
                         <td class="px-6 py-4 text-sm font-semibold text-red-600">${priority}</td>
                         <td class="px-6 py-4 text-sm">${line}</td>
-                        <td class="px-6 py-4 text-sm">-</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">${item.recommendation?.action || item.message || '-'}</td>
+                        <td class="px-6 py-4 text-sm">${methodsCount}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${responsibilities}</td>
                     `;
                 });
             }
@@ -1249,7 +1465,7 @@
             const isUnifiedFormat = debtData.format_version !== undefined;
 
             if (isUnifiedFormat) {
-                // In unified format, functions are in items array with type: "Function"
+                // In unified format, functions have type='Function'
                 functions = (debtData.items || [])
                     .filter(item => item.type === 'Function')
                     .map(item => ({
@@ -1264,8 +1480,29 @@
                         } : null
                     }));
             } else {
-                // Legacy format
-                functions = (debtData.complexity?.metrics || []);
+                // Legacy format with wrappers
+                const items = debtData.technical_debt?.items || [];
+                functions = items
+                    .filter(item => item.Function)
+                    .map(item => {
+                        const func = item.Function;
+                        return {
+                            name: func.location?.function || func.name || 'unknown',
+                            file: func.location?.file || func.file || '',
+                            cyclomatic: func.metrics?.cyclomatic_complexity || func.cyclomatic || 0,
+                            cognitive: func.metrics?.cognitive_complexity || func.cognitive || 0,
+                            nesting: func.metrics?.nesting_depth || func.nesting || 0,
+                            entropy_score: func.metrics?.entropy_score || func.entropy_score,
+                            adjusted_complexity: func.debt_type?.ComplexityHotspot ? {
+                                dampened_cyclomatic: func.debt_type.ComplexityHotspot.adjusted_cyclomatic
+                            } : null
+                        };
+                    });
+
+                // Also try old complexity format if no items found
+                if (functions.length === 0 && debtData.complexity?.metrics) {
+                    functions = debtData.complexity.metrics;
+                }
             }
 
             functions = functions
