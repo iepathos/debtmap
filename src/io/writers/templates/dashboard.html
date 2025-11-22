@@ -477,37 +477,44 @@
             const items = getDebtItems(data);
             items.forEach(item => {
                 let cause = 'Other';
-                const msg = item.message || '';
+                // Get text from either unified format (recommendation.action) or legacy (message)
+                const text = item.recommendation?.action || item.message || '';
 
-                // Categorize based on message patterns
-                if (msg.includes('Deep nesting level')) {
+                // Categorize based on recommendation/message patterns
+                if (text.includes('nesting') || text.toLowerCase().includes('reduce nesting')) {
                     cause = 'Deep nesting';
-                } else if (msg.includes('unbounded growth')) {
-                    cause = 'Unbounded collections';
-                } else if (msg.includes('.unwrap()') || msg.includes('.expect(')) {
-                    cause = 'Unsafe unwrap/expect';
-                } else if (msg.includes('.ok()') || msg.includes('discarding error')) {
-                    cause = 'Error information discarded';
-                } else if (msg.includes('type erasure') || msg.includes('Box<dyn')) {
-                    cause = 'Type erasure issues';
-                } else if (msg.includes('TODO') || msg.includes('FIXME')) {
-                    cause = 'TODOs/FIXMEs';
-                } else if (msg.includes('Extract') || msg.includes('extract')) {
-                    cause = 'Needs refactoring/extraction';
-                } else if (msg.includes('Reduce') || msg.includes('Simplify')) {
-                    cause = 'Excessive complexity';
-                } else if (msg.includes('duplication') || msg.includes('duplicate')) {
+                } else if (text.includes('Split') || text.includes('split')) {
+                    cause = 'Function/file too large';
+                } else if (text.includes('Extract') || text.includes('extract')) {
+                    cause = 'Needs extraction';
+                } else if (text.includes('Reduce complexity') || text.includes('reduce complexity')) {
+                    cause = 'High complexity';
+                } else if (text.includes('god object') || text.includes('God Object') || text.includes('GodObject')) {
+                    cause = 'God object';
+                } else if (text.includes('god module') || text.includes('God Module') || text.includes('GodModule')) {
+                    cause = 'God module';
+                } else if (text.includes('Standardize') || text.includes('standardize')) {
+                    cause = 'Inconsistent patterns';
+                } else if (text.includes('dispatcher') || text.includes('state transitions')) {
+                    cause = 'Complex control flow';
+                } else if (text.includes('duplication') || text.includes('duplicate')) {
                     cause = 'Code duplication';
-                } else if (msg.includes('BUG:')) {
+                } else if (text.includes('testing') || text.includes('coverage')) {
+                    cause = 'Testing gaps';
+                } else if (text.includes('decision clusters') || text.includes('focused functions')) {
+                    cause = 'Multiple responsibilities';
+                } else if (text.includes('URGENT')) {
+                    cause = 'Critical size violation';
+                } else if (text.includes('unbounded growth')) {
+                    cause = 'Unbounded collections';
+                } else if (text.includes('.unwrap()') || text.includes('.expect(')) {
+                    cause = 'Unsafe unwrap/expect';
+                } else if (text.includes('.ok()') || text.includes('discarding error')) {
+                    cause = 'Error information discarded';
+                } else if (text.includes('TODO') || text.includes('FIXME')) {
+                    cause = 'TODOs/FIXMEs';
+                } else if (text.includes('BUG:')) {
                     cause = 'Known bugs';
-                } else if (msg.includes(':')) {
-                    // Extract first part before colon as cause
-                    const parts = msg.split(':');
-                    cause = parts[0].trim();
-                    // Limit length
-                    if (cause.length > 50) {
-                        cause = cause.substring(0, 47) + '...';
-                    }
                 }
 
                 causes[cause] = (causes[cause] || 0) + 1;
