@@ -1233,18 +1233,66 @@ fn format_language_specific_advice(
     }
 }
 
-// Pure function to calculate impact message
-fn calculate_impact_message(is_god_object: bool, total_lines: usize) -> String {
+// Pure function to calculate impact message based on actual complexity metrics
+//
+// Previous implementation used LOC-only formula: ((LOC/200 - 1) * 100).min(80)
+// This meant any file >360 LOC claimed "80% reduction" regardless of actual complexity.
+//
+// New implementation:
+// - Uses god_object_score (derived from cyclomatic, cognitive, responsibilities)
+// - Provides conservative estimates (30-60% instead of 80%)
+// - Accounts for split quality (fewer, larger splits = lower reduction)
+// - Explicitly states dependency on coupling/cohesion
+fn calculate_impact_message(
+    is_god_object: bool,
+    god_object_score: f64,
+    responsibilities: usize,
+    split_count: usize,
+) -> String {
     if is_god_object {
-        format!(
-            "Reduce complexity by {}%, improve testability, enable parallel development",
-            ((total_lines as f64 / 200.0 - 1.0) * 100.0).min(80.0) as i32
-        )
+        // Base reduction estimate from god_object_score
+        // Score typically ranges 20-200+, normalize to 0.0-1.0
+        let score_normalized = (god_object_score / 100.0).min(1.0);
+
+        // Adjust for split quality indicators
+        // More responsibilities with fewer splits suggests tight coupling
+        let coupling_penalty = if responsibilities > 5 && split_count <= 2 {
+            0.7 // High coupling: 30% reduction in estimate
+        } else if split_count >= responsibilities.saturating_sub(1) {
+            1.0 // Good split coverage: no penalty
+        } else {
+            0.85 // Moderate coupling: 15% reduction
+        };
+
+        // Calculate conservative estimate: 30-60% range based on score
+        let base_estimate = (30.0 + score_normalized * 30.0) * coupling_penalty;
+        let estimate = base_estimate as i32;
+
+        // Provide range to avoid false precision
+        let range_start = estimate.saturating_sub(5);
+        let range_end = estimate.saturating_add(10);
+
+        if split_count == 0 {
+            // No actionable splits detected - be honest about it
+            "complexity reduction difficult to estimate (no clear split boundaries detected). \
+             Focus on extracting pure functions and reducing nesting first.".to_string()
+        } else if coupling_penalty < 0.8 {
+            // High coupling detected - warn user
+            format!(
+                "Estimated {}-{}% complexity reduction (high coupling detected - splits may be challenging). \
+                 Improve testability, enable parallel development",
+                range_start, range_end
+            )
+        } else {
+            format!(
+                "Estimated {}-{}% complexity reduction (depends on split cohesion). \
+                 Improve testability, enable parallel development",
+                range_start, range_end
+            )
+        }
     } else {
-        format!(
-            "Improve maintainability, reduce file size by {}%",
-            ((total_lines as f64 / 500.0 - 1.0) * 100.0).min(50.0) as i32
-        )
+        // Non-god-object files: conservative estimate
+        "Improve maintainability, reduce complexity through focused refactoring".to_string()
     }
 }
 
@@ -1569,7 +1617,9 @@ fn format_file_priority_item_with_verbosity(
 
     let impact = calculate_impact_message(
         item.metrics.god_object_indicators.is_god_object,
-        item.metrics.total_lines,
+        item.metrics.god_object_indicators.god_object_score,
+        item.metrics.god_object_indicators.responsibilities,
+        item.metrics.god_object_indicators.recommended_splits.len(),
     );
 
     writeln!(
@@ -2672,14 +2722,14 @@ mod tests {
 
         let config = FormattingConfig::default();
 
-        format_file_priority_item(&mut output, 1, &item, config);
+        // Use verbosity 2 to show coverage information in score breakdown
+        format_file_priority_item_with_verbosity(&mut output, 1, &item, config, 2);
 
         let clean_output = strip_ansi_codes(&output);
-        // The coverage info might be in WHY or METRICS section
+        // The coverage info is in the FILE SCORE CALCULATION section at verbosity >= 2
         assert!(
-            clean_output.contains("0.0%")
-                || clean_output.contains("0%")
-                || clean_output.contains("no coverage")
+            clean_output.contains("Coverage Factor")
+                && (clean_output.contains("No coverage") || clean_output.contains("assuming untested"))
         );
     }
 

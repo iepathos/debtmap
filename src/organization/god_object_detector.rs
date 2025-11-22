@@ -1076,23 +1076,31 @@ impl GodObjectDetector {
             0.0
         };
 
-        // Log clustering quality
+        // Log clustering quality (only at verbosity >= 2)
+        let should_log = crate::progress::ProgressManager::global()
+            .map(|pm| pm.verbosity() >= 2)
+            .unwrap_or(false);
+
         if unclustered_rate < 0.05 {
-            eprintln!(
-                "✓ Clustering complete: {} coherent clusters identified",
-                clusters.len()
-            );
-            eprintln!(
-                "  Unclustered methods: {} ({:.1}%)",
-                total_methods - clustered_methods,
-                unclustered_rate * 100.0
-            );
+            if should_log {
+                eprintln!(
+                    "✓ Clustering complete: {} coherent clusters identified",
+                    clusters.len()
+                );
+                eprintln!(
+                    "  Unclustered methods: {} ({:.1}%)",
+                    total_methods - clustered_methods,
+                    unclustered_rate * 100.0
+                );
+            }
         } else {
             // If unclustered rate is too high, fall back to legacy clustering
-            eprintln!(
-                "⚠ High unclustered rate ({:.1}%), falling back to legacy clustering",
-                unclustered_rate * 100.0
-            );
+            if should_log {
+                eprintln!(
+                    "⚠ High unclustered rate ({:.1}%), falling back to legacy clustering",
+                    unclustered_rate * 100.0
+                );
+            }
             return None;
         }
 
@@ -2777,10 +2785,16 @@ impl GodObjectDetector {
         let original_count = splits.len();
         splits.truncate(MAX_SPLITS_PER_FILE);
 
-        eprintln!(
-            "  ℹ Limiting to top {} highest-quality splits (from {} total)",
-            MAX_SPLITS_PER_FILE, original_count
-        );
+        // Log split limiting (only at verbosity >= 2)
+        if crate::progress::ProgressManager::global()
+            .map(|pm| pm.verbosity() >= 2)
+            .unwrap_or(false)
+        {
+            eprintln!(
+                "  ℹ Limiting to top {} highest-quality splits (from {} total)",
+                MAX_SPLITS_PER_FILE, original_count
+            );
+        }
     }
 
     /// Apply semantic naming to a module split (Spec 191)

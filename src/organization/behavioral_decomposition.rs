@@ -774,11 +774,17 @@ fn ensure_all_methods_clustered(
         .collect();
 
     if !missing_methods.is_empty() {
-        eprintln!(
-            "WARNING: {} methods were not clustered, merging into existing clusters: {:?}",
-            missing_methods.len(),
-            &missing_methods[..missing_methods.len().min(5)]
-        );
+        // Log unclustered methods warning (only at verbosity >= 2)
+        if crate::progress::ProgressManager::global()
+            .map(|pm| pm.verbosity() >= 2)
+            .unwrap_or(false)
+        {
+            eprintln!(
+                "WARNING: {} methods were not clustered, merging into existing clusters: {:?}",
+                missing_methods.len(),
+                &missing_methods[..missing_methods.len().min(5)]
+            );
+        }
 
         // Try to find an existing Utilities cluster first
         let utilities_cluster = clusters.iter_mut().find(
