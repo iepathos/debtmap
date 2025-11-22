@@ -249,7 +249,7 @@ impl SpecificityScorer {
 ///
 /// # Examples
 /// ```
-/// # use debtmap::organization::semantic_naming::specificity_scorer::is_generic_type_name;
+/// # use debtmap::organization::semantic_naming::is_generic_type_name;
 /// assert!(is_generic_type_name("unknown"));
 /// assert!(is_generic_type_name("self"));
 /// assert!(!is_generic_type_name("validation_rules"));

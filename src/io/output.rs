@@ -1,5 +1,5 @@
 use crate::core::{AnalysisResults, FunctionMetrics};
-use crate::io::writers::{JsonWriter, MarkdownWriter, TerminalWriter};
+use crate::io::writers::{HtmlWriter, JsonWriter, MarkdownWriter, TerminalWriter};
 use crate::risk::RiskInsight;
 use std::io;
 
@@ -8,6 +8,7 @@ pub enum OutputFormat {
     Json,
     Markdown,
     Terminal,
+    Html,
 }
 
 pub trait OutputWriter {
@@ -20,6 +21,7 @@ pub fn create_writer(format: OutputFormat) -> Box<dyn OutputWriter> {
         OutputFormat::Json => Box::new(JsonWriter::new(io::stdout())),
         OutputFormat::Markdown => Box::new(MarkdownWriter::new(io::stdout())),
         OutputFormat::Terminal => Box::new(TerminalWriter::default()),
+        OutputFormat::Html => Box::new(HtmlWriter::new(io::stdout())),
     }
 }
 

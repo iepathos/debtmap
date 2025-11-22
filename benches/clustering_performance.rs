@@ -2,8 +2,9 @@
 //!
 //! Validates that clustering overhead is <15% of total analysis time.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::organization::GodObjectDetector;
+use std::hint::black_box;
 use std::path::Path;
 
 fn benchmark_clustering_overhead(c: &mut Criterion) {
