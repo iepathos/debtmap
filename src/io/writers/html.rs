@@ -1,5 +1,7 @@
 use crate::core::AnalysisResults;
 use crate::io::output::OutputWriter;
+use crate::output::unified::convert_to_unified_format;
+use crate::priority::UnifiedAnalysis;
 use crate::risk::RiskInsight;
 use anyhow::Result;
 use html_escape::encode_text;
@@ -9,6 +11,17 @@ use std::io::Write;
 pub struct HtmlWriter<W: Write> {
     writer: W,
     template: &'static str,
+    unified_analysis: Option<UnifiedAnalysis>,
+}
+
+impl<W: Write> HtmlWriter<W> {
+    pub fn with_unified_analysis(writer: W, analysis: UnifiedAnalysis) -> Self {
+        Self {
+            writer,
+            template: include_str!("templates/dashboard.html"),
+            unified_analysis: Some(analysis),
+        }
+    }
 }
 
 impl<W: Write> HtmlWriter<W> {
@@ -16,6 +29,7 @@ impl<W: Write> HtmlWriter<W> {
         Self {
             writer,
             template: include_str!("templates/dashboard.html"),
+            unified_analysis: None,
         }
     }
 
@@ -61,7 +75,13 @@ impl<W: Write> HtmlWriter<W> {
     }
 
     fn render_html(&self, results: &AnalysisResults, metrics: &DashboardMetrics) -> Result<String> {
-        let json_data = serde_json::to_string(results)?;
+        // Use unified format if available, otherwise use legacy format
+        let json_data = if let Some(ref unified) = self.unified_analysis {
+            let unified_output = convert_to_unified_format(unified, true);
+            serde_json::to_string(&unified_output)?
+        } else {
+            serde_json::to_string(results)?
+        };
         let escaped_json = encode_text(&json_data);
 
         let html = self

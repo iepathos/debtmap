@@ -47,6 +47,75 @@
             content: ' ▼';
         }
 
+        .recommendation-card {
+            border-left: 4px solid #e5e7eb;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .recommendation-card:hover {
+            background: #f3f4f6;
+            border-left-color: #8B5CF6;
+        }
+
+        .recommendation-card.expanded {
+            background: white;
+            border-left-color: #8B5CF6;
+        }
+
+        .recommendation-card.critical {
+            border-left-color: #EF4444;
+        }
+
+        .recommendation-card.high {
+            border-left-color: #F59E0B;
+        }
+
+        .recommendation-card.medium {
+            border-left-color: #FBBF24;
+        }
+
+        .recommendation-details {
+            display: none;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .recommendation-details.show {
+            display: block;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge.critical {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .badge.high {
+            background: #FED7AA;
+            color: #9A3412;
+        }
+
+        .badge.medium {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge.low {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
         @media print {
             .no-print { display: none; }
             .chart-container { page-break-inside: avoid; }
@@ -65,6 +134,34 @@
                 <span>📈 Debt Density: {{{DEBT_DENSITY}}} per 1K LOC</span>
                 <span>🔢 {{{TOTAL_FUNCTIONS}}} functions</span>
                 <span>📅 Generated: {{{TIMESTAMP}}}</span>
+            </div>
+        </div>
+
+        <!-- Total Debt Score - Prominent Card -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8 border-l-8 border-purple-600">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <div class="text-sm text-gray-600 mb-2 uppercase tracking-wide">Total Debt Score</div>
+                    <div class="text-6xl font-bold text-purple-600 mb-4" id="total-debt-score">-</div>
+                    <div class="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                        <div>
+                            <span class="font-medium text-gray-600">Debt Density:</span>
+                            <span class="ml-2 font-semibold">{{{DEBT_DENSITY}}} per 1K LOC</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-600">Total LOC:</span>
+                            <span class="ml-2 font-semibold" id="total-loc">-</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-600">Total Items:</span>
+                            <span class="ml-2 font-semibold">{{{TOTAL_ITEMS}}}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium text-gray-600">Functions:</span>
+                            <span class="ml-2 font-semibold">{{{TOTAL_FUNCTIONS}}}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -89,6 +186,26 @@
                 <div class="text-sm text-gray-600 mb-2">Low/Optional</div>
                 <div class="text-3xl font-bold text-green-600">{{{LOW_COUNT}}}</div>
                 <div class="text-xs text-gray-500 mt-1" id="low-percentage"></div>
+            </div>
+        </div>
+
+        <!-- Top 10 Recommendations -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold flex items-center gap-2">
+                    <span>🎯</span> Top 10 Priority Recommendations
+                </h2>
+                <div class="flex gap-2">
+                    <button onclick="exportToCSV()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                        📊 Export CSV
+                    </button>
+                    <button onclick="exportToMarkdown()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
+                        📝 Export Markdown
+                    </button>
+                </div>
+            </div>
+            <div id="top-recommendations" class="space-y-4">
+                <!-- Populated by JavaScript -->
             </div>
         </div>
 
@@ -133,6 +250,14 @@
                     <canvas id="recommendationsChart"></canvas>
                 </div>
             </div>
+
+            <!-- Entropy Distribution -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Entropy Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="entropyDistChart"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- God Objects Table -->
@@ -158,9 +283,44 @@
         <!-- Complex Functions Table -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4">🔥 Most Complex Functions</h2>
-            <div class="mb-4">
-                <input type="text" id="searchBox" placeholder="Search functions..."
-                       class="px-4 py-2 border border-gray-300 rounded-md w-full md:w-96">
+
+            <!-- Filters -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2">Search</label>
+                        <input type="text" id="searchBox" placeholder="Filter by name or file..."
+                               class="px-3 py-2 border border-gray-300 rounded-md w-full text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2">Priority</label>
+                        <select id="priorityFilter" class="px-3 py-2 border border-gray-300 rounded-md w-full text-sm">
+                            <option value="all">All Priorities</option>
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2">Min Complexity</label>
+                        <input type="number" id="minComplexity" placeholder="0" min="0"
+                               class="px-3 py-2 border border-gray-300 rounded-md w-full text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-2">Min Entropy</label>
+                        <input type="number" id="minEntropy" placeholder="0.0" min="0" max="1" step="0.1"
+                               class="px-3 py-2 border border-gray-300 rounded-md w-full text-sm">
+                    </div>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button onclick="applyFilters()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
+                        Apply Filters
+                    </button>
+                    <button onclick="resetFilters()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-sm">
+                        Reset
+                    </button>
+                </div>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 sortable" id="complexFunctionsTable">
@@ -171,6 +331,8 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cyclomatic</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cognitive</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nesting</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entropy</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dampening</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
                         </tr>
                     </thead>
@@ -201,11 +363,55 @@
                 `${({{{LOW_COUNT}}} / totalItems * 100).toFixed(1)}% of items`;
         }
 
+        // Calculate and display total debt score
+        function calculateTotalDebtScore() {
+            // Handle both unified and legacy formats
+            const isUnifiedFormat = debtData.format_version !== undefined;
+
+            if (isUnifiedFormat) {
+                // Unified format has summary
+                const summary = debtData.summary || {};
+                document.getElementById('total-debt-score').textContent = Math.round(summary.total_debt_score || 0).toLocaleString();
+                document.getElementById('total-loc').textContent = (summary.total_loc || 0).toLocaleString();
+            } else {
+                // Legacy format - calculate from items
+                let totalScore = 0;
+                let totalLoc = 0;
+
+                (debtData.technical_debt?.items || []).forEach(item => {
+                    const score = item.unified_score?.final_score || 0;
+                    totalScore += score;
+                });
+
+                (debtData.complexity?.metrics || []).forEach(m => {
+                    totalLoc += m.length || 0;
+                });
+
+                document.getElementById('total-debt-score').textContent = Math.round(totalScore).toLocaleString();
+                document.getElementById('total-loc').textContent = totalLoc.toLocaleString();
+            }
+        }
+
+        calculateTotalDebtScore();
+
         // Helper functions for data extraction
+        function getDebtItems(data) {
+            const isUnifiedFormat = data.format_version !== undefined;
+            if (isUnifiedFormat) {
+                return data.items || [];
+            } else {
+                return data.technical_debt?.items || [];
+            }
+        }
+
         function extractIssueTypesAndCounts(data) {
             const types = {};
-            data.technical_debt.items.forEach(item => {
-                const type = item.debt_type;
+            const items = getDebtItems(data);
+
+            items.forEach(item => {
+                // Unified format: check item.category or item.debt_type
+                // Legacy format: item.debt_type
+                const type = item.category || item.debt_type || 'Unknown';
                 types[type] = (types[type] || 0) + 1;
             });
             // Sort by count descending to assign most distinct colors to largest categories
@@ -268,7 +474,8 @@
             const causes = {};
 
             // Extract and categorize issues from debt items
-            data.technical_debt.items.forEach(item => {
+            const items = getDebtItems(data);
+            items.forEach(item => {
                 let cause = 'Other';
                 const msg = item.message || '';
 
@@ -331,11 +538,33 @@
             const medium = [];
             const low = [];
 
-            data.complexity.metrics.forEach(func => {
+            // Get function metrics from either format
+            const isUnifiedFormat = data.format_version !== undefined;
+            let functions = [];
+
+            if (isUnifiedFormat) {
+                // Unified format: filter items where type === "Function"
+                functions = (data.items || [])
+                    .filter(item => item.type === 'Function')
+                    .map(item => ({
+                        name: item.location?.function || 'unknown',
+                        cyclomatic: item.metrics?.cyclomatic_complexity || 0,
+                        cognitive: item.metrics?.cognitive_complexity || 0
+                    }));
+            } else {
+                // Legacy format
+                functions = (data.complexity?.metrics || []).map(func => ({
+                    name: func.name,
+                    cyclomatic: func.cyclomatic,
+                    cognitive: func.cognitive
+                }));
+            }
+
+            functions.forEach(func => {
                 const point = {
                     x: func.cyclomatic,
                     y: func.cognitive,
-                    name: `${func.name}`
+                    name: func.name
                 };
 
                 if (func.cyclomatic >= 20 || func.cognitive >= 50) {
@@ -359,8 +588,14 @@
 
         function extractRecommendations(data) {
             const recommendations = {};
-            data.technical_debt.items.forEach(item => {
-                const rec = item.message.split(':')[0] || 'Other';
+            const items = getDebtItems(data);
+
+            items.forEach(item => {
+                // Try to extract from recommendation.action first, then fall back to message
+                const rec = item.recommendation?.action ||
+                           (item.message?.split(':')[0]) ||
+                           item.category ||
+                           'Other';
                 recommendations[rec] = (recommendations[rec] || 0) + 1;
             });
             const sorted = Object.entries(recommendations).sort((a, b) => b[1] - a[1]);
@@ -369,12 +604,413 @@
 
         function extractRecommendationCounts(data) {
             const recommendations = {};
-            data.technical_debt.items.forEach(item => {
-                const rec = item.message.split(':')[0] || 'Other';
+            const items = getDebtItems(data);
+
+            items.forEach(item => {
+                // Try to extract from recommendation.action first, then fall back to message
+                const rec = item.recommendation?.action ||
+                           (item.message?.split(':')[0]) ||
+                           item.category ||
+                           'Other';
                 recommendations[rec] = (recommendations[rec] || 0) + 1;
             });
             const sorted = Object.entries(recommendations).sort((a, b) => b[1] - a[1]);
             return sorted.slice(0, 6).map(x => x[1]);
+        }
+
+        // Populate Top 10 Recommendations
+        function populateTop10Recommendations() {
+            const items = getDebtItems(debtData)
+                .map(item => ({
+                    ...item,
+                    score: item.score || item.unified_score?.final_score || 0
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10);
+
+            const container = document.getElementById('top-recommendations');
+
+            items.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = `recommendation-card ${item.priority.toLowerCase()}`;
+
+                const priorityClass = item.priority.toLowerCase();
+                const recommendation = item.recommendation || {};
+                const impact = item.impact || {};
+                const metrics = item.metrics || {};
+
+                // Handle both unified and legacy formats for location
+                let locationText = '';
+                if (item.location) {
+                    // Unified format
+                    locationText = item.location.file || '';
+                    if (item.location.line) locationText += `:${item.location.line}`;
+                    if (item.location.function) locationText += ` ${item.location.function}()`;
+                } else {
+                    // Legacy format
+                    locationText = item.file || '';
+                    if (item.line) locationText += `:${item.line}`;
+                    if (item.function_name) locationText += ` ${item.function_name}()`;
+                }
+
+                // Calculate entropy and dampening
+                const entropy = metrics.entropy_score || item.entropy_score;
+                const entropyDisplay = entropy !== null && entropy !== undefined ? entropy.toFixed(2) : 'N/A';
+                const entropyColor = getEntropyColorClass(entropy);
+
+                // Calculate dampening factor if we have adjusted complexity
+                let dampeningDisplay = 'N/A';
+                if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
+                    const dampening = item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity;
+                    dampeningDisplay = dampening.toFixed(2);
+                }
+
+                // Extract rationale from item.context or recommendation
+                const rationale = recommendation.rationale || item.context?.rationale || extractRationaleFromMessage(item.message);
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between cursor-pointer" onclick="toggleDetails(${index})">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="text-lg font-bold text-gray-700">#${index + 1}</span>
+                                <span class="badge ${priorityClass}">${item.priority.toUpperCase()}</span>
+                                <span class="text-sm font-semibold text-purple-600">SCORE: ${Math.round(item.score)}</span>
+                            </div>
+                            <div class="text-sm font-mono text-gray-600 mb-1">${locationText}</div>
+                            ${recommendation.action ? `<div class="text-sm text-gray-800 font-medium">⚡ ${recommendation.action}</div>` : ''}
+                        </div>
+                        <button class="text-gray-400 hover:text-gray-600 ml-4">
+                            <span id="toggle-icon-${index}">▼</span>
+                        </button>
+                    </div>
+                    <div id="details-${index}" class="recommendation-details">
+                        ${rationale ? `
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">💡 Why This Matters</div>
+                                <div class="text-sm text-gray-700">${rationale}</div>
+                            </div>
+                        ` : ''}
+                        ${impact.complexity_reduction || impact.risk_reduction ? `
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">📈 Impact</div>
+                                <div class="text-sm text-gray-700 space-y-1">
+                                    ${impact.complexity_reduction ? `<div>• Complexity reduction: ${impact.complexity_reduction.toFixed(1)}</div>` : ''}
+                                    ${impact.risk_reduction ? `<div>• Risk reduction: ${impact.risk_reduction.toFixed(1)}</div>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${metrics.cyclomatic_complexity || metrics.cognitive_complexity || entropy !== null ? `
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">📊 Metrics</div>
+                                <div class="text-sm text-gray-700">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        ${metrics.cyclomatic_complexity ? `<div>Cyclomatic: <span class="font-semibold">${metrics.cyclomatic_complexity}</span></div>` : ''}
+                                        ${metrics.cognitive_complexity ? `<div>Cognitive: <span class="font-semibold">${metrics.cognitive_complexity}</span></div>` : ''}
+                                        ${metrics.nesting_depth ? `<div>Nesting: <span class="font-semibold">${metrics.nesting_depth}</span></div>` : ''}
+                                        ${entropy !== null && entropy !== undefined ? `<div>Entropy: <span class="font-semibold ${entropyColor}">${entropyDisplay}</span></div>` : ''}
+                                        ${dampeningDisplay !== 'N/A' ? `<div>Dampening: <span class="font-semibold text-blue-600">${dampeningDisplay}</span></div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${item.message ? `
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">📋 Details</div>
+                                <div class="text-xs text-gray-600 p-2 bg-gray-50 rounded">
+                                    ${item.message}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${item.god_object_indicators?.recommended_splits ? renderGodObjectSplits(item.god_object_indicators) : ''}
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function renderGodObjectSplits(indicators) {
+            const splits = indicators.recommended_splits || [];
+            if (splits.length === 0) return '';
+
+            const responsibilities = indicators.responsibility_names?.join(', ') || 'N/A';
+            const structureInfo = `${indicators.methods_count || 0} methods, ${indicators.fields_count || 0} fields, ${indicators.responsibilities || 0} responsibilities`;
+
+            let html = `
+                <div class="mt-4 border-t pt-4">
+                    <div class="text-xs font-semibold text-gray-600 uppercase mb-2">🏛️ God Object Analysis</div>
+                    <div class="text-sm text-gray-700 mb-3">
+                        <div><strong>Structure:</strong> ${structureInfo}</div>
+                        <div><strong>Responsibilities:</strong> ${responsibilities}</div>
+                        <div><strong>God Object Score:</strong> ${(indicators.god_object_score * 100).toFixed(0)}%</div>
+                    </div>
+                    <div class="text-xs font-semibold text-gray-600 uppercase mb-2">📦 Recommended Splits (${splits.length} modules)</div>
+                    <div class="space-y-3">
+            `;
+
+            splits.forEach((split, idx) => {
+                const priorityClass = split.priority?.toLowerCase() || 'medium';
+                const methods = split.methods_to_move || [];
+                const fields = split.fields_needed || [];
+
+                html += `
+                    <div class="border border-gray-200 rounded p-3 bg-white">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex-1">
+                                <div class="font-mono text-sm font-semibold text-purple-700">${split.suggested_name}</div>
+                                <div class="text-xs text-gray-600 mt-1">
+                                    <span class="badge ${priorityClass} mr-2">${split.priority || 'Medium'}</span>
+                                    <span>${split.responsibility || split.behavior_category || 'General'}</span>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-600">
+                                ${split.method_count || methods.length} methods, ~${split.estimated_lines || 0} lines
+                            </div>
+                        </div>
+                        ${methods.length > 0 ? `
+                            <div class="mt-2">
+                                <div class="text-xs font-semibold text-gray-600 mb-1">Methods (${methods.length}):</div>
+                                <div class="text-xs font-mono text-gray-700 space-y-1">
+                                    ${methods.slice(0, 5).map(m => `<div>• ${m}()</div>`).join('')}
+                                    ${methods.length > 5 ? `<div class="text-gray-500">... and ${methods.length - 5} more</div>` : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${fields.length > 0 ? `
+                            <div class="mt-2">
+                                <div class="text-xs font-semibold text-gray-600 mb-1">Fields needed (${fields.length}):</div>
+                                <div class="text-xs font-mono text-gray-700">
+                                    ${fields.join(', ')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${split.trait_suggestion ? `
+                            <details class="mt-2">
+                                <summary class="text-xs font-semibold text-gray-600 cursor-pointer hover:text-purple-600">
+                                    View trait suggestion
+                                </summary>
+                                <pre class="text-xs font-mono bg-gray-50 p-2 rounded mt-1 overflow-x-auto">${split.trait_suggestion}</pre>
+                            </details>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function toggleDetails(index) {
+            const details = document.getElementById(`details-${index}`);
+            const icon = document.getElementById(`toggle-icon-${index}`);
+            const card = details.parentElement;
+
+            if (details.classList.contains('show')) {
+                details.classList.remove('show');
+                icon.textContent = '▼';
+                card.classList.remove('expanded');
+            } else {
+                details.classList.add('show');
+                icon.textContent = '▲';
+                card.classList.add('expanded');
+            }
+        }
+
+        function getEntropyColorClass(entropy) {
+            if (entropy === null || entropy === undefined || entropy === 'N/A') return '';
+            if (entropy >= 0.6) return 'text-red-600';
+            if (entropy >= 0.4) return 'text-orange-600';
+            if (entropy >= 0.3) return 'text-yellow-600';
+            return 'text-green-600';
+        }
+
+        function extractRationaleFromMessage(message) {
+            if (!message) return null;
+
+            // Try to extract rationale from common patterns in messages
+            // Messages often have format like "Issue: details" or contain explanation after first sentence
+
+            // If message contains multiple sentences, use the explanation parts
+            const sentences = message.split(/[.!?]+/).filter(s => s.trim().length > 0);
+            if (sentences.length > 1) {
+                // Return sentences after the first one as rationale
+                return sentences.slice(1).join('. ').trim() + '.';
+            }
+
+            // If message has a colon, try to extract explanation
+            if (message.includes(':')) {
+                const parts = message.split(':');
+                if (parts.length > 1 && parts[1].trim().length > 20) {
+                    return parts.slice(1).join(':').trim();
+                }
+            }
+
+            // If message is long enough, use it as is
+            if (message.length > 50) {
+                return message;
+            }
+
+            return null;
+        }
+
+        populateTop10Recommendations();
+
+        // Export functionality
+        function exportToCSV() {
+            const items = getDebtItems(debtData)
+                .map(item => ({
+                    ...item,
+                    score: item.score || item.unified_score?.final_score || 0
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 50);
+
+            const headers = ['Rank', 'Score', 'Priority', 'File', 'Line', 'Function', 'Action', 'Complexity Reduction', 'Risk Reduction', 'Cyclomatic', 'Cognitive', 'Nesting', 'Entropy', 'Dampening', 'Message'];
+
+            const rows = items.map((item, idx) => {
+                const rec = item.recommendation || {};
+                const impact = item.impact || {};
+                const metrics = item.metrics || {};
+
+                // Extract location info
+                let file = '', line = '', funcName = '';
+                if (item.location) {
+                    file = item.location.file || '';
+                    line = item.location.line || '';
+                    funcName = item.location.function || '';
+                } else {
+                    file = item.file || '';
+                    line = item.line || '';
+                    funcName = item.function_name || '';
+                }
+
+                // Calculate dampening
+                let dampening = '';
+                if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
+                    dampening = (item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity).toFixed(2);
+                }
+
+                return [
+                    idx + 1,
+                    Math.round(item.score),
+                    item.priority || 'N/A',
+                    file,
+                    line,
+                    funcName,
+                    (rec.action || '').replace(/,/g, ';'),
+                    impact.complexity_reduction?.toFixed(1) || '',
+                    impact.risk_reduction?.toFixed(1) || '',
+                    metrics.cyclomatic_complexity || '',
+                    metrics.cognitive_complexity || '',
+                    metrics.nesting_depth || '',
+                    (metrics.entropy_score || item.entropy_score)?.toFixed(2) || '',
+                    dampening,
+                    (item.message || '').replace(/,/g, ';').replace(/\n/g, ' ')
+                ];
+            });
+
+            const csv = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            downloadFile('debtmap-recommendations.csv', csv, 'text/csv');
+        }
+
+        function exportToMarkdown() {
+            const items = getDebtItems(debtData)
+                .map(item => ({
+                    ...item,
+                    score: item.score || item.unified_score?.final_score || 0
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 50);
+
+            let md = '# Debtmap Analysis - Top Recommendations\n\n';
+            md += `**Generated:** ${new Date().toLocaleDateString()}\n`;
+
+            const isUnifiedFormat = debtData.format_version !== undefined;
+            const totalScore = isUnifiedFormat
+                ? (debtData.summary?.total_debt_score || 0)
+                : getDebtItems(debtData).reduce((sum, item) => sum + (item.unified_score?.final_score || 0), 0);
+            md += `**Total Debt Score:** ${Math.round(totalScore).toLocaleString()}\n\n`;
+            md += '---\n\n';
+
+            items.forEach((item, idx) => {
+                const rec = item.recommendation || {};
+                const impact = item.impact || {};
+                const metrics = item.metrics || {};
+
+                md += `## #${idx + 1} - Score: ${Math.round(item.score)} [${item.priority?.toUpperCase()}]\n\n`;
+
+                // Handle location for both formats
+                let location = '';
+                if (item.location) {
+                    location = item.location.file || '';
+                    if (item.location.line) location += `:${item.location.line}`;
+                    if (item.location.function) location += ` ${item.location.function}()`;
+                } else {
+                    location = item.file || '';
+                    if (item.line) location += `:${item.line}`;
+                    if (item.function_name) location += ` ${item.function_name}()`;
+                }
+                md += `**Location:** \`${location}\`\n\n`;
+
+                if (rec.action) {
+                    md += `### ⚡ Recommended Action\n${rec.action}\n\n`;
+                }
+
+                if (rec.rationale) {
+                    md += `### 💡 Why This Matters\n${rec.rationale}\n\n`;
+                }
+
+                if (impact.complexity_reduction || impact.risk_reduction) {
+                    md += `### 📈 Impact\n`;
+                    if (impact.complexity_reduction) md += `- Complexity reduction: ${impact.complexity_reduction.toFixed(1)}\n`;
+                    if (impact.risk_reduction) md += `- Risk reduction: ${impact.risk_reduction.toFixed(1)}\n`;
+                    md += '\n';
+                }
+
+                if (metrics.cyclomatic_complexity || metrics.cognitive_complexity) {
+                    md += `### 📊 Metrics\n`;
+                    if (metrics.cyclomatic_complexity) md += `- Cyclomatic complexity: ${metrics.cyclomatic_complexity}\n`;
+                    if (metrics.cognitive_complexity) md += `- Cognitive complexity: ${metrics.cognitive_complexity}\n`;
+                    if (metrics.nesting_depth) md += `- Nesting depth: ${metrics.nesting_depth}\n`;
+
+                    const entropy = metrics.entropy_score || item.entropy_score;
+                    if (entropy !== null && entropy !== undefined) {
+                        md += `- Entropy: ${entropy.toFixed(2)}\n`;
+                    }
+
+                    // Add dampening if available
+                    if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
+                        const dampening = (item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity).toFixed(2);
+                        md += `- Dampening factor: ${dampening}\n`;
+                    }
+
+                    md += '\n';
+                }
+
+                md += '---\n\n';
+            });
+
+            downloadFile('debtmap-recommendations.md', md, 'text/markdown');
+        }
+
+        function downloadFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         // Issue Distribution Pie Chart
@@ -493,7 +1129,18 @@
 
         // Complexity Distribution Histogram
         function createComplexityHistogram(data) {
-            const complexities = data.complexity.metrics.map(m => m.cyclomatic);
+            // Get complexities from either format
+            const isUnifiedFormat = data.format_version !== undefined;
+            let complexities = [];
+
+            if (isUnifiedFormat) {
+                complexities = (data.items || [])
+                    .filter(item => item.type === 'Function')
+                    .map(item => item.metrics?.cyclomatic_complexity || 0);
+            } else {
+                complexities = (data.complexity?.metrics || []).map(m => m.cyclomatic);
+            }
+
             const bins = [
                 { label: '0-10', min: 0, max: 10, count: 0 },
                 { label: '10-20', min: 10, max: 20, count: 0 },
@@ -590,25 +1237,158 @@
             }
         });
 
+        // Entropy Distribution Chart
+        function createEntropyDistribution(data) {
+            const entropyBins = [
+                { label: '0.0-0.2 (Low)', min: 0.0, max: 0.2, count: 0, color: 'rgba(16, 185, 129, 0.7)' },
+                { label: '0.2-0.4 (Medium)', min: 0.2, max: 0.4, count: 0, color: 'rgba(251, 191, 36, 0.7)' },
+                { label: '0.4-0.6 (High)', min: 0.4, max: 0.6, count: 0, color: 'rgba(245, 158, 11, 0.7)' },
+                { label: '0.6+ (Very High)', min: 0.6, max: 1.0, count: 0, color: 'rgba(239, 68, 68, 0.7)' }
+            ];
+
+            const isUnifiedFormat = data.format_version !== undefined;
+            let functions = [];
+
+            if (isUnifiedFormat) {
+                functions = (data.items || [])
+                    .filter(item => item.type === 'Function')
+                    .map(item => ({ entropy_score: item.metrics?.entropy_score }));
+            } else {
+                functions = data.complexity?.metrics || [];
+            }
+
+            functions.forEach(func => {
+                const entropy = func.entropy_score;
+                if (entropy !== null && entropy !== undefined) {
+                    for (let bin of entropyBins) {
+                        if (entropy >= bin.min && entropy < bin.max) {
+                            bin.count++;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            return {
+                labels: entropyBins.map(b => b.label),
+                datasets: [{
+                    label: 'Functions',
+                    data: entropyBins.map(b => b.count),
+                    backgroundColor: entropyBins.map(b => b.color),
+                    borderColor: entropyBins.map(b => b.color.replace('0.7', '1')),
+                    borderWidth: 1
+                }]
+            };
+        }
+
+        new Chart(document.getElementById('entropyDistChart'), {
+            type: 'bar',
+            data: createEntropyDistribution(debtData),
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Number of Functions' },
+                        ticks: { precision: 0 }
+                    },
+                    x: {
+                        title: { display: true, text: 'Entropy Range' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.y} functions`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Filter functionality
+        let allFunctions = [];
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+            const priority = document.getElementById('priorityFilter').value;
+            const minComplexity = parseFloat(document.getElementById('minComplexity').value) || 0;
+            const minEntropy = parseFloat(document.getElementById('minEntropy').value) || 0;
+
+            const tbody = document.getElementById('complexFunctionsBody');
+            const rows = tbody.getElementsByTagName('tr');
+
+            Array.from(rows).forEach(row => {
+                const cells = row.getElementsByTagName('td');
+                if (cells.length === 0) return;
+
+                const name = cells[0].textContent.toLowerCase();
+                const file = cells[1].textContent.toLowerCase();
+                const cyclomatic = parseInt(cells[2].textContent) || 0;
+                const cognitive = parseInt(cells[3].textContent) || 0;
+                const entropyText = cells[5].textContent;
+                const entropy = entropyText === 'N/A' ? 0 : parseFloat(entropyText) || 0;
+                const priorityBadge = cells[7].textContent.toLowerCase();
+
+                const matchesSearch = name.includes(searchTerm) || file.includes(searchTerm);
+                const matchesPriority = priority === 'all' || priorityBadge.includes(priority);
+                const matchesComplexity = Math.max(cyclomatic, cognitive) >= minComplexity;
+                const matchesEntropy = entropy >= minEntropy;
+
+                row.style.display = (matchesSearch && matchesPriority && matchesComplexity && matchesEntropy) ? '' : 'none';
+            });
+        }
+
+        function resetFilters() {
+            document.getElementById('searchBox').value = '';
+            document.getElementById('priorityFilter').value = 'all';
+            document.getElementById('minComplexity').value = '';
+            document.getElementById('minEntropy').value = '';
+            applyFilters();
+        }
+
+        // Auto-apply search filter on input
+        document.getElementById('searchBox').addEventListener('input', applyFilters);
+        document.getElementById('priorityFilter').addEventListener('change', applyFilters);
+
         // Populate God Objects Table
         function populateGodObjectsTable() {
-            const godObjects = debtData.technical_debt.items.filter(item =>
-                item.debt_type === 'GodObject' ||
-                (item.context && item.context.architectural_issues)
-            );
+            const items = getDebtItems(debtData);
+            const isUnifiedFormat = debtData.format_version !== undefined;
+
+            const godObjects = items.filter(item => {
+                if (isUnifiedFormat) {
+                    // Unified format: check category or debt_type
+                    return item.category === 'GodObject' ||
+                           (item.debt_type && typeof item.debt_type === 'object' && item.debt_type.GodObject);
+                } else {
+                    // Legacy format
+                    return item.debt_type === 'GodObject' ||
+                           (item.context && item.context.architectural_issues);
+                }
+            });
 
             if (godObjects.length > 0) {
                 document.getElementById('godObjectsSection').style.display = 'block';
                 const tbody = document.getElementById('godObjectsBody');
 
                 godObjects.forEach(item => {
+                    // Extract location data from either format
+                    const file = item.location?.file || item.file || '-';
+                    const line = item.location?.line || item.line || '-';
+                    const priority = typeof item.priority === 'string' ? item.priority : (item.priority?.toString() || '-');
+
                     const row = tbody.insertRow();
                     row.innerHTML = `
-                        <td class="px-6 py-4 text-sm font-mono">${item.file}</td>
-                        <td class="px-6 py-4 text-sm font-semibold text-red-600">${item.priority}</td>
-                        <td class="px-6 py-4 text-sm">${item.line || '-'}</td>
+                        <td class="px-6 py-4 text-sm font-mono">${file}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-red-600">${priority}</td>
+                        <td class="px-6 py-4 text-sm">${line}</td>
                         <td class="px-6 py-4 text-sm">-</td>
-                        <td class="px-6 py-4 text-sm text-gray-600">${item.message}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${item.recommendation?.action || item.message || '-'}</td>
                     `;
                 });
             }
@@ -617,21 +1397,66 @@
         // Populate Complex Functions Table
         function populateComplexFunctionsTable() {
             const tbody = document.getElementById('complexFunctionsBody');
-            const functions = debtData.complexity.metrics
+
+            // Get functions from data
+            let functions = [];
+            const isUnifiedFormat = debtData.format_version !== undefined;
+
+            if (isUnifiedFormat) {
+                // In unified format, functions are in items array with type: "Function"
+                functions = (debtData.items || [])
+                    .filter(item => item.type === 'Function')
+                    .map(item => ({
+                        name: item.location?.function || 'unknown',
+                        file: item.location?.file || '',
+                        cyclomatic: item.metrics?.cyclomatic_complexity || 0,
+                        cognitive: item.metrics?.cognitive_complexity || 0,
+                        nesting: item.metrics?.nesting_depth || 0,
+                        entropy_score: item.metrics?.entropy_score,
+                        adjusted_complexity: item.debt_type?.ComplexityHotspot ? {
+                            dampened_cyclomatic: item.debt_type.ComplexityHotspot.adjusted_cyclomatic
+                        } : null
+                    }));
+            } else {
+                // Legacy format
+                functions = (debtData.complexity?.metrics || []);
+            }
+
+            functions = functions
                 .sort((a, b) => Math.max(b.cyclomatic, b.cognitive) - Math.max(a.cyclomatic, a.cognitive))
                 .slice(0, 50);
 
             functions.forEach(func => {
                 const row = tbody.insertRow();
+                const entropy = func.entropy_score ?? 'N/A';
+                const entropyDisplay = entropy !== 'N/A' ? entropy.toFixed(2) : 'N/A';
+                const entropyColor = getEntropyColor(entropy);
+
+                // Calculate dampening factor (if adjusted_complexity exists)
+                let dampening = 'N/A';
+                if (func.adjusted_complexity && func.adjusted_complexity.dampened_cyclomatic) {
+                    dampening = (func.adjusted_complexity.dampened_cyclomatic / func.cyclomatic).toFixed(2);
+                }
+
                 row.innerHTML = `
                     <td class="px-6 py-4 text-sm font-mono">${func.name}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">${func.file}</td>
                     <td class="px-6 py-4 text-sm">${func.cyclomatic}</td>
                     <td class="px-6 py-4 text-sm font-semibold ${getCognitiveColor(func.cognitive)}">${func.cognitive}</td>
                     <td class="px-6 py-4 text-sm">${func.nesting}</td>
+                    <td class="px-6 py-4 text-sm ${entropyColor}">${entropyDisplay}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${dampening}</td>
                     <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs ${getPriorityBadge(func)}">${getPriority(func)}</span></td>
                 `;
             });
+        }
+
+        function getEntropyColor(entropy) {
+            if (entropy === 'N/A') return 'text-gray-400';
+            if (entropy >= 0.5) return 'text-red-600 font-semibold';
+            if (entropy >= 0.4) return 'text-orange-600';
+            if (entropy >= 0.3) return 'text-yellow-600';
+            return 'text-green-600';
         }
 
         function getCognitiveColor(cognitive) {

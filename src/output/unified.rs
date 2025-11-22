@@ -168,6 +168,15 @@ pub struct FunctionDebtItemOutput {
     pub impact: FunctionImpactOutput,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scoring_details: Option<FunctionScoringDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub adjusted_complexity: Option<AdjustedComplexity>,
+}
+
+/// Adjusted complexity based on entropy analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdjustedComplexity {
+    pub dampened_cyclomatic: f64,
+    pub dampening_factor: f64,
 }
 
 /// Function metrics in unified format
@@ -181,6 +190,8 @@ pub struct FunctionMetricsOutput {
     pub coverage: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uncovered_lines: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entropy_score: Option<f64>,
 }
 
 /// Purity analysis results
@@ -314,6 +325,7 @@ impl FunctionDebtItemOutput {
                 nesting_depth: item.nesting_depth,
                 coverage: item.transitive_coverage.as_ref().map(|c| c.transitive),
                 uncovered_lines: None, // Not currently tracked
+                entropy_score: item.entropy_details.as_ref().map(|e| e.entropy_score),
             },
             debt_type: item.debt_type.clone(),
             function_role: item.function_role,
@@ -353,6 +365,10 @@ impl FunctionDebtItemOutput {
             } else {
                 None
             },
+            adjusted_complexity: item.entropy_details.as_ref().map(|e| AdjustedComplexity {
+                dampened_cyclomatic: e.adjusted_complexity as f64,
+                dampening_factor: e.dampening_factor,
+            }),
         }
     }
 }
