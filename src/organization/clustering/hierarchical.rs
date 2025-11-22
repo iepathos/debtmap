@@ -84,37 +84,44 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
         // Build similarity matrix (cached for efficiency)
         let similarity_matrix = self.build_similarity_matrix(&clusters);
 
+        // Track failed merge pairs to avoid re-attempting them
+        let mut failed_merges: std::collections::HashSet<(usize, usize)> =
+            std::collections::HashSet::new();
+
         // Iteratively merge most similar clusters
         loop {
-            let merge_candidate = self.find_best_merge(&clusters, &similarity_matrix);
+            // Find best merge that hasn't failed before
+            let merge_candidate =
+                self.find_best_merge_excluding(&clusters, &similarity_matrix, &failed_merges);
 
             match merge_candidate {
                 Some((idx1, idx2, similarity)) if similarity > self.min_similarity_threshold => {
+                    // Save original clusters for potential undo
+                    let cluster1_original = clusters[idx1].clone();
+                    let cluster2_idx = idx2.max(idx1);
+                    let cluster2_original = clusters[cluster2_idx].clone();
+
                     // Merge clusters
-                    let cluster2 = clusters.remove(idx2.max(idx1));
+                    let cluster2 = clusters.remove(cluster2_idx);
                     let idx1_adjusted = if idx2 < idx1 { idx1 - 1 } else { idx1 };
                     clusters[idx1_adjusted].merge_with(cluster2);
 
                     // Recompute coherence
-                    clusters[idx1_adjusted].coherence =
-                        self.calculate_coherence(&clusters[idx1_adjusted]);
+                    let merged_coherence = self.calculate_coherence(&clusters[idx1_adjusted]);
+                    clusters[idx1_adjusted].coherence = merged_coherence;
 
                     // Reject if coherence too low
-                    if clusters[idx1_adjusted].coherence < self.min_coherence {
-                        // Undo merge by splitting
-                        let (c1, c2) = clusters.remove(idx1_adjusted).split();
-                        // Restore original coherence
-                        let c1_coherence = self.calculate_coherence(&c1);
-                        let c2_coherence = self.calculate_coherence(&c2);
+                    if merged_coherence < self.min_coherence {
+                        // Undo merge by restoring original clusters
+                        clusters.remove(idx1_adjusted);
+                        clusters.insert(idx1_adjusted, cluster1_original);
+                        clusters.insert(idx2.max(idx1), cluster2_original);
 
-                        let mut c1 = c1;
-                        let mut c2 = c2;
-                        c1.coherence = c1_coherence;
-                        c2.coherence = c2_coherence;
+                        // Mark this merge pair as failed to avoid retrying
+                        failed_merges.insert((idx1.min(idx2), idx1.max(idx2)));
 
-                        clusters.insert(idx1_adjusted, c1);
-                        clusters.insert(idx1_adjusted + 1, c2);
-                        break; // Stop merging
+                        // Continue trying other merges instead of stopping
+                        continue;
                     }
                 }
                 _ => break, // No more valid merges
@@ -165,16 +172,22 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
         }
     }
 
-    /// Find the best pair of clusters to merge
-    fn find_best_merge(
+    /// Find the best pair of clusters to merge, excluding failed merge attempts
+    fn find_best_merge_excluding(
         &self,
         clusters: &[Cluster],
         similarity_matrix: &SimilarityMatrix,
+        failed_merges: &std::collections::HashSet<(usize, usize)>,
     ) -> Option<(usize, usize, f64)> {
         let mut best_merge: Option<(usize, usize, f64)> = None;
 
         for i in 0..clusters.len() {
             for j in (i + 1)..clusters.len() {
+                // Skip if this merge pair has failed before
+                if failed_merges.contains(&(i, j)) {
+                    continue;
+                }
+
                 let similarity = similarity_matrix.get(i, j);
 
                 if similarity > best_merge.map(|(_, _, sim)| sim).unwrap_or(0.0) {

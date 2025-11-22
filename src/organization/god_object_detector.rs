@@ -1252,12 +1252,22 @@ impl GodObjectDetector {
         }
 
         // If we have a dominant pattern (3+ methods with avg confidence > 0.4), use it
-        if let Some((pattern, (count, total_confidence))) = pattern_scores
-            .iter()
+        // Convert to Vec and sort for deterministic ordering (fixes non-deterministic HashMap iteration)
+        let mut pattern_entries: Vec<_> = pattern_scores
+            .into_iter()
             .filter(|(_, (count, _))| *count >= 3)
-            .max_by_key(|(_, (count, _))| *count)
-        {
-            let avg_confidence = total_confidence / (*count as f64);
+            .collect();
+
+        // Sort by count (descending), then by pattern discriminant for deterministic tie-breaking
+        pattern_entries.sort_by(|(pattern1, (count1, _)), (pattern2, (count2, _))| {
+            count2.cmp(count1).then_with(|| {
+                // Use Debug representation for stable ordering across patterns
+                format!("{:?}", pattern1).cmp(&format!("{:?}", pattern2))
+            })
+        });
+
+        if let Some((pattern, (count, total_confidence))) = pattern_entries.into_iter().next() {
+            let avg_confidence = total_confidence / (count as f64);
             if avg_confidence >= 0.40 {
                 return match pattern {
                     DomainPattern::ObserverPattern => "Observer Pattern".to_string(),

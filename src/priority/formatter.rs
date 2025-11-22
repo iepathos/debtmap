@@ -1054,7 +1054,12 @@ fn format_god_object_steps_with_verbosity(
     // Use detailed verbosity by default (can be controlled via config in future)
     if let Some(module_structure) = &indicators.module_structure {
         use crate::config::VerbosityLevel;
-        format_module_structure_analysis(output, module_structure, VerbosityLevel::Detailed);
+        format_module_structure_analysis(
+            output,
+            module_structure,
+            VerbosityLevel::Detailed,
+            indicators.responsibilities, // Use god_object_indicators responsibilities for consistency
+        );
     }
 
     // Add implementation guidance
@@ -1087,6 +1092,7 @@ fn format_module_structure_analysis(
     output: &mut String,
     module_structure: &crate::analysis::ModuleStructure,
     verbosity: crate::config::VerbosityLevel,
+    responsibilities: usize, // Use god_object_indicators value for consistency
 ) {
     use crate::config::VerbosityLevel;
     use std::fmt::Write;
@@ -1097,7 +1103,7 @@ fn format_module_structure_analysis(
     writeln!(
         output,
         "  - STRUCTURE: {} responsibilities across {} components",
-        module_structure.responsibility_count,
+        responsibilities, // Use god_object_indicators value instead of module_structure.responsibility_count
         module_structure.components.len()
     )
     .unwrap();
@@ -1105,12 +1111,12 @@ fn format_module_structure_analysis(
     // Detailed and Comprehensive: Show function breakdown
     if verbosity != VerbosityLevel::Summary {
         let func_counts = &module_structure.function_counts;
+        // Use visibility-based total to match public+private breakdown
+        let total_functions = func_counts.public_functions + func_counts.private_functions;
         writeln!(
             output,
             "  - FUNCTIONS: {} total ({} public, {} private)",
-            func_counts.total(),
-            func_counts.public_functions,
-            func_counts.private_functions
+            total_functions, func_counts.public_functions, func_counts.private_functions
         )
         .unwrap();
 
@@ -1486,13 +1492,20 @@ fn format_file_priority_item_with_verbosity(
     )
     .unwrap();
 
+    // Use methods_count for god objects (excludes tests), raw function_count otherwise
+    let display_function_count = if item.metrics.god_object_indicators.is_god_object {
+        item.metrics.god_object_indicators.methods_count
+    } else {
+        item.metrics.function_count
+    };
+
     writeln!(
         output,
         "{} {} ({} lines, {} functions)",
         "└─".bright_blue(),
         item.metrics.path.display().to_string().bright_green(),
         item.metrics.total_lines,
-        item.metrics.function_count
+        display_function_count
     )
     .unwrap();
 
@@ -1510,7 +1523,7 @@ fn format_file_priority_item_with_verbosity(
         fields_count: item.metrics.god_object_indicators.fields_count,
         methods_count: item.metrics.god_object_indicators.methods_count,
         responsibilities: item.metrics.god_object_indicators.responsibilities,
-        function_count: item.metrics.function_count,
+        function_count: item.metrics.god_object_indicators.methods_count, // Use methods_count for consistency (excludes tests)
         total_lines: item.metrics.total_lines,
         god_object_type: item.metrics.god_object_type.as_ref(),
         domain_diversity_metrics: item
@@ -1580,7 +1593,7 @@ fn format_file_priority_item_with_verbosity(
         output,
         &formatter,
         item.metrics.total_lines,
-        item.metrics.function_count,
+        display_function_count, // Use consistent count (methods_count for god objects)
         item.metrics.file_type.as_ref(),
     );
 }
