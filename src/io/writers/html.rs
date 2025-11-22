@@ -284,4 +284,370 @@ mod tests {
         let density = calculate_debt_density(&results);
         assert_eq!(density, 0.0);
     }
+
+    #[test]
+    fn test_all_template_variables_substituted() {
+        let results = create_test_results();
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Verify all template variables are replaced (none should remain)
+        assert!(!output.contains("{{{PROJECT_NAME}}}"));
+        assert!(!output.contains("{{{TIMESTAMP}}}"));
+        assert!(!output.contains("{{{TOTAL_ITEMS}}}"));
+        assert!(!output.contains("{{{CRITICAL_COUNT}}}"));
+        assert!(!output.contains("{{{HIGH_COUNT}}}"));
+        assert!(!output.contains("{{{MEDIUM_COUNT}}}"));
+        assert!(!output.contains("{{{LOW_COUNT}}}"));
+        assert!(!output.contains("{{{DEBT_DENSITY}}}"));
+        assert!(!output.contains("{{{TOTAL_FUNCTIONS}}}"));
+        assert!(!output.contains("{{{AVG_COMPLEXITY}}}"));
+
+        // Verify actual values are present
+        assert!(output.contains("/test/project"));
+        assert!(output.contains("1 items analyzed"));
+        assert!(output.contains("1 functions"));
+    }
+
+    #[test]
+    fn test_priority_counts_all_levels() {
+        let items = vec![
+            DebtItem {
+                id: "critical-1".to_string(),
+                debt_type: DebtType::Complexity,
+                priority: Priority::Critical,
+                file: PathBuf::from("test1.rs"),
+                line: 1,
+                column: None,
+                message: "Critical issue".to_string(),
+                context: None,
+            },
+            DebtItem {
+                id: "critical-2".to_string(),
+                debt_type: DebtType::ErrorSwallowing,
+                priority: Priority::Critical,
+                file: PathBuf::from("test2.rs"),
+                line: 2,
+                column: None,
+                message: "Another critical".to_string(),
+                context: None,
+            },
+            DebtItem {
+                id: "high-1".to_string(),
+                debt_type: DebtType::CodeSmell,
+                priority: Priority::High,
+                file: PathBuf::from("test3.rs"),
+                line: 3,
+                column: None,
+                message: "High priority".to_string(),
+                context: None,
+            },
+            DebtItem {
+                id: "medium-1".to_string(),
+                debt_type: DebtType::Todo,
+                priority: Priority::Medium,
+                file: PathBuf::from("test4.rs"),
+                line: 4,
+                column: None,
+                message: "Medium priority".to_string(),
+                context: None,
+            },
+            DebtItem {
+                id: "low-1".to_string(),
+                debt_type: DebtType::Duplication,
+                priority: Priority::Low,
+                file: PathBuf::from("test5.rs"),
+                line: 5,
+                column: None,
+                message: "Low priority".to_string(),
+                context: None,
+            },
+        ];
+
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test/project"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 0,
+                    average_complexity: 0.0,
+                    max_complexity: 0,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: items.clone(),
+                by_type: HashMap::new(),
+                priorities: vec![
+                    Priority::Critical,
+                    Priority::High,
+                    Priority::Medium,
+                    Priority::Low,
+                ],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+            file_contexts: HashMap::new(),
+        };
+
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Check counts in metric cards
+        assert!(output.contains(">2</div>")); // Critical count
+        assert!(output.contains(">1</div>")); // High, Medium, Low counts
+        assert!(output.contains("5 items analyzed"));
+    }
+
+    #[test]
+    fn test_empty_results() {
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/empty/project"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: vec![],
+                summary: ComplexitySummary {
+                    total_functions: 0,
+                    average_complexity: 0.0,
+                    max_complexity: 0,
+                    high_complexity_count: 0,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+            file_contexts: HashMap::new(),
+        };
+
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+
+        // Should not panic with empty data
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.contains("0 items analyzed"));
+        assert!(output.contains("0 functions"));
+        assert!(output.contains("Debt Density: 0.0 per 1K LOC"));
+    }
+
+    #[test]
+    fn test_with_unified_analysis_constructor() {
+        // Simple test to verify with_unified_analysis constructor doesn't panic
+        // and produces valid HTML output
+        use crate::priority::call_graph::CallGraph;
+        use crate::priority::UnifiedAnalysis;
+
+        let call_graph = CallGraph::new();
+        let analysis = UnifiedAnalysis::new(call_graph);
+        let results = create_test_results();
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::with_unified_analysis(&mut buffer, analysis);
+
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Verify HTML structure is present
+        assert!(output.contains("<!DOCTYPE html>"));
+        assert!(output.contains("<html"));
+        // Verify unified format markers are present
+        assert!(output.contains("format_version"));
+    }
+
+    #[test]
+    fn test_special_characters_in_paths() {
+        let mut results = create_test_results();
+        results.project_path = PathBuf::from("/path/with spaces/and'quotes\"");
+        results.technical_debt.items[0].file = PathBuf::from("file with spaces.rs");
+        results.technical_debt.items[0].message = "Message with <html> & \"quotes\"".to_string();
+
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Verify special characters are escaped in JSON
+        assert!(output.contains("&lt;html&gt;") || output.contains("\\u003c"));
+        assert!(output.contains("file with spaces.rs"));
+        // Should not contain unescaped quotes that would break JSON
+        let json_start = output.find("debt-data").unwrap();
+        let json_section = &output[json_start..json_start + 1000];
+        // JSON should be properly escaped
+        assert!(!json_section.contains("Message with <html>"));
+    }
+
+    #[test]
+    fn test_multiple_debt_items_with_entropy() {
+        let metrics = vec![
+            FunctionMetrics {
+                name: "high_entropy_func".to_string(),
+                file: PathBuf::from("test1.rs"),
+                line: 10,
+                cyclomatic: 15,
+                cognitive: 20,
+                nesting: 3,
+                length: 50,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(crate::complexity::entropy_core::EntropyScore {
+                    token_entropy: 0.8,
+                    pattern_repetition: 0.2,
+                    branch_similarity: 0.3,
+                    effective_complexity: 0.7,
+                    unique_variables: 15,
+                    max_nesting: 3,
+                    dampening_applied: 0.8,
+                }),
+                is_pure: Some(true),
+                purity_confidence: Some(0.95),
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: Some(12.0),
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+            },
+            FunctionMetrics {
+                name: "low_entropy_func".to_string(),
+                file: PathBuf::from("test2.rs"),
+                line: 20,
+                cyclomatic: 10,
+                cognitive: 12,
+                nesting: 2,
+                length: 30,
+                is_test: false,
+                visibility: None,
+                is_trait_method: false,
+                in_test_module: false,
+                entropy_score: Some(crate::complexity::entropy_core::EntropyScore {
+                    token_entropy: 0.3,
+                    pattern_repetition: 0.7,
+                    branch_similarity: 0.8,
+                    effective_complexity: 0.2,
+                    unique_variables: 8,
+                    max_nesting: 2,
+                    dampening_applied: 0.3,
+                }),
+                is_pure: Some(false),
+                purity_confidence: Some(0.6),
+                purity_reason: None,
+                call_dependencies: None,
+                detected_patterns: None,
+                upstream_callers: None,
+                downstream_callees: None,
+                mapping_pattern_result: None,
+                adjusted_complexity: Some(3.0),
+                composition_metrics: None,
+                language_specific: None,
+                purity_level: None,
+            },
+        ];
+
+        let results = AnalysisResults {
+            project_path: PathBuf::from("/test/project"),
+            timestamp: Utc::now(),
+            complexity: ComplexityReport {
+                metrics: metrics.clone(),
+                summary: ComplexitySummary {
+                    total_functions: 2,
+                    average_complexity: 12.5,
+                    max_complexity: 20,
+                    high_complexity_count: 1,
+                },
+            },
+            technical_debt: TechnicalDebtReport {
+                items: vec![],
+                by_type: HashMap::new(),
+                priorities: vec![],
+                duplications: vec![],
+            },
+            dependencies: DependencyReport {
+                modules: vec![],
+                circular: vec![],
+            },
+            duplications: vec![],
+            file_contexts: HashMap::new(),
+        };
+
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Verify entropy data is in JSON
+        assert!(output.contains("token_entropy"));
+        assert!(output.contains("pattern_repetition"));
+        assert!(output.contains("effective_complexity"));
+        assert!(output.contains("high_entropy_func"));
+        assert!(output.contains("low_entropy_func"));
+    }
+
+    #[test]
+    fn test_very_large_numbers() {
+        let mut results = create_test_results();
+
+        // Add many items to create high density
+        for i in 0..1000 {
+            results.technical_debt.items.push(DebtItem {
+                id: format!("item-{}", i),
+                debt_type: DebtType::Complexity,
+                priority: Priority::Medium,
+                file: PathBuf::from(format!("test{}.rs", i)),
+                line: i,
+                column: None,
+                message: "Test item".to_string(),
+                context: None,
+            });
+        }
+
+        // Very large complexity numbers
+        results.complexity.metrics[0].cyclomatic = 999;
+        results.complexity.metrics[0].cognitive = 1500;
+        results.complexity.summary.average_complexity = 999.5;
+        results.complexity.summary.max_complexity = 1500;
+
+        let mut buffer = Vec::new();
+        let mut writer = HtmlWriter::new(&mut buffer);
+
+        writer.write_results(&results).unwrap();
+
+        let output = String::from_utf8(buffer).unwrap();
+
+        // Should handle large numbers without crashing
+        assert!(output.contains("1001 items analyzed")); // 1000 + original 1
+        assert!(output.contains("cyclomatic"));
+        // Debt density should be very high
+        assert!(output.contains("Debt Density:"));
+    }
 }
