@@ -170,6 +170,8 @@ pub struct FunctionDebtItemOutput {
     pub scoring_details: Option<FunctionScoringDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub adjusted_complexity: Option<AdjustedComplexity>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub complexity_pattern: Option<String>,
 }
 
 /// Adjusted complexity based on entropy analysis
@@ -305,9 +307,14 @@ impl FileDebtItemOutput {
 impl FunctionDebtItemOutput {
     fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
         let score = item.unified_score.final_score;
+        let complexity_pattern = extract_complexity_pattern(&item.recommendation.rationale, &item.recommendation.primary_action);
         FunctionDebtItemOutput {
             score,
-            category: categorize_function_debt(&item.debt_type),
+            category: if let Some(ref pattern) = complexity_pattern {
+                pattern.clone()
+            } else {
+                categorize_function_debt(&item.debt_type)
+            },
             priority: Priority::from_score(score),
             location: UnifiedLocation {
                 file: item.location.file.to_string_lossy().to_string(),
@@ -369,7 +376,37 @@ impl FunctionDebtItemOutput {
                 dampened_cyclomatic: e.adjusted_complexity as f64,
                 dampening_factor: e.dampening_factor,
             }),
+            complexity_pattern,
         }
+    }
+}
+
+/// Extract complexity pattern from recommendation text
+fn extract_complexity_pattern(rationale: &str, action: &str) -> Option<String> {
+    // Check for moderate complexity (preventive)
+    if action.contains("Maintain current low complexity") || action.contains("approaching thresholds") {
+        return Some("ModerateComplexity".to_string());
+    }
+
+    // Check for specific patterns in the rationale
+    if rationale.contains("Deep nesting") || rationale.contains("nesting is primary issue") {
+        Some("DeepNesting".to_string())
+    } else if rationale.contains("Many decision points") || rationale.contains("branches) drive cyclomatic") {
+        Some("HighBranching".to_string())
+    } else if rationale.contains("State machine pattern") {
+        Some("StateMachine".to_string())
+    } else if rationale.contains("High token entropy") || rationale.contains("inconsistent structure") {
+        Some("ChaoticStructure".to_string())
+    } else if action.contains("Clean dispatcher pattern") || rationale.contains("dispatcher") {
+        Some("Dispatcher".to_string())
+    } else if rationale.contains("repetitive validation") || rationale.contains("Repetitive validation") {
+        Some("RepetitiveValidation".to_string())
+    } else if rationale.contains("coordinator") || rationale.contains("orchestrat") {
+        Some("Coordinator".to_string())
+    } else if rationale.contains("nesting and branching") || action.contains("two-phase approach") {
+        Some("MixedComplexity".to_string())
+    } else {
+        None
     }
 }
 
@@ -386,21 +423,9 @@ fn categorize_file_debt(item: &FileDebtItem) -> String {
 fn categorize_function_debt(debt_type: &DebtType) -> String {
     match debt_type {
         DebtType::TestingGap { .. } => "TestingGap".to_string(),
-        DebtType::ComplexityHotspot { cyclomatic, cognitive, .. } => {
-            // Differentiate based on which complexity metric is the primary driver
-            const CYCLOMATIC_HIGH: u32 = 15;
-            const COGNITIVE_HIGH: u32 = 30;
-
-            let is_cyclomatic_high = *cyclomatic >= CYCLOMATIC_HIGH;
-            let is_cognitive_high = *cognitive >= COGNITIVE_HIGH;
-
-            match (is_cyclomatic_high, is_cognitive_high) {
-                (true, true) => "HighComplexity".to_string(),
-                (true, false) => "CyclomaticComplexity".to_string(),
-                (false, true) => "CognitiveComplexity".to_string(),
-                (false, false) => "ModerateComplexity".to_string(),
-            }
-        },
+        // For ComplexityHotspot, the pattern should be extracted from recommendation
+        // This is a fallback if pattern extraction failed
+        DebtType::ComplexityHotspot { .. } => "ComplexityHotspot".to_string(),
         DebtType::DeadCode { .. } => "DeadCode".to_string(),
         DebtType::Duplication { .. } => "Duplication".to_string(),
         DebtType::Risk { .. } => "Risk".to_string(),
