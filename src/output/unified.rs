@@ -307,14 +307,13 @@ impl FileDebtItemOutput {
 impl FunctionDebtItemOutput {
     fn from_function_item(item: &UnifiedDebtItem, include_scoring_details: bool) -> Self {
         let score = item.unified_score.final_score;
-        let complexity_pattern = extract_complexity_pattern(&item.recommendation.rationale, &item.recommendation.primary_action);
+        let complexity_pattern = extract_complexity_pattern(
+            &item.recommendation.rationale,
+            &item.recommendation.primary_action,
+        );
         FunctionDebtItemOutput {
             score,
-            category: if let Some(ref pattern) = complexity_pattern {
-                pattern.clone()
-            } else {
-                categorize_function_debt(&item.debt_type)
-            },
+            category: crate::priority::DebtCategory::from_debt_type(&item.debt_type).to_string(),
             priority: Priority::from_score(score),
             location: UnifiedLocation {
                 file: item.location.file.to_string_lossy().to_string(),
@@ -384,22 +383,30 @@ impl FunctionDebtItemOutput {
 /// Extract complexity pattern from recommendation text
 fn extract_complexity_pattern(rationale: &str, action: &str) -> Option<String> {
     // Check for moderate complexity (preventive)
-    if action.contains("Maintain current low complexity") || action.contains("approaching thresholds") {
+    if action.contains("Maintain current low complexity")
+        || action.contains("approaching thresholds")
+    {
         return Some("ModerateComplexity".to_string());
     }
 
     // Check for specific patterns in the rationale
     if rationale.contains("Deep nesting") || rationale.contains("nesting is primary issue") {
         Some("DeepNesting".to_string())
-    } else if rationale.contains("Many decision points") || rationale.contains("branches) drive cyclomatic") {
+    } else if rationale.contains("Many decision points")
+        || rationale.contains("branches) drive cyclomatic")
+    {
         Some("HighBranching".to_string())
     } else if rationale.contains("State machine pattern") {
         Some("StateMachine".to_string())
-    } else if rationale.contains("High token entropy") || rationale.contains("inconsistent structure") {
+    } else if rationale.contains("High token entropy")
+        || rationale.contains("inconsistent structure")
+    {
         Some("ChaoticStructure".to_string())
     } else if action.contains("Clean dispatcher pattern") || rationale.contains("dispatcher") {
         Some("Dispatcher".to_string())
-    } else if rationale.contains("repetitive validation") || rationale.contains("Repetitive validation") {
+    } else if rationale.contains("repetitive validation")
+        || rationale.contains("Repetitive validation")
+    {
         Some("RepetitiveValidation".to_string())
     } else if rationale.contains("coordinator") || rationale.contains("orchestrat") {
         Some("Coordinator".to_string())
@@ -410,49 +417,9 @@ fn extract_complexity_pattern(rationale: &str, action: &str) -> Option<String> {
     }
 }
 
-fn categorize_file_debt(item: &FileDebtItem) -> String {
-    if item.metrics.god_object_indicators.is_god_object {
-        "GodObject".to_string()
-    } else if item.metrics.function_count > 50 {
-        "GodModule".to_string()
-    } else {
-        "FileComplexity".to_string()
-    }
-}
-
-fn categorize_function_debt(debt_type: &DebtType) -> String {
-    match debt_type {
-        DebtType::TestingGap { .. } => "TestingGap".to_string(),
-        // For ComplexityHotspot, the pattern should be extracted from recommendation
-        // This is a fallback if pattern extraction failed
-        DebtType::ComplexityHotspot { .. } => "ComplexityHotspot".to_string(),
-        DebtType::DeadCode { .. } => "DeadCode".to_string(),
-        DebtType::Duplication { .. } => "Duplication".to_string(),
-        DebtType::Risk { .. } => "Risk".to_string(),
-        DebtType::TestComplexityHotspot { .. } => "TestComplexity".to_string(),
-        DebtType::TestTodo { .. } => "TestTodo".to_string(),
-        DebtType::TestDuplication { .. } => "TestDuplication".to_string(),
-        DebtType::ErrorSwallowing { .. } => "ErrorHandling".to_string(),
-        DebtType::AllocationInefficiency { .. } => "Performance".to_string(),
-        DebtType::StringConcatenation { .. } => "Performance".to_string(),
-        DebtType::NestedLoops { .. } => "NestedLoops".to_string(),
-        DebtType::BlockingIO { .. } => "BlockingIO".to_string(),
-        DebtType::SuboptimalDataStructure { .. } => "SuboptimalDataStructure".to_string(),
-        DebtType::GodObject { .. } => "GodObject".to_string(),
-        DebtType::GodModule { .. } => "GodModule".to_string(),
-        DebtType::FeatureEnvy { .. } => "FeatureEnvy".to_string(),
-        DebtType::PrimitiveObsession { .. } => "PrimitiveObsession".to_string(),
-        DebtType::MagicValues { .. } => "MagicValues".to_string(),
-        DebtType::AssertionComplexity { .. } => "AssertionComplexity".to_string(),
-        DebtType::FlakyTestPattern { .. } => "FlakyTestPattern".to_string(),
-        DebtType::AsyncMisuse { .. } => "AsyncMisuse".to_string(),
-        DebtType::ResourceLeak { .. } => "ResourceLeak".to_string(),
-        DebtType::CollectionInefficiency { .. } => "CollectionInefficiency".to_string(),
-        // Type organization (Spec 187)
-        DebtType::ScatteredType { .. } => "ScatteredType".to_string(),
-        DebtType::OrphanedFunctions { .. } => "OrphanedFunctions".to_string(),
-        DebtType::UtilitiesSprawl { .. } => "UtilitiesSprawl".to_string(),
-    }
+fn categorize_file_debt(_item: &FileDebtItem) -> String {
+    // File-level debt is always architecture-related (large files, god modules)
+    "Architecture".to_string()
 }
 
 fn calculate_file_scoring_details(item: &FileDebtItem) -> FileScoringDetails {

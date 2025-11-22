@@ -291,6 +291,17 @@ pub enum DebtCategory {
     CodeQuality,
 }
 
+impl std::fmt::Display for DebtCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DebtCategory::Architecture => write!(f, "Architecture"),
+            DebtCategory::Testing => write!(f, "Testing"),
+            DebtCategory::Performance => write!(f, "Performance"),
+            DebtCategory::CodeQuality => write!(f, "CodeQuality"),
+        }
+    }
+}
+
 impl DebtCategory {
     pub fn from_debt_type(debt_type: &DebtType) -> Self {
         match debt_type {

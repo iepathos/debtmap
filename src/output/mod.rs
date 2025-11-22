@@ -130,13 +130,15 @@ pub fn output_unified_priorities_with_summary(
         Some(crate::cli::OutputFormat::Html) => match output_file {
             Some(path) => {
                 let file = std::fs::File::create(&path)?;
-                let mut writer = io::writers::HtmlWriter::with_unified_analysis(file, analysis.clone());
+                let mut writer =
+                    io::writers::HtmlWriter::with_unified_analysis(file, analysis.clone());
                 writer.write_results(results)?;
                 Ok(())
             }
             None => {
                 let stdout = std::io::stdout();
-                let mut writer = io::writers::HtmlWriter::with_unified_analysis(stdout, analysis.clone());
+                let mut writer =
+                    io::writers::HtmlWriter::with_unified_analysis(stdout, analysis.clone());
                 writer.write_results(results)?;
                 Ok(())
             }

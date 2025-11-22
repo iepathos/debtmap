@@ -137,16 +137,19 @@
             </div>
         </div>
 
-        <!-- Total Debt Score - Prominent Card -->
+        <!-- Debt Density - Prominent Card -->
         <div class="bg-white rounded-lg shadow-lg p-8 mb-8 border-l-8 border-purple-600">
             <div class="flex items-center justify-between">
                 <div class="flex-1">
-                    <div class="text-sm text-gray-600 mb-2 uppercase tracking-wide">Total Debt Score</div>
-                    <div class="text-6xl font-bold text-purple-600 mb-4" id="total-debt-score">-</div>
+                    <div class="text-sm text-gray-600 mb-2 uppercase tracking-wide">Debt Density</div>
+                    <div class="flex items-baseline gap-2 mb-4">
+                        <div class="text-6xl font-bold text-purple-600">{{{DEBT_DENSITY}}}</div>
+                        <div class="text-2xl text-gray-500 font-medium">per 1K LOC</div>
+                    </div>
                     <div class="grid grid-cols-2 gap-4 text-sm text-gray-700">
                         <div>
-                            <span class="font-medium text-gray-600">Debt Density:</span>
-                            <span class="ml-2 font-semibold">{{{DEBT_DENSITY}}} per 1K LOC</span>
+                            <span class="font-medium text-gray-600">Total Debt Score:</span>
+                            <span class="ml-2 font-semibold" id="total-debt-score">-</span>
                         </div>
                         <div>
                             <span class="font-medium text-gray-600">Total LOC:</span>
@@ -191,19 +194,9 @@
 
         <!-- Top 10 Recommendations -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-2xl font-semibold flex items-center gap-2">
-                    <span>🎯</span> Top 10 Priority Recommendations
-                </h2>
-                <div class="flex gap-2">
-                    <button onclick="exportToCSV()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-                        📊 Export CSV
-                    </button>
-                    <button onclick="exportToMarkdown()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
-                        📝 Export Markdown
-                    </button>
-                </div>
-            </div>
+            <h2 class="text-2xl font-semibold flex items-center gap-2 mb-4">
+                <span>🎯</span> Top 10 Priority Recommendations
+            </h2>
             <div id="top-recommendations" class="space-y-4">
                 <!-- Populated by JavaScript -->
             </div>
@@ -865,160 +858,6 @@
         }
 
         populateTop10Recommendations();
-
-        // Export functionality
-        function exportToCSV() {
-            const items = getDebtItems(debtData)
-                .map(item => ({
-                    ...item,
-                    score: item.score || item.unified_score?.final_score || 0
-                }))
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 50);
-
-            const headers = ['Rank', 'Score', 'Priority', 'File', 'Line', 'Function', 'Action', 'Complexity Reduction', 'Risk Reduction', 'Cyclomatic', 'Cognitive', 'Nesting', 'Entropy', 'Dampening', 'Message'];
-
-            const rows = items.map((item, idx) => {
-                const rec = item.recommendation || {};
-                const impact = item.impact || {};
-                const metrics = item.metrics || {};
-
-                // Extract location info
-                let file = '', line = '', funcName = '';
-                if (item.location) {
-                    file = item.location.file || '';
-                    line = item.location.line || '';
-                    funcName = item.location.function || '';
-                } else {
-                    file = item.file || '';
-                    line = item.line || '';
-                    funcName = item.function_name || '';
-                }
-
-                // Calculate dampening
-                let dampening = '';
-                if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
-                    dampening = (item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity).toFixed(2);
-                }
-
-                return [
-                    idx + 1,
-                    Math.round(item.score),
-                    item.priority || 'N/A',
-                    file,
-                    line,
-                    funcName,
-                    (rec.action || '').replace(/,/g, ';'),
-                    impact.complexity_reduction?.toFixed(1) || '',
-                    impact.risk_reduction?.toFixed(1) || '',
-                    metrics.cyclomatic_complexity || '',
-                    metrics.cognitive_complexity || '',
-                    metrics.nesting_depth || '',
-                    (metrics.entropy_score || item.entropy_score)?.toFixed(2) || '',
-                    dampening,
-                    (item.message || '').replace(/,/g, ';').replace(/\n/g, ' ')
-                ];
-            });
-
-            const csv = [
-                headers.join(','),
-                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-            ].join('\n');
-
-            downloadFile('debtmap-recommendations.csv', csv, 'text/csv');
-        }
-
-        function exportToMarkdown() {
-            const items = getDebtItems(debtData)
-                .map(item => ({
-                    ...item,
-                    score: item.score || item.unified_score?.final_score || 0
-                }))
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 50);
-
-            let md = '# Debtmap Analysis - Top Recommendations\n\n';
-            md += `**Generated:** ${new Date().toLocaleDateString()}\n`;
-
-            const isUnifiedFormat = debtData.format_version !== undefined;
-            const totalScore = isUnifiedFormat
-                ? (debtData.summary?.total_debt_score || 0)
-                : getDebtItems(debtData).reduce((sum, item) => sum + (item.unified_score?.final_score || 0), 0);
-            md += `**Total Debt Score:** ${Math.round(totalScore).toLocaleString()}\n\n`;
-            md += '---\n\n';
-
-            items.forEach((item, idx) => {
-                const rec = item.recommendation || {};
-                const impact = item.impact || {};
-                const metrics = item.metrics || {};
-
-                md += `## #${idx + 1} - Score: ${Math.round(item.score)} [${item.priority?.toUpperCase()}]\n\n`;
-
-                // Handle location for both formats
-                let location = '';
-                if (item.location) {
-                    location = item.location.file || '';
-                    if (item.location.line) location += `:${item.location.line}`;
-                    if (item.location.function) location += ` ${item.location.function}()`;
-                } else {
-                    location = item.file || '';
-                    if (item.line) location += `:${item.line}`;
-                    if (item.function_name) location += ` ${item.function_name}()`;
-                }
-                md += `**Location:** \`${location}\`\n\n`;
-
-                if (rec.action) {
-                    md += `### ⚡ Recommended Action\n${rec.action}\n\n`;
-                }
-
-                if (rec.rationale) {
-                    md += `### 💡 Why This Matters\n${rec.rationale}\n\n`;
-                }
-
-                if (impact.complexity_reduction || impact.risk_reduction) {
-                    md += `### 📈 Impact\n`;
-                    if (impact.complexity_reduction) md += `- Complexity reduction: ${impact.complexity_reduction.toFixed(1)}\n`;
-                    if (impact.risk_reduction) md += `- Risk reduction: ${impact.risk_reduction.toFixed(1)}\n`;
-                    md += '\n';
-                }
-
-                if (metrics.cyclomatic_complexity || metrics.cognitive_complexity) {
-                    md += `### 📊 Metrics\n`;
-                    if (metrics.cyclomatic_complexity) md += `- Cyclomatic complexity: ${metrics.cyclomatic_complexity}\n`;
-                    if (metrics.cognitive_complexity) md += `- Cognitive complexity: ${metrics.cognitive_complexity}\n`;
-                    if (metrics.nesting_depth) md += `- Nesting depth: ${metrics.nesting_depth}\n`;
-
-                    const entropy = metrics.entropy_score || item.entropy_score;
-                    if (entropy !== null && entropy !== undefined) {
-                        md += `- Entropy: ${entropy.toFixed(2)}\n`;
-                    }
-
-                    // Add dampening if available
-                    if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
-                        const dampening = (item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity).toFixed(2);
-                        md += `- Dampening factor: ${dampening}\n`;
-                    }
-
-                    md += '\n';
-                }
-
-                md += '---\n\n';
-            });
-
-            downloadFile('debtmap-recommendations.md', md, 'text/markdown');
-        }
-
-        function downloadFile(filename, content, mimeType) {
-            const blob = new Blob([content], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
 
         // Issue Distribution Pie Chart
         const issueData = extractIssueTypesAndCounts(debtData);
