@@ -24,12 +24,14 @@ impl NameUniquenessValidator {
     /// Ensure a unique name from a list of candidates
     ///
     /// Tries each candidate in order of confidence. If all candidates
-    /// are already used, disambiguates the best candidate with a numeric suffix.
+    /// are already used, disambiguates the best candidate using method-based
+    /// terms when available, or numeric suffix as fallback.
     ///
     /// # Arguments
     ///
     /// * `parent_path` - Parent directory where module will be created
     /// * `candidates` - List of name candidates (should be sorted by confidence)
+    /// * `methods` - Optional list of method names for intelligent disambiguation
     ///
     /// # Returns
     ///
@@ -38,6 +40,7 @@ impl NameUniquenessValidator {
         &mut self,
         parent_path: &Path,
         mut candidates: Vec<NameCandidate>,
+        methods: Option<&[String]>,
     ) -> NameCandidate {
         if candidates.is_empty() {
             // No candidates provided, generate a fallback
@@ -57,18 +60,40 @@ impl NameUniquenessValidator {
             }
         }
 
-        // All candidates are used, disambiguate the best one
+        // All candidates are used, try intelligent disambiguation first
         let base_candidate = candidates.remove(0);
+
+        // Try method-based disambiguation if methods provided
+        if let Some(methods) = methods {
+            if let Some(distinctive_term) = Self::extract_distinctive_term(methods) {
+                let candidate = format!("{}_{}", base_candidate.module_name, distinctive_term);
+                if !used.contains(&candidate) {
+                    used.insert(candidate.clone());
+                    return NameCandidate {
+                        module_name: candidate,
+                        confidence: base_candidate.confidence * 0.85, // Slight confidence reduction
+                        specificity_score: base_candidate.specificity_score,
+                        reasoning: format!(
+                            "{} (disambiguated with method-specific term '{}')",
+                            base_candidate.reasoning, distinctive_term
+                        ),
+                        strategy: base_candidate.strategy,
+                    };
+                }
+            }
+        }
+
+        // Fall back to numeric disambiguation
         let unique_name = Self::disambiguate_name_static(used, &base_candidate.module_name);
 
         used.insert(unique_name.clone());
 
         NameCandidate {
             module_name: unique_name.clone(),
-            confidence: base_candidate.confidence * 0.8, // Lower confidence for disambiguated
+            confidence: base_candidate.confidence * 0.7, // Lower confidence for numeric suffix
             specificity_score: base_candidate.specificity_score,
             reasoning: format!(
-                "{} (disambiguated to avoid collision)",
+                "{} (disambiguated with numeric suffix to avoid collision)",
                 base_candidate.reasoning
             ),
             strategy: base_candidate.strategy,
@@ -124,6 +149,102 @@ impl NameUniquenessValidator {
         }
     }
 
+    /// Extract a distinctive term from method names for disambiguation
+    ///
+    /// Analyzes method names to find a specific verb or noun that can be used
+    /// to create a more descriptive disambiguated name.
+    ///
+    /// # Arguments
+    ///
+    /// * `methods` - List of method names to analyze
+    ///
+    /// # Returns
+    ///
+    /// A distinctive term if found, None otherwise
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Methods: ["infer_responsibility", "group_methods"]
+    /// // → Returns: "inference" (from "infer" verb)
+    ///
+    /// // Methods: ["classify_struct_domain", "extract_domain"]
+    /// // → Returns: "classification" (from "classify" verb)
+    /// ```
+    fn extract_distinctive_term(methods: &[String]) -> Option<String> {
+        use std::collections::HashMap;
+
+        // Look for distinctive verbs
+        let distinctive_verbs = [
+            ("infer", "inference"),
+            ("classify", "classification"),
+            ("extract", "extraction"),
+            ("recommend", "recommendations"),
+            ("suggest", "suggestions"),
+            ("validate", "validation"),
+            ("calculate", "calculation"),
+            ("compute", "computation"),
+            ("analyze", "analysis"),
+            ("detect", "detection"),
+            ("generate", "generation"),
+            ("transform", "transformation"),
+            ("convert", "conversion"),
+            ("serialize", "serialization"),
+            ("deserialize", "deserialization"),
+            ("group", "grouping"),
+            ("cluster", "clustering"),
+            ("merge", "merging"),
+            ("split", "splitting"),
+        ];
+
+        // Count verb occurrences
+        let mut verb_counts: HashMap<&str, usize> = HashMap::new();
+        for method in methods {
+            let method_lower = method.to_lowercase();
+            for (verb, _) in &distinctive_verbs {
+                if method_lower.starts_with(verb) || method_lower.contains(&format!("_{}", verb)) {
+                    *verb_counts.entry(verb).or_default() += 1;
+                    break;
+                }
+            }
+        }
+
+        // Find most common distinctive verb
+        if let Some((verb, _)) = verb_counts
+            .into_iter()
+            .filter(|(_, count)| (*count as f64 / methods.len() as f64) > 0.3)
+            .max_by_key(|(_, count)| *count)
+        {
+            // Return the noun form of the verb
+            for (v, noun) in &distinctive_verbs {
+                if *v == verb {
+                    return Some(noun.to_string());
+                }
+            }
+        }
+
+        // If no verb found, try to extract a distinctive noun
+        let mut noun_counts: HashMap<String, usize> = HashMap::new();
+        for method in methods {
+            let parts: Vec<&str> = method.split('_').collect();
+            // Look at non-first parts (skip verbs)
+            for part in parts.iter().skip(1) {
+                let part_lower = part.to_lowercase();
+                if part_lower.len() > 4 {
+                    // Only meaningful nouns
+                    *noun_counts.entry(part_lower).or_default() += 1;
+                }
+            }
+        }
+
+        // Return most common noun
+        noun_counts
+            .into_iter()
+            .filter(|(_, count)| (*count as f64 / methods.len() as f64) > 0.3)
+            .max_by_key(|(_, count)| *count)
+            .map(|(noun, _)| noun)
+    }
+
     /// Disambiguate a name by adding a numeric suffix (static version)
     ///
     /// Finds the smallest positive integer N such that "name_N" is not used.
@@ -177,7 +298,7 @@ mod tests {
 
         let candidates = vec![create_test_candidate("metrics", 0.9)];
 
-        let result = validator.ensure_unique_name(parent, candidates);
+        let result = validator.ensure_unique_name(parent, candidates, None);
 
         assert_eq!(result.module_name, "metrics");
         assert_eq!(result.confidence, 0.9);
@@ -191,8 +312,8 @@ mod tests {
         let candidates1 = vec![create_test_candidate("metrics", 0.9)];
         let candidates2 = vec![create_test_candidate("metrics", 0.85)];
 
-        let name1 = validator.ensure_unique_name(parent, candidates1);
-        let name2 = validator.ensure_unique_name(parent, candidates2);
+        let name1 = validator.ensure_unique_name(parent, candidates1, None);
+        let name2 = validator.ensure_unique_name(parent, candidates2, None);
 
         assert_eq!(name1.module_name, "metrics");
         assert_eq!(name2.module_name, "metrics_2");
@@ -206,7 +327,7 @@ mod tests {
 
         // Reserve first candidate
         let candidates1 = vec![create_test_candidate("metrics", 0.9)];
-        validator.ensure_unique_name(parent, candidates1);
+        validator.ensure_unique_name(parent, candidates1, None);
 
         // Provide multiple candidates, first is taken
         let candidates2 = vec![
@@ -215,7 +336,7 @@ mod tests {
             create_test_candidate("analysis", 0.75),
         ];
 
-        let result = validator.ensure_unique_name(parent, candidates2);
+        let result = validator.ensure_unique_name(parent, candidates2, None);
 
         assert_eq!(result.module_name, "computation");
         assert_eq!(result.confidence, 0.80);
@@ -227,11 +348,17 @@ mod tests {
         let parent = Path::new("src/organization");
 
         let name1 =
-            validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)]);
-        let name2 =
-            validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.85)]);
-        let name3 =
-            validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.80)]);
+            validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)], None);
+        let name2 = validator.ensure_unique_name(
+            parent,
+            vec![create_test_candidate("metrics", 0.85)],
+            None,
+        );
+        let name3 = validator.ensure_unique_name(
+            parent,
+            vec![create_test_candidate("metrics", 0.80)],
+            None,
+        );
 
         assert_eq!(name1.module_name, "metrics");
         assert_eq!(name2.module_name, "metrics_2");
@@ -244,10 +371,16 @@ mod tests {
         let parent1 = Path::new("src/organization");
         let parent2 = Path::new("src/analysis");
 
-        let name1 =
-            validator.ensure_unique_name(parent1, vec![create_test_candidate("metrics", 0.9)]);
-        let name2 =
-            validator.ensure_unique_name(parent2, vec![create_test_candidate("metrics", 0.9)]);
+        let name1 = validator.ensure_unique_name(
+            parent1,
+            vec![create_test_candidate("metrics", 0.9)],
+            None,
+        );
+        let name2 = validator.ensure_unique_name(
+            parent2,
+            vec![create_test_candidate("metrics", 0.9)],
+            None,
+        );
 
         // Same name can be used in different directories
         assert_eq!(name1.module_name, "metrics");
@@ -261,7 +394,7 @@ mod tests {
 
         assert!(!validator.is_used(parent, "metrics"));
 
-        validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)]);
+        validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)], None);
 
         assert!(validator.is_used(parent, "metrics"));
         assert!(!validator.is_used(parent, "coverage"));
@@ -277,8 +410,11 @@ mod tests {
         assert!(validator.is_used(parent, "existing_module"));
 
         // Should disambiguate when trying to use marked name
-        let result = validator
-            .ensure_unique_name(parent, vec![create_test_candidate("existing_module", 0.9)]);
+        let result = validator.ensure_unique_name(
+            parent,
+            vec![create_test_candidate("existing_module", 0.9)],
+            None,
+        );
 
         assert_eq!(result.module_name, "existing_module_2");
     }
@@ -288,7 +424,7 @@ mod tests {
         let mut validator = NameUniquenessValidator::new();
         let parent = Path::new("src/organization");
 
-        validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)]);
+        validator.ensure_unique_name(parent, vec![create_test_candidate("metrics", 0.9)], None);
         assert!(validator.is_used(parent, "metrics"));
 
         validator.clear();
@@ -301,8 +437,8 @@ mod tests {
         let parent1 = Path::new("src/organization");
         let parent2 = Path::new("src/analysis");
 
-        validator.ensure_unique_name(parent1, vec![create_test_candidate("metrics", 0.9)]);
-        validator.ensure_unique_name(parent2, vec![create_test_candidate("coverage", 0.9)]);
+        validator.ensure_unique_name(parent1, vec![create_test_candidate("metrics", 0.9)], None);
+        validator.ensure_unique_name(parent2, vec![create_test_candidate("coverage", 0.9)], None);
 
         validator.clear_directory(parent1);
 
@@ -315,9 +451,59 @@ mod tests {
         let mut validator = NameUniquenessValidator::new();
         let parent = Path::new("src/organization");
 
-        let result = validator.ensure_unique_name(parent, vec![]);
+        let result = validator.ensure_unique_name(parent, vec![], None);
 
         assert_eq!(result.module_name, "needs_review_1");
         assert!(result.confidence < 0.5);
+    }
+
+    #[test]
+    fn test_method_based_disambiguation() {
+        let mut validator = NameUniquenessValidator::new();
+        let parent = Path::new("src/organization");
+
+        // First use of "domain"
+        let candidates1 = vec![create_test_candidate("domain", 0.9)];
+        let name1 = validator.ensure_unique_name(parent, candidates1, None);
+        assert_eq!(name1.module_name, "domain");
+
+        // Second use with methods containing verbs
+        let methods = vec![
+            "classify_struct_domain".to_string(),
+            "classify_domain_from_name".to_string(),
+        ];
+        let candidates2 = vec![create_test_candidate("domain", 0.85)];
+        let name2 = validator.ensure_unique_name(parent, candidates2, Some(&methods));
+
+        // Should use method-based disambiguation instead of numeric
+        // Could be domain_classification or domain_<something> - just not domain_2
+        assert!(name2.module_name.starts_with("domain_"));
+        assert!(!name2.module_name.ends_with("_2"));
+        assert!(name2.module_name.contains("classification") || name2.module_name.len() > 7);
+        assert!(name2.confidence > 0.7); // Higher confidence than numeric
+    }
+
+    #[test]
+    fn test_method_based_disambiguation_with_inference() {
+        let mut validator = NameUniquenessValidator::new();
+        let parent = Path::new("src/organization");
+
+        // Reserve "responsibility"
+        let candidates1 = vec![create_test_candidate("responsibility", 0.9)];
+        validator.ensure_unique_name(parent, candidates1, None);
+
+        // Try to use "responsibility" again with methods containing "infer"
+        let methods = vec![
+            "infer_responsibility_multi_signal".to_string(),
+            "infer_responsibility_from_context".to_string(),
+        ];
+        let candidates2 = vec![create_test_candidate("responsibility", 0.85)];
+        let name2 = validator.ensure_unique_name(parent, candidates2, Some(&methods));
+
+        // Should extract a descriptive suffix (could be "inference" or something else)
+        // Just ensure it's not numeric
+        assert!(name2.module_name.starts_with("responsibility_"));
+        assert!(!name2.module_name.matches('_').count() == 1 || !name2.module_name.ends_with("_2"));
+        assert!(name2.confidence > 0.7);
     }
 }

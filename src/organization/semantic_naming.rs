@@ -117,6 +117,14 @@ impl SemanticNameGenerator {
     ) -> Vec<NameCandidate> {
         let mut candidates = Vec::new();
 
+        // Strategy 0: Method-based naming (HIGHEST PRIORITY)
+        // Extracts verb+noun from actual method names for maximum specificity
+        if let Some(method_name) = self.domain_extractor.extract_from_methods(methods) {
+            if self.is_valid_candidate(&method_name) {
+                candidates.push(method_name);
+            }
+        }
+
         // Strategy 1: Domain terms from method names
         if let Some(domain_name) = self.domain_extractor.generate_domain_name(methods) {
             if self.is_valid_candidate(&domain_name) {
@@ -175,7 +183,7 @@ impl SemanticNameGenerator {
     ) -> NameCandidate {
         let candidates = self.generate_names(methods, responsibility);
         self.uniqueness_validator
-            .ensure_unique_name(parent_path, candidates)
+            .ensure_unique_name(parent_path, candidates, Some(methods))
     }
 
     /// Check if a candidate is valid (passes specificity threshold)

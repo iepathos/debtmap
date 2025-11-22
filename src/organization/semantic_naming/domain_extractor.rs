@@ -29,6 +29,147 @@ impl DomainTermExtractor {
         }
     }
 
+    /// Extract a descriptive name from method names using verb+noun analysis
+    ///
+    /// This is the primary naming strategy. Analyzes method names to find
+    /// the dominant action (verb) and subject (noun), combining them into
+    /// a descriptive module name.
+    ///
+    /// # Arguments
+    ///
+    /// * `methods` - List of method names to analyze
+    ///
+    /// # Returns
+    ///
+    /// Name candidate if distinctive pattern found, None otherwise
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Methods: infer_responsibility_multi_signal, group_methods_by_responsibility
+    /// // → Extracts: verb="infer" + noun="responsibility"
+    /// // → Returns: "responsibility_inference"
+    /// ```
+    pub fn extract_from_methods(&self, methods: &[String]) -> Option<NameCandidate> {
+        if methods.is_empty() {
+            return None;
+        }
+
+        // Extract all verbs and nouns from method names
+        let mut verb_counts: HashMap<String, usize> = HashMap::new();
+        let mut noun_counts: HashMap<String, usize> = HashMap::new();
+
+        let action_verbs = [
+            "infer",
+            "classify",
+            "extract",
+            "detect",
+            "recommend",
+            "suggest",
+            "calculate",
+            "compute",
+            "analyze",
+            "validate",
+            "format",
+            "parse",
+            "transform",
+            "convert",
+            "generate",
+            "build",
+            "create",
+            "update",
+            "serialize",
+            "deserialize",
+            "encode",
+            "decode",
+            "evaluate",
+            "render",
+            "display",
+            "group",
+            "cluster",
+            "merge",
+            "split",
+        ];
+
+        for method in methods {
+            let tokens = self.tokenize_method_name(method);
+
+            // Find verbs (action words at start of method name)
+            if let Some(first_token) = tokens.first() {
+                if action_verbs.contains(&first_token.as_str()) {
+                    *verb_counts.entry(first_token.clone()).or_insert(0) += 1;
+                }
+            }
+
+            // Find nouns (significant domain terms, not at start)
+            for (i, token) in tokens.iter().enumerate() {
+                if i > 0 && !self.is_stop_word(token) && !action_verbs.contains(&token.as_str()) {
+                    let specificity = self.calculate_term_specificity(token);
+                    if specificity > 0.5 {
+                        *noun_counts.entry(token.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
+        // Find most common verb and noun
+        let dominant_verb = verb_counts
+            .into_iter()
+            .filter(|(_, count)| (*count as f64 / methods.len() as f64) > 0.3)
+            .max_by_key(|(_, count)| *count)
+            .map(|(verb, _)| verb);
+
+        let dominant_noun = noun_counts
+            .into_iter()
+            .filter(|(_, count)| (*count as f64 / methods.len() as f64) > 0.3)
+            .max_by_key(|(_, count)| *count)
+            .map(|(noun, _)| noun);
+
+        // Generate name based on what we found
+        match (dominant_noun, dominant_verb) {
+            (Some(noun), Some(verb)) => {
+                // Best case: noun_verb (e.g., "responsibility_inference")
+                let module_name = format!("{}_{}", noun, verb);
+                Some(NameCandidate {
+                    module_name,
+                    confidence: 0.90,
+                    specificity_score: 0.85,
+                    reasoning: format!(
+                        "Extracted verb '{}' and noun '{}' from method names",
+                        verb, noun
+                    ),
+                    strategy: NamingStrategy::DomainTerms,
+                })
+            }
+            (Some(noun), None) => {
+                // Good: Just noun (e.g., "validation")
+                Some(NameCandidate {
+                    module_name: noun.clone(),
+                    confidence: 0.75,
+                    specificity_score: self.calculate_term_specificity(&noun),
+                    reasoning: format!("Extracted dominant noun '{}' from method names", noun),
+                    strategy: NamingStrategy::DomainTerms,
+                })
+            }
+            (None, Some(verb)) => {
+                // Okay: Just verb (e.g., "formatting")
+                let gerund = if verb.ends_with('e') {
+                    format!("{}ing", &verb[..verb.len() - 1])
+                } else {
+                    format!("{}ing", verb)
+                };
+                Some(NameCandidate {
+                    module_name: gerund.clone(),
+                    confidence: 0.70,
+                    specificity_score: 0.65,
+                    reasoning: format!("Extracted dominant verb '{}' from method names", verb),
+                    strategy: NamingStrategy::BehavioralPattern,
+                })
+            }
+            (None, None) => None,
+        }
+    }
+
     /// Generate a domain-based name from method names
     ///
     /// Analyzes method names to extract domain terms and generates
