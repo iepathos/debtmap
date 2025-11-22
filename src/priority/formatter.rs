@@ -1275,7 +1275,8 @@ fn calculate_impact_message(
         if split_count == 0 {
             // No actionable splits detected - be honest about it
             "complexity reduction difficult to estimate (no clear split boundaries detected). \
-             Focus on extracting pure functions and reducing nesting first.".to_string()
+             Focus on extracting pure functions and reducing nesting first."
+                .to_string()
         } else if coupling_penalty < 0.8 {
             // High coupling detected - warn user
             format!(
@@ -2729,7 +2730,8 @@ mod tests {
         // The coverage info is in the FILE SCORE CALCULATION section at verbosity >= 2
         assert!(
             clean_output.contains("Coverage Factor")
-                && (clean_output.contains("No coverage") || clean_output.contains("assuming untested"))
+                && (clean_output.contains("No coverage")
+                    || clean_output.contains("assuming untested"))
         );
     }
 

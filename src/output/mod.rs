@@ -56,7 +56,7 @@ pub fn output_results_with_risk(
 pub fn output_unified_priorities_with_config(
     analysis: priority::UnifiedAnalysis,
     config: OutputConfig,
-    _results: &AnalysisResults,
+    results: &AnalysisResults,
     _coverage_file: Option<&PathBuf>,
 ) -> Result<()> {
     output_unified_priorities_with_summary(
@@ -69,9 +69,11 @@ pub fn output_unified_priorities_with_config(
         config.output_format,
         config.json_format,
         config.formatting_config,
+        results,
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn output_unified_priorities(
     analysis: priority::UnifiedAnalysis,
     top: Option<usize>,
@@ -80,6 +82,7 @@ pub fn output_unified_priorities(
     output_file: Option<PathBuf>,
     output_format: Option<crate::cli::OutputFormat>,
     formatting_config: FormattingConfig,
+    results: &AnalysisResults,
 ) -> Result<()> {
     output_unified_priorities_with_summary(
         analysis,
@@ -91,6 +94,7 @@ pub fn output_unified_priorities(
         output_format,
         crate::cli::JsonFormat::Legacy, // default to legacy for backward compatibility
         formatting_config,
+        results,
     )
 }
 
@@ -105,6 +109,7 @@ pub fn output_unified_priorities_with_summary(
     output_format: Option<crate::cli::OutputFormat>,
     json_format: crate::cli::JsonFormat,
     formatting_config: FormattingConfig,
+    results: &AnalysisResults,
 ) -> Result<()> {
     match output_format {
         Some(crate::cli::OutputFormat::Json) => {
@@ -120,6 +125,11 @@ pub fn output_unified_priorities_with_summary(
         }
         Some(crate::cli::OutputFormat::Markdown) => {
             markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
+        }
+        Some(crate::cli::OutputFormat::Html) => {
+            let mut writer = io::output::create_writer(io::output::OutputFormat::Html);
+            writer.write_results(results)?;
+            Ok(())
         }
         _ => {
             if is_markdown_file(&output_file) {

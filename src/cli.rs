@@ -498,6 +498,7 @@ pub enum OutputFormat {
     Json,
     Markdown,
     Terminal,
+    Html,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -533,6 +534,7 @@ impl From<OutputFormat> for crate::io::output::OutputFormat {
             OutputFormat::Json => crate::io::output::OutputFormat::Json,
             OutputFormat::Markdown => crate::io::output::OutputFormat::Markdown,
             OutputFormat::Terminal => crate::io::output::OutputFormat::Terminal,
+            OutputFormat::Html => crate::io::output::OutputFormat::Html,
         }
     }
 }

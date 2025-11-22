@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debtmap Analysis Dashboard - {{{PROJECT_NAME}}}</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .metric-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover { transform: scale(1.05); }
+        .metric-card.critical { border-left-color: #EF4444; }
+        .metric-card.high { border-left-color: #F59E0B; }
+        .metric-card.medium { border-left-color: #FBBF24; }
+        .metric-card.low { border-left-color: #10B981; }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 2rem;
+        }
+
+        table.sortable th {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        table.sortable th:hover {
+            background-color: #f3f4f6;
+        }
+
+        table.sortable th.sorted-asc::after {
+            content: ' ▲';
+        }
+
+        table.sortable th.sorted-desc::after {
+            content: ' ▼';
+        }
+
+        @media print {
+            .no-print { display: none; }
+            .chart-container { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-8 text-white mb-8">
+            <h1 class="text-4xl font-bold mb-2">Debtmap Analysis Dashboard</h1>
+            <p class="text-blue-100 mb-4">Technical Debt Analysis for {{{PROJECT_NAME}}}</p>
+            <div class="flex flex-wrap gap-4 text-sm">
+                <span>📊 {{{TOTAL_ITEMS}}} items analyzed</span>
+                <span>📈 Debt Density: {{{DEBT_DENSITY}}} per 1K LOC</span>
+                <span>🔢 {{{TOTAL_FUNCTIONS}}} functions</span>
+                <span>📅 Generated: {{{TIMESTAMP}}}</span>
+            </div>
+        </div>
+
+        <!-- Key Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card critical">
+                <div class="text-sm text-gray-600 mb-2">Critical Issues</div>
+                <div class="text-3xl font-bold text-red-600">{{{CRITICAL_COUNT}}}</div>
+                <div class="text-xs text-gray-500 mt-1" id="critical-percentage"></div>
+            </div>
+            <div class="metric-card high">
+                <div class="text-sm text-gray-600 mb-2">High Priority</div>
+                <div class="text-3xl font-bold text-orange-600">{{{HIGH_COUNT}}}</div>
+                <div class="text-xs text-gray-500 mt-1" id="high-percentage"></div>
+            </div>
+            <div class="metric-card medium">
+                <div class="text-sm text-gray-600 mb-2">Medium Priority</div>
+                <div class="text-3xl font-bold text-yellow-600">{{{MEDIUM_COUNT}}}</div>
+                <div class="text-xs text-gray-500 mt-1" id="medium-percentage"></div>
+            </div>
+            <div class="metric-card low">
+                <div class="text-sm text-gray-600 mb-2">Low/Optional</div>
+                <div class="text-3xl font-bold text-green-600">{{{LOW_COUNT}}}</div>
+                <div class="text-xs text-gray-500 mt-1" id="low-percentage"></div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Issue Distribution -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Issue Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="issueDistChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Root Causes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Root Causes</h2>
+                <div class="chart-container">
+                    <canvas id="rootCausesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Complexity Scatter -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Complexity Analysis</h2>
+                <div class="chart-container">
+                    <canvas id="complexityScatter"></canvas>
+                </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Top Recommendations</h2>
+                <div class="chart-container">
+                    <canvas id="recommendationsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- God Objects Table -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" id="godObjectsSection" style="display: none;">
+            <h2 class="text-xl font-semibold mb-4">🏛️ God Objects (Architectural Debt)</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 sortable" id="godObjectsTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOC</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Functions</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsibilities</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="godObjectsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Complex Functions Table -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">🔥 Most Complex Functions</h2>
+            <div class="mb-4">
+                <input type="text" id="searchBox" placeholder="Search functions..."
+                       class="px-4 py-2 border border-gray-300 rounded-md w-full md:w-96">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 sortable" id="complexFunctionsTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Function</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cyclomatic</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cognitive</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nesting</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="complexFunctionsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const debtData = {{{JSON_DATA}}};
+
+        // Calculate percentages for metric cards
+        const totalItems = {{{TOTAL_ITEMS}}};
+        if (totalItems > 0) {
+            document.getElementById('critical-percentage').textContent =
+                `${({{{CRITICAL_COUNT}}} / totalItems * 100).toFixed(1)}% of items`;
+            document.getElementById('high-percentage').textContent =
+                `${({{{HIGH_COUNT}}} / totalItems * 100).toFixed(1)}% of items`;
+            document.getElementById('medium-percentage').textContent =
+                `${({{{MEDIUM_COUNT}}} / totalItems * 100).toFixed(1)}% of items`;
+            document.getElementById('low-percentage').textContent =
+                `${({{{LOW_COUNT}}} / totalItems * 100).toFixed(1)}% of items`;
+        }
+
+        // Helper functions for data extraction
+        function extractIssueTypes(data) {
+            const types = {};
+            data.technical_debt.items.forEach(item => {
+                const type = item.debt_type;
+                types[type] = (types[type] || 0) + 1;
+            });
+            return Object.keys(types);
+        }
+
+        function extractIssueCounts(data) {
+            const types = {};
+            data.technical_debt.items.forEach(item => {
+                const type = item.debt_type;
+                types[type] = (types[type] || 0) + 1;
+            });
+            return Object.values(types);
+        }
+
+        function extractRootCauses(data) {
+            const causes = {};
+            data.technical_debt.items.forEach(item => {
+                if (item.context && item.context.root_cause) {
+                    const cause = item.context.root_cause;
+                    causes[cause] = (causes[cause] || 0) + 1;
+                }
+            });
+            return Object.keys(causes).slice(0, 10);
+        }
+
+        function extractRootCauseCounts(data) {
+            const causes = {};
+            data.technical_debt.items.forEach(item => {
+                if (item.context && item.context.root_cause) {
+                    const cause = item.context.root_cause;
+                    causes[cause] = (causes[cause] || 0) + 1;
+                }
+            });
+            return Object.values(causes).slice(0, 10);
+        }
+
+        function extractComplexityData(data) {
+            const critical = [];
+            const high = [];
+            const medium = [];
+            const low = [];
+
+            data.complexity.metrics.forEach(func => {
+                const point = {
+                    x: func.cyclomatic,
+                    y: func.cognitive,
+                    name: `${func.name}`
+                };
+
+                if (func.cyclomatic >= 20 || func.cognitive >= 50) {
+                    critical.push(point);
+                } else if (func.cyclomatic >= 15 || func.cognitive >= 30) {
+                    high.push(point);
+                } else if (func.cyclomatic >= 10 || func.cognitive >= 20) {
+                    medium.push(point);
+                } else {
+                    low.push(point);
+                }
+            });
+
+            return [
+                { label: 'Critical', data: critical, backgroundColor: '#EF4444' },
+                { label: 'High', data: high, backgroundColor: '#F59E0B' },
+                { label: 'Medium', data: medium, backgroundColor: '#FBBF24' },
+                { label: 'Low', data: low, backgroundColor: '#10B981' }
+            ];
+        }
+
+        function extractRecommendations(data) {
+            const recommendations = {};
+            data.technical_debt.items.forEach(item => {
+                const rec = item.message.split(':')[0] || 'Other';
+                recommendations[rec] = (recommendations[rec] || 0) + 1;
+            });
+            const sorted = Object.entries(recommendations).sort((a, b) => b[1] - a[1]);
+            return sorted.slice(0, 6).map(x => x[0]);
+        }
+
+        function extractRecommendationCounts(data) {
+            const recommendations = {};
+            data.technical_debt.items.forEach(item => {
+                const rec = item.message.split(':')[0] || 'Other';
+                recommendations[rec] = (recommendations[rec] || 0) + 1;
+            });
+            const sorted = Object.entries(recommendations).sort((a, b) => b[1] - a[1]);
+            return sorted.slice(0, 6).map(x => x[1]);
+        }
+
+        // Issue Distribution Pie Chart
+        new Chart(document.getElementById('issueDistChart'), {
+            type: 'doughnut',
+            data: {
+                labels: extractIssueTypes(debtData),
+                datasets: [{
+                    data: extractIssueCounts(debtData),
+                    backgroundColor: ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Root Causes Bar Chart
+        const rootCauses = extractRootCauses(debtData);
+        const rootCauseCounts = extractRootCauseCounts(debtData);
+
+        if (rootCauses.length > 0) {
+            new Chart(document.getElementById('rootCausesChart'), {
+                type: 'bar',
+                data: {
+                    labels: rootCauses,
+                    datasets: [{
+                        label: 'Count',
+                        data: rootCauseCounts,
+                        backgroundColor: '#3B82F6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Complexity Scatter Plot
+        new Chart(document.getElementById('complexityScatter'), {
+            type: 'scatter',
+            data: {
+                datasets: extractComplexityData(debtData)
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Cyclomatic Complexity' },
+                        beginAtZero: true
+                    },
+                    y: {
+                        title: { display: true, text: 'Cognitive Complexity' },
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.raw.name}: (${context.parsed.x}, ${context.parsed.y})`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Recommendations Horizontal Bar Chart
+        new Chart(document.getElementById('recommendationsChart'), {
+            type: 'bar',
+            data: {
+                labels: extractRecommendations(debtData),
+                datasets: [{
+                    data: extractRecommendationCounts(debtData),
+                    backgroundColor: ['#8B5CF6', '#3B82F6', '#10B981', '#FBBF24', '#F59E0B', '#EF4444']
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+
+        // Populate God Objects Table
+        function populateGodObjectsTable() {
+            const godObjects = debtData.technical_debt.items.filter(item =>
+                item.debt_type === 'GodObject' ||
+                (item.context && item.context.architectural_issues)
+            );
+
+            if (godObjects.length > 0) {
+                document.getElementById('godObjectsSection').style.display = 'block';
+                const tbody = document.getElementById('godObjectsBody');
+
+                godObjects.forEach(item => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td class="px-6 py-4 text-sm font-mono">${item.file}</td>
+                        <td class="px-6 py-4 text-sm font-semibold text-red-600">${item.priority}</td>
+                        <td class="px-6 py-4 text-sm">${item.line || '-'}</td>
+                        <td class="px-6 py-4 text-sm">-</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${item.message}</td>
+                    `;
+                });
+            }
+        }
+
+        // Populate Complex Functions Table
+        function populateComplexFunctionsTable() {
+            const tbody = document.getElementById('complexFunctionsBody');
+            const functions = debtData.complexity.metrics
+                .sort((a, b) => Math.max(b.cyclomatic, b.cognitive) - Math.max(a.cyclomatic, a.cognitive))
+                .slice(0, 50);
+
+            functions.forEach(func => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td class="px-6 py-4 text-sm font-mono">${func.name}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${func.file}</td>
+                    <td class="px-6 py-4 text-sm">${func.cyclomatic}</td>
+                    <td class="px-6 py-4 text-sm font-semibold ${getCognitiveColor(func.cognitive)}">${func.cognitive}</td>
+                    <td class="px-6 py-4 text-sm">${func.nesting}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs ${getPriorityBadge(func)}">${getPriority(func)}</span></td>
+                `;
+            });
+        }
+
+        function getCognitiveColor(cognitive) {
+            if (cognitive >= 50) return 'text-red-600';
+            if (cognitive >= 30) return 'text-orange-600';
+            if (cognitive >= 20) return 'text-yellow-600';
+            return 'text-green-600';
+        }
+
+        function getPriorityBadge(func) {
+            const max = Math.max(func.cyclomatic, func.cognitive);
+            if (max >= 20) return 'bg-red-100 text-red-800';
+            if (max >= 15) return 'bg-orange-100 text-orange-800';
+            if (max >= 10) return 'bg-yellow-100 text-yellow-800';
+            return 'bg-green-100 text-green-800';
+        }
+
+        function getPriority(func) {
+            const max = Math.max(func.cyclomatic, func.cognitive);
+            if (max >= 20) return 'CRITICAL';
+            if (max >= 15) return 'HIGH';
+            if (max >= 10) return 'MEDIUM';
+            return 'LOW';
+        }
+
+        // Search functionality
+        document.getElementById('searchBox').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.getElementById('complexFunctionsBody').getElementsByTagName('tr');
+
+            Array.from(rows).forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // Initialize tables
+        populateGodObjectsTable();
+        populateComplexFunctionsTable();
+
+        // Table sorting functionality
+        document.querySelectorAll('table.sortable th').forEach((header, index) => {
+            header.addEventListener('click', function() {
+                const table = header.closest('table');
+                sortTable(table, index);
+            });
+        });
+
+        function sortTable(table, columnIndex) {
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const header = table.querySelectorAll('th')[columnIndex];
+            const isAscending = header.classList.contains('sorted-asc');
+
+            table.querySelectorAll('th').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+            });
+
+            rows.sort((a, b) => {
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+
+                const aNum = parseFloat(aValue);
+                const bNum = parseFloat(bValue);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return isAscending ? bNum - aNum : aNum - bNum;
+                }
+
+                return isAscending ? bValue.localeCompare(aValue) : aValue.localeCompare(bValue);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+
+            header.classList.add(isAscending ? 'sorted-desc' : 'sorted-asc');
+        }
+    </script>
+</body>
+</html>

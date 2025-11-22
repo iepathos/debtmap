@@ -48,6 +48,7 @@ fn create_file_writer<'a>(
     format: io::output::OutputFormat,
 ) -> Box<dyn io::output::OutputWriter + 'a> {
     match format {
+        io::output::OutputFormat::Html => Box::new(io::writers::HtmlWriter::new(buffer)),
         io::output::OutputFormat::Markdown | io::output::OutputFormat::Terminal => {
             Box::new(io::writers::MarkdownWriter::new(buffer))
         }
