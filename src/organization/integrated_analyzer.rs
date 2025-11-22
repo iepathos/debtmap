@@ -251,19 +251,27 @@ impl IntegratedArchitectureAnalyzer {
         // Convert clusters to ModuleSplit
         Ok(clusters
             .into_iter()
-            .map(|cluster| ModuleSplit {
-                suggested_name: cluster.primary_type.name.clone(),
-                methods_to_move: cluster.methods,
-                responsibility: format!(
-                    "Manage {} data and transformations",
-                    cluster.primary_type.name
-                ),
-                method: SplitAnalysisMethod::TypeBased,
-                cohesion_score: Some(cluster.type_affinity_score),
-                input_types: cluster.input_types.into_iter().collect(),
-                output_types: cluster.output_types.into_iter().collect(),
-                core_type: Some(cluster.primary_type.name),
-                ..Default::default()
+            .map(|cluster| {
+                // Sort HashSet collections for deterministic ordering
+                let mut input_types: Vec<_> = cluster.input_types.into_iter().collect();
+                input_types.sort();
+                let mut output_types: Vec<_> = cluster.output_types.into_iter().collect();
+                output_types.sort();
+
+                ModuleSplit {
+                    suggested_name: cluster.primary_type.name.clone(),
+                    methods_to_move: cluster.methods,
+                    responsibility: format!(
+                        "Manage {} data and transformations",
+                        cluster.primary_type.name
+                    ),
+                    method: SplitAnalysisMethod::TypeBased,
+                    cohesion_score: Some(cluster.type_affinity_score),
+                    input_types,
+                    output_types,
+                    core_type: Some(cluster.primary_type.name),
+                    ..Default::default()
+                }
             })
             .collect())
     }

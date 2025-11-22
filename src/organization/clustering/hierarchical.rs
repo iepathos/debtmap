@@ -133,8 +133,22 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
             clusters[i].quality = Some(self.calculate_cluster_quality(&clusters[i], &clusters));
         }
 
-        // Sort by size (largest first) for stable output
-        clusters.sort_by_key(|c| std::cmp::Reverse(c.methods.len()));
+        // Sort methods within each cluster for deterministic ordering
+        for cluster in &mut clusters {
+            cluster.methods.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+
+        // Sort by size (largest first), then by first method name for deterministic ordering
+        clusters.sort_by(|a, b| {
+            let size_cmp = b.methods.len().cmp(&a.methods.len());
+            if size_cmp != std::cmp::Ordering::Equal {
+                return size_cmp;
+            }
+            // Secondary sort: compare first method name alphabetically
+            let a_first = a.methods.first().map(|m| m.name.as_str()).unwrap_or("");
+            let b_first = b.methods.first().map(|m| m.name.as_str()).unwrap_or("");
+            a_first.cmp(b_first)
+        });
 
         clusters
     }
@@ -190,7 +204,17 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
 
                 let similarity = similarity_matrix.get(i, j);
 
-                if similarity > best_merge.map(|(_, _, sim)| sim).unwrap_or(0.0) {
+                // Deterministic tie-breaking: prefer earlier indices for consistent results
+                let should_update = match best_merge {
+                    None => true,
+                    Some((_, _, best_sim)) => {
+                        similarity > best_sim
+                            || (similarity == best_sim
+                                && (i, j) < (best_merge.unwrap().0, best_merge.unwrap().1))
+                    }
+                };
+
+                if should_update {
                     best_merge = Some((i, j, similarity));
                 }
             }

@@ -1020,14 +1020,17 @@ impl GodObjectDetector {
     ) -> Option<Vec<ModuleSplit>> {
         use crate::organization::behavioral_decomposition::suggest_trait_extraction;
 
-        // Filter out test methods
-        let production_methods: Vec<String> = all_methods
+        // Filter out test methods and sort for deterministic ordering
+        let mut production_methods: Vec<String> = all_methods
             .iter()
             .filter(|m| {
                 !m.starts_with("test_") && !m.starts_with("mock_") && !m.starts_with("bench_")
             })
             .cloned()
             .collect();
+
+        // Sort for deterministic ordering (critical for consistent clustering)
+        production_methods.sort();
 
         if production_methods.is_empty() {
             return None;
@@ -1230,13 +1233,19 @@ impl GodObjectDetector {
             .collect();
 
         // Build file context for pattern detection
-        let call_edges: Vec<CallEdge> = adjacency
+        let mut call_edges: Vec<CallEdge> = adjacency
             .iter()
             .map(|((caller, callee), _)| CallEdge {
                 caller: caller.clone(),
                 callee: callee.clone(),
             })
             .collect();
+        // Sort for deterministic ordering (HashMap iteration is non-deterministic)
+        call_edges.sort_by(|a, b| {
+            a.caller
+                .cmp(&b.caller)
+                .then_with(|| a.callee.cmp(&b.callee))
+        });
 
         let structures = Self::extract_struct_names(ast);
         let context = FileContext {
@@ -2279,7 +2288,7 @@ impl GodObjectDetector {
                 analysis.recommended_splits = result.unified_splits;
 
                 // Store analysis metadata (if we had fields for it)
-                // analysis.analysis_time = Some(result.analysis_metadata.total_time);
+                // analysis.analysis_metadata.total_time = Some(result.analysis_metadata.total_time);
 
                 analysis
             }
