@@ -512,7 +512,7 @@ impl DomainTermExtractor {
 /// # Examples
 ///
 /// ```
-/// # use debtmap::organization::semantic_naming::domain_extractor::extract_dominant_verb;
+/// # use debtmap::organization::semantic_naming::extract_dominant_verb;
 /// let methods = vec![
 ///     "validate_input".to_string(),
 ///     "validate_output".to_string(),
