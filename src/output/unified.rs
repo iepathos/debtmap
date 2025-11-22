@@ -386,7 +386,21 @@ fn categorize_file_debt(item: &FileDebtItem) -> String {
 fn categorize_function_debt(debt_type: &DebtType) -> String {
     match debt_type {
         DebtType::TestingGap { .. } => "TestingGap".to_string(),
-        DebtType::ComplexityHotspot { .. } => "ComplexFunction".to_string(),
+        DebtType::ComplexityHotspot { cyclomatic, cognitive, .. } => {
+            // Differentiate based on which complexity metric is the primary driver
+            const CYCLOMATIC_HIGH: u32 = 15;
+            const COGNITIVE_HIGH: u32 = 30;
+
+            let is_cyclomatic_high = *cyclomatic >= CYCLOMATIC_HIGH;
+            let is_cognitive_high = *cognitive >= COGNITIVE_HIGH;
+
+            match (is_cyclomatic_high, is_cognitive_high) {
+                (true, true) => "HighComplexity".to_string(),
+                (true, false) => "CyclomaticComplexity".to_string(),
+                (false, true) => "CognitiveComplexity".to_string(),
+                (false, false) => "ModerateComplexity".to_string(),
+            }
+        },
         DebtType::DeadCode { .. } => "DeadCode".to_string(),
         DebtType::Duplication { .. } => "Duplication".to_string(),
         DebtType::Risk { .. } => "Risk".to_string(),
@@ -396,23 +410,23 @@ fn categorize_function_debt(debt_type: &DebtType) -> String {
         DebtType::ErrorSwallowing { .. } => "ErrorHandling".to_string(),
         DebtType::AllocationInefficiency { .. } => "Performance".to_string(),
         DebtType::StringConcatenation { .. } => "Performance".to_string(),
-        DebtType::NestedLoops { .. } => "Performance".to_string(),
-        DebtType::BlockingIO { .. } => "Performance".to_string(),
-        DebtType::SuboptimalDataStructure { .. } => "Performance".to_string(),
+        DebtType::NestedLoops { .. } => "NestedLoops".to_string(),
+        DebtType::BlockingIO { .. } => "BlockingIO".to_string(),
+        DebtType::SuboptimalDataStructure { .. } => "SuboptimalDataStructure".to_string(),
         DebtType::GodObject { .. } => "GodObject".to_string(),
         DebtType::GodModule { .. } => "GodModule".to_string(),
-        DebtType::FeatureEnvy { .. } => "CodeSmell".to_string(),
-        DebtType::PrimitiveObsession { .. } => "CodeSmell".to_string(),
-        DebtType::MagicValues { .. } => "CodeSmell".to_string(),
-        DebtType::AssertionComplexity { .. } => "TestQuality".to_string(),
-        DebtType::FlakyTestPattern { .. } => "TestQuality".to_string(),
-        DebtType::AsyncMisuse { .. } => "ResourceManagement".to_string(),
-        DebtType::ResourceLeak { .. } => "ResourceManagement".to_string(),
-        DebtType::CollectionInefficiency { .. } => "Performance".to_string(),
+        DebtType::FeatureEnvy { .. } => "FeatureEnvy".to_string(),
+        DebtType::PrimitiveObsession { .. } => "PrimitiveObsession".to_string(),
+        DebtType::MagicValues { .. } => "MagicValues".to_string(),
+        DebtType::AssertionComplexity { .. } => "AssertionComplexity".to_string(),
+        DebtType::FlakyTestPattern { .. } => "FlakyTestPattern".to_string(),
+        DebtType::AsyncMisuse { .. } => "AsyncMisuse".to_string(),
+        DebtType::ResourceLeak { .. } => "ResourceLeak".to_string(),
+        DebtType::CollectionInefficiency { .. } => "CollectionInefficiency".to_string(),
         // Type organization (Spec 187)
-        DebtType::ScatteredType { .. } => "TypeOrganization".to_string(),
-        DebtType::OrphanedFunctions { .. } => "TypeOrganization".to_string(),
-        DebtType::UtilitiesSprawl { .. } => "TypeOrganization".to_string(),
+        DebtType::ScatteredType { .. } => "ScatteredType".to_string(),
+        DebtType::OrphanedFunctions { .. } => "OrphanedFunctions".to_string(),
+        DebtType::UtilitiesSprawl { .. } => "UtilitiesSprawl".to_string(),
     }
 }
 
