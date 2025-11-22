@@ -220,14 +220,6 @@
                 </div>
             </div>
 
-            <!-- Complexity Distribution Histogram -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4">Complexity Distribution</h2>
-                <div class="chart-container">
-                    <canvas id="complexityHistogram"></canvas>
-                </div>
-            </div>
-
             <!-- Recommendations -->
             <div class="bg-white rounded-lg shadow-md p-6">
                 <h2 class="text-xl font-semibold mb-4">Top Recommendations</h2>
@@ -1064,89 +1056,6 @@
             // Hide the section if no adjusted data
             document.getElementById('adjustedComplexityScatterSection').style.display = 'none';
         }
-
-        // Complexity Distribution Histogram
-        function createComplexityHistogram(data) {
-            // Get complexities from either format
-            const isUnifiedFormat = data.format_version !== undefined;
-            let complexities = [];
-
-            if (isUnifiedFormat) {
-                complexities = (data.items || [])
-                    .filter(item => item.type === 'Function')
-                    .map(item => item.metrics?.cyclomatic_complexity || 0);
-            } else {
-                complexities = (data.complexity?.metrics || []).map(m => m.cyclomatic);
-            }
-
-            const bins = [
-                { label: '0-10', min: 0, max: 10, count: 0 },
-                { label: '10-20', min: 10, max: 20, count: 0 },
-                { label: '20-30', min: 20, max: 30, count: 0 },
-                { label: '30+', min: 30, max: Infinity, count: 0 }
-            ];
-
-            complexities.forEach(complexity => {
-                for (let bin of bins) {
-                    if (complexity >= bin.min && complexity < bin.max) {
-                        bin.count++;
-                        break;
-                    }
-                }
-            });
-
-            return {
-                labels: bins.map(b => b.label),
-                datasets: [{
-                    label: 'Functions',
-                    data: bins.map(b => b.count),
-                    backgroundColor: [
-                        'rgba(16, 185, 129, 0.7)',  // Green for 0-10
-                        'rgba(251, 191, 36, 0.7)',  // Yellow for 10-20
-                        'rgba(245, 158, 11, 0.7)',  // Orange for 20-30
-                        'rgba(239, 68, 68, 0.7)'    // Red for 30+
-                    ],
-                    borderColor: [
-                        'rgb(16, 185, 129)',
-                        'rgb(251, 191, 36)',
-                        'rgb(245, 158, 11)',
-                        'rgb(239, 68, 68)'
-                    ],
-                    borderWidth: 1
-                }]
-            };
-        }
-
-        new Chart(document.getElementById('complexityHistogram'), {
-            type: 'bar',
-            data: createComplexityHistogram(debtData),
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Number of Functions' },
-                        ticks: { precision: 0 }
-                    },
-                    x: {
-                        title: { display: true, text: 'Cyclomatic Complexity Range' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `${context.parsed.y} functions`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
 
         // Recommendations Horizontal Bar Chart
         const recommendationLabels = extractRecommendations(debtData);
