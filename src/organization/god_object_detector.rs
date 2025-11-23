@@ -20,12 +20,15 @@ use super::clustering::{
 
 /// Adapter for call graph adjacency matrix to CallGraphProvider trait
 struct CallGraphAdapter {
-    adjacency: HashMap<(String, String), usize>,
+    adjacency: std::collections::BTreeMap<(String, String), usize>,
 }
 
 impl CallGraphAdapter {
     fn from_adjacency_matrix(adjacency: HashMap<(String, String), usize>) -> Self {
-        Self { adjacency }
+        // Convert HashMap to BTreeMap for deterministic iteration order
+        Self {
+            adjacency: adjacency.into_iter().collect(),
+        }
     }
 }
 
@@ -38,6 +41,7 @@ impl CallGraphProvider for CallGraphAdapter {
     }
 
     fn callees(&self, method: &str) -> HashSet<String> {
+        // BTreeMap provides deterministic iteration order
         self.adjacency
             .keys()
             .filter(|(caller, _)| caller == method)
@@ -46,6 +50,7 @@ impl CallGraphProvider for CallGraphAdapter {
     }
 
     fn callers(&self, method: &str) -> HashSet<String> {
+        // BTreeMap provides deterministic iteration order
         self.adjacency
             .keys()
             .filter(|(_, callee)| callee == method)
@@ -1256,7 +1261,8 @@ impl GodObjectDetector {
 
         // Detect domain patterns
         let detector = DomainPatternDetector::new();
-        let mut pattern_scores: HashMap<DomainPattern, (usize, f64)> = HashMap::new();
+        let mut pattern_scores: std::collections::BTreeMap<DomainPattern, (usize, f64)> =
+            std::collections::BTreeMap::new();
 
         for method_info in &method_infos {
             if let Some(pattern_match) = detector.detect_method_domain(method_info, &context) {
@@ -2022,13 +2028,14 @@ impl GodObjectDetector {
             // Infer behavior category if not already set
             if split.behavior_category.is_none() && !split.methods_to_move.is_empty() {
                 // Categorize based on method names
-                let mut category_counts: HashMap<String, usize> = HashMap::new();
+                let mut category_counts: std::collections::BTreeMap<String, usize> =
+                    std::collections::BTreeMap::new();
                 for method in &split.methods_to_move {
                     let category = BehavioralCategorizer::categorize_method(method);
                     *category_counts.entry(category.display_name()).or_insert(0) += 1;
                 }
 
-                // Use most common category
+                // Use most common category (BTreeMap ensures deterministic tie-breaking)
                 if let Some((category, _)) = category_counts.iter().max_by_key(|(_, count)| *count)
                 {
                     split.behavior_category = Some(category.clone());
@@ -2659,7 +2666,7 @@ impl GodObjectDetector {
         use crate::organization::domain_patterns::{
             DomainPattern, DomainPatternDetector, FileContext, MethodInfo,
         };
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashSet;
 
         // Build method infos from AST
         let method_infos: Vec<MethodInfo> = methods
@@ -2698,7 +2705,8 @@ impl GodObjectDetector {
 
         // Detect domain patterns
         let detector = DomainPatternDetector::new();
-        let mut pattern_scores: HashMap<DomainPattern, (usize, f64)> = HashMap::new();
+        let mut pattern_scores: std::collections::BTreeMap<DomainPattern, (usize, f64)> =
+            std::collections::BTreeMap::new();
 
         for method_info in &method_infos {
             if let Some(pattern_match) = detector.detect_method_domain(method_info, &context) {

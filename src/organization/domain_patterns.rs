@@ -29,7 +29,7 @@ pub const WEIGHT_CALL_GRAPH: f64 = 0.20;
 pub const WEIGHT_DOCUMENTATION: f64 = 0.10;
 
 /// Design pattern categories for semantic clustering
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DomainPattern {
     /// Observer/Listener/Subject pattern
     ObserverPattern,

@@ -205,12 +205,19 @@ impl<C: CallGraphProvider, F: FieldAccessProvider> HierarchicalClustering<C, F> 
                 let similarity = similarity_matrix.get(i, j);
 
                 // Deterministic tie-breaking: prefer earlier indices for consistent results
+                // Use epsilon comparison for floating-point values to handle rounding
+                const EPSILON: f64 = 1e-10;
                 let should_update = match best_merge {
                     None => true,
-                    Some((_, _, best_sim)) => {
-                        similarity > best_sim
-                            || (similarity == best_sim
-                                && (i, j) < (best_merge.unwrap().0, best_merge.unwrap().1))
+                    Some((best_i, best_j, best_sim)) => {
+                        if similarity > best_sim + EPSILON {
+                            true
+                        } else if (similarity - best_sim).abs() < EPSILON {
+                            // Tie: use lexicographic ordering of indices for determinism
+                            (i, j) < (best_i, best_j)
+                        } else {
+                            false
+                        }
                     }
                 };
 
