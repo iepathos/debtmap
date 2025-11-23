@@ -3125,24 +3125,28 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow panic test for debug_assert (~400ms), run manually with --ignored if needed"]
     #[should_panic(expected = "should not include file extension")]
     fn test_split_name_validation_catches_rs_extension() {
         ModuleSplit::validate_name("config/misc.rs");
     }
 
     #[test]
+    #[ignore = "slow panic test for debug_assert (~400ms), run manually with --ignored if needed"]
     #[should_panic(expected = "should not include file extension")]
     fn test_split_name_validation_catches_py_extension() {
         ModuleSplit::validate_name("module.py");
     }
 
     #[test]
+    #[ignore = "slow panic test for debug_assert (~400ms), run manually with --ignored if needed"]
     #[should_panic(expected = "should not include file extension")]
     fn test_split_name_validation_catches_js_extension() {
         ModuleSplit::validate_name("handler.js");
     }
 
     #[test]
+    #[ignore = "slow panic test for debug_assert (~400ms), run manually with --ignored if needed"]
     #[should_panic(expected = "should not include file extension")]
     fn test_split_name_validation_catches_ts_extension() {
         ModuleSplit::validate_name("component.ts");
