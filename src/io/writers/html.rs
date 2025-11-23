@@ -6,7 +6,9 @@ use crate::risk::RiskInsight;
 use anyhow::Result;
 use html_escape::encode_text;
 use serde_json;
+use std::env;
 use std::io::Write;
+use std::path::Path;
 
 pub struct HtmlWriter<W: Write> {
     writer: W,
@@ -34,6 +36,37 @@ impl<W: Write> HtmlWriter<W> {
     }
 
     fn calculate_metrics(&self, results: &AnalysisResults) -> DashboardMetrics {
+        // If unified analysis is available, use filtered data (excludes T4 items)
+        if let Some(ref unified) = self.unified_analysis {
+            use crate::output::unified::convert_to_unified_format;
+            use crate::priority::tiers::TierConfig;
+            use crate::priority::UnifiedAnalysisQueries;
+
+            // Get filtered items (T4 excluded by default)
+            let tier_config = TierConfig::default();
+            let filtered_items = unified.get_top_mixed_priorities_tiered(usize::MAX, &tier_config);
+
+            // Use unified output which has filtered totals and density
+            let unified_output = convert_to_unified_format(unified, false);
+            let critical_count = unified_output.summary.score_distribution.critical;
+            let high_count = unified_output.summary.score_distribution.high;
+            let medium_count = unified_output.summary.score_distribution.medium;
+            let low_count = unified_output.summary.score_distribution.low;
+
+            return DashboardMetrics {
+                total_items: filtered_items.len(),
+                critical_count,
+                high_count,
+                medium_count,
+                low_count,
+                total_functions: results.complexity.summary.total_functions,
+                average_complexity: results.complexity.summary.average_complexity,
+                // Use debt density from unified output (calculated from filtered items)
+                debt_density: unified_output.summary.debt_density,
+            };
+        }
+
+        // Legacy path: use raw results (includes all items)
         let critical_count = results
             .technical_debt
             .items
@@ -93,7 +126,7 @@ impl<W: Write> HtmlWriter<W> {
             )
             .replace(
                 "{{{PROJECT_NAME}}}",
-                &results.project_path.display().to_string(),
+                &format_project_name(&results.project_path),
             )
             .replace("{{{TOTAL_ITEMS}}}", &metrics.total_items.to_string())
             .replace("{{{CRITICAL_COUNT}}}", &metrics.critical_count.to_string())
@@ -139,6 +172,33 @@ struct DashboardMetrics {
     total_functions: usize,
     average_complexity: f64,
     debt_density: f64,
+}
+
+fn format_project_name(project_path: &Path) -> String {
+    // Get the current directory for resolving relative paths
+    let current_dir = env::current_dir().ok();
+
+    // If the path is ".", return the current directory name
+    if project_path.as_os_str() == "." {
+        if let Some(cwd) = current_dir {
+            if let Some(dir_name) = cwd.file_name() {
+                return dir_name.to_string_lossy().to_string();
+            }
+        }
+        return ".".to_string();
+    }
+
+    // If it's a relative path and we have current_dir, combine them for context
+    if project_path.is_relative() {
+        if let Some(cwd) = current_dir {
+            if let Some(cwd_name) = cwd.file_name() {
+                return format!("{}/{}", cwd_name.to_string_lossy(), project_path.display());
+            }
+        }
+    }
+
+    // Otherwise, just display the path as is
+    project_path.display().to_string()
 }
 
 fn calculate_debt_density(results: &AnalysisResults) -> f64 {
@@ -611,6 +671,48 @@ mod tests {
         assert!(output.contains("effective_complexity"));
         assert!(output.contains("high_entropy_func"));
         assert!(output.contains("low_entropy_func"));
+    }
+
+    #[test]
+    fn test_format_project_name_current_dir() {
+        let path = Path::new(".");
+        let formatted = format_project_name(path);
+
+        // Should return the actual directory name, not "."
+        assert_ne!(formatted, ".");
+        // Should contain some directory name
+        assert!(!formatted.is_empty());
+    }
+
+    #[test]
+    fn test_format_project_name_relative_path() {
+        let path = Path::new("src");
+        let formatted = format_project_name(path);
+
+        // Should contain a slash indicating it's showing context
+        assert!(formatted.contains('/'));
+        // Should end with "src"
+        assert!(formatted.ends_with("src"));
+    }
+
+    #[test]
+    fn test_format_project_name_absolute_path() {
+        let path = Path::new("/absolute/path/to/project");
+        let formatted = format_project_name(path);
+
+        // Should return the path as-is for absolute paths
+        assert_eq!(formatted, "/absolute/path/to/project");
+    }
+
+    #[test]
+    fn test_format_project_name_nested_relative() {
+        let path = Path::new("src/analyzers");
+        let formatted = format_project_name(path);
+
+        // Should contain the relative path
+        assert!(formatted.contains("src/analyzers"));
+        // Should have context from current directory
+        assert!(formatted.contains('/'));
     }
 
     #[test]
