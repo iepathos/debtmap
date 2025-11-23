@@ -694,19 +694,21 @@
         function normalizeRecommendation(item) {
             const recommendation = item.recommendation || {};
             const action = recommendation.action || recommendation.primary_action || item.message || '';
+            const lowerAction = action.toLowerCase();
 
-            // Group similar recommendations
-            if (action.includes('Split') && action.includes('focused functions')) {
+            // Group similar recommendations (case-insensitive)
+            // Match "Split into X focused functions by decision clusters"
+            if (lowerAction.includes('split') && lowerAction.includes('focused') && lowerAction.includes('function') && lowerAction.includes('decision')) {
                 return 'Split into focused functions by decision clusters';
-            } else if (action.includes('Add tests') || action.includes('test coverage')) {
+            } else if (lowerAction.includes('add tests') || lowerAction.includes('test coverage')) {
                 return 'Add tests';
-            } else if (action.includes('Extract') && action.includes('function')) {
+            } else if (lowerAction.includes('extract') && lowerAction.includes('function')) {
                 return 'Extract helper functions';
-            } else if (action.includes('Reduce nesting') || action.includes('reduce nesting')) {
+            } else if (lowerAction.includes('reduce nesting')) {
                 return 'Reduce nesting depth';
-            } else if (action.includes('god object') || action.includes('God Object')) {
+            } else if (lowerAction.includes('god object')) {
                 return 'Refactor god object';
-            } else if (action.includes('Standardize') || action.includes('standardize')) {
+            } else if (lowerAction.includes('standardize')) {
                 return 'Standardize control flow patterns';
             }
 
