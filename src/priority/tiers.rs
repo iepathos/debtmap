@@ -139,6 +139,11 @@ pub fn classify_tier(item: &UnifiedDebtItem, config: &TierConfig) -> Recommendat
         return RecommendationTier::T2ComplexUntested;
     }
 
+    // Tier 2: Moderate complexity hotspots (not extreme enough for T1, but still important)
+    if is_moderate_complexity_hotspot(item, config) {
+        return RecommendationTier::T2ComplexUntested;
+    }
+
     // Tier 3: Moderate testing gaps
     if is_moderate_untested(item, config) {
         return RecommendationTier::T3TestingGaps;
@@ -162,6 +167,9 @@ fn is_architectural_issue(debt_type: &DebtType) -> bool {
             let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
             effective_cyclomatic > 50
         }
+        // Performance issues and error handling are NOT maintenance - they're real issues
+        DebtType::AsyncMisuse { .. } => true,
+        DebtType::ErrorSwallowing { .. } => true,
         _ => false,
     }
 }
@@ -200,6 +208,23 @@ fn is_moderate_untested(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
 
     // Moderate complexity
     item.cyclomatic_complexity >= config.t3_complexity_threshold
+}
+
+/// Check if item is a moderate complexity hotspot (T2, not extreme enough for T1)
+fn is_moderate_complexity_hotspot(item: &UnifiedDebtItem, config: &TierConfig) -> bool {
+    match &item.debt_type {
+        DebtType::ComplexityHotspot {
+            cyclomatic,
+            adjusted_cyclomatic,
+            ..
+        } => {
+            // Use adjusted complexity if available
+            let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
+            // Moderate complexity: above T2 threshold but not extreme (< 50)
+            effective_cyclomatic >= config.t2_complexity_threshold && effective_cyclomatic <= 50
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

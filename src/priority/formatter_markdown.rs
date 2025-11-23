@@ -2205,11 +2205,10 @@ mod tests {
                 line: 40,
                 function: "low_func".to_string(),
             },
-            debt_type: DebtType::DeadCode {
-                visibility: FunctionVisibility::Private,
-                cyclomatic: 5,
-                cognitive: 8,
-                usage_hints: vec![],
+            debt_type: DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 10, // At T3 threshold
+                cognitive: 12,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 2.0,
@@ -2246,8 +2245,8 @@ mod tests {
             downstream_callees: vec![],
             nesting_depth: 1,
             function_length: 30,
-            cyclomatic_complexity: 5,
-            cognitive_complexity: 8,
+            cyclomatic_complexity: 10, // Match debt_type
+            cognitive_complexity: 12,  // Match debt_type
             entropy_details: None,
             is_pure: Some(false),
             purity_confidence: Some(0.5),

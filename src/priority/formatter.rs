@@ -2000,8 +2000,8 @@ mod tests {
             },
             debt_type: DebtType::TestingGap {
                 coverage: 0.1,
-                cyclomatic: 5,
-                cognitive: 7,
+                cyclomatic: 15, // Use T2 threshold to avoid T4 filtering
+                cognitive: 20,
             },
             unified_score: UnifiedScore {
                 complexity_factor: 5.0,
@@ -2042,8 +2042,8 @@ mod tests {
             ],
             nesting_depth: 1,
             function_length: 15,
-            cyclomatic_complexity: 5,
-            cognitive_complexity: 7,
+            cyclomatic_complexity: 15, // Match debt_type cyclomatic
+            cognitive_complexity: 20,  // Match debt_type cognitive
             is_pure: None,
             purity_confidence: None,
             purity_level: None,

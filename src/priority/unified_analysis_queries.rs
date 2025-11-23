@@ -51,13 +51,22 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
         n: usize,
         tier_config: &TierConfig,
     ) -> Vector<DebtItem> {
+        use crate::priority::tiers::RecommendationTier;
+
         // Combine function and file items with tier classification
         let mut all_items: Vec<DebtItem> = Vec::new();
 
         // Add function items with tier classification
         for item in &self.items {
             let mut item_with_tier = item.clone();
-            item_with_tier.tier = Some(classify_tier(item, tier_config));
+            let tier = classify_tier(item, tier_config);
+            item_with_tier.tier = Some(tier);
+
+            // Filter out Tier 4 items unless explicitly requested (spec: reduce spam)
+            if tier == RecommendationTier::T4Maintenance && !tier_config.show_t4_in_main_report {
+                continue;
+            }
+
             all_items.push(DebtItem::Function(Box::new(item_with_tier)));
         }
 

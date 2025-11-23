@@ -111,7 +111,7 @@ t2_dependency_threshold = 10         # Dependency count cutoff
 t3_complexity_threshold = 10         # Lower complexity threshold
 
 # Display options
-show_t4_in_main_report = false      # Hide Tier 4 from main output (not yet implemented)
+show_t4_in_main_report = false      # Hide Tier 4 from main output (default: false)
 
 # Tier weights (multipliers applied to base scores)
 t1_weight = 1.5    # Critical architecture
