@@ -86,7 +86,7 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
 - Implement normalization algorithm (lines 693-717) in pure Rust functions
 - Calculate priority rankings using highest individual priority (lines 743-752)
 - Pre-compute aggregated impact metrics (complexity/risk reduction)
-- Generate HTML for recommendation cards server-side
+- Prepare structured recommendation data with pre-computed display values and CSS classes
 
 #### FR3: Root Cause Categorization
 - Implement root cause text analysis in Rust (lines 471-514 patterns)
@@ -101,11 +101,11 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
 - Generate scatter plot data points server-side
 - Build Chart.js configurations in Rust
 
-#### FR5: Table Generation
-- Pre-render complex function table rows in Rust with proper HTML escaping
-- Calculate all sortable values server-side
-- Apply priority badge CSS classes in backend
-- Generate god objects table if applicable
+#### FR5: Table Data Preparation
+- Prepare structured table data for complex functions with all display values pre-computed
+- Calculate all sortable values and formatting server-side
+- Pre-compute priority badge CSS classes and color classes in backend
+- Prepare god objects table data if applicable
 
 #### FR6: Chart Configuration
 - Generate complete Chart.js configuration objects in Rust
@@ -157,7 +157,7 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
   - `src/io/writers/dashboard/mod.rs` module created
   - `dashboard/data.rs` contains all data structures
   - `dashboard/charts.rs` handles chart configuration generation
-  - `dashboard/tables.rs` handles table HTML generation
+  - `dashboard/tables.rs` handles table data preparation
   - `dashboard/recommendations.rs` handles recommendation processing
   - `dashboard/metrics.rs` handles metric calculations
 
@@ -178,7 +178,7 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
   - Normalization algorithm converted to pure Rust function
   - Priority ranking uses highest individual priority
   - Top 10 recommendations pre-computed and sorted
-  - HTML for recommendation cards generated server-side
+  - Structured recommendation data with pre-computed CSS classes and display values
   - Rationale extraction implemented in Rust
 
 - [ ] **AC5: Root Cause Analysis**
@@ -193,12 +193,12 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
   - Entropy-adjusted complexity handling in backend
   - All distribution calculations server-side
 
-- [ ] **AC7: Table Generation**
-  - Complex functions table HTML pre-rendered in Rust
-  - All 50 rows generated with proper escaping
-  - Sortable data attributes included
-  - Priority badges and color classes applied server-side
-  - God objects table conditionally rendered
+- [ ] **AC7: Table Data Preparation**
+  - Complex functions table data prepared as structured Vec<FunctionTableRow>
+  - All display values pre-computed (formatted entropy, dampening, etc.)
+  - CSS classes for colors and badges pre-computed server-side
+  - Sortable values included in data structure
+  - God objects table data prepared conditionally
 
 - [ ] **AC8: Chart Configurations**
   - Complete Chart.js config objects generated in Rust
@@ -219,7 +219,7 @@ Refactor the HTML dashboard to move all business logic, data transformation, and
   - Tests for recommendation grouping algorithm
   - Tests for root cause categorization
   - Tests for chart configuration generation
-  - Tests for HTML escaping and sanitization
+  - Tests for data structure serialization
   - Integration test for complete dashboard generation
 
 - [ ] **AC11: No Regressions**
@@ -350,16 +350,57 @@ pub struct RecommendationGroup {
     pub avg_score: String,  // Pre-formatted
     pub count: usize,
     pub rationale: Option<String>,
-    pub impact_html: Option<String>,  // Pre-rendered impact section
-    pub items_html: String,  // Pre-rendered items HTML
+    pub impact: Option<ImpactMetrics>,  // Structured impact data
+    pub items: Vec<RecommendationItem>,  // Structured items
+}
+
+#[derive(Serialize, Debug)]
+pub struct ImpactMetrics {
+    pub complexity_reduction: Option<f64>,
+    pub risk_reduction: Option<f64>,
+    pub total_complexity_reduction: f64,
+    pub total_risk_reduction: f64,
+}
+
+#[derive(Serialize, Debug)]
+pub struct RecommendationItem {
+    pub location: String,  // Pre-formatted: "file.rs:123 function_name()"
+    pub score: String,  // Pre-formatted
+    pub priority_class: String,  // CSS class
+    pub details: Option<String>,  // Optional additional details
 }
 
 #[derive(Serialize, Debug)]
 pub struct TableData {
-    pub complex_functions_rows: Vec<String>,  // Pre-rendered HTML rows
-    pub god_objects_rows: Vec<String>,  // Pre-rendered HTML rows
+    pub complex_functions: Vec<FunctionTableRow>,  // Structured data
+    pub god_objects: Vec<GodObjectRow>,  // Structured data
     pub show_god_objects: bool,
     pub show_adjusted_complexity: bool,
+}
+
+#[derive(Serialize, Debug)]
+pub struct FunctionTableRow {
+    pub name: String,
+    pub file: String,
+    pub cyclomatic: u32,
+    pub cognitive: u32,
+    pub cognitive_color: String,  // CSS class: "text-red-600"
+    pub nesting: u32,
+    pub entropy: String,  // Pre-formatted: "0.52" or "N/A"
+    pub entropy_color: String,  // CSS class
+    pub dampening: String,  // Pre-formatted: "0.80" or "N/A"
+    pub priority_label: String,  // "CRITICAL", "HIGH", etc.
+    pub priority_class: String,  // CSS class: "bg-red-100 text-red-800"
+}
+
+#[derive(Serialize, Debug)]
+pub struct GodObjectRow {
+    pub file: String,
+    pub score: String,  // Pre-formatted
+    pub loc: String,  // Pre-formatted
+    pub functions: usize,
+    pub responsibilities: usize,
+    pub priority_class: String,  // CSS class
 }
 ```
 
@@ -641,49 +682,69 @@ pub fn generate_distinct_colors(count: usize) -> Vec<String> {
 }
 ```
 
-#### Phase 5: Implement Table Generation
+#### Phase 5: Implement Table Data Preparation
 
 Create `src/io/writers/dashboard/tables.rs`:
 
 ```rust
 use crate::core::FunctionMetrics;
-use html_escape::encode_text;
+use crate::io::writers::dashboard::data::FunctionTableRow;
 
-/// Generate HTML row for complex function table
-pub fn render_function_row(func: &FunctionMetrics) -> String {
+/// Convert FunctionMetrics to structured table row data
+pub fn prepare_function_row(func: &FunctionMetrics) -> FunctionTableRow {
     let entropy_display = func.entropy_score
         .map(|e| format!("{:.2}", e))
         .unwrap_or_else(|| "N/A".to_string());
-
-    let entropy_color = get_entropy_color_class(func.entropy_score);
 
     let dampening = func.adjusted_complexity
         .map(|adj| format!("{:.2}", adj / func.cyclomatic as f64))
         .unwrap_or_else(|| "N/A".to_string());
 
-    let priority_badge = get_priority_badge_class(func);
-    let priority_label = get_priority_label(func);
-
-    format!(
-        r#"<tr>
-            <td class="px-6 py-4 text-sm font-mono">{}</td>
-            <td class="px-6 py-4 text-sm text-gray-600">{}</td>
-            <td class="px-6 py-4 text-sm">{}</td>
-            <td class="px-6 py-4 text-sm font-semibold {}">{}</td>
-            <td class="px-6 py-4 text-sm">{}</td>
-            <td class="px-6 py-4 text-sm {}">{}</td>
-            <td class="px-6 py-4 text-sm text-gray-600">{}</td>
-            <td class="px-6 py-4"><span class="px-2 py-1 rounded text-xs {}">{}</span></td>
-        </tr>"#,
-        encode_text(&func.name),
-        encode_text(&func.file.display().to_string()),
-        func.cyclomatic,
-        get_cognitive_color_class(func.cognitive), func.cognitive,
-        func.nesting,
-        entropy_color, entropy_display,
+    FunctionTableRow {
+        name: func.name.clone(),
+        file: func.file.display().to_string(),
+        cyclomatic: func.cyclomatic,
+        cognitive: func.cognitive,
+        cognitive_color: get_cognitive_color_class(func.cognitive).to_string(),
+        nesting: func.nesting,
+        entropy: entropy_display,
+        entropy_color: get_entropy_color_class(func.entropy_score).to_string(),
         dampening,
-        priority_badge, priority_label
-    )
+        priority_label: get_priority_label(func).to_string(),
+        priority_class: get_priority_badge_class(func).to_string(),
+    }
+}
+
+/// Prepare all table data from metrics
+pub fn prepare_table_data(
+    functions: &[FunctionMetrics],
+    god_objects: &[GodObjectMetrics],
+) -> TableData {
+    // Sort and take top 50 functions by complexity
+    let mut sorted_functions = functions.to_vec();
+    sorted_functions.sort_by(|a, b| {
+        let a_max = a.cyclomatic.max(a.cognitive);
+        let b_max = b.cyclomatic.max(b.cognitive);
+        b_max.cmp(&a_max)
+    });
+
+    let complex_functions = sorted_functions
+        .into_iter()
+        .take(50)
+        .map(|f| prepare_function_row(&f))
+        .collect();
+
+    let god_objects_data = god_objects
+        .iter()
+        .map(|g| prepare_god_object_row(g))
+        .collect();
+
+    TableData {
+        complex_functions,
+        god_objects: god_objects_data,
+        show_god_objects: !god_objects.is_empty(),
+        show_adjusted_complexity: functions.iter().any(|f| f.adjusted_complexity.is_some()),
+    }
 }
 
 /// Get entropy color class (lines 1087-1093)
@@ -806,7 +867,29 @@ New `src/io/writers/templates/dashboard.html.tera` (< 300 lines):
                 {% if group.rationale %}
                 <div class="rationale">{{ group.rationale }}</div>
                 {% endif %}
-                {{ group.items_html | safe }}
+
+                {% if group.impact %}
+                <div class="impact">
+                    {% if group.impact.complexity_reduction %}
+                    <div>Complexity reduction: {{ group.impact.complexity_reduction }}</div>
+                    {% endif %}
+                    {% if group.impact.risk_reduction %}
+                    <div>Risk reduction: {{ group.impact.risk_reduction }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="items">
+                    {% for item in group.items %}
+                    <div class="item {{ item.priority_class }}">
+                        <span class="location">{{ item.location }}</span>
+                        <span class="score">{{ item.score }}</span>
+                        {% if item.details %}
+                        <div class="details">{{ item.details }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -831,8 +914,21 @@ New `src/io/writers/templates/dashboard.html.tera` (< 300 lines):
             </tr>
         </thead>
         <tbody>
-            {% for row in dashboard.tables.complex_functions_rows %}
-            {{ row | safe }}
+            {% for func in dashboard.tables.complex_functions %}
+            <tr>
+                <td class="px-6 py-4 text-sm font-mono">{{ func.name }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ func.file }}</td>
+                <td class="px-6 py-4 text-sm">{{ func.cyclomatic }}</td>
+                <td class="px-6 py-4 text-sm font-semibold {{ func.cognitive_color }}">{{ func.cognitive }}</td>
+                <td class="px-6 py-4 text-sm">{{ func.nesting }}</td>
+                <td class="px-6 py-4 text-sm {{ func.entropy_color }}">{{ func.entropy }}</td>
+                <td class="px-6 py-4 text-sm text-gray-600">{{ func.dampening }}</td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 rounded text-xs {{ func.priority_class }}">
+                        {{ func.priority_label }}
+                    </span>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
     </table>
@@ -1011,12 +1107,12 @@ fn test_generate_distinct_colors() {
 }
 ```
 
-**Table Generation** (`dashboard/tables.rs`):
+**Table Data Preparation** (`dashboard/tables.rs`):
 ```rust
 #[test]
-fn test_render_function_row_escaping() {
+fn test_prepare_function_row_data() {
     let func = FunctionMetrics {
-        name: "<script>alert('xss')</script>".to_string(),
+        name: "complex_function".to_string(),
         file: PathBuf::from("test.rs"),
         cyclomatic: 10,
         cognitive: 15,
@@ -1026,11 +1122,32 @@ fn test_render_function_row_escaping() {
         // ...
     };
 
-    let html = render_function_row(&func);
+    let row = prepare_function_row(&func);
 
-    // Should be escaped
-    assert!(html.contains("&lt;script&gt;"));
-    assert!(!html.contains("<script>alert"));
+    // Verify data structure
+    assert_eq!(row.name, "complex_function");
+    assert_eq!(row.cyclomatic, 10);
+    assert_eq!(row.cognitive, 15);
+    assert_eq!(row.entropy, "0.50");
+    assert_eq!(row.entropy_color, "text-orange-600");
+    assert_eq!(row.dampening, "0.80");
+    assert_eq!(row.priority_label, "MEDIUM");
+    assert_eq!(row.priority_class, "bg-yellow-100 text-yellow-800");
+}
+
+#[test]
+fn test_prepare_function_row_with_special_characters() {
+    let func = FunctionMetrics {
+        name: "<script>alert('xss')</script>".to_string(),
+        file: PathBuf::from("test.rs"),
+        // ...
+    };
+
+    let row = prepare_function_row(&func);
+
+    // Tera will handle escaping automatically
+    // Just verify the raw data is preserved correctly
+    assert_eq!(row.name, "<script>alert('xss')</script>");
 }
 
 #[test]
@@ -1040,6 +1157,22 @@ fn test_priority_badge_classes() {
 
     let low = create_func(5, 8);
     assert_eq!(get_priority_badge_class(&low), "bg-green-100 text-green-800");
+}
+
+#[test]
+fn test_prepare_table_data_sorts_by_complexity() {
+    let functions = vec![
+        create_func_with_name("low", 5, 8),
+        create_func_with_name("critical", 25, 60),
+        create_func_with_name("medium", 12, 18),
+    ];
+
+    let table_data = prepare_table_data(&functions, &[]);
+
+    // Should be sorted: critical, medium, low
+    assert_eq!(table_data.complex_functions[0].name, "critical");
+    assert_eq!(table_data.complex_functions[1].name, "medium");
+    assert_eq!(table_data.complex_functions[2].name, "low");
 }
 ```
 
@@ -1184,17 +1317,20 @@ Document migration for developers:
 
 **Recommendation**: Start with Tera, can swap if needed.
 
-### HTML Escaping
+### Template Escaping
 
-Always use `html_escape::encode_text()` for:
-- Function names
-- File paths
-- User-visible messages
-- Any dynamic content
+Tera automatically escapes all variables by default, providing XSS protection.
 
-Never escape:
-- Pre-rendered HTML marked `| safe` in template
-- Chart JSON (already JSON-escaped)
+**Automatic escaping** applies to:
+- All `{{ variable }}` expressions
+- Function names, file paths, messages
+- Any user-provided or dynamic content
+
+**When to use `| safe`**:
+- Only for Chart.js JSON configurations via `| json_encode()`
+- Never use for user-provided strings or file content
+
+**Best practice**: Store raw data in Rust structures, let Tera handle all escaping automatically
 
 ### Performance Considerations
 
