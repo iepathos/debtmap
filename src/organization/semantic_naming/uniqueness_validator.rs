@@ -164,7 +164,7 @@ impl NameUniquenessValidator {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```text
     /// // Methods: ["infer_responsibility", "group_methods"]
     /// // → Returns: "inference" (from "infer" verb)
     ///

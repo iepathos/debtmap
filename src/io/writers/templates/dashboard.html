@@ -1074,11 +1074,39 @@
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 10
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return recommendationLabels[context[0].dataIndex];
+                            }
+                        }
+                    }
+                },
                 scales: {
                     x: {
                         beginAtZero: true,
                         ticks: { precision: 0 }
+                    },
+                    y: {
+                        ticks: {
+                            autoSkip: false,
+                            callback: function(value, index) {
+                                const label = recommendationLabels[index];
+                                const maxLength = 35;
+                                if (label.length > maxLength) {
+                                    return label.substring(0, maxLength) + '...';
+                                }
+                                return label;
+                            }
+                        }
                     }
                 }
             }

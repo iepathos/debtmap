@@ -45,7 +45,7 @@ impl DomainTermExtractor {
     ///
     /// # Examples
     ///
-    /// ```ignore
+    /// ```text
     /// // Methods: infer_responsibility_multi_signal, group_methods_by_responsibility
     /// // → Extracts: verb="infer" + noun="responsibility"
     /// // → Returns: "responsibility_inference"

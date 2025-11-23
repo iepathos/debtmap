@@ -90,7 +90,7 @@ impl AggregateCoverage {
 /// - `execute::<WorkflowExecutor>` - 70% coverage, uncovered: [10, 20, 30]
 /// - `execute::<MockExecutor>` - 80% coverage, uncovered: [20, 40]
 ///
-/// Result: 75% coverage (average), uncovered: [20] (intersection - only line uncovered in BOTH)
+/// Result: 75% coverage (average), uncovered: \[20\] (intersection - only line uncovered in BOTH)
 ///
 /// # Performance
 ///
@@ -183,11 +183,11 @@ pub struct CoverageIndex {
     file_paths: Vec<PathBuf>,
 
     /// Index from base function name to all monomorphized versions
-    /// Maps (file, base_name) -> [monomorphized_names] for O(1) generic function lookup
+    /// Maps (file, base_name) -> \[monomorphized_names\] for O(1) generic function lookup
     base_function_index: HashMap<(PathBuf, String), Vec<String>>,
 
     /// Index from method name to actual function names for trait method matching
-    /// Maps (file, method_name) -> [actual_function_names] for O(1) variant matching
+    /// Maps (file, method_name) -> \[actual_function_names\] for O(1) variant matching
     /// Example: (recursive_detector.rs, "visit_expr") -> ["_RNvXs0_...visit_expr"]
     method_name_index: HashMap<(PathBuf, String), Vec<String>>,
 

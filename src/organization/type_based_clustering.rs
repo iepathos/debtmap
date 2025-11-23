@@ -481,7 +481,7 @@ impl TypeAffinityAnalyzer {
     /// 2. If tie, use tie-breaking rules:
     ///    - Prefer domain types over primitives
     ///    - Prefer return types (output) over param types (input)
-    ///    - Prefer non-wrapper types (avoid Option<T>, Vec<T>)
+    ///    - Prefer non-wrapper types (avoid `Option<T>`, `Vec<T>`)
     ///    - Prefer longer, more specific type names
     /// 3. Extract base type from generics
     fn identify_primary_type(
