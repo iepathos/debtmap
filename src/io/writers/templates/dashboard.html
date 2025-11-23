@@ -739,14 +739,24 @@
 
             // Convert to array and sort by total score
             const groupedRecommendations = Array.from(groups.entries())
-                .map(([recommendation, items]) => ({
-                    recommendation,
-                    items,
-                    totalScore: items.reduce((sum, item) => sum + item.score, 0),
-                    avgScore: items.reduce((sum, item) => sum + item.score, 0) / items.length,
-                    count: items.length,
-                    highestPriority: items[0].priority // Already sorted by score
-                }))
+                .map(([recommendation, items]) => {
+                    const totalScore = items.reduce((sum, item) => sum + item.score, 0);
+                    const avgScore = totalScore / items.length;
+
+                    // Find highest individual priority in the group
+                    // Items are already sorted by score, so first item has highest priority
+                    const highestPriority = items[0].priority;
+
+                    return {
+                        recommendation,
+                        items,
+                        totalScore,
+                        avgScore,
+                        count: items.length,
+                        // Use highest individual item priority (not calculated from total)
+                        priority: highestPriority
+                    };
+                })
                 .sort((a, b) => b.totalScore - a.totalScore)
                 .slice(0, 10);
 
@@ -754,7 +764,7 @@
 
             groupedRecommendations.forEach((group, groupIndex) => {
                 const card = document.createElement('div');
-                const priorityClass = group.highestPriority.toLowerCase();
+                const priorityClass = group.priority;
                 card.className = `recommendation-card ${priorityClass}`;
 
                 // Build HTML for the group
@@ -763,7 +773,7 @@
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="text-lg font-bold text-gray-700">#${groupIndex + 1}</span>
-                                <span class="badge ${priorityClass}">${group.highestPriority.toUpperCase()}</span>
+                                <span class="badge ${priorityClass}">${group.priority.toUpperCase()}</span>
                                 <span class="text-sm font-semibold text-purple-600">TOTAL SCORE: ${Math.round(group.totalScore)}</span>
                                 ${group.count > 1 ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">${group.count} items</span>` : ''}
                             </div>
