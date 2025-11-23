@@ -453,7 +453,7 @@ pub fn convert_to_unified_format(
         .map(|item| UnifiedDebtItemOutput::from_debt_item(item, include_scoring_details))
         .collect();
 
-    // Calculate summary statistics
+    // Calculate summary statistics from filtered items
     let mut file_count = 0;
     let mut function_count = 0;
     let mut category_counts: HashMap<String, usize> = HashMap::new();
@@ -463,6 +463,9 @@ pub fn convert_to_unified_format(
         medium: 0,
         low: 0,
     };
+
+    // Calculate total debt score from filtered items only
+    let total_debt_score: f64 = all_items.iter().map(|item| item.score()).sum();
 
     for item in &unified_items {
         match item {
@@ -489,6 +492,13 @@ pub fn convert_to_unified_format(
         }
     }
 
+    // Recalculate debt density from filtered items
+    let debt_density = if analysis.total_lines_of_code > 0 {
+        (total_debt_score / analysis.total_lines_of_code as f64) * 1000.0
+    } else {
+        0.0
+    };
+
     UnifiedOutput {
         format_version: "2.0".to_string(),
         metadata: OutputMetadata {
@@ -499,8 +509,8 @@ pub fn convert_to_unified_format(
         },
         summary: DebtSummary {
             total_items: unified_items.len(),
-            total_debt_score: analysis.total_debt_score,
-            debt_density: analysis.debt_density,
+            total_debt_score,
+            debt_density,
             total_loc: analysis.total_lines_of_code,
             by_type: TypeBreakdown {
                 file: file_count,

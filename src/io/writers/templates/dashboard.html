@@ -186,7 +186,7 @@
                 <div class="text-xs text-gray-500 mt-1" id="medium-percentage"></div>
             </div>
             <div class="metric-card low">
-                <div class="text-sm text-gray-600 mb-2">Low/Optional</div>
+                <div class="text-sm text-gray-600 mb-2">Low Priority</div>
                 <div class="text-3xl font-bold text-green-600">{{{LOW_COUNT}}}</div>
                 <div class="text-xs text-gray-500 mt-1" id="low-percentage"></div>
             </div>
@@ -690,9 +690,33 @@
             return sorted.slice(0, 6).map(x => x[1]);
         }
 
-        // Populate Top 10 Recommendations
+        // Normalize recommendation action for grouping
+        function normalizeRecommendation(item) {
+            const recommendation = item.recommendation || {};
+            const action = recommendation.action || recommendation.primary_action || item.message || '';
+
+            // Group similar recommendations
+            if (action.includes('Split') && action.includes('focused functions')) {
+                return 'Split into focused functions by decision clusters';
+            } else if (action.includes('Add tests') || action.includes('test coverage')) {
+                return 'Add tests';
+            } else if (action.includes('Extract') && action.includes('function')) {
+                return 'Extract helper functions';
+            } else if (action.includes('Reduce nesting') || action.includes('reduce nesting')) {
+                return 'Reduce nesting depth';
+            } else if (action.includes('god object') || action.includes('God Object')) {
+                return 'Refactor god object';
+            } else if (action.includes('Standardize') || action.includes('standardize')) {
+                return 'Standardize control flow patterns';
+            }
+
+            // Default: use first 50 chars of action
+            return action.substring(0, 50);
+        }
+
+        // Populate Top 10 Recommendations with grouping
         function populateTop10Recommendations() {
-            const items = getDebtItems(debtData)
+            const allItems = getDebtItems(debtData)
                 .map(item => {
                     const { unwrapped, itemType } = unwrapItem(item, debtData);
                     return {
@@ -701,72 +725,99 @@
                         _itemType: itemType  // Track original type
                     };
                 })
-                .sort((a, b) => b.score - a.score)
+                .sort((a, b) => b.score - a.score);
+
+            // Group items by normalized recommendation
+            const groups = new Map();
+            allItems.forEach(item => {
+                const normalizedRec = normalizeRecommendation(item);
+                if (!groups.has(normalizedRec)) {
+                    groups.set(normalizedRec, []);
+                }
+                groups.get(normalizedRec).push(item);
+            });
+
+            // Convert to array and sort by total score
+            const groupedRecommendations = Array.from(groups.entries())
+                .map(([recommendation, items]) => ({
+                    recommendation,
+                    items,
+                    totalScore: items.reduce((sum, item) => sum + item.score, 0),
+                    avgScore: items.reduce((sum, item) => sum + item.score, 0) / items.length,
+                    count: items.length,
+                    highestPriority: items[0].priority // Already sorted by score
+                }))
+                .sort((a, b) => b.totalScore - a.totalScore)
                 .slice(0, 10);
 
             const container = document.getElementById('top-recommendations');
 
-            items.forEach((item, index) => {
+            groupedRecommendations.forEach((group, groupIndex) => {
                 const card = document.createElement('div');
-                card.className = `recommendation-card ${item.priority.toLowerCase()}`;
+                const priorityClass = group.highestPriority.toLowerCase();
+                card.className = `recommendation-card ${priorityClass}`;
 
-                const priorityClass = item.priority.toLowerCase();
-                const recommendation = item.recommendation || {};
-                const impact = item.impact || item.expected_impact || {};
-                const metrics = item.metrics || {};
-
-                // Handle both unified and legacy formats for location
-                let locationText = '';
-                if (item.location) {
-                    // Unified format
-                    locationText = item.location.file || '';
-                    if (item.location.line) locationText += `:${item.location.line}`;
-                    if (item.location.function) locationText += ` ${item.location.function}()`;
-                } else if (item._itemType === 'File' && metrics.path) {
-                    // Legacy File item
-                    locationText = metrics.path;
-                } else {
-                    // Legacy Function format
-                    locationText = item.file || '';
-                    if (item.line) locationText += `:${item.line}`;
-                    if (item.function_name) locationText += ` ${item.function_name}()`;
-                }
-
-                // Calculate entropy and dampening
-                const entropy = metrics.entropy_score || item.entropy_score;
-                const entropyDisplay = entropy !== null && entropy !== undefined ? entropy.toFixed(2) : 'N/A';
-                const entropyColor = getEntropyColorClass(entropy);
-
-                // Calculate dampening factor if we have adjusted complexity
-                let dampeningDisplay = 'N/A';
-                if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
-                    const dampening = item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity;
-                    dampeningDisplay = dampening.toFixed(2);
-                }
-
-                // Extract rationale from item.context or recommendation
-                const rationale = recommendation.rationale || item.context?.rationale || extractRationaleFromMessage(item.message);
-
-                card.innerHTML = `
-                    <div class="flex items-start justify-between cursor-pointer" onclick="toggleDetails(${index})">
+                // Build HTML for the group
+                let groupHtml = `
+                    <div class="flex items-start justify-between cursor-pointer" onclick="toggleGroupDetails(${groupIndex})">
                         <div class="flex-1">
                             <div class="flex items-center gap-3 mb-2">
-                                <span class="text-lg font-bold text-gray-700">#${index + 1}</span>
-                                <span class="badge ${priorityClass}">${item.priority.toUpperCase()}</span>
-                                <span class="text-sm font-semibold text-purple-600">SCORE: ${Math.round(item.score)}</span>
+                                <span class="text-lg font-bold text-gray-700">#${groupIndex + 1}</span>
+                                <span class="badge ${priorityClass}">${group.highestPriority.toUpperCase()}</span>
+                                <span class="text-sm font-semibold text-purple-600">TOTAL SCORE: ${Math.round(group.totalScore)}</span>
+                                ${group.count > 1 ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">${group.count} items</span>` : ''}
                             </div>
-                            <div class="text-sm font-mono text-gray-600 mb-1">${locationText}</div>
-                            ${recommendation.action ? `<div class="text-sm text-gray-800 font-medium">⚡ ${recommendation.action}</div>` : ''}
+                            <div class="text-sm text-gray-800 font-medium">⚡ ${group.recommendation}</div>
+                            ${group.count > 1 ? `<div class="text-xs text-gray-600 mt-1">Average score: ${Math.round(group.avgScore)}</div>` : ''}
                         </div>
                         <button class="text-gray-400 hover:text-gray-600 ml-4">
-                            <span id="toggle-icon-${index}">▼</span>
+                            <span id="group-toggle-icon-${groupIndex}">▼</span>
                         </button>
                     </div>
-                    <div id="details-${index}" class="recommendation-details">
+                    <div id="group-details-${groupIndex}" class="recommendation-details">
+                `;
+
+                // If only one item, show its details directly
+                if (group.count === 1) {
+                    const item = group.items[0];
+                    const recommendation = item.recommendation || {};
+                    const impact = item.impact || item.expected_impact || {};
+                    const metrics = item.metrics || {};
+
+                    // Handle location
+                    let locationText = '';
+                    if (item.location) {
+                        locationText = item.location.file || '';
+                        if (item.location.line) locationText += `:${item.location.line}`;
+                        if (item.location.function) locationText += ` ${item.location.function}()`;
+                    } else if (item._itemType === 'File' && metrics.path) {
+                        locationText = metrics.path;
+                    } else {
+                        locationText = item.file || '';
+                        if (item.line) locationText += `:${item.line}`;
+                        if (item.function_name) locationText += ` ${item.function_name}()`;
+                    }
+
+                    const entropy = metrics.entropy_score || item.entropy_score;
+                    const entropyDisplay = entropy !== null && entropy !== undefined ? entropy.toFixed(2) : 'N/A';
+                    const entropyColor = getEntropyColorClass(entropy);
+
+                    let dampeningDisplay = 'N/A';
+                    if (item.adjusted_complexity?.dampened_cyclomatic && metrics.cyclomatic_complexity) {
+                        const dampening = item.adjusted_complexity.dampened_cyclomatic / metrics.cyclomatic_complexity;
+                        dampeningDisplay = dampening.toFixed(2);
+                    }
+
+                    const rationale = recommendation.rationale || item.context?.rationale || extractRationaleFromMessage(item.message);
+
+                    groupHtml += `
+                        <div class="mb-2">
+                            <div class="text-sm font-mono text-gray-600">${locationText}</div>
+                        </div>
                         ${rationale ? `
-                            <div class="mb-3">
-                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">💡 Why This Matters</div>
-                                <div class="text-sm text-gray-700">${rationale}</div>
+                            <div class="mb-3 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                                <div class="text-xs font-semibold text-blue-900 uppercase mb-1">💡 Why This Matters</div>
+                                <div class="text-sm text-blue-900">${rationale}</div>
                             </div>
                         ` : ''}
                         ${impact.complexity_reduction || impact.risk_reduction ? `
@@ -801,11 +852,114 @@
                             </div>
                         ` : ''}
                         ${item.god_object_indicators?.recommended_splits ? renderGodObjectSplits(item.god_object_indicators) : ''}
+                    `;
+                } else {
+                    // Multiple items - show Why This Matters and aggregated info
+                    const topItem = group.items[0]; // Highest scoring item
+                    const topRecommendation = topItem.recommendation || {};
+                    const topRationale = topRecommendation.rationale || topItem.context?.rationale || extractRationaleFromMessage(topItem.message);
+
+                    // Calculate aggregated impact
+                    let totalComplexityReduction = 0;
+                    let totalRiskReduction = 0;
+                    group.items.forEach(item => {
+                        const impact = item.impact || item.expected_impact || {};
+                        totalComplexityReduction += impact.complexity_reduction || 0;
+                        totalRiskReduction += impact.risk_reduction || 0;
+                    });
+
+                    // Show Why This Matters from the top-scoring item
+                    if (topRationale) {
+                        groupHtml += `
+                            <div class="mb-3 bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                                <div class="text-xs font-semibold text-blue-900 uppercase mb-1">💡 Why This Matters</div>
+                                <div class="text-sm text-blue-900">${topRationale}</div>
+                            </div>
+                        `;
+                    }
+
+                    // Show aggregated impact
+                    if (totalComplexityReduction > 0 || totalRiskReduction > 0) {
+                        groupHtml += `
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-gray-600 uppercase mb-1">📈 Aggregated Impact (${group.count} items)</div>
+                                <div class="text-sm text-gray-700 space-y-1">
+                                    ${totalComplexityReduction > 0 ? `<div>• Total complexity reduction: <span class="font-semibold text-green-600">${totalComplexityReduction.toFixed(1)}</span></div>` : ''}
+                                    ${totalRiskReduction > 0 ? `<div>• Total risk reduction: <span class="font-semibold text-green-600">${totalRiskReduction.toFixed(1)}</span></div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Show list of affected locations
+                    groupHtml += `
+                        <div class="mb-3">
+                            <div class="text-xs font-semibold text-gray-600 uppercase mb-2">📍 Affected Locations (${group.count})</div>
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                    `;
+
+                    group.items.slice(0, 20).forEach((item, idx) => {
+                        const metrics = item.metrics || {};
+                        let locationText = '';
+                        if (item.location) {
+                            locationText = item.location.file || '';
+                            if (item.location.line) locationText += `:${item.location.line}`;
+                            if (item.location.function) locationText += ` ${item.location.function}()`;
+                        } else if (item._itemType === 'File' && metrics.path) {
+                            locationText = metrics.path;
+                        } else {
+                            locationText = item.file || '';
+                            if (item.line) locationText += `:${item.line}`;
+                            if (item.function_name) locationText += ` ${item.function_name}()`;
+                        }
+
+                        const itemPriorityClass = item.priority.toLowerCase();
+
+                        groupHtml += `
+                            <div class="border-l-2 border-${itemPriorityClass === 'critical' ? 'red' : itemPriorityClass === 'high' ? 'orange' : itemPriorityClass === 'medium' ? 'yellow' : 'green'}-400 pl-3 py-1">
+                                <div class="flex items-center justify-between">
+                                    <div class="text-sm font-mono text-gray-700">${locationText}</div>
+                                    <span class="text-xs font-semibold text-purple-600 ml-2">${Math.round(item.score)}</span>
+                                </div>
+                                ${item.recommendation?.action && item.recommendation.action !== group.recommendation ?
+                                    `<div class="text-xs text-gray-600 mt-1">${item.recommendation.action}</div>` : ''}
+                            </div>
+                        `;
+                    });
+
+                    if (group.count > 20) {
+                        groupHtml += `<div class="text-xs text-gray-500 italic pl-3">... and ${group.count - 20} more</div>`;
+                    }
+
+                    groupHtml += `
+                            </div>
+                        </div>
+                    `;
+                }
+
+                groupHtml += `
                     </div>
                 `;
 
+                card.innerHTML = groupHtml;
                 container.appendChild(card);
             });
+        }
+
+        function toggleGroupDetails(index) {
+            const details = document.getElementById(`group-details-${index}`);
+            const icon = document.getElementById(`group-toggle-icon-${index}`);
+            const card = details.parentElement;
+
+            if (details.classList.contains('show')) {
+                details.classList.remove('show');
+                icon.textContent = '▼';
+                card.classList.remove('expanded');
+            } else {
+                details.classList.add('show');
+                icon.textContent = '▲';
+                card.classList.add('expanded');
+            }
         }
 
         function renderGodObjectSplits(indicators) {
