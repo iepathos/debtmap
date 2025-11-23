@@ -739,7 +739,19 @@
                 groups.get(normalizedRec).push(item);
             });
 
-            // Convert to array and sort by total score
+            // Priority ranking helper
+            function getPriorityRank(priority) {
+                const priorityStr = typeof priority === 'string' ? priority.toLowerCase() : priority;
+                switch(priorityStr) {
+                    case 'critical': return 4;
+                    case 'high': return 3;
+                    case 'medium': return 2;
+                    case 'low': return 1;
+                    default: return 0;
+                }
+            }
+
+            // Convert to array and sort by urgency (priority) then total score
             const groupedRecommendations = Array.from(groups.entries())
                 .map(([recommendation, items]) => {
                     const totalScore = items.reduce((sum, item) => sum + item.score, 0);
@@ -756,10 +768,17 @@
                         avgScore,
                         count: items.length,
                         // Use highest individual item priority (not calculated from total)
-                        priority: highestPriority
+                        priority: highestPriority,
+                        priorityRank: getPriorityRank(highestPriority)
                     };
                 })
-                .sort((a, b) => b.totalScore - a.totalScore)
+                // Sort by priority rank (descending), then total score (descending) as tiebreaker
+                .sort((a, b) => {
+                    if (a.priorityRank !== b.priorityRank) {
+                        return b.priorityRank - a.priorityRank;
+                    }
+                    return b.totalScore - a.totalScore;
+                })
                 .slice(0, 10);
 
             const container = document.getElementById('top-recommendations');
