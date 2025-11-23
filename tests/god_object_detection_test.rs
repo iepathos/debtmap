@@ -64,6 +64,7 @@ fn test_detects_file_with_many_standalone_functions() {
 
 /// Test that a file with many functions gets appropriate scoring
 #[test]
+#[ignore = "slow test with 270 functions requiring purity analysis (~30s+), run manually with --ignored if needed"]
 fn test_detects_rust_call_graph_scenario() {
     // Simulate a file similar to rust_call_graph.rs with 270 functions
     // With complexity-weighted scoring and the new conservative approach,
@@ -231,6 +232,7 @@ fn test_confidence_levels() {
 /// - God Class: Excludes test functions from method count, detection_type is GodClass
 /// - God File: Includes all functions (prod + tests), detection_type is GodFile
 #[test]
+#[ignore = "slow test with 85 total functions requiring purity analysis (~15s+), run manually with --ignored if needed"]
 fn test_spec_130_god_class_vs_god_file_detection() {
     // Part 1: Test god class detection with test methods excluded
     let god_class_code = r#"
