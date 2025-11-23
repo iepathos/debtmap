@@ -761,8 +761,16 @@
                     // Items are already sorted by score, so first item has highest priority
                     const highestPriority = items[0].priority;
 
+                    // Get full action text from first item for display (not truncated)
+                    const firstItem = items[0];
+                    const fullAction = firstItem.recommendation?.action ||
+                                      firstItem.recommendation?.primary_action ||
+                                      firstItem.message ||
+                                      recommendation;
+
                     return {
                         recommendation,
+                        fullAction,  // Store full action text for display
                         items,
                         totalScore,
                         avgScore,
@@ -798,7 +806,7 @@
                                 <span class="text-sm font-semibold text-purple-600">TOTAL SCORE: ${Math.round(group.totalScore)}</span>
                                 ${group.count > 1 ? `<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-semibold">${group.count} items</span>` : ''}
                             </div>
-                            <div class="text-sm text-gray-800 font-medium">⚡ ${group.recommendation}</div>
+                            <div class="text-sm text-gray-800 font-medium">⚡ ${group.fullAction}</div>
                             ${group.count > 1 ? `<div class="text-xs text-gray-600 mt-1">Average score: ${Math.round(group.avgScore)}</div>` : ''}
                         </div>
                         <button class="text-gray-400 hover:text-gray-600 ml-4">
