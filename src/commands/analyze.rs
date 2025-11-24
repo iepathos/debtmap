@@ -35,6 +35,7 @@ pub struct AnalyzeConfig {
     pub show_macro_stats: bool,
     pub group_by_category: bool,
     pub min_priority: Option<String>,
+    pub min_score: Option<f64>,
     pub filter_categories: Option<Vec<String>>,
     pub no_context_aware: bool,
     pub threshold_preset: Option<cli::ThresholdPreset>,
@@ -93,6 +94,11 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     // Set max files environment variable if specified
     if let Some(max_files) = config.max_files {
         std::env::set_var("DEBTMAP_MAX_FILES", max_files.to_string());
+    }
+
+    // Set minimum score threshold if specified (spec 193)
+    if let Some(min_score) = config.min_score {
+        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", min_score.to_string());
     }
 
     // Set jobs environment variable for parallel processing

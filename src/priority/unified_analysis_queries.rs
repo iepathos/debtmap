@@ -56,6 +56,9 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
         // Combine function and file items with tier classification
         let mut all_items: Vec<DebtItem> = Vec::new();
 
+        // Get configurable score threshold (spec 193)
+        let min_score = crate::config::get_minimum_score_threshold();
+
         // Add function items with tier classification
         for item in &self.items {
             let mut item_with_tier = item.clone();
@@ -67,11 +70,21 @@ impl UnifiedAnalysisQueries for UnifiedAnalysis {
                 continue;
             }
 
+            // Filter out items below score threshold (spec 193)
+            if item.unified_score.final_score < min_score {
+                continue;
+            }
+
             all_items.push(DebtItem::Function(Box::new(item_with_tier)));
         }
 
         // Add file items (files are always T1 if they're god objects)
         for item in &self.file_items {
+            // Apply score filtering to file items as well (spec 193)
+            if item.score < min_score {
+                continue;
+            }
+
             all_items.push(DebtItem::File(Box::new(item.clone())));
         }
 
@@ -634,5 +647,27 @@ mod tests {
         assert!(items[0].score() > items[1].score());
         assert_eq!(items[0].score(), 50.0);
         assert_eq!(items[1].score(), 10.0);
+    }
+
+    /// Test get_minimum_score_threshold with environment variable override (spec 193)
+    #[test]
+    fn test_get_minimum_score_threshold_with_env_override() {
+        // Test default threshold
+        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
+        let default_threshold = crate::config::get_minimum_score_threshold();
+        assert_eq!(default_threshold, 3.0);
+
+        // Test environment variable override
+        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "5.0");
+        let env_threshold = crate::config::get_minimum_score_threshold();
+        assert_eq!(env_threshold, 5.0);
+
+        // Test zero threshold (disable filtering)
+        std::env::set_var("DEBTMAP_MIN_SCORE_THRESHOLD", "0.0");
+        let zero_threshold = crate::config::get_minimum_score_threshold();
+        assert_eq!(zero_threshold, 0.0);
+
+        // Clean up
+        std::env::remove_var("DEBTMAP_MIN_SCORE_THRESHOLD");
     }
 }

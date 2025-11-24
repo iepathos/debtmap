@@ -137,6 +137,11 @@ pub enum Commands {
         #[arg(long = "min-priority")]
         min_priority: Option<String>,
 
+        /// Minimum score threshold to show recommendations (0.0 = show all, spec 193)
+        /// Overrides config file setting. Default: 3.0 (hide LOW severity items)
+        #[arg(long = "min-score")]
+        min_score: Option<f64>,
+
         /// Filter by debt categories (comma-separated)
         #[arg(long = "filter", value_delimiter = ',')]
         filter_categories: Option<Vec<String>>,
