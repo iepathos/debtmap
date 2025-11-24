@@ -195,7 +195,6 @@ impl CoverageInfo {
 
 /// Context dampening information for non-production code (spec 191)
 pub(crate) struct ContextDampeningInfo {
-    pub file_type: crate::context::FileType,
     pub multiplier: f64,
     pub description: String,
 }
@@ -207,7 +206,6 @@ impl ContextDampeningInfo {
             if multiplier < 1.0 {
                 let description = Self::get_file_type_description(file_type);
                 return Some(Self {
-                    file_type,
                     multiplier,
                     description,
                 });
