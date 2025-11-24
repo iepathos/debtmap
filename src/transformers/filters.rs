@@ -15,6 +15,9 @@ pub struct FilterConfig {
     pub exclude_patterns: Option<Vec<String>>,
     pub min_priority: Option<Priority>,
     pub debt_types: Option<Vec<DebtType>>,
+    /// Minimum score threshold for filtering recommendations
+    /// Items with score below this threshold will be filtered out
+    pub min_score_threshold: Option<f64>,
 }
 
 impl FilterConfig {

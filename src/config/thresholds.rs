@@ -100,6 +100,13 @@ pub struct ThresholdsConfig {
     #[serde(default)]
     pub minimum_risk_score: Option<f64>,
 
+    /// Minimum score threshold to show recommendations (spec 193)
+    /// Items with score below this threshold will be filtered out
+    /// Default: 3.0 (hide LOW severity items)
+    /// Options: 0.0 (show all), 3.0 (balanced), 5.0 (strict), 10.0 (very strict)
+    #[serde(default)]
+    pub min_score_threshold: Option<f64>,
+
     /// Validation thresholds - used by `debtmap validate` command
     #[serde(default)]
     pub validation: Option<ValidationThresholds>,

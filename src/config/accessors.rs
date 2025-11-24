@@ -213,3 +213,22 @@ pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisCo
 pub fn get_context_multipliers() -> ContextMultipliers {
     get_config().context_multipliers.clone().unwrap_or_default()
 }
+
+/// Get minimum score threshold for filtering recommendations (spec 193)
+/// Default: 3.0 (hide LOW severity items)
+/// CLI flag --min-score overrides config file setting via DEBTMAP_MIN_SCORE_THRESHOLD env var
+pub fn get_minimum_score_threshold() -> f64 {
+    // Check environment variable first (CLI override)
+    if let Ok(env_value) = std::env::var("DEBTMAP_MIN_SCORE_THRESHOLD") {
+        if let Ok(threshold) = env_value.parse::<f64>() {
+            return threshold;
+        }
+    }
+
+    // Fall back to config file or default
+    get_config()
+        .thresholds
+        .as_ref()
+        .and_then(|t| t.min_score_threshold)
+        .unwrap_or(3.0)
+}
