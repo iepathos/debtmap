@@ -64,6 +64,8 @@ fn create_testing_item(function_name: &str) -> UnifiedDebtItem {
         context_confidence: None,
         contextual_recommendation: None,
         pattern_analysis: None,
+        context_multiplier: None,
+        context_type: None,
     }
 }
 

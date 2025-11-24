@@ -494,3 +494,69 @@ pub fn default_log_multiplier() -> f64 {
 pub fn default_show_raw_scores() -> bool {
     true
 }
+
+/// Context-based dampening multipliers for non-production code (spec 191)
+/// Reduces false positive urgency scores for example, test, and benchmark code
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContextMultipliers {
+    /// Multiplier for example files (default: 0.1 = 90% reduction)
+    #[serde(default = "default_examples_multiplier")]
+    pub examples: f64,
+
+    /// Multiplier for test files (default: 0.2 = 80% reduction)
+    #[serde(default = "default_tests_multiplier")]
+    pub tests: f64,
+
+    /// Multiplier for benchmark files (default: 0.3 = 70% reduction)
+    #[serde(default = "default_benchmarks_multiplier")]
+    pub benchmarks: f64,
+
+    /// Multiplier for build scripts (default: 0.3 = 70% reduction)
+    #[serde(default = "default_build_scripts_multiplier")]
+    pub build_scripts: f64,
+
+    /// Multiplier for documentation files (default: 0.1 = 90% reduction)
+    #[serde(default = "default_documentation_multiplier")]
+    pub documentation: f64,
+
+    /// Whether to enable context-aware dampening (default: true)
+    #[serde(default = "default_enable_context_dampening")]
+    pub enable_context_dampening: bool,
+}
+
+impl Default for ContextMultipliers {
+    fn default() -> Self {
+        Self {
+            examples: default_examples_multiplier(),
+            tests: default_tests_multiplier(),
+            benchmarks: default_benchmarks_multiplier(),
+            build_scripts: default_build_scripts_multiplier(),
+            documentation: default_documentation_multiplier(),
+            enable_context_dampening: default_enable_context_dampening(),
+        }
+    }
+}
+
+pub fn default_examples_multiplier() -> f64 {
+    0.1 // 90% reduction - pedagogical patterns in examples are acceptable
+}
+
+pub fn default_tests_multiplier() -> f64 {
+    0.2 // 80% reduction - test helper complexity is acceptable
+}
+
+pub fn default_benchmarks_multiplier() -> f64 {
+    0.3 // 70% reduction - benchmark setup patterns are acceptable
+}
+
+pub fn default_build_scripts_multiplier() -> f64 {
+    0.3 // 70% reduction - build script complexity is acceptable
+}
+
+pub fn default_documentation_multiplier() -> f64 {
+    0.1 // 90% reduction - documentation code examples are acceptable
+}
+
+pub fn default_enable_context_dampening() -> bool {
+    true // Enable by default
+}

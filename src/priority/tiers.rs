@@ -289,6 +289,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         }
     }
 

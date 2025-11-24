@@ -69,7 +69,7 @@ pub enum FunctionRole {
 }
 
 /// The type of file being analyzed
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum FileType {
     /// Production code
     Production,

@@ -1467,6 +1467,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         }
     }
 
@@ -2077,6 +2079,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
 
         let high_item = UnifiedDebtItem {
@@ -2137,6 +2141,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
 
         let moderate_item = UnifiedDebtItem {
@@ -2197,6 +2203,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
 
         let low_item = UnifiedDebtItem {
@@ -2257,6 +2265,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
 
         analysis.add_item(critical_item);

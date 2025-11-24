@@ -511,6 +511,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -745,6 +747,8 @@ mod tests {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         }];
 
         let deps = extract_module_dependencies(&items);

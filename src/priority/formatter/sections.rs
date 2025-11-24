@@ -8,6 +8,7 @@ use std::fmt::Write;
 pub(crate) struct FormattedSections {
     pub header: String,
     pub location: String,
+    pub context_dampening: Option<String>, // spec 191: show context-aware dampening
     pub action: String,
     pub impact: String,
     pub evidence: Option<String>, // New: combines complexity + metrics
@@ -23,6 +24,7 @@ pub(crate) fn generate_formatted_sections(context: &FormatContext) -> FormattedS
     FormattedSections {
         header: format_header_section(context),
         location: format_location_section(context),
+        context_dampening: format_context_dampening_section(context), // spec 191
         action: format_action_section(context),
         impact: format_impact_section(context),
         evidence: format_evidence_section(context), // New
@@ -77,6 +79,20 @@ fn format_location_section(context: &FormatContext) -> String {
         context.location_info.line,
         context.location_info.function.bright_green()
     )
+}
+
+// Pure function to format context dampening section (spec 191)
+fn format_context_dampening_section(context: &FormatContext) -> Option<String> {
+    let dampening_info = context.context_info.as_ref()?;
+
+    let dampening_percentage = ((1.0 - dampening_info.multiplier) * 100.0) as i32;
+
+    Some(format!(
+        "{} {} ({}% dampening applied)",
+        "├─ CONTEXT:".bright_blue(),
+        dampening_info.description.bright_cyan(),
+        dampening_percentage
+    ))
 }
 
 // Pure function to format action section
@@ -320,10 +336,16 @@ fn format_rationale_section(context: &FormatContext) -> String {
 }
 
 // I/O function to apply formatted sections to output
-// Following spec 139: Header → Location → Impact → Evidence → WHY → Action
+// Following spec 139: Header → Location → Context → Impact → Evidence → WHY → Action
 pub(crate) fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
     writeln!(output, "{}", sections.header).unwrap();
     writeln!(output, "{}", sections.location).unwrap();
+
+    // Context dampening section (spec 191) - show after location
+    if let Some(context) = sections.context_dampening {
+        writeln!(output, "{}", context).unwrap();
+    }
+
     writeln!(output, "{}", sections.impact).unwrap();
 
     // Evidence section (new) - metrics only

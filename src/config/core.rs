@@ -6,8 +6,8 @@ use super::detection::{ErrorHandlingConfig, OrchestratorDetectionConfig};
 use super::display::{DisplayConfig, GodObjectConfig};
 use super::languages::{EntropyConfig, LanguagesConfig};
 use super::scoring::{
-    ComplexityWeightsConfig, NormalizationConfig, RebalancedScoringConfig, RoleCoverageWeights,
-    RoleMultiplierConfig, RoleMultipliers, ScoringWeights,
+    ComplexityWeightsConfig, ContextMultipliers, NormalizationConfig, RebalancedScoringConfig,
+    RoleCoverageWeights, RoleMultiplierConfig, RoleMultipliers, ScoringWeights,
 };
 use super::thresholds::ThresholdsConfig;
 use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
@@ -124,6 +124,10 @@ pub struct DebtmapConfig {
     /// Rebalanced scoring configuration (spec 136)
     #[serde(default, rename = "scoring_rebalanced")]
     pub scoring_rebalanced: Option<RebalancedScoringConfig>,
+
+    /// Context-aware dampening multipliers for non-production code (spec 191)
+    #[serde(default)]
+    pub context_multipliers: Option<ContextMultipliers>,
 }
 
 impl DebtmapConfig {

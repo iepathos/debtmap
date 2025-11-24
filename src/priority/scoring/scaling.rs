@@ -246,6 +246,8 @@ mod tests {
             contextual_recommendation: None,
             pattern_analysis: None,
             file_context: None,
+            context_multiplier: None,
+            context_type: None,
         }
     }
 

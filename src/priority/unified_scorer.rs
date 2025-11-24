@@ -71,6 +71,10 @@ pub struct UnifiedDebtItem {
     pub pattern_analysis: Option<crate::output::PatternAnalysis>, // Pattern analysis for purity, frameworks, Rust patterns (spec 151)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_context: Option<crate::analysis::FileContext>, // File context for test file detection (spec 166)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_multiplier: Option<f64>, // Context-based dampening multiplier applied (spec 191)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_type: Option<crate::context::FileType>, // Detected file type for context dampening (spec 191)
 }
 
 impl UnifiedDebtItem {
