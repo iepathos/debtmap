@@ -1248,7 +1248,7 @@ mod tests {
         let high_score_item = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.0,
-                cyclomatic: 15,  // High complexity - won't be T4
+                cyclomatic: 15, // High complexity - won't be T4
                 cognitive: 20,
             },
             15,
@@ -1259,7 +1259,7 @@ mod tests {
         let low_score_item = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.5,
-                cyclomatic: 12,  // Moderate complexity - won't be T4
+                cyclomatic: 12, // Moderate complexity - won't be T4
                 cognitive: 15,
             },
             12,
@@ -1270,7 +1270,7 @@ mod tests {
         let mid_score_item = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.3,
-                cyclomatic: 11,  // Moderate complexity - won't be T4
+                cyclomatic: 11, // Moderate complexity - won't be T4
                 cognitive: 12,
             },
             11,
@@ -1314,7 +1314,7 @@ mod tests {
         let item1 = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.0,
-                cyclomatic: 15,  // High complexity - won't be T4
+                cyclomatic: 15, // High complexity - won't be T4
                 cognitive: 20,
             },
             15,
@@ -1325,7 +1325,7 @@ mod tests {
         let item2 = create_test_item(
             DebtType::TestingGap {
                 coverage: 0.5,
-                cyclomatic: 12,  // Moderate complexity - won't be T4
+                cyclomatic: 12, // Moderate complexity - won't be T4
                 cognitive: 15,
             },
             12,
