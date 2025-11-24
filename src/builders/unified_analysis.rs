@@ -1055,6 +1055,8 @@ fn convert_error_swallowing_to_unified(
                 context_confidence: None,
                 contextual_recommendation: None,
                 pattern_analysis: None,
+                context_multiplier: None,
+                context_type: None,
             }
         })
         .collect()

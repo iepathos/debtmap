@@ -96,6 +96,8 @@ fn create_debt_item(
         context_confidence: None,
         contextual_recommendation: None,
         pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
     }
 }
 
@@ -193,6 +195,8 @@ fn test_coverage_scoring_invariant_total_analysis() {
             context_confidence: None,
             contextual_recommendation: None,
             pattern_analysis: None,
+            context_multiplier: None,
+            context_type: None,
         };
         analysis_no_coverage.add_item(item);
     }

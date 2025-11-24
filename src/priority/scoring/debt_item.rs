@@ -433,6 +433,8 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         context_confidence: None,
         contextual_recommendation: None,
         pattern_analysis: None,
+        context_multiplier: None,
+        context_type: None,
     }
 }
 

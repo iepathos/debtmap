@@ -3,6 +3,8 @@
 //! This module contains all the construction and builder functions for creating
 //! UnifiedDebtItem instances from various sources with different configurations.
 
+use crate::config::get_context_multipliers;
+use crate::context::{detect_file_type, FileType};
 use crate::core::FunctionMetrics;
 use crate::priority::unified_scorer::{
     calculate_unified_priority, calculate_unified_priority_with_debt,
@@ -22,6 +24,53 @@ use crate::priority::{
 };
 use crate::risk::lcov::LcovData;
 use std::collections::HashSet;
+use std::path::Path;
+
+/// Calculate context-aware multiplier for a file path (spec 191)
+///
+/// Returns a tuple of (multiplier, file_type) based on the detected file type.
+/// Non-production code (examples, tests, benchmarks) gets dampened multipliers.
+fn calculate_context_multiplier(file_path: &Path) -> (f64, FileType) {
+    let file_type = detect_file_type(file_path);
+    let config = get_context_multipliers();
+
+    // If context dampening is disabled, return 1.0 for all files
+    if !config.enable_context_dampening {
+        return (1.0, file_type);
+    }
+
+    let multiplier = match file_type {
+        FileType::Example => config.examples,
+        FileType::Test => config.tests,
+        FileType::Benchmark => config.benchmarks,
+        FileType::BuildScript => config.build_scripts,
+        FileType::Documentation => config.documentation,
+        FileType::Production | FileType::Configuration => 1.0, // No dampening for production code
+    };
+
+    (multiplier, file_type)
+}
+
+/// Apply context multiplier to a UnifiedScore (spec 191)
+fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -> UnifiedScore {
+    // Apply multiplier to final_score and all contributing factors
+    score.final_score *= multiplier;
+    score.complexity_factor *= multiplier;
+    score.coverage_factor *= multiplier;
+    score.dependency_factor *= multiplier;
+
+    // Also apply to base_score if present
+    if let Some(base) = score.base_score {
+        score.base_score = Some(base * multiplier);
+    }
+
+    // Apply to pre_adjustment_score if present
+    if let Some(pre_adj) = score.pre_adjustment_score {
+        score.pre_adjustment_score = Some(pre_adj * multiplier);
+    }
+
+    score
+}
 
 /// Create a unified debt item with enhanced call graph analysis
 pub fn create_unified_debt_item_enhanced(
@@ -35,9 +84,14 @@ pub fn create_unified_debt_item_enhanced(
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
-    let unified_score = calculate_unified_priority(
+    let mut unified_score = calculate_unified_priority(
         func, call_graph, coverage, None, // Organization factor no longer used
     );
+
+    // Apply context-aware dampening (spec 191)
+    let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
+    unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
+
     let role = classify_function_role(func, &func_id, call_graph);
 
     let transitive_coverage =
@@ -108,6 +162,8 @@ pub fn create_unified_debt_item_enhanced(
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
         file_context: None,
+        context_multiplier: Some(context_multiplier), // Context dampening multiplier (spec 191)
+        context_type: Some(context_type),             // Detected file type (spec 191)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -270,9 +326,14 @@ fn apply_score_scaling(mut item: UnifiedDebtItem) -> UnifiedDebtItem {
 // Pure function: Build unified debt item from components
 fn build_unified_debt_item(
     func: &FunctionMetrics,
-    context: DebtAnalysisContext,
+    mut context: DebtAnalysisContext,
     deps: DependencyMetrics,
 ) -> UnifiedDebtItem {
+    // Apply context-aware dampening (spec 191)
+    let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
+    context.unified_score =
+        apply_context_multiplier_to_score(context.unified_score, context_multiplier);
+
     // Detect function context (spec 122)
     let context_detector = crate::analysis::ContextDetector::new();
     let context_analysis = context_detector.detect_context(func, &func.file);
@@ -321,6 +382,8 @@ fn build_unified_debt_item(
         context_confidence: Some(context_analysis.confidence),
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
+        context_multiplier: Some(context_multiplier),
+        context_type: Some(context_type),
     }
 }
 
@@ -408,9 +471,13 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
-    let unified_score = calculate_unified_priority(
+    let mut unified_score = calculate_unified_priority(
         func, call_graph, coverage, None, // Organization factor no longer used
     );
+
+    // Apply context-aware dampening (spec 191)
+    let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
+    unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
 
     // Determine function role for more accurate analysis
     let function_role = classify_function_role(func, &func_id, call_graph);
@@ -480,6 +547,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
         file_context: None,
+        context_multiplier: Some(context_multiplier),
+        context_type: Some(context_type),
     }
 }
 
@@ -503,9 +572,14 @@ pub fn create_unified_debt_item_with_data_flow(
     // Security factor removed per spec 64
     // Organization factor removed per spec 58 - redundant with complexity factor
 
-    let unified_score = calculate_unified_priority(
+    let mut unified_score = calculate_unified_priority(
         func, call_graph, coverage, None, // Organization factor no longer used
     );
+
+    // Apply context-aware dampening (spec 191)
+    let (context_multiplier, context_type) = calculate_context_multiplier(&func.file);
+    unified_score = apply_context_multiplier_to_score(unified_score, context_multiplier);
+
     let role = classify_function_role(func, &func_id, call_graph);
 
     let transitive_coverage =
@@ -584,5 +658,109 @@ pub fn create_unified_debt_item_with_data_flow(
         contextual_recommendation,
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
         file_context: None,
+        context_multiplier: Some(context_multiplier),
+        context_type: Some(context_type),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::FileType;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_calculate_context_multiplier_for_example() {
+        let path = PathBuf::from("examples/demo.rs");
+        let (multiplier, file_type) = calculate_context_multiplier(&path);
+
+        assert_eq!(file_type, FileType::Example);
+        assert_eq!(multiplier, 0.1); // 90% reduction
+    }
+
+    #[test]
+    fn test_calculate_context_multiplier_for_test() {
+        let path = PathBuf::from("tests/integration_test.rs");
+        let (multiplier, file_type) = calculate_context_multiplier(&path);
+
+        assert_eq!(file_type, FileType::Test);
+        assert_eq!(multiplier, 0.2); // 80% reduction
+    }
+
+    #[test]
+    fn test_calculate_context_multiplier_for_benchmark() {
+        let path = PathBuf::from("benches/perf.rs");
+        let (multiplier, file_type) = calculate_context_multiplier(&path);
+
+        assert_eq!(file_type, FileType::Benchmark);
+        assert_eq!(multiplier, 0.3); // 70% reduction
+    }
+
+    #[test]
+    fn test_calculate_context_multiplier_for_build_script() {
+        let path = PathBuf::from("build.rs");
+        let (multiplier, file_type) = calculate_context_multiplier(&path);
+
+        assert_eq!(file_type, FileType::BuildScript);
+        assert_eq!(multiplier, 0.3); // 70% reduction
+    }
+
+    #[test]
+    fn test_calculate_context_multiplier_for_production() {
+        let path = PathBuf::from("src/main.rs");
+        let (multiplier, file_type) = calculate_context_multiplier(&path);
+
+        assert_eq!(file_type, FileType::Production);
+        assert_eq!(multiplier, 1.0); // No reduction
+    }
+
+    #[test]
+    fn test_apply_context_multiplier_to_score() {
+        let original_score = UnifiedScore {
+            complexity_factor: 8.0,
+            coverage_factor: 10.0,
+            dependency_factor: 6.0,
+            role_multiplier: 1.0,
+            final_score: 24.0,
+            base_score: Some(20.0),
+            exponential_factor: None,
+            risk_boost: None,
+            pre_adjustment_score: Some(22.0),
+            adjustment_applied: None,
+        };
+
+        let adjusted = apply_context_multiplier_to_score(original_score, 0.1);
+
+        // All scores should be multiplied by 0.1 (use approximate comparison for floats)
+        assert!((adjusted.final_score - 2.4).abs() < 0.0001);
+        assert!((adjusted.complexity_factor - 0.8).abs() < 0.0001);
+        assert!((adjusted.coverage_factor - 1.0).abs() < 0.0001);
+        assert!((adjusted.dependency_factor - 0.6).abs() < 0.0001);
+        assert!(adjusted.base_score.is_some());
+        assert!((adjusted.base_score.unwrap() - 2.0).abs() < 0.0001);
+        assert!(adjusted.pre_adjustment_score.is_some());
+        assert!((adjusted.pre_adjustment_score.unwrap() - 2.2).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_context_multiplier_never_increases_score() {
+        let original_score = UnifiedScore {
+            complexity_factor: 5.0,
+            coverage_factor: 5.0,
+            dependency_factor: 5.0,
+            role_multiplier: 1.0,
+            final_score: 15.0,
+            base_score: None,
+            exponential_factor: None,
+            risk_boost: None,
+            pre_adjustment_score: None,
+            adjustment_applied: None,
+        };
+
+        // Test with all file types
+        for multiplier in &[0.1, 0.2, 0.3, 1.0] {
+            let adjusted = apply_context_multiplier_to_score(original_score.clone(), *multiplier);
+            assert!(adjusted.final_score <= original_score.final_score);
+        }
     }
 }

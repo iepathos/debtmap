@@ -9,7 +9,9 @@ use super::detection::{
 use super::display::DisplayConfig;
 use super::languages::{EntropyConfig, LanguageFeatures};
 use super::loader::load_config;
-use super::scoring::{RoleCoverageWeights, RoleMultiplierConfig, RoleMultipliers, ScoringWeights};
+use super::scoring::{
+    ContextMultipliers, RoleCoverageWeights, RoleMultiplierConfig, RoleMultipliers, ScoringWeights,
+};
 use super::thresholds::ValidationThresholds;
 
 /// Cache the configuration
@@ -205,4 +207,9 @@ pub fn get_data_flow_classification_config() -> DataFlowClassificationConfig {
 /// Get functional analysis configuration (spec 111)
 pub fn get_functional_analysis_config() -> crate::analysis::FunctionalAnalysisConfig {
     get_config().functional_analysis.clone().unwrap_or_default()
+}
+
+/// Get context-aware dampening multipliers (spec 191)
+pub fn get_context_multipliers() -> ContextMultipliers {
+    get_config().context_multipliers.clone().unwrap_or_default()
 }

@@ -18,6 +18,7 @@ pub(crate) fn create_format_context(
         dependency_info: DependencyInfo::from_item(item),
         debt_specific_info: DebtSpecificInfo::from_item(item),
         coverage_info: CoverageInfo::from_item(item, has_coverage_data),
+        context_info: ContextDampeningInfo::from_item(item), // spec 191
         rationale: item.recommendation.rationale.clone(),
     }
 }
@@ -34,6 +35,7 @@ pub(crate) struct FormatContext {
     pub dependency_info: DependencyInfo,
     pub debt_specific_info: DebtSpecificInfo,
     pub coverage_info: Option<CoverageInfo>,
+    pub context_info: Option<ContextDampeningInfo>, // spec 191
     pub rationale: String,
 }
 
@@ -188,5 +190,42 @@ impl CoverageInfo {
             color,
             coverage_percentage: Some(coverage_pct),
         }
+    }
+}
+
+/// Context dampening information for non-production code (spec 191)
+pub(crate) struct ContextDampeningInfo {
+    pub file_type: crate::context::FileType,
+    pub multiplier: f64,
+    pub description: String,
+}
+
+impl ContextDampeningInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Option<Self> {
+        // Only show context info if dampening was applied (multiplier < 1.0)
+        if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type) {
+            if multiplier < 1.0 {
+                let description = Self::get_file_type_description(file_type);
+                return Some(Self {
+                    file_type,
+                    multiplier,
+                    description,
+                });
+            }
+        }
+        None
+    }
+
+    fn get_file_type_description(file_type: crate::context::FileType) -> String {
+        use crate::context::FileType;
+        match file_type {
+            FileType::Example => "Example/demonstration code (pedagogical patterns accepted)",
+            FileType::Test => "Test code (test helper complexity accepted)",
+            FileType::Benchmark => "Benchmark code (performance test patterns accepted)",
+            FileType::BuildScript => "Build script (build-time complexity accepted)",
+            FileType::Documentation => "Documentation code (code example patterns accepted)",
+            FileType::Production | FileType::Configuration => "Production code",
+        }
+        .to_string()
     }
 }
