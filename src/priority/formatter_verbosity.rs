@@ -591,6 +591,30 @@ fn format_item_body(
     )
     .unwrap();
 
+    // CONTEXT DAMPENING section (spec 191: show context-aware score dampening)
+    if let (Some(multiplier), Some(file_type)) = (item.context_multiplier, item.context_type) {
+        if multiplier < 1.0 {
+            use crate::context::FileType;
+            let description = match file_type {
+                FileType::Example => "Example/demonstration code (pedagogical patterns accepted)",
+                FileType::Test => "Test code (test helper complexity accepted)",
+                FileType::Benchmark => "Benchmark code (performance test patterns accepted)",
+                FileType::BuildScript => "Build script (build-time complexity accepted)",
+                FileType::Documentation => "Documentation code (code example patterns accepted)",
+                FileType::Production | FileType::Configuration => "Production code",
+            };
+            let dampening_percentage = ((1.0 - multiplier) * 100.0) as i32;
+            writeln!(
+                output,
+                "├─ {} {} ({}% dampening applied)",
+                "CONTEXT:".bright_blue(),
+                description.bright_cyan(),
+                dampening_percentage
+            )
+            .unwrap();
+        }
+    }
+
     // IMPACT section (before EVIDENCE per spec 139 ordering)
     writeln!(
         output,
