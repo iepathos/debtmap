@@ -677,6 +677,77 @@ impl UnifiedAnalysis {
             timings: self.timings.clone(),
         }
     }
+
+    /// Filter analysis results by minimum score threshold (spec 193)
+    ///
+    /// Removes items below the specified score threshold and recalculates
+    /// total debt score and debt density based on remaining items.
+    /// Also filters out T4 items if show_t4_in_main_report is false (default).
+    pub fn filter_by_score_threshold(&self, min_score: f64) -> Self {
+        use crate::priority::tiers::{classify_tier, RecommendationTier, TierConfig};
+
+        let tier_config = TierConfig::default();
+
+        let filtered_items: Vector<UnifiedDebtItem> = self
+            .items
+            .iter()
+            .filter(|item| {
+                // Filter by score
+                if item.unified_score.final_score < min_score {
+                    return false;
+                }
+
+                // Filter T4 items unless explicitly requested (consistent with display behavior)
+                if !tier_config.show_t4_in_main_report {
+                    let tier = classify_tier(item, &tier_config);
+                    if tier == RecommendationTier::T4Maintenance {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .cloned()
+            .collect();
+
+        let filtered_file_items: Vector<FileDebtItem> = self
+            .file_items
+            .iter()
+            .filter(|item| item.score >= min_score)
+            .cloned()
+            .collect();
+
+        // Recalculate total debt score for filtered items
+        let function_debt_score: f64 = filtered_items
+            .iter()
+            .map(|item| item.unified_score.final_score)
+            .sum();
+
+        let file_debt_score: f64 = filtered_file_items.iter().map(|item| item.score).sum();
+
+        let total_debt_score = function_debt_score + file_debt_score;
+
+        // Recalculate debt density based on filtered items
+        let debt_density = if self.total_lines_of_code > 0 {
+            (total_debt_score / self.total_lines_of_code as f64) * 1000.0
+        } else {
+            0.0
+        };
+
+        Self {
+            items: filtered_items,
+            file_items: filtered_file_items,
+            total_debt_score,
+            total_impact: self.total_impact.clone(),
+            debt_density,
+            total_lines_of_code: self.total_lines_of_code,
+            call_graph: self.call_graph.clone(),
+            data_flow_graph: self.data_flow_graph.clone(),
+            overall_coverage: self.overall_coverage,
+            has_coverage_data: self.has_coverage_data,
+            timings: self.timings.clone(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1163,6 +1234,128 @@ mod tests {
         // Clean up
         std::env::remove_var("DEBTMAP_MIN_CYCLOMATIC");
         std::env::remove_var("DEBTMAP_MIN_COGNITIVE");
+    }
+
+    #[test]
+    fn test_filter_by_score_threshold() {
+        use crate::priority::call_graph::CallGraph;
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Create items with different scores
+        // Use higher complexity to avoid T4 classification (T4 threshold is complexity < 10)
+        let high_score_item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 15,  // High complexity - won't be T4
+                cognitive: 20,
+            },
+            15,
+            20,
+            10.0, // High score - should be kept
+        );
+
+        let low_score_item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 12,  // Moderate complexity - won't be T4
+                cognitive: 15,
+            },
+            12,
+            15,
+            2.0, // Low score - should be filtered by score
+        );
+
+        let mid_score_item = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.3,
+                cyclomatic: 11,  // Moderate complexity - won't be T4
+                cognitive: 12,
+            },
+            11,
+            12,
+            5.0, // Mid score
+        );
+
+        analysis.items.push_back(high_score_item);
+        analysis.items.push_back(low_score_item);
+        analysis.items.push_back(mid_score_item);
+
+        // Calculate totals before filtering
+        analysis.calculate_total_impact();
+        let original_score = analysis.total_debt_score;
+        assert_eq!(original_score, 17.0); // 10.0 + 2.0 + 5.0
+
+        // Filter by threshold of 3.0
+        let filtered = analysis.filter_by_score_threshold(3.0);
+
+        // Should keep items with score >= 3.0 (high_score and mid_score)
+        // T4 items are also filtered out by default, but our items have high complexity so they won't be T4
+        assert_eq!(filtered.items.len(), 2);
+        assert_eq!(filtered.total_debt_score, 15.0); // 10.0 + 5.0
+
+        // Filter by higher threshold of 6.0
+        let filtered_high = analysis.filter_by_score_threshold(6.0);
+
+        // Should only keep high_score item
+        assert_eq!(filtered_high.items.len(), 1);
+        assert_eq!(filtered_high.total_debt_score, 10.0);
+    }
+
+    #[test]
+    fn test_filter_by_score_threshold_recalculates_density() {
+        use crate::priority::call_graph::CallGraph;
+
+        let call_graph = CallGraph::new();
+        let mut analysis = UnifiedAnalysis::new(call_graph);
+
+        // Add items with higher complexity to avoid T4 classification
+        let item1 = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.0,
+                cyclomatic: 15,  // High complexity - won't be T4
+                cognitive: 20,
+            },
+            15,
+            20,
+            10.0,
+        );
+
+        let item2 = create_test_item(
+            DebtType::TestingGap {
+                coverage: 0.5,
+                cyclomatic: 12,  // Moderate complexity - won't be T4
+                cognitive: 15,
+            },
+            12,
+            15,
+            2.0,
+        );
+
+        analysis.items.push_back(item1);
+        analysis.items.push_back(item2);
+
+        // Calculate totals and manually set LOC for density calculation
+        analysis.calculate_total_impact();
+        analysis.total_lines_of_code = 1000;
+
+        // Manually calculate density since calculate_total_impact sets LOC to 0 in test env
+        analysis.debt_density = (analysis.total_debt_score / 1000.0) * 1000.0;
+
+        // Original debt score should be 12.0 (10.0 + 2.0)
+        assert_eq!(analysis.total_debt_score, 12.0);
+        // Original density: (12.0 / 1000) * 1000 = 12.0 per 1K LOC
+        assert_eq!(analysis.debt_density, 12.0);
+
+        // Filter to keep only items with score >= 5.0
+        let filtered = analysis.filter_by_score_threshold(5.0);
+
+        // Should only keep item1 with score 10.0
+        assert_eq!(filtered.items.len(), 1);
+        assert_eq!(filtered.total_debt_score, 10.0);
+        // New density: (10.0 / 1000) * 1000 = 10.0 per 1K LOC
+        assert_eq!(filtered.debt_density, 10.0);
     }
 }
 

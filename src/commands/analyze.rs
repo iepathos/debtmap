@@ -188,7 +188,7 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     }
 
     // Apply category filtering if specified
-    let filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
+    let mut filtered_analysis = if let Some(ref filter_cats) = config.filter_categories {
         let categories: Vec<crate::priority::DebtCategory> = filter_cats
             .iter()
             .filter_map(|s| crate::priority::DebtCategory::from_string(s))
@@ -202,6 +202,12 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     } else {
         unified_analysis
     };
+
+    // Apply score threshold filtering (spec 193)
+    let min_score = crate::config::get_minimum_score_threshold();
+    if min_score > 0.0 {
+        filtered_analysis = filtered_analysis.filter_by_score_threshold(min_score);
+    }
 
     let output_config = output::OutputConfig {
         top: config.top,
