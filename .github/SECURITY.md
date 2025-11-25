@@ -41,7 +41,7 @@ Please report (suspected) security vulnerabilities to **[iepathos@gmail.com](mai
 
 ## Security Features
 
-### ClaudeForge Security
+### Debtmap Security
 - Templates are validated before processing
 - File system operations are sandboxed to project directories
 - Git operations use safe, validated paths
