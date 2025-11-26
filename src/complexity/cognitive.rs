@@ -1,3 +1,22 @@
+//! Cognitive complexity calculation for Rust code blocks.
+//!
+//! **Note**: For new code, prefer using [`super::pure::calculate_cognitive_pure`]
+//! which operates directly on `syn::File` AST and is faster to test.
+//! This module provides block-level complexity calculation with additional
+//! features like semantic normalization and pattern detection.
+//!
+//! The pure functions in `pure.rs` are:
+//! - Deterministic (same input = same output)
+//! - Fast to test (no I/O overhead)
+//! - Easier to compose
+//!
+//! This module provides more sophisticated analysis including:
+//! - Pattern-based complexity adjustments
+//! - Semantic normalization
+//! - Recursive match detection
+//!
+//! See [`super::pure`] for simpler file-level pure functions.
+
 use super::pattern_adjustments::calculate_cognitive_adjusted;
 use super::patterns::{analyze_patterns, PatternComplexity};
 use super::recursive_detector::RecursiveMatchDetector;

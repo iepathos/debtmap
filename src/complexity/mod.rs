@@ -1,5 +1,6 @@
 pub mod cognitive;
 pub mod cyclomatic;
+pub mod effects_wrappers;
 pub mod entropy;
 pub mod entropy_analysis;
 pub mod entropy_core;
@@ -10,6 +11,7 @@ pub mod match_patterns;
 pub mod message_generator;
 pub mod pattern_adjustments;
 pub mod patterns;
+pub mod pure;
 pub mod pure_mapping_patterns;
 pub mod python_pattern_adjustments;
 pub mod python_patterns;
@@ -26,6 +28,20 @@ use crate::core::FunctionMetrics;
 
 // Re-export weighted complexity types (spec 121)
 pub use weighted::{ComplexityNormalization, ComplexityWeights, WeightedComplexity};
+
+// Re-export pure complexity functions (spec 196)
+// These pure functions operate directly on AST and are much faster to test
+pub use pure::{
+    calculate_cognitive_pure, calculate_cyclomatic_pure, calculate_nesting_depth, count_branches,
+    detect_complex_matches, detect_patterns_pure, is_pure_mapping_match, Pattern,
+};
+
+// Re-export effect wrappers for I/O operations (spec 196)
+pub use effects_wrappers::{
+    analyze_complexity_effect, calculate_cognitive_effect, calculate_cognitive_from_string,
+    calculate_cyclomatic_effect, calculate_cyclomatic_from_string, detect_patterns_effect,
+    detect_patterns_from_string, ComplexityResult,
+};
 
 #[derive(Clone, Debug)]
 pub struct ComplexityCalculator {
