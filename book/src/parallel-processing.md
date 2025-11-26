@@ -1232,7 +1232,6 @@ debtmap analyze --jobs 4
 ## See Also
 
 - [CLI Reference - Performance & Caching](./cli-reference.md#performance--caching) - Complete flag documentation
-- [Cache Management](cache-management.md) - Cache configuration for performance
 - [Configuration](configuration.md) - Project-specific settings
 - [Troubleshooting](troubleshooting.md) - General troubleshooting guide
 - [Troubleshooting - Slow Analysis](./troubleshooting.md#slow-analysis-performance) - Performance debugging guide

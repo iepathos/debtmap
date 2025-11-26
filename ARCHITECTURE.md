@@ -1332,7 +1332,6 @@ Output Report
 #### Environment Variables
 - `RAYON_NUM_THREADS`: Override thread pool size
 - `DEBTMAP_BATCH_SIZE`: Default batch size
-- `DEBTMAP_CACHE_DIR`: Cache location for incremental analysis
 
 ### Adaptive Behavior
 The system automatically adjusts based on:

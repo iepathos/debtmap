@@ -154,22 +154,6 @@
       "source_feature": "prodigy_workflows"
     },
     {
-      "id": "cache-management",
-      "title": "Cache Management",
-      "file": "book/src/cache-management.md",
-      "topics": [
-        "Cache location and configuration",
-        "Cache strategies (LRU, LFU, FIFO, age-based)",
-        "Automatic pruning",
-        "Environment variables",
-        "Performance optimization",
-        "Troubleshooting cache issues"
-      ],
-      "validation": "Check that cache configuration options, pruning strategies, and environment variables are documented",
-      "auto_generated": true,
-      "source_feature": "cache_management"
-    },
-    {
       "id": "parallel-processing",
       "title": "Parallel Processing",
       "file": "book/src/parallel-processing.md",

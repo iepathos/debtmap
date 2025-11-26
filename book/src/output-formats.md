@@ -178,7 +178,7 @@ debtmap analyze . -vvv
 **Verbosity features:**
 - `-v`: Show main score factors (complexity, coverage, dependency breakdown)
 - `-vv`: Show detailed calculations with formulas and intermediate values
-- `-vvv`: Show all debug information including entropy metrics, role detection, and cache hits
+- `-vvv`: Show all debug information including entropy metrics and role detection
 
 > **Note:** Verbosity flags affect terminal output only. JSON and markdown formats include all data regardless of verbosity level.
 
@@ -216,9 +216,9 @@ Level 3 (`-vvv`) adds all internal details:
 Total debt score: 156 (threshold: 100)
   ... (all level 2 output) ...
   Debug info:
-    Entropy metrics cached: 42/50 functions
+    Entropy metrics analyzed: 42/50 functions
     Function role detection: BusinessLogic=12, Utility=8, TestHelper=5
-    Cache hit rate: 84%
+    Parse time: 245ms
 ```
 
 ### Understanding Metrics
