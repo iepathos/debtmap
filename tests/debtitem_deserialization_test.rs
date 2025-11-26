@@ -1,6 +1,6 @@
 /// Systematic tests to identify DebtItem deserialization bug
 /// Tests each component in isolation, then composed structures
-use debtmap::output::json::UnifiedJsonOutput;
+use debtmap::commands::compare_debtmap::DebtmapJsonInput;
 use debtmap::priority::{DebtItem, FileDebtItem, FileDebtMetrics, FileImpact};
 
 #[test]
@@ -269,8 +269,8 @@ fn test_unified_json_output_with_file_items() {
         "overall_coverage": null
     }"#;
 
-    eprintln!("Testing UnifiedJsonOutput with File items...");
-    let result: Result<UnifiedJsonOutput, _> = serde_json::from_str(json);
+    eprintln!("Testing DebtmapJsonInput with File items...");
+    let result: Result<DebtmapJsonInput, _> = serde_json::from_str(json);
 
     if let Err(ref e) = result {
         eprintln!("UnifiedJsonOutput ERROR: {}", e);

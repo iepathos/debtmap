@@ -1,22 +1,10 @@
+use crate::priority;
 #[cfg(test)]
 use crate::priority::UnifiedAnalysisUtils;
-use crate::priority::{self, UnifiedAnalysisQueries};
 use anyhow::Result;
-use serde::Serialize;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-
-/// Unified JSON output structure that merges function and file-level debt items
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
-pub struct UnifiedJsonOutput {
-    pub items: Vec<priority::DebtItem>,
-    pub total_impact: priority::ImpactMetrics,
-    pub total_debt_score: f64,
-    pub debt_density: f64,
-    pub total_lines_of_code: usize,
-    pub overall_coverage: Option<f64>,
-}
 
 pub fn output_json(
     analysis: &priority::UnifiedAnalysis,
@@ -31,14 +19,7 @@ pub fn output_json_with_filters(
     tail: Option<usize>,
     output_file: Option<PathBuf>,
 ) -> Result<()> {
-    output_json_with_format(
-        analysis,
-        top,
-        tail,
-        output_file,
-        crate::cli::JsonFormat::Legacy,
-        false,
-    )
+    output_json_with_format(analysis, top, tail, output_file, false)
 }
 
 pub fn output_json_with_format(
@@ -46,27 +27,15 @@ pub fn output_json_with_format(
     top: Option<usize>,
     tail: Option<usize>,
     output_file: Option<PathBuf>,
-    format: crate::cli::JsonFormat,
     include_scoring_details: bool,
 ) -> Result<()> {
-    let json = match format {
-        crate::cli::JsonFormat::Legacy => {
-            // Use existing legacy format
-            let output = apply_filters_unified(analysis, top, tail);
-            serde_json::to_string_pretty(&output)?
-        }
-        crate::cli::JsonFormat::Unified => {
-            // Use new unified format
-            let unified_output = crate::output::unified::convert_to_unified_format(
-                analysis,
-                include_scoring_details,
-            );
+    // Always use unified format (spec 202 - removed legacy format)
+    let unified_output =
+        crate::output::unified::convert_to_unified_format(analysis, include_scoring_details);
 
-            // Apply filtering to unified output
-            let filtered = apply_filters_to_unified_output(unified_output, top, tail);
-            serde_json::to_string_pretty(&filtered)?
-        }
-    };
+    // Apply filtering to unified output
+    let filtered = apply_filters_to_unified_output(unified_output, top, tail);
+    let json = serde_json::to_string_pretty(&filtered)?;
 
     if let Some(path) = output_file {
         if let Some(parent) = path.parent() {
@@ -98,38 +67,10 @@ fn apply_filters_to_unified_output(
     output
 }
 
-fn apply_filters_unified(
-    analysis: &priority::UnifiedAnalysis,
-    top: Option<usize>,
-    tail: Option<usize>,
-) -> UnifiedJsonOutput {
-    // Get all items merged and sorted by score
-    let all_items = analysis.get_top_mixed_priorities(usize::MAX);
-
-    // Apply top or tail filtering
-    let filtered_items: Vec<priority::DebtItem> = if let Some(n) = top {
-        all_items.into_iter().take(n).collect()
-    } else if let Some(n) = tail {
-        let total = all_items.len();
-        let skip = total.saturating_sub(n);
-        all_items.into_iter().skip(skip).collect()
-    } else {
-        all_items.into_iter().collect()
-    };
-
-    UnifiedJsonOutput {
-        items: filtered_items,
-        total_impact: analysis.total_impact.clone(),
-        total_debt_score: analysis.total_debt_score,
-        debt_density: analysis.debt_density,
-        total_lines_of_code: analysis.total_lines_of_code,
-        overall_coverage: analysis.overall_coverage,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::unified::{UnifiedDebtItemOutput, UnifiedOutput};
     use crate::priority::{
         call_graph::CallGraph, ActionableRecommendation, DebtType, FunctionRole, ImpactMetrics,
         Location, UnifiedDebtItem, UnifiedScore,
@@ -216,6 +157,14 @@ mod tests {
         analysis
     }
 
+    /// Helper to extract function name from unified output item
+    fn get_function_name(item: &UnifiedDebtItemOutput) -> Option<String> {
+        match item {
+            UnifiedDebtItemOutput::Function(f) => f.location.function.clone(),
+            UnifiedDebtItemOutput::File(_) => None,
+        }
+    }
+
     #[test]
     fn test_output_json_creates_parent_directories() {
         let temp_dir = TempDir::new().unwrap();
@@ -255,7 +204,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         assert_eq!(
             parsed.items.len(),
@@ -264,22 +213,19 @@ mod tests {
             parsed.items.len()
         );
 
-        // Verify we got the top 3 items (highest scores) as DebtItem::Function
-        if let priority::DebtItem::Function(item) = &parsed.items[0] {
-            assert_eq!(item.location.function, "func_0");
-        } else {
-            panic!("Expected Function debt item");
-        }
-        if let priority::DebtItem::Function(item) = &parsed.items[1] {
-            assert_eq!(item.location.function, "func_1");
-        } else {
-            panic!("Expected Function debt item");
-        }
-        if let priority::DebtItem::Function(item) = &parsed.items[2] {
-            assert_eq!(item.location.function, "func_2");
-        } else {
-            panic!("Expected Function debt item");
-        }
+        // Verify we got the top 3 items (highest scores)
+        assert_eq!(
+            get_function_name(&parsed.items[0]),
+            Some("func_0".to_string())
+        );
+        assert_eq!(
+            get_function_name(&parsed.items[1]),
+            Some("func_1".to_string())
+        );
+        assert_eq!(
+            get_function_name(&parsed.items[2]),
+            Some("func_2".to_string())
+        );
     }
 
     #[test]
@@ -294,7 +240,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         assert_eq!(
             parsed.items.len(),
@@ -304,21 +250,18 @@ mod tests {
         );
 
         // Verify we got the last 3 items (lowest scores)
-        if let priority::DebtItem::Function(item) = &parsed.items[0] {
-            assert_eq!(item.location.function, "func_7");
-        } else {
-            panic!("Expected Function debt item");
-        }
-        if let priority::DebtItem::Function(item) = &parsed.items[1] {
-            assert_eq!(item.location.function, "func_8");
-        } else {
-            panic!("Expected Function debt item");
-        }
-        if let priority::DebtItem::Function(item) = &parsed.items[2] {
-            assert_eq!(item.location.function, "func_9");
-        } else {
-            panic!("Expected Function debt item");
-        }
+        assert_eq!(
+            get_function_name(&parsed.items[0]),
+            Some("func_7".to_string())
+        );
+        assert_eq!(
+            get_function_name(&parsed.items[1]),
+            Some("func_8".to_string())
+        );
+        assert_eq!(
+            get_function_name(&parsed.items[2]),
+            Some("func_9".to_string())
+        );
     }
 
     #[test]
@@ -333,7 +276,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         assert_eq!(
             parsed.items.len(),
@@ -355,7 +298,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         assert_eq!(
             parsed.items.len(),
@@ -377,7 +320,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         assert_eq!(
             parsed.items.len(),
@@ -455,9 +398,9 @@ mod tests {
         let result = output_json_with_filters(&analysis, None, None, Some(output_path.clone()));
         assert!(result.is_ok(), "Failed to write JSON: {:?}", result.err());
 
-        // Parse and verify
+        // Parse and verify using unified output format
         let content = fs::read_to_string(&output_path).unwrap();
-        let parsed: UnifiedJsonOutput = serde_json::from_str(&content).unwrap();
+        let parsed: UnifiedOutput = serde_json::from_str(&content).unwrap();
 
         // Should have 4 total items (3 function + 1 file)
         assert_eq!(
@@ -469,9 +412,9 @@ mod tests {
 
         // File item with highest score should be first
         match &parsed.items[0] {
-            priority::DebtItem::File(file) => {
+            UnifiedDebtItemOutput::File(file) => {
                 assert_eq!(file.score, 606.0);
-                assert_eq!(file.metrics.path, PathBuf::from("god_object.rs"));
+                assert_eq!(file.location.file, "god_object.rs");
             }
             _ => panic!("Expected first item to be a File debt item with highest score"),
         }
@@ -479,7 +422,7 @@ mod tests {
         // Remaining should be function items
         for i in 1..4 {
             match &parsed.items[i] {
-                priority::DebtItem::Function(_) => {
+                UnifiedDebtItemOutput::Function(_) => {
                     // This is expected
                 }
                 _ => panic!("Expected item {} to be a Function debt item", i),

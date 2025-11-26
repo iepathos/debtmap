@@ -19,7 +19,6 @@ pub struct OutputConfig {
     pub verbosity: u8,
     pub output_file: Option<PathBuf>,
     pub output_format: Option<crate::cli::OutputFormat>,
-    pub json_format: crate::cli::JsonFormat,
     pub formatting_config: FormattingConfig,
 }
 
@@ -68,7 +67,6 @@ pub fn output_unified_priorities_with_config(
         config.verbosity,
         config.output_file,
         config.output_format,
-        config.json_format,
         config.formatting_config,
         results,
     )
@@ -93,7 +91,6 @@ pub fn output_unified_priorities(
         verbosity,
         output_file,
         output_format,
-        crate::cli::JsonFormat::Legacy, // default to legacy for backward compatibility
         formatting_config,
         results,
     )
@@ -108,7 +105,6 @@ pub fn output_unified_priorities_with_summary(
     verbosity: u8,
     output_file: Option<PathBuf>,
     output_format: Option<crate::cli::OutputFormat>,
-    json_format: crate::cli::JsonFormat,
     formatting_config: FormattingConfig,
     results: &AnalysisResults,
 ) -> Result<()> {
@@ -120,7 +116,6 @@ pub fn output_unified_priorities_with_summary(
                 top,
                 tail,
                 output_file,
-                json_format,
                 include_scoring_details,
             )
         }

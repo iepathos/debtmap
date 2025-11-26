@@ -1,9 +1,35 @@
-use crate::output::json::UnifiedJsonOutput;
+use crate::priority::{DebtItem, ImpactMetrics};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Internal type for parsing debtmap JSON files during comparison.
+/// This supports parsing the unified JSON format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebtmapJsonInput {
+    pub items: Vec<DebtItem>,
+    #[serde(default = "default_impact_metrics")]
+    pub total_impact: ImpactMetrics,
+    #[serde(default)]
+    pub total_debt_score: f64,
+    #[serde(default)]
+    pub debt_density: f64,
+    #[serde(default)]
+    pub total_lines_of_code: usize,
+    #[serde(default)]
+    pub overall_coverage: Option<f64>,
+}
+
+fn default_impact_metrics() -> ImpactMetrics {
+    ImpactMetrics {
+        complexity_reduction: 0.0,
+        coverage_improvement: 0.0,
+        risk_reduction: 0.0,
+        lines_reduction: 0,
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationResult {
@@ -73,7 +99,7 @@ pub fn compare_debtmaps(config: CompareConfig) -> Result<()> {
     Ok(())
 }
 
-fn load_debtmap(path: &Path) -> Result<UnifiedJsonOutput> {
+fn load_debtmap(path: &Path) -> Result<DebtmapJsonInput> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read debtmap file: {}", path.display()))?;
 
@@ -82,8 +108,8 @@ fn load_debtmap(path: &Path) -> Result<UnifiedJsonOutput> {
 }
 
 fn perform_validation(
-    before: &UnifiedJsonOutput,
-    after: &UnifiedJsonOutput,
+    before: &DebtmapJsonInput,
+    after: &DebtmapJsonInput,
 ) -> Result<ValidationResult> {
     let before_summary = create_summary(before);
     let after_summary = create_summary(after);
@@ -214,9 +240,7 @@ fn perform_validation(
     })
 }
 
-fn create_summary(analysis: &UnifiedJsonOutput) -> AnalysisSummary {
-    use crate::priority::DebtItem;
-
+fn create_summary(analysis: &DebtmapJsonInput) -> AnalysisSummary {
     // Only count Function items for summary
     let function_items: Vec<_> = analysis
         .items
@@ -255,9 +279,7 @@ struct ResolvedItems {
     total_count: usize,
 }
 
-fn identify_resolved_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> ResolvedItems {
-    use crate::priority::DebtItem;
-
+fn identify_resolved_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> ResolvedItems {
     // Extract Function items only
     let after_keys: HashSet<_> = after
         .items
@@ -300,9 +322,7 @@ struct ImprovedItems {
     coverage_improvement_count: usize,
 }
 
-fn identify_improved_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> ImprovedItems {
-    use crate::priority::DebtItem;
-
+fn identify_improved_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> ImprovedItems {
     let before_map: HashMap<_, _> = before
         .items
         .iter()
@@ -380,9 +400,7 @@ struct ItemInfo {
     score: f64,
 }
 
-fn identify_new_items(before: &UnifiedJsonOutput, after: &UnifiedJsonOutput) -> NewItems {
-    use crate::priority::DebtItem;
-
+fn identify_new_items(before: &DebtmapJsonInput, after: &DebtmapJsonInput) -> NewItems {
     let before_keys: HashSet<_> = before
         .items
         .iter()
@@ -497,8 +515,8 @@ fn filter_unchanged_critical_items(
 }
 
 fn identify_unchanged_critical(
-    before: &UnifiedJsonOutput,
-    after: &UnifiedJsonOutput,
+    before: &DebtmapJsonInput,
+    after: &DebtmapJsonInput,
 ) -> UnchangedCritical {
     let after_map = build_function_map(&after.items);
     let items = filter_unchanged_critical_items(&before.items, &after_map);
@@ -631,8 +649,8 @@ mod tests {
     use std::path::PathBuf;
 
     // Helper function to create empty output for tests
-    fn create_empty_output() -> UnifiedJsonOutput {
-        UnifiedJsonOutput {
+    fn create_empty_output() -> DebtmapJsonInput {
+        DebtmapJsonInput {
             items: vec![],
             total_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
@@ -648,8 +666,8 @@ mod tests {
     }
 
     // Helper function to create output with items
-    fn create_output_with_items(items: Vec<DebtItem>) -> UnifiedJsonOutput {
-        UnifiedJsonOutput {
+    fn create_output_with_items(items: Vec<DebtItem>) -> DebtmapJsonInput {
+        DebtmapJsonInput {
             items,
             total_impact: ImpactMetrics {
                 complexity_reduction: 0.0,
@@ -884,9 +902,9 @@ mod tests {
         }
     }
 
-    // Helper function to create UnifiedJsonOutput
-    fn create_test_output(items: Vec<DebtItem>) -> UnifiedJsonOutput {
-        UnifiedJsonOutput {
+    // Helper function to create DebtmapJsonInput
+    fn create_test_output(items: Vec<DebtItem>) -> DebtmapJsonInput {
+        DebtmapJsonInput {
             items,
             total_impact: ImpactMetrics {
                 risk_reduction: 0.0,

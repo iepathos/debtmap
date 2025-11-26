@@ -1,10 +1,15 @@
+//! Integration tests for JSON output format.
+//!
+//! Note: The legacy JSON format was removed in spec 202.
+//! JSON output now always uses the unified format with consistent structure.
+
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
-/// Test that --output-format unified flag generates valid unified format output
+/// Test that --format json generates valid unified format output
 #[test]
 fn test_cli_output_format_unified_produces_valid_structure() {
     let temp_dir = TempDir::new().unwrap();
@@ -14,7 +19,7 @@ fn test_cli_output_format_unified_produces_valid_structure() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    // Run debtmap analyze with --format json and --output-format unified
+    // Run debtmap analyze with --format json (always uses unified format now)
     let output = Command::new("cargo")
         .args([
             "run",
@@ -25,8 +30,6 @@ fn test_cli_output_format_unified_produces_valid_structure() {
             "analyze",
             "--format",
             "json",
-            "--output-format",
-            "unified",
             "--output",
             output_path.to_str().unwrap(),
             test_codebase.to_str().unwrap(),
@@ -156,7 +159,7 @@ fn test_cli_unified_format_scope_filtering() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    // Run analysis
+    // Run analysis (JSON output always uses unified format)
     let output = Command::new("cargo")
         .args([
             "run",
@@ -167,8 +170,6 @@ fn test_cli_unified_format_scope_filtering() {
             "analyze",
             "--format",
             "json",
-            "--output-format",
-            "unified",
             "--output",
             output_path.to_str().unwrap(),
             test_codebase.to_str().unwrap(),
@@ -212,7 +213,7 @@ fn test_cli_unified_format_metrics_presence() {
     let test_codebase =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
 
-    // Run analysis
+    // Run analysis (JSON output always uses unified format)
     let output = Command::new("cargo")
         .args([
             "run",
@@ -223,8 +224,6 @@ fn test_cli_unified_format_metrics_presence() {
             "analyze",
             "--format",
             "json",
-            "--output-format",
-            "unified",
             "--output",
             output_path.to_str().unwrap(),
             test_codebase.to_str().unwrap(),
@@ -251,54 +250,5 @@ fn test_cli_unified_format_metrics_presence() {
     }
 }
 
-/// Test that default output format is legacy (for backward compatibility per spec 108)
-#[test]
-fn test_cli_default_output_format_is_legacy() {
-    let temp_dir = TempDir::new().unwrap();
-    let output_path = temp_dir.path().join("default_output.json");
-
-    let test_codebase =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/sample_codebase");
-
-    // Run with --format json but without explicit --output-format flag (should default to legacy)
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "debtmap",
-            "--quiet",
-            "--",
-            "analyze",
-            "--format",
-            "json",
-            "--output",
-            output_path.to_str().unwrap(),
-            test_codebase.to_str().unwrap(),
-        ])
-        .output()
-        .expect("Failed to execute debtmap command");
-
-    assert!(output.status.success(), "Command should succeed");
-
-    let output_content = fs::read_to_string(&output_path).unwrap();
-    let json: Value = serde_json::from_str(&output_content).unwrap();
-
-    // Should have legacy format structure (items array with File/Function wrappers)
-    assert!(
-        json.get("items").is_some(),
-        "Default output should use legacy format with items array"
-    );
-
-    // Legacy format has items with File or Function keys
-    if let Some(items) = json.get("items").and_then(|v| v.as_array()) {
-        if !items.is_empty() {
-            let first_item = &items[0];
-            let has_file_wrapper = first_item.get("File").is_some();
-            let has_function_wrapper = first_item.get("Function").is_some();
-            assert!(
-                has_file_wrapper || has_function_wrapper,
-                "Legacy format items should have File or Function wrappers"
-            );
-        }
-    }
-}
+// Note: test_cli_default_output_format_is_legacy removed in spec 202
+// Legacy JSON format has been removed - unified format is now the only format

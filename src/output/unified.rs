@@ -210,9 +210,9 @@ pub struct PurityAnalysis {
 pub struct Dependencies {
     pub upstream_count: usize,
     pub downstream_count: usize,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upstream_callers: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub downstream_callees: Vec<String>,
 }
 
@@ -222,7 +222,7 @@ pub struct RecommendationOutput {
     pub action: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implementation_steps: Vec<String>,
 }
 

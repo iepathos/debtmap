@@ -533,7 +533,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     if let Commands::Analyze {
         path,
         format,
-        json_format,
         output,
         threshold_complexity,
         threshold_duplication,
@@ -616,7 +615,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         let config = build_analyze_config(
             path,
             format,
-            json_format,
             output,
             threshold_complexity,
             threshold_duplication,
@@ -772,7 +770,6 @@ fn create_formatting_config(
 fn build_analyze_config(
     path: std::path::PathBuf,
     format: debtmap::cli::OutputFormat,
-    json_format: debtmap::cli::JsonFormat,
     output: Option<std::path::PathBuf>,
     threshold_complexity: u32,
     threshold_duplication: usize,
@@ -840,7 +837,6 @@ fn build_analyze_config(
     debtmap::commands::analyze::AnalyzeConfig {
         path,
         format: convert_output_format(format),
-        json_format,
         output,
         threshold_complexity,
         threshold_duplication,
@@ -899,10 +895,10 @@ fn build_analyze_config(
     }
 }
 
-/// Pure function to convert UnifiedJsonOutput to UnifiedAnalysis
+/// Pure function to convert DebtmapJsonInput to UnifiedAnalysis
 /// Splits merged DebtItem enum into separate function and file vectors
 fn json_to_analysis(
-    json: debtmap::output::json::UnifiedJsonOutput,
+    json: debtmap::commands::compare_debtmap::DebtmapJsonInput,
 ) -> debtmap::priority::UnifiedAnalysis {
     use debtmap::priority::{call_graph::CallGraph, DebtItem, UnifiedAnalysis};
     use im::Vector;
@@ -946,8 +942,8 @@ fn handle_compare_command(
     format: debtmap::cli::OutputFormat,
     output: Option<&Path>,
 ) -> Result<()> {
+    use debtmap::commands::compare_debtmap::DebtmapJsonInput;
     use debtmap::comparison::{Comparator, PlanParser};
-    use debtmap::output::json::UnifiedJsonOutput;
     use std::fs;
 
     // Extract target location from plan or use explicit location
@@ -959,11 +955,11 @@ fn handle_compare_command(
 
     // Load JSON output and convert to UnifiedAnalysis
     let before_content = fs::read_to_string(before)?;
-    let before_json: UnifiedJsonOutput = serde_json::from_str(&before_content)?;
+    let before_json: DebtmapJsonInput = serde_json::from_str(&before_content)?;
     let before_results = json_to_analysis(before_json);
 
     let after_content = fs::read_to_string(after)?;
-    let after_json: UnifiedJsonOutput = serde_json::from_str(&after_content)?;
+    let after_json: DebtmapJsonInput = serde_json::from_str(&after_content)?;
     let after_results = json_to_analysis(after_json);
 
     // Perform comparison
