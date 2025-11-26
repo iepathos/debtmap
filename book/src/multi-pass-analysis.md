@@ -450,12 +450,6 @@ Multi-pass analysis aims to add no more than 25% overhead versus standard single
 
 ### Optimization Tips
 
-**Enable Caching**
-```bash
-# Use shared cache for repeated analyses
-debtmap analyze . --multi-pass --cache-location shared
-```
-
 **Disable Performance Tracking in Production**
 ```rust
 MultiPassOptions {

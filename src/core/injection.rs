@@ -1,6 +1,6 @@
 //! Dependency injection container and builder patterns
 
-use crate::core::traits::{Analyzer, Cache, ConfigProvider, Formatter, PriorityCalculator, Scorer};
+use crate::core::traits::{Analyzer, ConfigProvider, Formatter, PriorityCalculator, Scorer};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -16,8 +16,6 @@ pub struct AppContainer {
     pub ts_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
     /// Debt scorer
     pub debt_scorer: Arc<dyn Scorer<Item = crate::core::types::DebtItem>>,
-    /// Analysis cache
-    pub cache: Arc<dyn Cache<Key = String, Value = Vec<u8>>>,
     /// Configuration provider
     pub config: Arc<dyn ConfigProvider>,
     /// Priority calculator
@@ -37,7 +35,6 @@ pub struct AppContainerBuilder {
     js_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     ts_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     debt_scorer: Option<Arc<dyn Scorer<Item = crate::core::types::DebtItem>>>,
-    cache: Option<Arc<dyn Cache<Key = String, Value = Vec<u8>>>>,
     config: Option<Arc<dyn ConfigProvider>>,
     priority_calculator: Option<Arc<dyn PriorityCalculator<Item = crate::core::types::DebtItem>>>,
     json_formatter: Option<Arc<dyn Formatter<Report = crate::core::types::AnalysisResult>>>,
@@ -60,7 +57,6 @@ impl AppContainerBuilder {
             js_analyzer: None,
             ts_analyzer: None,
             debt_scorer: None,
-            cache: None,
             config: None,
             priority_calculator: None,
             json_formatter: None,
@@ -114,15 +110,6 @@ impl AppContainerBuilder {
         self
     }
 
-    /// Set the cache implementation
-    pub fn with_cache(
-        mut self,
-        cache: impl Cache<Key = String, Value = Vec<u8>> + 'static,
-    ) -> Self {
-        self.cache = Some(Arc::new(cache));
-        self
-    }
-
     /// Set the configuration provider
     pub fn with_config(mut self, config: impl ConfigProvider + 'static) -> Self {
         self.config = Some(Arc::new(config));
@@ -173,7 +160,6 @@ impl AppContainerBuilder {
             js_analyzer: self.js_analyzer.ok_or("JavaScript analyzer is required")?,
             ts_analyzer: self.ts_analyzer.ok_or("TypeScript analyzer is required")?,
             debt_scorer: self.debt_scorer.ok_or("Debt scorer is required")?,
-            cache: self.cache.ok_or("Cache is required")?,
             config: self.config.ok_or("Config provider is required")?,
             priority_calculator: self
                 .priority_calculator
@@ -476,7 +462,7 @@ impl ServiceLocator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::traits::{CacheStats, PriorityFactor};
+    use crate::core::traits::PriorityFactor;
     use crate::core::types::{DebtCategory, DebtItem, Language, ModuleInfo};
 
     // Mock implementations for testing
@@ -519,36 +505,6 @@ mod tests {
 
         fn methodology(&self) -> &str {
             "Mock scoring based on debt type"
-        }
-    }
-
-    struct MockCache {
-        data: std::collections::HashMap<String, Vec<u8>>,
-    }
-
-    impl Cache for MockCache {
-        type Key = String;
-        type Value = Vec<u8>;
-
-        fn get(&self, key: &Self::Key) -> Option<Self::Value> {
-            self.data.get(key).cloned()
-        }
-
-        fn set(&mut self, key: Self::Key, value: Self::Value) {
-            self.data.insert(key, value);
-        }
-
-        fn clear(&mut self) {
-            self.data.clear();
-        }
-
-        fn stats(&self) -> CacheStats {
-            CacheStats {
-                hits: 0,
-                misses: 0,
-                entries: self.data.len(),
-                memory_usage: 0,
-            }
         }
     }
 
@@ -625,9 +581,6 @@ mod tests {
                 language: Language::TypeScript,
             })
             .with_debt_scorer(MockScorer)
-            .with_cache(MockCache {
-                data: std::collections::HashMap::new(),
-            })
             .with_config(MockConfigProvider)
             .with_priority_calculator(MockPriorityCalculator)
             .with_json_formatter(MockFormatter)
@@ -651,9 +604,6 @@ mod tests {
                 language: Language::TypeScript,
             })
             .with_debt_scorer(MockScorer)
-            .with_cache(MockCache {
-                data: std::collections::HashMap::new(),
-            })
             .with_config(MockConfigProvider)
             .with_priority_calculator(MockPriorityCalculator)
             .with_json_formatter(MockFormatter)
@@ -679,7 +629,7 @@ mod tests {
         assert!(scorer.is_some());
 
         // Try to resolve non-existent service
-        let missing = locator.resolve::<MockCache>();
+        let missing = locator.resolve::<MockConfigProvider>();
         assert!(missing.is_none());
     }
 

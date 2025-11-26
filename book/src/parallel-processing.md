@@ -946,7 +946,7 @@ Parallel processing provides 4-8x speedup.
 Limited speedup from parallelism (1.5-2x).
 
 **If analysis is I/O-bound:**
-1. Move cache to SSD
+1. Use SSD storage
 2. Reduce thread count (less I/O contention)
 3. Use `--max-files` to limit scope
 
@@ -973,12 +973,11 @@ Optimal parallel efficiency. Expect 4-8x speedup from parallelism.
 ### Large Projects (>100k LOC)
 
 ```bash
-# Use all cores with optimized cache
-export DEBTMAP_CACHE_MAX_SIZE=5368709120  # 5GB
+# Use all cores
 debtmap analyze . --jobs 0  # 0 = all cores
 ```
 
-Maximize cache size to avoid re-analysis.
+Maximize parallel processing for large codebases.
 
 ### CI/CD Environments
 
@@ -1102,7 +1101,6 @@ Monitor memory usage during analysis:
 2. **Limit threads in CI** - Use `--jobs 2` or `--jobs 4` in shared environments
 3. **Profile before tuning** - Measure actual performance impact
 4. **Consider I/O** - If using slow storage, reduce thread count
-5. **Cache aggressively** - Large caches reduce repeated work
 
 ## Troubleshooting
 

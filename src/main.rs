@@ -10,7 +10,7 @@ use std::sync::Arc;
 mod default_implementations {
     use anyhow::Result;
     use debtmap::core::traits::{
-        Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
+        ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
     };
     use debtmap::core::types::{AnalysisResult, DebtCategory, DebtItem, Severity};
     use std::collections::HashMap;
@@ -53,63 +53,6 @@ mod default_implementations {
         }
     }
 
-    pub struct DefaultCache {
-        storage: std::sync::Mutex<HashMap<String, Vec<u8>>>,
-        hits: std::sync::atomic::AtomicUsize,
-        misses: std::sync::atomic::AtomicUsize,
-    }
-
-    impl DefaultCache {
-        pub fn new() -> Result<Self> {
-            Ok(Self {
-                storage: std::sync::Mutex::new(HashMap::new()),
-                hits: std::sync::atomic::AtomicUsize::new(0),
-                misses: std::sync::atomic::AtomicUsize::new(0),
-            })
-        }
-    }
-
-    impl Cache for DefaultCache {
-        type Key = String;
-        type Value = Vec<u8>;
-
-        fn get(&self, key: &Self::Key) -> Option<Self::Value> {
-            let storage = self.storage.lock().unwrap();
-            if let Some(value) = storage.get(key) {
-                self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                Some(value.clone())
-            } else {
-                self.misses
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                None
-            }
-        }
-
-        fn set(&mut self, key: Self::Key, value: Self::Value) {
-            let mut storage = self.storage.lock().unwrap();
-            storage.insert(key, value);
-        }
-
-        fn clear(&mut self) {
-            let mut storage = self.storage.lock().unwrap();
-            storage.clear();
-            self.hits.store(0, std::sync::atomic::Ordering::Relaxed);
-            self.misses.store(0, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        fn stats(&self) -> CacheStats {
-            let storage = self.storage.lock().unwrap();
-            let memory_usage: usize = storage.values().map(|v| v.len()).sum();
-
-            CacheStats {
-                hits: self.hits.load(std::sync::atomic::Ordering::Relaxed),
-                misses: self.misses.load(std::sync::atomic::Ordering::Relaxed),
-                entries: storage.len(),
-                memory_usage,
-            }
-        }
-    }
-
     pub struct DefaultConfigProvider {
         config: std::sync::RwLock<HashMap<String, String>>,
     }
@@ -120,7 +63,6 @@ mod default_implementations {
             // Load default configuration values
             config.insert("complexity_threshold".to_string(), "10".to_string());
             config.insert("max_file_size".to_string(), "1000000".to_string());
-            config.insert("enable_caching".to_string(), "true".to_string());
             config.insert("parallel_processing".to_string(), "true".to_string());
 
             Self {
@@ -379,7 +321,6 @@ fn create_app_container() -> Result<AppContainer> {
         .with_js_analyzer(JavaScriptAnalyzerAdapter::new())
         .with_ts_analyzer(TypeScriptAnalyzerAdapter::new())
         .with_debt_scorer(DefaultDebtScorer::new())
-        .with_cache(DefaultCache::new()?)
         .with_config(DefaultConfigProvider::new())
         .with_priority_calculator(DefaultPriorityCalculator::new())
         .with_json_formatter(JsonFormatter::new())

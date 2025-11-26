@@ -33,35 +33,6 @@ pub trait Scorer: Send + Sync {
     fn methodology(&self) -> &str;
 }
 
-/// Cache abstraction for storing analysis results
-pub trait Cache: Send + Sync {
-    /// The key type for cache lookups
-    type Key;
-    /// The value type stored in the cache
-    type Value;
-
-    /// Retrieve a value from the cache
-    fn get(&self, key: &Self::Key) -> Option<Self::Value>;
-
-    /// Store a value in the cache
-    fn set(&mut self, key: Self::Key, value: Self::Value);
-
-    /// Clear the entire cache
-    fn clear(&mut self);
-
-    /// Get cache statistics
-    fn stats(&self) -> CacheStats;
-}
-
-/// Cache statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheStats {
-    pub hits: usize,
-    pub misses: usize,
-    pub entries: usize,
-    pub memory_usage: usize,
-}
-
 /// File system operations abstraction
 pub trait FileSystem: Send + Sync {
     /// Read file contents as string

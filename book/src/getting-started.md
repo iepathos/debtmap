@@ -95,11 +95,6 @@ debtmap --help
   # Edit .debtmap.toml to add ignore patterns
   ```
 
-- **Unexpected results**: First run builds cache and may take longer. For fresh analysis:
-  ```bash
-  debtmap analyze . --clear-cache
-  ```
-
 - **Performance issues**: For large codebases (10,000+ files):
   ```bash
   # Limit parallel jobs to reduce memory usage
@@ -185,24 +180,6 @@ debtmap analyze . --filter Architecture,Testing
 debtmap analyze . --group-by-category
 ```
 
-**Cache Management:**
-```bash
-# Skip cache for fresh analysis
-debtmap analyze . --no-cache
-
-# Clear cache and rebuild
-debtmap analyze . --clear-cache
-
-# View cache statistics
-debtmap analyze . --cache-stats
-
-# Specify custom cache location
-debtmap analyze . --cache-location /custom/path
-
-# Migrate cache from local to shared location
-debtmap analyze . --migrate-cache
-```
-
 **Performance Control:**
 ```bash
 # Limit parallel jobs
@@ -272,14 +249,7 @@ debtmap analyze .
 4. **Prioritization** - Results are ranked by priority (CRITICAL, HIGH, MEDIUM, LOW)
 5. **Output** - Results are displayed in your chosen format
 
-**Expected timing**: Analyzing a 10,000 LOC project typically takes 2-5 seconds. The first run may be slightly slower as Debtmap builds its cache.
-
-**About Caching:**
-Debtmap caches parsed ASTs and computed metrics to speed up subsequent analyses:
-- **Cache location**: `XDG_CACHE_HOME/debtmap` on Linux, `~/Library/Caches/debtmap` on macOS, `%LOCALAPPDATA%/debtmap` on Windows
-- **What's cached**: Parsed ASTs and computed metrics for each file
-- **Invalidation**: Cache is automatically invalidated when files are modified
-- **Management**: Use `--clear-cache` to clear, `--no-cache` to skip, or `--cache-stats` to view statistics
+**Expected timing**: Analyzing a 10,000 LOC project typically takes 2-5 seconds.
 
 ## Language Support
 

@@ -12,7 +12,7 @@ This chapter demonstrates:
 - **Language-specific analysis**: Rust, Python, JavaScript/TypeScript with their respective testing tools
 - **CI/CD integration**: GitHub Actions, GitLab CI, CircleCI with validation gates
 - **Output formats**: Terminal, JSON, and Markdown with interpretation guidance
-- **Advanced features**: Context-aware analysis, multi-pass processing, cache management
+- **Advanced features**: Context-aware analysis, multi-pass processing
 - **Configuration patterns**: Tailored settings for different project types
 - **Progress tracking**: Using the `compare` command to validate refactoring improvements
 
@@ -845,38 +845,6 @@ debtmap analyze . --multi-pass --attribution
 
 # Shows which functions contribute to which patterns
 ```
-
-### Cache Management
-
-```bash
-# Show cache statistics
-debtmap analyze . --cache-stats
-
-# Clear cache before analysis
-debtmap analyze . --clear-cache
-
-# Force cache rebuild
-debtmap analyze . --force-cache-rebuild
-
-# Use per-project cache (default)
-debtmap analyze . --cache-location local
-
-# Use shared system-wide cache for faster multi-project analysis
-debtmap analyze . --cache-location shared
-
-# Use custom cache directory
-debtmap analyze . --cache-location /custom/path/to/cache
-```
-
-**Cache strategies:**
-- **local**: Per-project cache in `.debtmap-cache/` (default)
-- **shared**: Shared cache directory for all projects (faster when analyzing multiple projects)
-- **custom path**: Specify exact cache location
-
-**Benefits:**
-- Shared cache reduces analysis time when working on multiple projects
-- Custom path useful for CI systems with specific cache directories
-- Local cache isolates project-specific analysis results
 
 ### Aggregation Methods
 
