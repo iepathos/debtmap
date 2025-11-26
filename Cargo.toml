@@ -86,6 +86,10 @@ which = "8.0"
 anyhow = "1.0"
 thiserror = "2.0"
 
+# Effect composition and validation
+stillwater = { version = "0.8", features = ["async"] }
+tokio = { version = "1", features = ["rt"] }
+
 # File system
 walkdir = "2.5"
 ignore = "0.4"

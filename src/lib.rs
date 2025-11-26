@@ -344,6 +344,9 @@ pub mod core;
 pub mod data_flow;
 pub mod database;
 pub mod debt;
+pub mod effects;
+pub mod env;
+pub mod errors;
 pub mod example_debt;
 pub mod extraction_patterns;
 pub mod formatting;
@@ -406,3 +409,12 @@ pub use crate::analysis::{
     AnalysisConfig, CrossModuleTracker, DeadCodeAnalysis, FrameworkPatternDetector,
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
+
+// Stillwater integration: Effect system and environment (spec 195)
+pub use crate::effects::{
+    combine_validations, effect_fail, effect_from_fn, effect_pure, run_effect, run_effect_async,
+    run_validation, validation_failure, validation_failures, validation_map, validation_success,
+    AnalysisEffect, AnalysisErrors, AnalysisValidation,
+};
+pub use crate::env::{AnalysisEnv, RealEnv};
+pub use crate::errors::{errors_to_anyhow, format_error_list, AnalysisError};

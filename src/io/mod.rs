@@ -1,7 +1,13 @@
 pub mod output;
 pub mod pattern_output;
+pub mod real;
+pub mod traits;
 pub mod walker;
 pub mod writers;
+
+// Re-export I/O traits for convenient access
+pub use real::{MemoryCache, NoOpCache, RealCoverageLoader, RealFileSystem};
+pub use traits::{Cache, CoverageData, CoverageLoader, FileCoverage, FileSystem};
 
 use anyhow::Result;
 use std::fs;
