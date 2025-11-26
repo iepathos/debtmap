@@ -128,8 +128,9 @@ fn test_untested_labels_shown_when_coverage_data_available() {
 
     // Verify coverage line is present (spec 180)
     // When LCOV was provided but function not found, show "no coverage data"
+    // Note: Check for "COVERAGE" without colon because ANSI color codes separate them
     assert!(
-        output.contains("COVERAGE:"),
+        output.contains("COVERAGE"),
         "Output should contain COVERAGE line when has_coverage_data=true. Output:\n{}",
         output
     );
