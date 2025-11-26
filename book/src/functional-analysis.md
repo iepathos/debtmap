@@ -915,7 +915,7 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanc
 
 - **Spec 111 targets <10% overhead**: Performance impact should be minimal
 - **Disable for hot paths**: Analyze functional patterns in separate runs if needed
-- **Use caching**: Debtmap caches analysis results between runs
+- **Use parallel processing**: Leverage multi-core parallelism for faster analysis
 
 ## Related Chapters
 

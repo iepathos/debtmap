@@ -39,7 +39,7 @@ debtmap analyze <PATH> [OPTIONS]
 - `<PATH>` - Path to analyze (file or directory)
 
 **Description:**
-Primary command for code analysis. Supports multiple output formats (json, markdown, terminal), coverage file integration, caching, parallel processing, context-aware risk analysis, and comprehensive filtering options.
+Primary command for code analysis. Supports multiple output formats (json, markdown, terminal), coverage file integration, parallel processing, context-aware risk analysis, and comprehensive filtering options.
 
 See [Options](#options) section below for all available flags.
 
@@ -315,9 +315,9 @@ Enable context-aware risk analysis and integrate test coverage data.
   - Total debt score with coverage ≤ score without coverage
 - `--validate-loc` - Validate LOC consistency across analysis modes (with/without coverage)
 
-### Performance & Caching
+### Performance
 
-Optimize analysis performance through parallelization and caching.
+Optimize analysis performance through parallelization.
 
 **Parallel Processing:**
 - `--no-parallel` - Disable parallel call graph construction (enabled by default)

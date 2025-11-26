@@ -1108,14 +1108,13 @@ Monitor memory usage during analysis:
 
 **Possible causes:**
 1. I/O bottleneck (slow disk)
-2. Cache disabled or cleared
-3. Excessive cache pruning
-4. Memory pressure (swapping)
+2. Memory pressure (swapping)
+3. Thread contention
 
 **Solutions:**
-- Move cache to SSD
-- Increase `DEBTMAP_CACHE_MAX_SIZE`
+- Use faster storage (SSD)
 - Reduce thread count to avoid memory pressure
+- Limit analysis scope with `--max-files`
 
 ### Slow Analysis Performance
 
