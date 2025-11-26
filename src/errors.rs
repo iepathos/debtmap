@@ -338,6 +338,196 @@ pub fn errors_to_anyhow(errors: Vec<AnalysisError>) -> anyhow::Error {
     }
 }
 
+// ============================================================================
+// CLI Error Reporting (Spec 197)
+// ============================================================================
+
+/// Print an error report to stderr with formatting.
+///
+/// This is the primary function for CLI error output. It formats errors
+/// with numbering, colors (when available), and a helpful tip at the end.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::errors::{AnalysisError, print_error_report};
+///
+/// let errors = vec![
+///     AnalysisError::config("Invalid threshold: -5"),
+///     AnalysisError::parse_with_context("Unexpected token", "src/bad.rs", 12),
+/// ];
+///
+/// print_error_report(&errors);
+/// // Output:
+/// // Error: 2 issues found:
+/// //
+/// //   1. Config error: Invalid threshold: -5
+/// //   2. Parse error: Unexpected token in src/bad.rs at line 12
+/// //
+/// // Tip: Fix the issues above and run again.
+/// ```
+pub fn print_error_report(errors: &[AnalysisError]) {
+    if errors.is_empty() {
+        return;
+    }
+
+    let issue_count = if errors.len() == 1 {
+        "1 issue".to_string()
+    } else {
+        format!("{} issues", errors.len())
+    };
+
+    eprintln!("\nError: {} found:\n", issue_count);
+
+    for (i, error) in errors.iter().enumerate() {
+        eprintln!("  {}. {}", i + 1, error);
+    }
+
+    eprintln!("\nTip: Fix the issues above and run again.");
+}
+
+/// Print an error report with a custom title.
+///
+/// Similar to `print_error_report` but allows customizing the title text.
+pub fn print_error_report_titled(title: &str, errors: &[AnalysisError]) {
+    if errors.is_empty() {
+        return;
+    }
+
+    let issue_count = if errors.len() == 1 {
+        "1 issue".to_string()
+    } else {
+        format!("{} issues", errors.len())
+    };
+
+    eprintln!("\n{}: {} found:\n", title, issue_count);
+
+    for (i, error) in errors.iter().enumerate() {
+        eprintln!("  {}. {}", i + 1, error);
+    }
+
+    eprintln!("\nTip: Fix the issues above and run again.");
+}
+
+/// Format error report for return as string (useful for testing).
+pub fn format_error_report(errors: &[AnalysisError]) -> String {
+    if errors.is_empty() {
+        return String::new();
+    }
+
+    let issue_count = if errors.len() == 1 {
+        "1 issue".to_string()
+    } else {
+        format!("{} issues", errors.len())
+    };
+
+    let mut output = format!("Error: {} found:\n\n", issue_count);
+    output.push_str(&format_error_list(errors));
+    output.push_str("\n\nTip: Fix the issues above and run again.");
+
+    output
+}
+
+/// Group errors by category for structured reporting.
+///
+/// Returns a map of error category to list of errors in that category.
+pub fn group_errors_by_category(
+    errors: &[AnalysisError],
+) -> std::collections::HashMap<&'static str, Vec<&AnalysisError>> {
+    let mut groups: std::collections::HashMap<&'static str, Vec<&AnalysisError>> =
+        std::collections::HashMap::new();
+
+    for error in errors {
+        groups.entry(error.category()).or_default().push(error);
+    }
+
+    groups
+}
+
+/// Print a grouped error report organized by category.
+///
+/// This provides better organization for large error sets by grouping
+/// errors into categories.
+pub fn print_grouped_error_report(errors: &[AnalysisError]) {
+    if errors.is_empty() {
+        return;
+    }
+
+    let groups = group_errors_by_category(errors);
+    let issue_count = if errors.len() == 1 {
+        "1 issue".to_string()
+    } else {
+        format!("{} issues", errors.len())
+    };
+
+    eprintln!("\nError: {} found:\n", issue_count);
+
+    for (category, category_errors) in groups {
+        eprintln!("[{}] {} error(s):", category, category_errors.len());
+        for error in category_errors {
+            eprintln!("  - {}", error.message());
+            if let Some(path) = error.path() {
+                eprintln!("    at {}", path.display());
+            }
+        }
+        eprintln!();
+    }
+
+    eprintln!("Tip: Fix the issues above and run again.");
+}
+
+/// Error summary for structured output.
+#[derive(Debug, Clone)]
+pub struct ErrorSummary {
+    /// Total number of errors
+    pub total_count: usize,
+    /// Count by category
+    pub by_category: std::collections::HashMap<String, usize>,
+    /// Unique file paths mentioned in errors
+    pub affected_files: Vec<PathBuf>,
+    /// The original errors
+    pub errors: Vec<AnalysisError>,
+}
+
+impl ErrorSummary {
+    /// Create an error summary from a list of errors.
+    pub fn from_errors(errors: Vec<AnalysisError>) -> Self {
+        let mut by_category: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut affected_files: std::collections::HashSet<PathBuf> =
+            std::collections::HashSet::new();
+
+        for error in &errors {
+            *by_category.entry(error.category().to_string()).or_insert(0) += 1;
+            if let Some(path) = error.path() {
+                affected_files.insert(path.clone());
+            }
+        }
+
+        Self {
+            total_count: errors.len(),
+            by_category,
+            affected_files: affected_files.into_iter().collect(),
+            errors,
+        }
+    }
+
+    /// Check if there are any errors.
+    pub fn has_errors(&self) -> bool {
+        self.total_count > 0
+    }
+
+    /// Format as a one-line summary.
+    pub fn one_line_summary(&self) -> String {
+        if self.total_count == 0 {
+            "No errors".to_string()
+        } else {
+            let file_count = self.affected_files.len();
+            format!("{} error(s) in {} file(s)", self.total_count, file_count)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,5 +609,94 @@ mod tests {
         let io_err = io::Error::new(io::ErrorKind::NotFound, "file.txt not found");
         let analysis_err: AnalysisError = io_err.into();
         assert_eq!(analysis_err.category(), "I/O");
+    }
+
+    // Tests for error reporting utilities (Spec 197)
+
+    #[test]
+    fn test_format_error_report_single() {
+        let errors = vec![AnalysisError::config("Invalid threshold")];
+        let report = format_error_report(&errors);
+
+        assert!(report.contains("1 issue"));
+        assert!(report.contains("Invalid threshold"));
+        assert!(report.contains("Tip:"));
+    }
+
+    #[test]
+    fn test_format_error_report_multiple() {
+        let errors = vec![
+            AnalysisError::config("Error 1"),
+            AnalysisError::parse("Error 2"),
+            AnalysisError::io("Error 3"),
+        ];
+        let report = format_error_report(&errors);
+
+        assert!(report.contains("3 issues"));
+        assert!(report.contains("1."));
+        assert!(report.contains("2."));
+        assert!(report.contains("3."));
+    }
+
+    #[test]
+    fn test_format_error_report_empty() {
+        let errors: Vec<AnalysisError> = vec![];
+        let report = format_error_report(&errors);
+        assert!(report.is_empty());
+    }
+
+    #[test]
+    fn test_group_errors_by_category() {
+        let errors = vec![
+            AnalysisError::config("Config 1"),
+            AnalysisError::config("Config 2"),
+            AnalysisError::parse("Parse 1"),
+            AnalysisError::io("IO 1"),
+        ];
+
+        let groups = group_errors_by_category(&errors);
+
+        assert_eq!(groups.get("Config").map(|v| v.len()), Some(2));
+        assert_eq!(groups.get("Parse").map(|v| v.len()), Some(1));
+        assert_eq!(groups.get("I/O").map(|v| v.len()), Some(1));
+    }
+
+    #[test]
+    fn test_error_summary_from_errors() {
+        let errors = vec![
+            AnalysisError::io_with_path("Not found", "/path/to/file1.rs"),
+            AnalysisError::io_with_path("Permission denied", "/path/to/file2.rs"),
+            AnalysisError::config("Invalid threshold"),
+        ];
+
+        let summary = ErrorSummary::from_errors(errors);
+
+        assert_eq!(summary.total_count, 3);
+        assert_eq!(summary.by_category.get("I/O"), Some(&2));
+        assert_eq!(summary.by_category.get("Config"), Some(&1));
+        assert_eq!(summary.affected_files.len(), 2);
+        assert!(summary.has_errors());
+    }
+
+    #[test]
+    fn test_error_summary_one_line() {
+        let errors = vec![
+            AnalysisError::io_with_path("Error", "/file1.rs"),
+            AnalysisError::io_with_path("Error", "/file2.rs"),
+        ];
+
+        let summary = ErrorSummary::from_errors(errors);
+        let one_line = summary.one_line_summary();
+
+        assert!(one_line.contains("2 error(s)"));
+        assert!(one_line.contains("2 file(s)"));
+    }
+
+    #[test]
+    fn test_error_summary_empty() {
+        let summary = ErrorSummary::from_errors(vec![]);
+
+        assert!(!summary.has_errors());
+        assert_eq!(summary.one_line_summary(), "No errors");
     }
 }

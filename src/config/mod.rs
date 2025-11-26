@@ -10,6 +10,7 @@ mod thresholds;
 mod accessors;
 mod core;
 mod loader;
+pub mod validation;
 
 // Re-export scoring types for backward compatibility
 pub use scoring::{
@@ -64,7 +65,11 @@ pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
 pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};
 
 // Re-export loader functions
-pub use loader::{directory_ancestors, load_config, parse_and_validate_config};
+pub use loader::{
+    directory_ancestors, load_config, load_config_from_path_result,
+    load_config_from_path_validated, load_config_validated, load_config_validated_result,
+    parse_and_validate_config,
+};
 
 // Re-export accessor functions
 pub use accessors::*;

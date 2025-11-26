@@ -4,6 +4,9 @@ use std::path::{Path, PathBuf};
 
 use super::core::DebtmapConfig;
 use super::scoring::ScoringWeights;
+use super::validation::validate_config;
+use crate::effects::{run_validation, validation_failure, validation_success, AnalysisValidation};
+use crate::errors::AnalysisError;
 
 /// Load configuration from .debtmap.toml if it exists
 /// Pure function to read and parse config file contents
@@ -117,4 +120,131 @@ pub fn load_config() -> DebtmapConfig {
             );
             DebtmapConfig::default()
         })
+}
+
+// ============================================================================
+// Validation-based config loading (Spec 197)
+// ============================================================================
+
+/// Load and validate config using error accumulation.
+///
+/// This function reads the config file and validates it, accumulating
+/// ALL errors instead of failing at the first one.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::config::loader::load_config_validated;
+/// use std::path::Path;
+///
+/// let validation = load_config_validated(Path::new("project/"));
+///
+/// // Check all errors at once
+/// match validation {
+///     stillwater::Validation::Success(config) => {
+///         // Use config
+///     }
+///     stillwater::Validation::Failure(errors) => {
+///         // Show ALL errors to user
+///         for error in errors {
+///             eprintln!("  - {}", error);
+///         }
+///     }
+/// }
+/// ```
+pub fn load_config_validated(start_dir: &Path) -> AnalysisValidation<DebtmapConfig> {
+    const MAX_TRAVERSAL_DEPTH: usize = 10;
+
+    // Find config file
+    let config_path = directory_ancestors_impl(start_dir.to_path_buf(), MAX_TRAVERSAL_DEPTH)
+        .map(|dir| dir.join(".debtmap.toml"))
+        .find(|path| path.exists());
+
+    let Some(config_path) = config_path else {
+        // No config file found - return default (this is not an error)
+        return validation_success(DebtmapConfig::default());
+    };
+
+    // Read config file
+    let contents = match read_config_file(&config_path) {
+        Ok(contents) => contents,
+        Err(e) => {
+            return validation_failure(AnalysisError::io_with_path(
+                format!("Cannot read config file: {}", e),
+                &config_path,
+            ));
+        }
+    };
+
+    // Parse config
+    let config = match toml::from_str::<DebtmapConfig>(&contents) {
+        Ok(config) => config,
+        Err(e) => {
+            return validation_failure(AnalysisError::config_with_path(
+                format!("Failed to parse config: {}", e),
+                &config_path,
+            ));
+        }
+    };
+
+    // Validate config (accumulates ALL validation errors)
+    match validate_config(&config) {
+        stillwater::Validation::Success(_) => validation_success(config),
+        stillwater::Validation::Failure(errors) => stillwater::Validation::Failure(errors),
+    }
+}
+
+/// Load and validate config with backwards-compatible Result API.
+///
+/// This wraps `load_config_validated` to return `anyhow::Result` for use
+/// with existing code that expects fail-fast error handling.
+pub fn load_config_validated_result(start_dir: &Path) -> anyhow::Result<DebtmapConfig> {
+    run_validation(load_config_validated(start_dir))
+}
+
+/// Load config from a specific path with validation.
+///
+/// Unlike `load_config_validated`, this requires the config file to exist
+/// at the specified path.
+pub fn load_config_from_path_validated(config_path: &Path) -> AnalysisValidation<DebtmapConfig> {
+    // Check file exists
+    if !config_path.exists() {
+        return validation_failure(AnalysisError::config_with_path(
+            format!("Config file not found: {}", config_path.display()),
+            config_path,
+        ));
+    }
+
+    // Read config file
+    let contents = match read_config_file(config_path) {
+        Ok(contents) => contents,
+        Err(e) => {
+            return validation_failure(AnalysisError::io_with_path(
+                format!("Cannot read config file: {}", e),
+                config_path,
+            ));
+        }
+    };
+
+    // Parse config
+    let config = match toml::from_str::<DebtmapConfig>(&contents) {
+        Ok(config) => config,
+        Err(e) => {
+            return validation_failure(AnalysisError::config_with_path(
+                format!("Failed to parse config: {}", e),
+                config_path,
+            ));
+        }
+    };
+
+    // Validate config (accumulates ALL validation errors)
+    match validate_config(&config) {
+        stillwater::Validation::Success(_) => validation_success(config),
+        stillwater::Validation::Failure(errors) => stillwater::Validation::Failure(errors),
+    }
+}
+
+/// Load config from a specific path with backwards-compatible Result API.
+pub fn load_config_from_path_result(config_path: &Path) -> anyhow::Result<DebtmapConfig> {
+    run_validation(load_config_from_path_validated(config_path))
 }

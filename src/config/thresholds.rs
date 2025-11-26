@@ -79,7 +79,7 @@ fn default_max_complexity() -> u32 {
     200
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ThresholdsConfig {
     pub complexity: Option<u32>,
     pub duplication: Option<u32>,
