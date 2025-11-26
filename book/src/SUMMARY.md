@@ -19,7 +19,6 @@
 - [Architecture](architecture.md)
 - [Architectural Analysis](architectural-analysis.md)
 - [Boilerplate vs Complexity](boilerplate-vs-complexity.md)
-- [Cache Management](cache-management.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)

@@ -3,10 +3,7 @@ use crate::{
     analysis::diagnostics::{DetailLevel, DiagnosticReporter, OutputFormat},
     analysis::multi_pass::{analyze_with_attribution, MultiPassOptions, MultiPassResult},
     analyzers::{call_graph_integration, FileAnalyzer},
-    cache::{CacheKey, CallGraphCache, UnifiedAnalysisCache, UnifiedAnalysisCacheKey},
-    config,
-    core::{self, AnalysisResults, DebtItem, FunctionMetrics, Language},
-    io,
+    core::{AnalysisResults, DebtItem, FunctionMetrics, Language},
     priority::{
         self,
         call_graph::{CallGraph, FunctionId},
@@ -34,7 +31,6 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub show_macro_stats: bool,
     pub parallel: bool,
     pub jobs: usize,
-    pub use_cache: bool,
     pub multi_pass: bool,
     pub show_attribution: bool,
     pub aggregate_only: bool,
@@ -63,7 +59,6 @@ pub fn perform_unified_analysis(
         show_macro_stats,
         parallel: false,
         jobs: 0,
-        use_cache: false,
         multi_pass: false,
         show_attribution: false,
         aggregate_only: false,
@@ -88,7 +83,6 @@ pub fn perform_unified_analysis_with_options(
         show_macro_stats,
         parallel,
         jobs,
-        use_cache,
         multi_pass,
         show_attribution,
         aggregate_only: _aggregate_only,
@@ -100,220 +94,28 @@ pub fn perform_unified_analysis_with_options(
         _formatting_config,
     } = options;
 
-    // Extract files and create computation parameters in pure functional style
-    let analysis_params = create_analysis_parameters(
-        results,
-        coverage_file,
-        semantic_off,
-        project_path,
-        verbose_macro_warnings,
-        show_macro_stats,
-        parallel,
-        jobs,
-        use_cache,
-        multi_pass,
-        show_attribution,
-        no_aggregation,
-        aggregation_method,
-        min_problematic,
-        no_god_object,
-        suppress_coverage_tip,
-        _formatting_config,
-    );
-
-    // Apply caching strategy using function composition
-    apply_caching_strategy(&analysis_params)
-        .unwrap_or_else(|| perform_direct_computation(analysis_params))
-}
-
-// Pure function to create analysis parameters
-#[allow(clippy::too_many_arguments)]
-fn create_analysis_parameters<'a>(
-    results: &'a AnalysisResults,
-    coverage_file: Option<&'a PathBuf>,
-    semantic_off: bool,
-    project_path: &'a Path,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-    parallel: bool,
-    jobs: usize,
-    use_cache: bool,
-    multi_pass: bool,
-    show_attribution: bool,
-    no_aggregation: bool,
-    aggregation_method: Option<String>,
-    min_problematic: Option<usize>,
-    no_god_object: bool,
-    suppress_coverage_tip: bool,
-    _formatting_config: crate::formatting::FormattingConfig,
-) -> AnalysisParameters<'a> {
-    let files = extract_unique_files(&results.complexity.metrics);
-    let cache_config = CacheConfiguration::new(use_cache, files.len(), coverage_file.is_some());
-
-    AnalysisParameters {
-        results,
-        coverage_file,
-        semantic_off,
-        project_path,
-        verbose_macro_warnings,
-        show_macro_stats,
-        parallel,
-        jobs,
-        multi_pass,
-        show_attribution,
-        no_aggregation,
-        aggregation_method,
-        min_problematic,
-        no_god_object,
-        suppress_coverage_tip,
-        files,
-        cache_config,
-        _formatting_config,
-    }
-}
-
-// Pure function to extract unique files from metrics
-fn extract_unique_files(metrics: &[FunctionMetrics]) -> Vec<PathBuf> {
-    metrics
-        .iter()
-        .map(|m| m.file.clone())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect()
-}
-
-// Data structure to hold analysis parameters
-struct AnalysisParameters<'a> {
-    results: &'a AnalysisResults,
-    coverage_file: Option<&'a PathBuf>,
-    semantic_off: bool,
-    project_path: &'a Path,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-    parallel: bool,
-    jobs: usize,
-    multi_pass: bool,
-    show_attribution: bool,
-    no_aggregation: bool,
-    aggregation_method: Option<String>,
-    min_problematic: Option<usize>,
-    no_god_object: bool,
-    suppress_coverage_tip: bool,
-    files: Vec<PathBuf>,
-    cache_config: CacheConfiguration,
-    _formatting_config: crate::formatting::FormattingConfig,
-}
-
-// Pure function for cache configuration
-struct CacheConfiguration {
-    should_cache: bool,
-}
-
-impl CacheConfiguration {
-    fn new(use_cache: bool, file_count: usize, has_coverage: bool) -> Self {
-        Self {
-            should_cache: use_cache
-                && UnifiedAnalysisCache::should_use_cache(file_count, has_coverage),
-        }
-    }
-}
-
-// Functional approach to caching strategy
-fn apply_caching_strategy(params: &AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
-    if !params.cache_config.should_cache {
-        return None;
-    }
-
-    attempt_cached_analysis(params).or_else(|| None)
-}
-
-// Pure function for cache attempt
-fn attempt_cached_analysis(params: &AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
-    let mut unified_cache = UnifiedAnalysisCache::new(Some(params.project_path)).ok()?;
-    let cache_key = create_cache_key(params).ok()?;
-
-    unified_cache.get(&cache_key).map(|cached_analysis| {
-        log_cache_hit(params._formatting_config);
-        Ok(cached_analysis)
-    })
-}
-
-// Function composition for computation with caching
-#[allow(dead_code)]
-fn attempt_computation_with_caching(params: AnalysisParameters) -> Option<Result<UnifiedAnalysis>> {
-    let mut unified_cache = UnifiedAnalysisCache::new(Some(params.project_path)).ok()?;
-    let cache_key = create_cache_key(&params).ok()?;
-
-    Some(
-        perform_computation(&params)
-            .and_then(|result| cache_result(&mut unified_cache, cache_key, result, params.files)),
-    )
-}
-
-// Pure function to create cache key
-fn create_cache_key(params: &AnalysisParameters) -> Result<UnifiedAnalysisCacheKey> {
-    UnifiedAnalysisCache::generate_key(
-        params.project_path,
-        &params.files,
-        params.results.complexity.summary.max_complexity,
-        50, // Default duplication threshold
-        params.coverage_file.map(|p| p.as_path()),
-        params.semantic_off,
-        params.parallel,
-    )
-}
-
-// I/O function for logging cache hit
-fn log_cache_hit(__formatting_config: crate::formatting::FormattingConfig) {
-    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-    if !quiet_mode {
-        eprintln!("Using cached unified analysis [OK]");
-    }
-}
-
-// Function to cache computation result
-#[allow(dead_code)]
-fn cache_result(
-    cache: &mut UnifiedAnalysisCache,
-    cache_key: UnifiedAnalysisCacheKey,
-    result: UnifiedAnalysis,
-    files: Vec<PathBuf>,
-) -> Result<UnifiedAnalysis> {
-    if let Err(e) = cache.put(cache_key, result.clone(), files) {
-        log::warn!("Failed to cache unified analysis: {}", e);
-    }
-    Ok(result)
-}
-
-// Direct computation without caching
-fn perform_direct_computation(params: AnalysisParameters) -> Result<UnifiedAnalysis> {
-    perform_computation(&params)
-}
-
-// Core computation function (extracted for reuse)
-fn perform_computation(params: &AnalysisParameters) -> Result<UnifiedAnalysis> {
+    // Perform direct computation without caching
     perform_unified_analysis_computation(
-        params.results,
-        params.coverage_file,
-        params.semantic_off,
-        params.project_path,
-        params.verbose_macro_warnings,
-        params.show_macro_stats,
-        params.parallel,
-        params.jobs,
-        params.cache_config.should_cache,
-        params.multi_pass,
-        params.show_attribution,
-        params.no_aggregation,
-        params.aggregation_method.clone(),
-        params.min_problematic,
-        params.no_god_object,
-        params.suppress_coverage_tip,
-        params._formatting_config,
+        results,
+        coverage_file,
+        semantic_off,
+        project_path,
+        verbose_macro_warnings,
+        show_macro_stats,
+        parallel,
+        jobs,
+        multi_pass,
+        show_attribution,
+        no_aggregation,
+        aggregation_method,
+        min_problematic,
+        no_god_object,
+        suppress_coverage_tip,
+        _formatting_config,
     )
 }
 
-/// Perform the actual unified analysis computation (extracted for caching)
+/// Perform the actual unified analysis computation
 #[allow(clippy::too_many_arguments)]
 fn perform_unified_analysis_computation(
     results: &AnalysisResults,
@@ -324,7 +126,6 @@ fn perform_unified_analysis_computation(
     show_macro_stats: bool,
     parallel: bool,
     jobs: usize,
-    use_cache: bool,
     multi_pass: bool,
     show_attribution: bool,
     no_aggregation: bool,
@@ -341,31 +142,21 @@ fn perform_unified_analysis_computation(
         perform_multi_pass_analysis(results, show_attribution)?;
     }
 
-    // Select execution strategy based on options
-    let execution_strategy = determine_execution_strategy(parallel, use_cache);
-
     // Progress tracking
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
     // Progress will be shown by the parallel builder itself
 
     // Time call graph building
     let call_graph_start = std::time::Instant::now();
-    let (framework_exclusions, function_pointer_used_functions) = match execution_strategy {
-        ExecutionStrategy::Parallel => {
-            build_parallel_call_graph(project_path, &mut call_graph, jobs)?
-        }
-        ExecutionStrategy::Cached => build_cached_call_graph(
+    let (framework_exclusions, function_pointer_used_functions) = if parallel {
+        build_parallel_call_graph(project_path, &mut call_graph, jobs)?
+    } else {
+        build_sequential_call_graph(
             project_path,
             &mut call_graph,
             verbose_macro_warnings,
             show_macro_stats,
-        )?,
-        ExecutionStrategy::Sequential => build_sequential_call_graph(
-            project_path,
-            &mut call_graph,
-            verbose_macro_warnings,
-            show_macro_stats,
-        )?,
+        )?
     };
     let call_graph_time = call_graph_start.elapsed();
 
@@ -441,22 +232,6 @@ fn perform_unified_analysis_computation(
     Ok(result)
 }
 
-/// Determines the execution strategy based on configuration options
-fn determine_execution_strategy(parallel: bool, use_cache: bool) -> ExecutionStrategy {
-    match (parallel, use_cache) {
-        (true, _) => ExecutionStrategy::Parallel,
-        (false, true) => ExecutionStrategy::Cached,
-        (false, false) => ExecutionStrategy::Sequential,
-    }
-}
-
-/// Execution strategies for call graph construction
-enum ExecutionStrategy {
-    Parallel,
-    Cached,
-    Sequential,
-}
-
 /// Builds call graph using parallel processing
 fn build_parallel_call_graph(
     project_path: &Path,
@@ -476,94 +251,6 @@ fn build_parallel_call_graph(
     // Process Python files (still sequential for now)
     call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)?;
     *call_graph = parallel_graph;
-
-    Ok((exclusions, used_funcs))
-}
-
-/// Builds call graph with caching support
-fn build_cached_call_graph(
-    project_path: &Path,
-    call_graph: &mut CallGraph,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    let config = config::get_config();
-    let rust_files =
-        io::walker::find_project_files_with_config(project_path, vec![Language::Rust], config)?;
-
-    let mut cache = CallGraphCache::new()?;
-    let cache_key = CallGraphCache::generate_key(project_path, &rust_files, config)?;
-
-    if let Some((cached_graph, exclusions, used_funcs)) = cache.get(&cache_key) {
-        use_cached_graph(
-            project_path,
-            call_graph,
-            cached_graph,
-            exclusions,
-            used_funcs,
-        )
-    } else {
-        build_and_cache_graph(
-            project_path,
-            call_graph,
-            verbose_macro_warnings,
-            show_macro_stats,
-            cache,
-            cache_key,
-            rust_files,
-        )
-    }
-}
-
-/// Uses a cached call graph
-fn use_cached_graph(
-    project_path: &Path,
-    call_graph: &mut CallGraph,
-    cached_graph: CallGraph,
-    exclusions: Vec<FunctionId>,
-    used_funcs: Vec<FunctionId>,
-) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    log::info!("Using cached call graph");
-    *call_graph = cached_graph;
-
-    // Process Python files (still need to be done)
-    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
-
-    Ok((
-        exclusions.into_iter().collect(),
-        used_funcs.into_iter().collect(),
-    ))
-}
-
-/// Builds and caches a new call graph
-fn build_and_cache_graph(
-    project_path: &Path,
-    call_graph: &mut CallGraph,
-    verbose_macro_warnings: bool,
-    show_macro_stats: bool,
-    mut cache: CallGraphCache,
-    cache_key: CacheKey,
-    rust_files: Vec<PathBuf>,
-) -> Result<(HashSet<FunctionId>, HashSet<FunctionId>)> {
-    log::info!("No valid cache found, building call graph from scratch");
-
-    let (exclusions, used_funcs) = call_graph::process_rust_files_for_call_graph(
-        project_path,
-        call_graph,
-        verbose_macro_warnings,
-        show_macro_stats,
-    )?;
-
-    // Cache the result
-    cache.put(
-        cache_key,
-        call_graph.clone(),
-        exclusions.iter().cloned().collect(),
-        used_funcs.iter().cloned().collect(),
-        rust_files,
-    )?;
-
-    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
 
     Ok((exclusions, used_funcs))
 }
@@ -987,7 +674,7 @@ fn convert_error_swallowing_to_unified(
 ) -> Vec<UnifiedDebtItem> {
     debt_items
         .iter()
-        .filter(|item| item.debt_type == core::DebtType::ErrorSwallowing)
+        .filter(|item| item.debt_type == crate::core::DebtType::ErrorSwallowing)
         .map(|item| {
             let unified_score = UnifiedScore {
                 complexity_factor: 3.0,

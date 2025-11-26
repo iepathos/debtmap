@@ -727,11 +727,6 @@ max_cognitive = 100.0
 
 📖 **Read more:** [Analysis Guide](https://iepathos.github.io/debtmap/analysis-guide.html)
 
-### Cache Management
-Intelligent cache system with automatic pruning and configurable strategies (LRU, LFU, FIFO, age-based).
-
-📖 **Read more:** [Cache Management](https://iepathos.github.io/debtmap/cache-management.html)
-
 ### Suppression Patterns
 Flexible suppression via inline comments or configuration files.
 

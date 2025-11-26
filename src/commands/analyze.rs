@@ -3,16 +3,14 @@ use super::super::output;
 use super::super::utils::{analysis_helpers, language_parser};
 use crate::{
     analysis_utils, cli, config,
-    core::{self, *},
+    core::*,
     formatting::FormattingConfig,
     io,
     progress::{ProgressConfig, ProgressManager},
 };
 use anyhow::{Context, Result};
 use chrono::Utc;
-use rayon::prelude::*;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 pub struct AnalyzeConfig {
     pub path: PathBuf,
@@ -42,13 +40,6 @@ pub struct AnalyzeConfig {
     pub _formatting_config: FormattingConfig,
     pub parallel: bool,
     pub jobs: usize,
-    pub use_cache: bool,
-    pub no_cache: bool,
-    pub clear_cache: bool,
-    pub force_cache_rebuild: bool,
-    pub cache_stats: bool,
-    pub migrate_cache: bool,
-    pub cache_location: Option<String>,
     pub multi_pass: bool,
     pub show_attribution: bool,
     pub detail_level: Option<String>,
@@ -121,30 +112,6 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         }
     }
 
-    // Handle cache flags
-    if config.clear_cache || config.force_cache_rebuild {
-        // Clear cache using the shared cache system
-        if let Ok(mut cache) = core::cache::AnalysisCache::new(Some(&config.path)) {
-            cache.clear()?;
-            log::info!("File metrics cache cleared");
-        }
-
-        // Also clear unified analysis cache
-        use crate::cache::UnifiedAnalysisCache;
-        if let Ok(mut unified_cache) = UnifiedAnalysisCache::new(Some(&config.path)) {
-            unified_cache.clear()?;
-            log::info!("Unified analysis cache cleared");
-        }
-
-        if config.force_cache_rebuild {
-            log::info!("Force cache rebuild requested - all caches cleared");
-        }
-    }
-
-    if config.no_cache {
-        std::env::set_var("DEBTMAP_NO_CACHE", "1");
-    }
-
     let languages = language_parser::parse_languages(config.languages.clone());
     let results = analyze_project(
         config.path.clone(),
@@ -165,7 +132,6 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             show_macro_stats: config.show_macro_stats,
             parallel: config.parallel,
             jobs: config.jobs,
-            use_cache: config.use_cache,
             multi_pass: config.multi_pass,
             show_attribution: config.show_attribution,
             aggregate_only: config.aggregate_only,
@@ -279,33 +245,8 @@ pub fn analyze_project(
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
 
-    // Initialize cache (enabled by default unless DEBTMAP_NO_CACHE is set)
-    let cache_enabled = std::env::var("DEBTMAP_NO_CACHE").is_err();
-    let mut cache = if cache_enabled {
-        match core::cache::AnalysisCache::new(Some(&path)) {
-            Ok(c) => Some(c),
-            Err(e) => {
-                log::warn!("Failed to initialize cache: {}", e);
-                None
-            }
-        }
-    } else {
-        None
-    };
-
-    // Collect file metrics with or without cache
-    let file_metrics = if let Some(ref mut cache) = cache {
-        collect_file_metrics_with_cache(&files, cache)
-    } else {
-        analysis_utils::collect_file_metrics(&files)
-    };
-
-    // Print cache statistics in verbose mode
-    if cache_enabled && log::log_enabled!(log::Level::Debug) {
-        if let Some(cache) = &cache {
-            log::info!("Cache stats: {}", cache.stats());
-        }
-    }
+    // Collect file metrics directly without caching
+    let file_metrics = analysis_utils::collect_file_metrics(&files);
 
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
@@ -329,26 +270,6 @@ pub fn analyze_project(
         duplications,
         file_contexts,
     })
-}
-
-fn collect_file_metrics_with_cache(
-    files: &[PathBuf],
-    cache: &mut core::cache::AnalysisCache,
-) -> Vec<FileMetrics> {
-    let cache = Arc::new(Mutex::new(cache));
-
-    files
-        .par_iter()
-        .filter_map(|path| {
-            let mut cache = cache.lock().unwrap();
-            cache
-                .get_or_compute(path, || {
-                    analysis_utils::analyze_single_file(path)
-                        .ok_or_else(|| anyhow::anyhow!("Failed to analyze file"))
-                })
-                .ok()
-        })
-        .collect()
 }
 
 /// Analyze project size and configure optimizations based on scale

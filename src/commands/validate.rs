@@ -380,7 +380,6 @@ fn calculate_unified_analysis(
             show_macro_stats: false,
             parallel: parallel_enabled,
             jobs,
-            use_cache: true,
             multi_pass: false,
             show_attribution: false,
             aggregate_only: false,

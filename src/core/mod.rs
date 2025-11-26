@@ -1,6 +1,4 @@
-pub mod adapters;
 pub mod ast;
-pub mod cache;
 pub mod errors;
 pub mod injection;
 pub mod lazy;

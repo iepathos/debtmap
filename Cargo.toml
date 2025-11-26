@@ -142,10 +142,6 @@ incremental = true            # Enable incremental compilation
 opt-level = 3                 # Optimize dependencies in dev mode
 
 [[bench]]
-name = "cache_pruning"
-harness = false
-
-[[bench]]
 name = "call_graph_bench"
 harness = false
 

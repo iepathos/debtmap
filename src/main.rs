@@ -619,13 +619,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         plain,
         no_parallel,
         jobs,
-        use_cache,
-        no_cache,
-        clear_cache,
-        force_cache_rebuild,
-        cache_stats,
-        migrate_cache,
-        cache_location,
         multi_pass,
         show_attribution,
         detail_level,
@@ -661,13 +654,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     } = command
     {
         // Apply side effects first
-        let cache_location_path = cache_location.as_ref().map(std::path::PathBuf::from);
-        apply_environment_setup(&cache_location_path, no_context_aware)?;
-
-        // Handle early returns for cache operations
-        if let Some(result) = handle_cache_operations(cache_stats, migrate_cache, &path)? {
-            return Ok(result);
-        }
+        apply_environment_setup(no_context_aware)?;
 
         // Handle explain-metrics flag
         if explain_metrics {
@@ -714,11 +701,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             formatting_config,
             no_parallel,
             jobs,
-            use_cache,
-            no_cache,
-            clear_cache,
-            force_cache_rebuild,
-            cache_location,
             multi_pass,
             show_attribution,
             detail_level,
@@ -758,74 +740,13 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     }
 }
 
-// Pure function to check cache operations
-fn handle_cache_operations(
-    cache_stats: bool,
-    migrate_cache: bool,
-    path: &Path,
-) -> Result<Option<Result<()>>> {
-    if cache_stats {
-        return Ok(Some(handle_cache_stats(path)));
-    }
-    if migrate_cache {
-        return Ok(Some(handle_cache_migration(path)?));
-    }
-    Ok(None)
-}
-
-// Side effect handler for cache stats
-fn handle_cache_stats(path: &std::path::Path) -> Result<()> {
-    let cache = debtmap::cache::SharedCache::new(Some(path))?;
-    let stats = cache.get_stats();
-    println!("Cache Statistics:");
-    println!("  Entries: {}", stats.entry_count);
-    println!("  Size: {} bytes", stats.total_size);
-    Ok(())
-}
-
-// Side effect handler for cache migration
-fn handle_cache_migration(path: &std::path::Path) -> Result<Result<()>> {
-    use debtmap::cache::CacheStrategy;
-
-    println!("Migrating cache to shared location");
-
-    // Get the shared cache location
-    let dst_location =
-        debtmap::cache::CacheLocation::resolve_with_strategy(Some(path), CacheStrategy::Shared)?;
-
-    // Create a new cache at the shared location
-    let _dst_cache = debtmap::cache::SharedCache::new_with_cache_dir(
-        Some(path),
-        dst_location.get_cache_path().to_path_buf(),
-    )?;
-
-    // For now, just report that we've set up the cache in the shared location
-    println!(
-        "Cache now configured at shared location: {:?}",
-        dst_location.get_cache_path()
-    );
-    Ok(Ok(()))
-}
-
 // Side effect function for environment setup (I/O at edges)
-fn apply_environment_setup(
-    cache_location: &Option<std::path::PathBuf>,
-    no_context_aware: bool,
-) -> Result<()> {
-    if let Some(ref location) = cache_location {
-        std::env::set_var("DEBTMAP_CACHE_DIR", location);
-    }
-
+fn apply_environment_setup(no_context_aware: bool) -> Result<()> {
     if !no_context_aware {
         std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
     }
 
     Ok(())
-}
-
-// Pure function to check condition
-fn should_use_cache(use_cache: bool, no_cache: bool) -> bool {
-    !no_cache || use_cache
 }
 
 // Pure function to determine parallel mode
@@ -863,10 +784,6 @@ fn convert_disable_context(disable_context: Option<Vec<String>>) -> Option<Vec<S
 
 fn convert_languages(languages: Option<Vec<String>>) -> Option<Vec<String>> {
     languages.filter(|v| !v.is_empty())
-}
-
-fn convert_cache_location(location: &Option<String>) -> Option<String> {
-    location.clone()
 }
 
 fn convert_threshold_preset(
@@ -940,11 +857,6 @@ fn build_analyze_config(
     formatting_config: FormattingConfig,
     no_parallel: bool,
     jobs: usize,
-    use_cache: bool,
-    no_cache: bool,
-    clear_cache: bool,
-    force_cache_rebuild: bool,
-    cache_location: Option<String>,
     multi_pass: bool,
     show_attribution: bool,
     detail_level: Option<String>,
@@ -1012,13 +924,6 @@ fn build_analyze_config(
         _formatting_config: formatting_config,
         parallel: should_use_parallel(no_parallel),
         jobs: get_worker_count(jobs),
-        use_cache: should_use_cache(use_cache, no_cache),
-        no_cache,
-        clear_cache,
-        force_cache_rebuild,
-        cache_stats: false,
-        migrate_cache: false,
-        cache_location: convert_cache_location(&cache_location),
         multi_pass,
         show_attribution,
         detail_level,

@@ -109,7 +109,6 @@ The `validate` command supports a focused subset of `analyze` options, primarily
 
 **Note:** The following `analyze` options are NOT available in the `validate` command:
 - `--threshold-complexity`, `--threshold-duplication`, `--threshold-preset` (configure these in `.debtmap.toml` instead)
-- `--cache-*` options (caching control)
 - `--languages` (language filtering)
 
 **Note:** The `--explain-score` flag exists in the `validate` command but is deprecated (hidden). Use `-v`, `-vv`, or `-vvv` for verbosity instead.
@@ -326,16 +325,6 @@ Optimize analysis performance through parallelization and caching.
   - `0` = use all available CPU cores (default)
   - Specify number to limit thread count
 
-**Caching:**
-- `--no-cache` - Disable caching for this run (caching is enabled by default)
-- `--clear-cache` - Clear cache before running analysis
-- `--force-cache-rebuild` - Force cache rebuild (same as --clear-cache)
-- `--cache-stats` - Show cache statistics and location
-- `--migrate-cache` - Migrate cache from local to shared location
-- `--cache-location <LOCATION>` - Cache location strategy: local, shared, or path
-  - Can also be set via `DEBTMAP_CACHE_DIR` environment variable
-  - Affects where analysis results are cached for faster subsequent runs
-
 **Other Performance:**
 - `--max-files <N>` - Maximum number of files to analyze (0 = no limit)
 
@@ -395,8 +384,6 @@ Common option shortcuts and aliases for convenience:
 
 The following options are deprecated and should be migrated:
 
-- `--cache` (hidden) - **Deprecated:** caching is now enabled by default
-  - **Migration:** Remove this flag, use `--no-cache` to disable if needed
 - `--explain-score` (hidden) - **Deprecated:** use `-v` instead
   - **Migration:** Use `-v`, `-vv`, or `-vvv` for increasing verbosity levels
 
@@ -417,9 +404,6 @@ debtmap init --force
 
 ### Environment Variables
 
-- `DEBTMAP_CACHE_DIR` - Cache location (same as `--cache-location` flag)
-  - Example: `export DEBTMAP_CACHE_DIR=/shared/team/cache`
-  - Affects where analysis results are cached for faster subsequent runs
 - `DEBTMAP_JOBS` - Number of threads for parallel processing (same as `--jobs` / `-j` flag)
   - Example: `export DEBTMAP_JOBS=8  # Same as --jobs 8`
   - Use `0` to utilize all available CPU cores
@@ -518,18 +502,6 @@ debtmap analyze . --jobs 8
 
 # Disable parallel processing
 debtmap analyze . --no-parallel
-```
-
-Manage caching:
-```bash
-# Use shared cache location
-debtmap analyze . --cache-location shared
-
-# Clear cache and rebuild
-debtmap analyze . --clear-cache
-
-# Show cache statistics
-debtmap analyze . --cache-stats
 ```
 
 Limit analysis scope:
@@ -686,12 +658,6 @@ debtmap analyze . --no-parallel
 
 # Limit file count
 debtmap analyze . --max-files 100
-
-# Shared cache
-debtmap analyze . --cache-location shared
-
-# Clear and rebuild cache
-debtmap analyze . --clear-cache
 ```
 
 ### Validation
@@ -783,7 +749,6 @@ debtmap analyze . --explain-metrics -v
 | `--context` | ✓ | ✓ | ✗ | ✗ | ✗ |
 | `--threshold-*` | ✓ | ✗ | ✗ | ✗ | ✗ |
 | `--top / --tail` | ✓ | ✓ | ✗ | ✗ | ✗ |
-| `--cache-*` | ✓ | ✗ | ✗ | ✗ | ✗ |
 | `--jobs` | ✓ | ✓ | ✗ | ✗ | ✗ |
 | `--no-parallel` | ✓ | ✓ | ✗ | ✗ | ✗ |
 | `--verbose` | ✓ | ✓ | ✗ | ✗ | ✓ |
@@ -819,12 +784,6 @@ debtmap analyze . --explain-metrics -v
 ```bash
 # Use more threads (if you have CPU cores available)
 debtmap analyze . --jobs 16
-
-# Enable caching (on by default, but ensure it's not disabled)
-debtmap analyze . # caching is automatic
-
-# Use shared cache for team
-debtmap analyze . --cache-location shared
 
 # Limit analysis scope
 debtmap analyze . --max-files 500 --languages rust
@@ -863,22 +822,6 @@ debtmap analyze . --plain
 ```bash
 # Use JSON with plain mode
 debtmap analyze . --format json --plain --output report.json
-```
-
-### Cache Issues
-
-**Problem:** Stale cached results
-
-**Solutions:**
-```bash
-# Clear cache
-debtmap analyze . --clear-cache
-
-# Check cache statistics
-debtmap analyze . --cache-stats
-
-# Disable cache temporarily
-debtmap analyze . --no-cache
 ```
 
 ### Threshold Issues
@@ -924,26 +867,12 @@ debtmap validate . --config debtmap.toml
 debtmap analyze . --coverage-file coverage.lcov --format json --output weekly-report.json
 ```
 
-### Team Workflows
-
-Use shared cache for consistent team experience:
-```bash
-# Set environment variable for all team members
-export DEBTMAP_CACHE_DIR=/shared/team/debtmap-cache
-
-# Or use flag
-debtmap analyze . --cache-location shared
-```
-
 ### Performance Optimization
 
 For large codebases:
 ```bash
 # Use maximum parallelization
 debtmap analyze . --jobs 0  # 0 = all cores
-
-# Cache aggressively
-debtmap analyze . --cache-location shared
 
 # Focus on changed files in CI
 # (implement via custom scripts to analyze git diff)
