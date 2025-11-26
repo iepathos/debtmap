@@ -166,34 +166,6 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0")]
         jobs: usize,
 
-        /// Enable caching (deprecated: caching is now enabled by default)
-        #[arg(long = "cache", hide = true)]
-        use_cache: bool,
-
-        /// Disable caching for this run (caching is enabled by default)
-        #[arg(long = "no-cache")]
-        no_cache: bool,
-
-        /// Clear cache before running analysis
-        #[arg(long = "clear-cache")]
-        clear_cache: bool,
-
-        /// Force cache rebuild (same as --clear-cache)
-        #[arg(long = "force-cache-rebuild", conflicts_with = "clear_cache")]
-        force_cache_rebuild: bool,
-
-        /// Show cache statistics and location
-        #[arg(long = "cache-stats")]
-        cache_stats: bool,
-
-        /// Migrate cache from local to shared location
-        #[arg(long = "migrate-cache")]
-        migrate_cache: bool,
-
-        /// Cache location strategy (local, shared, or path)
-        #[arg(long = "cache-location", env = "DEBTMAP_CACHE_DIR")]
-        cache_location: Option<String>,
-
         /// Enable multi-pass analysis with attribution
         #[arg(long = "multi-pass")]
         multi_pass: bool,

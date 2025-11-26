@@ -446,10 +446,10 @@ Tier: LOW (entry point with decent coverage)
 - Streaming mode available for very large codebases
 
 **Optimization Strategies:**
-- Incremental analysis (cache previous results)
 - Skip unchanged files (git diff integration)
 - Parallel processing with rayon
 - Efficient AST traversal (visitor pattern)
+- Memory-efficient streaming for large codebases
 
 ## Extension Points
 

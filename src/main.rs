@@ -10,7 +10,7 @@ use std::sync::Arc;
 mod default_implementations {
     use anyhow::Result;
     use debtmap::core::traits::{
-        Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
+        ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
     };
     use debtmap::core::types::{AnalysisResult, DebtCategory, DebtItem, Severity};
     use std::collections::HashMap;
@@ -53,63 +53,6 @@ mod default_implementations {
         }
     }
 
-    pub struct DefaultCache {
-        storage: std::sync::Mutex<HashMap<String, Vec<u8>>>,
-        hits: std::sync::atomic::AtomicUsize,
-        misses: std::sync::atomic::AtomicUsize,
-    }
-
-    impl DefaultCache {
-        pub fn new() -> Result<Self> {
-            Ok(Self {
-                storage: std::sync::Mutex::new(HashMap::new()),
-                hits: std::sync::atomic::AtomicUsize::new(0),
-                misses: std::sync::atomic::AtomicUsize::new(0),
-            })
-        }
-    }
-
-    impl Cache for DefaultCache {
-        type Key = String;
-        type Value = Vec<u8>;
-
-        fn get(&self, key: &Self::Key) -> Option<Self::Value> {
-            let storage = self.storage.lock().unwrap();
-            if let Some(value) = storage.get(key) {
-                self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                Some(value.clone())
-            } else {
-                self.misses
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                None
-            }
-        }
-
-        fn set(&mut self, key: Self::Key, value: Self::Value) {
-            let mut storage = self.storage.lock().unwrap();
-            storage.insert(key, value);
-        }
-
-        fn clear(&mut self) {
-            let mut storage = self.storage.lock().unwrap();
-            storage.clear();
-            self.hits.store(0, std::sync::atomic::Ordering::Relaxed);
-            self.misses.store(0, std::sync::atomic::Ordering::Relaxed);
-        }
-
-        fn stats(&self) -> CacheStats {
-            let storage = self.storage.lock().unwrap();
-            let memory_usage: usize = storage.values().map(|v| v.len()).sum();
-
-            CacheStats {
-                hits: self.hits.load(std::sync::atomic::Ordering::Relaxed),
-                misses: self.misses.load(std::sync::atomic::Ordering::Relaxed),
-                entries: storage.len(),
-                memory_usage,
-            }
-        }
-    }
-
     pub struct DefaultConfigProvider {
         config: std::sync::RwLock<HashMap<String, String>>,
     }
@@ -120,7 +63,6 @@ mod default_implementations {
             // Load default configuration values
             config.insert("complexity_threshold".to_string(), "10".to_string());
             config.insert("max_file_size".to_string(), "1000000".to_string());
-            config.insert("enable_caching".to_string(), "true".to_string());
             config.insert("parallel_processing".to_string(), "true".to_string());
 
             Self {
@@ -379,7 +321,6 @@ fn create_app_container() -> Result<AppContainer> {
         .with_js_analyzer(JavaScriptAnalyzerAdapter::new())
         .with_ts_analyzer(TypeScriptAnalyzerAdapter::new())
         .with_debt_scorer(DefaultDebtScorer::new())
-        .with_cache(DefaultCache::new()?)
         .with_config(DefaultConfigProvider::new())
         .with_priority_calculator(DefaultPriorityCalculator::new())
         .with_json_formatter(JsonFormatter::new())
@@ -619,13 +560,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         plain,
         no_parallel,
         jobs,
-        use_cache,
-        no_cache,
-        clear_cache,
-        force_cache_rebuild,
-        cache_stats,
-        migrate_cache,
-        cache_location,
         multi_pass,
         show_attribution,
         detail_level,
@@ -661,13 +595,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     } = command
     {
         // Apply side effects first
-        let cache_location_path = cache_location.as_ref().map(std::path::PathBuf::from);
-        apply_environment_setup(&cache_location_path, no_context_aware)?;
-
-        // Handle early returns for cache operations
-        if let Some(result) = handle_cache_operations(cache_stats, migrate_cache, &path)? {
-            return Ok(result);
-        }
+        apply_environment_setup(no_context_aware)?;
 
         // Handle explain-metrics flag
         if explain_metrics {
@@ -714,11 +642,6 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             formatting_config,
             no_parallel,
             jobs,
-            use_cache,
-            no_cache,
-            clear_cache,
-            force_cache_rebuild,
-            cache_location,
             multi_pass,
             show_attribution,
             detail_level,
@@ -758,74 +681,13 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
     }
 }
 
-// Pure function to check cache operations
-fn handle_cache_operations(
-    cache_stats: bool,
-    migrate_cache: bool,
-    path: &Path,
-) -> Result<Option<Result<()>>> {
-    if cache_stats {
-        return Ok(Some(handle_cache_stats(path)));
-    }
-    if migrate_cache {
-        return Ok(Some(handle_cache_migration(path)?));
-    }
-    Ok(None)
-}
-
-// Side effect handler for cache stats
-fn handle_cache_stats(path: &std::path::Path) -> Result<()> {
-    let cache = debtmap::cache::SharedCache::new(Some(path))?;
-    let stats = cache.get_stats();
-    println!("Cache Statistics:");
-    println!("  Entries: {}", stats.entry_count);
-    println!("  Size: {} bytes", stats.total_size);
-    Ok(())
-}
-
-// Side effect handler for cache migration
-fn handle_cache_migration(path: &std::path::Path) -> Result<Result<()>> {
-    use debtmap::cache::CacheStrategy;
-
-    println!("Migrating cache to shared location");
-
-    // Get the shared cache location
-    let dst_location =
-        debtmap::cache::CacheLocation::resolve_with_strategy(Some(path), CacheStrategy::Shared)?;
-
-    // Create a new cache at the shared location
-    let _dst_cache = debtmap::cache::SharedCache::new_with_cache_dir(
-        Some(path),
-        dst_location.get_cache_path().to_path_buf(),
-    )?;
-
-    // For now, just report that we've set up the cache in the shared location
-    println!(
-        "Cache now configured at shared location: {:?}",
-        dst_location.get_cache_path()
-    );
-    Ok(Ok(()))
-}
-
 // Side effect function for environment setup (I/O at edges)
-fn apply_environment_setup(
-    cache_location: &Option<std::path::PathBuf>,
-    no_context_aware: bool,
-) -> Result<()> {
-    if let Some(ref location) = cache_location {
-        std::env::set_var("DEBTMAP_CACHE_DIR", location);
-    }
-
+fn apply_environment_setup(no_context_aware: bool) -> Result<()> {
     if !no_context_aware {
         std::env::set_var("DEBTMAP_CONTEXT_AWARE", "true");
     }
 
     Ok(())
-}
-
-// Pure function to check condition
-fn should_use_cache(use_cache: bool, no_cache: bool) -> bool {
-    !no_cache || use_cache
 }
 
 // Pure function to determine parallel mode
@@ -863,10 +725,6 @@ fn convert_disable_context(disable_context: Option<Vec<String>>) -> Option<Vec<S
 
 fn convert_languages(languages: Option<Vec<String>>) -> Option<Vec<String>> {
     languages.filter(|v| !v.is_empty())
-}
-
-fn convert_cache_location(location: &Option<String>) -> Option<String> {
-    location.clone()
 }
 
 fn convert_threshold_preset(
@@ -940,11 +798,6 @@ fn build_analyze_config(
     formatting_config: FormattingConfig,
     no_parallel: bool,
     jobs: usize,
-    use_cache: bool,
-    no_cache: bool,
-    clear_cache: bool,
-    force_cache_rebuild: bool,
-    cache_location: Option<String>,
     multi_pass: bool,
     show_attribution: bool,
     detail_level: Option<String>,
@@ -1012,13 +865,6 @@ fn build_analyze_config(
         _formatting_config: formatting_config,
         parallel: should_use_parallel(no_parallel),
         jobs: get_worker_count(jobs),
-        use_cache: should_use_cache(use_cache, no_cache),
-        no_cache,
-        clear_cache,
-        force_cache_rebuild,
-        cache_stats: false,
-        migrate_cache: false,
-        cache_location: convert_cache_location(&cache_location),
         multi_pass,
         show_attribution,
         detail_level,

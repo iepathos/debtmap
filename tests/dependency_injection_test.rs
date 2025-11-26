@@ -3,8 +3,7 @@
 use anyhow::Result;
 use debtmap::core::injection::{AnalyzerFactory, AppContainerBuilder, ServiceLocator};
 use debtmap::core::traits::{
-    Analyzer, Cache, CacheStats, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor,
-    Scorer,
+    Analyzer, ConfigProvider, Formatter, PriorityCalculator, PriorityFactor, Scorer,
 };
 use debtmap::core::types::{
     AnalysisResult, DebtCategory, DebtItem, FunctionInfo, Language, ModuleInfo, ProjectMetrics,
@@ -82,66 +81,6 @@ impl Scorer for TestScorer {
 
     fn methodology(&self) -> &str {
         "Test scoring methodology based on category and severity"
-    }
-}
-
-struct TestCache {
-    storage: std::sync::Mutex<HashMap<String, Vec<u8>>>,
-    hit_count: std::sync::atomic::AtomicUsize,
-    miss_count: std::sync::atomic::AtomicUsize,
-}
-
-impl TestCache {
-    fn new() -> Self {
-        Self {
-            storage: std::sync::Mutex::new(HashMap::new()),
-            hit_count: std::sync::atomic::AtomicUsize::new(0),
-            miss_count: std::sync::atomic::AtomicUsize::new(0),
-        }
-    }
-}
-
-impl Cache for TestCache {
-    type Key = String;
-    type Value = Vec<u8>;
-
-    fn get(&self, key: &Self::Key) -> Option<Self::Value> {
-        let storage = self.storage.lock().unwrap();
-        if let Some(value) = storage.get(key) {
-            self.hit_count
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            Some(value.clone())
-        } else {
-            self.miss_count
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            None
-        }
-    }
-
-    fn set(&mut self, key: Self::Key, value: Self::Value) {
-        let mut storage = self.storage.lock().unwrap();
-        storage.insert(key, value);
-    }
-
-    fn clear(&mut self) {
-        let mut storage = self.storage.lock().unwrap();
-        storage.clear();
-        self.hit_count
-            .store(0, std::sync::atomic::Ordering::Relaxed);
-        self.miss_count
-            .store(0, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    fn stats(&self) -> CacheStats {
-        let storage = self.storage.lock().unwrap();
-        let memory_usage: usize = storage.values().map(|v| v.len()).sum();
-
-        CacheStats {
-            hits: self.hit_count.load(std::sync::atomic::Ordering::Relaxed),
-            misses: self.miss_count.load(std::sync::atomic::Ordering::Relaxed),
-            entries: storage.len(),
-            memory_usage,
-        }
     }
 }
 
@@ -281,7 +220,6 @@ fn test_complete_container_creation() {
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })
-        .with_cache(TestCache::new())
         .with_config(TestConfigProvider::new())
         .with_priority_calculator(TestPriorityCalculator { base_priority: 0.5 })
         .with_json_formatter(TestFormatter {
@@ -458,7 +396,7 @@ fn test_service_locator_integration() {
     assert!(priority > 0.0 && priority < 1.0);
 
     // Test non-existent service
-    let missing = locator.resolve::<TestCache>();
+    let missing = locator.resolve::<TestFormatter>();
     assert!(missing.is_none());
 }
 
@@ -477,28 +415,6 @@ fn test_trait_boundaries_and_contracts() {
 
     let result = analyzer.analyze("very long input".repeat(1000));
     assert!(result.is_ok(), "Analyzer should handle large input");
-
-    // Test Cache contract
-    let mut cache = TestCache::new();
-
-    // Test get on empty cache
-    assert_eq!(cache.get(&"nonexistent".to_string()), None);
-
-    // Test set and get
-    cache.set("key1".to_string(), vec![1, 2, 3]);
-    assert_eq!(cache.get(&"key1".to_string()), Some(vec![1, 2, 3]));
-
-    // Test stats
-    let stats = cache.stats();
-    assert_eq!(stats.entries, 1);
-    assert_eq!(stats.hits, 1);
-    assert_eq!(stats.misses, 1);
-
-    // Test clear
-    cache.clear();
-    assert_eq!(cache.get(&"key1".to_string()), None);
-    let stats = cache.stats();
-    assert_eq!(stats.entries, 0);
 
     // Test Scorer contract
     let scorer = TestScorer { base_score: 1.0 };
@@ -611,7 +527,6 @@ fn test_container_with_arc_sharing() {
             name: "shared_ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 20.0 })
-        .with_cache(TestCache::new())
         .with_config(TestConfigProvider::new())
         .with_priority_calculator(TestPriorityCalculator { base_priority: 0.8 })
         .with_json_formatter(TestFormatter {
@@ -680,7 +595,6 @@ fn test_error_handling_in_container_builder() {
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })
-        .with_cache(TestCache::new())
         .with_config(TestConfigProvider::new())
         .with_priority_calculator(TestPriorityCalculator { base_priority: 0.5 })
         .with_json_formatter(TestFormatter {
@@ -720,7 +634,6 @@ fn test_error_handling_in_container_builder() {
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })
-        .with_cache(TestCache::new())
         .with_config(TestConfigProvider::new())
         .with_priority_calculator(TestPriorityCalculator { base_priority: 0.5 })
         .with_json_formatter(TestFormatter {

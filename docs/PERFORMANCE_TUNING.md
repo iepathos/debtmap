@@ -81,14 +81,6 @@ export DEBTMAP_BATCH_SIZE=200
 debtmap analyze
 ```
 
-#### `DEBTMAP_CACHE_DIR`
-Specify cache directory for incremental analysis (when available).
-
-```bash
-export DEBTMAP_CACHE_DIR=/path/to/cache
-debtmap analyze
-```
-
 ## Performance Expectations
 
 ### By Codebase Size

@@ -460,18 +460,13 @@ exclude_patterns = [
 ]
 ```
 
-**2. Use incremental mode** (cache results for unchanged files):
-```bash
-debtmap analyze . --incremental --cache-dir .debtmap-cache
-```
-
-**3. Analyze specific directories:**
+**2. Analyze specific directories:**
 ```bash
 # Only analyze src/, skip examples and benches
 debtmap analyze src/
 ```
 
-**4. Reduce parallelism** if memory-constrained:
+**3. Reduce parallelism** if memory-constrained:
 ```bash
 debtmap analyze . --jobs 4
 ```

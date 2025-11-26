@@ -55,8 +55,6 @@ Debtmap helps you make data-driven decisions about where to focus your refactori
 - **Parallel processing** - Built with Rust and Rayon for blazing-fast analysis of large codebases
 - **Multiple output formats** - JSON (legacy and unified structures), Markdown, and human-readable terminal formats for different tool integration needs
 - **Configurable thresholds** - Customize complexity and duplication thresholds to match your standards
-- **Incremental analysis** - Smart caching system for analyzing only changed files
-- **Intelligent caching** - Smart cache system with automatic pruning, configurable strategies (LRU, LFU, FIFO), location options (local/shared/custom path), and environment-based configuration for fast repeated analysis
 - **Verbosity controls** - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail
 
 ### Configuration & Customization

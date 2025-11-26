@@ -32,10 +32,6 @@ pub enum Error {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
-    /// Cache operation errors
-    #[error("Cache error: {0}")]
-    Cache(String),
-
     /// Unsupported feature errors
     #[error("Unsupported: {0}")]
     Unsupported(String),

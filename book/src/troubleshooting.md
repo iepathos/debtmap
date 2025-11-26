@@ -6,11 +6,10 @@ Common issues and solutions for using debtmap effectively.
 
 If you're experiencing problems, try these first:
 
-1. **Analysis is slow**: Check `--cache-stats`, ensure caching is enabled, adjust threads with `--jobs`
+1. **Analysis is slow**: Adjust threads with `--jobs` or use `--semantic-off` for faster fallback mode
 2. **Parse errors**: Use `--semantic-off` for faster fallback mode or exclude problematic files
 3. **No output**: Increase verbosity with `-v` or lower `--min-priority`
-4. **Cache corruption**: Run with `--clear-cache` to rebuild
-5. **Inconsistent results**: Check if coverage file changed or context providers are enabled
+4. **Inconsistent results**: Check if coverage file changed or context providers are enabled
 
 ## Common Issues
 
@@ -61,12 +60,6 @@ debtmap path/to/subset
 
 **Solutions**:
 ```bash
-# Check cache statistics
-debtmap --cache-stats
-
-# Ensure caching is enabled (it is by default)
-# If cache was disabled, remove --no-cache flag
-
 # Use all available CPU cores
 debtmap --jobs 0
 
@@ -79,27 +72,6 @@ debtmap --plain
 
 See [Performance Tips](#performance-tips) for detailed optimization strategies.
 
-### Cache Corruption
-
-**Problem**: Getting "Cache error" messages or stale results
-
-**Solutions**:
-```bash
-# Clear cache and rebuild
-debtmap --clear-cache
-
-# Force cache rebuild
-debtmap --force-cache-rebuild
-
-# Check cache status
-debtmap --cache-stats
-
-# Use different cache location
-debtmap --cache-location /path/to/cache
-```
-
-See [Cache Troubleshooting](#cache-troubleshooting) for more details.
-
 ### File Permission Errors
 
 **Problem**: "File system error" when accessing files
@@ -107,8 +79,6 @@ See [Cache Troubleshooting](#cache-troubleshooting) for more details.
 **Solutions**:
 - Ensure you have read permissions for all source files
 - Check that the project directory is accessible
-- Verify cache directory is writable (default: `.debtmap/cache`)
-- Use `--cache-location` to specify an accessible cache directory
 
 ### Git History Errors
 
@@ -249,7 +219,7 @@ debtmap -vvv
 **What each level shows**:
 - `-v`: Score breakdowns, main contributing factors
 - `-vv`: Detailed metric calculations, file processing
-- `-vvv`: Full debug output, context provider details, cache operations
+- `-vvv`: Full debug output, context provider details
 
 ### Diagnostic Options
 
@@ -265,9 +235,6 @@ debtmap --semantic-off
 
 # Validate LOC consistency
 debtmap --validate-loc
-
-# Show cache statistics
-debtmap --cache-stats
 ```
 
 **Note**: The `--explain-score` flag is deprecated and hidden. Use `-v`, `-vv`, or `-vvv` for verbosity levels instead to see score breakdowns.
@@ -291,16 +258,13 @@ debtmap --context --context-providers critical_path -v
 # Step 1: Run with verbosity to see what's happening
 debtmap -vv
 
-# Step 2: Check cache stats
-debtmap --cache-stats
-
-# Step 3: Try without semantic analysis
+# Step 2: Try without semantic analysis
 debtmap --semantic-off -v
 
-# Step 4: Check specific file
+# Step 3: Check specific file
 debtmap path/to/file.rs -vvv
 
-# Step 5: Validate results
+# Step 4: Validate results
 debtmap --validate-loc
 ```
 
@@ -327,48 +291,6 @@ debtmap --no-parallel
 - **Use `--jobs N`**: Limit resource usage while other tasks run
 - **Use `--no-parallel`**: Debugging concurrency issues
 
-### Caching Strategies
-
-Caching is **enabled by default** and provides the biggest performance improvement.
-
-**Note**: The `--cache` flag (to enable caching) is deprecated and hidden. Caching is now always enabled by default; use `--no-cache` to disable it.
-
-```bash
-# Check cache effectiveness
-debtmap --cache-stats
-
-# Clear cache if corrupted
-debtmap --clear-cache
-
-# Force cache rebuild
-debtmap --force-cache-rebuild
-
-# Disable cache (not recommended)
-debtmap --no-cache
-```
-
-**Cache locations**:
-```bash
-# Local cache (default): .debtmap/cache
-debtmap
-
-# Shared cache for multiple projects
-debtmap --cache-location ~/.cache/debtmap
-
-# Migrate existing cache to shared location
-debtmap --migrate-cache
-
-# Set via environment variable
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap
-```
-
-**Cache best practices**:
-1. Use shared cache for multiple similar projects
-2. Monitor cache size with `--cache-stats` periodically
-3. Clear cache after major refactorings
-4. Use local cache for project-specific configurations
-
 ### Analysis Optimizations
 
 ```bash
@@ -392,8 +314,7 @@ debtmap --min-priority 4 --top 20
 
 | Configuration | Speed | Accuracy |
 |--------------|-------|----------|
-| Default (cached) | Fast | High |
-| `--no-cache` | Slow | High |
+| Default | Fast | High |
 | `--semantic-off` | Fastest | Medium |
 | `--no-parallel` | Slowest | High |
 | `--jobs 4` | Medium | High |
@@ -404,145 +325,13 @@ debtmap --min-priority 4 --top 20
 # Time analysis
 time debtmap
 
-# Check cache hit rate
-debtmap --cache-stats
-
 # Profile with verbosity
 debtmap -vv 2>&1 | grep "processed in"
-```
-
-## Cache Troubleshooting
-
-Detailed guidance for cache-related issues.
-
-### Check Cache Status
-
-```bash
-# View cache statistics
-debtmap --cache-stats
-
-# Sample output:
-# Cache location: .debtmap/cache
-# Cache entries: 1,234
-# Cache size: 45.2 MB
-# Hit rate: 87.3%
-```
-
-### Clear Corrupted Cache
-
-```bash
-# Clear all cache entries
-debtmap --clear-cache
-
-# Force rebuild on next run
-debtmap --force-cache-rebuild
-
-# Manual cache deletion
-rm -rf .debtmap/cache
-# or for shared cache:
-rm -rf ~/.cache/debtmap
-```
-
-### Cache Location Management
-
-```bash
-# Use local cache (default)
-debtmap
-# Cache at: .debtmap/cache
-
-# Use shared cache
-debtmap --cache-location ~/.cache/debtmap
-
-# Set permanently via environment
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap
-
-# Migrate existing cache
-debtmap --migrate-cache
-```
-
-### Cache Pruning Configuration
-
-Debtmap automatically manages cache size and age to prevent unbounded growth.
-
-See the [Environment Variables](#environment-variables) section for a complete list of cache-related configuration options.
-
-**Cache Environment Variables**:
-```bash
-# Enable/disable automatic cache pruning (default: true)
-export DEBTMAP_CACHE_AUTO_PRUNE=true
-
-# Maximum cache size in bytes (default: 1GB)
-export DEBTMAP_CACHE_MAX_SIZE=1073741824
-
-# Maximum cache entry age in days (default: 30)
-export DEBTMAP_CACHE_MAX_AGE_DAYS=30
-
-# Maximum number of cache entries (default: 10000)
-export DEBTMAP_CACHE_MAX_ENTRIES=10000
-
-# Percentage of entries to remove when pruning (default: 0.25)
-export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25
-
-# Pruning strategy: lru, lfu, fifo, age_based (default: lru)
-export DEBTMAP_CACHE_STRATEGY=lru
-```
-
-**Pruning Strategies**:
-- **LRU (Least Recently Used)**: Removes oldest accessed entries (recommended for general use)
-- **LFU (Least Frequently Used)**: Removes least accessed entries (best for stable workloads)
-- **FIFO (First In First Out)**: Removes oldest created entries (simple, useful for testing)
-- **Age-based**: Removes entries older than MAX_AGE_DAYS (useful for compliance requirements)
-
-**Performance Implications**:
-- LRU/LFU provide better cache hit rates than FIFO
-- Age-based strategy ensures data freshness but may reduce hit rate
-- Adjust MAX_SIZE based on available disk space and project count
-- Lower PRUNE_PERCENTAGE means more frequent but smaller cleanup operations
-
-### Cache Strategies
-
-**Local cache** (`.debtmap/cache`):
-- **Pros**: Isolated per project, automatically managed
-- **Cons**: Duplicates across projects
-
-**Shared cache** (`~/.cache/debtmap`):
-- **Pros**: Shared across projects, saves disk space
-- **Cons**: Requires manual management, may mix unrelated projects
-
-### Cache Consistency
-
-```bash
-# Validate LOC consistency
-debtmap --validate-loc
-
-# Cache automatically invalidates on file changes
-# Uses file hashes to detect modifications
-
-# Force fresh analysis
-debtmap --no-cache
 ```
 
 ## Environment Variables
 
 Debtmap supports various environment variables for configuring behavior without command-line flags.
-
-### Cache Environment Variables
-
-See [Cache Pruning Configuration](#cache-pruning-configuration) for detailed descriptions of cache-related variables:
-
-```bash
-# Cache location
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-
-# Automatic cache management
-export DEBTMAP_CACHE_AUTO_PRUNE=true
-export DEBTMAP_CACHE_MAX_SIZE=1073741824     # 1GB in bytes
-export DEBTMAP_CACHE_MAX_AGE_DAYS=30
-export DEBTMAP_CACHE_MAX_ENTRIES=10000
-export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25   # Remove 25% when pruning
-export DEBTMAP_CACHE_STRATEGY=lru            # lru, lfu, fifo, age_based
-```
 
 ### Analysis Feature Flags
 
@@ -577,14 +366,10 @@ export NO_COLOR=1
 ### Usage Examples
 
 ```bash
-# Set cache location permanently in shell profile
-echo 'export DEBTMAP_CACHE_DIR=~/.cache/debtmap' >> ~/.bashrc
-
 # Enable context-aware analysis by default
 echo 'export DEBTMAP_CONTEXT_AWARE=true' >> ~/.bashrc
 
 # CI/CD environment setup
-export DEBTMAP_CACHE_DIR=/tmp/debtmap-cache
 export NO_EMOJI=1
 export NO_COLOR=1
 export PRODIGY_AUTOMATION=true
@@ -604,39 +389,15 @@ When both environment variables and CLI flags are present:
 2. **Environment variables override** config file defaults
 3. **Config file settings override** built-in defaults
 
-```bash
-# Example: CLI flag wins
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap --cache-location /tmp/cache  # Uses /tmp/cache, not ~/.cache/debtmap
-```
-
 ### Troubleshooting Environment Variables
 
 ```bash
-# Check if environment variable is set
-echo $DEBTMAP_CACHE_DIR
-
-# Temporarily unset for testing
-unset DEBTMAP_CACHE_DIR
-debtmap  # Uses default cache location
-
 # Test with specific environment
 env DEBTMAP_CONTEXT_AWARE=true debtmap -v
 
 # See all debtmap-related environment variables
 env | grep -i debtmap
 env | grep -i prodigy
-```
-
-### Cache Size Monitoring
-
-```bash
-# Check cache size
-debtmap --cache-stats
-
-# Clean up old entries (manual)
-# No automatic cleanup - manage cache size manually
-# Consider clearing cache periodically for large projects
 ```
 
 ## Context Provider Troubleshooting
@@ -1385,7 +1146,7 @@ debtmap --multi-pass --attribution --context -vv
 debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
 # Performance-focused advanced analysis
-debtmap --multi-pass --jobs 8 --cache-location ~/.cache/debtmap
+debtmap --multi-pass --jobs 8
 
 # Summary view with aggregated scores
 debtmap --detail-level summary --aggregate-only
@@ -1404,8 +1165,6 @@ Understanding common error messages and how to resolve them.
 **Solutions**:
 - Check file permissions: `ls -la <file>`
 - Ensure user has read access
-- Verify cache directory is writable
-- Use `--cache-location` for accessible directory
 
 ---
 
@@ -1467,24 +1226,6 @@ debtmap --max-files 1 path/to/suspected/file
 - Validate TOML format: `cat .debtmap/config.toml`
 - Review CLI flag values
 - Check for typos in flag names
-
-### Cache Errors
-
-**Message**: `Cache error: corrupted cache entry`
-
-**Meaning**: Cache data is invalid or corrupted
-
-**Solutions**:
-```bash
-# Clear cache
-debtmap --clear-cache
-
-# Force rebuild
-debtmap --force-cache-rebuild
-
-# Use different cache location
-debtmap --cache-location /tmp/debtmap-cache
-```
 
 ### Validation Errors
 
@@ -2273,14 +2014,11 @@ debtmap validate-improvement \
 
 A: Check several factors:
 ```bash
-# Check cache status
-debtmap --cache-stats
-
-# Ensure caching is enabled (default)
-# Remove --no-cache if present
-
 # Use all CPU cores
 debtmap --jobs 0
+
+# Try faster fallback mode
+debtmap --semantic-off
 
 # Check for large files or complex macros
 debtmap -vv
@@ -2299,7 +2037,6 @@ A: File contains syntax debtmap cannot parse. Solutions:
 A: Several factors affect scores:
 - Coverage file changed (use `--coverage-file`)
 - Context providers enabled/disabled (`--context`)
-- Cache was cleared (`--clear-cache`)
 - Code changes (intended behavior)
 - Different threshold settings
 
@@ -2600,20 +2337,6 @@ debtmap --jobs 4
 debtmap --no-parallel
 ```
 
-**Q: Should I use shared or local cache?**
-
-A: Depends on your workflow:
-- **Local cache** (`.debtmap/cache`): Isolated, automatic
-- **Shared cache** (`~/.cache/debtmap`): Saves space across projects
-
-```bash
-# Shared cache
-debtmap --cache-location ~/.cache/debtmap
-
-# Set permanently
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-```
-
 ## When to File Bug Reports
 
 File a bug report when:
@@ -2622,7 +2345,6 @@ File a bug report when:
 - Parse errors on valid syntax
 - Crashes or panics
 - Incorrect complexity calculations
-- Cache corruption
 - Concurrency errors
 - Incorrect error messages
 
@@ -2645,9 +2367,8 @@ File a bug report when:
 
 1. Check this troubleshooting guide
 2. Try `--semantic-off` fallback mode
-3. Clear cache with `--clear-cache`
-4. Update to latest version
-5. Search existing issues on GitHub
+3. Update to latest version
+4. Search existing issues on GitHub
 
 ## Related Documentation
 
@@ -2662,8 +2383,6 @@ File a bug report when:
 When debugging issues, work through this checklist:
 
 - [ ] Run with `-vv` to see detailed output
-- [ ] Check `--cache-stats` for cache issues
-- [ ] Try `--clear-cache` to rule out cache corruption
 - [ ] Try `--semantic-off` to use fallback mode
 - [ ] Check file permissions and paths
 - [ ] Verify configuration in `.debtmap/config.toml`

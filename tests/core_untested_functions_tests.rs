@@ -1,13 +1,11 @@
 use anyhow::anyhow;
 use debtmap::core::{
-    cache::{AnalysisCache, IncrementalAnalysis},
     lazy::TransformationPipeline,
     metrics::combine_metrics,
     monadic::{lift_result, traverse_results, Applicative, OptionExt, ResultExt},
     ComplexityMetrics, FileMetrics, FunctionMetrics, Language,
 };
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 // Helper function to create test metrics
 fn create_test_metrics_simple() -> FileMetrics {
@@ -119,70 +117,6 @@ fn create_test_metrics_complex() -> FileMetrics {
         duplications: vec![],
         module_scope: None,
         classes: None,
-    }
-}
-
-// Tests for load_previous() in IncrementalAnalysis
-mod test_load_previous {
-    use super::*;
-
-    #[test]
-    fn test_load_previous_empty_cache() {
-        let mut inc = IncrementalAnalysis::new();
-        let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
-
-        inc.load_previous(&cache);
-
-        assert!(inc.previous_state.is_empty());
-    }
-
-    #[test]
-    fn test_load_previous_single_entry() {
-        let mut inc = IncrementalAnalysis::new();
-        let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
-
-        // Load from cache (which is empty initially)
-        inc.load_previous(&cache);
-
-        // Since the cache is empty through public API, previous_state should be empty
-        assert_eq!(inc.previous_state.len(), 0);
-    }
-
-    #[test]
-    fn test_load_previous_multiple_entries() {
-        let mut inc = IncrementalAnalysis::new();
-        let temp_dir = TempDir::new().unwrap();
-        let cache = AnalysisCache::new(Some(temp_dir.path())).unwrap();
-
-        // Load from cache
-        inc.load_previous(&cache);
-
-        // Since we can't easily manipulate the cache internals, test the behavior
-        assert!(inc.previous_state.is_empty());
-
-        // Add entries to current state to test the diff functionality
-        inc.update_file(create_test_metrics_simple());
-        inc.update_file(create_test_metrics_complex());
-
-        assert_eq!(inc.current_state.len(), 2);
-    }
-
-    #[test]
-    fn test_load_previous_preserves_metrics() {
-        let mut inc = IncrementalAnalysis::new();
-
-        // Manually populate previous_state to test preservation
-        let metrics = create_test_metrics_simple();
-        inc.previous_state = inc
-            .previous_state
-            .update(metrics.path.clone(), metrics.clone());
-
-        assert_eq!(inc.previous_state.len(), 1);
-        let stored = inc.previous_state.get(&PathBuf::from("test.rs")).unwrap();
-        assert_eq!(stored.complexity.cyclomatic_complexity, 2);
-        assert_eq!(stored.complexity.cognitive_complexity, 3);
     }
 }
 
