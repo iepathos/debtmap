@@ -6,38 +6,77 @@ This chapter explains how debtmap's analysis pipeline works, from discovering fi
 
 Debtmap's analysis follows a multi-stage pipeline that transforms source code into actionable recommendations:
 
-```mermaid
-graph TD
-    A[File Discovery] --> B[Language Detection]
-    B --> C{Parser}
-    C -->|Rust| D[syn AST]
-    C -->|Python| E[rustpython AST]
-    C -->|JS/TS| F[tree-sitter AST]
-
-    D --> G[Metric Extraction]
-    E --> G
-    F --> G
-
-    G --> H[Complexity Calculation]
-    G --> I[Call Graph Construction]
-    G --> J[Pattern Detection]
-
-    H --> K[Entropy Analysis]
-    K --> L[Effective Complexity]
-
-    I --> M[Dependency Analysis]
-    J --> N[Debt Classification]
-
-    O[LCOV Coverage] --> P[Coverage Mapping]
-    P --> Q[Risk Scoring]
-
-    L --> Q
-    M --> Q
-    N --> Q
-
-    Q --> R[Tiered Prioritization]
-    R --> S[Output Formatting]
-    S --> T[Terminal/JSON/Markdown]
+```
+┌─────────────────┐
+│ File Discovery  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│Language Detection│
+└────────┬────────┘
+         │
+         ▼
+    ┌────────┐
+    │ Parser │
+    └────┬───┘
+         │
+    ┌────┼────────────┐
+    │    │            │
+    ▼    ▼            ▼
+┌─────┐ ┌──────────┐ ┌───────────┐
+│ syn │ │rustpython│ │tree-sitter│
+│ AST │ │   AST    │ │    AST    │
+└──┬──┘ └────┬─────┘ └─────┬─────┘
+   │         │             │
+   └─────────┼─────────────┘
+             │
+             ▼
+  ┌──────────────────┐
+  │ Metric Extraction │
+  └─────────┬────────┘
+            │
+    ┌───────┼───────┐
+    │       │       │
+    ▼       ▼       ▼
+┌────────┐ ┌─────┐ ┌─────────┐
+│Complexity│ │Call │ │ Pattern │
+│  Calc   │ │Graph│ │Detection│
+└────┬───┘ └──┬──┘ └────┬────┘
+     │        │         │
+     ▼        │         │
+┌─────────┐   │         │
+│ Entropy │   │         │
+│ Analysis│   │         │
+└────┬────┘   │         │
+     │        │         │
+     ▼        ▼         ▼
+┌─────────┐ ┌────────┐ ┌──────┐    ┌──────────┐
+│Effective│ │Dependency│ │ Debt │    │   LCOV   │
+│Complexity│ │Analysis│ │Class │    │ Coverage │
+└────┬────┘ └────┬───┘ └──┬───┘    └────┬─────┘
+     │           │        │             │
+     └───────────┼────────┼─────────────┘
+                 │        │
+                 ▼        ▼
+           ┌─────────────────┐
+           │  Risk Scoring   │
+           └────────┬────────┘
+                    │
+                    ▼
+         ┌───────────────────┐
+         │Tiered Prioritization│
+         └─────────┬─────────┘
+                   │
+                   ▼
+          ┌────────────────┐
+          │Output Formatting│
+          └────────┬───────┘
+                   │
+                   ▼
+       ┌─────────────────────┐
+       │Terminal/JSON/Markdown│
+       └─────────────────────┘
 ```
 
 ## Key Components

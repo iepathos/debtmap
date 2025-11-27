@@ -2381,7 +2381,7 @@ Debtmap parses LCOV coverage data for risk analysis:
 - O(1) exact name lookups (~0.5μs)
 - O(log n) line-based fallback (~5-8μs)
 - ~200 bytes per function
-- Thread-safe (Arc<CoverageIndex>)
+- Thread-safe (`Arc<CoverageIndex>`)
 
 #### Performance Characteristics
 
@@ -2406,7 +2406,7 @@ Debtmap parses LCOV coverage data for risk analysis:
 - **Include coverage** (comprehensive analysis): Use coverage integration for final validation, sprint planning, and CI/CD gates where comprehensive risk analysis is needed
 
 **Thread Safety:**
-- Coverage index wrapped in `Arc<CoverageIndex>` for lock-free parallel access
+- Coverage index wrapped in `Arc&lt;CoverageIndex&gt;` for lock-free parallel access
 - Multiple analyzer threads can query coverage simultaneously
 - No contention on reads, suitable for parallel analysis pipelines
 
