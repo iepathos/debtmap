@@ -13,7 +13,6 @@ default-theme = "rust"
 preferred-dark-theme = "navy"
 smart-punctuation = true
 git-repository-url = "https://github.com/iepathos/debtmap"
-git-repository-icon = "github"
 
 [output.html.search]
 enable = true
