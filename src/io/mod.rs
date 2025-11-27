@@ -1,3 +1,4 @@
+pub mod effects;
 pub mod output;
 pub mod pattern_output;
 pub mod real;

@@ -3,6 +3,7 @@ pub mod correlation;
 pub mod coverage_gap;
 pub mod coverage_index;
 pub mod delegation;
+pub mod effects;
 pub mod evidence;
 pub mod evidence_calculator;
 pub mod insights;
