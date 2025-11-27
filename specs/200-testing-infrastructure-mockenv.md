@@ -3,9 +3,10 @@ number: 200
 title: Testing Infrastructure with MockEnv
 category: testing
 priority: high
-status: draft
+status: ready
 dependencies: [195, 196, 197, 198, 199]
 created: 2025-11-24
+updated: 2025-11-27
 ---
 
 # Specification 200: Testing Infrastructure with MockEnv
@@ -31,6 +32,23 @@ However, testing infrastructure hasn't caught up. Current tests:
 - Hard to test parallel operations
 
 Stillwater provides `MockEnv` for testing effects without real I/O, and assertion macros for clearer test code. This specification completes the integration by modernizing debtmap's test infrastructure to leverage all stillwater capabilities.
+
+## Stillwater 0.11.0 Provides
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| `MockEnv` builder | ✅ Generic | `.with(|| T)` for composing envs |
+| `TestEffect` wrapper | ✅ Complete | `TestEffect::new(effect).run(&env)` |
+| `assert_success!` | ✅ For Validation | Works with `Validation<T, E>` |
+| `assert_failure!` | ✅ For Validation | Works with `Validation<T, E>` |
+| `assert_validation_errors!` | ✅ Complete | Compares error vectors |
+| `Arbitrary` for Validation | ✅ With `proptest` | Property-based testing support |
+
+**Debtmap must implement:**
+- Domain-specific `DebtmapTestEnv` with `.with_file()`, `.with_coverage()`, etc.
+- Extended assertion macros for `Result` types
+- Test helpers for ASTs, configs, coverage
+- Property-based generators for debtmap types
 
 ## Objective
 
@@ -88,23 +106,37 @@ Implement comprehensive testing infrastructure using stillwater's MockEnv and as
 
 #### 1. MockEnv Builder
 
+**Stillwater's Generic MockEnv (provided):**
+```rust
+use stillwater::testing::MockEnv;
+
+// Compose environments via nested tuples
+let env = MockEnv::new()
+    .with(|| Config { value: 42 })
+    .with(|| Database { url: "test" })
+    .build();
+// Result: (((), Config), Database)
+```
+
+**Debtmap-Specific TestEnv (to implement):**
 ```rust
 // src/testing/mock_env.rs
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Builder for mock test environments
+/// Domain-specific test environment for debtmap
+/// Wraps stillwater's MockEnv with file system and coverage mocking
 #[derive(Clone)]
-pub struct MockEnv {
+pub struct DebtmapTestEnv {
     files: Arc<Mutex<HashMap<PathBuf, String>>>,
     coverage: Arc<Mutex<HashMap<PathBuf, Coverage>>>,
     cache: Arc<Mutex<HashMap<String, Vec<u8>>>>,
     config: Config,
 }
 
-impl MockEnv {
-    /// Create new mock environment
+impl DebtmapTestEnv {
+    /// Create new test environment
     pub fn new() -> Self {
         Self {
             files: Arc::new(Mutex::new(HashMap::new())),
@@ -152,7 +184,8 @@ impl MockEnv {
     }
 }
 
-impl AnalysisEnv for MockEnv {
+// Implement AnalysisEnv trait (from Spec 199)
+impl AnalysisEnv for DebtmapTestEnv {
     fn file_system(&self) -> &dyn FileSystem {
         self
     }
@@ -170,7 +203,7 @@ impl AnalysisEnv for MockEnv {
     }
 }
 
-impl FileSystem for MockEnv {
+impl FileSystem for DebtmapTestEnv {
     fn read_to_string(&self, path: &Path) -> Result<String> {
         self.files
             .lock()
@@ -197,7 +230,7 @@ impl FileSystem for MockEnv {
     }
 }
 
-impl CoverageLoader for MockEnv {
+impl CoverageLoader for DebtmapTestEnv {
     fn load_lcov(&self, path: &Path) -> Result<Coverage> {
         self.coverage
             .lock()
@@ -212,7 +245,7 @@ impl CoverageLoader for MockEnv {
     }
 }
 
-impl Cache for MockEnv {
+impl Cache for DebtmapTestEnv {
     fn get<T: DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.cache
             .lock()
@@ -236,40 +269,68 @@ impl Cache for MockEnv {
 
 #### 2. Assertion Macros
 
+**Stillwater provides (for Validation):**
+```rust
+use stillwater::{assert_success, assert_failure, assert_validation_errors};
+
+// These work with Validation<T, E>
+let val = Validation::<_, Vec<String>>::success(42);
+assert_success!(val);
+
+let val = Validation::<i32, _>::failure(vec!["error".to_string()]);
+assert_failure!(val);
+assert_validation_errors!(val, vec!["error".to_string()]);
+```
+
+**Debtmap extends for Result (to implement):**
 ```rust
 // src/testing/assertions.rs
 
-/// Assert that an Effect succeeds
+/// Assert that a Result succeeds and return the value
 #[macro_export]
-macro_rules! assert_success {
+macro_rules! assert_result_ok {
     ($result:expr) => {
         match $result {
             Ok(value) => value,
-            Err(e) => panic!("Expected success, got error: {}", e),
+            Err(e) => panic!("Expected Ok, got Err: {}", e),
         }
     };
 }
 
-/// Assert that an Effect fails
+/// Assert that a Result fails and return the error
 #[macro_export]
-macro_rules! assert_failure {
+macro_rules! assert_result_err {
     ($result:expr) => {
         match $result {
-            Ok(value) => panic!("Expected failure, got success: {:?}", value),
+            Ok(value) => panic!("Expected Err, got Ok: {:?}", value),
             Err(e) => e,
         }
     };
 }
 
+/// Assert error contains specific message
+#[macro_export]
+macro_rules! assert_contains_error {
+    ($result:expr, $pattern:expr) => {
+        let err = assert_result_err!($result);
+        assert!(
+            err.to_string().contains($pattern),
+            "Error '{}' does not contain '{}'",
+            err,
+            $pattern
+        );
+    };
+}
+
 /// Assert validation has specific number of errors
 #[macro_export]
-macro_rules! assert_validation_errors {
+macro_rules! assert_validation_error_count {
     ($validation:expr, $count:expr) => {
         match $validation {
-            Validation::Success(_) => {
+            stillwater::Validation::Success(_) => {
                 panic!("Expected {} validation errors, got success", $count)
             }
-            Validation::Failure(errors) => {
+            stillwater::Validation::Failure(errors) => {
                 assert_eq!(
                     errors.len(),
                     $count,
@@ -281,20 +342,6 @@ macro_rules! assert_validation_errors {
                 errors
             }
         }
-    };
-}
-
-/// Assert error contains specific message
-#[macro_export]
-macro_rules! assert_contains_error {
-    ($result:expr, $pattern:expr) => {
-        let err = assert_failure!($result);
-        assert!(
-            err.to_string().contains($pattern),
-            "Error '{}' does not contain '{}'",
-            err,
-            $pattern
-        );
     };
 }
 ```
@@ -479,13 +526,16 @@ fn test_analyze_file() {
 // Runtime: ~50ms (file I/O overhead)
 ```
 
-#### After: Fast Unit Test with MockEnv
+#### After: Fast Unit Test with DebtmapTestEnv
 
 ```rust
-#[test]
-fn test_analyze_file() {
+use stillwater::Effect;
+use crate::testing::DebtmapTestEnv;
+
+#[tokio::test]
+async fn test_analyze_file() {
     // Setup: Pure in-memory environment (instant)
-    let env = MockEnv::new()
+    let env = DebtmapTestEnv::new()
         .with_file("test.rs", r#"
             fn example() {
                 if true {
@@ -501,15 +551,36 @@ fn test_analyze_file() {
                 .build()
         );
 
-    // Run analysis
+    // Run analysis - Effect::run is async in stillwater 0.11.0
     let result = analyze_file_effect("test.rs".into())
-        .run(&env);
+        .run(&env)
+        .await;
 
     // Verify with assertion macro
-    let analysis = assert_success!(result);
+    let analysis = assert_result_ok!(result);
     assert_eq!(analysis.complexity, 3);
 }
 // Runtime: ~0.5ms (100x faster, no I/O)
+```
+
+#### Using TestEffect Wrapper (for boxed effects)
+
+```rust
+use stillwater::testing::TestEffect;
+use stillwater::effect::prelude::*;
+
+#[tokio::test]
+async fn test_with_test_effect() {
+    let env = DebtmapTestEnv::new()
+        .with_file("test.rs", "fn foo() {}");
+
+    // For boxed effects, use TestEffect wrapper
+    let effect = analyze_file_effect("test.rs".into()).boxed();
+    let test_effect = TestEffect::new(effect);
+
+    let result = test_effect.run(&env).await;
+    assert!(result.is_ok());
+}
 ```
 
 #### Property-Based Test
@@ -563,25 +634,28 @@ proptest! {
 
 ## Implementation Notes
 
+### Stillwater 0.11.0 API Summary
+
+| Feature | Stillwater Provides | Debtmap Implements |
+|---------|--------------------|--------------------|
+| `MockEnv` | Generic `.with(|| T)` builder | `DebtmapTestEnv` with domain methods |
+| `TestEffect` | Complete wrapper | Use as-is |
+| `assert_success!` | For `Validation` | `assert_result_ok!` for `Result` |
+| `assert_failure!` | For `Validation` | `assert_result_err!` for `Result` |
+| `assert_validation_errors!` | Compares error vec | `assert_validation_error_count!` |
+| `Arbitrary` | For `Validation` | For AST, Config, Coverage types |
+
 ### Files to Create
-- `src/testing/mock_env.rs` - MockEnv builder
-- `src/testing/assertions.rs` - Assertion macros
+- `src/testing/mod.rs` - Testing module exports
+- `src/testing/mock_env.rs` - `DebtmapTestEnv` builder
+- `src/testing/assertions.rs` - Extended assertion macros
 - `src/testing/helpers.rs` - Test helpers
-- `src/testing/proptest.rs` - Property-based testing
+- `src/testing/proptest.rs` - Property-based testing generators
 
 ### Files to Modify
-- Migrate 100+ existing tests to use MockEnv
+- Migrate 100+ existing tests to use `DebtmapTestEnv`
 - Remove TempDir usage from unit tests
 - Add property-based tests for pure functions
-
-### Estimated Effort
-- MockEnv implementation: 6-8 hours
-- Assertion macros: 2-3 hours
-- Test helpers: 4-6 hours
-- Property-based setup: 3-4 hours
-- Test migration: 12-16 hours
-- Documentation: 4-6 hours
-- **Total: 31-43 hours**
 
 ## Success Metrics
 
