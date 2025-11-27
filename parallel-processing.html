@@ -12,21 +12,20 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
@@ -36,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex.js";
+            window.path_to_searchindex_js = "searchindex-59964db6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="toc-f78e0b5d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -53,7 +52,7 @@
             </div>
         </div>
     </div>
-    <div id="body-container">
+    <div id="mdbook-body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
@@ -82,12 +81,12 @@
             html.classList.add("js");
         </script>
 
-        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             let sidebar = null;
-            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -102,39 +101,39 @@
             }
         </script>
 
-        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
                 <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <div id="page-wrapper" class="page-wrapper">
+        <div id="mdbook-page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                            <i class="fa fa-bars"></i>
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
                         </label>
-                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                            <i class="fa fa-paint-brush"></i>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
                         </button>
-                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
-                            <i class="fa fa-search"></i>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
                         </button>
                     </div>
 
@@ -142,41 +141,41 @@
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
-                            <i id="print-button" class="fa fa-print"></i>
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
 
                     </div>
                 </div>
 
-                <div id="search-wrapper" class="hidden">
-                    <form id="searchbar-outer" class="searchbar-outer">
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
                         <div class="search-wrapper">
-                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
                             <div class="spinner-wrapper">
-                                <i class="fa fa-spinner fa-spin"></i>
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
                             </div>
                         </div>
                     </form>
-                    <div id="searchresults-outer" class="searchresults-outer hidden">
-                        <div id="searchresults-header" class="searchresults-header"></div>
-                        <ul id="searchresults">
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
                         </ul>
                     </div>
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
-                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
                         link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
                     });
                 </script>
 
-                <div id="content" class="content">
+                <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="parallel-processing"><a class="header" href="#parallel-processing">Parallel Processing</a></h1>
 <p>Debtmap leverages Rust’s powerful parallel processing capabilities to analyze large codebases efficiently. Built on Rayon for data parallelism and DashMap for lock-free concurrent data structures, debtmap achieves 10-100x faster performance than Java/Python-based competitors.</p>
@@ -260,7 +259,7 @@ debtmap analyze  # Parallel processing enabled (also accepts '1')
 <p>Debtmap uses <a href="https://docs.rs/rayon">Rayon</a>, a data parallelism library for Rust, to parallelize file processing operations.</p>
 <h3 id="thread-pool-configuration"><a class="header" href="#thread-pool-configuration">Thread Pool Configuration</a></h3>
 <p>The global Rayon thread pool is configured at startup based on the <code>--jobs</code> parameter:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/builders/parallel_call_graph.rs:48-53
 if self.config.num_threads &gt; 0 {
@@ -269,11 +268,11 @@ if self.config.num_threads &gt; 0 {
         .build_global()
         .ok(); // Ignore if already configured
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>This configures Rayon to use a specific number of worker threads for all parallel operations throughout the analysis.</p>
 <h3 id="worker-thread-selection"><a class="header" href="#worker-thread-selection">Worker Thread Selection</a></h3>
 <p>The <code>get_worker_count()</code> function determines how many threads to use:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/main.rs:828-836
 fn get_worker_count(jobs: usize) -&gt; usize {
@@ -285,7 +284,7 @@ fn get_worker_count(jobs: usize) -&gt; usize {
         jobs  // Use explicit value
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Auto-detection behavior:</strong></p>
 <ul>
 <li>Queries the OS for available parallelism (CPU cores)</li>
@@ -301,7 +300,7 @@ fn get_worker_count(jobs: usize) -&gt; usize {
 <h3 id="parallel-file-processing"><a class="header" href="#parallel-file-processing">Parallel File Processing</a></h3>
 <p><strong>Phase 1: Parallel File Parsing</strong></p>
 <p>Files are parsed concurrently using Rayon’s parallel iterators:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/builders/parallel_call_graph.rs (parallel_parse_files method)
 let parsed_files: Vec&lt;_&gt; = rust_files
@@ -315,7 +314,7 @@ let parsed_files: Vec&lt;_&gt; = rust_files
         Some((file_path.clone(), content))
     })
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Key features:</p>
 <ul>
 <li><code>.par_iter()</code> converts a sequential iterator to a parallel one</li>
@@ -324,7 +323,7 @@ let parsed_files: Vec&lt;_&gt; = rust_files
 </ul>
 <p><strong>Phase 2: Parallel Multi-File Extraction</strong></p>
 <p>Files are grouped into chunks for optimal parallelization:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)
 let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
@@ -348,7 +347,7 @@ parsed_files.par_chunks(chunk_size).for_each(|chunk| {
         parallel_graph.merge_concurrent(chunk_graph);
     }
 });
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>This chunking strategy balances parallelism with overhead:</p>
 <ul>
 <li>Minimum chunk size of 10 files prevents excessive overhead</li>
@@ -362,7 +361,7 @@ parsed_files.par_chunks(chunk_size).for_each(|chunk| {
 <li>Phase 2: <strong>Re-parse the same content</strong> to extract call graphs</li>
 </ol>
 <p>This redundant parsing was eliminated by parsing each file exactly once and reusing the parsed <code>syn::File</code> AST:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Optimized: Parse once in Phase 1
 let parsed_files: Vec&lt;(PathBuf, syn::File)&gt; = rust_files
@@ -382,7 +381,7 @@ for chunk in parsed_files.chunks(chunk_size) {
         .collect();
     // Extract call graph...
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Performance Impact:</strong></p>
 <ul>
 <li><strong>Before</strong>: 2N parse operations (404 files × 2 = 808 parses)</li>
@@ -402,12 +401,12 @@ for chunk in parsed_files.chunks(chunk_size) {
 <p>The third phase analyzes trait dispatch, function pointers, and framework patterns. This phase is currently sequential due to complex shared state requirements, but benefits from the parallel foundation built in phases 1-2.</p>
 <h3 id="parallel-architecture"><a class="header" href="#parallel-architecture">Parallel Architecture</a></h3>
 <p>Debtmap processes files in parallel using Rayon’s parallel iterators:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>files.par_iter()
     .map(|file| analyze_file(file))
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Each file is:</p>
 <ol>
 <li>Parsed independently</li>
@@ -418,16 +417,16 @@ for chunk in parsed_files.chunks(chunk_size) {
 <p>Debtmap uses <a href="https://docs.rs/dashmap">DashMap</a>, a concurrent hash map implementation, for lock-free data structures during parallel call graph construction.</p>
 <h3 id="why-dashmap"><a class="header" href="#why-dashmap">Why DashMap?</a></h3>
 <p>Traditional approaches to concurrent hash maps use a single <code>Mutex&lt;HashMap&gt;</code>, which creates contention:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// ❌ Traditional approach - serializes all access
 let map = Arc&lt;Mutex&lt;HashMap&lt;K, V&gt;&gt;&gt;;
 
 // Thread 1 blocks Thread 2, even for reads
 let val = map.lock().unwrap().get(&amp;key);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>DashMap provides <strong>lock-free reads</strong> and <strong>fine-grained write locking</strong> through internal sharding:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// ✅ DashMap approach - concurrent reads, fine-grained writes
 let map = Arc&lt;DashMap&lt;K, V&gt;&gt;;
@@ -437,10 +436,10 @@ let val = map.get(&amp;key);
 
 // Writes only lock the specific shard, not the whole map
 map.insert(key, value);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="parallelcallgraph-implementation"><a class="header" href="#parallelcallgraph-implementation">ParallelCallGraph Implementation</a></h3>
 <p>The <code>ParallelCallGraph</code> uses DashMap for all concurrent data structures:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:50-56
 pub struct ParallelCallGraph {
@@ -450,7 +449,7 @@ pub struct ParallelCallGraph {
     callee_index: Arc&lt;DashMap&lt;FunctionId, DashSet&lt;FunctionId&gt;&gt;&gt;,  // Who does this call?
     stats: Arc&lt;ParallelStats&gt;,                      // Atomic counters
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Key components:</strong></p>
 <ol>
 <li><strong>nodes</strong>: Maps function identifiers to metadata (complexity, lines, flags)</li>
@@ -462,7 +461,7 @@ pub struct ParallelCallGraph {
 <h3 id="concurrent-operations"><a class="header" href="#concurrent-operations">Concurrent Operations</a></h3>
 <p><strong>Adding Functions Concurrently</strong></p>
 <p>Multiple analyzer threads can add functions simultaneously:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:79-96
 pub fn add_function(
@@ -483,7 +482,7 @@ pub fn add_function(
     self.nodes.insert(id, node_info);
     self.stats.add_nodes(1);  // Atomic increment
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Atomicity guarantees:</strong></p>
 <ul>
 <li><code>DashMap::insert()</code> is atomic - no data races</li>
@@ -492,7 +491,7 @@ pub fn add_function(
 </ul>
 <p><strong>Adding Calls Concurrently</strong></p>
 <p>Function calls are added with automatic deduplication:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:99-117
 pub fn add_call(&amp;self, caller: FunctionId, callee: FunctionId, call_type: CallType) {
@@ -514,7 +513,7 @@ pub fn add_call(&amp;self, caller: FunctionId, callee: FunctionId, call_type: Ca
         self.stats.add_edges(1);  // Only increment if actually inserted
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Deduplication:</strong></p>
 <ul>
 <li><code>DashSet::insert()</code> returns <code>true</code> only for new items</li>
@@ -523,14 +522,14 @@ pub fn add_call(&amp;self, caller: FunctionId, callee: FunctionId, call_type: Ca
 </ul>
 <h3 id="shared-read-only-data"><a class="header" href="#shared-read-only-data">Shared Read-Only Data</a></h3>
 <p>Analysis configuration and indexes are shared across threads:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let coverage_index = Arc::new(build_coverage_index());
 
 // All threads share the same index
 files.par_iter()
     .map(|file| analyze_with_coverage(file, &amp;coverage_index))
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="memory-overhead"><a class="header" href="#memory-overhead">Memory Overhead</a></h3>
 <p>DashMap uses internal sharding for parallelism, which has a memory overhead:</p>
 <ul>
@@ -543,7 +542,7 @@ files.par_iter()
 <h2 id="parallel-call-graph-statistics"><a class="header" href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a></h2>
 <p>Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads.</p>
 <h3 id="parallelstats-structure"><a class="header" href="#parallelstats-structure">ParallelStats Structure</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:7-14
 pub struct ParallelStats {
@@ -552,7 +551,7 @@ pub struct ParallelStats {
     pub files_processed: AtomicUsize,  // Files completed
     pub total_files: AtomicUsize,      // Total files to process
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Atomic operations:</strong></p>
 <ul>
 <li><code>fetch_add()</code> - Atomically increment counters from any thread</li>
@@ -561,7 +560,7 @@ pub struct ParallelStats {
 </ul>
 <h3 id="progress-tracking"><a class="header" href="#progress-tracking">Progress Tracking</a></h3>
 <p>Progress ratio calculation for long-running analysis:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:38-46
 pub fn progress_ratio(&amp;self) -&gt; f64 {
@@ -573,9 +572,9 @@ pub fn progress_ratio(&amp;self) -&gt; f64 {
         0.0
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>This enables progress callbacks during analysis:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/builders/parallel_call_graph.rs:110-121
 parallel_graph.stats().increment_files();
@@ -590,10 +589,10 @@ if let Some(ref callback) = self.config.progress_callback {
         .load(std::sync::atomic::Ordering::Relaxed);
     callback(processed, total);
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="log-output-format"><a class="header" href="#log-output-format">Log Output Format</a></h3>
 <p>After analysis completes, debtmap reports final statistics:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/builders/parallel_call_graph.rs:85-93
 log::info!(
@@ -604,7 +603,7 @@ log::info!(
         .files_processed
         .load(std::sync::atomic::Ordering::Relaxed),
 );
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Example output:</strong></p>
 <pre><code>INFO - Processing 1247 Rust files in parallel
 INFO - Progress: 100/1247 files processed
@@ -617,7 +616,7 @@ INFO - Parallel call graph complete: 8942 nodes, 23451 edges, 1247 files process
 <h3 id="two-phase-architecture"><a class="header" href="#two-phase-architecture">Two-Phase Architecture</a></h3>
 <p><strong>Phase 1: Parallel Resolution (Read-Only)</strong></p>
 <p>The first phase processes unresolved calls concurrently using Rayon’s parallel iterators:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/call_graph/cross_file.rs
 let resolutions: Vec&lt;(FunctionCall, FunctionId)&gt; = calls_to_resolve
@@ -633,7 +632,7 @@ let resolutions: Vec&lt;(FunctionCall, FunctionId)&gt; = calls_to_resolve
         })
     })
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Key benefits:</strong></p>
 <ul>
 <li><strong>Pure functional resolution</strong>: No side effects, safe for concurrent execution</li>
@@ -643,13 +642,13 @@ let resolutions: Vec&lt;(FunctionCall, FunctionId)&gt; = calls_to_resolve
 </ul>
 <p><strong>Phase 2: Sequential Updates (Mutation)</strong></p>
 <p>The second phase applies all resolutions to the graph sequentially:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Apply resolutions to graph in sequence
 for (original_call, resolved_callee) in resolutions {
     self.apply_call_resolution(&amp;original_call, &amp;resolved_callee);
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Key benefits:</strong></p>
 <ul>
 <li><strong>Batch updates</strong>: All resolutions processed together</li>
@@ -658,12 +657,18 @@ for (original_call, resolved_callee) in resolutions {
 </ul>
 <h3 id="performance-impact"><a class="header" href="#performance-impact">Performance Impact</a></h3>
 <p>The two-phase approach provides significant speedups on multi-core systems:</p>
-<div class="table-wrapper"><table><thead><tr><th>CPU Cores</th><th>Speedup</th><th>Example Time (1500 calls)</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>CPU Cores</th><th>Speedup</th><th>Example Time (1500 calls)</th></tr>
+</thead>
+<tbody>
 <tr><td>1</td><td>0%</td><td>100ms (baseline)</td></tr>
 <tr><td>2</td><td>~8%</td><td>92ms</td></tr>
 <tr><td>4</td><td>~12%</td><td>88ms</td></tr>
 <tr><td>8</td><td>~15%</td><td>85ms</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>Performance characteristics:</strong></p>
 <ul>
@@ -739,7 +744,7 @@ time debtmap analyze . --no-parallel
 <h2 id="concurrent-merging"><a class="header" href="#concurrent-merging">Concurrent Merging</a></h2>
 <p>The <code>merge_concurrent()</code> method combines call graphs from different analysis phases using parallel iteration.</p>
 <h3 id="implementation"><a class="header" href="#implementation">Implementation</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:120-138
 pub fn merge_concurrent(&amp;self, other: CallGraph) {
@@ -761,7 +766,7 @@ pub fn merge_concurrent(&amp;self, other: CallGraph) {
         );
     });
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>How it works:</strong></p>
 <ol>
 <li>Extract all nodes and edges from the source <code>CallGraph</code></li>
@@ -776,7 +781,7 @@ pub fn merge_concurrent(&amp;self, other: CallGraph) {
 <li><strong>CallGraph</strong>: Sequential data structures (HashMap/HashSet) for analysis algorithms</li>
 </ul>
 <p>Conversion happens at phase boundaries:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// From src/priority/parallel_call_graph.rs:141-162
 pub fn to_call_graph(&amp;self) -&gt; CallGraph {
@@ -801,7 +806,7 @@ pub fn to_call_graph(&amp;self) -&gt; CallGraph {
 
     call_graph
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Why two representations?</strong></p>
 <ul>
 <li><strong>ParallelCallGraph</strong>: Optimized for concurrent writes during construction</li>
@@ -812,7 +817,7 @@ pub fn to_call_graph(&amp;self) -&gt; CallGraph {
 <p>Debtmap uses an optimized nested HashMap structure for coverage data lookups, providing significant performance improvements for coverage-enabled analysis.</p>
 <h3 id="nested-hashmap-architecture"><a class="header" href="#nested-hashmap-architecture">Nested HashMap Architecture</a></h3>
 <p>The <code>CoverageIndex</code> structure uses a two-level nested HashMap instead of a flat structure:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Optimized structure (nested)
 pub struct CoverageIndex {
@@ -828,7 +833,7 @@ pub struct CoverageIndex {
 
 // OLD structure (flat) - no longer used
 HashMap&lt;(PathBuf, String), FunctionCoverage&gt;
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="performance-characteristics-1"><a class="header" href="#performance-characteristics-1">Performance Characteristics</a></h3>
 <p>The nested structure provides dramatic performance improvements:</p>
 <p><strong>Lookup Complexity:</strong></p>
@@ -885,7 +890,7 @@ HashMap&lt;(PathBuf, String), FunctionCoverage&gt;
 <p><strong>Combined speedup: ~50,000x</strong> (10+ minutes → 3 seconds)</p>
 <h3 id="implementation-details"><a class="header" href="#implementation-details">Implementation Details</a></h3>
 <p><strong>Exact Match Lookup (O(1)):</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn get_function_coverage(&amp;self, file: &amp;Path, function_name: &amp;str) -&gt; Option&lt;f64&gt; {
     // Two O(1) hash lookups
@@ -897,9 +902,9 @@ HashMap&lt;(PathBuf, String), FunctionCoverage&gt;
     // Fallback to path strategies (rare)
     self.find_by_path_strategies(file, function_name)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Path Strategy Fallback (O(files)):</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn find_by_path_strategies(&amp;self, query_path: &amp;Path, function_name: &amp;str) -&gt; Option&lt;f64&gt; {
     // Iterate over FILES not FUNCTIONS (375 vs 1,500 = 4x faster)
@@ -915,7 +920,7 @@ HashMap&lt;(PathBuf, String), FunctionCoverage&gt;
     }
     None
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="memory-overhead-1"><a class="header" href="#memory-overhead-1">Memory Overhead</a></h3>
 <p>The nested structure has minimal memory overhead:</p>
 <p><strong>Flat structure:</strong></p>
@@ -965,12 +970,18 @@ lscpu | grep "Core(s) per socket"
 sysctl hw.physicalcpu
 </code></pre>
 <p><strong>Recommended settings:</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>System</th><th>Cores</th><th>Recommended –jobs</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>System</th><th>Cores</th><th>Recommended –jobs</th></tr>
+</thead>
+<tbody>
 <tr><td>Laptop</td><td>4</td><td>Default or 4</td></tr>
 <tr><td>Desktop</td><td>8</td><td>Default</td></tr>
 <tr><td>Workstation</td><td>16+</td><td>Default</td></tr>
 <tr><td>CI/CD</td><td>Varies</td><td>2-4 (shared resources)</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <h3 id="memory-considerations"><a class="header" href="#memory-considerations">Memory Considerations</a></h3>
 <p>Each thread requires memory for:</p>
@@ -988,13 +999,19 @@ sysctl hw.physicalcpu
 <p>For very large files (&gt;1 MB), consider reducing thread count.</p>
 <h3 id="memory-vs-speed-tradeoffs"><a class="header" href="#memory-vs-speed-tradeoffs">Memory vs Speed Tradeoffs</a></h3>
 <p>Parallel processing uses more memory:</p>
-<div class="table-wrapper"><table><thead><tr><th>Configuration</th><th>Memory Overhead</th><th>Speed Benefit</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Configuration</th><th>Memory Overhead</th><th>Speed Benefit</th></tr>
+</thead>
+<tbody>
 <tr><td><code>--no-parallel</code></td><td>Baseline</td><td>Baseline</td></tr>
 <tr><td><code>--jobs 1</code></td><td>+10% (data structures)</td><td>1x</td></tr>
 <tr><td><code>--jobs 4</code></td><td>+30% (+ worker buffers)</td><td>4-6x</td></tr>
 <tr><td><code>--jobs 8</code></td><td>+50% (+ worker buffers)</td><td>6-10x</td></tr>
 <tr><td><code>--jobs 16</code></td><td>+80% (+ worker buffers)</td><td>10-15x</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>Memory overhead sources:</strong></p>
 <ul>
@@ -1018,7 +1035,7 @@ sysctl hw.physicalcpu
 <p>Limited speedup from parallelism (1.5-2x).</p>
 <p><strong>If analysis is I/O-bound:</strong></p>
 <ol>
-<li>Move cache to SSD</li>
+<li>Use SSD storage</li>
 <li>Reduce thread count (less I/O contention)</li>
 <li>Use <code>--max-files</code> to limit scope</li>
 </ol>
@@ -1034,11 +1051,10 @@ debtmap analyze .
 </code></pre>
 <p>Optimal parallel efficiency. Expect 4-8x speedup from parallelism.</p>
 <h3 id="large-projects-100k-loc"><a class="header" href="#large-projects-100k-loc">Large Projects (&gt;100k LOC)</a></h3>
-<pre><code class="language-bash"># Use all cores with optimized cache
-export DEBTMAP_CACHE_MAX_SIZE=5368709120  # 5GB
+<pre><code class="language-bash"># Use all cores
 debtmap analyze . --jobs 0  # 0 = all cores
 </code></pre>
-<p>Maximize cache size to avoid re-analysis.</p>
+<p>Maximize parallel processing for large codebases.</p>
 <h3 id="cicd-environments"><a class="header" href="#cicd-environments">CI/CD Environments</a></h3>
 <pre><code class="language-bash"># Limit threads to avoid resource contention
 debtmap analyze . --jobs 2
@@ -1047,14 +1063,20 @@ debtmap analyze . --jobs 2
 <h3 id="scaling-behavior"><a class="header" href="#scaling-behavior">Scaling Behavior</a></h3>
 <p>Debtmap’s parallel processing scales with CPU core count:</p>
 <p><strong>Strong Scaling (Fixed Problem Size):</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>CPU Cores</th><th>Speedup</th><th>Efficiency</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>CPU Cores</th><th>Speedup</th><th>Efficiency</th></tr>
+</thead>
+<tbody>
 <tr><td>1</td><td>1x</td><td>100%</td></tr>
 <tr><td>2</td><td>1.8x</td><td>90%</td></tr>
 <tr><td>4</td><td>3.4x</td><td>85%</td></tr>
 <tr><td>8</td><td>6.2x</td><td>78%</td></tr>
 <tr><td>16</td><td>10.5x</td><td>66%</td></tr>
 <tr><td>32</td><td>16.8x</td><td>53%</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p>Efficiency decreases at higher core counts due to:</p>
 <ul>
@@ -1127,22 +1149,20 @@ time debtmap analyze --no-parallel  # Sequential
 <li><strong>Limit threads in CI</strong> - Use <code>--jobs 2</code> or <code>--jobs 4</code> in shared environments</li>
 <li><strong>Profile before tuning</strong> - Measure actual performance impact</li>
 <li><strong>Consider I/O</strong> - If using slow storage, reduce thread count</li>
-<li><strong>Cache aggressively</strong> - Large caches reduce repeated work</li>
 </ol>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="analysis-is-slow-despite-parallelism"><a class="header" href="#analysis-is-slow-despite-parallelism">Analysis is Slow Despite Parallelism</a></h3>
 <p><strong>Possible causes:</strong></p>
 <ol>
 <li>I/O bottleneck (slow disk)</li>
-<li>Cache disabled or cleared</li>
-<li>Excessive cache pruning</li>
 <li>Memory pressure (swapping)</li>
+<li>Thread contention</li>
 </ol>
 <p><strong>Solutions:</strong></p>
 <ul>
-<li>Move cache to SSD</li>
-<li>Increase <code>DEBTMAP_CACHE_MAX_SIZE</code></li>
+<li>Use faster storage (SSD)</li>
 <li>Reduce thread count to avoid memory pressure</li>
+<li>Limit analysis scope with <code>--max-files</code></li>
 </ul>
 <h3 id="slow-analysis-performance"><a class="header" href="#slow-analysis-performance">Slow Analysis Performance</a></h3>
 <p>If analysis is slower than expected:</p>
@@ -1247,7 +1267,6 @@ debtmap analyze --jobs 4
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="./cli-reference.html#performance--caching">CLI Reference - Performance &amp; Caching</a> - Complete flag documentation</li>
-<li><a href="cache-management.html">Cache Management</a> - Cache configuration for performance</li>
 <li><a href="configuration.html">Configuration</a> - Project-specific settings</li>
 <li><a href="troubleshooting.html">Troubleshooting</a> - General troubleshooting guide</li>
 <li><a href="./troubleshooting.html#slow-analysis-performance">Troubleshooting - Slow Analysis</a> - Performance debugging guide</li>
@@ -1271,11 +1290,11 @@ debtmap analyze --jobs 4
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                             <a rel="prev" href="multi-pass-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                                <i class="fa fa-angle-left"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
                             <a rel="next prefetch" href="prodigy-integration.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
                         <div style="clear: both"></div>
@@ -1285,16 +1304,21 @@ debtmap analyze --jobs 4
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                     <a rel="prev" href="multi-pass-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                        <i class="fa fa-angle-left"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
                     <a rel="next prefetch" href="prodigy-integration.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
 
         </div>
 
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
 
 
@@ -1303,13 +1327,13 @@ debtmap analyze --jobs 4
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
 

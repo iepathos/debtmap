@@ -12,21 +12,20 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
@@ -36,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex.js";
+            window.path_to_searchindex_js = "searchindex-59964db6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="toc-f78e0b5d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -53,7 +52,7 @@
             </div>
         </div>
     </div>
-    <div id="body-container">
+    <div id="mdbook-body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
@@ -82,12 +81,12 @@
             html.classList.add("js");
         </script>
 
-        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             let sidebar = null;
-            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -102,39 +101,39 @@
             }
         </script>
 
-        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
                 <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <div id="page-wrapper" class="page-wrapper">
+        <div id="mdbook-page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                            <i class="fa fa-bars"></i>
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
                         </label>
-                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                            <i class="fa fa-paint-brush"></i>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
                         </button>
-                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
-                            <i class="fa fa-search"></i>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
                         </button>
                     </div>
 
@@ -142,41 +141,41 @@
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
-                            <i id="print-button" class="fa fa-print"></i>
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
 
                     </div>
                 </div>
 
-                <div id="search-wrapper" class="hidden">
-                    <form id="searchbar-outer" class="searchbar-outer">
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
                         <div class="search-wrapper">
-                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
                             <div class="spinner-wrapper">
-                                <i class="fa fa-spinner fa-spin"></i>
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
                             </div>
                         </div>
                     </form>
-                    <div id="searchresults-outer" class="searchresults-outer hidden">
-                        <div id="searchresults-header" class="searchresults-header"></div>
-                        <ul id="searchresults">
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
                         </ul>
                     </div>
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
-                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
                         link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
                     });
                 </script>
 
-                <div id="content" class="content">
+                <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="analysis-guide"><a class="header" href="#analysis-guide">Analysis Guide</a></h1>
 <p>This guide explains Debtmap’s analysis capabilities, metrics, and methodologies in depth. Use this to understand what Debtmap measures, how it scores technical debt, and how to interpret analysis results for maximum impact.</p>
@@ -207,7 +206,7 @@
 <li><strong>20+</strong>: Very complex, high risk - difficult to test thoroughly</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn validate_user(age: u32, has_license: bool, country: &amp;str) -&gt; bool {
     // Complexity: 4
@@ -221,7 +220,7 @@
         false
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="cognitive-complexity"><a class="header" href="#cognitive-complexity">Cognitive Complexity</a></h3>
 <p>Measures how difficult code is to understand by considering nesting depth and control flow interruptions.</p>
 <p><strong>How it differs from cyclomatic:</strong></p>
@@ -237,7 +236,7 @@
 <li>Break/continue/return in middle of function adds cognitive load</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Cyclomatic: 5, Cognitive: 8
 fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
@@ -259,7 +258,7 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 
     results
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Thresholds:</strong></p>
 <ul>
 <li><strong>0-5</strong>: Trivial - anyone can understand</li>
@@ -312,7 +311,7 @@ fn process_items(items: Vec&lt;Item&gt;) -&gt; Vec&lt;Result&gt; {
 </code></pre>
 <p><strong>Dampening cap:</strong> The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.</p>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Without entropy: Cyclomatic = 15 (appears very complex)
 // With entropy: Effective = 5 (pattern-based, dampened 67%)
@@ -324,7 +323,7 @@ fn validate_config(config: &amp;Config) -&gt; Result&lt;(), ValidationError&gt; 
     // ... 11 more similar checks
     Ok(())
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Enable in <code>.debtmap.toml</code>:</strong></p>
 <pre><code class="language-toml">[entropy]
 enabled = true                 # Enable entropy analysis (default: true)
@@ -350,7 +349,7 @@ max_combined_reduction = 0.3  # Maximum 30% reduction
 <li><strong>5+</strong>: Deep nesting, consider extracting functions</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Nesting depth: 4 (difficult to follow)
 fn process(data: Data) -&gt; Result&lt;Output&gt; {
@@ -365,9 +364,9 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Refactored:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Nesting depth: 2 (much clearer)
 fn process(data: Data) -&gt; Result&lt;Output&gt; {
@@ -381,7 +380,7 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
         .map(|item| process_item(item))     // Extract to separate function
         .collect()
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="function-length"><a class="header" href="#function-length">Function Length</a></h3>
 <p>Number of lines in a function. Long functions often violate single responsibility principle.</p>
 <p><strong>Thresholds:</strong></p>
@@ -408,7 +407,7 @@ fn process(data: Data) -&gt; Result&lt;Output&gt; {
 </ol>
 <p><strong>Why AST-based detection?</strong></p>
 <p>Name-based detection (looking for <code>new</code>, <code>new_*</code>, <code>from_*</code>) misses non-standard constructors:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Caught by name-based detection
 fn new() -&gt; Self {
@@ -423,10 +422,10 @@ pub fn create_default_client() -&gt; Self {
 pub fn initialized() -&gt; Self {
     Self::new()
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Builder vs Constructor:</strong></p>
 <p>AST analysis distinguishes between constructors and builder methods:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Constructor: creates new instance
 pub fn new(timeout: u32) -&gt; Self {
@@ -438,7 +437,7 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
     self.timeout = timeout;
     self  // Returns modified self, not new instance
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Detection Criteria:</strong></p>
 <p>A function is classified as a constructor if:</p>
 <ul>
@@ -508,7 +507,7 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
 </ul>
 <h3 id="debt-categories"><a class="header" href="#debt-categories">Debt Categories</a></h3>
 <p>The <code>DebtCategory</code> enum groups debt types into strategic categories:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum DebtCategory {
     Architecture,  // Structure, design, complexity
@@ -516,14 +515,20 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
     Performance,   // Speed, memory, efficiency
     CodeQuality,   // Maintainability, readability
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Category Mapping:</strong></p>
-<div class="table-wrapper"><table><thead><tr><th>Debt Type</th><th>Category</th><th>Strategic Focus</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Debt Type</th><th>Category</th><th>Strategic Focus</th></tr>
+</thead>
+<tbody>
 <tr><td>ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues</td><td>Architecture</td><td>Structural improvements, design patterns</td></tr>
 <tr><td>TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern</td><td>Testing</td><td>Test coverage, test quality</td></tr>
 <tr><td>AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency</td><td>Performance</td><td>Runtime efficiency, resource usage</td></tr>
 <tr><td>Risk, Duplication, ErrorSwallowing</td><td>CodeQuality</td><td>Maintainability, reliability</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>Language-Specific Debt Patterns:</strong></p>
 <p>Some debt patterns only apply to languages with specific features:</p>
@@ -536,7 +541,7 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
 <h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
 <h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
 <p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Cyclomatic: 22, Cognitive: 35
 fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&lt;Receipt&gt; {
@@ -546,11 +551,11 @@ fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&
     // ... deeply nested logic with many branches
     Ok(receipt)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Cyclomatic &gt; 10 OR Cognitive &gt; 15 (configurable)
 <strong>Action</strong>: Break into smaller functions, extract validation, simplify control flow</p>
 <p><strong>GodObject / GodModule</strong>: Too many responsibilities</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// God module: handles parsing, validation, storage, notifications
 mod user_service {
@@ -561,7 +566,7 @@ mod user_service {
     fn log_activity() { /* ... */ }
     // ... 20+ more functions
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Complexity-weighted scoring system (see detailed explanation below)
 <strong>Action</strong>: Split into focused modules (parser, validator, repository, notifier)</p>
 <h4 id="complexity-weighted-god-object-detection"><a class="header" href="#complexity-weighted-god-object-detection">Complexity-Weighted God Object Detection</a></h4>
@@ -627,7 +632,7 @@ legacy_parser.rs:
 <li>Recommended module splits based on responsibility clustering</li>
 </ul>
 <p><strong>MagicValues</strong>: Unexplained literals</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Bad: Magic numbers
 fn calculate_price(quantity: u32) -&gt; f64 {
@@ -640,21 +645,21 @@ const SHIPPING_COST: f64 = 5.0;
 fn calculate_price(quantity: u32) -&gt; f64 {
     quantity as f64 * UNIT_PRICE + SHIPPING_COST
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="testing-debt"><a class="header" href="#testing-debt">Testing Debt</a></h4>
 <p><strong>TestingGap</strong>: Functions with insufficient test coverage</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// 0% coverage - critical business logic untested
 fn calculate_tax(amount: f64, region: &amp;str) -&gt; f64 {
     // Complex tax calculation logic
     // No tests exist for this function!
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Coverage data shows function has &lt; 80% line coverage
 <strong>Action</strong>: Add unit tests to cover all branches and edge cases</p>
 <p><strong>TestComplexity</strong>: Test functions too complex</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[test]
 fn complex_test() {
@@ -667,11 +672,11 @@ fn complex_test() {
         }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Test functions with cyclomatic &gt; 10 or cognitive &gt; 15
 <strong>Action</strong>: Split into multiple focused tests, use test fixtures</p>
 <p><strong>FlakyTestPattern</strong>: Non-deterministic tests</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[test]
 fn flaky_test() {
@@ -679,12 +684,12 @@ fn flaky_test() {
     thread::sleep(Duration::from_millis(100));  // Race condition!
     assert_eq!(result.status, "complete");
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Pattern analysis for timing dependencies, random values
 <strong>Action</strong>: Use mocks, deterministic test data, proper async test utilities</p>
 <h4 id="performance-debt"><a class="header" href="#performance-debt">Performance Debt</a></h4>
 <p><strong>AllocationInefficiency</strong>: Excessive allocations</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Bad: Allocates on every iteration
 fn process_items(items: &amp;[Item]) -&gt; Vec&lt;String&gt; {
@@ -699,9 +704,9 @@ fn process_items(items: &amp;[Item]) -&gt; Vec&lt;String&gt; {
 fn process_items(items: &amp;[Item]) -&gt; Vec&lt;&amp;str&gt; {
     items.iter().map(|item| item.name.as_str()).collect()
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>BlockingIO</strong>: Blocking operations in async contexts</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Bad: Blocks async runtime
 async fn load_data() -&gt; Result&lt;Data&gt; {
@@ -714,9 +719,9 @@ async fn load_data() -&gt; Result&lt;Data&gt; {
     let file = tokio::fs::read_to_string("data.json").await?;
     parse_json(&amp;file)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>NestedLoops</strong>: O(n²) or worse complexity</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Bad: O(n²) nested loops
 fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;(Item, Item)&gt; {
@@ -736,10 +741,10 @@ fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;Item&gt; {
     let mut seen = HashSet::new();
     items.iter().filter(|item| !seen.insert(item)).cloned().collect()
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="code-quality-debt"><a class="header" href="#code-quality-debt">Code Quality Debt</a></h4>
 <p><strong>Duplication</strong>: Duplicated code blocks</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// File A:
 fn process_user(user: User) -&gt; Result&lt;()&gt; {
@@ -758,11 +763,11 @@ fn process_admin(admin: Admin) -&gt; Result&lt;()&gt; {
     grant_admin_privileges(&amp;admin)?;
     Ok(())
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Similar code blocks &gt; 50 lines (configurable)
 <strong>Action</strong>: Extract shared code into reusable functions</p>
 <p><strong>ErrorSwallowing</strong>: Errors caught but ignored</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Bad: Error swallowed, no context
 match risky_operation() {
@@ -778,18 +783,18 @@ match risky_operation() {
         return Err(e.into());
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Empty catch blocks, ignored Results
 <strong>Action</strong>: Add proper error logging and propagation</p>
 <p><strong>Risk</strong>: High-risk code (complex + poorly tested)</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Cyclomatic: 18, Coverage: 20%, Risk Score: 47.6 (HIGH)
 fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
     // Complex payment logic with minimal testing
     // High risk of bugs in production
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>When detected</strong>: Combines complexity metrics with coverage data
 <strong>Action</strong>: Either add comprehensive tests OR refactor to reduce complexity</p>
 <h3 id="debt-scoring-formula"><a class="header" href="#debt-scoring-formula">Debt Scoring Formula</a></h3>
@@ -818,13 +823,19 @@ fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
 <p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
 <h4 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h4>
 <p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
-<div class="table-wrapper"><table><thead><tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr>
+</thead>
+<tbody>
 <tr><td><strong>9.0-10.0</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
 <tr><td><strong>7.0-8.9</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan for this sprint</td></tr>
 <tr><td><strong>5.0-6.9</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule for next sprint</td></tr>
 <tr><td><strong>3.0-4.9</strong></td><td>Low</td><td>Minor risk, lower priority</td><td>Monitor and address as time permits</td></tr>
 <tr><td><strong>0.0-2.9</strong></td><td>Minimal</td><td>Well-managed code</td><td>Continue monitoring</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <h4 id="scoring-formula"><a class="header" href="#scoring-formula">Scoring Formula</a></h4>
 <p>The unified score combines three weighted factors:</p>
@@ -859,14 +870,20 @@ Based on call graph analysis with specific thresholds:</p>
 <p>These weights can be adjusted in <code>.debtmap.toml</code> to match your team’s priorities.</p>
 <h4 id="role-based-prioritization"><a class="header" href="#role-based-prioritization">Role-Based Prioritization</a></h4>
 <p>The unified score is multiplied by a <strong>role multiplier</strong> based on the function’s semantic classification:</p>
-<div class="table-wrapper"><table><thead><tr><th>Role</th><th>Multiplier</th><th>Description</th><th>Example</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Role</th><th>Multiplier</th><th>Description</th><th>Example</th></tr>
+</thead>
+<tbody>
 <tr><td><strong>Entry Points</strong></td><td>1.5×</td><td>main(), HTTP handlers, API endpoints</td><td>User-facing code where bugs have immediate impact</td></tr>
 <tr><td><strong>Business Logic</strong></td><td>1.2×</td><td>Core domain functions, algorithms</td><td>Critical functionality</td></tr>
 <tr><td><strong>Data Access</strong></td><td>1.0×</td><td>Database queries, file I/O</td><td>Baseline importance</td></tr>
 <tr><td><strong>Infrastructure</strong></td><td>0.8×</td><td>Logging, configuration, monitoring</td><td>Supporting code</td></tr>
 <tr><td><strong>Utilities</strong></td><td>0.5×</td><td>Helpers, formatters, converters</td><td>Lower impact</td></tr>
 <tr><td><strong>Test Code</strong></td><td>0.1×</td><td>Test functions, fixtures, mocks</td><td>Internal quality</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>How role classification works:</strong></p>
 <p>Debtmap identifies function roles through pattern analysis:</p>
@@ -949,7 +966,7 @@ Calculation:
 <p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong> (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.</p>
 <h4 id="legacy-risklevel-enum"><a class="header" href="#legacy-risklevel-enum">Legacy RiskLevel Enum</a></h4>
 <p>For legacy risk scoring, Debtmap classifies functions into four risk levels:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum RiskLevel {
     Low,       // Score &lt; 10
@@ -957,7 +974,7 @@ Calculation:
     High,      // Score 25-49
     Critical,  // Score ≥ 50
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Critical</strong> (legacy score ≥ 50)</p>
 <ul>
 <li>High complexity (cyclomatic &gt; 15) AND low coverage (&lt; 30%)</li>
@@ -1002,7 +1019,7 @@ Calculation:
 <h3 id="legacy-risk-calculation"><a class="header" href="#legacy-risk-calculation">Legacy Risk Calculation</a></h3>
 <p><strong>Note:</strong> The legacy risk calculation is still supported for compatibility but has been superseded by the unified scoring system (see above). Unified scoring provides better prioritization through its multi-factor, weighted approach with role-based adjustments.</p>
 <p>The legacy risk score uses a simpler additive formula:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>risk_score = complexity_factor + coverage_factor + debt_factor
 
@@ -1010,7 +1027,7 @@ where:
   complexity_factor = (cyclomatic / 5) + (cognitive / 10)
   coverage_factor = (1 - coverage_percentage) × 50
   debt_factor = debt_score / 10  // If debt data available
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Example (legacy scoring):</strong></p>
 <pre><code>Function: process_payment
   - Cyclomatic complexity: 18
@@ -1287,7 +1304,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
 <p>Debtmap uses a tier-based system to map debt scores to actionable priority levels. Each tier includes effort estimates and strategic guidance for efficient debt remediation.</p>
 <h4 id="tier-levels"><a class="header" href="#tier-levels">Tier Levels</a></h4>
 <p>The <code>Tier</code> enum defines four priority levels based on score thresholds:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum Tier {
     Critical,  // Score ≥ 90
@@ -1295,7 +1312,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
     Moderate,  // Score 50-69.9
     Low,       // Score &lt; 50
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Score-to-Tier Mapping:</strong></p>
 <ul>
 <li><strong>Critical</strong> (≥ 90): Immediate action required - blocks progress</li>
@@ -1305,12 +1322,18 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
 </ul>
 <h4 id="effort-estimates-per-tier"><a class="header" href="#effort-estimates-per-tier">Effort Estimates Per Tier</a></h4>
 <p>Each tier includes estimated effort based on typical remediation patterns:</p>
-<div class="table-wrapper"><table><thead><tr><th>Tier</th><th>Estimated Effort</th><th>Typical Work</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tier</th><th>Estimated Effort</th><th>Typical Work</th></tr>
+</thead>
+<tbody>
 <tr><td><strong>Critical</strong></td><td>1-2 days</td><td>Major refactoring, comprehensive testing, architectural changes</td></tr>
 <tr><td><strong>High</strong></td><td>2-4 hours</td><td>Extract functions, add test coverage, fix resource leaks</td></tr>
 <tr><td><strong>Moderate</strong></td><td>1-2 hours</td><td>Simplify logic, reduce duplication, improve error handling</td></tr>
 <tr><td><strong>Low</strong></td><td>30 minutes</td><td>Address TODOs, minor cleanup, documentation</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>Effort calculation considers:</strong></p>
 <ul>
@@ -1321,7 +1344,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
 </ul>
 <h4 id="tiered-display-grouping"><a class="header" href="#tiered-display-grouping">Tiered Display Grouping</a></h4>
 <p><code>TieredDisplay</code> groups similar debt items for batch action recommendations:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct TieredDisplay {
     pub tier: Tier,
@@ -1330,7 +1353,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;=
     pub estimated_total_effort_hours: f64,
     pub batch_recommendations: Vec&lt;String&gt;,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Grouping strategy:</strong></p>
 <ul>
 <li>Groups items by tier and similarity pattern</li>
@@ -1413,7 +1436,7 @@ Address during slack time or as warm-up tasks for new contributors.</p>
 <p>Debtmap provides <code>CategorizedDebt</code> analysis that groups debt items by category and identifies cross-category dependencies. This helps teams understand strategic relationships between different types of technical debt.</p>
 <h4 id="categorysummary"><a class="header" href="#categorysummary">CategorySummary</a></h4>
 <p>Each category gets a summary with metrics for planning:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct CategorySummary {
     pub category: DebtCategory,
@@ -1423,7 +1446,7 @@ Address during slack time or as warm-up tasks for new contributors.</p>
     pub average_severity: f64,
     pub top_items: Vec&lt;DebtItem&gt;,  // Up to 5 highest priority
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Effort estimation formulas:</strong></p>
 <ul>
 <li><strong>Architecture debt</strong>: <code>complexity_score / 10 × 2</code> hours (structural changes take longer)</li>
@@ -1456,7 +1479,7 @@ Address during slack time or as warm-up tasks for new contributors.</p>
 </code></pre>
 <h4 id="cross-category-dependencies"><a class="header" href="#cross-category-dependencies">Cross-Category Dependencies</a></h4>
 <p><code>CrossCategoryDependency</code> identifies blocking relationships between different debt categories:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct CrossCategoryDependency {
     pub from_category: DebtCategory,
@@ -1465,7 +1488,7 @@ Address during slack time or as warm-up tasks for new contributors.</p>
     pub impact_level: ImpactLevel,  // Critical, High, Medium, Low
     pub recommendation: String,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Common dependency patterns:</strong></p>
 <p><strong>1. Architecture blocks Testing:</strong></p>
 <ul>
@@ -1635,12 +1658,18 @@ Project B:
 <p>Projects A and B have <strong>equal debt density</strong> (50) despite B having twice the absolute debt, because B is also twice as large. They have proportionally similar technical debt.</p>
 <h4 id="interpretation-guidelines"><a class="header" href="#interpretation-guidelines">Interpretation Guidelines</a></h4>
 <p>Use these thresholds to assess codebase health:</p>
-<div class="table-wrapper"><table><thead><tr><th>Debt Density</th><th>Assessment</th><th>Description</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Debt Density</th><th>Assessment</th><th>Description</th></tr>
+</thead>
+<tbody>
 <tr><td><strong>0-50</strong></td><td>Clean</td><td>Well-maintained codebase, minimal debt</td></tr>
 <tr><td><strong>51-100</strong></td><td>Moderate</td><td>Typical technical debt, manageable</td></tr>
 <tr><td><strong>101-150</strong></td><td>High</td><td>Significant debt, prioritize remediation</td></tr>
 <tr><td><strong>150+</strong></td><td>Critical</td><td>Severe debt burden, may impede development</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <p><strong>Context matters:</strong></p>
 <ul>
@@ -1874,10 +1903,10 @@ debtmap analyze . --languages rust,python
 </code></pre>
 <h3 id="language-detection"><a class="header" href="#language-detection">Language Detection</a></h3>
 <p>Automatic detection by file extension:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let language = Language::from_path(&amp;path);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Explicit language selection:</p>
 <pre><code class="language-bash">debtmap analyze . --languages rust,python
 </code></pre>
@@ -1886,18 +1915,18 @@ debtmap analyze . --languages rust,python
 <ol>
 <li><strong>Implement Analyzer trait:</strong></li>
 </ol>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub trait Analyzer: Send + Sync {
     fn parse(&amp;self, content: &amp;str, path: PathBuf) -&gt; Result&lt;Ast&gt;;
     fn analyze(&amp;self, ast: &amp;Ast) -&gt; FileMetrics;
     fn language(&amp;self) -&gt; Language;
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <ol start="2">
 <li><strong>Register in get_analyzer():</strong></li>
 </ol>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn get_analyzer(language: Language) -&gt; Box&lt;dyn Analyzer&gt; {
     match language {
@@ -1906,7 +1935,7 @@ debtmap analyze . --languages rust,python
         // ...
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>See <code>src/analyzers/rust.rs</code> for a complete implementation example.</p>
 <h2 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h2>
 <h3 id="purity-detection"><a class="header" href="#purity-detection">Purity Detection</a></h3>
@@ -1933,7 +1962,7 @@ debtmap analyze . --languages rust,python
 <li><strong>0.0-0.4</strong>: Likely impure (side effects detected)</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Pure: confidence = 0.95
 fn calculate_total(items: &amp;[Item]) -&gt; f64 {
@@ -1945,7 +1974,7 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
     let total = items.iter().map(|i| i.price).sum();
     write_to_file(total)  // Side effect!
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Benefits:</strong></p>
 <ul>
 <li>Pure functions are easier to test</li>
@@ -1984,14 +2013,14 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
 </code></pre>
 <h4 id="variable-dependency-tracking"><a class="header" href="#variable-dependency-tracking">Variable Dependency Tracking</a></h4>
 <p><code>DataFlowGraph</code> tracks which variables each function depends on:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct DataFlowGraph {
     // Maps function_id -&gt; set of variable names used
     variable_dependencies: HashMap&lt;String, HashSet&lt;String&gt;&gt;,
     // ...
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>What it tracks:</strong></p>
 <ul>
 <li>Local variables accessed in function body</li>
@@ -2015,7 +2044,7 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
 </code></pre>
 <h4 id="data-transformation-patterns"><a class="header" href="#data-transformation-patterns">Data Transformation Patterns</a></h4>
 <p><code>DataFlowGraph</code> identifies common functional programming patterns:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub enum TransformationType {
     Map,        // Transform each element
@@ -2024,7 +2053,7 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
     FlatMap,    // Transform and flatten
     Unknown,    // Other transformations
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Pattern detection:</strong></p>
 <ul>
 <li>Recognizes iterator chains (<code>.map()</code>, <code>.filter()</code>, <code>.fold()</code>)</li>
@@ -2032,7 +2061,7 @@ fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
 <li>Tracks input/output variable relationships</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected as: Filter → Map → Reduce pattern
 fn total_active_users(users: &amp;[User]) -&gt; f64 {
@@ -2041,7 +2070,7 @@ fn total_active_users(users: &amp;[User]) -&gt; f64 {
         .map(|u| u.balance)        // Map transformation
         .sum()                      // Reduce transformation
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Transformation metadata:</strong></p>
 <pre><code class="language-json">{
   "function": "total_active_users",
@@ -2063,7 +2092,7 @@ fn total_active_users(users: &amp;[User]) -&gt; f64 {
 <li><strong>Blocking operations</strong>: <code>thread::sleep</code>, synchronous I/O in async</li>
 </ul>
 <p><strong>Example detection:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected I/O operations: FileRead, FileWrite
 fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
@@ -2071,7 +2100,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
     std::fs::write(path, json)?;                 // FileWrite detected
     Ok(())
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>I/O metadata:</strong></p>
 <pre><code class="language-json">{
   "function": "save_config",
@@ -2112,7 +2141,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
 </code></pre>
 <h4 id="modification-impact-analysis"><a class="header" href="#modification-impact-analysis">Modification Impact Analysis</a></h4>
 <p><code>DataFlowGraph</code> calculates the impact of modifying a function:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct ModificationImpact {
     pub function_name: String,
@@ -2121,7 +2150,7 @@ fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
     pub has_side_effects: bool,
     pub risk_level: RiskLevel,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Risk level calculation:</strong></p>
 <ul>
 <li><strong>Critical</strong>: Many upstream callers + side effects + low test coverage</li>
@@ -2161,7 +2190,7 @@ debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_p
 </ul>
 <h4 id="dataflowgraph-methods"><a class="header" href="#dataflowgraph-methods">DataFlowGraph Methods</a></h4>
 <p>Key methods for data flow analysis:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Add function with its dependencies
 pub fn add_function(&amp;mut self, function_id: String, callees: Vec&lt;String&gt;)
@@ -2180,7 +2209,7 @@ pub fn get_affected_functions(&amp;self, function_id: &amp;str) -&gt; Vec&lt;Str
 
 // Find functions with side effects
 pub fn find_functions_with_side_effects(&amp;self) -&gt; Vec&lt;String&gt;
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Integration in analysis pipeline:</strong></p>
 <ol>
 <li>Parser builds initial call graph</li>
@@ -2213,7 +2242,7 @@ due to its critical role in the call graph.
 <h3 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h3>
 <p>Advanced pattern detection to reduce false positives.</p>
 <p><strong>Token Classification:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>enum TokenType {
     Variable,     // Weight: 1.0
@@ -2222,13 +2251,13 @@ due to its critical role in the call graph.
     Keyword,      // Weight: 0.8
     Operator,     // Weight: 0.6
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Shannon Entropy Calculation:</strong></p>
 <pre><code>H(X) = -Σ p(x) × log₂(p(x))
 </code></pre>
 <p>where p(x) is the probability of each token type.</p>
 <p><strong>Dampening Decision:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>if entropy_score.token_entropy &lt; 0.4
    &amp;&amp; entropy_score.pattern_repetition &gt; 0.6
@@ -2237,7 +2266,7 @@ due to its critical role in the call graph.
     // Apply dampening
     effective_complexity = base_complexity × (1 - dampening_factor);
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Output explanation:</strong></p>
 <pre><code>Function: validate_input
   Cyclomatic: 15 → Effective: 5
@@ -2250,14 +2279,14 @@ due to its critical role in the call graph.
 <h3 id="entropy-analysis-caching"><a class="header" href="#entropy-analysis-caching">Entropy Analysis Caching</a></h3>
 <p><code>EntropyAnalyzer</code> includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.</p>
 <h4 id="cache-structure"><a class="header" href="#cache-structure">Cache Structure</a></h4>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>struct CacheEntry {
     score: EntropyScore,
     timestamp: Instant,
     hit_count: usize,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Cache configuration:</strong></p>
 <ul>
 <li><strong>Default size</strong>: 1000 entries</li>
@@ -2267,7 +2296,7 @@ due to its critical role in the call graph.
 </ul>
 <h4 id="cache-statistics"><a class="header" href="#cache-statistics">Cache Statistics</a></h4>
 <p>The analyzer tracks cache performance:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct CacheStats {
     pub hits: usize,
@@ -2276,7 +2305,7 @@ due to its critical role in the call graph.
     pub hit_rate: f64,
     pub memory_bytes: usize,
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Example stats output:</strong></p>
 <pre><code class="language-json">{
   "entropy_cache_stats": {
@@ -2350,7 +2379,7 @@ ttl_seconds = 3600    # Optional: expire after 1 hour
 <li>Consider pattern confidence in scoring</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Recognized as "validation_pattern"
 // Complexity dampening applied
@@ -2361,7 +2390,7 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
     // ... more similar validations
     Ok(())
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h3>
 <p>Debtmap parses LCOV coverage data for risk analysis:</p>
 <p><strong>LCOV Support:</strong></p>
@@ -2375,7 +2404,7 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
 <li>O(1) exact name lookups (~0.5μs)</li>
 <li>O(log n) line-based fallback (~5-8μs)</li>
 <li>~200 bytes per function</li>
-<li>Thread-safe (Arc<CoverageIndex>)</li>
+<li>Thread-safe (<code>Arc&lt;CoverageIndex&gt;</code>)</li>
 </ul>
 <h4 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h4>
 <p><strong>Index Build Performance:</strong></p>
@@ -2404,7 +2433,7 @@ fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
 </ul>
 <p><strong>Thread Safety:</strong></p>
 <ul>
-<li>Coverage index wrapped in <code>Arc&lt;CoverageIndex&gt;</code> for lock-free parallel access</li>
+<li>Coverage index wrapped in <code>Arc&amp;lt;CoverageIndex&amp;gt;</code> for lock-free parallel access</li>
 <li>Multiple analyzer threads can query coverage simultaneously</li>
 <li>No contention on reads, suitable for parallel analysis pipelines</li>
 </ul>
@@ -2596,11 +2625,11 @@ Impact:
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                             <a rel="prev" href="cli-reference.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                                <i class="fa fa-angle-left"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
                             <a rel="next prefetch" href="compare-analysis.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
                         <div style="clear: both"></div>
@@ -2610,16 +2639,21 @@ Impact:
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                     <a rel="prev" href="cli-reference.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                        <i class="fa fa-angle-left"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
                     <a rel="next prefetch" href="compare-analysis.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
 
         </div>
 
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
 
 
@@ -2628,13 +2662,13 @@ Impact:
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
 

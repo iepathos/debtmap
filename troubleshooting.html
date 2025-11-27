@@ -12,21 +12,20 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
@@ -36,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex.js";
+            window.path_to_searchindex_js = "searchindex-59964db6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="toc-f78e0b5d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -53,7 +52,7 @@
             </div>
         </div>
     </div>
-    <div id="body-container">
+    <div id="mdbook-body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
@@ -82,12 +81,12 @@
             html.classList.add("js");
         </script>
 
-        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             let sidebar = null;
-            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -102,39 +101,39 @@
             }
         </script>
 
-        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
                 <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <div id="page-wrapper" class="page-wrapper">
+        <div id="mdbook-page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                            <i class="fa fa-bars"></i>
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
                         </label>
-                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                            <i class="fa fa-paint-brush"></i>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
                         </button>
-                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
-                            <i class="fa fa-search"></i>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
                         </button>
                     </div>
 
@@ -142,51 +141,50 @@
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
-                            <i id="print-button" class="fa fa-print"></i>
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
 
                     </div>
                 </div>
 
-                <div id="search-wrapper" class="hidden">
-                    <form id="searchbar-outer" class="searchbar-outer">
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
                         <div class="search-wrapper">
-                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
                             <div class="spinner-wrapper">
-                                <i class="fa fa-spinner fa-spin"></i>
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
                             </div>
                         </div>
                     </form>
-                    <div id="searchresults-outer" class="searchresults-outer hidden">
-                        <div id="searchresults-header" class="searchresults-header"></div>
-                        <ul id="searchresults">
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
                         </ul>
                     </div>
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
-                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
                         link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
                     });
                 </script>
 
-                <div id="content" class="content">
+                <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
 <p>Common issues and solutions for using debtmap effectively.</p>
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
 <ol>
-<li><strong>Analysis is slow</strong>: Check <code>--cache-stats</code>, ensure caching is enabled, adjust threads with <code>--jobs</code></li>
+<li><strong>Analysis is slow</strong>: Adjust threads with <code>--jobs</code> or use <code>--semantic-off</code> for faster fallback mode</li>
 <li><strong>Parse errors</strong>: Use <code>--semantic-off</code> for faster fallback mode or exclude problematic files</li>
 <li><strong>No output</strong>: Increase verbosity with <code>-v</code> or lower <code>--min-priority</code></li>
-<li><strong>Cache corruption</strong>: Run with <code>--clear-cache</code> to rebuild</li>
 <li><strong>Inconsistent results</strong>: Check if coverage file changed or context providers are enabled</li>
 </ol>
 <h2 id="common-issues"><a class="header" href="#common-issues">Common Issues</a></h2>
@@ -227,13 +225,7 @@ debtmap path/to/subset
 <h3 id="performance-issues"><a class="header" href="#performance-issues">Performance Issues</a></h3>
 <p><strong>Problem</strong>: Analysis takes too long to complete</p>
 <p><strong>Solutions</strong>:</p>
-<pre><code class="language-bash"># Check cache statistics
-debtmap --cache-stats
-
-# Ensure caching is enabled (it is by default)
-# If cache was disabled, remove --no-cache flag
-
-# Use all available CPU cores
+<pre><code class="language-bash"># Use all available CPU cores
 debtmap --jobs 0
 
 # Try faster fallback mode (less accurate)
@@ -243,30 +235,12 @@ debtmap --semantic-off
 debtmap --plain
 </code></pre>
 <p>See <a href="#performance-tips">Performance Tips</a> for detailed optimization strategies.</p>
-<h3 id="cache-corruption"><a class="header" href="#cache-corruption">Cache Corruption</a></h3>
-<p><strong>Problem</strong>: Getting “Cache error” messages or stale results</p>
-<p><strong>Solutions</strong>:</p>
-<pre><code class="language-bash"># Clear cache and rebuild
-debtmap --clear-cache
-
-# Force cache rebuild
-debtmap --force-cache-rebuild
-
-# Check cache status
-debtmap --cache-stats
-
-# Use different cache location
-debtmap --cache-location /path/to/cache
-</code></pre>
-<p>See <a href="#cache-troubleshooting">Cache Troubleshooting</a> for more details.</p>
 <h3 id="file-permission-errors"><a class="header" href="#file-permission-errors">File Permission Errors</a></h3>
 <p><strong>Problem</strong>: “File system error” when accessing files</p>
 <p><strong>Solutions</strong>:</p>
 <ul>
 <li>Ensure you have read permissions for all source files</li>
 <li>Check that the project directory is accessible</li>
-<li>Verify cache directory is writable (default: <code>.debtmap/cache</code>)</li>
-<li>Use <code>--cache-location</code> to specify an accessible cache directory</li>
 </ul>
 <h3 id="git-history-errors"><a class="header" href="#git-history-errors">Git History Errors</a></h3>
 <p><strong>Problem</strong>: Errors when using <code>git_history</code> context provider</p>
@@ -377,7 +351,7 @@ debtmap -vvv
 <ul>
 <li><code>-v</code>: Score breakdowns, main contributing factors</li>
 <li><code>-vv</code>: Detailed metric calculations, file processing</li>
-<li><code>-vvv</code>: Full debug output, context provider details, cache operations</li>
+<li><code>-vvv</code>: Full debug output, context provider details</li>
 </ul>
 <h3 id="diagnostic-options"><a class="header" href="#diagnostic-options">Diagnostic Options</a></h3>
 <pre><code class="language-bash"># Show macro parsing warnings (Rust)
@@ -391,9 +365,6 @@ debtmap --semantic-off
 
 # Validate LOC consistency
 debtmap --validate-loc
-
-# Show cache statistics
-debtmap --cache-stats
 </code></pre>
 <p><strong>Note</strong>: The <code>--explain-score</code> flag is deprecated and hidden. Use <code>-v</code>, <code>-vv</code>, or <code>-vvv</code> for verbosity levels instead to see score breakdowns.</p>
 <h3 id="debugging-score-calculations"><a class="header" href="#debugging-score-calculations">Debugging Score Calculations</a></h3>
@@ -410,16 +381,13 @@ debtmap --context --context-providers critical_path -v
 <pre><code class="language-bash"># Step 1: Run with verbosity to see what's happening
 debtmap -vv
 
-# Step 2: Check cache stats
-debtmap --cache-stats
-
-# Step 3: Try without semantic analysis
+# Step 2: Try without semantic analysis
 debtmap --semantic-off -v
 
-# Step 4: Check specific file
+# Step 3: Check specific file
 debtmap path/to/file.rs -vvv
 
-# Step 5: Validate results
+# Step 4: Validate results
 debtmap --validate-loc
 </code></pre>
 <h2 id="performance-tips"><a class="header" href="#performance-tips">Performance Tips</a></h2>
@@ -441,42 +409,6 @@ debtmap --no-parallel
 <li><strong>Use <code>--jobs N</code></strong>: Limit resource usage while other tasks run</li>
 <li><strong>Use <code>--no-parallel</code></strong>: Debugging concurrency issues</li>
 </ul>
-<h3 id="caching-strategies"><a class="header" href="#caching-strategies">Caching Strategies</a></h3>
-<p>Caching is <strong>enabled by default</strong> and provides the biggest performance improvement.</p>
-<p><strong>Note</strong>: The <code>--cache</code> flag (to enable caching) is deprecated and hidden. Caching is now always enabled by default; use <code>--no-cache</code> to disable it.</p>
-<pre><code class="language-bash"># Check cache effectiveness
-debtmap --cache-stats
-
-# Clear cache if corrupted
-debtmap --clear-cache
-
-# Force cache rebuild
-debtmap --force-cache-rebuild
-
-# Disable cache (not recommended)
-debtmap --no-cache
-</code></pre>
-<p><strong>Cache locations</strong>:</p>
-<pre><code class="language-bash"># Local cache (default): .debtmap/cache
-debtmap
-
-# Shared cache for multiple projects
-debtmap --cache-location ~/.cache/debtmap
-
-# Migrate existing cache to shared location
-debtmap --migrate-cache
-
-# Set via environment variable
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap
-</code></pre>
-<p><strong>Cache best practices</strong>:</p>
-<ol>
-<li>Use shared cache for multiple similar projects</li>
-<li>Monitor cache size with <code>--cache-stats</code> periodically</li>
-<li>Clear cache after major refactorings</li>
-<li>Use local cache for project-specific configurations</li>
-</ol>
 <h3 id="analysis-optimizations"><a class="header" href="#analysis-optimizations">Analysis Optimizations</a></h3>
 <pre><code class="language-bash"># Fast mode: disable semantic analysis
 debtmap --semantic-off
@@ -494,135 +426,28 @@ debtmap src/specific/module
 debtmap --min-priority 4 --top 20
 </code></pre>
 <h3 id="performance-comparison"><a class="header" href="#performance-comparison">Performance Comparison</a></h3>
-<div class="table-wrapper"><table><thead><tr><th>Configuration</th><th>Speed</th><th>Accuracy</th></tr></thead><tbody>
-<tr><td>Default (cached)</td><td>Fast</td><td>High</td></tr>
-<tr><td><code>--no-cache</code></td><td>Slow</td><td>High</td></tr>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Configuration</th><th>Speed</th><th>Accuracy</th></tr>
+</thead>
+<tbody>
+<tr><td>Default</td><td>Fast</td><td>High</td></tr>
 <tr><td><code>--semantic-off</code></td><td>Fastest</td><td>Medium</td></tr>
 <tr><td><code>--no-parallel</code></td><td>Slowest</td><td>High</td></tr>
 <tr><td><code>--jobs 4</code></td><td>Medium</td><td>High</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <h3 id="monitoring-performance"><a class="header" href="#monitoring-performance">Monitoring Performance</a></h3>
 <pre><code class="language-bash"># Time analysis
 time debtmap
 
-# Check cache hit rate
-debtmap --cache-stats
-
 # Profile with verbosity
 debtmap -vv 2&gt;&amp;1 | grep "processed in"
 </code></pre>
-<h2 id="cache-troubleshooting"><a class="header" href="#cache-troubleshooting">Cache Troubleshooting</a></h2>
-<p>Detailed guidance for cache-related issues.</p>
-<h3 id="check-cache-status"><a class="header" href="#check-cache-status">Check Cache Status</a></h3>
-<pre><code class="language-bash"># View cache statistics
-debtmap --cache-stats
-
-# Sample output:
-# Cache location: .debtmap/cache
-# Cache entries: 1,234
-# Cache size: 45.2 MB
-# Hit rate: 87.3%
-</code></pre>
-<h3 id="clear-corrupted-cache"><a class="header" href="#clear-corrupted-cache">Clear Corrupted Cache</a></h3>
-<pre><code class="language-bash"># Clear all cache entries
-debtmap --clear-cache
-
-# Force rebuild on next run
-debtmap --force-cache-rebuild
-
-# Manual cache deletion
-rm -rf .debtmap/cache
-# or for shared cache:
-rm -rf ~/.cache/debtmap
-</code></pre>
-<h3 id="cache-location-management"><a class="header" href="#cache-location-management">Cache Location Management</a></h3>
-<pre><code class="language-bash"># Use local cache (default)
-debtmap
-# Cache at: .debtmap/cache
-
-# Use shared cache
-debtmap --cache-location ~/.cache/debtmap
-
-# Set permanently via environment
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap
-
-# Migrate existing cache
-debtmap --migrate-cache
-</code></pre>
-<h3 id="cache-pruning-configuration"><a class="header" href="#cache-pruning-configuration">Cache Pruning Configuration</a></h3>
-<p>Debtmap automatically manages cache size and age to prevent unbounded growth.</p>
-<p>See the <a href="#environment-variables">Environment Variables</a> section for a complete list of cache-related configuration options.</p>
-<p><strong>Cache Environment Variables</strong>:</p>
-<pre><code class="language-bash"># Enable/disable automatic cache pruning (default: true)
-export DEBTMAP_CACHE_AUTO_PRUNE=true
-
-# Maximum cache size in bytes (default: 1GB)
-export DEBTMAP_CACHE_MAX_SIZE=1073741824
-
-# Maximum cache entry age in days (default: 30)
-export DEBTMAP_CACHE_MAX_AGE_DAYS=30
-
-# Maximum number of cache entries (default: 10000)
-export DEBTMAP_CACHE_MAX_ENTRIES=10000
-
-# Percentage of entries to remove when pruning (default: 0.25)
-export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25
-
-# Pruning strategy: lru, lfu, fifo, age_based (default: lru)
-export DEBTMAP_CACHE_STRATEGY=lru
-</code></pre>
-<p><strong>Pruning Strategies</strong>:</p>
-<ul>
-<li><strong>LRU (Least Recently Used)</strong>: Removes oldest accessed entries (recommended for general use)</li>
-<li><strong>LFU (Least Frequently Used)</strong>: Removes least accessed entries (best for stable workloads)</li>
-<li><strong>FIFO (First In First Out)</strong>: Removes oldest created entries (simple, useful for testing)</li>
-<li><strong>Age-based</strong>: Removes entries older than MAX_AGE_DAYS (useful for compliance requirements)</li>
-</ul>
-<p><strong>Performance Implications</strong>:</p>
-<ul>
-<li>LRU/LFU provide better cache hit rates than FIFO</li>
-<li>Age-based strategy ensures data freshness but may reduce hit rate</li>
-<li>Adjust MAX_SIZE based on available disk space and project count</li>
-<li>Lower PRUNE_PERCENTAGE means more frequent but smaller cleanup operations</li>
-</ul>
-<h3 id="cache-strategies"><a class="header" href="#cache-strategies">Cache Strategies</a></h3>
-<p><strong>Local cache</strong> (<code>.debtmap/cache</code>):</p>
-<ul>
-<li><strong>Pros</strong>: Isolated per project, automatically managed</li>
-<li><strong>Cons</strong>: Duplicates across projects</li>
-</ul>
-<p><strong>Shared cache</strong> (<code>~/.cache/debtmap</code>):</p>
-<ul>
-<li><strong>Pros</strong>: Shared across projects, saves disk space</li>
-<li><strong>Cons</strong>: Requires manual management, may mix unrelated projects</li>
-</ul>
-<h3 id="cache-consistency"><a class="header" href="#cache-consistency">Cache Consistency</a></h3>
-<pre><code class="language-bash"># Validate LOC consistency
-debtmap --validate-loc
-
-# Cache automatically invalidates on file changes
-# Uses file hashes to detect modifications
-
-# Force fresh analysis
-debtmap --no-cache
-</code></pre>
 <h2 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h2>
 <p>Debtmap supports various environment variables for configuring behavior without command-line flags.</p>
-<h3 id="cache-environment-variables"><a class="header" href="#cache-environment-variables">Cache Environment Variables</a></h3>
-<p>See <a href="#cache-pruning-configuration">Cache Pruning Configuration</a> for detailed descriptions of cache-related variables:</p>
-<pre><code class="language-bash"># Cache location
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-
-# Automatic cache management
-export DEBTMAP_CACHE_AUTO_PRUNE=true
-export DEBTMAP_CACHE_MAX_SIZE=1073741824     # 1GB in bytes
-export DEBTMAP_CACHE_MAX_AGE_DAYS=30
-export DEBTMAP_CACHE_MAX_ENTRIES=10000
-export DEBTMAP_CACHE_PRUNE_PERCENTAGE=0.25   # Remove 25% when pruning
-export DEBTMAP_CACHE_STRATEGY=lru            # lru, lfu, fifo, age_based
-</code></pre>
 <h3 id="analysis-feature-flags"><a class="header" href="#analysis-feature-flags">Analysis Feature Flags</a></h3>
 <pre><code class="language-bash"># Enable context-aware analysis by default
 export DEBTMAP_CONTEXT_AWARE=true
@@ -645,14 +470,10 @@ export NO_EMOJI=1
 export NO_COLOR=1
 </code></pre>
 <h3 id="usage-examples"><a class="header" href="#usage-examples">Usage Examples</a></h3>
-<pre><code class="language-bash"># Set cache location permanently in shell profile
-echo 'export DEBTMAP_CACHE_DIR=~/.cache/debtmap' &gt;&gt; ~/.bashrc
-
-# Enable context-aware analysis by default
+<pre><code class="language-bash"># Enable context-aware analysis by default
 echo 'export DEBTMAP_CONTEXT_AWARE=true' &gt;&gt; ~/.bashrc
 
 # CI/CD environment setup
-export DEBTMAP_CACHE_DIR=/tmp/debtmap-cache
 export NO_EMOJI=1
 export NO_COLOR=1
 export PRODIGY_AUTOMATION=true
@@ -670,32 +491,13 @@ DEBTMAP_CONTEXT_AWARE=false debtmap --context  # Flag takes precedence
 <li><strong>Environment variables override</strong> config file defaults</li>
 <li><strong>Config file settings override</strong> built-in defaults</li>
 </ol>
-<pre><code class="language-bash"># Example: CLI flag wins
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-debtmap --cache-location /tmp/cache  # Uses /tmp/cache, not ~/.cache/debtmap
-</code></pre>
 <h3 id="troubleshooting-environment-variables"><a class="header" href="#troubleshooting-environment-variables">Troubleshooting Environment Variables</a></h3>
-<pre><code class="language-bash"># Check if environment variable is set
-echo $DEBTMAP_CACHE_DIR
-
-# Temporarily unset for testing
-unset DEBTMAP_CACHE_DIR
-debtmap  # Uses default cache location
-
-# Test with specific environment
+<pre><code class="language-bash"># Test with specific environment
 env DEBTMAP_CONTEXT_AWARE=true debtmap -v
 
 # See all debtmap-related environment variables
 env | grep -i debtmap
 env | grep -i prodigy
-</code></pre>
-<h3 id="cache-size-monitoring"><a class="header" href="#cache-size-monitoring">Cache Size Monitoring</a></h3>
-<pre><code class="language-bash"># Check cache size
-debtmap --cache-stats
-
-# Clean up old entries (manual)
-# No automatic cleanup - manage cache size manually
-# Consider clearing cache periodically for large projects
 </code></pre>
 <h2 id="context-provider-troubleshooting"><a class="header" href="#context-provider-troubleshooting">Context Provider Troubleshooting</a></h2>
 <p>Diagnose and fix issues with context providers (critical_path, dependency, git_history).</p>
@@ -1317,7 +1119,7 @@ debtmap --multi-pass --attribution --context -vv
 debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
 # Performance-focused advanced analysis
-debtmap --multi-pass --jobs 8 --cache-location ~/.cache/debtmap
+debtmap --multi-pass --jobs 8
 
 # Summary view with aggregated scores
 debtmap --detail-level summary --aggregate-only
@@ -1331,10 +1133,8 @@ debtmap --detail-level summary --aggregate-only
 <ul>
 <li>Check file permissions: <code>ls -la &lt;file&gt;</code></li>
 <li>Ensure user has read access</li>
-<li>Verify cache directory is writable</li>
-<li>Use <code>--cache-location</code> for accessible directory</li>
 </ul>
-<hr />
+<hr>
 <p><strong>Message</strong>: <code>File system error: No such file or directory</code></p>
 <p><strong>Meaning</strong>: File or directory does not exist</p>
 <p><strong>Solutions</strong>:</p>
@@ -1381,19 +1181,6 @@ debtmap --max-files 1 path/to/suspected/file
 <li>Review CLI flag values</li>
 <li>Check for typos in flag names</li>
 </ul>
-<h3 id="cache-errors"><a class="header" href="#cache-errors">Cache Errors</a></h3>
-<p><strong>Message</strong>: <code>Cache error: corrupted cache entry</code></p>
-<p><strong>Meaning</strong>: Cache data is invalid or corrupted</p>
-<p><strong>Solutions</strong>:</p>
-<pre><code class="language-bash"># Clear cache
-debtmap --clear-cache
-
-# Force rebuild
-debtmap --force-cache-rebuild
-
-# Use different cache location
-debtmap --cache-location /tmp/debtmap-cache
-</code></pre>
 <h3 id="validation-errors"><a class="header" href="#validation-errors">Validation Errors</a></h3>
 <p><strong>Message</strong>: <code>Validation error: threshold validation failed</code></p>
 <p><strong>Meaning</strong>: Threshold configuration is invalid</p>
@@ -2030,14 +1817,11 @@ debtmap validate-improvement \
 <h3 id="general-questions"><a class="header" href="#general-questions">General Questions</a></h3>
 <p><strong>Q: Why is my analysis slow?</strong></p>
 <p>A: Check several factors:</p>
-<pre><code class="language-bash"># Check cache status
-debtmap --cache-stats
-
-# Ensure caching is enabled (default)
-# Remove --no-cache if present
-
-# Use all CPU cores
+<pre><code class="language-bash"># Use all CPU cores
 debtmap --jobs 0
+
+# Try faster fallback mode
+debtmap --semantic-off
 
 # Check for large files or complex macros
 debtmap -vv
@@ -2055,7 +1839,6 @@ debtmap -vv
 <ul>
 <li>Coverage file changed (use <code>--coverage-file</code>)</li>
 <li>Context providers enabled/disabled (<code>--context</code>)</li>
-<li>Cache was cleared (<code>--clear-cache</code>)</li>
 <li>Code changes (intended behavior)</li>
 <li>Different threshold settings</li>
 </ul>
@@ -2320,18 +2103,6 @@ debtmap --jobs 4
 # Single threaded (debugging only)
 debtmap --no-parallel
 </code></pre>
-<p><strong>Q: Should I use shared or local cache?</strong></p>
-<p>A: Depends on your workflow:</p>
-<ul>
-<li><strong>Local cache</strong> (<code>.debtmap/cache</code>): Isolated, automatic</li>
-<li><strong>Shared cache</strong> (<code>~/.cache/debtmap</code>): Saves space across projects</li>
-</ul>
-<pre><code class="language-bash"># Shared cache
-debtmap --cache-location ~/.cache/debtmap
-
-# Set permanently
-export DEBTMAP_CACHE_DIR=~/.cache/debtmap
-</code></pre>
 <h2 id="when-to-file-bug-reports"><a class="header" href="#when-to-file-bug-reports">When to File Bug Reports</a></h2>
 <p>File a bug report when:</p>
 <p>✅ <strong>These are bugs</strong>:</p>
@@ -2339,7 +2110,6 @@ export DEBTMAP_CACHE_DIR=~/.cache/debtmap
 <li>Parse errors on valid syntax</li>
 <li>Crashes or panics</li>
 <li>Incorrect complexity calculations</li>
-<li>Cache corruption</li>
 <li>Concurrency errors</li>
 <li>Incorrect error messages</li>
 </ul>
@@ -2363,7 +2133,6 @@ export DEBTMAP_CACHE_DIR=~/.cache/debtmap
 <ol>
 <li>Check this troubleshooting guide</li>
 <li>Try <code>--semantic-off</code> fallback mode</li>
-<li>Clear cache with <code>--clear-cache</code></li>
 <li>Update to latest version</li>
 <li>Search existing issues on GitHub</li>
 </ol>
@@ -2378,32 +2147,17 @@ export DEBTMAP_CACHE_DIR=~/.cache/debtmap
 <h2 id="troubleshooting-checklist"><a class="header" href="#troubleshooting-checklist">Troubleshooting Checklist</a></h2>
 <p>When debugging issues, work through this checklist:</p>
 <ul>
-<li><input disabled="" type="checkbox"/>
-Run with <code>-vv</code> to see detailed output</li>
-<li><input disabled="" type="checkbox"/>
-Check <code>--cache-stats</code> for cache issues</li>
-<li><input disabled="" type="checkbox"/>
-Try <code>--clear-cache</code> to rule out cache corruption</li>
-<li><input disabled="" type="checkbox"/>
-Try <code>--semantic-off</code> to use fallback mode</li>
-<li><input disabled="" type="checkbox"/>
-Check file permissions and paths</li>
-<li><input disabled="" type="checkbox"/>
-Verify configuration in <code>.debtmap/config.toml</code></li>
-<li><input disabled="" type="checkbox"/>
-Test with <code>--max-files 10</code> to isolate issues</li>
-<li><input disabled="" type="checkbox"/>
-Try <code>--no-parallel</code> to rule out concurrency</li>
-<li><input disabled="" type="checkbox"/>
-Check <code>debtmap --version</code> for updates</li>
-<li><input disabled="" type="checkbox"/>
-Review error messages in this guide</li>
-<li><input disabled="" type="checkbox"/>
-Search GitHub issues for similar problems</li>
-<li><input disabled="" type="checkbox"/>
-Create minimal reproduction case</li>
-<li><input disabled="" type="checkbox"/>
-File bug report with debug output</li>
+<li><input disabled="" type="checkbox"> Run with <code>-vv</code> to see detailed output</li>
+<li><input disabled="" type="checkbox"> Try <code>--semantic-off</code> to use fallback mode</li>
+<li><input disabled="" type="checkbox"> Check file permissions and paths</li>
+<li><input disabled="" type="checkbox"> Verify configuration in <code>.debtmap/config.toml</code></li>
+<li><input disabled="" type="checkbox"> Test with <code>--max-files 10</code> to isolate issues</li>
+<li><input disabled="" type="checkbox"> Try <code>--no-parallel</code> to rule out concurrency</li>
+<li><input disabled="" type="checkbox"> Check <code>debtmap --version</code> for updates</li>
+<li><input disabled="" type="checkbox"> Review error messages in this guide</li>
+<li><input disabled="" type="checkbox"> Search GitHub issues for similar problems</li>
+<li><input disabled="" type="checkbox"> Create minimal reproduction case</li>
+<li><input disabled="" type="checkbox"> File bug report with debug output</li>
 </ul>
 
                     </main>
@@ -2411,7 +2165,7 @@ File bug report with debug output</li>
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                             <a rel="prev" href="faq.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                                <i class="fa fa-angle-left"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
 
@@ -2422,13 +2176,18 @@ File bug report with debug output</li>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                     <a rel="prev" href="faq.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                        <i class="fa fa-angle-left"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
             </nav>
 
         </div>
 
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
 
 
@@ -2437,13 +2196,13 @@ File bug report with debug output</li>
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
 

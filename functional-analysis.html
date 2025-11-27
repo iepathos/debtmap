@@ -12,21 +12,20 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="highlight-css" href="highlight.css">
-        <link rel="stylesheet" id="tomorrow-night-css" href="tomorrow-night.css">
-        <link rel="stylesheet" id="ayu-highlight-css" href="ayu-highlight.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
@@ -36,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex.js";
+            window.path_to_searchindex_js = "searchindex-59964db6.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc.js"></script>
+        <script src="toc-f78e0b5d.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -53,7 +52,7 @@
             </div>
         </div>
     </div>
-    <div id="body-container">
+    <div id="mdbook-body-container">
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
@@ -82,12 +81,12 @@
             html.classList.add("js");
         </script>
 
-        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
             let sidebar = null;
-            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -102,39 +101,39 @@
             }
         </script>
 
-        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
                 <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
             </noscript>
-            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
             </div>
         </nav>
 
-        <div id="page-wrapper" class="page-wrapper">
+        <div id="mdbook-page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
-                <div id="menu-bar" class="menu-bar sticky">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
                     <div class="left-buttons">
-                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
-                            <i class="fa fa-bars"></i>
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
                         </label>
-                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
-                            <i class="fa fa-paint-brush"></i>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
                         </button>
-                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
-                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
                         </ul>
-                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
-                            <i class="fa fa-search"></i>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
                         </button>
                     </div>
 
@@ -142,41 +141,41 @@
 
                     <div class="right-buttons">
                         <a href="print.html" title="Print this book" aria-label="Print this book">
-                            <i id="print-button" class="fa fa-print"></i>
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
-                            <i id="git-repository-button" class="fa fa-github"></i>
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
 
                     </div>
                 </div>
 
-                <div id="search-wrapper" class="hidden">
-                    <form id="searchbar-outer" class="searchbar-outer">
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
                         <div class="search-wrapper">
-                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
                             <div class="spinner-wrapper">
-                                <i class="fa fa-spinner fa-spin"></i>
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
                             </div>
                         </div>
                     </form>
-                    <div id="searchresults-outer" class="searchresults-outer hidden">
-                        <div id="searchresults-header" class="searchresults-header"></div>
-                        <ul id="searchresults">
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
                         </ul>
                     </div>
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script>
-                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
-                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
-                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
                         link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
                     });
                 </script>
 
-                <div id="content" class="content">
+                <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="functional-composition-analysis"><a class="header" href="#functional-composition-analysis">Functional Composition Analysis</a></h1>
 <p>Debtmap provides deep AST-based analysis to detect and evaluate functional programming patterns in Rust code. This feature helps you understand how effectively your codebase uses functional composition patterns like iterator pipelines, identify opportunities for refactoring imperative code to functional style, and rewards pure, side-effect-free functions in complexity scoring.</p>
@@ -192,11 +191,17 @@
 <p><strong>Specification</strong>: This feature implements <a href="https://github.com/yourusername/debtmap/specs/111">Specification 111: AST-Based Functional Pattern Detection</a> with accuracy targets of precision ≥90%, recall ≥85%, F1 ≥0.87, and performance overhead &lt;10%.</p>
 <h2 id="configuration-profiles"><a class="header" href="#configuration-profiles">Configuration Profiles</a></h2>
 <p>Debtmap provides three pre-configured analysis profiles to match different codebases:</p>
-<div class="table-wrapper"><table><thead><tr><th>Profile</th><th>Use Case</th><th>Min Pipeline Depth</th><th>Max Closure Complexity</th><th>Purity Threshold</th><th>Quality Threshold</th></tr></thead><tbody>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Profile</th><th>Use Case</th><th>Min Pipeline Depth</th><th>Max Closure Complexity</th><th>Purity Threshold</th><th>Quality Threshold</th></tr>
+</thead>
+<tbody>
 <tr><td><strong>Strict</strong></td><td>Functional-first codebases</td><td>3</td><td>3</td><td>0.9</td><td>0.7</td></tr>
 <tr><td><strong>Balanced</strong> (default)</td><td>Typical Rust projects</td><td>2</td><td>5</td><td>0.8</td><td>0.6</td></tr>
 <tr><td><strong>Lenient</strong></td><td>Imperative-heavy legacy code</td><td>2</td><td>10</td><td>0.5</td><td>0.4</td></tr>
-</tbody></table>
+</tbody>
+</table>
 </div>
 <h3 id="choosing-a-profile"><a class="header" href="#choosing-a-profile">Choosing a Profile</a></h3>
 <p><strong>Use Strict</strong> when:</p>
@@ -241,7 +246,7 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile lenien
 <li>Doesn’t perform I/O</li>
 </ol>
 <h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Pure function
 fn add(a: i32, b: i32) -&gt; i32 {
@@ -264,7 +269,7 @@ fn increment_counter(counter: &amp;mut i32) -&gt; i32 {
     *counter += 1;  // Side effect!
     *counter
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h2 id="pipeline-detection"><a class="header" href="#pipeline-detection">Pipeline Detection</a></h2>
 <p>Debtmap detects functional pipelines through deep AST analysis, identifying iterator chains and their transformations.</p>
 <h3 id="pipeline-stages"><a class="header" href="#pipeline-stages">Pipeline Stages</a></h3>
@@ -276,16 +281,16 @@ fn increment_counter(counter: &amp;mut i32) -&gt; i32 {
 <li><code>.into_iter()</code> - Consuming iteration</li>
 <li><code>.iter_mut()</code> - Mutable iteration</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected iterator initialization
 let results = collection.iter()
     .map(|x| x * 2)
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="2-map-transformations"><a class="header" href="#2-map-transformations">2. Map Transformations</a></h4>
 <p>Applies a transformation function to each element:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected Map stage
 items.iter()
@@ -295,11 +300,11 @@ items.iter()
         doubled + 1
     })
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>The analyzer tracks <strong>closure complexity</strong> for each map operation. Complex closures may indicate code smells and affect quality scoring based on your <code>max_closure_complexity</code> threshold.</p>
 <h4 id="3-filter-predicates"><a class="header" href="#3-filter-predicates">3. Filter Predicates</a></h4>
 <p>Selects elements based on a predicate:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected Filter stage
 items.iter()
@@ -308,10 +313,10 @@ items.iter()
         x.is_positive() &amp;&amp; x &lt; 100
     })
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="4-foldreduce-aggregation"><a class="header" href="#4-foldreduce-aggregation">4. Fold/Reduce Aggregation</a></h4>
 <p>Combines elements into a single value:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected Fold stage
 items.iter()
@@ -320,29 +325,29 @@ items.iter()
 // Or using reduce
 items.iter()
     .reduce(|a, b| a + b)
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="5-flatmap-transformations"><a class="header" href="#5-flatmap-transformations">5. FlatMap Transformations</a></h4>
 <p>Maps and flattens nested structures:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected FlatMap stage
 items.iter()
     .flat_map(|x| vec![x, x * 2])
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="6-inspect-side-effect-aware"><a class="header" href="#6-inspect-side-effect-aware">6. Inspect (Side-Effect Aware)</a></h4>
 <p>Performs side effects while passing through values:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected Inspect stage (affects purity scoring)
 items.iter()
     .inspect(|x| println!("Processing: {}", x))
     .map(|x| x * 2)
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="7-resultoption-chaining"><a class="header" href="#7-resultoption-chaining">7. Result/Option Chaining</a></h4>
 <p>Specialized stages for error handling:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected AndThen stage
 results.iter()
@@ -353,7 +358,7 @@ results.iter()
 results.iter()
     .map_err(|e| format!("Error: {}", e))
     .collect()
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="terminal-operations"><a class="header" href="#terminal-operations">Terminal Operations</a></h3>
 <p>Pipelines typically end with a terminal operation that consumes the iterator:</p>
 <ul>
@@ -366,17 +371,17 @@ results.iter()
 <li><strong><code>reduce()</code></strong> - Reduce to single value</li>
 <li><strong><code>for_each()</code></strong> - Execute side effects for each element</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Complete pipeline with terminal operation
 let total: i32 = items.iter()
     .filter(|x| **x &gt; 0)
     .map(|x| x * 2)
     .sum();  // Terminal operation: sum
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="nested-pipelines"><a class="header" href="#nested-pipelines">Nested Pipelines</a></h3>
 <p>Debtmap detects pipelines nested within closures, indicating highly functional code patterns:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Nested pipeline detected
 let results = outer_items.iter()
@@ -387,11 +392,11 @@ let results = outer_items.iter()
             .collect()
     })
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Nesting level</strong> tracking helps identify sophisticated functional composition patterns.</p>
 <h3 id="parallel-pipelines"><a class="header" href="#parallel-pipelines">Parallel Pipelines</a></h3>
 <p>Parallel iteration using Rayon is automatically detected:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use rayon::prelude::*;
 
@@ -400,11 +405,11 @@ let results: Vec&lt;_&gt; = items.par_iter()
     .filter(|x| **x &gt; 0)
     .map(|x| x * 2)
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Parallel pipelines indicate high-performance functional patterns and receive positive quality scoring.</p>
 <h3 id="builder-pattern-filtering"><a class="header" href="#builder-pattern-filtering">Builder Pattern Filtering</a></h3>
 <p>To avoid false positives, debtmap distinguishes builder patterns from functional pipelines:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// This is a builder pattern, NOT counted as a functional pipeline
 let config = ConfigBuilder::new()
@@ -416,7 +421,7 @@ let config = ConfigBuilder::new()
 let values = items.iter()
     .map(|x| x * 2)
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Builder patterns are filtered out to ensure accurate functional composition metrics.</p>
 <h2 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h2>
 <p>Debtmap analyzes functions to determine their purity level - whether they have side effects and mutable state.</p>
@@ -439,7 +444,7 @@ let values = items.iter()
 <li>No <code>unsafe</code> blocks</li>
 <li>Only immutable bindings</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Pure function
 fn calculate_total(items: &amp;[i32]) -&gt; i32 {
@@ -452,7 +457,7 @@ fn process_value(x: i32) -&gt; i32 {
     let result = doubled + 10;
     result
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="probably-pure-weight-05"><a class="header" href="#probably-pure-weight-05">Probably Pure (Weight 0.5)</a></h4>
 <p>Likely no side effects:</p>
 <ul>
@@ -460,7 +465,7 @@ fn process_value(x: i32) -&gt; i32 {
 <li>Associated functions (no <code>self</code>)</li>
 <li>No obvious side effects detected</li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Probably pure - static function
 fn transform(value: i32) -&gt; i32 {
@@ -473,7 +478,7 @@ impl MyType {
         MyType { value: 0 }
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="impure-weight-10"><a class="header" href="#impure-weight-10">Impure (Weight 1.0)</a></h4>
 <p>Has side effects:</p>
 <ul>
@@ -483,7 +488,7 @@ impl MyType {
 <li>Mutates global state</li>
 <li>Uses <code>unsafe</code></li>
 </ul>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Impure - mutable reference
 fn increment(value: &amp;mut i32) {
@@ -499,7 +504,7 @@ fn log_value(value: i32) {
 fn process_items(items: &amp;mut Vec&lt;i32&gt;) {
     items.push(42);
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="purity-weight-multipliers"><a class="header" href="#purity-weight-multipliers">Purity Weight Multipliers</a></h3>
 <p>Purity levels affect god object detection through weight multipliers (implemented in <code>src/organization/purity_analyzer.rs:29-39</code>). Pure functions contribute <strong>less</strong> to god object scores, rewarding codebases with many small pure helper functions:</p>
 <ul>
@@ -536,7 +541,7 @@ fn process_items(items: &amp;mut Vec&lt;i32&gt;) {
 <li>Thread spawning</li>
 </ul>
 <h3 id="rust-specific-detection"><a class="header" href="#rust-specific-detection">Rust-Specific Detection</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Interior mutability detection
 use std::cell::RefCell;
@@ -552,12 +557,12 @@ fn unsafe_side_effect() {
         // Automatically flagged as potentially impure
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="side-effect-classification"><a class="header" href="#side-effect-classification">Side Effect Classification</a></h3>
 <p>Side effects are categorized by severity:</p>
 <h4 id="pure---no-side-effects"><a class="header" href="#pure---no-side-effects">Pure - No Side Effects</a></h4>
 <p>No mutations, I/O, or global state changes:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Pure - only computation
 fn fibonacci(n: u32) -&gt; u32 {
@@ -567,10 +572,10 @@ fn fibonacci(n: u32) -&gt; u32 {
         _ =&gt; fibonacci(n - 1) + fibonacci(n - 2),
     }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h4 id="benign---small-penalty"><a class="header" href="#benign---small-penalty">Benign - Small Penalty</a></h4>
 <p>Only logging, tracing, or metrics:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use tracing::debug;
 
@@ -579,11 +584,11 @@ fn process(value: i32) -&gt; i32 {
     debug!("Processing value: {}", value);
     value * 2
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Benign side effects receive a <strong>small penalty</strong> in purity scoring. Logging and observability are recognized as practical necessities.</p>
 <h4 id="impure---large-penalty"><a class="header" href="#impure---large-penalty">Impure - Large Penalty</a></h4>
 <p>I/O, mutations, network operations:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Impure - file I/O
 fn save_to_file(data: &amp;str) -&gt; std::io::Result&lt;()&gt; {
@@ -594,7 +599,7 @@ fn save_to_file(data: &amp;str) -&gt; std::io::Result&lt;()&gt; {
 async fn fetch_data(url: &amp;str) -&gt; Result&lt;String, reqwest::Error&gt; {
     reqwest::get(url).await?.text().await
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Impure side effects receive a <strong>large penalty</strong> in purity scoring.</p>
 <h3 id="purity-metrics"><a class="header" href="#purity-metrics">Purity Metrics</a></h3>
 <p>For each function, debtmap calculates purity metrics through the functional composition analysis (<code>src/analysis/functional_composition.rs</code>). These metrics are computed by <code>analyze_composition()</code> and returned in <code>CompositionMetrics</code> and <code>PurityMetrics</code>:</p>
@@ -608,7 +613,7 @@ async fn fetch_data(url: &amp;str) -&gt; Result&lt;String, reqwest::Error&gt; {
 </ul>
 <h4 id="immutability-ratio"><a class="header" href="#immutability-ratio">Immutability Ratio</a></h4>
 <p>The immutability ratio measures how much of a function’s local state is immutable:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn example() {
     let x = 10;         // Immutable
@@ -617,11 +622,11 @@ async fn fetch_data(url: &amp;str) -&gt; Result&lt;String, reqwest::Error&gt; {
     z += 1;
     // immutability_ratio = 2/3 = 0.67
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p>Higher immutability ratios contribute to better purity scores.</p>
 <h2 id="composition-pattern-recognition"><a class="header" href="#composition-pattern-recognition">Composition Pattern Recognition</a></h2>
 <h3 id="function-composition"><a class="header" href="#function-composition">Function Composition</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected composition pattern
 fn process_data(input: String) -&gt; Result&lt;Output&gt; {
@@ -631,9 +636,9 @@ fn process_data(input: String) -&gt; Result&lt;Output&gt; {
         .and_then(transform)
         .map(normalize)
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="higher-order-functions"><a class="header" href="#higher-order-functions">Higher-Order Functions</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected HOF pattern
 fn apply_twice&lt;F&gt;(f: F, x: i32) -&gt; i32
@@ -642,9 +647,9 @@ where
 {
     f(f(x))
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="mapfilterfold-chains"><a class="header" href="#mapfilterfold-chains">Map/Filter/Fold Chains</a></h3>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Detected functional pipeline
 let result = items
@@ -652,7 +657,7 @@ let result = items
     .filter(|x| x.is_valid())
     .map(|x| x.transform())
     .fold(0, |acc, x| acc + x);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h2 id="composition-quality-scoring"><a class="header" href="#composition-quality-scoring">Composition Quality Scoring</a></h2>
 <p>Debtmap combines pipeline metrics and purity analysis into an overall <strong>composition quality score</strong> (0.0-1.0).</p>
 <h3 id="scoring-factors"><a class="header" href="#scoring-factors">Scoring Factors</a></h3>
@@ -706,7 +711,7 @@ Side Effect Density = total_side_effects / total_functions
 <h2 id="practical-examples"><a class="header" href="#practical-examples">Practical Examples</a></h2>
 <h3 id="example-1-detecting-imperative-vs-functional-code"><a class="header" href="#example-1-detecting-imperative-vs-functional-code">Example 1: Detecting Imperative vs Functional Code</a></h3>
 <p><strong>Imperative style</strong> (lower composition quality):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn process_items_imperative(items: Vec&lt;i32&gt;) -&gt; Vec&lt;i32&gt; {
     let mut results = Vec::new();
@@ -718,9 +723,9 @@ Side Effect Density = total_side_effects / total_functions
     results
 }
 // Detected: No pipelines, mutable state, lower purity score
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Functional style</strong> (higher composition quality):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn process_items_functional(items: Vec&lt;i32&gt;) -&gt; Vec&lt;i32&gt; {
     items.iter()
@@ -729,10 +734,10 @@ Side Effect Density = total_side_effects / total_functions
         .collect()
 }
 // Detected: Pipeline depth 3, pure function, high composition quality
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="example-2-identifying-refactoring-opportunities"><a class="header" href="#example-2-identifying-refactoring-opportunities">Example 2: Identifying Refactoring Opportunities</a></h3>
 <p>When debtmap detects low composition quality, it suggests refactoring:</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Original: Imperative with mutations
 fn calculate_statistics(data: &amp;[f64]) -&gt; (f64, f64, f64) {
@@ -758,7 +763,7 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
     (sum / data.len() as f64, *min, *max)
 }
 // Higher purity score, multiple pipelines detected
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h3 id="example-3-using-profiles-for-different-codebases"><a class="header" href="#example-3-using-profiles-for-different-codebases">Example 3: Using Profiles for Different Codebases</a></h3>
 <p><strong>Strict profile</strong> - Catches subtle functional patterns:</p>
 <pre><code class="language-bash">$ debtmap analyze --ast-functional-analysis --functional-analysis-profile strict src/
@@ -780,7 +785,7 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 </code></pre>
 <h3 id="example-4-interpreting-purity-scores"><a class="header" href="#example-4-interpreting-purity-scores">Example 4: Interpreting Purity Scores</a></h3>
 <p><strong>Pure function</strong> (score: 1.0):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn add(a: i32, b: i32) -&gt; i32 {
     a + b
@@ -788,9 +793,9 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 // Purity: 1.0 (perfect)
 // Immutability ratio: 1.0 (no bindings)
 // Side effects: None
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Mostly pure</strong> (score: 0.8):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn process(values: &amp;[i32]) -&gt; i32 {
     let doubled: Vec&lt;_&gt; = values.iter().map(|x| x * 2).collect();
@@ -801,9 +806,9 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 // Immutability ratio: 1.0 (both bindings immutable)
 // Side effects: None
 // Pipelines: 2 detected
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <p><strong>Impure function</strong> (score: 0.2):</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn log_and_process(values: &amp;mut Vec&lt;i32&gt;) {
     println!("Processing {} items", values.len());
@@ -812,14 +817,14 @@ fn calculate_statistics_functional(data: &amp;[f64]) -&gt; (f64, f64, f64) {
 // Purity: 0.2 (low)
 // Immutability ratio: 0.0 (mutable parameter)
 // Side effects: I/O (println), mutation
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 <h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
 <h3 id="writing-functional-rust-code"><a class="header" href="#writing-functional-rust-code">Writing Functional Rust Code</a></h3>
 <p>To achieve high composition quality scores:</p>
 <ol>
 <li>
 <p><strong>Prefer iterator chains over manual loops</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Good
 let evens: Vec&lt;_&gt; = items.iter().filter(|x| *x % 2 == 0).collect();
@@ -829,11 +834,11 @@ let mut evens = Vec::new();
 for item in &amp;items {
     if item % 2 == 0 { evens.push(item); }
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 <li>
 <p><strong>Minimize mutable state</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Good
 let result = calculate(input);
@@ -841,11 +846,11 @@ let result = calculate(input);
 // Avoid
 let mut result = 0;
 result = calculate(input);
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 <li>
 <p><strong>Separate pure logic from side effects</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Good - pure computation
 fn calculate_price(quantity: u32, unit_price: f64) -&gt; f64 {
@@ -856,11 +861,11 @@ fn calculate_price(quantity: u32, unit_price: f64) -&gt; f64 {
 fn display_price(price: f64) {
     println!("Total: ${:.2}", price);
 }
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 <li>
 <p><strong>Keep closures simple</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Good - simple closure
 items.map(|x| x * 2)
@@ -877,18 +882,18 @@ fn transform_item(x: i32) -&gt; i32 {
     transform(temp)
 }
 items.map(transform_item)
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 <li>
 <p><strong>Use parallel iteration for CPU-intensive work</strong></p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use rayon::prelude::*;
 
 let results: Vec&lt;_&gt; = large_dataset.par_iter()
     .map(|item| expensive_computation(item))
     .collect();
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 </ol>
 <h3 id="code-organization"><a class="header" href="#code-organization">Code Organization</a></h3>
@@ -996,7 +1001,7 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanc
 <h3 id="high-complexity-closures-flagged"><a class="header" href="#high-complexity-closures-flagged">“High complexity closures flagged”</a></h3>
 <ul>
 <li><strong>Extract complex closures</strong> into named functions:
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// Instead of
 items.map(|x| { /* 10 lines */ })
@@ -1004,7 +1009,7 @@ items.map(|x| { /* 10 lines */ })
 // Use
 fn process_item(x: Item) -&gt; Result { /* 10 lines */ }
 items.map(process_item)
-<span class="boring">}</span></code></pre></pre>
+<span class="boring">}</span></code></pre>
 </li>
 <li><strong>Adjust <code>max_closure_complexity</code></strong>: Consider lenient profile if needed</li>
 <li><strong>Refactor closure logic</strong>: Break down complex operations</li>
@@ -1030,7 +1035,7 @@ items.map(process_item)
 <ul>
 <li><strong>Spec 111 targets &lt;10% overhead</strong>: Performance impact should be minimal</li>
 <li><strong>Disable for hot paths</strong>: Analyze functional patterns in separate runs if needed</li>
-<li><strong>Use caching</strong>: Debtmap caches analysis results between runs</li>
+<li><strong>Use parallel processing</strong>: Leverage multi-core parallelism for faster analysis</li>
 </ul>
 <h2 id="related-chapters"><a class="header" href="#related-chapters">Related Chapters</a></h2>
 <ul>
@@ -1057,11 +1062,11 @@ items.map(process_item)
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                             <a rel="prev" href="error-handling-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                                <i class="fa fa-angle-left"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
                             <a rel="next prefetch" href="god-object-detection.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
                         <div style="clear: both"></div>
@@ -1071,16 +1076,21 @@ items.map(process_item)
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                     <a rel="prev" href="error-handling-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
-                        <i class="fa fa-angle-left"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
                     <a rel="next prefetch" href="god-object-detection.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
 
         </div>
 
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
 
 
@@ -1089,13 +1099,13 @@ items.map(process_item)
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
 
