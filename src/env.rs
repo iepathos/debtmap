@@ -91,6 +91,25 @@ pub trait AnalysisEnv: Clone + Send + Sync {
     ///
     /// This provides access to thresholds, scoring weights, and other settings.
     fn config(&self) -> &DebtmapConfig;
+
+    /// Create a new environment with the updated config.
+    ///
+    /// This is used by the Reader pattern's `local` operation to run effects
+    /// with temporarily modified configuration. Returns a new environment
+    /// instance with the updated config (immutable pattern).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use debtmap::env::AnalysisEnv;
+    ///
+    /// fn with_strict_thresholds<E: AnalysisEnv>(env: E) -> E {
+    ///     let mut config = env.config().clone();
+    ///     // Modify config...
+    ///     env.with_config(config)
+    /// }
+    /// ```
+    fn with_config(self, config: DebtmapConfig) -> Self;
 }
 
 /// Production environment implementation.
@@ -186,6 +205,10 @@ impl AnalysisEnv for RealEnv {
 
     fn config(&self) -> &DebtmapConfig {
         &self.config
+    }
+
+    fn with_config(self, config: DebtmapConfig) -> Self {
+        Self { config, ..self }
     }
 }
 

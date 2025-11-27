@@ -16,6 +16,41 @@
 //!   instead of failing at the first one. Use for configuration validation,
 //!   input checking, and anywhere you want comprehensive error reporting.
 //!
+//! # Reader Pattern (Spec 199)
+//!
+//! This module also provides **Reader pattern** helpers using stillwater 0.11.0's
+//! zero-cost `ask`, `asks`, and `local` primitives. The Reader pattern eliminates
+//! config parameter threading by making configuration available through the
+//! environment.
+//!
+//! ## Reader Pattern Benefits
+//!
+//! **Before (parameter threading):**
+//! ```rust,ignore
+//! fn analyze(ast: &Ast, config: &Config) -> Metrics {
+//!     calculate_complexity(ast, &config.thresholds)
+//! }
+//! ```
+//!
+//! **After (Reader pattern):**
+//! ```rust,ignore
+//! use debtmap::effects::asks_config;
+//!
+//! fn analyze_effect<Env>(ast: Ast) -> impl Effect<...>
+//! where Env: AnalysisEnv + Clone + Send + Sync
+//! {
+//!     asks_config(move |config| calculate_complexity(&ast, &config.thresholds))
+//! }
+//! ```
+//!
+//! ## Available Reader Helpers
+//!
+//! - [`asks_config`]: Access the full config via closure
+//! - [`asks_thresholds`]: Access thresholds config section
+//! - [`asks_scoring`]: Access scoring weights config section
+//! - [`asks_entropy`]: Access entropy config section
+//! - [`local_with_config`]: Run effect with modified config (temporary override)
+//!
 //! # Example: Using Effects
 //!
 //! ```rust,ignore
@@ -52,6 +87,37 @@
 //!
 //!     // Combine validations - collects ALL errors
 //!     v1.and(v2)
+//! }
+//! ```
+//!
+//! # Example: Using Reader Pattern
+//!
+//! ```rust,ignore
+//! use debtmap::effects::{asks_config, asks_thresholds, local_with_config};
+//! use debtmap::env::AnalysisEnv;
+//! use stillwater::Effect;
+//!
+//! // Query config via closure
+//! fn get_complexity_threshold<Env>() -> impl Effect<Output = Option<u32>, Error = AnalysisError, Env = Env>
+//! where
+//!     Env: AnalysisEnv + Clone + Send + Sync,
+//! {
+//!     asks_config(|config| config.thresholds.as_ref().and_then(|t| t.complexity))
+//! }
+//!
+//! // Use temporary config override
+//! fn analyze_strict<Env>(path: PathBuf) -> impl Effect<...>
+//! where
+//!     Env: AnalysisEnv + Clone + Send + Sync,
+//! {
+//!     local_with_config(
+//!         |config| {
+//!             let mut strict = config.clone();
+//!             // Apply stricter thresholds
+//!             strict
+//!         },
+//!         analyze_file_effect(path)
+//!     )
 //! }
 //! ```
 
@@ -363,6 +429,265 @@ where
     }
 }
 
+// =============================================================================
+// Reader Pattern Helpers (Spec 199)
+// =============================================================================
+//
+// These helpers use stillwater 0.11.0's zero-cost Reader primitives to provide
+// config access without parameter threading.
+
+use crate::config::{EntropyConfig, ScoringWeights, ThresholdsConfig};
+use stillwater::Effect;
+
+use std::sync::Arc;
+
+/// A wrapper type that makes a shared function callable via `Fn` traits.
+///
+/// This wrapper holds an `Arc<F>` and implements `Fn` by cloning the `Arc`
+/// on each call, allowing the function to be called multiple times.
+#[derive(Clone)]
+pub struct SharedFn<F>(Arc<F>);
+
+impl<F> SharedFn<F> {
+    fn new(f: F) -> Self {
+        Self(Arc::new(f))
+    }
+}
+
+/// Query config through closure - the core Reader pattern primitive.
+///
+/// This function creates an effect that queries the environment's config
+/// using a provided closure. The closure receives a reference to the
+/// [`DebtmapConfig`] and returns any value.
+///
+/// Uses `Arc` internally to allow the closure to be called multiple times.
+///
+/// # Type Parameters
+///
+/// - `U`: The return type of the query
+/// - `Env`: The environment type (must implement [`AnalysisEnv`])
+/// - `F`: The query function type
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::asks_config;
+///
+/// // Get ignore patterns from config
+/// fn get_ignore_patterns<Env>() -> impl Effect<Output = Vec<String>, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     asks_config(|config| config.get_ignore_patterns())
+/// }
+///
+/// // Get complexity threshold
+/// fn get_complexity_threshold<Env>() -> impl Effect<Output = Option<u32>, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     asks_config(|config| config.thresholds.as_ref().and_then(|t| t.complexity))
+/// }
+/// ```
+pub fn asks_config<U, Env, F>(f: F) -> impl Effect<Output = U, Error = AnalysisError, Env = Env>
+where
+    U: Send + 'static,
+    Env: AnalysisEnv + Clone + Send + Sync + 'static,
+    F: Fn(&DebtmapConfig) -> U + Send + Sync + 'static,
+{
+    let shared = SharedFn::new(f);
+    stillwater::asks(move |env: &Env| (shared.0)(env.config()))
+}
+
+/// Query thresholds config section.
+///
+/// Convenience helper for accessing the thresholds configuration.
+/// Returns `None` if thresholds are not configured.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::asks_thresholds;
+///
+/// fn get_max_file_length<Env>() -> impl Effect<Output = Option<usize>, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     asks_thresholds(|thresholds| thresholds.and_then(|t| t.max_file_length))
+/// }
+/// ```
+pub fn asks_thresholds<U, Env, F>(f: F) -> impl Effect<Output = U, Error = AnalysisError, Env = Env>
+where
+    U: Send + 'static,
+    Env: AnalysisEnv + Clone + Send + Sync + 'static,
+    F: Fn(Option<&ThresholdsConfig>) -> U + Send + Sync + 'static,
+{
+    let shared = SharedFn::new(f);
+    stillwater::asks(move |env: &Env| (shared.0)(env.config().thresholds.as_ref()))
+}
+
+/// Query scoring weights config section.
+///
+/// Convenience helper for accessing the scoring weights configuration.
+/// Returns `None` if scoring weights are not configured.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::asks_scoring;
+///
+/// fn get_coverage_weight<Env>() -> impl Effect<Output = f64, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     asks_scoring(|scoring| scoring.map(|s| s.coverage).unwrap_or(0.5))
+/// }
+/// ```
+pub fn asks_scoring<U, Env, F>(f: F) -> impl Effect<Output = U, Error = AnalysisError, Env = Env>
+where
+    U: Send + 'static,
+    Env: AnalysisEnv + Clone + Send + Sync + 'static,
+    F: Fn(Option<&ScoringWeights>) -> U + Send + Sync + 'static,
+{
+    let shared = SharedFn::new(f);
+    stillwater::asks(move |env: &Env| (shared.0)(env.config().scoring.as_ref()))
+}
+
+/// Query entropy config section.
+///
+/// Convenience helper for accessing the entropy configuration.
+/// Returns `None` if entropy config is not set.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::asks_entropy;
+///
+/// fn is_entropy_enabled<Env>() -> impl Effect<Output = bool, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     asks_entropy(|entropy| entropy.map(|e| e.enabled).unwrap_or(true))
+/// }
+/// ```
+pub fn asks_entropy<U, Env, F>(f: F) -> impl Effect<Output = U, Error = AnalysisError, Env = Env>
+where
+    U: Send + 'static,
+    Env: AnalysisEnv + Clone + Send + Sync + 'static,
+    F: Fn(Option<&EntropyConfig>) -> U + Send + Sync + 'static,
+{
+    let shared = SharedFn::new(f);
+    stillwater::asks(move |env: &Env| (shared.0)(env.config().entropy.as_ref()))
+}
+
+/// Run an effect with a temporarily modified config.
+///
+/// This is the Reader pattern's `local` operation - it allows running an
+/// inner effect with a modified environment. The modification is only
+/// visible to the inner effect; after it completes, the original
+/// environment is restored.
+///
+/// This is useful for:
+/// - **Strict mode**: Running analysis with stricter thresholds
+/// - **Custom thresholds**: Temporarily overriding specific settings
+/// - **Feature flags**: Temporarily enabling/disabling features
+///
+/// # Type Parameters
+///
+/// - `Inner`: The inner effect type
+/// - `F`: The environment transformation function
+/// - `Env`: The environment type
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::local_with_config;
+///
+/// // Run analysis in strict mode (lower complexity threshold)
+/// fn analyze_strict<Env>(
+///     path: PathBuf,
+/// ) -> impl Effect<Output = FileAnalysis, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     local_with_config(
+///         |config| {
+///             let mut strict = config.clone();
+///             if let Some(ref mut thresholds) = strict.thresholds {
+///                 // Reduce complexity threshold by half
+///                 if let Some(complexity) = thresholds.complexity {
+///                     thresholds.complexity = Some(complexity / 2);
+///                 }
+///             }
+///             strict
+///         },
+///         analyze_file_effect(path)
+///     )
+/// }
+///
+/// // Temporarily disable entropy-based scoring
+/// fn analyze_without_entropy<Env>(
+///     inner: impl Effect<Output = T, Error = AnalysisError, Env = Env>
+/// ) -> impl Effect<Output = T, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     local_with_config(
+///         |config| {
+///             let mut modified = config.clone();
+///             if let Some(ref mut entropy) = modified.entropy {
+///                 entropy.enabled = false;
+///             }
+///             modified
+///         },
+///         inner
+///     )
+/// }
+/// ```
+pub fn local_with_config<Inner, F, Env>(
+    f: F,
+    inner: Inner,
+) -> impl Effect<Output = Inner::Output, Error = Inner::Error, Env = Env>
+where
+    Env: AnalysisEnv + Clone + Send + Sync + 'static,
+    F: Fn(&DebtmapConfig) -> DebtmapConfig + Send + Sync + 'static,
+    Inner: Effect<Env = Env>,
+{
+    let shared = SharedFn::new(f);
+    stillwater::local(
+        move |env: &Env| {
+            let new_config = (shared.0)(env.config());
+            env.clone().with_config(new_config)
+        },
+        inner,
+    )
+}
+
+/// Query the entire environment.
+///
+/// This is a low-level helper that returns a clone of the entire environment.
+/// Prefer using [`asks_config`] or the specific query helpers when you only
+/// need config access.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::ask_env;
+///
+/// fn get_full_env<Env>() -> impl Effect<Output = Env, Error = AnalysisError, Env = Env>
+/// where
+///     Env: AnalysisEnv + Clone + Send + Sync,
+/// {
+///     ask_env()
+/// }
+/// ```
+pub fn ask_env<Env>() -> stillwater::effect::reader::Ask<AnalysisError, Env>
+where
+    Env: Clone + Send + Sync + 'static,
+{
+    stillwater::ask::<AnalysisError, Env>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -485,5 +810,219 @@ mod tests {
         let effect = effect_pure(42);
         let result = run_effect(effect, DebtmapConfig::default());
         assert_eq!(result.unwrap(), 42);
+    }
+
+    // =========================================================================
+    // Reader Pattern Tests (Spec 199)
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_asks_config_returns_config_value() {
+        use crate::config::IgnoreConfig;
+
+        let config = DebtmapConfig {
+            ignore: Some(IgnoreConfig {
+                patterns: vec!["test/**".to_string()],
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        // Create effect that queries config
+        let effect = asks_config::<Vec<String>, RealEnv, _>(|config| config.get_ignore_patterns());
+
+        let patterns = effect.run(&env).await.unwrap();
+        assert_eq!(patterns, vec!["test/**".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_asks_config_with_default_config() {
+        let env = RealEnv::default();
+
+        // Query ignore patterns from default config
+        let effect = asks_config::<Vec<String>, RealEnv, _>(|config| config.get_ignore_patterns());
+
+        let patterns = effect.run(&env).await.unwrap();
+        assert!(patterns.is_empty()); // Default config has no ignore patterns
+    }
+
+    #[tokio::test]
+    async fn test_asks_thresholds_with_thresholds() {
+        use crate::config::ThresholdsConfig;
+
+        let config = DebtmapConfig {
+            thresholds: Some(ThresholdsConfig {
+                complexity: Some(15),
+                max_file_length: Some(500),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        let effect = asks_thresholds::<Option<u32>, RealEnv, _>(|thresholds| {
+            thresholds.and_then(|t| t.complexity)
+        });
+
+        let complexity = effect.run(&env).await.unwrap();
+        assert_eq!(complexity, Some(15));
+    }
+
+    #[tokio::test]
+    async fn test_asks_thresholds_without_thresholds() {
+        let env = RealEnv::default();
+
+        let effect = asks_thresholds::<Option<u32>, RealEnv, _>(|thresholds| {
+            thresholds.and_then(|t| t.complexity)
+        });
+
+        let complexity = effect.run(&env).await.unwrap();
+        assert_eq!(complexity, None);
+    }
+
+    #[tokio::test]
+    async fn test_asks_scoring_with_weights() {
+        let config = DebtmapConfig {
+            scoring: Some(ScoringWeights {
+                coverage: 0.6,
+                complexity: 0.3,
+                dependency: 0.1,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        let effect =
+            asks_scoring::<f64, RealEnv, _>(|scoring| scoring.map(|s| s.coverage).unwrap_or(0.5));
+
+        let coverage = effect.run(&env).await.unwrap();
+        assert!((coverage - 0.6).abs() < 0.001);
+    }
+
+    #[tokio::test]
+    async fn test_asks_entropy_enabled() {
+        let config = DebtmapConfig {
+            entropy: Some(EntropyConfig {
+                enabled: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        let effect =
+            asks_entropy::<bool, RealEnv, _>(|entropy| entropy.map(|e| e.enabled).unwrap_or(true));
+
+        let enabled = effect.run(&env).await.unwrap();
+        assert!(!enabled);
+    }
+
+    #[tokio::test]
+    async fn test_local_with_config_modifies_config() {
+        use crate::config::IgnoreConfig;
+
+        let original_config = DebtmapConfig {
+            ignore: Some(IgnoreConfig {
+                patterns: vec!["original/**".to_string()],
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(original_config);
+
+        // Inner effect that queries config
+        let inner = asks_config::<Vec<String>, RealEnv, _>(|config| config.get_ignore_patterns());
+
+        // Wrap with local that modifies config
+        let effect = local_with_config(
+            |_config| DebtmapConfig {
+                ignore: Some(IgnoreConfig {
+                    patterns: vec!["modified/**".to_string()],
+                }),
+                ..Default::default()
+            },
+            inner,
+        );
+
+        let patterns = effect.run(&env).await.unwrap();
+        assert_eq!(patterns, vec!["modified/**".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_local_with_config_restores_after() {
+        use crate::config::IgnoreConfig;
+
+        let original_config = DebtmapConfig {
+            ignore: Some(IgnoreConfig {
+                patterns: vec!["original/**".to_string()],
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(original_config.clone());
+
+        // Run with modified config
+        let inner = asks_config::<Vec<String>, RealEnv, _>(|config| config.get_ignore_patterns());
+        let modified_effect = local_with_config(
+            |_| DebtmapConfig {
+                ignore: Some(IgnoreConfig {
+                    patterns: vec!["modified/**".to_string()],
+                }),
+                ..Default::default()
+            },
+            inner,
+        );
+        let _ = modified_effect.run(&env).await.unwrap();
+
+        // Original env should be unchanged (run a new query)
+        let check_effect =
+            asks_config::<Vec<String>, RealEnv, _>(|config| config.get_ignore_patterns());
+        let patterns = check_effect.run(&env).await.unwrap();
+        assert_eq!(patterns, vec!["original/**".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn test_ask_env_returns_cloned_env() {
+        let config = DebtmapConfig::default();
+        let env = RealEnv::new(config);
+
+        let effect = ask_env::<RealEnv>();
+
+        let cloned_env = effect.run(&env).await.unwrap();
+        // Both should have the same config
+        assert_eq!(
+            format!("{:?}", cloned_env.config()),
+            format!("{:?}", env.config())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reader_pattern_composition() {
+        use stillwater::EffectExt;
+
+        let config = DebtmapConfig {
+            scoring: Some(ScoringWeights {
+                coverage: 0.6,
+                complexity: 0.4,
+                dependency: 0.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        // Compose multiple Reader queries
+        let coverage_effect =
+            asks_scoring::<f64, RealEnv, _>(|scoring| scoring.map(|s| s.coverage).unwrap_or(0.5));
+
+        let complexity_effect = asks_scoring::<f64, RealEnv, _>(|scoring| {
+            scoring.map(|s| s.complexity).unwrap_or(0.35)
+        });
+
+        // Use and_then to compose effects
+        let combined =
+            coverage_effect.and_then(move |cov| complexity_effect.map(move |comp| cov + comp));
+
+        let sum = combined.run(&env).await.unwrap();
+        assert!((sum - 1.0).abs() < 0.001); // 0.6 + 0.4 = 1.0
     }
 }
