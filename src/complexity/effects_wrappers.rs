@@ -37,7 +37,7 @@ use crate::effects::{effect_fail, effect_pure, AnalysisEffect};
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use std::path::PathBuf;
-use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 /// Calculate cyclomatic complexity for a file with I/O.
 ///
@@ -55,7 +55,7 @@ use stillwater::Effect;
 /// let complexity = run_effect(effect, config)?;
 /// ```
 pub fn calculate_cyclomatic_effect(path: PathBuf) -> AnalysisEffect<u32> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         // Read file content
         let content = env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
@@ -69,6 +69,7 @@ pub fn calculate_cyclomatic_effect(path: PathBuf) -> AnalysisEffect<u32> {
         // Calculate complexity using pure function
         Ok(calculate_cyclomatic_pure(&ast))
     })
+    .boxed()
 }
 
 /// Calculate cognitive complexity for a file with I/O.
@@ -87,7 +88,7 @@ pub fn calculate_cyclomatic_effect(path: PathBuf) -> AnalysisEffect<u32> {
 /// let complexity = run_effect(effect, config)?;
 /// ```
 pub fn calculate_cognitive_effect(path: PathBuf) -> AnalysisEffect<u32> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         // Read file content
         let content = env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
@@ -101,6 +102,7 @@ pub fn calculate_cognitive_effect(path: PathBuf) -> AnalysisEffect<u32> {
         // Calculate complexity using pure function
         Ok(calculate_cognitive_pure(&ast))
     })
+    .boxed()
 }
 
 /// Detect patterns in a file with I/O.
@@ -119,7 +121,7 @@ pub fn calculate_cognitive_effect(path: PathBuf) -> AnalysisEffect<u32> {
 /// let patterns = run_effect(effect, config)?;
 /// ```
 pub fn detect_patterns_effect(path: PathBuf) -> AnalysisEffect<Vec<Pattern>> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         // Read file content
         let content = env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
@@ -133,6 +135,7 @@ pub fn detect_patterns_effect(path: PathBuf) -> AnalysisEffect<Vec<Pattern>> {
         // Detect patterns using pure function
         Ok(detect_patterns_pure(&ast))
     })
+    .boxed()
 }
 
 /// Combined complexity analysis result.
@@ -160,7 +163,7 @@ pub struct ComplexityResult {
 /// println!("Cyclomatic: {}, Cognitive: {}", result.cyclomatic, result.cognitive);
 /// ```
 pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResult> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         // Read file content
         let content = env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e), path.clone())
@@ -178,6 +181,7 @@ pub fn analyze_complexity_effect(path: PathBuf) -> AnalysisEffect<ComplexityResu
             patterns: detect_patterns_pure(&ast),
         })
     })
+    .boxed()
 }
 
 /// Calculate complexity from a string (for testing or processing in-memory content).

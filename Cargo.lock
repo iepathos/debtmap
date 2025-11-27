@@ -3317,9 +3317,9 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stillwater"
-version = "0.8.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e86782dce3d3494a7040ac8926f64cfc09f1208c2f0147d349a2d8f6715dc53"
+checksum = "4b1e8e08a028817aa1ef3ce500ee762c4158307b6bb6952a6acabf0795d2e1b8"
 dependencies = [
  "futures",
  "tokio",

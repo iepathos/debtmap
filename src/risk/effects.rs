@@ -33,7 +33,7 @@ use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use crate::io::traits::CoverageData;
 use std::path::PathBuf;
-use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 // ============================================================================
 // LCOV Loading
@@ -62,7 +62,7 @@ use stillwater::Effect;
 /// - The file isn't valid LCOV format
 pub fn load_lcov_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.coverage_loader().load_lcov(&path).map_err(|e| {
             AnalysisError::coverage_with_path(
                 format!(
@@ -74,6 +74,7 @@ pub fn load_lcov_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
             )
         })
     })
+    .boxed()
 }
 
 /// Load coverage data from a Cobertura XML file as an Effect.
@@ -90,7 +91,7 @@ pub fn load_lcov_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
 /// - The file isn't valid Cobertura XML
 pub fn load_cobertura_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.coverage_loader().load_cobertura(&path).map_err(|e| {
             AnalysisError::coverage_with_path(
                 format!(
@@ -102,6 +103,7 @@ pub fn load_cobertura_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
             )
         })
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -161,7 +163,7 @@ fn try_coverage_paths(
     let paths_display: Vec<String> = lcov_paths.iter().map(|p| p.display().to_string()).collect();
     let cobertura_display = cobertura_path.display().to_string();
 
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         let mut last_error = None;
 
         // Try each LCOV path
@@ -194,6 +196,7 @@ fn try_coverage_paths(
                 .unwrap_or_else(|| "none".to_string())
         )))
     })
+    .boxed()
 }
 
 /// Load coverage data, returning empty coverage if not found.
@@ -212,7 +215,7 @@ fn try_coverage_paths(
 /// ```
 pub fn load_coverage_optional_effect(path: PathBuf) -> AnalysisEffect<CoverageData> {
     let path_clone = path.clone();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         if !env.file_system().exists(&path_clone) {
             return Ok(CoverageData::default());
         }
@@ -225,6 +228,7 @@ pub fn load_coverage_optional_effect(path: PathBuf) -> AnalysisEffect<CoverageDa
             }
         }
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -235,7 +239,7 @@ pub fn load_coverage_optional_effect(path: PathBuf) -> AnalysisEffect<CoverageDa
 ///
 /// Returns true if any of the common coverage file locations exist.
 pub fn has_coverage_effect(project_root: PathBuf) -> AnalysisEffect<bool> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         let paths = [
             project_root.join("target/llvm-cov-target/debug/coverage/lcov.info"),
             project_root.join("target/coverage/lcov.info"),
@@ -246,13 +250,14 @@ pub fn has_coverage_effect(project_root: PathBuf) -> AnalysisEffect<bool> {
 
         Ok(paths.iter().any(|p| env.file_system().exists(p)))
     })
+    .boxed()
 }
 
 /// Get the path to the first available coverage file.
 ///
 /// Returns `None` if no coverage file is found.
 pub fn find_coverage_path_effect(project_root: PathBuf) -> AnalysisEffect<Option<PathBuf>> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         let paths = [
             project_root.join("target/llvm-cov-target/debug/coverage/lcov.info"),
             project_root.join("target/coverage/lcov.info"),
@@ -263,6 +268,7 @@ pub fn find_coverage_path_effect(project_root: PathBuf) -> AnalysisEffect<Option
 
         Ok(paths.into_iter().find(|p| env.file_system().exists(p)))
     })
+    .boxed()
 }
 
 #[cfg(test)]

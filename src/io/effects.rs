@@ -39,7 +39,7 @@ use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::AnalysisError;
 use crate::io::walker::FileWalker;
 use std::path::PathBuf;
-use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 // ============================================================================
 // File Read Operations
@@ -68,7 +68,7 @@ use stillwater::Effect;
 /// - The file isn't valid UTF-8
 pub fn read_file_effect(path: PathBuf) -> AnalysisEffect<String> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.file_system().read_to_string(&path).map_err(|e| {
             AnalysisError::io_with_path(format!("Failed to read file: {}", e.message()), &path)
         })
@@ -80,6 +80,7 @@ pub fn read_file_effect(path: PathBuf) -> AnalysisEffect<String> {
             e.path().cloned().unwrap_or_default(),
         )
     })
+    .boxed()
 }
 
 /// Read file contents as bytes.
@@ -88,7 +89,7 @@ pub fn read_file_effect(path: PathBuf) -> AnalysisEffect<String> {
 /// Useful for binary files or when UTF-8 validation isn't needed.
 pub fn read_file_bytes_effect(path: PathBuf) -> AnalysisEffect<Vec<u8>> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.file_system().read_bytes(&path).map_err(|e| {
             AnalysisError::io_with_path(
                 format!(
@@ -100,6 +101,7 @@ pub fn read_file_bytes_effect(path: PathBuf) -> AnalysisEffect<Vec<u8>> {
             )
         })
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -128,7 +130,7 @@ pub fn read_file_bytes_effect(path: PathBuf) -> AnalysisEffect<Vec<u8>> {
 /// - Disk is full
 pub fn write_file_effect(path: PathBuf, content: String) -> AnalysisEffect<()> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.file_system().write(&path, &content).map_err(|e| {
             AnalysisError::io_with_path(
                 format!("Failed to write file '{}': {}", path_display, e.message()),
@@ -136,6 +138,7 @@ pub fn write_file_effect(path: PathBuf, content: String) -> AnalysisEffect<()> {
             )
         })
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -156,17 +159,17 @@ pub fn write_file_effect(path: PathBuf, content: String) -> AnalysisEffect<()> {
 /// let exists = run_effect(effect, DebtmapConfig::default())?;
 /// ```
 pub fn file_exists_effect(path: PathBuf) -> AnalysisEffect<bool> {
-    Effect::from_fn(move |env: &RealEnv| Ok(env.file_system().is_file(&path)))
+    from_fn(move |env: &RealEnv| Ok(env.file_system().is_file(&path))).boxed()
 }
 
 /// Check if a path exists (file or directory) as an Effect.
 pub fn path_exists_effect(path: PathBuf) -> AnalysisEffect<bool> {
-    Effect::from_fn(move |env: &RealEnv| Ok(env.file_system().exists(&path)))
+    from_fn(move |env: &RealEnv| Ok(env.file_system().exists(&path))).boxed()
 }
 
 /// Check if a path is a directory as an Effect.
 pub fn is_directory_effect(path: PathBuf) -> AnalysisEffect<bool> {
-    Effect::from_fn(move |env: &RealEnv| Ok(env.file_system().is_dir(&path)))
+    from_fn(move |env: &RealEnv| Ok(env.file_system().is_dir(&path))).boxed()
 }
 
 // ============================================================================
@@ -197,7 +200,7 @@ pub fn is_directory_effect(path: PathBuf) -> AnalysisEffect<bool> {
 /// - Permission is denied
 pub fn walk_dir_effect(path: PathBuf) -> AnalysisEffect<Vec<PathBuf>> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |_env: &RealEnv| {
+    from_fn(move |_env: &RealEnv| {
         FileWalker::new(path.clone()).walk().map_err(|e| {
             AnalysisError::io_with_path(
                 format!("Failed to walk directory '{}': {}", path_display, e),
@@ -205,6 +208,7 @@ pub fn walk_dir_effect(path: PathBuf) -> AnalysisEffect<Vec<PathBuf>> {
             )
         })
     })
+    .boxed()
 }
 
 /// Walk a directory with configuration-based ignore patterns.
@@ -229,7 +233,7 @@ pub fn walk_dir_with_config_effect(
     languages: Vec<crate::core::Language>,
 ) -> AnalysisEffect<Vec<PathBuf>> {
     let path_display = path.display().to_string();
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         let ignore_patterns = env.config().get_ignore_patterns();
 
         FileWalker::new(path.clone())
@@ -243,6 +247,7 @@ pub fn walk_dir_with_config_effect(
                 )
             })
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -273,7 +278,7 @@ pub fn cache_get_effect<T>(key: String) -> AnalysisEffect<Option<T>>
 where
     T: serde::de::DeserializeOwned + Send + 'static,
 {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         match env.cache().get(&key) {
             Some(bytes) => {
                 // Try to deserialize the cached value
@@ -288,6 +293,7 @@ where
             None => Ok(None),
         }
     })
+    .boxed()
 }
 
 /// Set a value in the cache as an Effect.
@@ -311,7 +317,7 @@ pub fn cache_set_effect<T>(key: String, value: T) -> AnalysisEffect<()>
 where
     T: serde::Serialize + Send + 'static,
 {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         let bytes = bincode::serialize(&value).map_err(|e| {
             AnalysisError::other(format!(
                 "Failed to serialize cache value for '{}': {}",
@@ -323,6 +329,7 @@ where
             AnalysisError::other(format!("Cache write failed for '{}': {}", key, e.message()))
         })
     })
+    .boxed()
 }
 
 /// Invalidate a cache entry as an Effect.
@@ -330,7 +337,7 @@ where
 /// Removes the cached value for the given key. No error is returned
 /// if the key doesn't exist.
 pub fn cache_invalidate_effect(key: String) -> AnalysisEffect<()> {
-    Effect::from_fn(move |env: &RealEnv| {
+    from_fn(move |env: &RealEnv| {
         env.cache().invalidate(&key).map_err(|e| {
             AnalysisError::other(format!(
                 "Cache invalidation failed for '{}': {}",
@@ -339,15 +346,17 @@ pub fn cache_invalidate_effect(key: String) -> AnalysisEffect<()> {
             ))
         })
     })
+    .boxed()
 }
 
 /// Clear all cache entries as an Effect.
 pub fn cache_clear_effect() -> AnalysisEffect<()> {
-    Effect::from_fn(|env: &RealEnv| {
+    from_fn(|env: &RealEnv| {
         env.cache()
             .clear()
             .map_err(|e| AnalysisError::other(format!("Cache clear failed: {}", e.message())))
     })
+    .boxed()
 }
 
 // ============================================================================
@@ -369,13 +378,15 @@ pub fn cache_clear_effect() -> AnalysisEffect<()> {
 /// ```
 pub fn read_file_if_exists_effect(path: PathBuf) -> AnalysisEffect<Option<String>> {
     let path_clone = path.clone();
-    file_exists_effect(path.clone()).and_then(move |exists| {
-        if exists {
-            read_file_effect(path_clone).map(Some)
-        } else {
-            Effect::pure(None)
-        }
-    })
+    file_exists_effect(path.clone())
+        .and_then(move |exists| {
+            if exists {
+                read_file_effect(path_clone).map(Some).boxed()
+            } else {
+                pure(None).boxed()
+            }
+        })
+        .boxed()
 }
 
 /// Read multiple files in sequence, collecting all contents.
@@ -398,19 +409,21 @@ pub fn read_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<String>> {
 
     // Sequence all effects
     if effects.is_empty() {
-        return Effect::pure(Vec::new());
+        return pure(Vec::new()).boxed();
     }
 
     let first = effects.remove(0);
     effects
         .into_iter()
-        .fold(first.map(|s| vec![s]), |acc, eff| {
+        .fold(first.map(|s| vec![s]).boxed(), |acc, eff| {
             acc.and_then(move |mut results| {
                 eff.map(move |s| {
                     results.push(s);
                     results
                 })
+                .boxed()
             })
+            .boxed()
         })
 }
 

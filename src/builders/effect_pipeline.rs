@@ -45,7 +45,7 @@ use crate::io::effects::{
 };
 use crate::risk::effects::load_coverage_optional_effect;
 use std::path::PathBuf;
-use stillwater::Effect;
+use stillwater::effect::prelude::*;
 
 // ============================================================================
 // Single File Analysis
@@ -77,9 +77,8 @@ pub fn analyze_file_effect(path: PathBuf) -> AnalysisEffect<Vec<FunctionMetrics>
 
     read_file_effect(path)
         .and_then(move |content| {
-            Effect::from_fn(move |_env: &RealEnv| {
-                analyze_content_pure(&content, &path_for_analysis)
-            })
+            from_fn(move |_env: &RealEnv| analyze_content_pure(&content, &path_for_analysis))
+                .boxed()
         })
         .map_err(move |e| {
             AnalysisError::analysis(format!(
@@ -88,6 +87,7 @@ pub fn analyze_file_effect(path: PathBuf) -> AnalysisEffect<Vec<FunctionMetrics>
                 e.message()
             ))
         })
+        .boxed()
 }
 
 /// Analyze file content directly (pure function, no I/O).
@@ -123,17 +123,21 @@ pub fn analyze_file_cached_effect(path: PathBuf) -> AnalysisEffect<Vec<FunctionM
     let cache_key_for_set = cache_key.clone();
 
     // Try cache first
-    cache_get_effect::<Vec<FunctionMetrics>>(cache_key).and_then(move |cached| {
-        match cached {
-            Some(metrics) => Effect::pure(metrics),
+    cache_get_effect::<Vec<FunctionMetrics>>(cache_key)
+        .and_then(move |cached| match cached {
+            Some(metrics) => pure(metrics).boxed(),
             None => {
                 // Not in cache, analyze and cache
-                analyze_file_effect(path_for_analysis).and_then(move |metrics| {
-                    cache_set_effect(cache_key_for_set, metrics.clone()).map(move |_| metrics)
-                })
+                analyze_file_effect(path_for_analysis)
+                    .and_then(move |metrics| {
+                        cache_set_effect(cache_key_for_set, metrics.clone())
+                            .map(move |_| metrics)
+                            .boxed()
+                    })
+                    .boxed()
             }
-        }
-    })
+        })
+        .boxed()
 }
 
 // ============================================================================
@@ -153,7 +157,7 @@ pub fn analyze_file_cached_effect(path: PathBuf) -> AnalysisEffect<Vec<FunctionM
 /// ```
 pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<Vec<FunctionMetrics>>> {
     if paths.is_empty() {
-        return Effect::pure(Vec::new());
+        return pure(Vec::new()).boxed();
     }
 
     let mut effects: Vec<AnalysisEffect<Vec<FunctionMetrics>>> =
@@ -162,13 +166,15 @@ pub fn analyze_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<Vec<Funct
     let first = effects.remove(0);
     effects
         .into_iter()
-        .fold(first.map(|m| vec![m]), |acc, eff| {
+        .fold(first.map(|m| vec![m]).boxed(), |acc, eff| {
             acc.and_then(move |mut results| {
                 eff.map(move |m| {
                     results.push(m);
                     results
                 })
+                .boxed()
             })
+            .boxed()
         })
 }
 
@@ -186,7 +192,7 @@ pub fn analyze_files_parallel_effect(
     paths: Vec<PathBuf>,
 ) -> AnalysisEffect<Vec<Vec<FunctionMetrics>>> {
     if paths.is_empty() {
-        return Effect::pure(Vec::new());
+        return pure(Vec::new()).boxed();
     }
 
     // Read all files first (I/O)
@@ -194,25 +200,30 @@ pub fn analyze_files_parallel_effect(
         .into_iter()
         .map(|p| {
             let path = p.clone();
-            read_file_effect(p).map(move |content| (path, content))
+            read_file_effect(p)
+                .map(move |content| (path, content))
+                .boxed()
         })
         .collect();
 
     // Sequence all reads
-    sequence_effects(read_effects).and_then(|file_contents| {
-        Effect::from_fn(move |_env: &RealEnv| {
-            use rayon::prelude::*;
+    sequence_effects(read_effects)
+        .and_then(|file_contents| {
+            from_fn(move |_env: &RealEnv| {
+                use rayon::prelude::*;
 
-            // Parallel analysis
-            let results: Vec<Result<Vec<FunctionMetrics>, AnalysisError>> = file_contents
-                .par_iter()
-                .map(|(path, content)| analyze_content_pure(content, path))
-                .collect();
+                // Parallel analysis
+                let results: Vec<Result<Vec<FunctionMetrics>, AnalysisError>> = file_contents
+                    .par_iter()
+                    .map(|(path, content)| analyze_content_pure(content, path))
+                    .collect();
 
-            // Collect results, failing on first error
-            results.into_iter().collect()
+                // Collect results, failing on first error
+                results.into_iter().collect()
+            })
+            .boxed()
         })
-    })
+        .boxed()
 }
 
 /// Discover and analyze all files in a directory.
@@ -234,7 +245,9 @@ pub fn analyze_directory_effect(
     path: PathBuf,
     languages: Vec<Language>,
 ) -> AnalysisEffect<Vec<Vec<FunctionMetrics>>> {
-    walk_dir_with_config_effect(path, languages).and_then(analyze_files_parallel_effect)
+    walk_dir_with_config_effect(path, languages)
+        .and_then(analyze_files_parallel_effect)
+        .boxed()
 }
 
 // ============================================================================
@@ -262,17 +275,21 @@ pub fn analyze_file_with_coverage_effect(
 ) -> AnalysisEffect<FileAnalysisWithCoverage> {
     let path_for_result = path.clone();
 
-    analyze_file_effect(path).and_then(move |functions| {
-        load_coverage_optional_effect(coverage_path).map(move |coverage| {
-            let coverage_percent =
-                coverage.get_file_coverage(std::path::Path::new(&path_for_result));
-            FileAnalysisWithCoverage {
-                path: path_for_result,
-                functions,
-                coverage_percent,
-            }
+    analyze_file_effect(path)
+        .and_then(move |functions| {
+            load_coverage_optional_effect(coverage_path)
+                .map(move |coverage| {
+                    let coverage_percent =
+                        coverage.get_file_coverage(std::path::Path::new(&path_for_result));
+                    FileAnalysisWithCoverage {
+                        path: path_for_result,
+                        functions,
+                        coverage_percent,
+                    }
+                })
+                .boxed()
         })
-    })
+        .boxed()
 }
 
 // ============================================================================
@@ -285,19 +302,21 @@ where
     T: Send + 'static,
 {
     if effects.is_empty() {
-        return Effect::pure(Vec::new());
+        return pure(Vec::new()).boxed();
     }
 
     let mut iter = effects.into_iter();
     let first = iter.next().unwrap();
 
-    iter.fold(first.map(|x| vec![x]), |acc, eff| {
+    iter.fold(first.map(|x| vec![x]).boxed(), |acc, eff| {
         acc.and_then(move |mut results| {
             eff.map(move |x| {
                 results.push(x);
                 results
             })
+            .boxed()
         })
+        .boxed()
     })
 }
 

@@ -58,7 +58,8 @@
 use crate::config::DebtmapConfig;
 use crate::env::{AnalysisEnv, RealEnv};
 use crate::errors::{errors_to_anyhow, AnalysisError};
-use stillwater::{Effect, NonEmptyVec, Validation};
+use stillwater::effect::prelude::*;
+use stillwater::{BoxedEffect, NonEmptyVec, Validation};
 
 /// Error collection type for validation accumulation.
 ///
@@ -84,7 +85,7 @@ pub type AnalysisErrors = NonEmptyVec<AnalysisError>;
 ///     })
 /// }
 /// ```
-pub type AnalysisEffect<T> = Effect<T, AnalysisError, RealEnv>;
+pub type AnalysisEffect<T> = BoxedEffect<T, AnalysisError, RealEnv>;
 
 /// Validation type for debtmap validations.
 ///
@@ -180,7 +181,7 @@ pub fn validation_failures<T>(errors: Vec<AnalysisError>) -> AnalysisValidation<
 /// assert_eq!(effect.run(&env).unwrap(), 42);
 /// ```
 pub fn effect_pure<T: Send + 'static>(value: T) -> AnalysisEffect<T> {
-    Effect::pure(value)
+    pure(value).boxed()
 }
 
 /// Create an effect from an error.
@@ -194,7 +195,7 @@ pub fn effect_pure<T: Send + 'static>(value: T) -> AnalysisEffect<T> {
 /// assert!(effect.run(&env).is_err());
 /// ```
 pub fn effect_fail<T: Send + 'static>(error: AnalysisError) -> AnalysisEffect<T> {
-    Effect::fail(error)
+    fail(error).boxed()
 }
 
 /// Create an effect from a synchronous function.
@@ -216,7 +217,7 @@ where
     T: Send + 'static,
     F: FnOnce(&RealEnv) -> Result<T, AnalysisError> + Send + 'static,
 {
-    Effect::from_fn(f)
+    from_fn(f).boxed()
 }
 
 /// Run an effect and convert the result to anyhow::Result for backwards compatibility.
@@ -256,8 +257,8 @@ pub fn run_effect<T: Send + 'static>(
 /// I/O implementations.
 ///
 /// Note: This uses tokio's block_on to run the async effect synchronously.
-pub fn run_effect_with_env<T: Send + 'static, E: AnalysisEnv + 'static>(
-    effect: Effect<T, AnalysisError, E>,
+pub fn run_effect_with_env<T: Send + 'static, E: AnalysisEnv + Sync + 'static>(
+    effect: BoxedEffect<T, AnalysisError, E>,
     env: &E,
 ) -> anyhow::Result<T> {
     let rt = tokio::runtime::Builder::new_current_thread()
