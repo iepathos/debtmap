@@ -9,6 +9,7 @@ pub mod call_graph_integration;
 pub mod closure_analyzer;
 pub mod context_aware;
 pub mod custom_macro_analyzer;
+pub mod effects;
 pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;

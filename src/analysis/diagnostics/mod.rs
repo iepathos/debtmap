@@ -3,6 +3,7 @@ use crate::analysis::multi_pass::{ComplexityRecommendation, MultiPassResult};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+pub mod effects;
 pub mod insights;
 pub mod recommendations;
 pub mod reporter;

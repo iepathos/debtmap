@@ -136,6 +136,30 @@ pub struct DebtmapConfig {
     /// Retry configuration for resilient operations (spec 205)
     #[serde(default)]
     pub retry: Option<super::retry::RetryConfig>,
+
+    /// Advanced analysis settings (spec 207)
+    #[serde(default)]
+    pub analysis: Option<AnalysisSettings>,
+}
+
+/// Advanced analysis settings for call graph and dead code detection (Spec 207).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AnalysisSettings {
+    /// Enable trait method resolution for call graph analysis
+    #[serde(default)]
+    pub enable_trait_analysis: Option<bool>,
+    /// Enable function pointer and closure tracking
+    #[serde(default)]
+    pub enable_function_pointer_tracking: Option<bool>,
+    /// Enable framework pattern detection (test functions, handlers)
+    #[serde(default)]
+    pub enable_framework_patterns: Option<bool>,
+    /// Enable cross-module dependency analysis
+    #[serde(default)]
+    pub enable_cross_module_analysis: Option<bool>,
+    /// Maximum depth for transitive analysis
+    #[serde(default)]
+    pub max_analysis_depth: Option<usize>,
 }
 
 impl DebtmapConfig {
@@ -165,9 +189,17 @@ pub struct IgnoreConfig {
     pub patterns: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OutputConfig {
+    /// Default output format (json, yaml, markdown, html, text)
+    #[serde(default)]
     pub default_format: Option<String>,
+    /// Output format for reports (same as default_format, kept for API clarity)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<String>,
+    /// Detail level for diagnostic reports (summary, standard, comprehensive, debug)
+    #[serde(default)]
+    pub detail_level: Option<String>,
     /// Enable colored output (default: auto-detect based on TTY)
     #[serde(default)]
     pub use_color: Option<bool>,

@@ -71,7 +71,7 @@ pub use parallel::{BatchAnalysisConfig, ParallelConfig};
 pub use retry::{RetryConfig, RetryStrategy};
 
 // Re-export core types
-pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};
+pub use core::{AnalysisSettings, DebtmapConfig, IgnoreConfig, OutputConfig};
 
 // Re-export loader functions
 pub use loader::{
