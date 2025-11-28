@@ -282,6 +282,104 @@ Fail builds when quality thresholds are exceeded:
 
 📖 See the [Getting Started Guide](https://iepathos.github.io/debtmap/getting-started.html) for complete feature documentation and examples.
 
+## Parallel Batch Analysis
+
+Debtmap uses the **traverse pattern** from functional programming for efficient parallel file analysis. This approach provides:
+
+- **Parallel processing** - Analyze multiple files concurrently using all CPU cores
+- **Error accumulation** - Collect ALL errors instead of failing at the first one
+- **Configurable batching** - Control batch sizes for large codebases
+
+### Basic Usage
+
+```rust
+use debtmap::analyzers::batch::{analyze_files_effect, validate_files};
+use debtmap::effects::{run_effect, run_validation};
+
+// Parallel analysis with Effect pattern
+let files = vec!["src/main.rs".into(), "src/lib.rs".into()];
+let results = run_effect(
+    analyze_files_effect(files),
+    config,
+)?;
+
+// Process results
+for result in results {
+    println!("{}: {} functions analyzed",
+        result.path.display(),
+        result.metrics.complexity.functions.len()
+    );
+}
+```
+
+### Validation with Error Accumulation
+
+When you need comprehensive error reporting (showing ALL issues, not just the first):
+
+```rust
+use debtmap::analyzers::batch::validate_files;
+use debtmap::effects::run_validation;
+
+let paths = vec!["file1.rs".into(), "file2.rs".into(), "file3.rs".into()];
+match run_validation(validate_files(&paths)) {
+    Ok(validated_files) => {
+        // All files are valid, proceed with analysis
+        println!("Validated {} files", validated_files.len());
+    }
+    Err(all_errors) => {
+        // Show ALL validation errors to user
+        eprintln!("Found {} validation errors:", all_errors.len());
+        for error in all_errors {
+            eprintln!("  - {}", error);
+        }
+    }
+}
+```
+
+### Configuration
+
+Control parallel processing behavior in `.debtmap.toml`:
+
+```toml
+[batch_analysis]
+# Enable/disable parallel processing
+parallelism.enabled = true
+
+# Batch size for chunked processing (default: auto-detected based on CPU count)
+parallelism.batch_size = 50
+
+# Collect timing information for each file
+collect_timing = true
+```
+
+Or via CLI:
+
+```bash
+# Analyze with timing information
+debtmap analyze . --collect-timing
+
+# Force sequential processing (useful for debugging)
+debtmap analyze . --sequential
+```
+
+### Performance Characteristics
+
+| File Count | Speedup (8 cores) | Memory |
+|------------|-------------------|--------|
+| 10 files   | ~2x               | Minimal |
+| 50 files   | ~4x               | Low |
+| 100+ files | ~6-7x             | Moderate |
+
+The traverse pattern batches files to balance parallelism with memory usage. For very large codebases (1000+ files), files are processed in configurable chunks.
+
+### When to Use Each Pattern
+
+| Pattern | Use Case |
+|---------|----------|
+| `analyze_files_effect` | Normal analysis - fail fast on errors |
+| `validate_files` | Pre-validation - collect ALL errors for user feedback |
+| `validate_and_analyze_files` | Combined - validate first, then analyze valid files |
+
 ## Advanced Features
 
 ### God Object Detection
