@@ -36,6 +36,14 @@ pub enum FunctionalAnalysisProfile {
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
+
+    /// Show where each configuration value came from (spec 201)
+    #[arg(long, global = true)]
+    pub show_config_sources: bool,
+
+    /// Custom config file path (overrides default locations)
+    #[arg(long, global = true, env = "DEBTMAP_CONFIG")]
+    pub config: Option<PathBuf>,
 }
 
 #[derive(Subcommand, Debug)]
