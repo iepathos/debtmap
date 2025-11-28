@@ -427,6 +427,70 @@ pub fn read_files_effect(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<String>> {
         })
 }
 
+// ============================================================================
+// Batch Analysis Operations (Spec 203)
+// ============================================================================
+
+/// Walk a directory and analyze all files in parallel.
+///
+/// This is a composed effect that combines directory walking with
+/// parallel file analysis using stillwater's traverse pattern.
+///
+/// # Arguments
+///
+/// * `path` - Root directory to analyze
+/// * `languages` - Languages to include in analysis
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::io::effects::walk_and_analyze_effect;
+/// use debtmap::core::Language;
+///
+/// let effect = walk_and_analyze_effect(
+///     "src".into(),
+///     vec![Language::Rust],
+/// );
+/// let results = run_effect(effect, config)?;
+/// for result in results {
+///     println!("{}: {} functions", result.path.display(),
+///         result.metrics.complexity.functions.len());
+/// }
+/// ```
+pub fn walk_and_analyze_effect(
+    path: PathBuf,
+    languages: Vec<crate::core::Language>,
+) -> AnalysisEffect<Vec<crate::analyzers::batch::FileAnalysisResult>> {
+    walk_dir_with_config_effect(path, languages)
+        .and_then(crate::analyzers::batch::analyze_files_effect)
+        .boxed()
+}
+
+/// Walk a directory and validate all files, accumulating errors.
+///
+/// This effect validates all discovered files and accumulates ALL
+/// validation errors instead of failing at the first one.
+///
+/// # Arguments
+///
+/// * `path` - Root directory to validate
+/// * `languages` - Languages to include
+///
+/// # Returns
+///
+/// An Effect that produces a Validation result with either:
+/// - All successfully validated files
+/// - All validation errors accumulated
+pub fn walk_and_validate_effect(
+    path: PathBuf,
+    languages: Vec<crate::core::Language>,
+) -> AnalysisEffect<crate::effects::AnalysisValidation<Vec<crate::analyzers::batch::ValidatedFile>>>
+{
+    walk_dir_with_config_effect(path, languages)
+        .map(|files| crate::analyzers::batch::validate_files(&files))
+        .boxed()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

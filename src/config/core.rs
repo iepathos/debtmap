@@ -128,6 +128,10 @@ pub struct DebtmapConfig {
     /// Context-aware dampening multipliers for non-production code (spec 191)
     #[serde(default)]
     pub context_multipliers: Option<ContextMultipliers>,
+
+    /// Batch analysis configuration for parallel processing (spec 203)
+    #[serde(default)]
+    pub batch_analysis: Option<super::parallel::BatchAnalysisConfig>,
 }
 
 impl DebtmapConfig {
