@@ -758,10 +758,7 @@ where
                 match effect.run(&env).await {
                     Ok(value) => {
                         if attempt > 0 {
-                            info!(
-                                "Operation succeeded after {} retry attempt(s)",
-                                attempt
-                            );
+                            info!("Operation succeeded after {} retry attempt(s)", attempt);
                         }
                         return Ok(value);
                     }
@@ -773,9 +770,7 @@ where
                             attempt += 1;
                             warn!(
                                 "Retrying operation (attempt {}/{}): {}",
-                                attempt,
-                                config.max_retries,
-                                e
+                                attempt, config.max_retries, e
                             );
 
                             // Sleep before retry
@@ -788,8 +783,7 @@ where
                             if attempt > 0 {
                                 error!(
                                     "Operation failed after {} retry attempt(s): {}",
-                                    attempt,
-                                    e
+                                    attempt, e
                                 );
                             }
                             return Err(e);
@@ -842,10 +836,7 @@ where
                 match effect.run(&env).await {
                     Ok(value) => {
                         if attempt > 0 {
-                            info!(
-                                "Operation succeeded after {} retry attempt(s)",
-                                attempt
-                            );
+                            info!("Operation succeeded after {} retry attempt(s)", attempt);
                         }
                         return Ok(value);
                     }
@@ -856,9 +847,7 @@ where
                             attempt += 1;
                             warn!(
                                 "Retrying operation (attempt {}/{}): {}",
-                                attempt,
-                                config.max_retries,
-                                e
+                                attempt, config.max_retries, e
                             );
 
                             let delay = config.delay_for_attempt(attempt);
@@ -867,8 +856,7 @@ where
                             if attempt > 0 {
                                 error!(
                                     "Operation failed after {} retry attempt(s): {}",
-                                    attempt,
-                                    e
+                                    attempt, e
                                 );
                             }
                             return Err(e);
