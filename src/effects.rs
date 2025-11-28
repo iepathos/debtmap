@@ -688,6 +688,201 @@ where
     stillwater::ask::<AnalysisError, Env>()
 }
 
+// =============================================================================
+// Retry Pattern Helpers (Spec 205)
+// =============================================================================
+//
+// These helpers enable automatic retry of transient failures with configurable
+// backoff strategies.
+
+use crate::config::RetryConfig;
+use log::{error, info, warn};
+use std::time::Instant;
+
+/// Wrap an effect with retry logic using the configured policy.
+///
+/// This combinator automatically retries the effect when it fails with
+/// a retryable error, using the configured retry strategy and delays.
+///
+/// # Arguments
+///
+/// * `effect_factory` - A function that creates the effect to retry.
+///   Called each time a retry is needed.
+/// * `retry_config` - Configuration for retry behavior.
+///
+/// # Retryable Errors
+///
+/// Only errors where `error.is_retryable()` returns `true` will trigger
+/// a retry. Non-retryable errors (parse errors, validation errors, etc.)
+/// cause immediate failure.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::{with_retry, AnalysisEffect};
+/// use debtmap::config::RetryConfig;
+/// use debtmap::io::effects::read_file_effect;
+///
+/// fn read_file_resilient(path: PathBuf) -> AnalysisEffect<String> {
+///     let config = RetryConfig::default();
+///     with_retry(
+///         move || read_file_effect(path.clone()),
+///         config,
+///     )
+/// }
+/// ```
+///
+/// # Logging
+///
+/// Retry attempts are logged at WARN level for visibility:
+/// ```text
+/// WARN Retrying operation (attempt 2/3): I/O error: Resource busy
+/// ```
+pub fn with_retry<T, F>(effect_factory: F, retry_config: RetryConfig) -> AnalysisEffect<T>
+where
+    T: Send + 'static,
+    F: Fn() -> AnalysisEffect<T> + Send + Sync + 'static,
+{
+    from_async(move |env: &RealEnv| {
+        let env = env.clone();
+        let config = retry_config.clone();
+        let factory = SharedFn::new(effect_factory);
+
+        async move {
+            let start = Instant::now();
+            let mut attempt = 0u32;
+            let mut last_error: Option<AnalysisError> = None;
+
+            loop {
+                let effect = (factory.0)();
+                match effect.run(&env).await {
+                    Ok(value) => {
+                        if attempt > 0 {
+                            info!("Operation succeeded after {} retry attempt(s)", attempt);
+                        }
+                        return Ok(value);
+                    }
+                    Err(e) => {
+                        let elapsed = start.elapsed();
+
+                        // Check if error is retryable and we should try again
+                        if e.is_retryable() && config.should_retry(attempt, elapsed) {
+                            attempt += 1;
+                            warn!(
+                                "Retrying operation (attempt {}/{}): {}",
+                                attempt, config.max_retries, e
+                            );
+
+                            // Sleep before retry
+                            let delay = config.delay_for_attempt(attempt);
+                            tokio::time::sleep(delay).await;
+
+                            let _ = last_error.insert(e);
+                        } else {
+                            // Not retryable or exhausted retries
+                            if attempt > 0 {
+                                error!(
+                                    "Operation failed after {} retry attempt(s): {}",
+                                    attempt, e
+                                );
+                            }
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        }
+    })
+    .boxed()
+}
+
+/// Wrap an effect with retry logic, using the retry config from environment.
+///
+/// This is a convenience function that reads the retry configuration from
+/// the environment's config. If no retry config is set, uses defaults.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::effects::with_retry_from_env;
+/// use debtmap::io::effects::read_file_effect;
+///
+/// fn read_file_resilient(path: PathBuf) -> AnalysisEffect<String> {
+///     with_retry_from_env(move || read_file_effect(path.clone()))
+/// }
+/// ```
+pub fn with_retry_from_env<T, F>(effect_factory: F) -> AnalysisEffect<T>
+where
+    T: Send + 'static,
+    F: Fn() -> AnalysisEffect<T> + Send + Sync + Clone + 'static,
+{
+    from_async(move |env: &RealEnv| {
+        let env = env.clone();
+        let factory = effect_factory.clone();
+
+        async move {
+            let config = env.config().retry.clone().unwrap_or_default();
+
+            // If retries are disabled, just run the effect directly
+            if !config.enabled {
+                return factory().run(&env).await;
+            }
+
+            let start = Instant::now();
+            let mut attempt = 0u32;
+
+            loop {
+                let effect = factory();
+                match effect.run(&env).await {
+                    Ok(value) => {
+                        if attempt > 0 {
+                            info!("Operation succeeded after {} retry attempt(s)", attempt);
+                        }
+                        return Ok(value);
+                    }
+                    Err(e) => {
+                        let elapsed = start.elapsed();
+
+                        if e.is_retryable() && config.should_retry(attempt, elapsed) {
+                            attempt += 1;
+                            warn!(
+                                "Retrying operation (attempt {}/{}): {}",
+                                attempt, config.max_retries, e
+                            );
+
+                            let delay = config.delay_for_attempt(attempt);
+                            tokio::time::sleep(delay).await;
+                        } else {
+                            if attempt > 0 {
+                                error!(
+                                    "Operation failed after {} retry attempt(s): {}",
+                                    attempt, e
+                                );
+                            }
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+        }
+    })
+    .boxed()
+}
+
+/// Check if retries are enabled in the given config.
+///
+/// Returns `true` if the retry config is present and enabled.
+pub fn is_retry_enabled(config: &DebtmapConfig) -> bool {
+    config.retry.as_ref().map(|r| r.enabled).unwrap_or(true) // Default is enabled
+}
+
+/// Get the effective retry config from a DebtmapConfig.
+///
+/// Returns the configured retry settings or defaults if not set.
+pub fn get_retry_config(config: &DebtmapConfig) -> RetryConfig {
+    config.retry.clone().unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1024,5 +1219,252 @@ mod tests {
 
         let sum = combined.run(&env).await.unwrap();
         assert!((sum - 1.0).abs() < 0.001); // 0.6 + 0.4 = 1.0
+    }
+
+    // =========================================================================
+    // Retry Pattern Tests (Spec 205)
+    // =========================================================================
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[tokio::test]
+    async fn test_with_retry_succeeds_first_attempt() {
+        let config = RetryConfig::default();
+        let env = RealEnv::default();
+
+        let effect = with_retry(|| effect_pure(42), config);
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_succeeds_after_transient_failure() {
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 10, // Short delay for tests
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        // Counter to track attempts
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect = with_retry(
+            move || {
+                let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+                if count < 2 {
+                    // Fail with retryable error for first 2 attempts
+                    effect_fail(AnalysisError::io("Resource busy"))
+                } else {
+                    // Succeed on third attempt
+                    effect_pure("success".to_string())
+                }
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success");
+        // Should have made 3 attempts (indices 0, 1, 2)
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_fails_on_permanent_error() {
+        let config = RetryConfig {
+            max_retries: 3,
+            base_delay_ms: 10,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect: AnalysisEffect<String> = with_retry(
+            move || {
+                attempt_clone.fetch_add(1, Ordering::SeqCst);
+                // Parse errors are not retryable
+                effect_fail(AnalysisError::parse("Syntax error"))
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_err());
+        // Should have only made 1 attempt (immediate failure, no retry)
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_exhausts_retries() {
+        let config = RetryConfig {
+            max_retries: 2,
+            base_delay_ms: 10,
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect: AnalysisEffect<String> = with_retry(
+            move || {
+                attempt_clone.fetch_add(1, Ordering::SeqCst);
+                // Always fail with retryable error
+                effect_fail(AnalysisError::io("Resource busy"))
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_err());
+        // Initial attempt + 2 retries = 3 total attempts
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_disabled() {
+        let config = RetryConfig::disabled();
+        let env = RealEnv::default();
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let effect: AnalysisEffect<String> = with_retry(
+            move || {
+                attempt_clone.fetch_add(1, Ordering::SeqCst);
+                effect_fail(AnalysisError::io("Resource busy"))
+            },
+            config,
+        );
+
+        let result = effect.run(&env).await;
+
+        assert!(result.is_err());
+        // With retries disabled, should only try once
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_from_env_uses_config() {
+        let config = DebtmapConfig {
+            retry: Some(RetryConfig {
+                enabled: true,
+                max_retries: 2,
+                base_delay_ms: 10,
+                jitter_factor: 0.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let factory = move || {
+            let count = attempt_clone.fetch_add(1, Ordering::SeqCst);
+            if count < 1 {
+                effect_fail(AnalysisError::io("Resource busy"))
+            } else {
+                effect_pure("success".to_string())
+            }
+        };
+
+        let effect = with_retry_from_env(factory);
+        let result = effect.run(&env).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "success");
+        // Should have made 2 attempts
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_from_env_disabled() {
+        let config = DebtmapConfig {
+            retry: Some(RetryConfig::disabled()),
+            ..Default::default()
+        };
+        let env = RealEnv::new(config);
+
+        let attempt_count = Arc::new(AtomicUsize::new(0));
+        let attempt_clone = attempt_count.clone();
+
+        let factory = move || {
+            attempt_clone.fetch_add(1, Ordering::SeqCst);
+            effect_fail::<String>(AnalysisError::io("Resource busy"))
+        };
+
+        let effect = with_retry_from_env(factory);
+        let result = effect.run(&env).await;
+
+        assert!(result.is_err());
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn test_is_retry_enabled_default() {
+        let config = DebtmapConfig::default();
+        assert!(is_retry_enabled(&config));
+    }
+
+    #[test]
+    fn test_is_retry_enabled_explicit_true() {
+        let config = DebtmapConfig {
+            retry: Some(RetryConfig {
+                enabled: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        assert!(is_retry_enabled(&config));
+    }
+
+    #[test]
+    fn test_is_retry_enabled_explicit_false() {
+        let config = DebtmapConfig {
+            retry: Some(RetryConfig::disabled()),
+            ..Default::default()
+        };
+        assert!(!is_retry_enabled(&config));
+    }
+
+    #[test]
+    fn test_get_retry_config_default() {
+        let config = DebtmapConfig::default();
+        let retry_config = get_retry_config(&config);
+
+        assert!(retry_config.enabled);
+        assert_eq!(retry_config.max_retries, 3);
+    }
+
+    #[test]
+    fn test_get_retry_config_custom() {
+        let config = DebtmapConfig {
+            retry: Some(RetryConfig {
+                enabled: true,
+                max_retries: 5,
+                base_delay_ms: 200,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let retry_config = get_retry_config(&config);
+
+        assert!(retry_config.enabled);
+        assert_eq!(retry_config.max_retries, 5);
+        assert_eq!(retry_config.base_delay_ms, 200);
     }
 }

@@ -132,6 +132,10 @@ pub struct DebtmapConfig {
     /// Batch analysis configuration for parallel processing (spec 203)
     #[serde(default)]
     pub batch_analysis: Option<super::parallel::BatchAnalysisConfig>,
+
+    /// Retry configuration for resilient operations (spec 205)
+    #[serde(default)]
+    pub retry: Option<super::retry::RetryConfig>,
 }
 
 impl DebtmapConfig {
