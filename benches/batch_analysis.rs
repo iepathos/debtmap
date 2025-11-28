@@ -155,25 +155,21 @@ fn benchmark_sequential_vs_parallel_comparison(c: &mut Criterion) {
     group.throughput(Throughput::Elements(size as u64));
 
     // Sequential benchmark
-    group.bench_with_input(
-        BenchmarkId::new("sequential", size),
-        &paths,
-        |b, paths| {
-            b.iter(|| {
-                let results: Vec<_> = paths
-                    .iter()
-                    .map(|path| {
-                        let content = std::fs::read_to_string(path).unwrap();
-                        let language = Language::from_path(path);
-                        let analyzer = get_analyzer(language);
-                        let ast = analyzer.parse(&content, path.clone()).unwrap();
-                        analyzer.analyze(&ast)
-                    })
-                    .collect();
-                black_box(results)
-            });
-        },
-    );
+    group.bench_with_input(BenchmarkId::new("sequential", size), &paths, |b, paths| {
+        b.iter(|| {
+            let results: Vec<_> = paths
+                .iter()
+                .map(|path| {
+                    let content = std::fs::read_to_string(path).unwrap();
+                    let language = Language::from_path(path);
+                    let analyzer = get_analyzer(language);
+                    let ast = analyzer.parse(&content, path.clone()).unwrap();
+                    analyzer.analyze(&ast)
+                })
+                .collect();
+            black_box(results)
+        });
+    });
 
     // Parallel benchmark
     group.bench_with_input(BenchmarkId::new("parallel", size), &paths, |b, paths| {
@@ -226,8 +222,10 @@ fn benchmark_effect_with_timing(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), &paths, |b, paths| {
             b.iter(|| {
                 // Create a config with timing enabled
-                let mut config = DebtmapConfig::default();
-                config.batch_analysis = Some(BatchAnalysisConfig::default().with_timing());
+                let config = DebtmapConfig {
+                    batch_analysis: Some(BatchAnalysisConfig::default().with_timing()),
+                    ..Default::default()
+                };
 
                 let effect = analyze_files_effect(paths.clone());
                 let result = run_effect(effect, config);

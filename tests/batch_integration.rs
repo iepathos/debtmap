@@ -194,11 +194,7 @@ fn test_parallel_analysis_large_batch() {
     let files: Vec<(String, String)> = (0..25)
         .map(|i| {
             let name = format!("file_{}.rs", i);
-            let content = format!(
-                "fn func_{}() {{ let x = {}; }}",
-                i,
-                i * 10
-            );
+            let content = format!("fn func_{}() {{ let x = {}; }}", i, i * 10);
             (name, content)
         })
         .collect();
@@ -411,7 +407,8 @@ fn test_empty_file_analysis() {
     let (_temp_dir, paths) = create_test_project(&files);
 
     let config = DebtmapConfig::default();
-    let results = run_effect(analyze_files_effect(paths), config).expect("Should handle empty file");
+    let results =
+        run_effect(analyze_files_effect(paths), config).expect("Should handle empty file");
 
     assert_eq!(results.len(), 1);
     assert!(
@@ -431,8 +428,7 @@ fn test_single_file_analysis() {
         ..Default::default()
     };
 
-    let results =
-        run_effect(analyze_files_effect(paths), config).expect("Single file should work");
+    let results = run_effect(analyze_files_effect(paths), config).expect("Single file should work");
     assert_eq!(results.len(), 1);
 }
 
@@ -446,8 +442,8 @@ fn test_deeply_nested_directory_structure() {
     let (_temp_dir, paths) = create_test_project(&files);
 
     let config = DebtmapConfig::default();
-    let results = run_effect(analyze_files_effect(paths), config)
-        .expect("Should handle nested directories");
+    let results =
+        run_effect(analyze_files_effect(paths), config).expect("Should handle nested directories");
 
     assert_eq!(results.len(), 3);
 }
@@ -498,7 +494,11 @@ pub fn function_{}(x: i32) -> i32 {{
     // Verify each file was analyzed (check paths are unique)
     let result_paths: std::collections::HashSet<_> =
         results.iter().map(|r| r.path.clone()).collect();
-    assert_eq!(result_paths.len(), 10, "All results should have unique paths");
+    assert_eq!(
+        result_paths.len(),
+        10,
+        "All results should have unique paths"
+    );
 
     // Verify paths match input
     for path in &paths {
