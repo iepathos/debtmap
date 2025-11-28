@@ -359,6 +359,7 @@ pub mod priority;
 pub mod progress;
 pub mod refactoring;
 pub mod resource;
+pub mod resources;
 pub mod risk;
 pub mod testing;
 pub mod testkit;
@@ -423,6 +424,12 @@ pub use crate::errors::{errors_to_anyhow, format_error_list, AnalysisError};
 // Reader pattern helpers (spec 199) - zero-cost config access without parameter threading
 pub use crate::effects::{
     ask_env, asks_config, asks_entropy, asks_scoring, asks_thresholds, local_with_config,
+};
+
+// Bracket pattern resource management (spec 206)
+pub use crate::resources::{
+    bracket_io, with_file_read, with_lock_file, with_progress, with_spinner, with_temp_dir,
+    FileHandle, LockFile, ProgressHandle, TempDir,
 };
 
 // Testing infrastructure (spec 200) - MockEnv and test helpers
