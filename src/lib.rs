@@ -418,3 +418,8 @@ pub use crate::effects::{
 };
 pub use crate::env::{AnalysisEnv, RealEnv};
 pub use crate::errors::{errors_to_anyhow, format_error_list, AnalysisError};
+
+// Reader pattern helpers (spec 199) - zero-cost config access without parameter threading
+pub use crate::effects::{
+    ask_env, asks_config, asks_entropy, asks_scoring, asks_thresholds, local_with_config,
+};
