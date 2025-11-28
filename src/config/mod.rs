@@ -10,6 +10,7 @@ mod thresholds;
 mod accessors;
 mod core;
 mod loader;
+pub mod multi_source;
 pub mod validation;
 
 // Re-export scoring types for backward compatibility
@@ -69,6 +70,12 @@ pub use loader::{
     directory_ancestors, load_config, load_config_from_path_result,
     load_config_from_path_validated, load_config_validated, load_config_validated_result,
     parse_and_validate_config,
+};
+
+// Re-export multi-source config types (spec 201)
+pub use multi_source::{
+    display_config_sources, load_multi_source_config, load_multi_source_config_from,
+    load_multi_source_config_validated, user_config_path, ConfigSource, TracedConfig, TracedValue,
 };
 
 // Re-export accessor functions

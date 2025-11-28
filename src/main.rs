@@ -332,6 +332,25 @@ fn create_app_container() -> Result<AppContainer> {
     Ok(container)
 }
 
+/// Display configuration sources (spec 201)
+fn show_config_sources() -> Result<()> {
+    use debtmap::config::multi_source::{display_config_sources, load_multi_source_config};
+
+    match load_multi_source_config() {
+        Ok(traced) => {
+            display_config_sources(&traced);
+            Ok(())
+        }
+        Err(errors) => {
+            eprintln!("Error loading configuration:");
+            for error in errors {
+                eprintln!("  - {}", error);
+            }
+            Err(anyhow::anyhow!("Configuration loading failed"))
+        }
+    }
+}
+
 /// Print explanation of metric definitions and formulas
 fn print_metrics_explanation() {
     println!("\n=== Debtmap Metrics Reference ===\n");
@@ -391,6 +410,17 @@ fn main() -> Result<()> {
     } else {
         Cli::parse()
     };
+
+    // Handle --show-config-sources flag (spec 201)
+    if cli.show_config_sources {
+        show_config_sources()?;
+        return Ok(());
+    }
+
+    // If custom config path provided, set environment variable for loaders
+    if let Some(ref config_path) = cli.config {
+        std::env::set_var("DEBTMAP_CONFIG", config_path);
+    }
 
     // Create the dependency injection container once at startup
     let _container = Arc::new(create_app_container()?);
