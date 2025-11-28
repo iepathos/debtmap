@@ -575,7 +575,13 @@ fn format_mixed_priority_item_markdown(
             format_priority_item_markdown(output, rank, func_item, verbosity);
         }
         DebtItem::File(file_item) => {
-            format_file_priority_item_markdown(output, rank, file_item, verbosity, config.show_splits);
+            format_file_priority_item_markdown(
+                output,
+                rank,
+                file_item,
+                verbosity,
+                config.show_splits,
+            );
         }
     }
 }
@@ -756,12 +762,7 @@ fn format_split_recommendations_markdown(
 
             for split in indicators.recommended_splits.iter() {
                 // Show module name and responsibility
-                writeln!(
-                    output,
-                    "- **{}.{}**",
-                    split.suggested_name, extension
-                )
-                .unwrap();
+                writeln!(output, "- **{}.{}**", split.suggested_name, extension).unwrap();
 
                 let priority_indicator = match split.priority {
                     crate::priority::file_metrics::Priority::High => "High",
@@ -817,12 +818,8 @@ fn format_split_recommendations_markdown(
                     }
 
                     if total_methods > sample_size {
-                        writeln!(
-                            output,
-                            "    - ... and {} more",
-                            total_methods - sample_size
-                        )
-                        .unwrap();
+                        writeln!(output, "    - ... and {} more", total_methods - sample_size)
+                            .unwrap();
                     }
                 } else if !split.methods_to_move.is_empty() {
                     // Fallback to methods_to_move if representative_methods not populated
@@ -836,12 +833,8 @@ fn format_split_recommendations_markdown(
                     }
 
                     if total_methods > sample_size {
-                        writeln!(
-                            output,
-                            "    - ... and {} more",
-                            total_methods - sample_size
-                        )
-                        .unwrap();
+                        writeln!(output, "    - ... and {} more", total_methods - sample_size)
+                            .unwrap();
                     }
                 }
 
@@ -867,12 +860,7 @@ fn format_split_recommendations_markdown(
 
                 // Show structs being moved (secondary to methods, per Spec 178)
                 if !split.structs_to_move.is_empty() {
-                    writeln!(
-                        output,
-                        "  - Structs: {}",
-                        split.structs_to_move.join(", ")
-                    )
-                    .unwrap();
+                    writeln!(output, "  - Structs: {}", split.structs_to_move.join(", ")).unwrap();
                 }
 
                 // Show warning if present
@@ -915,11 +903,7 @@ fn format_split_recommendations_markdown(
                 "  - File has too few functions (< 3 per responsibility)"
             )
             .unwrap();
-            writeln!(
-                output,
-                "  - Functions lack clear responsibility signals"
-            )
-            .unwrap();
+            writeln!(output, "  - Functions lack clear responsibility signals").unwrap();
             writeln!(output, "  - File may be test-only or configuration").unwrap();
             writeln!(
                 output,
@@ -2250,7 +2234,10 @@ mod tests {
     #[test]
     fn test_show_splits_flag_hides_splits_by_default() {
         // Test that splits are hidden by default (show_splits = false)
-        use crate::priority::{file_metrics::{ModuleSplit, Priority}, FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use crate::priority::{
+            file_metrics::{ModuleSplit, Priority},
+            FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
+        };
         use std::path::PathBuf;
 
         let item = FileDebtItem {
@@ -2271,27 +2258,25 @@ mod tests {
                     is_god_object: true,
                     god_object_score: 3.5,
                     responsibility_names: vec!["IO".to_string(), "Business Logic".to_string()],
-                    recommended_splits: vec![
-                        ModuleSplit {
-                            suggested_name: "io_handler".to_string(),
-                            responsibility: "IO Operations".to_string(),
-                            methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
-                            fields_needed: vec!["buffer".to_string()],
-                            estimated_lines: 200,
-                            method_count: 2,
-                            priority: Priority::High,
-                            representative_methods: vec!["read_file".to_string()],
-                            structs_to_move: vec![],
-                            trait_suggestion: None,
-                            warning: None,
-                            classification_evidence: None,
-                            domain: String::new(),
-                            rationale: None,
-                            method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-                            severity: None,
-                            behavior_category: None,
-                        },
-                    ],
+                    recommended_splits: vec![ModuleSplit {
+                        suggested_name: "io_handler".to_string(),
+                        responsibility: "IO Operations".to_string(),
+                        methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
+                        fields_needed: vec!["buffer".to_string()],
+                        estimated_lines: 200,
+                        method_count: 2,
+                        priority: Priority::High,
+                        representative_methods: vec!["read_file".to_string()],
+                        structs_to_move: vec![],
+                        trait_suggestion: None,
+                        warning: None,
+                        classification_evidence: None,
+                        domain: String::new(),
+                        rationale: None,
+                        method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                        severity: None,
+                        behavior_category: None,
+                    }],
                     module_structure: None,
                     domain_count: 0,
                     domain_diversity: 0.0,
@@ -2328,7 +2313,10 @@ mod tests {
     #[test]
     fn test_show_splits_flag_shows_splits_when_enabled() {
         // Test that splits are shown when show_splits = true
-        use crate::priority::{file_metrics::{ModuleSplit, Priority}, FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use crate::priority::{
+            file_metrics::{ModuleSplit, Priority},
+            FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators,
+        };
         use std::path::PathBuf;
 
         let item = FileDebtItem {
@@ -2349,27 +2337,25 @@ mod tests {
                     is_god_object: true,
                     god_object_score: 3.5,
                     responsibility_names: vec!["IO".to_string(), "Business Logic".to_string()],
-                    recommended_splits: vec![
-                        ModuleSplit {
-                            suggested_name: "io_handler".to_string(),
-                            responsibility: "IO Operations".to_string(),
-                            methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
-                            fields_needed: vec!["buffer".to_string()],
-                            estimated_lines: 200,
-                            method_count: 2,
-                            priority: Priority::High,
-                            representative_methods: vec!["read_file".to_string()],
-                            structs_to_move: vec![],
-                            trait_suggestion: None,
-                            warning: None,
-                            classification_evidence: None,
-                            domain: String::new(),
-                            rationale: None,
-                            method: crate::priority::file_metrics::SplitAnalysisMethod::None,
-                            severity: None,
-                            behavior_category: None,
-                        },
-                    ],
+                    recommended_splits: vec![ModuleSplit {
+                        suggested_name: "io_handler".to_string(),
+                        responsibility: "IO Operations".to_string(),
+                        methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
+                        fields_needed: vec!["buffer".to_string()],
+                        estimated_lines: 200,
+                        method_count: 2,
+                        priority: Priority::High,
+                        representative_methods: vec!["read_file".to_string()],
+                        structs_to_move: vec![],
+                        trait_suggestion: None,
+                        warning: None,
+                        classification_evidence: None,
+                        domain: String::new(),
+                        rationale: None,
+                        method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                        severity: None,
+                        behavior_category: None,
+                    }],
                     module_structure: None,
                     domain_count: 0,
                     domain_diversity: 0.0,
@@ -2397,7 +2383,10 @@ mod tests {
         format_file_priority_item_markdown(&mut output, 1, &item, 0, true);
 
         // Should show detailed splits
-        assert!(output.contains("**RECOMMENDED SPLITS**") || output.contains("**EXTRACTION CANDIDATE**"));
+        assert!(
+            output.contains("**RECOMMENDED SPLITS**")
+                || output.contains("**EXTRACTION CANDIDATE**")
+        );
         assert!(output.contains("io_handler.rs"));
         assert!(output.contains("IO Operations"));
         assert!(output.contains("read_file"));

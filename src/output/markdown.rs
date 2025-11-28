@@ -28,7 +28,12 @@ pub fn output_markdown(
     let output = if display_config.tiered {
         priority::format_priorities_tiered_markdown(&filtered_analysis, limit, verbosity)
     } else {
-        priority::format_priorities_markdown(&filtered_analysis, limit, verbosity, formatting_config)
+        priority::format_priorities_markdown(
+            &filtered_analysis,
+            limit,
+            verbosity,
+            formatting_config,
+        )
     };
 
     if let Some(path) = output_file {
@@ -174,7 +179,14 @@ mod tests {
         let analysis = create_test_analysis_with_items(10);
 
         // Test with head=3
-        let result = output_markdown(&analysis, Some(3), None, 0, Some(output_path.clone()), FormattingConfig::default());
+        let result = output_markdown(
+            &analysis,
+            Some(3),
+            None,
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(
             result.is_ok(),
             "Failed to write markdown: {:?}",
@@ -204,7 +216,14 @@ mod tests {
         let analysis = create_test_analysis_with_items(10);
 
         // Test with tail=3
-        let result = output_markdown(&analysis, None, Some(3), 0, Some(output_path.clone()), FormattingConfig::default());
+        let result = output_markdown(
+            &analysis,
+            None,
+            Some(3),
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(
             result.is_ok(),
             "Failed to write markdown: {:?}",
@@ -235,7 +254,14 @@ mod tests {
         let analysis = create_test_analysis_with_items(20);
 
         // Test without head/tail (should default to 10)
-        let result = output_markdown(&analysis, None, None, 0, Some(output_path.clone()), FormattingConfig::default());
+        let result = output_markdown(
+            &analysis,
+            None,
+            None,
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(
             result.is_ok(),
             "Failed to write markdown: {:?}",
@@ -259,7 +285,14 @@ mod tests {
         let analysis = create_test_analysis_with_items(5);
 
         // Test with head=10 when only 5 items exist
-        let result = output_markdown(&analysis, Some(10), None, 0, Some(output_path.clone()), FormattingConfig::default());
+        let result = output_markdown(
+            &analysis,
+            Some(10),
+            None,
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(
             result.is_ok(),
             "Failed to write markdown: {:?}",
@@ -283,7 +316,14 @@ mod tests {
         let analysis = create_test_analysis_with_items(5);
 
         // Test with tail=10 when only 5 items exist
-        let result = output_markdown(&analysis, None, Some(10), 0, Some(output_path.clone()), FormattingConfig::default());
+        let result = output_markdown(
+            &analysis,
+            None,
+            Some(10),
+            0,
+            Some(output_path.clone()),
+            FormattingConfig::default(),
+        );
         assert!(
             result.is_ok(),
             "Failed to write markdown: {:?}",
