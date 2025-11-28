@@ -1,3 +1,4 @@
+pub mod destinations;
 pub mod effects;
 pub mod output;
 pub mod pattern_output;
@@ -7,6 +8,9 @@ pub mod walker;
 pub mod writers;
 
 // Re-export I/O traits for convenient access
+pub use destinations::{
+    FileDestination, MemoryDestination, OutputDestination, StderrDestination, StdoutDestination,
+};
 pub use real::{MemoryCache, NoOpCache, RealCoverageLoader, RealFileSystem};
 pub use traits::{Cache, CoverageData, CoverageLoader, FileCoverage, FileSystem};
 
