@@ -221,6 +221,74 @@ impl AnalysisError {
             Self::Other(_) => "Error",
         }
     }
+
+    /// Check if this error is potentially transient and retryable.
+    ///
+    /// Retryable errors are those that might succeed on a subsequent attempt,
+    /// such as:
+    /// - File locks from concurrent access
+    /// - Network timeouts
+    /// - Resource temporarily unavailable
+    /// - Git index lock contention
+    ///
+    /// Non-retryable errors include:
+    /// - Syntax/parse errors
+    /// - Configuration errors
+    /// - Validation errors
+    /// - File not found (permanent)
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use debtmap::errors::AnalysisError;
+    ///
+    /// let io_err = AnalysisError::io("Resource busy");
+    /// // Resource busy is typically retryable
+    ///
+    /// let parse_err = AnalysisError::parse("Syntax error at line 5");
+    /// assert!(!parse_err.is_retryable()); // Parse errors are not retryable
+    /// ```
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            // I/O errors that might be transient
+            Self::IoError { message, .. } => {
+                let msg_lower = message.to_lowercase();
+                // Check for transient conditions
+                msg_lower.contains("resource busy")
+                    || msg_lower.contains("would block")
+                    || msg_lower.contains("timed out")
+                    || msg_lower.contains("timeout")
+                    || msg_lower.contains("interrupted")
+                    || msg_lower.contains("temporarily unavailable")
+                    || msg_lower.contains("connection reset")
+                    || msg_lower.contains("broken pipe")
+                    || msg_lower.contains("try again")
+            }
+            // Coverage errors from external tools may be transient
+            Self::CoverageError { message, .. } => {
+                let msg_lower = message.to_lowercase();
+                msg_lower.contains("connection")
+                    || msg_lower.contains("timeout")
+                    || msg_lower.contains("unavailable")
+            }
+            // Other errors - check for common transient patterns in message
+            Self::Other(message) => {
+                let msg_lower = message.to_lowercase();
+                // Git lock contention
+                msg_lower.contains("index.lock")
+                    || msg_lower.contains("lock file")
+                    || msg_lower.contains("unable to lock")
+                    // Network issues
+                    || msg_lower.contains("connection refused")
+                    || msg_lower.contains("network unreachable")
+            }
+            // Parse, Validation, Config, and Analysis errors are never retryable
+            Self::ParseError { .. }
+            | Self::ValidationError { .. }
+            | Self::ConfigError { .. }
+            | Self::AnalysisFailure { .. } => false,
+        }
+    }
 }
 
 impl fmt::Display for AnalysisError {
@@ -717,5 +785,93 @@ mod tests {
 
         assert!(!summary.has_errors());
         assert_eq!(summary.one_line_summary(), "No errors");
+    }
+
+    // Tests for is_retryable (Spec 205)
+
+    #[test]
+    fn test_is_retryable_io_resource_busy() {
+        let err = AnalysisError::io("Resource busy - file locked");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_io_timeout() {
+        let err = AnalysisError::io("Operation timed out");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_io_interrupted() {
+        let err = AnalysisError::io("System call interrupted");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_io_would_block() {
+        let err = AnalysisError::io("Would block on non-blocking read");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_io_not_found() {
+        // File not found is NOT retryable - it won't suddenly appear
+        let err = AnalysisError::io("No such file or directory");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_io_permission_denied() {
+        // Permission denied is NOT retryable
+        let err = AnalysisError::io("Permission denied");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_parse_error() {
+        let err = AnalysisError::parse("Syntax error at line 5");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_validation_error() {
+        let err = AnalysisError::validation("Invalid configuration value");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_config_error() {
+        let err = AnalysisError::config("Missing required field");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_analysis_error() {
+        let err = AnalysisError::analysis("Algorithm failed");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_coverage_timeout() {
+        let err = AnalysisError::coverage("Connection timeout to coverage server");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_coverage_parse_fail() {
+        let err = AnalysisError::coverage("Invalid coverage format");
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_git_lock() {
+        let err = AnalysisError::other("Unable to create index.lock: File exists");
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_is_retryable_other_not_retryable() {
+        let err = AnalysisError::other("Unknown error occurred");
+        assert!(!err.is_retryable());
     }
 }

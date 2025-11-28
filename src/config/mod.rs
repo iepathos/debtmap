@@ -4,6 +4,7 @@ mod detection;
 mod display;
 mod languages;
 mod parallel;
+pub mod retry;
 mod scoring;
 mod thresholds;
 
@@ -65,6 +66,9 @@ pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
 
 // Re-export parallel config types (spec 203)
 pub use parallel::{BatchAnalysisConfig, ParallelConfig};
+
+// Re-export retry config types (spec 205)
+pub use retry::{RetryConfig, RetryStrategy};
 
 // Re-export core types
 pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};
