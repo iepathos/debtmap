@@ -3,6 +3,7 @@ mod classification;
 mod detection;
 mod display;
 mod languages;
+mod parallel;
 mod scoring;
 mod thresholds;
 
@@ -61,6 +62,9 @@ pub use display::{
 
 // Pure mapping pattern detection config (spec 118)
 pub use crate::complexity::pure_mapping_patterns::MappingPatternConfig;
+
+// Re-export parallel config types (spec 203)
+pub use parallel::{BatchAnalysisConfig, ParallelConfig};
 
 // Re-export core types
 pub use core::{DebtmapConfig, IgnoreConfig, OutputConfig};

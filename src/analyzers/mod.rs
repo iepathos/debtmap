@@ -3,6 +3,7 @@ use crate::priority::file_metrics::FileDebtMetrics;
 use anyhow::Result;
 use std::path::Path;
 
+pub mod batch;
 pub mod call_graph;
 pub mod call_graph_integration;
 pub mod closure_analyzer;

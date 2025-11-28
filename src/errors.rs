@@ -115,10 +115,29 @@ impl AnalysisError {
         }
     }
 
+    /// Create a parse error with path context (no line number).
+    pub fn parse_with_path(message: impl Into<String>, path: impl AsRef<std::path::Path>) -> Self {
+        Self::ParseError {
+            message: message.into(),
+            path: Some(path.as_ref().to_path_buf()),
+            line: None,
+        }
+    }
+
     /// Create a validation error.
     pub fn validation(message: impl Into<String>) -> Self {
         Self::ValidationError {
             message: message.into(),
+        }
+    }
+
+    /// Create a validation error with path context.
+    pub fn validation_with_path(
+        message: impl Into<String>,
+        path: impl AsRef<std::path::Path>,
+    ) -> Self {
+        Self::ValidationError {
+            message: format!("{} (path: {})", message.into(), path.as_ref().display()),
         }
     }
 
