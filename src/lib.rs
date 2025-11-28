@@ -361,6 +361,7 @@ pub mod refactoring;
 pub mod resource;
 pub mod risk;
 pub mod testing;
+pub mod testkit;
 pub mod transformers;
 pub mod utils;
 
@@ -423,3 +424,7 @@ pub use crate::errors::{errors_to_anyhow, format_error_list, AnalysisError};
 pub use crate::effects::{
     ask_env, asks_config, asks_entropy, asks_scoring, asks_thresholds, local_with_config,
 };
+
+// Testing infrastructure (spec 200) - MockEnv and test helpers
+// Note: Assertion macros are exported via #[macro_export] in testkit::assertions
+pub use crate::testkit::{ConfigBuilder, DebtmapTestEnv};
