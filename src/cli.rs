@@ -295,6 +295,12 @@ pub enum Commands {
         /// Functional analysis profile (strict, balanced, lenient)
         #[arg(long = "functional-analysis-profile", value_enum)]
         functional_analysis_profile: Option<FunctionalAnalysisProfile>,
+
+        /// Show detailed module split recommendations for god objects and large files.
+        /// This experimental feature suggests how to decompose large files into
+        /// smaller, focused modules. Hidden by default.
+        #[arg(long = "show-splits")]
+        show_splits: bool,
     },
 
     /// Initialize configuration file
@@ -383,6 +389,12 @@ pub enum Commands {
         /// Environment variable DEBTMAP_JOBS can also be used to set this value.
         #[arg(long = "jobs", short = 'j', default_value = "0")]
         jobs: usize,
+
+        /// Show detailed module split recommendations for god objects and large files.
+        /// This experimental feature suggests how to decompose large files into
+        /// smaller, focused modules. Hidden by default.
+        #[arg(long = "show-splits")]
+        show_splits: bool,
     },
 
     /// Compare two analysis results and generate diff

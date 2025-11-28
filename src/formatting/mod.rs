@@ -33,6 +33,8 @@ impl ColorMode {
 pub struct FormattingConfig {
     pub color: ColorMode,
     pub caller_callee: CallerCalleeConfig,
+    /// Show detailed module split recommendations for god objects (Spec 208)
+    pub show_splits: bool,
 }
 
 impl Default for FormattingConfig {
@@ -40,6 +42,7 @@ impl Default for FormattingConfig {
         Self {
             color: ColorMode::Auto,
             caller_callee: CallerCalleeConfig::default(),
+            show_splits: false,
         }
     }
 }
@@ -49,6 +52,7 @@ impl FormattingConfig {
         Self {
             color,
             caller_callee: CallerCalleeConfig::default(),
+            show_splits: false,
         }
     }
 
@@ -56,6 +60,7 @@ impl FormattingConfig {
         Self {
             color,
             caller_callee,
+            show_splits: false,
         }
     }
 
@@ -89,7 +94,14 @@ impl FormattingConfig {
         Self {
             color: ColorMode::Never,
             caller_callee: CallerCalleeConfig::default(),
+            show_splits: false,
         }
+    }
+
+    /// Create a configuration with show_splits enabled
+    pub fn with_show_splits(mut self, show_splits: bool) -> Self {
+        self.show_splits = show_splits;
+        self
     }
 }
 

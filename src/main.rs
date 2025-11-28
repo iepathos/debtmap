@@ -449,6 +449,7 @@ fn main() -> Result<()> {
             verbosity,
             no_parallel,
             jobs,
+            show_splits,
         } => {
             let validate_config = debtmap::commands::validate::ValidateConfig {
                 path,
@@ -466,6 +467,7 @@ fn main() -> Result<()> {
                 verbosity,
                 no_parallel,
                 jobs,
+                show_splits,
             };
             debtmap::commands::validate::validate_project(validate_config)?;
             Ok(())
@@ -621,6 +623,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         functional_analysis_profile,
         min_split_methods,
         min_split_lines,
+        show_splits,
     } = command
     {
         // Apply side effects first
@@ -641,6 +644,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             max_callees,
             show_external,
             show_std_lib,
+            show_splits,
         );
         let config = build_analyze_config(
             path,
@@ -766,6 +770,7 @@ fn convert_output_format(format: debtmap::cli::OutputFormat) -> debtmap::cli::Ou
 }
 
 // Pure function to create formatting configuration
+#[allow(clippy::too_many_arguments)]
 fn create_formatting_config(
     plain: bool,
     _show_dependencies: bool,
@@ -774,6 +779,7 @@ fn create_formatting_config(
     max_callees: usize,
     show_external: bool,
     show_std_lib: bool,
+    show_splits: bool,
 ) -> FormattingConfig {
     use debtmap::config::CallerCalleeConfig;
 
@@ -792,7 +798,7 @@ fn create_formatting_config(
         show_std_lib,
     };
 
-    FormattingConfig::with_caller_callee(color_mode, caller_callee)
+    FormattingConfig::with_caller_callee(color_mode, caller_callee).with_show_splits(show_splits)
 }
 
 // Pure function to build analyze configuration

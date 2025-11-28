@@ -24,6 +24,8 @@ pub struct ValidateConfig {
     pub verbosity: u8,
     pub no_parallel: bool,
     pub jobs: usize,
+    /// Show detailed module split recommendations for god objects (Spec 208)
+    pub show_splits: bool,
 }
 
 pub struct ValidationDetails {
@@ -470,6 +472,7 @@ mod tests {
             verbosity: 0,
             no_parallel: false,
             jobs: 0,
+            show_splits: false,
         };
 
         // When parallel is enabled, the environment variable should be set
@@ -502,6 +505,7 @@ mod tests {
             verbosity: 0,
             no_parallel: true,
             jobs: 0,
+            show_splits: false,
         };
 
         // Verify that no_parallel flag is set correctly
@@ -534,6 +538,7 @@ mod tests {
             verbosity: 0,
             no_parallel: false,
             jobs: 4,
+            show_splits: false,
         };
 
         // When jobs is set, the environment variable should be set
