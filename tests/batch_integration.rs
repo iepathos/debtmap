@@ -27,50 +27,6 @@ fn create_test_project(files: &[(&str, &str)]) -> (TempDir, Vec<PathBuf>) {
     (temp_dir, paths)
 }
 
-/// Create a moderately complex Rust file for testing.
-fn complex_rust_file(name: &str) -> (&'static str, String) {
-    let content = format!(
-        r#"
-/// A complex function for testing batch analysis.
-pub fn process_{name}(data: &[i32], threshold: i32) -> Vec<i32> {{
-    let mut results = Vec::new();
-    for &value in data {{
-        if value > threshold {{
-            if value % 2 == 0 {{
-                results.push(value * 2);
-            }} else {{
-                results.push(value * 3);
-            }}
-        }} else if value == threshold {{
-            results.push(value);
-        }} else {{
-            results.push(value / 2);
-        }}
-    }}
-    results
-}}
-
-/// A simpler helper function.
-pub fn helper_{name}(x: i32) -> i32 {{
-    x + 1
-}}
-
-#[cfg(test)]
-mod tests {{
-    use super::*;
-
-    #[test]
-    fn test_process_{name}() {{
-        let result = process_{name}(&[1, 2, 3], 2);
-        assert!(!result.is_empty());
-    }}
-}}
-"#,
-        name = name
-    );
-    (Box::leak(name.to_string().into_boxed_str()), content)
-}
-
 // ============================================================================
 // Parallel Analysis Tests
 // ============================================================================
