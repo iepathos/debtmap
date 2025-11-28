@@ -15,11 +15,13 @@
 //! - Purity analysis for function classification and refactoring guidance
 //! - Multi-signal aggregation for high-accuracy responsibility classification
 //! - Type signature-based classification for improved responsibility detection
+//! - Effect-based analysis patterns for testability and composability (Spec 207)
 
 pub mod attribution;
 pub mod call_graph;
 pub mod context_detection;
 pub mod diagnostics;
+pub mod effects;
 pub mod file_context;
 pub mod framework_patterns;
 pub mod framework_patterns_multi;
@@ -29,6 +31,7 @@ pub mod graph_metrics;
 pub mod io_detection;
 pub mod module_structure;
 pub mod multi_pass;
+pub mod multi_pass_effects;
 pub mod multi_signal_aggregation;
 pub mod patterns;
 pub mod purity_analysis;
@@ -115,3 +118,6 @@ pub use type_signatures::{
     TypeMatcher, TypeNormalizer, TypePattern, TypePatternLibrary, TypeSignature,
     TypeSignatureAnalyzer,
 };
+
+#[cfg(test)]
+mod effects_tests;

@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use syn::File;
 
 mod cross_module;
+pub mod effects;
 mod framework_patterns;
 mod function_pointer;
 mod trait_registry;
