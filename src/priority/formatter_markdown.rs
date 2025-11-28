@@ -1,3 +1,4 @@
+use crate::formatting::FormattingConfig;
 use crate::priority::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
     DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedAnalysisQueries,
@@ -10,6 +11,7 @@ pub fn format_priorities_markdown(
     analysis: &UnifiedAnalysis,
     limit: usize,
     verbosity: u8,
+    config: FormattingConfig,
 ) -> String {
     let mut output = String::new();
 
@@ -22,7 +24,7 @@ pub fn format_priorities_markdown(
     writeln!(output, "## Top {} Recommendations\n", count).unwrap();
 
     for (idx, item) in top_items.iter().enumerate() {
-        format_mixed_priority_item_markdown(&mut output, idx + 1, item, verbosity);
+        format_mixed_priority_item_markdown(&mut output, idx + 1, item, verbosity, &config);
         writeln!(output).unwrap();
     }
 
@@ -566,13 +568,14 @@ fn format_mixed_priority_item_markdown(
     rank: usize,
     item: &DebtItem,
     verbosity: u8,
+    config: &FormattingConfig,
 ) {
     match item {
         DebtItem::Function(func_item) => {
             format_priority_item_markdown(output, rank, func_item, verbosity);
         }
         DebtItem::File(file_item) => {
-            format_file_priority_item_markdown(output, rank, file_item, verbosity);
+            format_file_priority_item_markdown(output, rank, file_item, verbosity, config.show_splits);
         }
     }
 }
@@ -582,6 +585,7 @@ fn format_file_priority_item_markdown(
     rank: usize,
     item: &FileDebtItem,
     verbosity: u8,
+    show_splits: bool,
 ) {
     let severity = get_severity_label(item.score);
 
@@ -669,6 +673,9 @@ fn format_file_priority_item_markdown(
         }
     }
 
+    // Show split recommendations if available (Spec 208)
+    format_split_recommendations_markdown(output, item, verbosity, show_splits);
+
     writeln!(output, "**Recommendation:** {}", item.recommendation).unwrap();
 
     writeln!(output, "**Impact:** {}", format_file_impact(&item.impact)).unwrap();
@@ -702,6 +709,235 @@ fn format_file_priority_item_markdown(
             .unwrap();
         }
     }
+}
+
+/// Format split recommendations for markdown output (Spec 208)
+fn format_split_recommendations_markdown(
+    output: &mut String,
+    item: &FileDebtItem,
+    verbosity: u8,
+    show_splits: bool,
+) {
+    let indicators = &item.metrics.god_object_indicators;
+    let extension = get_file_extension(&item.metrics.path);
+
+    // If we have detailed split recommendations, use them
+    if !indicators.recommended_splits.is_empty() {
+        // Spec 208: Only show detailed splits when --show-splits flag is provided
+        if !show_splits {
+            // Show a brief hint that splits are available
+            writeln!(output).unwrap();
+            writeln!(
+                output,
+                "*(Use --show-splits for detailed module split recommendations)*"
+            )
+            .unwrap();
+        } else {
+            // Full splits display when --show-splits is enabled
+            writeln!(output).unwrap();
+
+            // Use different header based on number of splits
+            if indicators.recommended_splits.len() == 1 {
+                writeln!(
+                    output,
+                    "**EXTRACTION CANDIDATE** (single cohesive group found):"
+                )
+                .unwrap();
+            } else {
+                writeln!(
+                    output,
+                    "**RECOMMENDED SPLITS** ({} modules):",
+                    indicators.recommended_splits.len()
+                )
+                .unwrap();
+            }
+
+            writeln!(output).unwrap();
+
+            for split in indicators.recommended_splits.iter() {
+                // Show module name and responsibility
+                writeln!(
+                    output,
+                    "- **{}.{}**",
+                    split.suggested_name, extension
+                )
+                .unwrap();
+
+                let priority_indicator = match split.priority {
+                    crate::priority::file_metrics::Priority::High => "High",
+                    crate::priority::file_metrics::Priority::Medium => "Medium",
+                    crate::priority::file_metrics::Priority::Low => "Low",
+                };
+
+                writeln!(
+                    output,
+                    "  - Category: {} | Priority: {}",
+                    split.responsibility, priority_indicator
+                )
+                .unwrap();
+                writeln!(
+                    output,
+                    "  - Size: {} methods, ~{} lines",
+                    split.methods_to_move.len(),
+                    split.estimated_lines,
+                )
+                .unwrap();
+
+                // Display classification evidence if available and verbosity > 0
+                if verbosity > 0 {
+                    if let Some(ref evidence) = split.classification_evidence {
+                        writeln!(
+                            output,
+                            "  - Confidence: {:.1}% | Signals: {}",
+                            evidence.confidence * 100.0,
+                            evidence.evidence.len()
+                        )
+                        .unwrap();
+
+                        // Show alternatives warning if confidence is low
+                        if evidence.confidence < 0.80 && !evidence.alternatives.is_empty() {
+                            writeln!(
+                                output,
+                                "  - **⚠ Low confidence classification - review recommended**"
+                            )
+                            .unwrap();
+                        }
+                    }
+                }
+
+                // Show representative methods (Spec 178: methods before structs)
+                if !split.representative_methods.is_empty() {
+                    let total_methods = split.representative_methods.len();
+                    let sample_size = 5.min(total_methods);
+
+                    writeln!(output, "  - Methods ({} total):", total_methods).unwrap();
+
+                    for method in split.representative_methods.iter().take(sample_size) {
+                        writeln!(output, "    - `{}()`", method).unwrap();
+                    }
+
+                    if total_methods > sample_size {
+                        writeln!(
+                            output,
+                            "    - ... and {} more",
+                            total_methods - sample_size
+                        )
+                        .unwrap();
+                    }
+                } else if !split.methods_to_move.is_empty() {
+                    // Fallback to methods_to_move if representative_methods not populated
+                    let total_methods = split.methods_to_move.len();
+                    let sample_size = 5.min(total_methods);
+
+                    writeln!(output, "  - Methods ({} total):", total_methods).unwrap();
+
+                    for method in split.methods_to_move.iter().take(sample_size) {
+                        writeln!(output, "    - `{}()`", method).unwrap();
+                    }
+
+                    if total_methods > sample_size {
+                        writeln!(
+                            output,
+                            "    - ... and {} more",
+                            total_methods - sample_size
+                        )
+                        .unwrap();
+                    }
+                }
+
+                // Show fields needed (Spec 178: field dependencies)
+                if !split.fields_needed.is_empty() {
+                    writeln!(
+                        output,
+                        "  - Fields needed: {}",
+                        split.fields_needed.join(", ")
+                    )
+                    .unwrap();
+                }
+
+                // Show trait extraction suggestion (Spec 178)
+                if let Some(ref trait_suggestion) = split.trait_suggestion {
+                    if verbosity > 0 {
+                        writeln!(output, "  - Trait extraction:").unwrap();
+                        for line in trait_suggestion.lines() {
+                            writeln!(output, "    {}", line).unwrap();
+                        }
+                    }
+                }
+
+                // Show structs being moved (secondary to methods, per Spec 178)
+                if !split.structs_to_move.is_empty() {
+                    writeln!(
+                        output,
+                        "  - Structs: {}",
+                        split.structs_to_move.join(", ")
+                    )
+                    .unwrap();
+                }
+
+                // Show warning if present
+                if let Some(warning) = &split.warning {
+                    writeln!(output, "  - **⚠ {}**", warning).unwrap();
+                }
+
+                writeln!(output).unwrap();
+            }
+
+            // Add explanation if only 1 group found
+            if indicators.recommended_splits.len() == 1 {
+                writeln!(
+                    output,
+                    "*NOTE: Only one cohesive group detected. This suggests methods are tightly coupled.*"
+                )
+                .unwrap();
+                writeln!(
+                    output,
+                    "*Consider splitting by feature/responsibility rather than call patterns.*"
+                )
+                .unwrap();
+                writeln!(output).unwrap();
+            }
+        }
+    } else {
+        // No detailed splits available - provide diagnostic message (Spec 149)
+        // Spec 208: Only show this diagnostic when --show-splits is enabled
+        if show_splits {
+            writeln!(output).unwrap();
+            writeln!(output, "**NO DETAILED SPLITS AVAILABLE**").unwrap();
+            writeln!(
+                output,
+                "- Analysis could not generate responsibility-based splits for this file."
+            )
+            .unwrap();
+            writeln!(output, "- This may indicate:").unwrap();
+            writeln!(
+                output,
+                "  - File has too few functions (< 3 per responsibility)"
+            )
+            .unwrap();
+            writeln!(
+                output,
+                "  - Functions lack clear responsibility signals"
+            )
+            .unwrap();
+            writeln!(output, "  - File may be test-only or configuration").unwrap();
+            writeln!(
+                output,
+                "- Consider manual analysis or consult documentation."
+            )
+            .unwrap();
+            writeln!(output).unwrap();
+        }
+        // Note: When show_splits is false and no splits are available, we don't show anything
+        // since there's no hint to offer (no splits exist to display)
+    }
+}
+
+/// Helper to get file extension from path
+fn get_file_extension(path: &std::path::Path) -> &str {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("unknown")
 }
 
 fn score_category(lines: usize) -> &'static str {
@@ -1659,7 +1895,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+        format_file_priority_item_markdown(&mut output, 1, &item, 0, false);
 
         assert!(output.contains("### #1 [T1] Score: 45.2"));
         assert!(output.contains("**Type:** FILE"));
@@ -1718,7 +1954,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+        format_file_priority_item_markdown(&mut output, 1, &item, 0, false);
 
         assert!(output.contains("### #1 [T1] Score: 125.8"));
         assert!(output.contains("**Type:** FILE - GOD OBJECT"));
@@ -1779,7 +2015,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 2, &item, 0);
+        format_file_priority_item_markdown(&mut output, 2, &item, 0, false);
 
         assert!(output.contains("### #2 [T1] Score: 85.3"));
         assert!(output.contains("**Type:** FILE - HIGH COMPLEXITY"));
@@ -1836,7 +2072,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 3, &item, 1);
+        format_file_priority_item_markdown(&mut output, 3, &item, 1, false);
 
         assert!(output.contains("### #3 [T1] Score: 55.7"));
         assert!(output.contains("**Scoring Breakdown:**"));
@@ -1895,7 +2131,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 10, &item, 1);
+        format_file_priority_item_markdown(&mut output, 10, &item, 1, false);
 
         assert!(output.contains("0 functions"));
         assert!(!output.contains("- Dependencies:"));
@@ -1950,7 +2186,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 1, &item, 0);
+        format_file_priority_item_markdown(&mut output, 1, &item, 0, false);
 
         assert!(output.contains("[CRITICAL]"));
         assert!(output.contains("**Type:** FILE - GOD OBJECT"));
@@ -2005,10 +2241,281 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 15, &item, 0);
+        format_file_priority_item_markdown(&mut output, 15, &item, 0, false);
 
         assert!(output.contains("[CRITICAL]")); // Score 18.5 is CRITICAL (>=9.0)
         assert!(output.contains("**Type:** FILE"));
+    }
+
+    #[test]
+    fn test_show_splits_flag_hides_splits_by_default() {
+        // Test that splits are hidden by default (show_splits = false)
+        use crate::priority::{file_metrics::{ModuleSplit, Priority}, FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/god.rs"),
+                total_lines: 800,
+                function_count: 40,
+                class_count: 3,
+                avg_complexity: 12.0,
+                max_complexity: 30,
+                total_complexity: 480,
+                coverage_percent: 0.60,
+                uncovered_lines: 320,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 35,
+                    fields_count: 15,
+                    responsibilities: 5,
+                    is_god_object: true,
+                    god_object_score: 3.5,
+                    responsibility_names: vec!["IO".to_string(), "Business Logic".to_string()],
+                    recommended_splits: vec![
+                        ModuleSplit {
+                            suggested_name: "io_handler".to_string(),
+                            responsibility: "IO Operations".to_string(),
+                            methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
+                            fields_needed: vec!["buffer".to_string()],
+                            estimated_lines: 200,
+                            method_count: 2,
+                            priority: Priority::High,
+                            representative_methods: vec!["read_file".to_string()],
+                            structs_to_move: vec![],
+                            trait_suggestion: None,
+                            warning: None,
+                            classification_evidence: None,
+                            domain: String::new(),
+                            rationale: None,
+                            method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                            severity: None,
+                            behavior_category: None,
+                        },
+                    ],
+                    module_structure: None,
+                    domain_count: 0,
+                    domain_diversity: 0.0,
+                    struct_ratio: 0.0,
+                    analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                    cross_domain_severity: None,
+                    domain_diversity_metrics: None,
+                    detection_type: None,
+                },
+                function_scores: vec![],
+                god_object_type: None,
+                file_type: None,
+            },
+            score: 95.0,
+            priority_rank: 1,
+            recommendation: "Split into multiple modules".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 60.0,
+                maintainability_improvement: 75.0,
+                test_effort: 40.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 1, &item, 0, false);
+
+        // Should show hint but not detailed splits
+        assert!(output.contains("Use --show-splits"));
+        assert!(!output.contains("**RECOMMENDED SPLITS**"));
+        assert!(!output.contains("io_handler.rs"));
+        assert!(!output.contains("IO Operations"));
+    }
+
+    #[test]
+    fn test_show_splits_flag_shows_splits_when_enabled() {
+        // Test that splits are shown when show_splits = true
+        use crate::priority::{file_metrics::{ModuleSplit, Priority}, FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/god.rs"),
+                total_lines: 800,
+                function_count: 40,
+                class_count: 3,
+                avg_complexity: 12.0,
+                max_complexity: 30,
+                total_complexity: 480,
+                coverage_percent: 0.60,
+                uncovered_lines: 320,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 35,
+                    fields_count: 15,
+                    responsibilities: 5,
+                    is_god_object: true,
+                    god_object_score: 3.5,
+                    responsibility_names: vec!["IO".to_string(), "Business Logic".to_string()],
+                    recommended_splits: vec![
+                        ModuleSplit {
+                            suggested_name: "io_handler".to_string(),
+                            responsibility: "IO Operations".to_string(),
+                            methods_to_move: vec!["read_file".to_string(), "write_file".to_string()],
+                            fields_needed: vec!["buffer".to_string()],
+                            estimated_lines: 200,
+                            method_count: 2,
+                            priority: Priority::High,
+                            representative_methods: vec!["read_file".to_string()],
+                            structs_to_move: vec![],
+                            trait_suggestion: None,
+                            warning: None,
+                            classification_evidence: None,
+                            domain: String::new(),
+                            rationale: None,
+                            method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                            severity: None,
+                            behavior_category: None,
+                        },
+                    ],
+                    module_structure: None,
+                    domain_count: 0,
+                    domain_diversity: 0.0,
+                    struct_ratio: 0.0,
+                    analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                    cross_domain_severity: None,
+                    domain_diversity_metrics: None,
+                    detection_type: None,
+                },
+                function_scores: vec![],
+                god_object_type: None,
+                file_type: None,
+            },
+            score: 95.0,
+            priority_rank: 1,
+            recommendation: "Split into multiple modules".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 60.0,
+                maintainability_improvement: 75.0,
+                test_effort: 40.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 1, &item, 0, true);
+
+        // Should show detailed splits
+        assert!(output.contains("**RECOMMENDED SPLITS**") || output.contains("**EXTRACTION CANDIDATE**"));
+        assert!(output.contains("io_handler.rs"));
+        assert!(output.contains("IO Operations"));
+        assert!(output.contains("read_file"));
+        assert!(!output.contains("Use --show-splits")); // Hint should not be shown
+    }
+
+    #[test]
+    fn test_show_splits_flag_no_hint_when_no_splits() {
+        // Test that no hint is shown when there are no splits available
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/simple.rs"),
+                total_lines: 200,
+                function_count: 10,
+                class_count: 1,
+                avg_complexity: 5.0,
+                max_complexity: 10,
+                total_complexity: 50,
+                coverage_percent: 0.80,
+                uncovered_lines: 40,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 8,
+                    fields_count: 3,
+                    responsibilities: 2,
+                    is_god_object: false,
+                    god_object_score: 1.5,
+                    responsibility_names: vec![],
+                    recommended_splits: vec![], // No splits
+                    module_structure: None,
+                    domain_count: 0,
+                    domain_diversity: 0.0,
+                    struct_ratio: 0.0,
+                    analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                    cross_domain_severity: None,
+                    domain_diversity_metrics: None,
+                    detection_type: None,
+                },
+                function_scores: vec![],
+                god_object_type: None,
+                file_type: None,
+            },
+            score: 45.0,
+            priority_rank: 5,
+            recommendation: "Moderate refactoring".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 20.0,
+                maintainability_improvement: 30.0,
+                test_effort: 15.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 5, &item, 0, false);
+
+        // Should not show hint when no splits exist
+        assert!(!output.contains("Use --show-splits"));
+        assert!(!output.contains("**RECOMMENDED SPLITS**"));
+        assert!(!output.contains("**NO DETAILED SPLITS AVAILABLE**"));
+    }
+
+    #[test]
+    fn test_show_splits_flag_shows_diagnostic_when_enabled_no_splits() {
+        // Test that diagnostic is shown when show_splits=true but no splits available
+        use crate::priority::{FileDebtItem, FileDebtMetrics, FileImpact, GodObjectIndicators};
+        use std::path::PathBuf;
+
+        let item = FileDebtItem {
+            metrics: FileDebtMetrics {
+                path: PathBuf::from("src/simple.rs"),
+                total_lines: 200,
+                function_count: 10,
+                class_count: 1,
+                avg_complexity: 5.0,
+                max_complexity: 10,
+                total_complexity: 50,
+                coverage_percent: 0.80,
+                uncovered_lines: 40,
+                god_object_indicators: GodObjectIndicators {
+                    methods_count: 8,
+                    fields_count: 3,
+                    responsibilities: 2,
+                    is_god_object: false,
+                    god_object_score: 1.5,
+                    responsibility_names: vec![],
+                    recommended_splits: vec![], // No splits
+                    module_structure: None,
+                    domain_count: 0,
+                    domain_diversity: 0.0,
+                    struct_ratio: 0.0,
+                    analysis_method: crate::priority::file_metrics::SplitAnalysisMethod::None,
+                    cross_domain_severity: None,
+                    domain_diversity_metrics: None,
+                    detection_type: None,
+                },
+                function_scores: vec![],
+                god_object_type: None,
+                file_type: None,
+            },
+            score: 45.0,
+            priority_rank: 5,
+            recommendation: "Moderate refactoring".to_string(),
+            impact: FileImpact {
+                complexity_reduction: 20.0,
+                maintainability_improvement: 30.0,
+                test_effort: 15.0,
+            },
+        };
+
+        let mut output = String::new();
+        format_file_priority_item_markdown(&mut output, 5, &item, 0, true);
+
+        // Should show diagnostic when show_splits=true but no splits
+        assert!(output.contains("**NO DETAILED SPLITS AVAILABLE**"));
+        assert!(output.contains("This may indicate:"));
+        assert!(!output.contains("Use --show-splits")); // Hint should not be shown
     }
 
     #[test]
@@ -2374,7 +2881,7 @@ mod tests {
         };
 
         let mut output = String::new();
-        format_file_priority_item_markdown(&mut output, 4, &item, 2);
+        format_file_priority_item_markdown(&mut output, 4, &item, 2, false);
 
         // With verbosity 2, should include all details
         assert!(output.contains("**Scoring Breakdown:**"));

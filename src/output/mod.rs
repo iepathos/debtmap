@@ -120,7 +120,7 @@ pub fn output_unified_priorities_with_summary(
             )
         }
         Some(crate::cli::OutputFormat::Markdown) => {
-            markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
+            markdown::output_markdown(&analysis, top, tail, verbosity, output_file, formatting_config)
         }
         Some(crate::cli::OutputFormat::Html) => match output_file {
             Some(path) => {
@@ -140,7 +140,7 @@ pub fn output_unified_priorities_with_summary(
         },
         _ => {
             if is_markdown_file(&output_file) {
-                markdown::output_markdown(&analysis, top, tail, verbosity, output_file)
+                markdown::output_markdown(&analysis, top, tail, verbosity, output_file, formatting_config)
             } else {
                 terminal::output_terminal_with_mode(
                     &analysis,
