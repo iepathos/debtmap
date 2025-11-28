@@ -193,3 +193,7 @@ harness = false
 [[bench]]
 name = "score_based_sorting_bench"
 harness = false
+
+[[bench]]
+name = "batch_analysis"
+harness = false
