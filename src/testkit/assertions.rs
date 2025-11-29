@@ -11,10 +11,10 @@
 //!
 //! # Debtmap Extends (for Result)
 //!
-//! - [`assert_result_ok!`] - Assert Result is Ok and extract value
-//! - [`assert_result_err!`] - Assert Result is Err and extract error
-//! - [`assert_contains_error!`] - Assert error message contains pattern
-//! - [`assert_validation_error_count!`] - Assert validation has N errors
+//! - [`crate::assert_result_ok!`] - Assert Result is Ok and extract value
+//! - [`crate::assert_result_err!`] - Assert Result is Err and extract error
+//! - [`crate::assert_contains_error!`] - Assert error message contains pattern
+//! - [`crate::assert_validation_error_count!`] - Assert validation has N errors
 //!
 //! # Example
 //!

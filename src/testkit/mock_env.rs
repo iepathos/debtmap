@@ -1,15 +1,15 @@
 //! Mock environment for testing debtmap analysis operations.
 //!
 //! This module provides [`DebtmapTestEnv`], an in-memory implementation of
-//! [`AnalysisEnv`](crate::env::AnalysisEnv) that enables fast, isolated tests
+//! [`AnalysisEnv`] that enables fast, isolated tests
 //! without real I/O operations.
 //!
 //! # Architecture
 //!
 //! `DebtmapTestEnv` implements the same traits as production environments:
-//! - [`FileSystem`](crate::io::traits::FileSystem): In-memory file storage
-//! - [`CoverageLoader`](crate::io::traits::CoverageLoader): Mock coverage data
-//! - [`Cache`](crate::io::traits::Cache): In-memory cache
+//! - [`FileSystem`]: In-memory file storage
+//! - [`CoverageLoader`]: Mock coverage data
+//! - [`Cache`]: In-memory cache
 //!
 //! # Thread Safety
 //!
