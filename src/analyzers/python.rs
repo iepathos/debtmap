@@ -52,7 +52,11 @@ impl Analyzer for PythonAnalyzer {
     fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
         let module = rustpython_parser::parse(content, rustpython_parser::Mode::Module, "<module>")
             .map_err(|e| anyhow::anyhow!("Python parse error: {:?}", e))?;
-        Ok(Ast::Python(PythonAst { module, path }))
+        Ok(Ast::Python(PythonAst {
+            module,
+            path,
+            source: content.to_string(),
+        }))
     }
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
@@ -68,10 +72,9 @@ impl Analyzer for PythonAnalyzer {
                 metrics.debt_items.extend(detector.get_debt_items());
 
                 // Add organization anti-pattern detection
-                let source_content = std::fs::read_to_string(&python_ast.path).unwrap_or_default();
                 let org_analyzer = PythonOrganizationAnalyzer::new();
                 let org_patterns =
-                    org_analyzer.analyze(&python_ast.module, &python_ast.path, &source_content);
+                    org_analyzer.analyze(&python_ast.module, &python_ast.path, &python_ast.source);
 
                 // Convert organization patterns to debt items
                 for pattern in org_patterns {

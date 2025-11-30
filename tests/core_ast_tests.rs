@@ -8,6 +8,7 @@ fn create_test_rust_ast() -> Ast {
     Ast::Rust(RustAst {
         file: syn::parse_str("fn main() {}").unwrap(),
         path: PathBuf::from("test.rs"),
+        source: "fn main() {}".to_string(),
     })
 }
 
