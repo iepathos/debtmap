@@ -284,7 +284,7 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     let mut functions = extract_function_metrics(
         &ast.module,
         &ast.path,
-        &source_content,
+        source_content,
         &mut entropy_calculator,
     );
 
@@ -297,7 +297,7 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
         &ast.path,
         threshold,
         &functions,
-        &source_content,
+        source_content,
     );
     let dependencies = extract_dependencies(&ast.module);
 
