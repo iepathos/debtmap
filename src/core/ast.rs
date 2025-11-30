@@ -134,12 +134,14 @@ pub struct SingletonInstance {
 pub struct RustAst {
     pub file: syn::File,
     pub path: PathBuf,
+    pub source: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct PythonAst {
     pub module: rustpython_parser::ast::Mod,
     pub path: PathBuf,
+    pub source: String,
 }
 
 #[derive(Clone, Debug)]
@@ -375,6 +377,7 @@ mod tests {
                 items: vec![],
             },
             path: PathBuf::from("test.rs"),
+            source: String::new(),
         });
 
         // Currently returns empty vec, test that it doesn't panic
@@ -415,6 +418,7 @@ mod tests {
                 items: vec![],
             },
             path: PathBuf::from("test.rs"),
+            source: String::new(),
         });
 
         let nodes = ast.extract_nodes();
@@ -513,6 +517,7 @@ mod tests {
                 items: vec![],
             },
             path: PathBuf::from("test.rs"),
+            source: String::new(),
         });
 
         let transformed = rust_ast.transform(|a| a);

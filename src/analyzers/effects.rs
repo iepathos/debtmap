@@ -16,7 +16,7 @@
 use super::{analyze_file, get_analyzer, Analyzer};
 use crate::analysis::effects::{analyze_with_env, lift_pure, traverse_effect};
 use crate::core::{FileMetrics, Language};
-use crate::effects::AnalysisEffect;
+use crate::effects::{effect_from_fn, AnalysisEffect};
 use crate::env::RealEnv;
 use crate::errors::AnalysisError;
 use std::path::PathBuf;
@@ -73,6 +73,33 @@ pub fn analyze_with_analyzer_effect(
 pub fn analyze_file_auto_effect(path: PathBuf, content: String) -> AnalysisEffect<FileMetrics> {
     let language = Language::from_path(&path);
     analyze_file_effect(path, content, language)
+}
+
+/// Log a timing diagnostic message via the effect system.
+///
+/// This function provides pure I/O separation for timing diagnostics by
+/// checking the DEBTMAP_TIMING environment variable and conditionally
+/// outputting timing information to stderr.
+///
+/// # Arguments
+///
+/// * `message` - The timing message to log
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use debtmap::analyzers::effects::log_timing_effect;
+///
+/// let effect = log_timing_effect(format!("[TIMING] parse {}: {:.2}s", path, duration));
+/// effect.run(&env).await?;
+/// ```
+pub fn log_timing_effect(message: String) -> AnalysisEffect<()> {
+    effect_from_fn(move |_env: &RealEnv| {
+        if std::env::var("DEBTMAP_TIMING").is_ok() {
+            eprintln!("{}", message);
+        }
+        Ok(())
+    })
 }
 
 // =============================================================================

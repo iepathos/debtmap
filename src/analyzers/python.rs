@@ -52,7 +52,11 @@ impl Analyzer for PythonAnalyzer {
     fn parse(&self, content: &str, path: PathBuf) -> Result<Ast> {
         let module = rustpython_parser::parse(content, rustpython_parser::Mode::Module, "<module>")
             .map_err(|e| anyhow::anyhow!("Python parse error: {:?}", e))?;
-        Ok(Ast::Python(PythonAst { module, path }))
+        Ok(Ast::Python(PythonAst {
+            module,
+            path,
+            source: content.to_string(),
+        }))
     }
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
@@ -68,10 +72,9 @@ impl Analyzer for PythonAnalyzer {
                 metrics.debt_items.extend(detector.get_debt_items());
 
                 // Add organization anti-pattern detection
-                let source_content = std::fs::read_to_string(&python_ast.path).unwrap_or_default();
                 let org_analyzer = PythonOrganizationAnalyzer::new();
                 let org_patterns =
-                    org_analyzer.analyze(&python_ast.module, &python_ast.path, &source_content);
+                    org_analyzer.analyze(&python_ast.module, &python_ast.path, &python_ast.source);
 
                 // Convert organization patterns to debt items
                 for pattern in org_patterns {
@@ -264,12 +267,12 @@ fn convert_org_pattern_to_debt_item(
 }
 
 fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
-    let source_content = std::fs::read_to_string(&ast.path).unwrap_or_default();
+    let source_content = ast.source.as_str();
     let mut entropy_calculator = UniversalEntropyCalculator::new(EntropyConfig::default());
 
     // Use TwoPassExtractor for two-pass analysis
     use crate::analysis::python_type_tracker::TwoPassExtractor;
-    let mut extractor = TwoPassExtractor::new_with_source(ast.path.clone(), &source_content);
+    let mut extractor = TwoPassExtractor::new_with_source(ast.path.clone(), source_content);
 
     // Phase 1: Register all functions and extract call relationships
     extractor.extract(&ast.module);
@@ -281,7 +284,7 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
     let mut functions = extract_function_metrics(
         &ast.module,
         &ast.path,
-        &source_content,
+        source_content,
         &mut entropy_calculator,
     );
 
@@ -294,7 +297,7 @@ fn analyze_python_file(ast: &PythonAst, threshold: u32) -> FileMetrics {
         &ast.path,
         threshold,
         &functions,
-        &source_content,
+        source_content,
     );
     let dependencies = extract_dependencies(&ast.module);
 

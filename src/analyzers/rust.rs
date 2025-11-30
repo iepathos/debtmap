@@ -100,7 +100,11 @@ impl Analyzer for RustAnalyzer {
             );
         }
 
-        Ok(Ast::Rust(RustAst { file, path }))
+        Ok(Ast::Rust(RustAst {
+            file,
+            path,
+            source: content.to_string(),
+        }))
     }
 
     fn analyze(&self, ast: &Ast) -> FileMetrics {
@@ -148,14 +152,10 @@ fn analyze_rust_file(
 ) -> FileMetrics {
     let start = std::time::Instant::now();
 
-    let read_start = std::time::Instant::now();
-    let source_content = read_source_content(&ast.path);
-    let read_time = read_start.elapsed();
-
     let analysis_start = std::time::Instant::now();
     let analysis_result = analyze_ast_with_content(
         ast,
-        &source_content,
+        &ast.source,
         enhanced_thresholds,
         enable_functional_analysis,
         enable_rust_patterns,
@@ -168,7 +168,7 @@ fn analyze_rust_file(
         &ast.path,
         threshold,
         &analysis_result.functions,
-        &source_content,
+        &ast.source,
         &analysis_result.enhanced_analysis,
     );
     let debt_time = debt_start.elapsed();
@@ -183,10 +183,9 @@ fn analyze_rust_file(
 
     if std::env::var("DEBTMAP_TIMING").is_ok() {
         eprintln!(
-            "[TIMING] analyze_rust_file {}: total={:.2}s (read={:.2}s, analysis={:.2}s, debt={:.2}s, deps={:.2}s)",
+            "[TIMING] analyze_rust_file {}: total={:.2}s (analysis={:.2}s, debt={:.2}s, deps={:.2}s)",
             ast.path.display(),
             total_time.as_secs_f64(),
-            read_time.as_secs_f64(),
             analysis_time.as_secs_f64(),
             debt_time.as_secs_f64(),
             deps_time.as_secs_f64()
@@ -200,11 +199,6 @@ fn analyze_rust_file(
         debt_items,
         dependencies,
     )
-}
-
-/// Pure I/O function to read source content
-fn read_source_content(path: &std::path::Path) -> String {
-    std::fs::read_to_string(path).unwrap_or_default()
 }
 
 /// Structure to hold analysis results
@@ -221,9 +215,6 @@ fn analyze_ast_with_content(
     enable_functional_analysis: bool,
     enable_rust_patterns: bool,
 ) -> AnalysisResult {
-    let start = std::time::Instant::now();
-
-    let visitor_start = std::time::Instant::now();
     let mut visitor = create_configured_visitor(
         ast.path.clone(),
         source_content.to_string(),
@@ -232,22 +223,8 @@ fn analyze_ast_with_content(
         enable_functional_analysis,
         enable_rust_patterns,
     );
-    let visitor_create_time = visitor_start.elapsed();
 
-    let visit_start = std::time::Instant::now();
     visitor.visit_file(&ast.file);
-    let visit_time = visit_start.elapsed();
-
-    let total_time = start.elapsed();
-
-    if std::env::var("DEBTMAP_TIMING").is_ok() {
-        eprintln!(
-            "[TIMING] analyze_ast_with_content: total={:.2}s (visitor_create={:.2}s, visit={:.2}s)",
-            total_time.as_secs_f64(),
-            visitor_create_time.as_secs_f64(),
-            visit_time.as_secs_f64()
-        );
-    }
 
     AnalysisResult {
         functions: visitor.functions,
