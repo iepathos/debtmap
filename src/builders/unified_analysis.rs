@@ -241,12 +241,11 @@ fn build_parallel_call_graph(
     let thread_count = if jobs == 0 { None } else { Some(jobs) };
     log_parallel_execution(jobs);
 
-    let (parallel_graph, exclusions, used_funcs) =
-        parallel_call_graph::build_call_graph_parallel(
-            project_path,
-            call_graph.clone(),
-            thread_count,
-        )?;
+    let (parallel_graph, exclusions, used_funcs) = parallel_call_graph::build_call_graph_parallel(
+        project_path,
+        call_graph.clone(),
+        thread_count,
+    )?;
 
     *call_graph = parallel_graph;
 

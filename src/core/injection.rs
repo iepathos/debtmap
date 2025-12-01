@@ -9,11 +9,14 @@ pub struct AppContainer {
     /// Rust language analyzer
     pub rust_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
     /// Python language analyzer (deprecated, will be removed)
-    pub python_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
+    pub python_analyzer:
+        Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     /// JavaScript language analyzer (deprecated, will be removed)
-    pub js_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
+    pub js_analyzer:
+        Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     /// TypeScript language analyzer (deprecated, will be removed)
-    pub ts_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
+    pub ts_analyzer:
+        Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     /// Debt scorer
     pub debt_scorer: Arc<dyn Scorer<Item = crate::core::types::DebtItem>>,
     /// Configuration provider

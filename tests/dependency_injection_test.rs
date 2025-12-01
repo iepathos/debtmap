@@ -310,11 +310,7 @@ fn test_analyzer_factory_integration() {
     let test_code = "fn main() { println!(\"Hello\"); }";
 
     let result = analyzer.analyze(test_code.to_string());
-    assert!(
-        result.is_ok(),
-        "Failed to analyze Rust code: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "Failed to analyze Rust code: {:?}", result);
 
     let module_info = result.unwrap();
     assert_eq!(module_info.language, Language::Rust);

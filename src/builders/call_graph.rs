@@ -1,10 +1,7 @@
 use crate::{
     analysis::call_graph::RustCallGraphBuilder,
-    analyzers::rust_call_graph::extract_call_graph_multi_file,
-    config,
-    core::FunctionMetrics,
-    core::Language,
-    io, priority,
+    analyzers::rust_call_graph::extract_call_graph_multi_file, config, core::FunctionMetrics,
+    core::Language, io, priority,
 };
 use anyhow::{Context, Result};
 use std::collections::HashSet;

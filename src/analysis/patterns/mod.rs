@@ -243,9 +243,7 @@ impl PatternDetector {
         _context: &CrossModuleContext,
     ) -> bool {
         // Simplified without Python cross-module support
-        if class.base_classes.contains(&interface.name)
-            && class_file == interface_file
-        {
+        if class.base_classes.contains(&interface.name) && class_file == interface_file {
             return true;
         }
 
@@ -365,5 +363,4 @@ mod tests {
         let detector = PatternDetector::new();
         assert_eq!(detector.recognizers.len(), 7);
     }
-
 }
