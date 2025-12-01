@@ -47,7 +47,7 @@ fn test_walk_finds_all_supported_files() {
     // Verify we find the expected Rust files
     let rust_files: Vec<_> = files
         .iter()
-        .filter(|f| f.extension().map_or(false, |ext| ext == "rs"))
+        .filter(|f| f.extension().is_some_and(|ext| ext == "rs"))
         .collect();
 
     assert_eq!(rust_files.len(), 3, "Should find exactly 3 Rust files");
