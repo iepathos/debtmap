@@ -1,6 +1,5 @@
 // Debt classification functions
 
-use crate::analysis::PythonDeadCodeDetector;
 use crate::core::{FunctionMetrics, Language};
 use crate::priority::call_graph::{CallGraph, FunctionId};
 use crate::priority::semantic_classifier::{classify_function_role, FunctionRole};
@@ -499,28 +498,6 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
     // Check language-specific exclusions
     let language = Language::from_path(&func.file);
 
-    if language == Language::Python {
-        // Use Python-specific dead code detector with auto-detection
-        let mut detector = PythonDeadCodeDetector::new();
-
-        // Auto-detect frameworks based on file path
-        detector.auto_detect_frameworks(&func.file, &[]);
-
-        // Also explicitly add common frameworks for better coverage
-        let common_frameworks = vec![
-            "wxpython".to_string(),
-            "unittest".to_string(),
-            "pytest".to_string(),
-            "django".to_string(),
-            "flask".to_string(),
-        ];
-        detector = detector.with_frameworks(common_frameworks);
-
-        if detector.is_implicitly_called(func) {
-            return true;
-        }
-    }
-
     // Entry points
     if func.name == "main" || func.name.starts_with("_start") {
         return true;
@@ -536,11 +513,13 @@ fn is_excluded_from_dead_code_analysis(func: &FunctionMetrics) -> bool {
         return true;
     }
 
-    // Common framework patterns (for non-Python languages)
-    if language != Language::Python && (is_likely_trait_method(func) || is_framework_callback(func))
-    {
+    // Common framework patterns
+    if is_likely_trait_method(func) || is_framework_callback(func) {
         return true;
     }
+
+    // Avoid unused variable warning
+    let _ = language;
 
     false
 }
@@ -631,17 +610,9 @@ fn generate_usage_hints(
 
     // Check language for specialized hints
     let language = Language::from_path(&func.file);
+    let _ = language; // Avoid unused variable warning
 
-    if language == Language::Python {
-        // Use Python-specific detector for usage hints
-        let detector = PythonDeadCodeDetector::new();
-        let python_hints = detector.generate_usage_hints(func);
-        if !python_hints.is_empty() {
-            return python_hints;
-        }
-    }
-
-    // Generic hints for non-Python or when Python detector has no specific hints
+    // Generic hints
     if func.visibility.as_ref().is_some_and(|v| v == "pub") {
         hints.push("Public function with no internal callers".to_string());
     } else {

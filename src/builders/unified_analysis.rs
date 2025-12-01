@@ -241,15 +241,13 @@ fn build_parallel_call_graph(
     let thread_count = if jobs == 0 { None } else { Some(jobs) };
     log_parallel_execution(jobs);
 
-    let (mut parallel_graph, exclusions, used_funcs) =
+    let (parallel_graph, exclusions, used_funcs) =
         parallel_call_graph::build_call_graph_parallel(
             project_path,
             call_graph.clone(),
             thread_count,
         )?;
 
-    // Process Python files (still sequential for now)
-    call_graph::process_python_files_for_call_graph(project_path, &mut parallel_graph)?;
     *call_graph = parallel_graph;
 
     Ok((exclusions, used_funcs))
@@ -268,8 +266,6 @@ fn build_sequential_call_graph(
         verbose_macro_warnings,
         show_macro_stats,
     )?;
-
-    call_graph::process_python_files_for_call_graph(project_path, call_graph)?;
 
     Ok((exclusions, used_funcs))
 }

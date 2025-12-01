@@ -14,11 +14,20 @@ pub mod strategy;
 pub mod template_method;
 
 use crate::analysis::call_graph::TraitRegistry;
-use crate::analysis::python_call_graph::cross_module::CrossModuleContext;
 use crate::core::{ast::ClassDef, FileMetrics, FunctionMetrics};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
+
+// Stub for removed Python cross-module context
+#[derive(Debug, Clone, Default)]
+pub struct CrossModuleContext;
+
+impl CrossModuleContext {
+    pub fn new() -> Self {
+        CrossModuleContext
+    }
+}
 
 /// Types of design patterns that can be detected
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,20 +240,13 @@ impl PatternDetector {
         interface: &ClassDef,
         class_file: &std::path::Path,
         interface_file: &std::path::Path,
-        context: &CrossModuleContext,
+        _context: &CrossModuleContext,
     ) -> bool {
-        if class.base_classes.contains(&interface.name) {
-            if class_file == interface_file {
-                return true;
-            }
-
-            if let Some(imports) = context.imports.get(class_file) {
-                for import in imports {
-                    if import.name == interface.name {
-                        return true;
-                    }
-                }
-            }
+        // Simplified without Python cross-module support
+        if class.base_classes.contains(&interface.name)
+            && class_file == interface_file
+        {
+            return true;
         }
 
         false

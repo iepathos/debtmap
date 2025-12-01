@@ -137,9 +137,9 @@ pub struct RustAst {
     pub source: String,
 }
 
+// Stub for removed Python AST support
 #[derive(Clone, Debug)]
 pub struct PythonAst {
-    pub module: rustpython_parser::ast::Mod,
     pub path: PathBuf,
     pub source: String,
 }

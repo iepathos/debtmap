@@ -1,7 +1,6 @@
 pub mod assertion_detector;
 pub mod complexity_detector;
 pub mod flaky_detector;
-pub mod python;
 pub mod rust;
 pub mod timing_classifier;
 

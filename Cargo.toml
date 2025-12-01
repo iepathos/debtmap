@@ -43,7 +43,6 @@ path = "src/main.rs"
 # AST Parsing
 syn = { version = "2.0", features = ["full", "visit", "extra-traits"] }
 proc-macro2 = { version = "1.0", features = ["span-locations"] }
-rustpython-parser = "0.4"
 tree-sitter = "0.25"
 tree-sitter-javascript = "0.25"
 tree-sitter-typescript = "0.23"
@@ -159,15 +158,7 @@ name = "parallel_performance"
 harness = false
 
 [[bench]]
-name = "python_type_inference_bench"
-harness = false
-
-[[bench]]
 name = "unified_output_format_bench"
-harness = false
-
-[[bench]]
-name = "python_import_resolution_bench"
 harness = false
 
 [[bench]]

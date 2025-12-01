@@ -17,12 +17,6 @@ pub mod implementations;
 pub mod javascript;
 pub mod macro_definition_collector;
 pub mod purity_detector;
-pub mod python;
-pub mod python_ast_extraction;
-pub mod python_asyncio_patterns;
-pub mod python_detectors;
-pub mod python_exception_flow;
-pub mod python_purity;
 pub mod rust;
 pub mod rust_call_graph;
 pub mod rust_complexity_calculation;
@@ -103,7 +97,6 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
             }
             Box::new(analyzer)
         }),
-        (Language::Python, || Box::new(python::PythonAnalyzer::new())),
         (Language::JavaScript, || {
             create_js_analyzer(javascript::JavaScriptAnalyzer::new_javascript, "JavaScript")
         }),
@@ -200,12 +193,6 @@ mod tests {
     fn test_get_analyzer_rust() {
         let analyzer = get_analyzer(crate::core::Language::Rust);
         assert_eq!(analyzer.language(), crate::core::Language::Rust);
-    }
-
-    #[test]
-    fn test_get_analyzer_python() {
-        let analyzer = get_analyzer(crate::core::Language::Python);
-        assert_eq!(analyzer.language(), crate::core::Language::Python);
     }
 
     #[test]

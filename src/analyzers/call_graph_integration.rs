@@ -92,60 +92,6 @@ fn format_function_name(func_id: &FunctionId) -> String {
     format!("{}:{}", file_name, func_id.name)
 }
 
-/// Filter call graph data for Python functions only
-///
-/// This helper function filters the call graph to include only Python functions,
-/// which is useful when we want to focus on Python-specific call relationships.
-pub fn filter_python_call_graph(call_graph: &CallGraph) -> CallGraph {
-    let mut filtered_graph = CallGraph::new();
-
-    // Get all Python function nodes
-    let python_functions: Vec<FunctionId> = call_graph
-        .get_all_functions()
-        .filter(|func_id| {
-            func_id
-                .file
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "py")
-                .unwrap_or(false)
-        })
-        .cloned()
-        .collect();
-
-    // Add Python functions to the filtered graph
-    for func_id in &python_functions {
-        if let Some((is_entry_point, is_test, complexity, length)) =
-            call_graph.get_function_info(func_id)
-        {
-            filtered_graph.add_function(
-                func_id.clone(),
-                is_entry_point,
-                is_test,
-                complexity,
-                length,
-            );
-        }
-    }
-
-    // Add call relationships between Python functions
-    for func_id in &python_functions {
-        let callees = call_graph.get_callees(func_id);
-        for callee in callees {
-            // Only add the call if the callee is also a Python function
-            if python_functions.contains(&callee) {
-                filtered_graph.add_call_parts(
-                    func_id.clone(),
-                    callee,
-                    crate::priority::call_graph::CallType::Direct,
-                );
-            }
-        }
-    }
-
-    filtered_graph
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

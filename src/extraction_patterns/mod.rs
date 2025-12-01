@@ -182,10 +182,6 @@ impl UnifiedExtractionAnalyzer {
             Box::new(language_specific::RustPatternMatcher::new()),
         );
         matchers.insert(
-            "python".to_string(),
-            Box::new(language_specific::PythonPatternMatcher::new()),
-        );
-        matchers.insert(
             "javascript".to_string(),
             Box::new(language_specific::JavaScriptPatternMatcher::new()),
         );

@@ -192,7 +192,9 @@ impl AnalyzerFactory {
     ) -> Box<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>> {
         match language {
             crate::core::types::Language::Rust => Box::new(RustAnalyzerAdapter::new()),
-            crate::core::types::Language::Python => Box::new(PythonAnalyzerAdapter::new()),
+            crate::core::types::Language::Python => {
+                panic!("Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis.")
+            }
             crate::core::types::Language::JavaScript => Box::new(JavaScriptAnalyzerAdapter::new()),
             crate::core::types::Language::TypeScript => Box::new(TypeScriptAnalyzerAdapter::new()),
         }
@@ -270,80 +272,6 @@ impl Analyzer for RustAnalyzerAdapter {
 
     fn name(&self) -> &str {
         "RustAnalyzer"
-    }
-}
-
-/// Adapter for Python analyzer to implement Analyzer trait
-pub struct PythonAnalyzerAdapter {
-    inner: crate::analyzers::python::PythonAnalyzer,
-}
-
-impl Default for PythonAnalyzerAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PythonAnalyzerAdapter {
-    pub fn new() -> Self {
-        Self {
-            inner: crate::analyzers::python::PythonAnalyzer::new(),
-        }
-    }
-}
-
-impl Analyzer for PythonAnalyzerAdapter {
-    type Input = String;
-    type Output = crate::core::types::ModuleInfo;
-
-    fn analyze(&self, input: Self::Input) -> anyhow::Result<Self::Output> {
-        // Parse the input string and analyze it using the existing Analyzer trait
-        use crate::analyzers::Analyzer as AnalyzerImpl;
-        let path = std::path::PathBuf::from("temp.py");
-        let ast = self.inner.parse(&input, path.clone())?;
-        let file_metrics = self.inner.analyze(&ast);
-
-        // Convert FileMetrics to ModuleInfo
-        Ok(crate::core::types::ModuleInfo {
-            name: path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("module")
-                .to_string(),
-            language: crate::core::types::Language::Python,
-            path: path.clone(),
-            functions: file_metrics
-                .complexity
-                .functions
-                .into_iter()
-                .map(|f| crate::core::types::FunctionInfo {
-                    name: f.name,
-                    location: crate::core::types::SourceLocation {
-                        file: path.clone(),
-                        line: f.line,
-                        column: 0,
-                        end_line: Some(f.line + f.length),
-                        end_column: Some(0),
-                    },
-                    parameters: vec![],
-                    return_type: None,
-                    is_public: true,
-                    is_async: false,
-                    is_generic: false,
-                    doc_comment: None,
-                })
-                .collect(),
-            exports: vec![],
-            imports: file_metrics
-                .dependencies
-                .iter()
-                .map(|d| d.name.clone())
-                .collect(),
-        })
-    }
-
-    fn name(&self) -> &str {
-        "PythonAnalyzer"
     }
 }
 

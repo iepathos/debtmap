@@ -36,12 +36,6 @@ pub mod multi_signal_aggregation;
 pub mod patterns;
 pub mod purity_analysis;
 pub mod purity_propagation;
-pub mod python_call_graph;
-pub mod python_dead_code;
-pub mod python_dead_code_enhanced;
-pub mod python_imports;
-pub mod python_static_errors;
-pub mod python_type_tracker;
 pub mod rust_patterns;
 pub mod type_flow_tracker;
 pub mod type_signatures;
@@ -92,21 +86,6 @@ pub use purity_analysis::{
 };
 pub use purity_propagation::{
     PurityCache, PurityCallGraphAdapter, PurityPropagator, PurityReason, PurityResult,
-};
-pub use python_dead_code::{FrameworkPattern, PythonDeadCodeDetector, RemovalConfidence};
-pub use python_dead_code_enhanced::{
-    DeadCodeConfidence, DeadCodeReason, DeadCodeResult, EnhancedDeadCodeAnalyzer, LiveCodeReason,
-    RemovalSuggestion,
-};
-pub use python_imports::{
-    EnhancedImportResolver, ExportedSymbol as ImportExportedSymbol, ImportGraph, ImportType,
-    ModuleSymbols, ResolvedSymbol,
-};
-pub use python_static_errors::{
-    analyze_static_errors, errors_to_debt_items, LocalSymbols, StaticAnalysisResult, StaticError,
-};
-pub use python_type_tracker::{
-    ClassInfo, FunctionSignature, PythonType, PythonTypeTracker, TwoPassExtractor,
 };
 pub use rust_patterns::{
     ImplContext, RustFunctionContext, RustPattern, RustPatternDetector, RustPatternResult,

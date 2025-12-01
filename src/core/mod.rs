@@ -377,7 +377,6 @@ impl Language {
     pub fn from_extension(ext: &str) -> Self {
         static EXTENSION_MAP: &[(&[&str], Language)] = &[
             (&["rs"], Language::Rust),
-            (&["py"], Language::Python),
             (&["js", "jsx", "mjs", "cjs"], Language::JavaScript),
             (&["ts", "tsx", "mts", "cts"], Language::TypeScript),
         ];

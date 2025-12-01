@@ -31,9 +31,29 @@
 //! let types = tracker.get_collection_types("self.observers");
 //! ```
 
-use rustpython_parser::ast;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+
+// Stub for removed Python AST types
+pub mod ast {
+    #[derive(Debug)]
+    pub enum Expr {
+        Name(Name),
+        Attribute(Attribute),
+        Other,
+    }
+
+    #[derive(Debug)]
+    pub struct Name {
+        pub id: String,
+    }
+
+    #[derive(Debug)]
+    pub struct Attribute {
+        pub value: Box<Expr>,
+        pub attr: String,
+    }
+}
 
 /// Type identifier with source location
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

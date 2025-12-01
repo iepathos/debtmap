@@ -8,7 +8,6 @@ pub mod error_swallowing;
 pub mod panic_patterns;
 pub mod patterns;
 pub mod public_api_detector;
-pub mod python_error_handling;
 pub mod smells;
 pub mod suppression;
 

@@ -176,18 +176,13 @@ impl AnalyzerFactory {
         unimplemented!("Would create Rust analyzer with dependencies")
     }
 
-    /// Create a Python analyzer with all dependencies
-    pub fn create_python_analyzer(&self) -> Box<dyn LanguageAnalyzer> {
-        // In real implementation, would create actual dependencies
-        // For now, returning a placeholder
-        unimplemented!("Would create Python analyzer with dependencies")
-    }
-
     /// Create analyzer based on language
     pub fn create_analyzer(&self, language: crate::core::Language) -> Box<dyn LanguageAnalyzer> {
         match language {
             crate::core::Language::Rust => self.create_rust_analyzer(),
-            crate::core::Language::Python => self.create_python_analyzer(),
+            crate::core::Language::Python => {
+                panic!("Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis.")
+            }
             crate::core::Language::JavaScript => {
                 Box::new(JavaScriptAnalyzerAdapter::new_javascript().unwrap())
             }
@@ -227,33 +222,6 @@ impl LanguageAnalyzer for RustAnalyzerAdapter {
 
     fn language(&self) -> crate::core::Language {
         crate::core::Language::Rust
-    }
-}
-
-/// Adapter for PythonAnalyzer to implement LanguageAnalyzer
-#[allow(dead_code)]
-struct PythonAnalyzerAdapter {
-    inner: crate::analyzers::python::PythonAnalyzer,
-}
-
-#[allow(dead_code)]
-impl PythonAnalyzerAdapter {
-    fn new() -> Self {
-        Self {
-            inner: crate::analyzers::python::PythonAnalyzer::new(),
-        }
-    }
-}
-
-impl LanguageAnalyzer for PythonAnalyzerAdapter {
-    fn analyze_file(&self, path: &Path, content: &str) -> Result<crate::core::FileMetrics> {
-        use crate::analyzers::Analyzer;
-        let ast = self.inner.parse(content, path.to_path_buf())?;
-        Ok(self.inner.analyze(&ast))
-    }
-
-    fn language(&self) -> crate::core::Language {
-        crate::core::Language::Python
     }
 }
 
