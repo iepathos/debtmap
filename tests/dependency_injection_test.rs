@@ -305,46 +305,27 @@ fn test_complete_container_creation() {
 fn test_analyzer_factory_integration() {
     let factory = AnalyzerFactory;
 
-    // Test creation of each analyzer type
-    let languages = vec![
-        Language::Rust,
-        Language::Python,
-        Language::JavaScript,
-        Language::TypeScript,
-    ];
+    // Test Rust analyzer (the only supported language after spec 191)
+    let analyzer = factory.create_analyzer(Language::Rust);
+    let test_code = "fn main() { println!(\"Hello\"); }";
 
-    for language in languages {
-        let analyzer = factory.create_analyzer(language);
+    let result = analyzer.analyze(test_code.to_string());
+    assert!(
+        result.is_ok(),
+        "Failed to analyze Rust code: {:?}",
+        result
+    );
 
-        // Use valid code for each language
-        let test_code = match language {
-            Language::Rust => "fn main() { println!(\"Hello\"); }",
-            Language::Python => "def main():\n    print(\"Hello\")",
-            Language::JavaScript => "function main() { console.log(\"Hello\"); }",
-            Language::TypeScript => "function main(): void { console.log(\"Hello\"); }",
-        };
+    let module_info = result.unwrap();
+    assert_eq!(module_info.language, Language::Rust);
+    assert_eq!(analyzer.name(), "RustAnalyzer");
+}
 
-        // Verify the analyzer can be used
-        let result = analyzer.analyze(test_code.to_string());
-        assert!(
-            result.is_ok(),
-            "Failed to analyze for {:?}: {:?}",
-            language,
-            result
-        );
-
-        let module_info = result.unwrap();
-        assert_eq!(module_info.language, language);
-
-        // Verify name is correct
-        let expected_name = match language {
-            Language::Rust => "RustAnalyzer",
-            Language::Python => "PythonAnalyzer",
-            Language::JavaScript => "JavaScriptAnalyzer",
-            Language::TypeScript => "TypeScriptAnalyzer",
-        };
-        assert_eq!(analyzer.name(), expected_name);
-    }
+#[test]
+#[should_panic(expected = "Python analysis is not currently supported")]
+fn test_analyzer_factory_python_not_supported() {
+    let factory = AnalyzerFactory;
+    let _analyzer = factory.create_analyzer(Language::Python);
 }
 
 #[test]

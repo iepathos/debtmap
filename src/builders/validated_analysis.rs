@@ -560,21 +560,18 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
 
         // Create files with different extensions
-        let rust_file = temp_dir.path().join("test.rs");
-        let py_file = temp_dir.path().join("test.py");
-        let js_file = temp_dir.path().join("test.js");
+        let rust_file1 = temp_dir.path().join("test1.rs");
+        let rust_file2 = temp_dir.path().join("test2.rs");
 
-        fs::write(&rust_file, "fn main() {}").unwrap();
-        fs::write(&py_file, "def main(): pass").unwrap();
-        fs::write(&js_file, "function main() {}").unwrap();
+        fs::write(&rust_file1, "fn main() {}").unwrap();
+        fs::write(&rust_file2, "fn another() { let x = 5; }").unwrap();
 
-        let files = vec![rust_file, py_file, js_file];
+        let files = vec![rust_file1, rust_file2];
         let result = validate_files_readable(&files);
 
         if let Validation::Success(contents) = result {
             assert_eq!(contents[0].language, Language::Rust);
-            assert_eq!(contents[1].language, Language::Python);
-            assert_eq!(contents[2].language, Language::JavaScript);
+            assert_eq!(contents[1].language, Language::Rust);
         } else {
             panic!("Expected success");
         }

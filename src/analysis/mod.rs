@@ -2,10 +2,6 @@
 //!
 //! This module provides advanced analysis capabilities including:
 //! - Rust-specific call graph analysis with trait dispatch and function pointers
-//! - Python-specific call graph analysis with instance method tracking
-//! - Python type tracking and inference for improved method resolution
-//! - Python-aware dead code detection with magic methods and framework patterns
-//! - Framework pattern detection (Python-specific and multi-language)
 //! - Design pattern recognition (Observer, Factory, Callback)
 //! - Cross-module dependency tracking
 //! - Multi-pass complexity analysis with attribution

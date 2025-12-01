@@ -205,15 +205,15 @@ mod tests {
     #[tokio::test]
     async fn test_analyze_file_auto_effect() {
         let env = RealEnv::default();
-        let path = PathBuf::from("test.py");
-        let content = "def main(): print('hello')".to_string();
+        let path = PathBuf::from("test.rs");
+        let content = "fn main() { println!(\"hello\"); }".to_string();
 
         let effect = analyze_file_auto_effect(path, content);
         let result = effect.run(&env).await;
 
         assert!(result.is_ok());
         let metrics = result.unwrap();
-        assert_eq!(metrics.language, Language::Python);
+        assert_eq!(metrics.language, Language::Rust);
     }
 
     #[tokio::test]

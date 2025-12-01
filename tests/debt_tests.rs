@@ -78,6 +78,7 @@ fn test_priority_ordering() {
 #[test]
 fn test_language_detection() {
     assert_eq!(Language::from_extension("rs"), Language::Rust);
-    assert_eq!(Language::from_extension("py"), Language::Python);
+    // Python support removed in spec 191
+    assert_eq!(Language::from_extension("py"), Language::Unknown);
     assert_eq!(Language::from_extension("unknown"), Language::Unknown);
 }

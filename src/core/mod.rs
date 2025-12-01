@@ -375,10 +375,9 @@ pub enum Language {
 
 impl Language {
     pub fn from_extension(ext: &str) -> Self {
+        // After spec 191, only Rust is supported
         static EXTENSION_MAP: &[(&[&str], Language)] = &[
             (&["rs"], Language::Rust),
-            (&["js", "jsx", "mjs", "cjs"], Language::JavaScript),
-            (&["ts", "tsx", "mts", "cts"], Language::TypeScript),
         ];
 
         EXTENSION_MAP

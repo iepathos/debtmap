@@ -127,23 +127,26 @@ fn test_language_from_extension_rust() {
 
 #[test]
 fn test_language_from_extension_python() {
-    assert_eq!(Language::from_extension("py"), Language::Python);
+    // Python support removed in spec 191
+    assert_eq!(Language::from_extension("py"), Language::Unknown);
 }
 
 #[test]
 fn test_language_from_extension_javascript() {
-    assert_eq!(Language::from_extension("js"), Language::JavaScript);
-    assert_eq!(Language::from_extension("jsx"), Language::JavaScript);
-    assert_eq!(Language::from_extension("mjs"), Language::JavaScript);
-    assert_eq!(Language::from_extension("cjs"), Language::JavaScript);
+    // JavaScript support removed in spec 191
+    assert_eq!(Language::from_extension("js"), Language::Unknown);
+    assert_eq!(Language::from_extension("jsx"), Language::Unknown);
+    assert_eq!(Language::from_extension("mjs"), Language::Unknown);
+    assert_eq!(Language::from_extension("cjs"), Language::Unknown);
 }
 
 #[test]
 fn test_language_from_extension_typescript() {
-    assert_eq!(Language::from_extension("ts"), Language::TypeScript);
-    assert_eq!(Language::from_extension("tsx"), Language::TypeScript);
-    assert_eq!(Language::from_extension("mts"), Language::TypeScript);
-    assert_eq!(Language::from_extension("cts"), Language::TypeScript);
+    // TypeScript support removed in spec 191
+    assert_eq!(Language::from_extension("ts"), Language::Unknown);
+    assert_eq!(Language::from_extension("tsx"), Language::Unknown);
+    assert_eq!(Language::from_extension("mts"), Language::Unknown);
+    assert_eq!(Language::from_extension("cts"), Language::Unknown);
 }
 
 #[test]

@@ -118,17 +118,18 @@ fn test_language_from_path() {
         Language::from_path(&PathBuf::from("test.rs")),
         Language::Rust
     );
+    // Python/JS/TS support removed in spec 191
     assert_eq!(
         Language::from_path(&PathBuf::from("test.py")),
-        Language::Python
+        Language::Unknown
     );
     assert_eq!(
         Language::from_path(&PathBuf::from("test.js")),
-        Language::JavaScript
+        Language::Unknown
     );
     assert_eq!(
         Language::from_path(&PathBuf::from("test.ts")),
-        Language::TypeScript
+        Language::Unknown
     );
     assert_eq!(
         Language::from_path(&PathBuf::from("test.unknown")),

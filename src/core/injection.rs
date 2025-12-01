@@ -8,12 +8,12 @@ use std::sync::Arc;
 pub struct AppContainer {
     /// Rust language analyzer
     pub rust_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
-    /// Python language analyzer
-    pub python_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
-    /// JavaScript language analyzer
-    pub js_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
-    /// TypeScript language analyzer
-    pub ts_analyzer: Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>,
+    /// Python language analyzer (deprecated, will be removed)
+    pub python_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
+    /// JavaScript language analyzer (deprecated, will be removed)
+    pub js_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
+    /// TypeScript language analyzer (deprecated, will be removed)
+    pub ts_analyzer: Option<Arc<dyn Analyzer<Input = String, Output = crate::core::types::ModuleInfo>>>,
     /// Debt scorer
     pub debt_scorer: Arc<dyn Scorer<Item = crate::core::types::DebtItem>>,
     /// Configuration provider
@@ -156,9 +156,9 @@ impl AppContainerBuilder {
     pub fn build(self) -> Result<AppContainer, String> {
         Ok(AppContainer {
             rust_analyzer: self.rust_analyzer.ok_or("Rust analyzer is required")?,
-            python_analyzer: self.python_analyzer.ok_or("Python analyzer is required")?,
-            js_analyzer: self.js_analyzer.ok_or("JavaScript analyzer is required")?,
-            ts_analyzer: self.ts_analyzer.ok_or("TypeScript analyzer is required")?,
+            python_analyzer: self.python_analyzer,
+            js_analyzer: self.js_analyzer,
+            ts_analyzer: self.ts_analyzer,
             debt_scorer: self.debt_scorer.ok_or("Debt scorer is required")?,
             config: self.config.ok_or("Config provider is required")?,
             priority_calculator: self
@@ -567,14 +567,12 @@ mod tests {
 
         let rust_analyzer = factory.create_analyzer(Language::Rust);
         assert_eq!(rust_analyzer.name(), "RustAnalyzer");
+    }
 
-        let python_analyzer = factory.create_analyzer(Language::Python);
-        assert_eq!(python_analyzer.name(), "PythonAnalyzer");
-
-        let js_analyzer = factory.create_analyzer(Language::JavaScript);
-        assert_eq!(js_analyzer.name(), "JavaScriptAnalyzer");
-
-        let ts_analyzer = factory.create_analyzer(Language::TypeScript);
-        assert_eq!(ts_analyzer.name(), "TypeScriptAnalyzer");
+    #[test]
+    #[should_panic(expected = "Python analysis is not currently supported")]
+    fn test_analyzer_factory_python_panics() {
+        let factory = AnalyzerFactory;
+        let _python_analyzer = factory.create_analyzer(Language::Python);
     }
 }

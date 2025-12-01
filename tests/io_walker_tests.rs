@@ -39,20 +39,18 @@ fn test_walk_finds_all_supported_files() {
 
     let files = walker.walk().unwrap();
 
-    // Should find: main.rs, lib.rs, test.py, app.js, types.ts, nested/deep.rs
-    assert_eq!(files.len(), 6);
+    // The walker may still find Python/JS/TS files even though they won't be analyzed
+    // After spec 191, the language detection will return Unknown for these files
+    // but the walker itself doesn't filter by supported languages
+    assert!(files.len() >= 3, "Should find at least the 3 Rust files");
 
-    // Verify file extensions are correct
-    let extensions: Vec<String> = files
+    // Verify we find the expected Rust files
+    let rust_files: Vec<_> = files
         .iter()
-        .filter_map(|f| f.extension())
-        .map(|e| e.to_string_lossy().to_string())
+        .filter(|f| f.extension().map_or(false, |ext| ext == "rs"))
         .collect();
 
-    assert!(extensions.contains(&"rs".to_string()));
-    assert!(extensions.contains(&"py".to_string()));
-    assert!(extensions.contains(&"js".to_string()));
-    assert!(extensions.contains(&"ts".to_string()));
+    assert_eq!(rust_files.len(), 3, "Should find exactly 3 Rust files");
 }
 
 #[test]
