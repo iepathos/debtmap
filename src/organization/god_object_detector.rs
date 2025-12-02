@@ -593,7 +593,6 @@ impl GodObjectDetector {
         let language = match file_path.extension().and_then(|s| s.to_str()) {
             Some("rs") => Language::Rust,
             Some("py") => Language::Python,
-            Some("js") | Some("ts") => Language::JavaScript,
             _ => return None,
         };
 

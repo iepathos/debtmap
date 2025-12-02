@@ -122,7 +122,6 @@
 //!
 //! - **Rust** - Full support with comprehensive AST analysis using [`syn`](https://docs.rs/syn)
 //! - **Python** - Partial support via [`rustpython-parser`](https://docs.rs/rustpython-parser)
-//! - **JavaScript/TypeScript** - Partial support via [`tree-sitter`](https://docs.rs/tree-sitter)
 //!
 //! ### Performance Characteristics
 //!

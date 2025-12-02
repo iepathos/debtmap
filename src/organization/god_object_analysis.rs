@@ -2002,7 +2002,7 @@ pub struct StructWithMethods {
     pub line_span: (usize, usize),
 }
 
-/// Reserved keywords across Rust, Python, JavaScript, and TypeScript.
+/// Reserved keywords across Rust and Python.
 const RESERVED_KEYWORDS: &[&str] = &[
     // Rust
     "mod",
@@ -2076,31 +2076,6 @@ const RESERVED_KEYWORDS: &[&str] = &[
     "None",
     "True",
     "False",
-    // JavaScript/TypeScript
-    "export",
-    "default",
-    "function",
-    "var",
-    "case",
-    "catch",
-    "debugger",
-    "delete",
-    "do",
-    "new",
-    "switch",
-    "this",
-    "throw",
-    "typeof",
-    "void",
-    "with",
-    "arguments",
-    "interface",
-    "package",
-    "private",
-    "protected",
-    "public",
-    "implements",
-    "extends",
 ];
 
 /// Check if a name is a reserved keyword in any supported language.
@@ -2996,27 +2971,6 @@ mod tests {
     }
 
     #[test]
-    fn test_io_detection_javascript_network() {
-        use crate::analysis::io_detection::Language;
-
-        let method_name = "getData";
-        let method_body = r#"
-            async function getData() {
-                const response = await fetch('https://api.example.com');
-                return await response.json();
-            }
-        "#;
-
-        let responsibility = infer_responsibility_with_io_detection(
-            method_name,
-            Some(method_body),
-            Language::JavaScript,
-        );
-
-        assert_eq!(responsibility, "Network I/O");
-    }
-
-    #[test]
     fn test_map_io_to_traditional_responsibility() {
         assert_eq!(
             map_io_to_traditional_responsibility("File I/O"),
@@ -3287,16 +3241,6 @@ mod tests {
     }
 
     #[test]
-    fn test_reserved_keyword_javascript() {
-        assert_eq!(
-            ensure_not_reserved("function".to_string()),
-            "function_module"
-        );
-        assert_eq!(ensure_not_reserved("export".to_string()), "export_module");
-        assert_eq!(ensure_not_reserved("const".to_string()), "const_module");
-    }
-
-    #[test]
     fn test_reserved_keyword_not_reserved() {
         assert_eq!(ensure_not_reserved("utilities".to_string()), "utilities");
         assert_eq!(ensure_not_reserved("data".to_string()), "data");
@@ -3310,7 +3254,6 @@ mod tests {
     fn test_is_reserved_keyword() {
         assert!(is_reserved_keyword("mod"));
         assert!(is_reserved_keyword("import"));
-        assert!(is_reserved_keyword("function"));
         assert!(!is_reserved_keyword("utilities"));
         assert!(!is_reserved_keyword("data_access"));
     }
