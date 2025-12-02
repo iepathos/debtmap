@@ -702,7 +702,8 @@ impl FunctionVisitor {
         // Detect state machine and coordinator patterns (spec 179)
         let (state_signals, coordinator_signals) = {
             use crate::analyzers::state_machine_pattern_detector::StateMachinePatternDetector;
-            let detector = StateMachinePatternDetector::new();
+            use crate::config::get_state_detection_config;
+            let detector = StateMachinePatternDetector::with_config(get_state_detection_config());
             let state_signals = detector.detect_state_machine(block);
             let coordinator_signals = detector.detect_coordinator(block);
             (state_signals, coordinator_signals)

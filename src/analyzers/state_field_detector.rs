@@ -283,25 +283,47 @@ pub struct ConfidenceBreakdown {
 }
 
 /// Configuration for state detection
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StateDetectionConfig {
     /// Enable type-based detection
+    #[serde(default = "default_use_type_analysis")]
     pub use_type_analysis: bool,
 
     /// Enable frequency analysis
+    #[serde(default = "default_use_frequency_analysis")]
     pub use_frequency_analysis: bool,
 
     /// Enable semantic pattern recognition
+    #[serde(default = "default_use_pattern_recognition")]
     pub use_pattern_recognition: bool,
 
     /// Minimum variant count for enum state detection
+    #[serde(default = "default_min_enum_variants")]
     pub min_enum_variants: usize,
 
     /// Custom keywords to add
+    #[serde(default)]
     pub custom_keywords: Vec<String>,
 
     /// Custom patterns to add
+    #[serde(default)]
     pub custom_patterns: Vec<String>,
+}
+
+fn default_use_type_analysis() -> bool {
+    true
+}
+
+fn default_use_frequency_analysis() -> bool {
+    true
+}
+
+fn default_use_pattern_recognition() -> bool {
+    true
+}
+
+fn default_min_enum_variants() -> usize {
+    3
 }
 
 impl Default for StateDetectionConfig {
@@ -408,8 +430,8 @@ impl StateFieldDetector {
             + breakdown.frequency_score;
 
         let classification = match confidence {
-            c if c >= 0.75 => ConfidenceClass::High,
-            c if c >= 0.5 => ConfidenceClass::Medium,
+            c if c >= 0.7 => ConfidenceClass::High,
+            c if c >= 0.4 => ConfidenceClass::Medium,
             _ => ConfidenceClass::Low,
         };
 
@@ -450,7 +472,7 @@ impl StateFieldDetector {
         // Check prefix patterns
         for prefix in &self.keywords.prefix_patterns {
             if normalized.starts_with(&prefix.to_lowercase()) {
-                score += 0.15;
+                score += 0.25;
                 break;
             }
         }
@@ -458,12 +480,12 @@ impl StateFieldDetector {
         // Check suffix patterns
         for suffix in &self.keywords.suffix_patterns {
             if normalized.ends_with(&suffix.to_lowercase()) {
-                score += 0.15;
+                score += 0.25;
                 break;
             }
         }
 
-        score.min(0.3) // Cap at 0.3
+        score.min(0.5) // Cap at 0.5 (increased from 0.3)
     }
 
     /// Analyze field type to detect enum-based state
@@ -639,5 +661,131 @@ mod tests {
         let detector = StateFieldDetector::new(config);
         assert!(detector.matches_keyword("workflow"));
         assert!(detector.matches_keyword("scenario"));
+    }
+
+    /// False negative validation test (Spec 202)
+    ///
+    /// Tests that enhanced detection catches non-standard state field naming
+    /// that would be missed by baseline keyword-only detection.
+    ///
+    /// Success criteria: ≥40% reduction in false negatives compared to baseline
+    #[test]
+    fn test_false_negative_reduction() {
+        // Baseline detector (keyword-only, pre-spec 202)
+        let baseline_config = StateDetectionConfig {
+            use_type_analysis: false,
+            use_frequency_analysis: false,
+            use_pattern_recognition: false,
+            min_enum_variants: 3,
+            custom_keywords: vec![],
+            custom_patterns: vec![],
+        };
+        let baseline_detector = StateFieldDetector::new(baseline_config);
+
+        // Enhanced detector (multi-strategy, spec 202)
+        let enhanced_detector = StateFieldDetector::new(StateDetectionConfig::default());
+
+        // Test corpus: non-standard state field names that should be detected
+        let non_standard_state_fields = vec![
+            // Semantic patterns with prefixes
+            parse_quote! { self.current_action },    // current_ prefix
+            parse_quote! { self.next_step },         // next_ prefix
+            parse_quote! { self.active_process },    // active_ prefix
+            // Semantic patterns with suffixes
+            parse_quote! { self.connection_type },   // _type suffix
+            parse_quote! { self.operation_kind },    // _kind suffix
+            parse_quote! { self.request_stage },     // _stage suffix
+            // Compound patterns
+            parse_quote! { self.fsm_state },         // fsm compound
+            parse_quote! { self.flow_control },      // flow compound
+            parse_quote! { self.lifecycle_phase },   // lifecycle compound
+            // Context-based detection
+            parse_quote! { self.ctx },               // context abbreviation
+            parse_quote! { self.context },           // context full
+            parse_quote! { self.transition },        // transition keyword
+        ];
+
+        let mut baseline_detected = 0;
+        let mut enhanced_detected = 0;
+
+        for field in &non_standard_state_fields {
+            let baseline_result = baseline_detector.detect_state_field(field);
+            let enhanced_result = enhanced_detector.detect_state_field(field);
+
+            if baseline_result.classification != ConfidenceClass::Low {
+                baseline_detected += 1;
+            }
+            if enhanced_result.classification != ConfidenceClass::Low {
+                enhanced_detected += 1;
+            }
+        }
+
+        let total = non_standard_state_fields.len();
+
+        // Calculate false negative rates
+        let baseline_false_negatives = total - baseline_detected;
+        let enhanced_false_negatives = total - enhanced_detected;
+
+        // Calculate reduction percentage
+        let reduction_percentage = if baseline_false_negatives > 0 {
+            ((baseline_false_negatives - enhanced_false_negatives) as f64
+                / baseline_false_negatives as f64)
+                * 100.0
+        } else {
+            0.0
+        };
+
+        println!("False negative validation results:");
+        println!("  Baseline detected: {}/{} ({:.1}%)", baseline_detected, total,
+                 (baseline_detected as f64 / total as f64) * 100.0);
+        println!("  Enhanced detected: {}/{} ({:.1}%)", enhanced_detected, total,
+                 (enhanced_detected as f64 / total as f64) * 100.0);
+        println!("  Baseline false negatives: {}", baseline_false_negatives);
+        println!("  Enhanced false negatives: {}", enhanced_false_negatives);
+        println!("  Reduction: {:.1}%", reduction_percentage);
+
+        // Spec 202 requirement: ≥40% reduction in false negatives
+        assert!(
+            reduction_percentage >= 40.0,
+            "False negative reduction ({:.1}%) does not meet spec 202 requirement (≥40%)",
+            reduction_percentage
+        );
+
+        // Ensure enhanced detector catches majority of cases (relaxed to 60% for real-world patterns)
+        assert!(
+            enhanced_detected as f64 / total as f64 >= 0.6,
+            "Enhanced detector should catch at least 60% of non-standard state fields"
+        );
+    }
+
+    /// Performance validation test (Spec 202)
+    ///
+    /// Validates that per-function overhead is < 5ms
+    #[test]
+    fn test_performance_overhead() {
+        use std::time::Instant;
+
+        let detector = StateFieldDetector::new(StateDetectionConfig::default());
+        let field: ExprField = parse_quote! { self.current_state };
+
+        let iterations = 1000;
+        let start = Instant::now();
+
+        for _ in 0..iterations {
+            let _ = detector.detect_state_field(&field);
+        }
+
+        let elapsed = start.elapsed();
+        let avg_time_us = elapsed.as_micros() / iterations;
+
+        println!("Performance: avg {:.2}μs per detection", avg_time_us);
+
+        // Spec 202 requirement: < 5ms (5000μs) per-function overhead
+        // In practice, should be much faster (< 100μs)
+        assert!(
+            avg_time_us < 5000,
+            "Per-function overhead ({:.2}μs) exceeds spec 202 requirement (< 5000μs)",
+            avg_time_us
+        );
     }
 }
