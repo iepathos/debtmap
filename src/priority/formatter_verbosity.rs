@@ -800,9 +800,8 @@ fn format_pattern_detection(output: &mut String, item: &UnifiedDebtItem) {
                     );
                     writeln!(
                         output,
-                        "├─ {} {} {} ({}, confidence: {:.2})",
+                        "├─ {} 🔄 {} ({}, confidence: {:.2})",
                         "PATTERN:".bright_blue(),
-                        "🔄",
                         "State Machine".bright_magenta().bold(),
                         metrics.cyan(),
                         sm_signals.confidence
@@ -825,9 +824,8 @@ fn format_pattern_detection(output: &mut String, item: &UnifiedDebtItem) {
                     );
                     writeln!(
                         output,
-                        "├─ {} {} {} ({}, confidence: {:.2})",
+                        "├─ {} 🎯 {} ({}, confidence: {:.2})",
                         "PATTERN:".bright_blue(),
-                        "🎯",
                         "Coordinator".bright_magenta().bold(),
                         metrics.cyan(),
                         coord_signals.confidence

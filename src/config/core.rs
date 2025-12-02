@@ -140,6 +140,10 @@ pub struct DebtmapConfig {
     /// Advanced analysis settings (spec 207)
     #[serde(default)]
     pub analysis: Option<AnalysisSettings>,
+
+    /// State field detection configuration (spec 202)
+    #[serde(default)]
+    pub state_detection: Option<crate::analyzers::state_field_detector::StateDetectionConfig>,
 }
 
 /// Advanced analysis settings for call graph and dead code detection (Spec 207).

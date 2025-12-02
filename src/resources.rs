@@ -42,7 +42,7 @@ use indicatif::ProgressBar;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use stillwater::effect::prelude::*;
-use stillwater::{bracket, bracket_simple, Effect, EffectExt};
+use stillwater::{bracket, Effect, EffectExt};
 
 // =============================================================================
 // Lock File Resource
@@ -121,15 +121,13 @@ where
                 })?;
             Ok(LockFile { path: acquire_path })
         }),
-        // Use: Run the provided effect
-        move |_lock: LockFile| effect_fn(),
         // Release: Remove the lock file (ignore errors)
-        |lock: LockFile| {
-            from_fn(move |_env: &RealEnv| {
-                let _ = std::fs::remove_file(&lock.path);
-                Ok(())
-            })
+        |lock: LockFile| async move {
+            let _ = std::fs::remove_file(&lock.path);
+            Ok::<(), AnalysisError>(())
         },
+        // Use: Run the provided effect
+        move |_lock: &LockFile| effect_fn(),
     )
     .boxed()
 }
@@ -209,15 +207,13 @@ where
 
             Ok(TempDir { path: temp_path })
         }),
-        // Use: Run the effect with the temp dir path
-        move |temp: TempDir| effect_fn(temp.path.clone()),
         // Release: Remove the temp directory (ignore errors)
-        |temp: TempDir| {
-            from_fn(move |_env: &RealEnv| {
-                let _ = std::fs::remove_dir_all(&temp.path);
-                Ok(())
-            })
+        |temp: TempDir| async move {
+            let _ = std::fs::remove_dir_all(&temp.path);
+            Ok::<(), AnalysisError>(())
         },
+        // Use: Run the effect with the temp dir path
+        move |temp: &TempDir| effect_fn(temp.path.clone()),
     )
     .boxed()
 }
@@ -291,7 +287,7 @@ where
 {
     let message = message.to_string();
 
-    bracket_simple(
+    bracket(
         // Acquire: Create the progress bar
         from_fn(move |_env: &RealEnv| {
             let bar = ProgressBar::new(total);
@@ -303,12 +299,13 @@ where
             bar.set_message(message);
             Ok(ProgressHandle { bar })
         }),
-        // Use: Run the effect with the progress handle
-        move |handle: ProgressHandle| effect_fn(handle.clone()),
-        // Release: Finish and clear the progress bar (simple closure)
-        |handle: ProgressHandle| {
+        // Release: Finish and clear the progress bar
+        |handle: ProgressHandle| async move {
             handle.bar.finish_and_clear();
+            Ok::<(), AnalysisError>(())
         },
+        // Use: Run the effect with the progress handle
+        move |handle: &ProgressHandle| effect_fn(handle.clone()),
     )
     .boxed()
 }
@@ -341,7 +338,7 @@ where
 {
     let message = message.to_string();
 
-    bracket_simple(
+    bracket(
         // Acquire: Create the spinner
         from_fn(move |_env: &RealEnv| {
             let bar = ProgressBar::new_spinner();
@@ -354,12 +351,13 @@ where
             bar.enable_steady_tick(std::time::Duration::from_millis(100));
             Ok(ProgressHandle { bar })
         }),
-        // Use: Run the effect (doesn't need the handle for spinner)
-        move |_handle: ProgressHandle| effect_fn(),
         // Release: Stop and clear the spinner
-        |handle: ProgressHandle| {
+        |handle: ProgressHandle| async move {
             handle.bar.finish_and_clear();
+            Ok::<(), AnalysisError>(())
         },
+        // Use: Run the effect (doesn't need the handle for spinner)
+        move |_handle: &ProgressHandle| effect_fn(),
     )
     .boxed()
 }
@@ -432,7 +430,7 @@ where
 {
     let open_path = path.clone();
 
-    bracket_simple(
+    bracket(
         // Acquire: Open the file
         from_fn(move |_env: &RealEnv| {
             let file = File::open(&open_path).map_err(|e| {
@@ -443,10 +441,10 @@ where
                 path: open_path,
             })
         }),
-        // Use: Run the effect with the file handle
-        move |handle: FileHandle| effect_fn(handle),
         // Release: File is dropped automatically (Rust handles this)
-        |_handle: FileHandle| {},
+        |_handle: FileHandle| async move { Ok::<(), AnalysisError>(()) },
+        // Use: Run the effect with the file handle
+        move |handle: &FileHandle| effect_fn(handle.clone()),
     )
     .boxed()
 }
@@ -501,10 +499,13 @@ where
     UseFn: FnOnce(R) -> UseEff + Send + 'static,
     UseEff: Effect<Output = T, Error = AnalysisError, Env = RealEnv> + Send + 'static,
 {
-    bracket_simple(
+    bracket(
         from_fn(move |_env: &RealEnv| acquire_fn()),
-        move |resource: R| use_fn(resource),
-        release_fn,
+        |resource: R| async move {
+            release_fn(resource);
+            Ok::<(), AnalysisError>(())
+        },
+        move |resource: &R| use_fn(resource.clone()),
     )
     .boxed()
 }
