@@ -13,6 +13,7 @@ pub(crate) struct FormattedSections {
     pub impact: String,
     pub evidence: Option<String>, // New: combines complexity + metrics
     pub complexity: Option<String>,
+    pub pattern: Option<String>, // spec 190: show detected patterns
     pub coverage: Option<String>,
     pub dependencies: Option<String>,
     pub debt_specific: Option<String>,
@@ -29,6 +30,7 @@ pub(crate) fn generate_formatted_sections(context: &FormatContext) -> FormattedS
         impact: format_impact_section(context),
         evidence: format_evidence_section(context), // New
         complexity: format_complexity_section(context),
+        pattern: format_pattern_section(context), // spec 190
         coverage: format_coverage_section(context),
         dependencies: format_dependencies_section(context),
         debt_specific: format_debt_specific_section(context),
@@ -142,6 +144,29 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
             format!("{}", context.complexity_info.nesting).yellow()
         ))
     }
+}
+
+// Pure function to format pattern section (spec 190)
+// Shows detected state machine or coordinator patterns with confidence
+fn format_pattern_section(context: &FormatContext) -> Option<String> {
+    let pattern_info = context.pattern_info.as_ref()?;
+
+    // Format: ├─ PATTERN: 🔄 State Machine (transitions: 4, matches: 2, actions: 8, confidence: 0.85)
+    let metrics_str = pattern_info
+        .display_metrics
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    Some(format!(
+        "{} {} {} ({}, confidence: {:.2})",
+        "├─ PATTERN:".bright_blue(),
+        pattern_info.icon,
+        pattern_info.pattern_type.bright_magenta().bold(),
+        metrics_str.cyan(),
+        pattern_info.confidence
+    ))
 }
 
 // Pure function to format coverage section (spec 180)
@@ -356,6 +381,11 @@ pub(crate) fn apply_formatted_sections(output: &mut String, sections: FormattedS
     // Keep legacy complexity for backward compatibility
     if let Some(complexity) = sections.complexity {
         writeln!(output, "{}", complexity).unwrap();
+    }
+
+    // Pattern section (spec 190) - show detected state machine/coordinator patterns
+    if let Some(pattern) = sections.pattern {
+        writeln!(output, "{}", pattern).unwrap();
     }
 
     // Coverage section (spec 180)
