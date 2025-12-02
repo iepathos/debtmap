@@ -9,14 +9,7 @@
 [![License](https://img.shields.io/badge/license-MIT)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
-> **Beta Software** - Debtmap is a Rust code analyzer actively developed and
-tested in production. Core features are stable, though APIs may evolve as we
-add new capabilities. Contributions and feedback welcome!
-
-Debtmap is the premier Rust code analyzer that combines coverage-risk correlation
-with multi-factor analysis (complexity, dependencies, call graphs) and
-entropy-adjusted scoring to reduce false positives and prioritize testing efforts
-effectively.
+Debtmap is a Rust code analyzer that combines coverage-risk correlation with multi-factor analysis (complexity, dependencies, call graphs) and entropy-adjusted scoring to reduce false positives and prioritize testing efforts effectively.
 
 📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
 
@@ -826,11 +819,11 @@ We welcome contributions! This is an early-stage project, so there's plenty of r
 Please note that this project is released with a [Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
 
 ### Areas for Contribution
-- **Language support** - Add analyzers for Go, Java, etc.
-- **New metrics** - Implement additional complexity or quality metrics
-- **Speed** - Optimize analysis algorithms
+- **Rust-specific analysis** - Enhance macro expansion, trait resolution, lifetime analysis
+- **New metrics** - Implement additional complexity or quality metrics for Rust
+- **Speed** - Optimize analysis algorithms and parallel processing
 - **Documentation** - Improve docs and add examples
-- **Testing** - Expand test coverage
+- **Testing** - Expand test coverage, especially property-based tests
 
 ## Development
 
@@ -1487,18 +1480,23 @@ Example output:
 
 ## Roadmap
 
-### Language Support
-- [x] Rust - Full support with AST parsing, macro expansion, and trait resolution
-- [ ] Python - Planned after Rust analysis is mature
-- [ ] JavaScript/TypeScript - Planned after Rust analysis is mature
-- [ ] Go - Planned
-- [ ] C/C++ - Planned
-- [ ] C# - Planned
-- [ ] Java - Planned
+### Rust Analysis (Primary Focus)
+- [x] Rust AST parsing with syn
+- [x] Macro expansion tracking
+- [x] Trait resolution and analysis
+- [x] Lifetime and ownership analysis
+- [x] Async/await pattern detection
+- [x] Property-based test detection
+- [ ] Unsafe code analysis and scoring
+- [ ] Performance pattern detection (clone vs borrow)
+- [ ] Error propagation analysis (Result/Option chains)
+- [ ] Type state pattern detection
+- [ ] Cargo workspace analysis
+- [ ] Proc macro complexity tracking
 
-**Current Focus**: Perfecting Rust analysis before expanding to other languages.
-We're building the best Rust code analyzer first, then will apply those learnings
-to other languages.
+**Strategic Direction**: Debtmap is currently focused exclusively on perfecting Rust code analysis.
+Once Rust analysis is exceptionally mature and accurate, we may consider adding support for other
+languages. For Python, JavaScript, or TypeScript analysis, please use debtmap v0.6.0 or earlier.
 
 ### Core Features
 - [x] Inline suppression comments
