@@ -2,15 +2,14 @@
 
 ## Overview
 
-DebtMap is a high-performance technical debt analyzer that provides unified analysis of code quality metrics across multiple programming languages. The architecture is designed for scalability, performance, and extensibility.
+DebtMap is a high-performance technical debt analyzer focused exclusively on Rust code analysis. The architecture is designed for deep Rust language integration, optimal performance, and comprehensive static analysis capabilities.
 
 ## Core Components
 
 ### 1. Language Analyzers
 - **FileAnalyzer**: Trait-based abstraction for language-specific analysis
-- **RustAnalyzer**: Rust-specific implementation using syn for AST parsing
-- **PythonAnalyzer**: Python-specific implementation using tree-sitter
-- **Support for**: Rust, Python, JavaScript, TypeScript, Go
+- **RustAnalyzer**: Rust-specific implementation using syn for native AST parsing and comprehensive Rust language support
+- **Focus**: Rust-only analysis with deep language integration for maximum accuracy
 
 ### 2. Unified Analysis Engine
 - **UnifiedAnalysis**: Coordinates all analysis phases
@@ -797,7 +796,7 @@ Debtmap distinguishes between two fundamental categories of metrics to help user
 **Characteristics**:
 - **Deterministic**: Same code always produces the same value
 - **Precise**: Exact counts from syntax parsing, not approximations
-- **Language-specific**: Uses language parsers (syn for Rust, tree-sitter for others)
+- **Language-specific**: Uses syn for native Rust AST parsing with full language support
 - **Suitable for thresholds**: Reliable for quality gates and CI/CD enforcement
 
 **Examples**:
@@ -1342,11 +1341,11 @@ The system automatically adjusts based on:
 
 ## Extension Points
 
-### Adding Language Support
-1. Implement the `FileAnalyzer` trait
-2. Add parser integration (tree-sitter, syn, etc.)
-3. Map language constructs to unified metrics
-4. Register analyzer in the factory
+### Extending Rust Analysis
+1. Extend `RustAnalyzer` with new patterns or metrics
+2. Leverage syn's AST capabilities for deeper analysis
+3. Add Rust-specific complexity patterns or debt detectors
+4. Integrate new analysis passes into the pipeline
 
 ### Custom Metrics
 1. Extend `FunctionMetrics` or `FileMetrics`
@@ -1758,48 +1757,32 @@ mod tests {
 }
 ```
 
-#### Python Test Detection
+#### Rust Test Detection Extensions
 
-**File-Level Detection**:
-- Files starting with `test_` (e.g., `test_parser.py`)
-- Files ending with `_test.py` (e.g., `parser_test.py`)
-- Files in `tests/`, `test/`, or `__tests__/` directories
-- Files importing `unittest`, `pytest`, or `nose`
+**Beyond Basic Detection** (covered earlier):
+- Custom test harnesses using `#[test_case]` or `#[rstest]` attributes
+- Property-based tests with `proptest` or `quickcheck` macros
+- Benchmark functions with `#[bench]` attribute
+- Integration tests in `tests/` directory with complex setup
 
-**Function-Level Detection**:
-- Functions starting with `test_` (e.g., `def test_validation()`)
-- Methods in classes inheriting from `unittest.TestCase`
-- Functions decorated with `@pytest.mark.*`
+**Advanced Test Patterns**:
+```rust
+#[test_case("input1"; "case 1")]
+#[test_case("input2"; "case 2")]
+fn test_parameterized(input: &str) {  // Detected as test
+    // Parameterized tests may have higher complexity
+    // due to handling multiple cases
+}
 
-```python
-import pytest
-
-def test_complex_workflow():  # Detected as test function
-    # High cyclomatic complexity acceptable for tests
-    if condition_a:
-        # ... many branches for edge cases
-    elif condition_b:
-        # ... more branches
-```
-
-#### JavaScript/TypeScript Test Detection
-
-**File-Level Detection**:
-- Files ending with `.test.js`, `.test.ts`, `.spec.js`, `.spec.ts`
-- Files in `__tests__/`, `tests/`, or `test/` directories
-- Files importing Jest (`'@jest/globals'`), Mocha (`'mocha'`), or other test frameworks
-
-**Function-Level Detection**:
-- Functions inside `describe()` blocks
-- Functions passed to `it()`, `test()`, or `expect()` calls
-- Functions with test-related names (e.g., `testSomething`)
-
-```typescript
-describe('Parser', () => {
-    test('handles complex input', () => {  // Detected as test
-        // Test-specific complexity is acceptable
-    });
-});
+#[cfg(test)]
+mod tests {
+    proptest! {
+        #[test]
+        fn test_property(value in 0..100) {  // Detected as test
+            // Property tests often have complex assertions
+        }
+    }
+}
 ```
 
 ### Context-Aware Scoring Adjustments
@@ -3233,15 +3216,10 @@ Recommendation: Initialization is appropriately complex for field count
 
 ### Core Dependencies
 - **rayon**: Parallel execution framework
-- **syn**: Rust AST parsing
-- **tree-sitter**: Multi-language parsing
+- **syn**: Native Rust AST parsing with full language support
 - **serde**: Serialization
 - **clap**: CLI argument parsing
-
-### Language-Specific
-- **tree-sitter-python**: Python support
-- **tree-sitter-javascript**: JS/TS support
-- **tree-sitter-go**: Go support
+- **quote**: Rust code generation utilities
 
 ### Development Dependencies
 - **cargo-modules**: Module dependency analysis and visualization
