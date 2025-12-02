@@ -228,9 +228,7 @@ pub fn get_minimum_score_threshold() -> f64 {
 }
 
 /// Get state field detection configuration (spec 202)
-pub fn get_state_detection_config() -> crate::analyzers::state_field_detector::StateDetectionConfig {
-    get_config()
-        .state_detection
-        .clone()
-        .unwrap_or_default()
+pub fn get_state_detection_config() -> crate::analyzers::state_field_detector::StateDetectionConfig
+{
+    get_config().state_detection.clone().unwrap_or_default()
 }

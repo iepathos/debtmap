@@ -113,10 +113,7 @@ fn bench_custom_keywords(c: &mut Criterion) {
             "step".to_string(),
             "stage".to_string(),
         ],
-        custom_patterns: vec![
-            "current_workflow".to_string(),
-            "active_step".to_string(),
-        ],
+        custom_patterns: vec!["current_workflow".to_string(), "active_step".to_string()],
     };
 
     let detector = StateFieldDetector::new(config);

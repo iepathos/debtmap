@@ -181,7 +181,7 @@ pub struct TypeInfo {
     /// Variant names
     pub variants: Vec<String>,
 
-    /// Is this a wrapped type? (Option<T>, Result<T, E>)
+    /// Is this a wrapped type? (`Option<T>`, `Result<T, E>`)
     pub is_wrapped: bool,
 
     /// Wrapped inner type name
@@ -688,21 +688,21 @@ mod tests {
         // Test corpus: non-standard state field names that should be detected
         let non_standard_state_fields = vec![
             // Semantic patterns with prefixes
-            parse_quote! { self.current_action },    // current_ prefix
-            parse_quote! { self.next_step },         // next_ prefix
-            parse_quote! { self.active_process },    // active_ prefix
+            parse_quote! { self.current_action }, // current_ prefix
+            parse_quote! { self.next_step },      // next_ prefix
+            parse_quote! { self.active_process }, // active_ prefix
             // Semantic patterns with suffixes
-            parse_quote! { self.connection_type },   // _type suffix
-            parse_quote! { self.operation_kind },    // _kind suffix
-            parse_quote! { self.request_stage },     // _stage suffix
+            parse_quote! { self.connection_type }, // _type suffix
+            parse_quote! { self.operation_kind },  // _kind suffix
+            parse_quote! { self.request_stage },   // _stage suffix
             // Compound patterns
-            parse_quote! { self.fsm_state },         // fsm compound
-            parse_quote! { self.flow_control },      // flow compound
-            parse_quote! { self.lifecycle_phase },   // lifecycle compound
+            parse_quote! { self.fsm_state },       // fsm compound
+            parse_quote! { self.flow_control },    // flow compound
+            parse_quote! { self.lifecycle_phase }, // lifecycle compound
             // Context-based detection
-            parse_quote! { self.ctx },               // context abbreviation
-            parse_quote! { self.context },           // context full
-            parse_quote! { self.transition },        // transition keyword
+            parse_quote! { self.ctx },        // context abbreviation
+            parse_quote! { self.context },    // context full
+            parse_quote! { self.transition }, // transition keyword
         ];
 
         let mut baseline_detected = 0;
@@ -736,10 +736,18 @@ mod tests {
         };
 
         println!("False negative validation results:");
-        println!("  Baseline detected: {}/{} ({:.1}%)", baseline_detected, total,
-                 (baseline_detected as f64 / total as f64) * 100.0);
-        println!("  Enhanced detected: {}/{} ({:.1}%)", enhanced_detected, total,
-                 (enhanced_detected as f64 / total as f64) * 100.0);
+        println!(
+            "  Baseline detected: {}/{} ({:.1}%)",
+            baseline_detected,
+            total,
+            (baseline_detected as f64 / total as f64) * 100.0
+        );
+        println!(
+            "  Enhanced detected: {}/{} ({:.1}%)",
+            enhanced_detected,
+            total,
+            (enhanced_detected as f64 / total as f64) * 100.0
+        );
         println!("  Baseline false negatives: {}", baseline_false_negatives);
         println!("  Enhanced false negatives: {}", enhanced_false_negatives);
         println!("  Reduction: {:.1}%", reduction_percentage);
