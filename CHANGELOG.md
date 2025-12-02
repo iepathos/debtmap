@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2025-12-01
+## [0.7.0] - 2025-12-02
+
+### Added
+
+- **State Transition Metrics Display** (Spec 190)
+  - Display state transition metrics in all output formats (JSON, table, detailed text)
+  - Show state transition patterns in priority recommendations
+  - Added metrics for mutation frequency, transition complexity, and state field counts
+
+- **Enhanced State Field Detection** (Spec 202)
+  - Pattern-based heuristics for identifying state fields in Rust code
+  - Detection of common naming patterns (state, cache, buffer, queue, pool, registry, etc.)
+  - Improved accuracy in identifying mutable state and tracking state transitions
 
 ### Changed - Strategic Direction
 
@@ -42,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Simplified file walker to focus on `.rs` files
   - Removed language-specific configuration options
 
+### Changed
+
+- **Dependency Updates**
+  - Updated `stillwater` from 0.11.0 to 0.13.0 for improved bracket analysis
+  - Updated `criterion` from 0.7.0 to 0.8.0 for enhanced benchmarking capabilities
+
 ### Improved
 
 - **Architecture Refinement** (Spec 181)
@@ -57,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced cyclomatic complexity in key modules
 
 ### Fixed
+
+- **Stillwater API Compatibility**
+  - Updated bracket API usage for stillwater 0.13.0 compatibility
+  - Ensured correct bracket analysis integration with latest stillwater version
 
 - **Tier Classification Accuracy** (Commit 2b037ce0)
   - Fixed tier classification to use sophisticated scoring metrics instead of raw cyclomatic complexity
@@ -108,3 +130,6 @@ For Rust projects:
   - Terminal output UX enhancements (specs 194-200)
   - State transition metrics display (spec 190)
   - Additional architectural refinements (specs 182-189)
+- Added spec 201 for data flow analysis of state transitions and mutation tracking
+- Added spec 202 for enhanced state field detection with pattern-based heuristics
+- Applied automated code formatting across the codebase
