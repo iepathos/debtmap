@@ -1,7 +1,5 @@
 // debtmap:ignore-start -- This file contains test code with function names that trigger crypto detection
-use debtmap::core::ast::{
-    combine_asts, filter_ast, Ast, AstNode, JavaScriptAst, NodeKind, RustAst, TypeScriptAst,
-};
+use debtmap::core::ast::{combine_asts, filter_ast, Ast, AstNode, NodeKind, RustAst};
 use std::path::PathBuf;
 
 fn create_test_rust_ast() -> Ast {
@@ -17,36 +15,6 @@ fn create_test_python_ast() -> Ast {
     // We'll use Unknown since the exact Python AST structure is complex
     // The important part is testing the extract_nodes behavior
     Ast::Unknown
-}
-
-fn create_test_javascript_ast() -> Ast {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_javascript::LANGUAGE.into())
-        .unwrap();
-    let source = "function test() {}";
-    let tree = parser.parse(source, None).unwrap();
-
-    Ast::JavaScript(JavaScriptAst {
-        tree,
-        source: source.to_string(),
-        path: PathBuf::from("test.js"),
-    })
-}
-
-fn create_test_typescript_ast() -> Ast {
-    let mut parser = tree_sitter::Parser::new();
-    parser
-        .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
-        .unwrap();
-    let source = "function test(): void {}";
-    let tree = parser.parse(source, None).unwrap();
-
-    Ast::TypeScript(TypeScriptAst {
-        tree,
-        source: source.to_string(),
-        path: PathBuf::from("test.ts"),
-    })
 }
 
 #[test]
@@ -81,42 +49,6 @@ fn test_extract_python_nodes() {
             // This branch should be taken
         }
         _ => panic!("Expected Unknown AST"),
-    }
-}
-
-#[test]
-fn test_extract_javascript_nodes() {
-    let ast = create_test_javascript_ast();
-    let nodes = ast.extract_nodes();
-
-    // Currently returns empty vec as per implementation
-    assert_eq!(nodes.len(), 0);
-
-    // Test that it's called for JavaScript AST
-    match &ast {
-        Ast::JavaScript(_) => {
-            // This branch should be taken
-            // Note: extract_javascript_nodes is private, so we test via extract_nodes
-        }
-        _ => panic!("Expected JavaScript AST"),
-    }
-}
-
-#[test]
-fn test_extract_typescript_nodes() {
-    let ast = create_test_typescript_ast();
-    let nodes = ast.extract_nodes();
-
-    // Currently returns empty vec as per implementation
-    assert_eq!(nodes.len(), 0);
-
-    // Test that it's called for TypeScript AST
-    match &ast {
-        Ast::TypeScript(_) => {
-            // This branch should be taken
-            // Note: extract_typescript_nodes is private, so we test via extract_nodes
-        }
-        _ => panic!("Expected TypeScript AST"),
     }
 }
 
@@ -257,13 +189,12 @@ fn test_count_branches_with_mock_nodes() {
 fn test_combine_asts() {
     let ast1 = create_test_rust_ast();
     let ast2 = create_test_python_ast();
-    let ast3 = create_test_javascript_ast();
 
-    let asts = vec![ast1, ast2, ast3];
+    let asts = vec![ast1, ast2];
     let combined = combine_asts(asts.clone());
 
     // combine_asts just returns the input vector
-    assert_eq!(combined.len(), 3);
+    assert_eq!(combined.len(), 2);
 }
 
 #[test]

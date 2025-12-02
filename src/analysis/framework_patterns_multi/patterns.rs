@@ -8,8 +8,6 @@ pub enum Language {
     #[default]
     Rust,
     Python,
-    JavaScript,
-    TypeScript,
 }
 
 impl Language {
@@ -18,8 +16,6 @@ impl Language {
         match s.to_lowercase().as_str() {
             "rust" => Ok(Language::Rust),
             "python" => Ok(Language::Python),
-            "javascript" | "js" => Ok(Language::JavaScript),
-            "typescript" | "ts" => Ok(Language::TypeScript),
             _ => Err(anyhow::anyhow!("Unknown language: {}", s)),
         }
     }
@@ -29,8 +25,6 @@ impl Language {
         match self {
             Language::Rust => "rust",
             Language::Python => "python",
-            Language::JavaScript => "javascript",
-            Language::TypeScript => "typescript",
         }
     }
 }

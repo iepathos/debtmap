@@ -183,12 +183,6 @@ impl AnalyzerFactory {
             crate::core::Language::Python => {
                 panic!("Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis.")
             }
-            crate::core::Language::JavaScript => {
-                Box::new(JavaScriptAnalyzerAdapter::new_javascript().unwrap())
-            }
-            crate::core::Language::TypeScript => {
-                Box::new(JavaScriptAnalyzerAdapter::new_typescript().unwrap())
-            }
             crate::core::Language::Unknown => panic!("Cannot create analyzer for unknown language"),
         }
     }
@@ -222,39 +216,5 @@ impl LanguageAnalyzer for RustAnalyzerAdapter {
 
     fn language(&self) -> crate::core::Language {
         crate::core::Language::Rust
-    }
-}
-
-/// Adapter for JavaScriptAnalyzer to implement LanguageAnalyzer
-struct JavaScriptAnalyzerAdapter {
-    inner: crate::analyzers::javascript::JavaScriptAnalyzer,
-    language: crate::core::Language,
-}
-
-impl JavaScriptAnalyzerAdapter {
-    fn new_javascript() -> Result<Self> {
-        Ok(Self {
-            inner: crate::analyzers::javascript::JavaScriptAnalyzer::new_javascript()?,
-            language: crate::core::Language::JavaScript,
-        })
-    }
-
-    fn new_typescript() -> Result<Self> {
-        Ok(Self {
-            inner: crate::analyzers::javascript::JavaScriptAnalyzer::new_typescript()?,
-            language: crate::core::Language::TypeScript,
-        })
-    }
-}
-
-impl LanguageAnalyzer for JavaScriptAnalyzerAdapter {
-    fn analyze_file(&self, path: &Path, content: &str) -> Result<crate::core::FileMetrics> {
-        use crate::analyzers::Analyzer;
-        let ast = self.inner.parse(content, path.to_path_buf())?;
-        Ok(self.inner.analyze(&ast))
-    }
-
-    fn language(&self) -> crate::core::Language {
-        self.language
     }
 }

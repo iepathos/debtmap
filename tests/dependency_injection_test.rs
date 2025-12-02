@@ -212,11 +212,11 @@ fn test_complete_container_creation() {
             name: "python".to_string(),
         })
         .with_js_analyzer(TestAnalyzer {
-            language: Language::JavaScript,
+            language: Language::Rust,
             name: "js".to_string(),
         })
         .with_ts_analyzer(TestAnalyzer {
-            language: Language::TypeScript,
+            language: Language::Rust,
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })
@@ -496,11 +496,11 @@ fn test_container_with_arc_sharing() {
             name: "shared_python".to_string(),
         })
         .with_js_analyzer(TestAnalyzer {
-            language: Language::JavaScript,
+            language: Language::Rust,
             name: "shared_js".to_string(),
         })
         .with_ts_analyzer(TestAnalyzer {
-            language: Language::TypeScript,
+            language: Language::Rust,
             name: "shared_ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 20.0 })
@@ -564,11 +564,11 @@ fn test_error_handling_in_container_builder() {
             name: "python".to_string(),
         })
         .with_js_analyzer(TestAnalyzer {
-            language: Language::JavaScript,
+            language: Language::Rust,
             name: "js".to_string(),
         })
         .with_ts_analyzer(TestAnalyzer {
-            language: Language::TypeScript,
+            language: Language::Rust,
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })
@@ -603,11 +603,11 @@ fn test_error_handling_in_container_builder() {
             name: "python".to_string(),
         })
         .with_js_analyzer(TestAnalyzer {
-            language: Language::JavaScript,
+            language: Language::Rust,
             name: "js".to_string(),
         })
         .with_ts_analyzer(TestAnalyzer {
-            language: Language::TypeScript,
+            language: Language::Rust,
             name: "ts".to_string(),
         })
         .with_debt_scorer(TestScorer { base_score: 10.0 })

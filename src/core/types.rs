@@ -9,8 +9,6 @@ use std::path::PathBuf;
 pub enum Language {
     Rust,
     Python,
-    JavaScript,
-    TypeScript,
 }
 
 impl Language {
@@ -19,8 +17,6 @@ impl Language {
         match self {
             Language::Rust => &["rs"],
             Language::Python => &["py", "pyw"],
-            Language::JavaScript => &["js", "jsx", "mjs"],
-            Language::TypeScript => &["ts", "tsx"],
         }
     }
 
@@ -29,8 +25,6 @@ impl Language {
         match self {
             Language::Rust => "Rust",
             Language::Python => "Python",
-            Language::JavaScript => "JavaScript",
-            Language::TypeScript => "TypeScript",
         }
     }
 }

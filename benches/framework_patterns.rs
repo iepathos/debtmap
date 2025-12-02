@@ -59,12 +59,6 @@ fn generate_file_context(language: Language) -> FileContext {
             context.add_import("from fastapi import FastAPI".to_string());
             context.add_import("import pytest".to_string());
         }
-        Language::JavaScript => {
-            context.add_import("const express = require('express');".to_string());
-        }
-        Language::TypeScript => {
-            context.add_import("import { Controller } from '@nestjs/common';".to_string());
-        }
     }
 
     context
@@ -189,14 +183,7 @@ fn bench_multi_language_detection(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("multi_language_detection");
 
-    for lang in [
-        Language::Rust,
-        Language::Python,
-        Language::JavaScript,
-        Language::TypeScript,
-    ]
-    .iter()
-    {
+    for lang in [Language::Rust, Language::Python].iter() {
         let functions = generate_test_functions(50);
         let file_context = generate_file_context(*lang);
 

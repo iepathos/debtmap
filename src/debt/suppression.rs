@@ -178,7 +178,7 @@ impl SuppressionPatterns {
 fn get_comment_prefix(language: Language) -> &'static str {
     match language {
         Language::Python => "#",
-        Language::Rust | Language::JavaScript | Language::TypeScript => "//",
+        Language::Rust => "//",
         _ => "//",
     }
 }

@@ -175,21 +175,6 @@ impl FileContextDetector {
                     0.0
                 }
             }
-            Language::JavaScript | Language::TypeScript => {
-                if filename.ends_with(".test.js")
-                    || filename.ends_with(".test.ts")
-                    || filename.ends_with(".test.jsx")
-                    || filename.ends_with(".test.tsx")
-                    || filename.ends_with(".spec.js")
-                    || filename.ends_with(".spec.ts")
-                    || filename.ends_with(".spec.jsx")
-                    || filename.ends_with(".spec.tsx")
-                {
-                    0.9
-                } else {
-                    0.0
-                }
-            }
             Language::Unknown => 0.0,
         }
     }
@@ -424,22 +409,6 @@ mod tests {
     fn detects_python_test_file() {
         let detector = FileContextDetector::new(Language::Python);
         let path = Path::new("test_module.py");
-        let score = detector.score_naming(path);
-        assert_eq!(score, 0.9);
-    }
-
-    #[test]
-    fn detects_javascript_test_file() {
-        let detector = FileContextDetector::new(Language::JavaScript);
-        let path = Path::new("component.test.js");
-        let score = detector.score_naming(path);
-        assert_eq!(score, 0.9);
-    }
-
-    #[test]
-    fn detects_typescript_spec_file() {
-        let detector = FileContextDetector::new(Language::TypeScript);
-        let path = Path::new("service.spec.ts");
         let score = detector.score_naming(path);
         assert_eq!(score, 0.9);
     }

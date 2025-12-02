@@ -55,8 +55,8 @@ impl TestCase {
         match self.language.to_lowercase().as_str() {
             "rust" => Language::Rust,
             "python" => Language::Python,
-            "javascript" | "js" => Language::JavaScript,
-            "typescript" | "ts" => Language::TypeScript,
+            "javascript" | "js" => Language::Rust,
+            "typescript" | "ts" => Language::Rust,
             _ => Language::Rust, // Default fallback
         }
     }

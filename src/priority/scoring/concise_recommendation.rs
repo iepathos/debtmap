@@ -429,11 +429,6 @@ fn add_language_hints_for_early_returns(language: &crate::core::Language) -> Vec
             "# Pattern: if not valid: return error".to_string(),
             "# Reduce try-except nesting with early checks".to_string(),
         ],
-        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
-            "# Use early returns for null/undefined checks".to_string(),
-            "# Pattern: if (!value) return error".to_string(),
-            "# Use optional chaining (?.) where possible".to_string(),
-        ],
         _ => vec![
             "# Move validation checks to function start".to_string(),
             "# Return early on invalid states".to_string(),
@@ -452,10 +447,6 @@ fn add_language_verification_commands(language: &crate::core::Language) -> Vec<S
         crate::core::Language::Python => vec![
             "# Run pylint or flake8 for complexity checks".to_string(),
             "pytest".to_string(),
-        ],
-        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
-            "# Run eslint with complexity rules".to_string(),
-            "npm test".to_string(),
         ],
         _ => vec!["# Run your test suite".to_string()],
     }
@@ -945,7 +936,7 @@ fn generate_repetitive_validation_recommendation(
 /// Add language-specific declarative validation examples (spec 180)
 fn add_declarative_validation_examples(
     language: &crate::core::Language,
-    count: u32,
+    _count: u32,
 ) -> Vec<String> {
     match language {
         crate::core::Language::Rust => vec![
@@ -968,15 +959,6 @@ fn add_declarative_validation_examples(
             "# @define".to_string(),
             "# class Config:".to_string(),
             "#     output_dir: str = field(validator=instance_of(str))".to_string(),
-        ],
-        crate::core::Language::JavaScript | crate::core::Language::TypeScript => vec![
-            "# Option 1: Joi schema".to_string(),
-            format!("# const schema = Joi.object({{ /* {} fields */ }});", count),
-            "# schema.validate(config);".to_string(),
-            "".to_string(),
-            "# Option 2: Zod schema".to_string(),
-            "# const ConfigSchema = z.object({ ... });".to_string(),
-            "# ConfigSchema.parse(config);".to_string(),
         ],
         _ => vec!["# Use declarative validation approach for your language".to_string()],
     }

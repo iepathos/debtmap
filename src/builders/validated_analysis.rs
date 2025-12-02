@@ -207,7 +207,6 @@ fn validate_single_source_parseable(file: &FileContent) -> AnalysisValidation<Fi
     match file.language {
         Language::Rust => validate_rust_parseable(file),
         Language::Python => validate_python_parseable(file),
-        Language::JavaScript | Language::TypeScript => validate_js_parseable(file),
         Language::Unknown => {
             // Unknown languages pass through - we can't validate them
             validation_success(file.clone())
@@ -255,96 +254,6 @@ fn validate_python_parseable(file: &FileContent) -> AnalysisValidation<FileConte
 
     // For now, Python files pass through without deep validation
     // A full Python parser would be needed for proper validation
-    validation_success(file.clone())
-}
-
-/// Validate JavaScript/TypeScript source is parseable (basic validation).
-fn validate_js_parseable(file: &FileContent) -> AnalysisValidation<FileContent> {
-    // Basic bracket matching validation
-    let mut paren_count: i32 = 0;
-    let mut brace_count: i32 = 0;
-    let mut bracket_count: i32 = 0;
-    let mut in_string = false;
-    let mut string_char = ' ';
-    let mut prev_char = ' ';
-
-    for (line_num, line) in file.content.lines().enumerate() {
-        for ch in line.chars() {
-            // Track string state
-            if !in_string && (ch == '"' || ch == '\'' || ch == '`') {
-                in_string = true;
-                string_char = ch;
-            } else if in_string && ch == string_char && prev_char != '\\' {
-                in_string = false;
-            }
-
-            // Only count brackets outside strings
-            if !in_string {
-                match ch {
-                    '(' => paren_count += 1,
-                    ')' => {
-                        paren_count -= 1;
-                        if paren_count < 0 {
-                            return validation_failure(AnalysisError::parse_with_context(
-                                "Unmatched closing parenthesis".to_string(),
-                                &file.path,
-                                line_num + 1,
-                            ));
-                        }
-                    }
-                    '{' => brace_count += 1,
-                    '}' => {
-                        brace_count -= 1;
-                        if brace_count < 0 {
-                            return validation_failure(AnalysisError::parse_with_context(
-                                "Unmatched closing brace".to_string(),
-                                &file.path,
-                                line_num + 1,
-                            ));
-                        }
-                    }
-                    '[' => bracket_count += 1,
-                    ']' => {
-                        bracket_count -= 1;
-                        if bracket_count < 0 {
-                            return validation_failure(AnalysisError::parse_with_context(
-                                "Unmatched closing bracket".to_string(),
-                                &file.path,
-                                line_num + 1,
-                            ));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            prev_char = ch;
-        }
-    }
-
-    // Check for unclosed brackets at end of file
-    if paren_count > 0 {
-        return validation_failure(AnalysisError::parse_with_context(
-            format!("Unclosed parenthesis ({} open)", paren_count),
-            &file.path,
-            file.content.lines().count(),
-        ));
-    }
-    if brace_count > 0 {
-        return validation_failure(AnalysisError::parse_with_context(
-            format!("Unclosed brace ({} open)", brace_count),
-            &file.path,
-            file.content.lines().count(),
-        ));
-    }
-    if bracket_count > 0 {
-        return validation_failure(AnalysisError::parse_with_context(
-            format!("Unclosed bracket ({} open)", bracket_count),
-            &file.path,
-            file.content.lines().count(),
-        ));
-    }
-
     validation_success(file.clone())
 }
 
@@ -504,43 +413,6 @@ mod tests {
             }
             Validation::Success(_) => panic!("Expected failure for invalid Rust"),
         }
-    }
-
-    #[test]
-    fn test_validate_js_parseable_success() {
-        let file = FileContent {
-            path: PathBuf::from("test.js"),
-            content: "function test() { return { a: 1 }; }".to_string(),
-            language: Language::JavaScript,
-        };
-
-        let result = validate_js_parseable(&file);
-        assert!(result.is_success());
-    }
-
-    #[test]
-    fn test_validate_js_parseable_unmatched_brace() {
-        let file = FileContent {
-            path: PathBuf::from("test.js"),
-            content: "function test() { return { a: 1 }".to_string(), // Missing }
-            language: Language::JavaScript,
-        };
-
-        let result = validate_js_parseable(&file);
-        assert!(result.is_failure());
-    }
-
-    #[test]
-    fn test_validate_js_parseable_string_with_brackets() {
-        // Brackets inside strings should not be counted
-        let file = FileContent {
-            path: PathBuf::from("test.js"),
-            content: r#"const s = "{ hello }"; const x = [];"#.to_string(),
-            language: Language::JavaScript,
-        };
-
-        let result = validate_js_parseable(&file);
-        assert!(result.is_success());
     }
 
     #[test]

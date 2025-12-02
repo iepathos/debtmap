@@ -15,17 +15,10 @@ pub fn parse_single_language(lang_str: &str) -> Option<Language> {
     match lang_str.to_lowercase().as_str() {
         "rust" | "rs" => Some(Language::Rust),
         "python" | "py" => Some(Language::Python),
-        "javascript" | "js" => Some(Language::JavaScript),
-        "typescript" | "ts" => Some(Language::TypeScript),
         _ => None,
     }
 }
 
 pub fn default_languages() -> Vec<Language> {
-    vec![
-        Language::Rust,
-        Language::Python,
-        Language::JavaScript,
-        Language::TypeScript,
-    ]
+    vec![Language::Rust, Language::Python]
 }

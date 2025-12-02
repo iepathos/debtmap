@@ -65,7 +65,7 @@ fn test_no_subprocess_hanging() {
     let codes = vec![
         ("fn simple() { }", Language::Rust),
         ("def simple(): pass", Language::Python),
-        ("function simple() {}", Language::JavaScript),
+        ("function simple() {}", Language::Rust),
     ];
 
     for (code, lang) in codes {

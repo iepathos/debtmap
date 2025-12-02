@@ -310,14 +310,10 @@ fn create_app_container() -> Result<AppContainer> {
     // Build the container with all required dependencies
     // We need to create instances directly since the factory returns Box<dyn Analyzer>
     // But our AppContainerBuilder expects concrete types implementing the new trait
-    use debtmap::core::injection::{
-        JavaScriptAnalyzerAdapter, RustAnalyzerAdapter, TypeScriptAnalyzerAdapter,
-    };
+    use debtmap::core::injection::RustAnalyzerAdapter;
 
     let container = AppContainerBuilder::new()
         .with_rust_analyzer(RustAnalyzerAdapter::new())
-        .with_js_analyzer(JavaScriptAnalyzerAdapter::new())
-        .with_ts_analyzer(TypeScriptAnalyzerAdapter::new())
         .with_debt_scorer(DefaultDebtScorer::new())
         .with_config(DefaultConfigProvider::new())
         .with_priority_calculator(DefaultPriorityCalculator::new())

@@ -14,7 +14,6 @@ pub mod enhanced_analyzer;
 pub mod file_analyzer;
 pub mod function_registry;
 pub mod implementations;
-pub mod javascript;
 pub mod macro_definition_collector;
 pub mod purity_detector;
 pub mod rust;
@@ -88,22 +87,14 @@ pub fn get_analyzer(language: crate::core::Language) -> Box<dyn Analyzer> {
 
     type AnalyzerFactory = fn() -> Box<dyn Analyzer>;
 
-    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[
-        (Language::Rust, || {
-            let mut analyzer = rust::RustAnalyzer::new();
-            // Check environment variable for functional analysis (spec 111)
-            if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
-                analyzer = analyzer.with_functional_analysis(true);
-            }
-            Box::new(analyzer)
-        }),
-        (Language::JavaScript, || {
-            create_js_analyzer(javascript::JavaScriptAnalyzer::new_javascript, "JavaScript")
-        }),
-        (Language::TypeScript, || {
-            create_js_analyzer(javascript::JavaScriptAnalyzer::new_typescript, "TypeScript")
-        }),
-    ];
+    static ANALYZER_MAP: &[(Language, AnalyzerFactory)] = &[(Language::Rust, || {
+        let mut analyzer = rust::RustAnalyzer::new();
+        // Check environment variable for functional analysis (spec 111)
+        if std::env::var("DEBTMAP_FUNCTIONAL_ANALYSIS").is_ok() {
+            analyzer = analyzer.with_functional_analysis(true);
+        }
+        Box::new(analyzer)
+    })];
 
     ANALYZER_MAP
         .iter()
@@ -123,16 +114,6 @@ pub fn get_analyzer_with_context(
     } else {
         base_analyzer
     }
-}
-
-fn create_js_analyzer<F>(factory: F, lang_name: &str) -> Box<dyn Analyzer>
-where
-    F: Fn() -> Result<javascript::JavaScriptAnalyzer>,
-{
-    Box::new(factory().unwrap_or_else(|_| {
-        eprintln!("Failed to initialize {lang_name} analyzer");
-        factory().unwrap_or_else(|_| panic!("{lang_name} analyzer initialization failed"))
-    }))
 }
 
 struct NullAnalyzer;

@@ -91,16 +91,6 @@ fn test_language_display_python() {
 }
 
 #[test]
-fn test_language_display_javascript() {
-    assert_eq!(format!("{}", Language::JavaScript), "JavaScript");
-}
-
-#[test]
-fn test_language_display_typescript() {
-    assert_eq!(format!("{}", Language::TypeScript), "TypeScript");
-}
-
-#[test]
 fn test_language_display_unknown() {
     assert_eq!(format!("{}", Language::Unknown), "Unknown");
 }
@@ -110,8 +100,6 @@ fn test_language_display_all_variants() {
     let languages = vec![
         (Language::Rust, "Rust"),
         (Language::Python, "Python"),
-        (Language::JavaScript, "JavaScript"),
-        (Language::TypeScript, "TypeScript"),
         (Language::Unknown, "Unknown"),
     ];
 

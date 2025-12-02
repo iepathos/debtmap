@@ -25,24 +25,6 @@ fn test_python_dead_code_enabled_by_default() {
 }
 
 #[test]
-fn test_javascript_dead_code_enabled_by_default() {
-    let js_features = get_language_features(&Language::JavaScript);
-    assert!(
-        js_features.detect_dead_code,
-        "JavaScript dead code detection should be enabled by default"
-    );
-}
-
-#[test]
-fn test_typescript_dead_code_enabled_by_default() {
-    let ts_features = get_language_features(&Language::TypeScript);
-    assert!(
-        ts_features.detect_dead_code,
-        "TypeScript dead code detection should be enabled by default"
-    );
-}
-
-#[test]
 fn test_rust_dead_code_always_returns_false() {
     // Create a simple Rust file with an unused function
     let rust_code = r#"

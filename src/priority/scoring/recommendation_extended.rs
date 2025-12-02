@@ -479,7 +479,6 @@ fn detect_file_language(file_path: &std::path::Path) -> crate::core::Language {
     match extension {
         "rs" => crate::core::Language::Rust,
         "py" => crate::core::Language::Python,
-        "js" | "jsx" | "ts" | "tsx" => crate::core::Language::JavaScript,
         _ => crate::core::Language::Rust, // Default to Rust
     }
 }
@@ -1624,22 +1623,6 @@ mod tests {
         assert_eq!(
             detect_file_language(Path::new("test.py")),
             crate::core::Language::Python
-        );
-        assert_eq!(
-            detect_file_language(Path::new("test.js")),
-            crate::core::Language::JavaScript
-        );
-        assert_eq!(
-            detect_file_language(Path::new("test.jsx")),
-            crate::core::Language::JavaScript
-        );
-        assert_eq!(
-            detect_file_language(Path::new("test.ts")),
-            crate::core::Language::JavaScript
-        );
-        assert_eq!(
-            detect_file_language(Path::new("test.tsx")),
-            crate::core::Language::JavaScript
         );
         assert_eq!(
             detect_file_language(Path::new("test.unknown")),

@@ -35,8 +35,6 @@ use std::path::PathBuf;
 pub enum Ast {
     Rust(RustAst),
     Python(PythonAst),
-    JavaScript(JavaScriptAst),
-    TypeScript(TypeScriptAst),
     Unknown,
 }
 
@@ -145,20 +143,6 @@ pub struct PythonAst {
 }
 
 #[derive(Clone, Debug)]
-pub struct JavaScriptAst {
-    pub tree: tree_sitter::Tree,
-    pub source: String,
-    pub path: PathBuf,
-}
-
-#[derive(Clone, Debug)]
-pub struct TypeScriptAst {
-    pub tree: tree_sitter::Tree,
-    pub source: String,
-    pub path: PathBuf,
-}
-
-#[derive(Clone, Debug)]
 pub struct AstNode {
     pub kind: NodeKind,
     pub name: Option<String>,
@@ -204,8 +188,6 @@ impl Ast {
         match self {
             Ast::Rust(_) => self.extract_rust_nodes(),
             Ast::Python(_) => self.extract_python_nodes(),
-            Ast::JavaScript(_) => self.extract_javascript_nodes(),
-            Ast::TypeScript(_) => self.extract_typescript_nodes(),
             Ast::Unknown => vec![],
         }
     }
@@ -215,14 +197,6 @@ impl Ast {
     }
 
     fn extract_python_nodes(&self) -> Vec<AstNode> {
-        vec![]
-    }
-
-    fn extract_javascript_nodes(&self) -> Vec<AstNode> {
-        vec![]
-    }
-
-    fn extract_typescript_nodes(&self) -> Vec<AstNode> {
         vec![]
     }
 
@@ -390,22 +364,6 @@ mod tests {
         // Test with Unknown AST since creating PythonAst requires complex structures
         let ast = Ast::Unknown;
         let nodes = ast.extract_python_nodes();
-        assert_eq!(nodes.len(), 0);
-    }
-
-    #[test]
-    fn test_extract_javascript_nodes() {
-        // We can't easily create a tree_sitter::Tree, but we can test with Unknown
-        let ast = Ast::Unknown;
-        let nodes = ast.extract_javascript_nodes();
-        assert_eq!(nodes.len(), 0);
-    }
-
-    #[test]
-    fn test_extract_typescript_nodes() {
-        // We can't easily create a tree_sitter::Tree, but we can test with Unknown
-        let ast = Ast::Unknown;
-        let nodes = ast.extract_typescript_nodes();
         assert_eq!(nodes.len(), 0);
     }
 

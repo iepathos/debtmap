@@ -571,24 +571,6 @@ interface_weight = 0.15
     }
 
     #[test]
-    fn test_get_language_features_javascript() {
-        use crate::core::Language;
-        let features = get_language_features(&Language::JavaScript);
-        assert!(features.detect_dead_code);
-        assert!(features.detect_complexity);
-        assert!(features.detect_duplication);
-    }
-
-    #[test]
-    fn test_get_language_features_typescript() {
-        use crate::core::Language;
-        let features = get_language_features(&Language::TypeScript);
-        assert!(features.detect_dead_code);
-        assert!(features.detect_complexity);
-        assert!(features.detect_duplication);
-    }
-
-    #[test]
     fn test_get_language_features_unknown() {
         use crate::core::Language;
         let features = get_language_features(&Language::Unknown);

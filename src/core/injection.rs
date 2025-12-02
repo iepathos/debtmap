@@ -198,8 +198,6 @@ impl AnalyzerFactory {
             crate::core::types::Language::Python => {
                 panic!("Python analysis is not currently supported. Debtmap is focusing exclusively on Rust analysis.")
             }
-            crate::core::types::Language::JavaScript => Box::new(JavaScriptAnalyzerAdapter::new()),
-            crate::core::types::Language::TypeScript => Box::new(TypeScriptAnalyzerAdapter::new()),
         }
     }
 }
@@ -275,84 +273,6 @@ impl Analyzer for RustAnalyzerAdapter {
 
     fn name(&self) -> &str {
         "RustAnalyzer"
-    }
-}
-
-/// Adapter for JavaScript analyzer to implement Analyzer trait
-pub struct JavaScriptAnalyzerAdapter;
-
-impl Default for JavaScriptAnalyzerAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl JavaScriptAnalyzerAdapter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Analyzer for JavaScriptAnalyzerAdapter {
-    type Input = String;
-    type Output = crate::core::types::ModuleInfo;
-
-    fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
-        // JavaScript analysis implementation
-        // For now, use a basic implementation
-        let path = std::path::PathBuf::from("temp.js");
-
-        Ok(crate::core::types::ModuleInfo {
-            name: "module".to_string(),
-            language: crate::core::types::Language::JavaScript,
-            path,
-            functions: vec![],
-            exports: vec![],
-            imports: vec![],
-        })
-    }
-
-    fn name(&self) -> &str {
-        "JavaScriptAnalyzer"
-    }
-}
-
-/// Adapter for TypeScript analyzer to implement Analyzer trait
-pub struct TypeScriptAnalyzerAdapter;
-
-impl Default for TypeScriptAnalyzerAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TypeScriptAnalyzerAdapter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Analyzer for TypeScriptAnalyzerAdapter {
-    type Input = String;
-    type Output = crate::core::types::ModuleInfo;
-
-    fn analyze(&self, _input: Self::Input) -> anyhow::Result<Self::Output> {
-        // TypeScript analysis implementation
-        // For now, use a basic implementation
-        let path = std::path::PathBuf::from("temp.ts");
-
-        Ok(crate::core::types::ModuleInfo {
-            name: "module".to_string(),
-            language: crate::core::types::Language::TypeScript,
-            path,
-            functions: vec![],
-            exports: vec![],
-            imports: vec![],
-        })
-    }
-
-    fn name(&self) -> &str {
-        "TypeScriptAnalyzer"
     }
 }
 
@@ -505,12 +425,6 @@ mod tests {
             .with_python_analyzer(MockAnalyzer {
                 language: Language::Python,
             })
-            .with_js_analyzer(MockAnalyzer {
-                language: Language::JavaScript,
-            })
-            .with_ts_analyzer(MockAnalyzer {
-                language: Language::TypeScript,
-            })
             .with_debt_scorer(MockScorer)
             .with_config(MockConfigProvider)
             .with_priority_calculator(MockPriorityCalculator)
@@ -527,12 +441,6 @@ mod tests {
         let builder = AppContainerBuilder::new()
             .with_python_analyzer(MockAnalyzer {
                 language: Language::Python,
-            })
-            .with_js_analyzer(MockAnalyzer {
-                language: Language::JavaScript,
-            })
-            .with_ts_analyzer(MockAnalyzer {
-                language: Language::TypeScript,
             })
             .with_debt_scorer(MockScorer)
             .with_config(MockConfigProvider)

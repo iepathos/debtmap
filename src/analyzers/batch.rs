@@ -300,11 +300,6 @@ fn validate_syntax(content: &str, language: Language, path: &Path) -> Result<(),
                 Ok(())
             }
         }
-        Language::JavaScript | Language::TypeScript => {
-            // Basic JS/TS check - could use tree-sitter
-            // For now, accept any content
-            Ok(())
-        }
         Language::Unknown => Err(AnalysisError::validation_with_path(
             "Cannot validate unknown language",
             path,
@@ -720,13 +715,6 @@ mod tests {
     fn test_validate_syntax_python() {
         let content = "def hello():\n    pass";
         let result = validate_syntax(content, Language::Python, Path::new("test.py"));
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_validate_syntax_javascript() {
-        let content = "function hello() { return 1; }";
-        let result = validate_syntax(content, Language::JavaScript, Path::new("test.js"));
         assert!(result.is_ok());
     }
 

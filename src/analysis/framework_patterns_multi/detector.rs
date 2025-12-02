@@ -422,8 +422,6 @@ mod tests {
     fn test_language_parse() {
         assert_eq!(Language::parse("rust").unwrap(), Language::Rust);
         assert_eq!(Language::parse("python").unwrap(), Language::Python);
-        assert_eq!(Language::parse("javascript").unwrap(), Language::JavaScript);
-        assert_eq!(Language::parse("typescript").unwrap(), Language::TypeScript);
         assert!(Language::parse("unknown").is_err());
     }
 

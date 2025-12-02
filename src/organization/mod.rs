@@ -32,7 +32,6 @@ pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod hidden_type_extractor;
 pub mod integrated_analyzer;
-pub mod javascript;
 pub mod language;
 pub mod macro_recommendations;
 pub mod module_function_classifier;

@@ -368,8 +368,6 @@ pub enum DependencyKind {
 pub enum Language {
     Rust,
     Python,
-    JavaScript,
-    TypeScript,
     Unknown,
 }
 
@@ -398,8 +396,6 @@ impl std::fmt::Display for Language {
         static DISPLAY_STRINGS: &[(Language, &str)] = &[
             (Language::Rust, "Rust"),
             (Language::Python, "Python"),
-            (Language::JavaScript, "JavaScript"),
-            (Language::TypeScript, "TypeScript"),
             (Language::Unknown, "Unknown"),
         ];
 

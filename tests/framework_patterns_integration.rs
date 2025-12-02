@@ -118,32 +118,6 @@ fn test_clap_cli_parser_detection() {
 }
 
 #[test]
-fn test_express_handler_detection() {
-    let config_path = Path::new("framework_patterns.toml");
-
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
-    let detector = FrameworkDetector::from_config(config_path)
-        .expect("Failed to load framework patterns config");
-
-    let mut function = FunctionAst::new("handleRequest".to_string());
-    function.calls.push(FunctionCall {
-        name: "app.get".to_string(),
-    });
-
-    let mut file_context = FileContext::new(Language::JavaScript, "routes.js".into());
-    file_context.add_import("const express = require('express');".to_string());
-
-    let matches = detector.detect_framework_patterns(&function, &file_context);
-
-    assert!(!matches.is_empty(), "Should detect Express framework");
-    assert_eq!(matches[0].category, "HTTP Request Handler");
-}
-
-#[test]
 fn test_fastapi_handler_detection() {
     let config_path = Path::new("framework_patterns.toml");
 
@@ -167,31 +141,6 @@ fn test_fastapi_handler_detection() {
 
     assert!(!matches.is_empty(), "Should detect FastAPI framework");
     assert_eq!(matches[0].category, "HTTP Request Handler");
-}
-
-#[test]
-fn test_jest_test_detection() {
-    let config_path = Path::new("framework_patterns.toml");
-
-    if !config_path.exists() {
-        eprintln!("Skipping test: framework_patterns.toml not found");
-        return;
-    }
-
-    let detector = FrameworkDetector::from_config(config_path)
-        .expect("Failed to load framework patterns config");
-
-    let mut function = FunctionAst::new("should_work".to_string());
-    function.calls.push(FunctionCall {
-        name: "test".to_string(),
-    });
-
-    let file_context = FileContext::new(Language::JavaScript, "example.test.js".into());
-
-    let matches = detector.detect_framework_patterns(&function, &file_context);
-
-    assert!(!matches.is_empty(), "Should detect Jest framework");
-    assert_eq!(matches[0].category, "Test Function");
 }
 
 #[test]

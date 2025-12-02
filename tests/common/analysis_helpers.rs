@@ -20,8 +20,6 @@ pub fn analyze_code_snippet(code: &str, language: Language) -> Result<FileMetric
     let path = PathBuf::from(match language {
         Language::Rust => "test.rs",
         Language::Python => "test.py",
-        Language::JavaScript => "test.js",
-        Language::TypeScript => "test.ts",
         _ => "test.txt",
     });
 
@@ -158,8 +156,8 @@ fn detect_language(path: &Path) -> Language {
     match path.extension().and_then(|s| s.to_str()) {
         Some("rs") => Language::Rust,
         Some("py") => Language::Python,
-        Some("js") => Language::JavaScript,
-        Some("ts") => Language::TypeScript,
+        Some("js") => Language::Rust,
+        Some("ts") => Language::Rust,
         _ => Language::Rust, // Default
     }
 }

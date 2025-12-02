@@ -371,49 +371,6 @@ fn test_entropy_cache_performance() {
 }
 
 #[test]
-fn test_javascript_entropy_integration() {
-    use debtmap::analyzers::javascript::JavaScriptAnalyzer;
-
-    let analyzer = JavaScriptAnalyzer::new_javascript().unwrap();
-
-    let validation_code = r#"
-        function validateForm(data) {
-            if (!data.name) {
-                return { error: "Name is required" };
-            }
-            if (!data.email) {
-                return { error: "Email is required" };
-            }
-            if (!data.phone) {
-                return { error: "Phone is required" };
-            }
-            if (data.age < 18) {
-                return { error: "Must be 18 or older" };
-            }
-            if (data.age > 120) {
-                return { error: "Invalid age" };
-            }
-            return { success: true };
-        }
-    "#;
-
-    let ast = analyzer
-        .parse(validation_code, PathBuf::from("test.js"))
-        .unwrap();
-    let metrics = analyzer.analyze(&ast);
-
-    // Should detect the validation function
-    assert_eq!(metrics.complexity.functions.len(), 1);
-
-    let func = &metrics.complexity.functions[0];
-    assert_eq!(func.name, "validateForm");
-
-    // With entropy enabled, should have entropy score
-    // Note: This requires entropy to be enabled in config
-    // The test verifies the infrastructure is in place
-}
-
-#[test]
 fn test_entropy_score_ranges() {
     let mut entropy_analyzer = EntropyAnalyzer::new();
 

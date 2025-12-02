@@ -113,12 +113,6 @@ pub fn get_language_features(language: &crate::core::Language) -> LanguageFeatur
         Language::Python => languages_config
             .and_then(|lc| lc.python.clone())
             .unwrap_or_default(),
-        Language::JavaScript => languages_config
-            .and_then(|lc| lc.javascript.clone())
-            .unwrap_or_default(),
-        Language::TypeScript => languages_config
-            .and_then(|lc| lc.typescript.clone())
-            .unwrap_or_default(),
         Language::Unknown => LanguageFeatures::default(),
     }
 }

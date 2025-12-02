@@ -19,30 +19,20 @@ fn test_parse_single_language_python() {
 
 #[test]
 fn test_parse_single_language_javascript() {
-    assert_eq!(
-        parse_single_language("javascript"),
-        Some(Language::JavaScript)
-    );
-    assert_eq!(parse_single_language("js"), Some(Language::JavaScript));
-    assert_eq!(
-        parse_single_language("JAVASCRIPT"),
-        Some(Language::JavaScript)
-    );
-    assert_eq!(parse_single_language("JS"), Some(Language::JavaScript));
+    // JavaScript support removed in spec 191
+    assert_eq!(parse_single_language("javascript"), None);
+    assert_eq!(parse_single_language("js"), None);
+    assert_eq!(parse_single_language("JAVASCRIPT"), None);
+    assert_eq!(parse_single_language("JS"), None);
 }
 
 #[test]
 fn test_parse_single_language_typescript() {
-    assert_eq!(
-        parse_single_language("typescript"),
-        Some(Language::TypeScript)
-    );
-    assert_eq!(parse_single_language("ts"), Some(Language::TypeScript));
-    assert_eq!(
-        parse_single_language("TYPESCRIPT"),
-        Some(Language::TypeScript)
-    );
-    assert_eq!(parse_single_language("TS"), Some(Language::TypeScript));
+    // TypeScript support removed in spec 191
+    assert_eq!(parse_single_language("typescript"), None);
+    assert_eq!(parse_single_language("ts"), None);
+    assert_eq!(parse_single_language("TYPESCRIPT"), None);
+    assert_eq!(parse_single_language("TS"), None);
 }
 
 #[test]
@@ -87,9 +77,7 @@ fn test_parse_languages_empty_vec_returns_empty() {
 #[test]
 fn test_default_languages() {
     let defaults = default_languages();
-    assert_eq!(defaults.len(), 4);
+    assert_eq!(defaults.len(), 2);
     assert!(defaults.contains(&Language::Rust));
     assert!(defaults.contains(&Language::Python));
-    assert!(defaults.contains(&Language::JavaScript));
-    assert!(defaults.contains(&Language::TypeScript));
 }

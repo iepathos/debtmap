@@ -37,8 +37,7 @@ pub fn is_jest_test(function: &FunctionAst, file_context: &FileContext) -> bool 
 
 #[cfg(test)]
 mod tests {
-    use super::super::detector::{Attribute, Decorator, FileContext, FunctionAst, FunctionCall};
-    use super::super::patterns::Language;
+    use super::super::detector::{Attribute, Decorator, FunctionAst};
     use super::*;
 
     #[test]
@@ -59,17 +58,5 @@ mod tests {
         });
 
         assert!(is_rust_test(&function));
-    }
-
-    #[test]
-    fn test_jest_test_detection() {
-        let mut function = FunctionAst::new("should_work".to_string());
-        function.calls.push(FunctionCall {
-            name: "test".to_string(),
-        });
-
-        let file_context = FileContext::new(Language::JavaScript, "example.test.js".into());
-
-        assert!(is_jest_test(&function, &file_context));
     }
 }
