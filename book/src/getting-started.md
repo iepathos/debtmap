@@ -13,9 +13,7 @@ Before installing Debtmap, you'll need:
   - Rust edition 2021 or later
 
 **Optional** (for coverage-based risk analysis):
-- **Rust projects**: `cargo-tarpaulin` for coverage data
-- **JavaScript/TypeScript**: Jest or other tools generating LCOV format
-- **Python**: pytest with coverage plugin
+- **Rust projects**: `cargo-tarpaulin` or `cargo-llvm-cov` for coverage data
 
 ## Installation
 
@@ -84,7 +82,7 @@ debtmap --help
 
 ### First Run Issues
 
-- **Empty output or no items found**: Check that your project contains supported source files (`.rs`, `.py`, `.js`, `.ts`, `.tsx`). Verify with `debtmap analyze . -vvv` for debug output.
+- **Empty output or no items found**: Check that your project contains Rust source files (`.rs`). Verify with `debtmap analyze . -vvv` for debug output.
 
 - **Parser failures**: If analysis fails with parsing errors:
   ```bash
@@ -243,7 +241,7 @@ debtmap analyze .
 
 **What happens during analysis:**
 
-1. **File Discovery** - Debtmap scans your project for supported source files (Rust, Python, JavaScript, TypeScript)
+1. **File Discovery** - Debtmap scans your project for Rust source files (`.rs`)
 2. **Parsing** - Each file is parsed into an Abstract Syntax Tree (AST)
 3. **Metrics Calculation** - Complexity, debt patterns, and risk scores are computed
 4. **Prioritization** - Results are ranked by priority (CRITICAL, HIGH, MEDIUM, LOW)
@@ -253,7 +251,7 @@ debtmap analyze .
 
 ## Language Support
 
-Debtmap supports multiple programming languages with varying feature completeness:
+Debtmap is focused exclusively on Rust for comprehensive code analysis:
 
 ### Rust (Full Support)
 All analysis features available:
@@ -266,23 +264,7 @@ All analysis features available:
   - Call graph generation
   - Macro expansion tracking
 
-### Python (Partial Support)
-Core features available:
-- Complexity metrics (cyclomatic, cognitive, nesting, lines)
-- Basic debt detection (code smells, god objects)
-- Test gap analysis with coverage integration
-
-**Not yet available**: Purity analysis, detailed call graphs
-
-### JavaScript/TypeScript (Partial Support)
-Core features available:
-- Complexity metrics (cyclomatic, cognitive, nesting, lines)
-- Basic debt detection (code smells, god objects)
-- Test gap analysis with coverage integration
-
-**Not yet available**: Purity analysis, detailed call graphs
-
-**Note**: All languages benefit from coverage integration for accurate risk assessment. The core analysis workflow (complexity → debt patterns → prioritization) works consistently across all supported languages.
+**Note**: Support for additional languages may be added in future releases based on community feedback and demand.
 
 ## Example Output
 
@@ -481,20 +463,11 @@ coverage = 0.4         # Weight for test coverage gaps
 complexity = 0.35      # Weight for complexity metrics
 dependencies = 0.25    # Weight for call graph dependencies
 
-# Language-specific settings
-[languages]
-rust = true            # Enable Rust analysis
-python = true          # Enable Python analysis
-javascript = true      # Enable JavaScript/TypeScript analysis
-
 # Files and directories to ignore
 [ignore]
 patterns = [
     "**/target/**",     # Rust build artifacts
-    "**/node_modules/**", # JavaScript dependencies
-    "**/__pycache__/**", # Python bytecode
     "**/tests/**",      # Test directories (optional)
-    "**/*.test.ts",     # Test files (optional)
 ]
 
 # God object detection thresholds
@@ -513,7 +486,6 @@ threshold = 0.7        # Flag functions with entropy > 0.7
 The configuration file allows you to customize:
 - **Threshold customization** - Adjust complexity, duplication, and file size thresholds
 - **Scoring weights** - Fine-tune how coverage, complexity, and dependencies are weighted
-- **Language selection** - Enable/disable specific language analyzers
 - **Ignore patterns** - Exclude test files or generated code from analysis
 - **God object thresholds** - Configure what constitutes a "god object" anti-pattern
 - **Entropy analysis** - Control entropy-based complexity detection
@@ -529,43 +501,15 @@ For more accurate risk assessment, run analysis with coverage data. Coverage hel
 
 **Rust Projects:**
 ```bash
-# Install cargo-tarpaulin if not already installed
+# Option 1: Using cargo-tarpaulin
 cargo install cargo-tarpaulin
-
-# Generate LCOV coverage report
 cargo tarpaulin --out lcov --output-dir target/coverage
-
-# Run debtmap with coverage
 debtmap analyze . --lcov target/coverage/lcov.info
-```
 
-**Python Projects:**
-```bash
-# Install coverage plugin if not already installed
-pip install pytest-cov
-
-# Generate LCOV coverage report
-pytest --cov=. --cov-report=lcov:coverage.lcov
-
-# Run debtmap with coverage
-debtmap analyze . --lcov coverage.lcov
-```
-
-**JavaScript/TypeScript Projects:**
-```bash
-# Using Jest (add to package.json or run directly)
-jest --coverage --coverageReporters=lcov
-
-# Run debtmap with coverage
-debtmap analyze . --lcov coverage/lcov.info
-
-# Using NYC with other test runners
-npx nyc --reporter=lcovonly npm test
-debtmap analyze . --lcov coverage/lcov.info
-
-# Using Vitest
-vitest run --coverage --coverage.reporter=lcov
-debtmap analyze . --lcov coverage/lcov-report/lcov.info
+# Option 2: Using cargo-llvm-cov (recommended for faster builds)
+cargo install cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
+debtmap analyze . --lcov target/coverage/lcov.info
 ```
 
 **Note**: The `--lcov` flag is a shorthand alias for `--coverage-file`. Both accept LCOV format coverage reports.

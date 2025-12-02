@@ -359,11 +359,11 @@ pub enum DebtCategory {
 **Language-Specific Debt Patterns:**
 
 Some debt patterns only apply to languages with specific features:
-- **BlockingIO, AsyncMisuse**: Async-capable languages (Rust, JavaScript, TypeScript)
+- **BlockingIO, AsyncMisuse**: Async-capable languages (Rust)
 - **AllocationInefficiency, ResourceLeak**: Languages with manual memory management (Rust)
-- **Error handling patterns**: Vary by language error model (Result in Rust, exceptions in Python/JS)
+- **Error handling patterns**: Vary by language error model (Result in Rust)
 
-Debtmap automatically applies only the relevant debt patterns for each language during analysis.
+Debtmap automatically applies only the relevant debt patterns during analysis.
 
 ### Examples by Category
 
@@ -1794,65 +1794,35 @@ Debtmap automatically identifies function roles in Rust code to apply appropriat
 
 This classification feeds directly into the unified scoring system's role multiplier (see Risk Scoring section).
 
-**Python** (Partial Support)
-- **Parser**: rustpython-parser
-- **Capabilities**:
-  - Complexity metrics (cyclomatic, cognitive)
-  - Python-specific error handling patterns
-  - Purity detection for pure functions
-  - Basic debt pattern detection
-  - Limited call graph support
-
-**JavaScript** (Partial Support)
-- **Parser**: tree-sitter (JavaScript grammar)
-- **File extensions**: .js, .jsx, .mjs, .cjs
-- **Capabilities**:
-  - ECMAScript complexity patterns
-  - Basic complexity metrics
-  - Function extraction
-  - Limited pattern detection
-
-**TypeScript** (Partial Support)
-- **Parser**: tree-sitter (TypeScript grammar)
-- **File extensions**: .ts, .tsx, .mts, .cts
-- **Capabilities**:
-  - Similar to JavaScript support
-  - Type information currently not utilized
-  - Basic complexity metrics
-  - Limited pattern detection
-
 **Unsupported Languages:**
 
-Debtmap's `Language` enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.
+Debtmap currently supports only Rust. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.
 
-Files with extensions like `.cpp` (C++), `.java`, `.go`, `.rb` (Ruby), `.php`, `.cs` (C#), `.swift`, `.kt` (Kotlin), `.scala`, and others are silently filtered during discovery.
+Files with extensions like `.py` (Python), `.js`/`.ts` (JavaScript/TypeScript), `.cpp` (C++), `.java`, `.go`, `.rb` (Ruby), `.php`, `.cs` (C#), `.swift`, `.kt` (Kotlin), `.scala`, and others are silently filtered during discovery.
 
 **File filtering behavior:**
-- Discovery scans project for files matching supported extensions
-- Unsupported files are skipped silently (no warnings or errors)
+- Discovery scans project for Rust source files (.rs extension)
+- Non-Rust files are skipped silently (no warnings or errors)
 - No analysis, metrics, or debt patterns are generated for filtered files
-- Use `--languages` flag to explicitly control which languages to analyze
 
 **Example:**
 ```bash
-# Only analyze Rust files (skip Python/JS/TS)
-debtmap analyze . --languages rust
+# Analyze all Rust files in current directory
+debtmap analyze .
 
-# Analyze Rust and Python only
-debtmap analyze . --languages rust,python
+# Analyze specific Rust file
+debtmap analyze src/main.rs
 ```
 
 ### Language Detection
 
 Automatic detection by file extension:
 ```rust
+// Detects .rs files as Rust
 let language = Language::from_path(&path);
 ```
 
-Explicit language selection:
-```bash
-debtmap analyze . --languages rust,python
-```
+All `.rs` files are automatically analyzed. No language flag is needed since Debtmap is Rust-focused.
 
 ### Extensibility
 
@@ -2427,18 +2397,11 @@ Examples:
 
 **Generating coverage:**
 ```bash
-# Rust
+# Rust (using cargo-tarpaulin)
 cargo tarpaulin --out lcov --output-dir target/coverage
 
-# Python
-pytest --cov --cov-report=lcov
-
-# JavaScript/TypeScript
-jest --coverage --coverageReporters=lcov
-
-# Go
-go test -coverprofile=coverage.out
-gocover-cobertura < coverage.out > coverage.lcov
+# Or using cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 ```
 
 **Using with Debtmap:**
