@@ -1494,9 +1494,7 @@ Example output:
 - [ ] Cargo workspace analysis
 - [ ] Proc macro complexity tracking
 
-**Strategic Direction**: Debtmap is currently focused exclusively on perfecting Rust code analysis.
-Once Rust analysis is exceptionally mature and accurate, we may consider adding support for other
-languages. For Python, JavaScript, or TypeScript analysis, please use debtmap v0.6.0 or earlier.
+**Strategic Direction**: Debtmap is currently focused exclusively on perfecting Rust code analysis. Support for other languages is on the long term goals. If you want support for a specific language please open an issue, slide me a dm, or shoot me an email to discuss further. Languages that are high on my hit list are Go, Python, Javascript/Typescript, and C++. 
 
 ### Core Features
 - [x] Inline suppression comments
