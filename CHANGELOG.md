@@ -56,6 +56,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced type safety and error handling
   - Reduced cyclomatic complexity in key modules
 
+### Fixed
+
+- **Tier Classification Accuracy** (Commit 2b037ce0)
+  - Fixed tier classification to use sophisticated scoring metrics instead of raw cyclomatic complexity
+  - Tier classification now respects weighted complexity (30% cyclomatic + 70% cognitive), entropy dampening, nesting depth, and other advanced metrics
+  - Functions with high cognitive complexity (e.g., cyclo=9, cognitive=16, nesting=4) now correctly appear as T2 (Complex) instead of being hidden as T4 (Maintenance)
+  - Resolves false negatives where high-cognitive-load functions were incorrectly filtered from analysis results
+  - Example: `reconcile_state()` in examples/rethinking-code-quality-analysis now correctly ranks as #1 priority
+  - Impact: Tier classification now aligns with debtmap's core philosophy that cognitive load and nesting matter more than raw cyclomatic complexity
+
 ### Benefits of Rust-Only Approach
 
 - **Accuracy**: Native syn-based AST parsing provides 100% Rust language coverage
