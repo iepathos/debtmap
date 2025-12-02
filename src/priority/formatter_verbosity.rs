@@ -627,6 +627,9 @@ fn format_item_body(
     // COMPLEXITY section (acts as EVIDENCE - metrics only)
     format_complexity_summary(output, item, _formatter);
 
+    // PATTERN section (spec 190: show detected state machine/coordinator patterns)
+    format_pattern_detection(output, item);
+
     // COVERAGE section (show right after complexity for consistency)
     format_coverage_section(
         output,
@@ -754,6 +757,87 @@ fn format_complexity_summary(
                 nesting.to_string().yellow()
             )
             .unwrap();
+        }
+    }
+}
+
+/// Format pattern detection for state machine and coordinator patterns (spec 190)
+fn format_pattern_detection(output: &mut String, item: &UnifiedDebtItem) {
+    use crate::core::LanguageSpecificData;
+    use crate::priority::complexity_patterns::{ComplexityMetrics, ComplexityPattern};
+
+    // Reconstruct ComplexityMetrics to detect pattern (same logic as recommendation generation)
+    let complexity_metrics =
+        if let Some(LanguageSpecificData::Rust(rust_data)) = &item.language_specific {
+            ComplexityMetrics {
+                cyclomatic: item.cyclomatic_complexity,
+                cognitive: item.cognitive_complexity,
+                nesting: item.nesting_depth,
+                entropy_score: item.entropy_details.as_ref().map(|e| e.entropy_score),
+                state_signals: rust_data.state_machine_signals.clone(),
+                coordinator_signals: rust_data.coordinator_signals.clone(),
+                validation_signals: None, // Not used for state machine/coordinator detection
+            }
+        } else {
+            return; // No Rust-specific data, skip pattern detection
+        };
+
+    // Detect pattern using same logic as recommendation generation
+    let pattern = ComplexityPattern::detect(&complexity_metrics);
+
+    match pattern {
+        ComplexityPattern::StateMachine {
+            state_transitions,
+            match_expression_count,
+            ..
+        } => {
+            // Extract confidence from signals
+            if let Some(LanguageSpecificData::Rust(rust_data)) = &item.language_specific {
+                if let Some(sm_signals) = &rust_data.state_machine_signals {
+                    let metrics = format!(
+                        "transitions: {}, matches: {}, actions: {}",
+                        state_transitions, match_expression_count, sm_signals.action_dispatch_count
+                    );
+                    writeln!(
+                        output,
+                        "├─ {} {} {} ({}, confidence: {:.2})",
+                        "PATTERN:".bright_blue(),
+                        "🔄",
+                        "State Machine".bright_magenta().bold(),
+                        metrics.cyan(),
+                        sm_signals.confidence
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        ComplexityPattern::Coordinator {
+            action_count,
+            comparison_count,
+            ..
+        } => {
+            // Extract confidence from signals
+            if let Some(LanguageSpecificData::Rust(rust_data)) = &item.language_specific {
+                if let Some(coord_signals) = &rust_data.coordinator_signals {
+                    let metrics = format!(
+                        "actions: {}, comparisons: {}",
+                        action_count, comparison_count
+                    );
+                    writeln!(
+                        output,
+                        "├─ {} {} {} ({}, confidence: {:.2})",
+                        "PATTERN:".bright_blue(),
+                        "🎯",
+                        "Coordinator".bright_magenta().bold(),
+                        metrics.cyan(),
+                        coord_signals.confidence
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        _ => {
+            // No state machine or coordinator pattern detected
         }
     }
 }

@@ -83,7 +83,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Effect composition and validation
-stillwater = { version = "0.11", features = ["async"] }
+stillwater = { version = "0.13", features = ["async"] }
 tokio = { version = "1", features = ["rt"] }
 
 # File system
@@ -121,7 +121,7 @@ cargo-modules = "0.25"
 proptest = "1.4"
 pretty_assertions = "1.4"
 tempfile = "3.10"
-criterion = "0.7"
+criterion = "0.8"
 
 # Test data
 indoc = "2.0"

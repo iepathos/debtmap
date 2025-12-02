@@ -19,6 +19,7 @@ pub(crate) fn create_format_context(
         debt_specific_info: DebtSpecificInfo::from_item(item),
         coverage_info: CoverageInfo::from_item(item, has_coverage_data),
         context_info: ContextDampeningInfo::from_item(item), // spec 191
+        pattern_info: PatternInfo::from_item(item),          // spec 190
         rationale: item.recommendation.rationale.clone(),
     }
 }
@@ -36,6 +37,7 @@ pub(crate) struct FormatContext {
     pub debt_specific_info: DebtSpecificInfo,
     pub coverage_info: Option<CoverageInfo>,
     pub context_info: Option<ContextDampeningInfo>, // spec 191
+    pub pattern_info: Option<PatternInfo>,          // spec 190
     pub rationale: String,
 }
 
@@ -225,5 +227,59 @@ impl ContextDampeningInfo {
             FileType::Production | FileType::Configuration => "Production code",
         }
         .to_string()
+    }
+}
+
+/// Pattern information for state machine and coordinator patterns (spec 190)
+pub(crate) struct PatternInfo {
+    pub pattern_type: String,         // "State Machine" or "Coordinator"
+    pub icon: &'static str,           // "🔄" or "🎯"
+    pub confidence: f64,              // 0.7-1.0
+    pub display_metrics: Vec<String>, // e.g., ["transitions: 4", "matches: 2", "actions: 8"]
+}
+
+impl PatternInfo {
+    fn from_item(item: &UnifiedDebtItem) -> Option<Self> {
+        use crate::core::LanguageSpecificData;
+
+        // Extract pattern info from language_specific field
+        if let Some(LanguageSpecificData::Rust(rust_data)) = &item.language_specific {
+            // Check state machine first (higher priority)
+            if let Some(sm_signals) = &rust_data.state_machine_signals {
+                if sm_signals.confidence >= 0.7 {
+                    let display_metrics = vec![
+                        format!("transitions: {}", sm_signals.transition_count),
+                        format!("matches: {}", sm_signals.match_expression_count),
+                        format!("actions: {}", sm_signals.action_dispatch_count),
+                    ];
+
+                    return Some(Self {
+                        pattern_type: "State Machine".to_string(),
+                        icon: "🔄",
+                        confidence: sm_signals.confidence,
+                        display_metrics,
+                    });
+                }
+            }
+
+            // Check coordinator second
+            if let Some(coord_signals) = &rust_data.coordinator_signals {
+                if coord_signals.confidence >= 0.7 {
+                    let display_metrics = vec![
+                        format!("actions: {}", coord_signals.actions),
+                        format!("comparisons: {}", coord_signals.comparisons),
+                    ];
+
+                    return Some(Self {
+                        pattern_type: "Coordinator".to_string(),
+                        icon: "🎯",
+                        confidence: coord_signals.confidence,
+                        display_metrics,
+                    });
+                }
+            }
+        }
+
+        None
     }
 }
