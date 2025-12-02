@@ -1,6 +1,6 @@
 //! State Machine Pattern Detector
 //!
-//! Detects state machine and coordinator patterns (spec 179, 192) by analyzing:
+//! Detects state machine and coordinator patterns (spec 179, 192, 202) by analyzing:
 //! - Match expressions on enum variants (state transitions)
 //! - Conditional logic based on state comparisons
 //! - Action accumulation and dispatching patterns
@@ -9,14 +9,28 @@
 //! on validation code by distinguishing:
 //! - State comparisons vs value checks
 //! - Action accumulation vs error accumulation
+//!
+//! Spec 202 adds enhanced state field detection with multi-strategy approach:
+//! - Extended keyword dictionary (30+ terms)
+//! - Type-based heuristics (enum analysis)
+//! - Semantic pattern recognition (prefix/suffix)
+//! - Usage frequency analysis
+//! - Multi-factor confidence scoring
 
+use crate::analyzers::state_field_detector::{
+    ConfidenceClass, StateDetectionConfig, StateFieldDetector,
+};
 use crate::priority::complexity_patterns::{CoordinatorSignals, StateMachineSignals};
 use syn::{
-    visit::Visit, Block, Expr, ExprBinary, ExprMatch, ExprMethodCall, Pat, PatTupleStruct, Stmt,
+    visit::Visit, Block, Expr, ExprBinary, ExprField, ExprMatch, ExprMethodCall, Pat,
+    PatTupleStruct, Stmt,
 };
 
 /// Detector for state machine and coordinator patterns
-pub struct StateMachinePatternDetector;
+pub struct StateMachinePatternDetector {
+    /// Enhanced state field detector (spec 202)
+    state_detector: StateFieldDetector,
+}
 
 /// Keywords that indicate state-related fields
 const STATE_FIELD_KEYWORDS: &[&str] = &[
@@ -50,29 +64,54 @@ const ACTION_TYPE_PATTERNS: &[&str] = &[
 
 impl StateMachinePatternDetector {
     pub fn new() -> Self {
-        Self
+        Self {
+            state_detector: StateFieldDetector::new(StateDetectionConfig::default()),
+        }
     }
 
-    /// Detect state machine pattern from AST block
+    /// Create detector with custom configuration
+    pub fn with_config(config: StateDetectionConfig) -> Self {
+        Self {
+            state_detector: StateFieldDetector::new(config),
+        }
+    }
+
+    /// Detect state machine pattern from AST block (enhanced in spec 202)
     pub fn detect_state_machine(&self, block: &Block) -> Option<StateMachineSignals> {
         let mut visitor = StateMachineVisitor::new();
         visitor.visit_block(block);
 
-        // Require evidence of state machine pattern
-        if !visitor.has_enum_match && visitor.state_comparison_count == 0 {
+        // NEW (spec 202): Enhanced state field detection
+        let state_fields: Vec<_> = visitor
+            .field_accesses
+            .iter()
+            .map(|field| self.state_detector.detect_state_field(field))
+            .filter(|detection| detection.classification != ConfidenceClass::Low)
+            .collect();
+
+        // Enhanced evidence check: accept enum matches OR high-confidence state fields
+        if !visitor.has_enum_match && state_fields.is_empty() {
             return None;
         }
 
-        // Calculate confidence based on signals
-        let confidence = calculate_state_machine_confidence(
+        // Calculate field confidence for boosting
+        let field_confidence: f64 = state_fields
+            .iter()
+            .map(|d| d.confidence)
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(0.0);
+
+        // Enhanced confidence calculation with state field detection
+        let confidence = calculate_enhanced_state_machine_confidence(
             visitor.enum_match_count,
             visitor.tuple_match_count,
-            visitor.state_comparison_count,
+            state_fields.len() as u32,
             visitor.action_dispatch_count,
+            field_confidence,
         );
 
-        // Require minimum confidence to avoid false positives
-        if confidence < 0.6 {
+        // Lowered threshold from 0.6 to 0.5 (spec 202)
+        if confidence < 0.5 {
             return None;
         }
 
@@ -80,7 +119,7 @@ impl StateMachinePatternDetector {
             transition_count: visitor.enum_match_count + visitor.tuple_match_count,
             match_expression_count: visitor.match_expression_count,
             has_enum_match: visitor.has_enum_match,
-            has_state_comparison: visitor.state_comparison_count > 0,
+            has_state_comparison: !state_fields.is_empty(),
             action_dispatch_count: visitor.action_dispatch_count,
             confidence,
         })
@@ -175,7 +214,8 @@ impl Default for StateMachinePatternDetector {
     }
 }
 
-/// Calculate confidence for state machine pattern
+/// Calculate confidence for state machine pattern (legacy)
+#[allow(dead_code)]
 fn calculate_state_machine_confidence(
     enum_match_count: u32,
     tuple_match_count: u32,
@@ -194,6 +234,34 @@ fn calculate_state_machine_confidence(
 
     // Action dispatch within branches (up to 0.2)
     confidence += (action_dispatch_count as f64 / 10.0).min(0.2);
+
+    confidence.min(1.0)
+}
+
+/// Enhanced confidence calculation with state field detection (spec 202)
+fn calculate_enhanced_state_machine_confidence(
+    enum_match_count: u32,
+    tuple_match_count: u32,
+    state_field_count: u32,
+    action_dispatch_count: u32,
+    max_field_confidence: f64,
+) -> f64 {
+    let mut confidence = 0.0;
+
+    // Enum/tuple matching (original logic)
+    if enum_match_count > 0 || tuple_match_count >= 2 {
+        confidence += 0.5;
+    }
+
+    // NEW (spec 202): State field detection confidence
+    if state_field_count > 0 {
+        confidence += max_field_confidence * 0.4; // Weight: 40% of field confidence
+    }
+
+    // Action dispatch (original logic)
+    if action_dispatch_count >= 2 {
+        confidence += 0.2;
+    }
 
     confidence.min(1.0)
 }
@@ -240,6 +308,8 @@ struct StateMachineVisitor {
     action_dispatch_count: u32,
     match_expression_count: u32,
     has_enum_match: bool,
+    /// NEW (spec 202): Collect field accesses for enhanced detection
+    field_accesses: Vec<ExprField>,
 }
 
 impl StateMachineVisitor {
@@ -251,6 +321,7 @@ impl StateMachineVisitor {
             action_dispatch_count: 0,
             match_expression_count: 0,
             has_enum_match: false,
+            field_accesses: Vec::new(),
         }
     }
 
@@ -258,7 +329,7 @@ impl StateMachineVisitor {
     fn is_enum_or_tuple_pattern(&self, pat: &Pat) -> bool {
         matches!(
             pat,
-            Pat::TupleStruct(_) | Pat::Struct(_) | Pat::Ident(_) | Pat::Tuple(_)
+            Pat::TupleStruct(_) | Pat::Struct(_) | Pat::Ident(_) | Pat::Tuple(_) | Pat::Path(_)
         )
     }
 
@@ -292,6 +363,11 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
     fn visit_expr_match(&mut self, match_expr: &'ast ExprMatch) {
         // Count this match expression
         self.match_expression_count += 1;
+
+        // NEW (spec 202): Collect field access from match expression
+        if let Expr::Field(field_expr) = match_expr.expr.as_ref() {
+            self.field_accesses.push(field_expr.clone());
+        }
 
         // Check if matching on state-related expression
         if self.has_state_field_access(&match_expr.expr) {
@@ -342,6 +418,11 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
             if self.has_state_field_access(&if_expr.cond) {
                 self.state_comparison_count += 1;
             }
+        }
+
+        // NEW (spec 202): Collect field accesses for enhanced detection
+        if let Expr::Field(field_expr) = expr {
+            self.field_accesses.push(field_expr.clone());
         }
 
         syn::visit::visit_expr(self, expr);
@@ -883,5 +964,70 @@ mod tests {
         let signals = detector.detect_state_machine(&block);
 
         assert!(signals.is_none());
+    }
+
+    #[test]
+    fn enhanced_detection_with_fsm_state_field() {
+        let block: Block = parse_quote! {
+            {
+                match self.fsm_state {
+                    FsmState::Idle => self.handle_idle(),
+                    FsmState::Processing => self.handle_processing(),
+                    FsmState::Complete => self.handle_complete(),
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block);
+
+        assert!(
+            signals.is_some(),
+            "Should detect state machine with fsm_state field"
+        );
+        let signals = signals.unwrap();
+        assert!(signals.confidence >= 0.5, "Confidence should be >= 0.5");
+    }
+
+    #[test]
+    fn enhanced_detection_with_prefix_pattern() {
+        let block: Block = parse_quote! {
+            {
+                match self.current_operation {
+                    Operation::Read => { /* ... */ }
+                    Operation::Write => { /* ... */ }
+                    Operation::Delete => { /* ... */ }
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block);
+
+        assert!(
+            signals.is_some(),
+            "Should detect state machine with current_* prefix"
+        );
+    }
+
+    #[test]
+    fn enhanced_detection_with_suffix_pattern() {
+        let block: Block = parse_quote! {
+            {
+                match self.connection_state {
+                    ConnectionState::Idle => { /* ... */ }
+                    ConnectionState::Connecting => { /* ... */ }
+                    ConnectionState::Connected => { /* ... */ }
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block);
+
+        assert!(
+            signals.is_some(),
+            "Should detect state machine with *_state suffix"
+        );
     }
 }

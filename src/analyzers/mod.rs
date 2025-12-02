@@ -24,6 +24,7 @@ pub mod rust_data_flow_analyzer;
 pub mod rust_enum_converter_detector;
 pub mod scope_tracker;
 pub mod signature_extractor;
+pub mod state_field_detector;
 pub mod state_machine_pattern_detector;
 pub mod test_detector;
 pub mod trait_implementation_tracker;
