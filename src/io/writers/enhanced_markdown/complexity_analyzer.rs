@@ -513,6 +513,7 @@ mod tests {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         };
 
         assert_eq!(estimate_effort(&item), 8); // 4 * 2
@@ -749,6 +750,7 @@ mod tests {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         }];
 
         let deps = extract_module_dependencies(&items);

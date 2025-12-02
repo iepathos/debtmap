@@ -3,6 +3,7 @@ pub mod enhanced_markdown;
 pub mod html;
 pub mod json;
 pub mod markdown;
+pub mod pattern_display;
 pub mod terminal;
 
 pub use effects::{

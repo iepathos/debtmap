@@ -6,6 +6,8 @@
 //! - Location structure is unified (file, line, function)
 //! - Simplifies filtering and sorting across item types
 
+use crate::core::LanguageSpecificData;
+use crate::io::writers::pattern_display::PATTERN_CONFIDENCE_THRESHOLD;
 use crate::priority::{
     DebtItem, DebtType, FileDebtItem, FunctionRole, GodObjectIndicators, UnifiedAnalysisQueries,
     UnifiedDebtItem,
@@ -172,6 +174,12 @@ pub struct FunctionDebtItemOutput {
     pub adjusted_complexity: Option<AdjustedComplexity>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub complexity_pattern: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_type: Option<String>, // "state_machine" | "coordinator"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_confidence: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern_details: Option<serde_json::Value>, // Pattern-specific metrics
 }
 
 /// Adjusted complexity based on entropy analysis
@@ -311,6 +319,8 @@ impl FunctionDebtItemOutput {
             &item.recommendation.rationale,
             &item.recommendation.primary_action,
         );
+        let (pattern_type, pattern_confidence, pattern_details) =
+            extract_pattern_data(&item.language_specific);
         FunctionDebtItemOutput {
             score,
             category: crate::priority::DebtCategory::from_debt_type(&item.debt_type).to_string(),
@@ -376,6 +386,9 @@ impl FunctionDebtItemOutput {
                 dampening_factor: e.dampening_factor,
             }),
             complexity_pattern,
+            pattern_type,
+            pattern_confidence,
+            pattern_details,
         }
     }
 }
@@ -415,6 +428,47 @@ fn extract_complexity_pattern(rationale: &str, action: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Extract pattern data from language-specific information
+///
+/// Returns (pattern_type, confidence, details) if a pattern is detected with sufficient confidence
+fn extract_pattern_data(
+    language_specific: &Option<LanguageSpecificData>,
+) -> (Option<String>, Option<f64>, Option<serde_json::Value>) {
+    if let Some(LanguageSpecificData::Rust(rust_data)) = language_specific {
+        // Check state machine first (higher priority)
+        if let Some(sm_signals) = &rust_data.state_machine_signals {
+            if sm_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
+                let details = serde_json::json!({
+                    "transition_count": sm_signals.transition_count,
+                    "match_expression_count": sm_signals.match_expression_count,
+                    "action_dispatch_count": sm_signals.action_dispatch_count,
+                });
+                return (
+                    Some("state_machine".to_string()),
+                    Some(sm_signals.confidence),
+                    Some(details),
+                );
+            }
+        }
+
+        // Check coordinator second
+        if let Some(coord_signals) = &rust_data.coordinator_signals {
+            if coord_signals.confidence >= PATTERN_CONFIDENCE_THRESHOLD {
+                let details = serde_json::json!({
+                    "actions": coord_signals.actions,
+                    "comparisons": coord_signals.comparisons,
+                });
+                return (
+                    Some("coordinator".to_string()),
+                    Some(coord_signals.confidence),
+                    Some(details),
+                );
+            }
+        }
+    }
+    (None, None, None)
 }
 
 fn categorize_file_debt(_item: &FileDebtItem) -> String {

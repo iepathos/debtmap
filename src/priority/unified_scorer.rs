@@ -75,6 +75,8 @@ pub struct UnifiedDebtItem {
     pub context_multiplier: Option<f64>, // Context-based dampening multiplier applied (spec 191)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_type: Option<crate::context::FileType>, // Detected file type for context dampening (spec 191)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language_specific: Option<crate::core::LanguageSpecificData>, // Language-specific pattern detection (spec 190)
 }
 
 impl UnifiedDebtItem {

@@ -758,6 +758,7 @@ mod tests {
             file_context: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         }))
     }
 
@@ -829,6 +830,7 @@ mod tests {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         }))
     }
 
@@ -899,6 +901,7 @@ mod tests {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         }
     }
 

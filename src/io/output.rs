@@ -64,8 +64,8 @@ pub fn complexity_header_lines() -> Vec<&'static str> {
     vec![
         "## Complexity Analysis",
         "",
-        "| Location | Function | Cyclomatic | Cognitive | Recommendation |",
-        "|----------|----------|------------|-----------|----------------|",
+        "| Location | Function | Cyclomatic | Cognitive | Pattern | Confidence | Recommendation |",
+        "|----------|----------|------------|-----------|---------|------------|----------------|",
     ]
 }
 

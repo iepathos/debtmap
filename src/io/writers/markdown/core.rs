@@ -9,6 +9,7 @@ use crate::io::output::{
     build_summary_rows, complexity_header_lines, get_recommendation, get_top_complex_functions,
     OutputWriter,
 };
+use crate::io::writers::pattern_display::{format_pattern_confidence, format_pattern_type};
 use crate::risk::{RiskDistribution, RiskInsight};
 use std::io::Write;
 
@@ -138,12 +139,14 @@ impl<W: Write> MarkdownWriter<W> {
     fn write_complexity_row(&mut self, func: &FunctionMetrics) -> anyhow::Result<()> {
         writeln!(
             self.writer,
-            "| {}:{} | {} | {} | {} | {} |",
+            "| {}:{} | {} | {} | {} | {} | {} | {} |",
             func.file.display(),
             func.line,
             func.name,
             func.cyclomatic,
             func.cognitive,
+            format_pattern_type(func),
+            format_pattern_confidence(func),
             get_recommendation(func)
         )?;
         Ok(())

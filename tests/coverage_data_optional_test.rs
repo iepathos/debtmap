@@ -72,6 +72,7 @@ fn create_untested_item() -> UnifiedDebtItem {
         pattern_analysis: None,
         context_multiplier: None,
         context_type: None,
+        language_specific: None, // spec 190
     }
 }
 

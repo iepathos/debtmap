@@ -164,6 +164,7 @@ pub fn create_unified_debt_item_enhanced(
         file_context: None,
         context_multiplier: Some(context_multiplier), // Context dampening multiplier (spec 191)
         context_type: Some(context_type),             // Detected file type (spec 191)
+        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -384,6 +385,7 @@ fn build_unified_debt_item(
         pattern_analysis: None, // Pattern analysis added in spec 151, populated when available
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
+        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
     }
 }
 
@@ -549,6 +551,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         file_context: None,
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
+        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
     }
 }
 
@@ -660,6 +663,7 @@ pub fn create_unified_debt_item_with_data_flow(
         file_context: None,
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
+        language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
     }
 }
 

@@ -79,6 +79,7 @@ fn create_test_item(
         pattern_analysis: None,
         context_multiplier: None,
         context_type: None,
+        language_specific: None, // spec 190
         file_context: None,
     }
 }
