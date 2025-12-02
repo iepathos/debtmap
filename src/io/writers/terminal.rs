@@ -2,6 +2,7 @@ use crate::core::{AnalysisResults, FunctionMetrics, Priority};
 use crate::debt::total_debt_score;
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::io::output::OutputWriter;
+use crate::io::writers::pattern_display::extract_pattern_info;
 use crate::refactoring::{ComplexityLevel, PatternRecognitionEngine};
 use crate::risk::{RiskDistribution, RiskInsight};
 use colored::*;
@@ -279,6 +280,11 @@ fn print_complexity_hotspots(results: &AnalysisResults) {
             func.cyclomatic,
             func.cognitive
         );
+
+        // Display pattern information if available
+        if let Some(pattern_info) = extract_pattern_info(func) {
+            println!("     {}", pattern_info.format_terminal());
+        }
 
         // Display entropy information if available
         if let Some(entropy_details) = func.get_entropy_details() {

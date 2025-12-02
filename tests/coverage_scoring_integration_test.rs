@@ -98,6 +98,7 @@ fn create_debt_item(
         pattern_analysis: None,
         context_multiplier: None,
         context_type: None,
+        language_specific: None, // spec 190
     }
 }
 
@@ -197,6 +198,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             pattern_analysis: None,
             context_multiplier: None,
             context_type: None,
+            language_specific: None, // spec 190
         };
         analysis_no_coverage.add_item(item);
     }
