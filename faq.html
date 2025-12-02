@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-59964db6.js";
+            window.path_to_searchindex_js = "searchindex-28e21e55.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -255,23 +255,41 @@ debtmap analyze . --lcov target/coverage/lcov.info
 </code></pre>
 <p><a href="analysis-guide.html#coverage-integrated-analysis">See examples in Analysis Guide</a></p>
 <h3 id="what-languages-are-supported"><a class="header" href="#what-languages-are-supported">What languages are supported?</a></h3>
-<p><strong>Full support:</strong></p>
+<p><strong>Currently supported:</strong></p>
 <ul>
-<li>Rust (via <code>syn</code> crate - complete AST analysis)</li>
-<li>Python (via <code>rustpython</code> - full Python 3.x support)</li>
+<li>Rust - Full support with AST parsing, macro expansion, and trait resolution</li>
 </ul>
-<p><strong>Partial support:</strong></p>
+<p><strong>Planned (after Rust analysis is mature):</strong></p>
 <ul>
-<li>JavaScript (via <code>tree-sitter</code> - ES6+, JSX)</li>
-<li>TypeScript (via <code>tree-sitter</code> - basic support)</li>
+<li>Python (high priority)</li>
+<li>JavaScript/TypeScript (high priority)</li>
+<li>Go, Java, C/C++, C# (medium priority)</li>
 </ul>
-<p><strong>Planned:</strong></p>
+<h3 id="why-is-debtmap-rust-only-right-now"><a class="header" href="#why-is-debtmap-rust-only-right-now">Why is debtmap Rust-only right now?</a></h3>
+<p>We’re taking a focused approach to deliver the best possible Rust code
+analyzer before expanding to other languages. This strategy allows us to:</p>
+<ol>
+<li><strong>Perfect the core</strong>: Get our algorithms, metrics, and UX right with one
+language before the complexity of multi-language support</li>
+<li><strong>Deep integration</strong>: Build Rust-specific features like macro expansion,
+trait resolution, and lifetime analysis</li>
+<li><strong>Build trust</strong>: Establish debtmap as the go-to Rust analyzer with a
+strong user base</li>
+<li><strong>Learn once, apply broadly</strong>: Use our learnings from Rust to build
+better multi-language support later</li>
+</ol>
+<p>We will expand to other languages (Python, JavaScript/TypeScript, Go, etc.)
+once Rust analysis is mature and we have a stable foundation.</p>
+<h3 id="will-other-languages-be-supported-in-the-future"><a class="header" href="#will-other-languages-be-supported-in-the-future">Will other languages be supported in the future?</a></h3>
+<p>Absolutely! Multi-language support is on the roadmap. We plan to add:</p>
 <ul>
-<li>Go (target: Q2 2025)</li>
-<li>Java (target: Q3 2025)</li>
-<li>C/C++ (target: Q4 2025)</li>
+<li>Python (high priority)</li>
+<li>JavaScript/TypeScript (high priority)</li>
+<li>Go, Java, C/C++, C# (medium priority)</li>
 </ul>
-<p>Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.</p>
+<p>The timeline depends on Rust analysis maturity and community demand.
+Follow our <a href="https://github.com/iepathos/debtmap/milestones">GitHub milestones</a>
+for updates.</p>
 <h3 id="why-was-branches-renamed-to-est_branches"><a class="header" href="#why-was-branches-renamed-to-est_branches">Why was “branches” renamed to “est_branches”?</a></h3>
 <p>The metric was renamed in Spec 118 to make it clear that this is an <strong>estimated</strong> value, not a precise measurement.</p>
 <p><strong>Problem with old name (“branches”):</strong></p>
@@ -350,15 +368,15 @@ debtmap validate . --max-critical 0 --max-high 5
 <tr><td><strong>Speed</strong></td><td>10-100x faster (Rust)</td><td>Slower (JVM overhead)</td></tr>
 <tr><td><strong>Coverage Integration</strong></td><td>✅ Built-in LCOV</td><td>⚠️ Enterprise only</td></tr>
 <tr><td><strong>Entropy Analysis</strong></td><td>✅ Unique feature</td><td>❌ No</td></tr>
-<tr><td><strong>Language Support</strong></td><td>Rust, Python, JS/TS</td><td>25+ languages</td></tr>
+<tr><td><strong>Language Support</strong></td><td>Rust (focused)</td><td>25+ languages</td></tr>
 <tr><td><strong>Setup</strong></td><td>Single binary</td><td>JVM + server setup</td></tr>
 <tr><td><strong>Cost</strong></td><td>Free, open-source</td><td>Free (basic) / Paid (advanced)</td></tr>
-<tr><td><strong>Use Case</strong></td><td>Fast local analysis</td><td>Enterprise dashboards</td></tr>
+<tr><td><strong>Use Case</strong></td><td>Rust projects</td><td>Enterprise dashboards</td></tr>
 </tbody>
 </table>
 </div>
 <p><strong>When to use SonarQube:</strong> Multi-language monorepos, enterprise compliance, centralized quality dashboards.</p>
-<p><strong>When to use debtmap:</strong> Rust-focused projects, local development workflow, coverage-driven prioritization.</p>
+<p><strong>When to use debtmap:</strong> Rust projects, local development workflow, coverage-driven prioritization, deep Rust-specific analysis.</p>
 <h3 id="how-is-debtmap-different-from-codeclimate"><a class="header" href="#how-is-debtmap-different-from-codeclimate">How is debtmap different from CodeClimate?</a></h3>
 <div class="table-wrapper">
 <table>

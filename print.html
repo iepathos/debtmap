@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-59964db6.js";
+            window.path_to_searchindex_js = "searchindex-28e21e55.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -182,14 +182,26 @@
 <blockquote>
 <p>🚧 <strong>Early Prototype</strong> - This project is under active development and APIs may change</p>
 </blockquote>
-<p>Debtmap is a code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
+<p>Debtmap is a Rust code analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
 <p>Unlike traditional static analysis tools that simply flag complex code, Debtmap answers two critical questions:</p>
 <ol>
 <li><strong>“What should I refactor to reduce cognitive burden?”</strong> - Identifies overly complex code that slows down development</li>
 <li><strong>“What should I test first to reduce the most risk?”</strong> - Pinpoints untested complex code that threatens stability</li>
 </ol>
-<p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.</p>
+<p>Debtmap analyzes Rust codebases to identify complexity hotspots, technical debt patterns, and architectural risks with full AST parsing, macro expansion, and trait tracking.</p>
+<h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
+<p>Debtmap currently focuses exclusively on Rust codebases. Our goal is to
+perfect Rust analysis before expanding to other languages. This focused
+approach allows us to:</p>
+<ul>
+<li>Build deep Rust-specific analysis (macro expansion, trait resolution, lifetime awareness)</li>
+<li>Perfect our core algorithms and metrics</li>
+<li>Establish a stable API and user experience</li>
+<li>Build a strong user community</li>
+</ul>
+<p>Multi-language support (Python, JavaScript/TypeScript, Go, etc.) is planned
+for future releases once Rust analysis reaches maturity.</p>
 <p><strong>What Makes Debtmap Different:</strong></p>
 <ul>
 <li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
@@ -211,7 +223,7 @@
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
+<li><strong>Rust-first analysis</strong> - Deep Rust support with AST parsing, macro expansion, trait resolution, and lifetime awareness</li>
 <li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction compared to traditional analyzers)</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>
@@ -557,9 +569,7 @@ debtmap compare --before debt-202410.json --after debt-202411.json
 </ul>
 <p><strong>Optional</strong> (for coverage-based risk analysis):</p>
 <ul>
-<li><strong>Rust projects</strong>: <code>cargo-tarpaulin</code> for coverage data</li>
-<li><strong>JavaScript/TypeScript</strong>: Jest or other tools generating LCOV format</li>
-<li><strong>Python</strong>: pytest with coverage plugin</li>
+<li><strong>Rust projects</strong>: <code>cargo-tarpaulin</code> or <code>cargo-llvm-cov</code> for coverage data</li>
 </ul>
 <h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
 <h3 id="quick-install-recommended"><a class="header" href="#quick-install-recommended">Quick Install (Recommended)</a></h3>
@@ -610,7 +620,7 @@ debtmap --help
 <h3 id="first-run-issues"><a class="header" href="#first-run-issues">First Run Issues</a></h3>
 <ul>
 <li>
-<p><strong>Empty output or no items found</strong>: Check that your project contains supported source files (<code>.rs</code>, <code>.py</code>, <code>.js</code>, <code>.ts</code>, <code>.tsx</code>). Verify with <code>debtmap analyze . -vvv</code> for debug output.</p>
+<p><strong>Empty output or no items found</strong>: Check that your project contains Rust source files (<code>.rs</code>). Verify with <code>debtmap analyze . -vvv</code> for debug output.</p>
 </li>
 <li>
 <p><strong>Parser failures</strong>: If analysis fails with parsing errors:</p>
@@ -747,7 +757,7 @@ debtmap analyze . --detail-level high       # More detailed output
 </code></pre>
 <p><strong>What happens during analysis:</strong></p>
 <ol>
-<li><strong>File Discovery</strong> - Debtmap scans your project for supported source files (Rust, Python, JavaScript, TypeScript)</li>
+<li><strong>File Discovery</strong> - Debtmap scans your project for Rust source files (<code>.rs</code>)</li>
 <li><strong>Parsing</strong> - Each file is parsed into an Abstract Syntax Tree (AST)</li>
 <li><strong>Metrics Calculation</strong> - Complexity, debt patterns, and risk scores are computed</li>
 <li><strong>Prioritization</strong> - Results are ranked by priority (CRITICAL, HIGH, MEDIUM, LOW)</li>
@@ -755,7 +765,7 @@ debtmap analyze . --detail-level high       # More detailed output
 </ol>
 <p><strong>Expected timing</strong>: Analyzing a 10,000 LOC project typically takes 2-5 seconds.</p>
 <h2 id="language-support"><a class="header" href="#language-support">Language Support</a></h2>
-<p>Debtmap supports multiple programming languages with varying feature completeness:</p>
+<p>Debtmap is focused exclusively on Rust for comprehensive code analysis:</p>
 <h3 id="rust-full-support"><a class="header" href="#rust-full-support">Rust (Full Support)</a></h3>
 <p>All analysis features available:</p>
 <ul>
@@ -771,23 +781,7 @@ debtmap analyze . --detail-level high       # More detailed output
 </ul>
 </li>
 </ul>
-<h3 id="python-partial-support"><a class="header" href="#python-partial-support">Python (Partial Support)</a></h3>
-<p>Core features available:</p>
-<ul>
-<li>Complexity metrics (cyclomatic, cognitive, nesting, lines)</li>
-<li>Basic debt detection (code smells, god objects)</li>
-<li>Test gap analysis with coverage integration</li>
-</ul>
-<p><strong>Not yet available</strong>: Purity analysis, detailed call graphs</p>
-<h3 id="javascripttypescript-partial-support"><a class="header" href="#javascripttypescript-partial-support">JavaScript/TypeScript (Partial Support)</a></h3>
-<p>Core features available:</p>
-<ul>
-<li>Complexity metrics (cyclomatic, cognitive, nesting, lines)</li>
-<li>Basic debt detection (code smells, god objects)</li>
-<li>Test gap analysis with coverage integration</li>
-</ul>
-<p><strong>Not yet available</strong>: Purity analysis, detailed call graphs</p>
-<p><strong>Note</strong>: All languages benefit from coverage integration for accurate risk assessment. The core analysis workflow (complexity → debt patterns → prioritization) works consistently across all supported languages.</p>
+<p><strong>Note</strong>: Support for additional languages may be added in future releases based on community feedback and demand.</p>
 <h2 id="example-output"><a class="header" href="#example-output">Example Output</a></h2>
 <p>When you run <code>debtmap analyze .</code>, you’ll see output similar to this:</p>
 <pre><code>════════════════════════════════════════════
@@ -973,20 +967,11 @@ coverage = 0.4         # Weight for test coverage gaps
 complexity = 0.35      # Weight for complexity metrics
 dependencies = 0.25    # Weight for call graph dependencies
 
-# Language-specific settings
-[languages]
-rust = true            # Enable Rust analysis
-python = true          # Enable Python analysis
-javascript = true      # Enable JavaScript/TypeScript analysis
-
 # Files and directories to ignore
 [ignore]
 patterns = [
     "**/target/**",     # Rust build artifacts
-    "**/node_modules/**", # JavaScript dependencies
-    "**/__pycache__/**", # Python bytecode
     "**/tests/**",      # Test directories (optional)
-    "**/*.test.ts",     # Test files (optional)
 ]
 
 # God object detection thresholds
@@ -1004,7 +989,6 @@ threshold = 0.7        # Flag functions with entropy &gt; 0.7
 <ul>
 <li><strong>Threshold customization</strong> - Adjust complexity, duplication, and file size thresholds</li>
 <li><strong>Scoring weights</strong> - Fine-tune how coverage, complexity, and dependencies are weighted</li>
-<li><strong>Language selection</strong> - Enable/disable specific language analyzers</li>
 <li><strong>Ignore patterns</strong> - Exclude test files or generated code from analysis</li>
 <li><strong>God object thresholds</strong> - Configure what constitutes a “god object” anti-pattern</li>
 <li><strong>Entropy analysis</strong> - Control entropy-based complexity detection</li>
@@ -1015,39 +999,15 @@ threshold = 0.7        # Flag functions with entropy &gt; 0.7
 <p>For more accurate risk assessment, run analysis with coverage data. Coverage helps Debtmap identify <strong>truly risky code</strong> - functions that are both complex AND untested.</p>
 <h4 id="generating-coverage-data"><a class="header" href="#generating-coverage-data">Generating Coverage Data</a></h4>
 <p><strong>Rust Projects:</strong></p>
-<pre><code class="language-bash"># Install cargo-tarpaulin if not already installed
+<pre><code class="language-bash"># Option 1: Using cargo-tarpaulin
 cargo install cargo-tarpaulin
-
-# Generate LCOV coverage report
 cargo tarpaulin --out lcov --output-dir target/coverage
-
-# Run debtmap with coverage
 debtmap analyze . --lcov target/coverage/lcov.info
-</code></pre>
-<p><strong>Python Projects:</strong></p>
-<pre><code class="language-bash"># Install coverage plugin if not already installed
-pip install pytest-cov
 
-# Generate LCOV coverage report
-pytest --cov=. --cov-report=lcov:coverage.lcov
-
-# Run debtmap with coverage
-debtmap analyze . --lcov coverage.lcov
-</code></pre>
-<p><strong>JavaScript/TypeScript Projects:</strong></p>
-<pre><code class="language-bash"># Using Jest (add to package.json or run directly)
-jest --coverage --coverageReporters=lcov
-
-# Run debtmap with coverage
-debtmap analyze . --lcov coverage/lcov.info
-
-# Using NYC with other test runners
-npx nyc --reporter=lcovonly npm test
-debtmap analyze . --lcov coverage/lcov.info
-
-# Using Vitest
-vitest run --coverage --coverage.reporter=lcov
-debtmap analyze . --lcov coverage/lcov-report/lcov.info
+# Option 2: Using cargo-llvm-cov (recommended for faster builds)
+cargo install cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
+debtmap analyze . --lcov target/coverage/lcov.info
 </code></pre>
 <p><strong>Note</strong>: The <code>--lcov</code> flag is a shorthand alias for <code>--coverage-file</code>. Both accept LCOV format coverage reports.</p>
 <hr>
@@ -2232,11 +2192,11 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
 <p><strong>Language-Specific Debt Patterns:</strong></p>
 <p>Some debt patterns only apply to languages with specific features:</p>
 <ul>
-<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust, JavaScript, TypeScript)</li>
+<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust)</li>
 <li><strong>AllocationInefficiency, ResourceLeak</strong>: Languages with manual memory management (Rust)</li>
-<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust, exceptions in Python/JS)</li>
+<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust)</li>
 </ul>
-<p>Debtmap automatically applies only the relevant debt patterns for each language during analysis.</p>
+<p>Debtmap automatically applies only the relevant debt patterns during analysis.</p>
 <h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
 <h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
 <p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
@@ -3544,71 +3504,30 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <li><strong>Test Code</strong>: Functions in <code>#[cfg(test)]</code> modules, functions with <code>#[test]</code> attribute</li>
 </ul>
 <p>This classification feeds directly into the unified scoring system’s role multiplier (see Risk Scoring section).</p>
-<p><strong>Python</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: rustpython-parser</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>Complexity metrics (cyclomatic, cognitive)</li>
-<li>Python-specific error handling patterns</li>
-<li>Purity detection for pure functions</li>
-<li>Basic debt pattern detection</li>
-<li>Limited call graph support</li>
-</ul>
-</li>
-</ul>
-<p><strong>JavaScript</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: tree-sitter (JavaScript grammar)</li>
-<li><strong>File extensions</strong>: .js, .jsx, .mjs, .cjs</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>ECMAScript complexity patterns</li>
-<li>Basic complexity metrics</li>
-<li>Function extraction</li>
-<li>Limited pattern detection</li>
-</ul>
-</li>
-</ul>
-<p><strong>TypeScript</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: tree-sitter (TypeScript grammar)</li>
-<li><strong>File extensions</strong>: .ts, .tsx, .mts, .cts</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>Similar to JavaScript support</li>
-<li>Type information currently not utilized</li>
-<li>Basic complexity metrics</li>
-<li>Limited pattern detection</li>
-</ul>
-</li>
-</ul>
 <p><strong>Unsupported Languages:</strong></p>
-<p>Debtmap’s <code>Language</code> enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
-<p>Files with extensions like <code>.cpp</code> (C++), <code>.java</code>, <code>.go</code>, <code>.rb</code> (Ruby), <code>.php</code>, <code>.cs</code> (C#), <code>.swift</code>, <code>.kt</code> (Kotlin), <code>.scala</code>, and others are silently filtered during discovery.</p>
+<p>Debtmap currently supports only Rust. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
+<p>Files with extensions like <code>.py</code> (Python), <code>.js</code>/<code>.ts</code> (JavaScript/TypeScript), <code>.cpp</code> (C++), <code>.java</code>, <code>.go</code>, <code>.rb</code> (Ruby), <code>.php</code>, <code>.cs</code> (C#), <code>.swift</code>, <code>.kt</code> (Kotlin), <code>.scala</code>, and others are silently filtered during discovery.</p>
 <p><strong>File filtering behavior:</strong></p>
 <ul>
-<li>Discovery scans project for files matching supported extensions</li>
-<li>Unsupported files are skipped silently (no warnings or errors)</li>
+<li>Discovery scans project for Rust source files (.rs extension)</li>
+<li>Non-Rust files are skipped silently (no warnings or errors)</li>
 <li>No analysis, metrics, or debt patterns are generated for filtered files</li>
-<li>Use <code>--languages</code> flag to explicitly control which languages to analyze</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Only analyze Rust files (skip Python/JS/TS)
-debtmap analyze . --languages rust
+<pre><code class="language-bash"># Analyze all Rust files in current directory
+debtmap analyze .
 
-# Analyze Rust and Python only
-debtmap analyze . --languages rust,python
+# Analyze specific Rust file
+debtmap analyze src/main.rs
 </code></pre>
 <h3 id="language-detection"><a class="header" href="#language-detection">Language Detection</a></h3>
 <p>Automatic detection by file extension:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let language = Language::from_path(&amp;path);
+</span>// Detects .rs files as Rust
+let language = Language::from_path(&amp;path);
 <span class="boring">}</span></code></pre>
-<p>Explicit language selection:</p>
-<pre><code class="language-bash">debtmap analyze . --languages rust,python
-</code></pre>
+<p>All <code>.rs</code> files are automatically analyzed. No language flag is needed since Debtmap is Rust-focused.</p>
 <h3 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h3>
 <p>Debtmap’s architecture allows adding new languages:</p>
 <ol>
@@ -4151,18 +4070,11 @@ Examples:
 <li>Memory usage stays bounded and reasonable</li>
 </ul>
 <p><strong>Generating coverage:</strong></p>
-<pre><code class="language-bash"># Rust
+<pre><code class="language-bash"># Rust (using cargo-tarpaulin)
 cargo tarpaulin --out lcov --output-dir target/coverage
 
-# Python
-pytest --cov --cov-report=lcov
-
-# JavaScript/TypeScript
-jest --coverage --coverageReporters=lcov
-
-# Go
-go test -coverprofile=coverage.out
-gocover-cobertura &lt; coverage.out &gt; coverage.lcov
+# Or using cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 </code></pre>
 <p><strong>Using with Debtmap:</strong></p>
 <pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
@@ -23374,23 +23286,41 @@ debtmap analyze . --lcov target/coverage/lcov.info
 </code></pre>
 <p><a href="#coverage-integrated-analysis">See examples in Analysis Guide</a></p>
 <h3 id="what-languages-are-supported"><a class="header" href="#what-languages-are-supported">What languages are supported?</a></h3>
-<p><strong>Full support:</strong></p>
+<p><strong>Currently supported:</strong></p>
 <ul>
-<li>Rust (via <code>syn</code> crate - complete AST analysis)</li>
-<li>Python (via <code>rustpython</code> - full Python 3.x support)</li>
+<li>Rust - Full support with AST parsing, macro expansion, and trait resolution</li>
 </ul>
-<p><strong>Partial support:</strong></p>
+<p><strong>Planned (after Rust analysis is mature):</strong></p>
 <ul>
-<li>JavaScript (via <code>tree-sitter</code> - ES6+, JSX)</li>
-<li>TypeScript (via <code>tree-sitter</code> - basic support)</li>
+<li>Python (high priority)</li>
+<li>JavaScript/TypeScript (high priority)</li>
+<li>Go, Java, C/C++, C# (medium priority)</li>
 </ul>
-<p><strong>Planned:</strong></p>
+<h3 id="why-is-debtmap-rust-only-right-now"><a class="header" href="#why-is-debtmap-rust-only-right-now">Why is debtmap Rust-only right now?</a></h3>
+<p>We’re taking a focused approach to deliver the best possible Rust code
+analyzer before expanding to other languages. This strategy allows us to:</p>
+<ol>
+<li><strong>Perfect the core</strong>: Get our algorithms, metrics, and UX right with one
+language before the complexity of multi-language support</li>
+<li><strong>Deep integration</strong>: Build Rust-specific features like macro expansion,
+trait resolution, and lifetime analysis</li>
+<li><strong>Build trust</strong>: Establish debtmap as the go-to Rust analyzer with a
+strong user base</li>
+<li><strong>Learn once, apply broadly</strong>: Use our learnings from Rust to build
+better multi-language support later</li>
+</ol>
+<p>We will expand to other languages (Python, JavaScript/TypeScript, Go, etc.)
+once Rust analysis is mature and we have a stable foundation.</p>
+<h3 id="will-other-languages-be-supported-in-the-future"><a class="header" href="#will-other-languages-be-supported-in-the-future">Will other languages be supported in the future?</a></h3>
+<p>Absolutely! Multi-language support is on the roadmap. We plan to add:</p>
 <ul>
-<li>Go (target: Q2 2025)</li>
-<li>Java (target: Q3 2025)</li>
-<li>C/C++ (target: Q4 2025)</li>
+<li>Python (high priority)</li>
+<li>JavaScript/TypeScript (high priority)</li>
+<li>Go, Java, C/C++, C# (medium priority)</li>
 </ul>
-<p>Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.</p>
+<p>The timeline depends on Rust analysis maturity and community demand.
+Follow our <a href="https://github.com/iepathos/debtmap/milestones">GitHub milestones</a>
+for updates.</p>
 <h3 id="why-was-branches-renamed-to-est_branches"><a class="header" href="#why-was-branches-renamed-to-est_branches">Why was “branches” renamed to “est_branches”?</a></h3>
 <p>The metric was renamed in Spec 118 to make it clear that this is an <strong>estimated</strong> value, not a precise measurement.</p>
 <p><strong>Problem with old name (“branches”):</strong></p>
@@ -23469,15 +23399,15 @@ debtmap validate . --max-critical 0 --max-high 5
 <tr><td><strong>Speed</strong></td><td>10-100x faster (Rust)</td><td>Slower (JVM overhead)</td></tr>
 <tr><td><strong>Coverage Integration</strong></td><td>✅ Built-in LCOV</td><td>⚠️ Enterprise only</td></tr>
 <tr><td><strong>Entropy Analysis</strong></td><td>✅ Unique feature</td><td>❌ No</td></tr>
-<tr><td><strong>Language Support</strong></td><td>Rust, Python, JS/TS</td><td>25+ languages</td></tr>
+<tr><td><strong>Language Support</strong></td><td>Rust (focused)</td><td>25+ languages</td></tr>
 <tr><td><strong>Setup</strong></td><td>Single binary</td><td>JVM + server setup</td></tr>
 <tr><td><strong>Cost</strong></td><td>Free, open-source</td><td>Free (basic) / Paid (advanced)</td></tr>
-<tr><td><strong>Use Case</strong></td><td>Fast local analysis</td><td>Enterprise dashboards</td></tr>
+<tr><td><strong>Use Case</strong></td><td>Rust projects</td><td>Enterprise dashboards</td></tr>
 </tbody>
 </table>
 </div>
 <p><strong>When to use SonarQube:</strong> Multi-language monorepos, enterprise compliance, centralized quality dashboards.</p>
-<p><strong>When to use debtmap:</strong> Rust-focused projects, local development workflow, coverage-driven prioritization.</p>
+<p><strong>When to use debtmap:</strong> Rust projects, local development workflow, coverage-driven prioritization, deep Rust-specific analysis.</p>
 <h3 id="how-is-debtmap-different-from-codeclimate"><a class="header" href="#how-is-debtmap-different-from-codeclimate">How is debtmap different from CodeClimate?</a></h3>
 <div class="table-wrapper">
 <table>

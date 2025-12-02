@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-59964db6.js";
+            window.path_to_searchindex_js = "searchindex-28e21e55.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -181,14 +181,26 @@
 <blockquote>
 <p>🚧 <strong>Early Prototype</strong> - This project is under active development and APIs may change</p>
 </blockquote>
-<p>Debtmap is a code complexity and technical debt analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
+<p>Debtmap is a Rust code analyzer that identifies which code to refactor for maximum cognitive debt reduction and which code to test for maximum risk reduction.</p>
 <h2 id="what-is-debtmap"><a class="header" href="#what-is-debtmap">What is Debtmap?</a></h2>
 <p>Unlike traditional static analysis tools that simply flag complex code, Debtmap answers two critical questions:</p>
 <ol>
 <li><strong>“What should I refactor to reduce cognitive burden?”</strong> - Identifies overly complex code that slows down development</li>
 <li><strong>“What should I test first to reduce the most risk?”</strong> - Pinpoints untested complex code that threatens stability</li>
 </ol>
-<p>Debtmap analyzes your codebase to identify complexity hotspots, technical debt patterns, and architectural risks. It supports Rust, Python, JavaScript, and TypeScript with full AST parsing and analysis capabilities. Rust includes additional advanced features like macro expansion and trait tracking.</p>
+<p>Debtmap analyzes Rust codebases to identify complexity hotspots, technical debt patterns, and architectural risks with full AST parsing, macro expansion, and trait tracking.</p>
+<h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
+<p>Debtmap currently focuses exclusively on Rust codebases. Our goal is to
+perfect Rust analysis before expanding to other languages. This focused
+approach allows us to:</p>
+<ul>
+<li>Build deep Rust-specific analysis (macro expansion, trait resolution, lifetime awareness)</li>
+<li>Perfect our core algorithms and metrics</li>
+<li>Establish a stable API and user experience</li>
+<li>Build a strong user community</li>
+</ul>
+<p>Multi-language support (Python, JavaScript/TypeScript, Go, etc.) is planned
+for future releases once Rust analysis reaches maturity.</p>
 <p><strong>What Makes Debtmap Different:</strong></p>
 <ul>
 <li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
@@ -210,7 +222,7 @@
 <h2 id="key-features"><a class="header" href="#key-features">Key Features</a></h2>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
-<li><strong>Multi-language support</strong> - Full support for Rust, Python, JavaScript, and TypeScript with AST parsing, complexity analysis, and debt detection</li>
+<li><strong>Rust-first analysis</strong> - Deep Rust support with AST parsing, macro expansion, trait resolution, and lifetime awareness</li>
 <li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction compared to traditional analyzers)</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>

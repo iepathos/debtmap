@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-59964db6.js";
+            window.path_to_searchindex_js = "searchindex-28e21e55.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -533,11 +533,11 @@ pub fn set_timeout(mut self, timeout: Duration) -&gt; Self {
 <p><strong>Language-Specific Debt Patterns:</strong></p>
 <p>Some debt patterns only apply to languages with specific features:</p>
 <ul>
-<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust, JavaScript, TypeScript)</li>
+<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust)</li>
 <li><strong>AllocationInefficiency, ResourceLeak</strong>: Languages with manual memory management (Rust)</li>
-<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust, exceptions in Python/JS)</li>
+<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust)</li>
 </ul>
-<p>Debtmap automatically applies only the relevant debt patterns for each language during analysis.</p>
+<p>Debtmap automatically applies only the relevant debt patterns during analysis.</p>
 <h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
 <h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
 <p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
@@ -1845,71 +1845,30 @@ echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
 <li><strong>Test Code</strong>: Functions in <code>#[cfg(test)]</code> modules, functions with <code>#[test]</code> attribute</li>
 </ul>
 <p>This classification feeds directly into the unified scoring system’s role multiplier (see Risk Scoring section).</p>
-<p><strong>Python</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: rustpython-parser</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>Complexity metrics (cyclomatic, cognitive)</li>
-<li>Python-specific error handling patterns</li>
-<li>Purity detection for pure functions</li>
-<li>Basic debt pattern detection</li>
-<li>Limited call graph support</li>
-</ul>
-</li>
-</ul>
-<p><strong>JavaScript</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: tree-sitter (JavaScript grammar)</li>
-<li><strong>File extensions</strong>: .js, .jsx, .mjs, .cjs</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>ECMAScript complexity patterns</li>
-<li>Basic complexity metrics</li>
-<li>Function extraction</li>
-<li>Limited pattern detection</li>
-</ul>
-</li>
-</ul>
-<p><strong>TypeScript</strong> (Partial Support)</p>
-<ul>
-<li><strong>Parser</strong>: tree-sitter (TypeScript grammar)</li>
-<li><strong>File extensions</strong>: .ts, .tsx, .mts, .cts</li>
-<li><strong>Capabilities</strong>:
-<ul>
-<li>Similar to JavaScript support</li>
-<li>Type information currently not utilized</li>
-<li>Basic complexity metrics</li>
-<li>Limited pattern detection</li>
-</ul>
-</li>
-</ul>
 <p><strong>Unsupported Languages:</strong></p>
-<p>Debtmap’s <code>Language</code> enum contains only the four supported languages: Rust, Python, JavaScript, and TypeScript. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
-<p>Files with extensions like <code>.cpp</code> (C++), <code>.java</code>, <code>.go</code>, <code>.rb</code> (Ruby), <code>.php</code>, <code>.cs</code> (C#), <code>.swift</code>, <code>.kt</code> (Kotlin), <code>.scala</code>, and others are silently filtered during discovery.</p>
+<p>Debtmap currently supports only Rust. Files with unsupported extensions are filtered out during the file discovery phase and never reach the analysis stage.</p>
+<p>Files with extensions like <code>.py</code> (Python), <code>.js</code>/<code>.ts</code> (JavaScript/TypeScript), <code>.cpp</code> (C++), <code>.java</code>, <code>.go</code>, <code>.rb</code> (Ruby), <code>.php</code>, <code>.cs</code> (C#), <code>.swift</code>, <code>.kt</code> (Kotlin), <code>.scala</code>, and others are silently filtered during discovery.</p>
 <p><strong>File filtering behavior:</strong></p>
 <ul>
-<li>Discovery scans project for files matching supported extensions</li>
-<li>Unsupported files are skipped silently (no warnings or errors)</li>
+<li>Discovery scans project for Rust source files (.rs extension)</li>
+<li>Non-Rust files are skipped silently (no warnings or errors)</li>
 <li>No analysis, metrics, or debt patterns are generated for filtered files</li>
-<li>Use <code>--languages</code> flag to explicitly control which languages to analyze</li>
 </ul>
 <p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Only analyze Rust files (skip Python/JS/TS)
-debtmap analyze . --languages rust
+<pre><code class="language-bash"># Analyze all Rust files in current directory
+debtmap analyze .
 
-# Analyze Rust and Python only
-debtmap analyze . --languages rust,python
+# Analyze specific Rust file
+debtmap analyze src/main.rs
 </code></pre>
 <h3 id="language-detection"><a class="header" href="#language-detection">Language Detection</a></h3>
 <p>Automatic detection by file extension:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let language = Language::from_path(&amp;path);
+</span>// Detects .rs files as Rust
+let language = Language::from_path(&amp;path);
 <span class="boring">}</span></code></pre>
-<p>Explicit language selection:</p>
-<pre><code class="language-bash">debtmap analyze . --languages rust,python
-</code></pre>
+<p>All <code>.rs</code> files are automatically analyzed. No language flag is needed since Debtmap is Rust-focused.</p>
 <h3 id="extensibility"><a class="header" href="#extensibility">Extensibility</a></h3>
 <p>Debtmap’s architecture allows adding new languages:</p>
 <ol>
@@ -2452,18 +2411,11 @@ Examples:
 <li>Memory usage stays bounded and reasonable</li>
 </ul>
 <p><strong>Generating coverage:</strong></p>
-<pre><code class="language-bash"># Rust
+<pre><code class="language-bash"># Rust (using cargo-tarpaulin)
 cargo tarpaulin --out lcov --output-dir target/coverage
 
-# Python
-pytest --cov --cov-report=lcov
-
-# JavaScript/TypeScript
-jest --coverage --coverageReporters=lcov
-
-# Go
-go test -coverprofile=coverage.out
-gocover-cobertura &lt; coverage.out &gt; coverage.lcov
+# Or using cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
 </code></pre>
 <p><strong>Using with Debtmap:</strong></p>
 <pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
