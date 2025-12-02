@@ -255,30 +255,31 @@ src/
 
 For detailed architecture documentation, see the [Architecture Guide](https://iepathos.github.io/debtmap/architecture.html).
 
-### Adding Language Support
+### Improving Rust Analysis
 
-To add support for a new language:
+To contribute to Rust analysis depth:
 
-1. Create a new analyzer in `src/analyzers/<language>.rs`
-2. Implement the `LanguageAnalyzer` trait
-3. Add parser integration (tree-sitter recommended)
-4. Write comprehensive tests in `tests/<language>_tests.rs`
-5. Update documentation
+1. Add new analysis in `src/analyzers/rust.rs` or related modules
+2. Implement trait methods or extend existing analyzers
+3. Add comprehensive tests in `tests/rust_tests.rs` or module-specific tests
+4. Update documentation with examples
 
-Example structure:
+Example areas for improvement:
 
 ```rust
-// src/analyzers/go.rs
-pub struct GoAnalyzer;
+// Improving macro expansion analysis
+pub fn analyze_macro_expansion(item: &syn::Item) -> Result<MacroMetrics> {
+    // Detect macro invocations and their complexity impact
+}
 
-impl LanguageAnalyzer for GoAnalyzer {
-    fn parse_file(&self, path: &Path) -> Result<FileMetrics> {
-        // Parse Go AST and extract metrics
-    }
+// Better trait resolution
+pub fn resolve_trait_impl(impl_item: &syn::ItemImpl) -> Result<TraitContext> {
+    // Track trait implementations and their relationships
+}
 
-    fn calculate_complexity(&self, ast: &GoAst) -> ComplexityMetrics {
-        // Calculate cyclomatic and cognitive complexity
-    }
+// Lifetime analysis
+pub fn analyze_lifetimes(sig: &syn::Signature) -> LifetimeComplexity {
+    // Measure complexity introduced by lifetime annotations
 }
 ```
 
@@ -292,11 +293,18 @@ New to Debtmap? Look for issues labeled:
 
 ### Recommended First Contributions
 
-- **Documentation improvements**: Fix typos, clarify confusing sections, add examples
-- **Test coverage**: Add tests for untested code paths
+- **Documentation improvements**: Fix typos, clarify confusing sections, add Rust examples
+- **Test coverage**: Add tests for untested Rust analysis code paths
 - **Bug fixes**: Start with issues tagged `bug` and `good-first-issue`
-- **New detectors**: Add new technical debt pattern detectors
-- **Performance**: Optimize hot paths identified by profiling
+- **Rust analysis depth**: Improve macro expansion, trait resolution, lifetime analysis
+- **New Rust metrics**: Implement additional Rust-specific complexity or quality metrics
+- **Rust patterns**: Detect more Rust idioms and anti-patterns
+- **Performance**: Optimize Rust analysis algorithms
+
+**Note on multi-language support**: Debtmap is currently focusing exclusively on Rust analysis.
+Multi-language support (Python, JavaScript/TypeScript, Go, etc.) will be considered once
+Rust analysis reaches maturity. If you're interested in contributing to multi-language
+support in the future, please open an issue to discuss the roadmap and timeline.
 
 ## Communication
 

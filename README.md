@@ -9,9 +9,14 @@
 [![License](https://img.shields.io/badge/license-MIT)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
-> **Beta Software** - Debtmap is actively developed and tested in production. Core features are stable for Rust, though APIs may evolve as we add new capabilities. Contributions and feedback welcome!
+> **Beta Software** - Debtmap is a Rust code analyzer actively developed and
+tested in production. Core features are stable, though APIs may evolve as we
+add new capabilities. Contributions and feedback welcome!
 
-Debtmap combines coverage-risk correlation with multi-factor analysis (complexity, dependencies, call graphs) and entropy-adjusted scoring to reduce false positives and prioritize testing efforts effectively.
+Debtmap is the premier Rust code analyzer that combines coverage-risk correlation
+with multi-factor analysis (complexity, dependencies, call graphs) and
+entropy-adjusted scoring to reduce false positives and prioritize testing efforts
+effectively.
 
 📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
 
@@ -23,6 +28,7 @@ Debtmap answers two critical questions:
 2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
 
 **Unique Capabilities:**
+- **Rust-First Design** - Deep Rust analysis with macro expansion, trait resolution, and lifetime awareness
 - **Coverage-Risk Correlation** - Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
 - **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
 - **Actionable Recommendations** - Provides specific guidance with quantified impact metrics instead of generic warnings
@@ -269,12 +275,12 @@ Fail builds when quality thresholds are exceeded:
 
 ## Key Features
 
+- **Rust-First Analysis** - Deep Rust analysis with macro expansion, trait resolution, and lifetime awareness
 - **Coverage-Risk Correlation** - Combines complexity with test coverage to prioritize genuinely risky code
 - **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive scoring
 - **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuine complexity from repetitive patterns (reduces false positives by up to 70%)
-- **Test File Detection** - Automatically identifies test files across languages and applies context-aware scoring adjustments
+- **Test File Detection** - Automatically identifies test files and applies context-aware scoring adjustments
 - **Actionable Recommendations** - Specific guidance with quantified impact metrics
-- **Multi-language Support** - Full Rust support, partial Python/JavaScript/TypeScript
 - **Fast Performance** - 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
 - **Language-Agnostic Coverage** - Works with any tool generating LCOV format
 - **Context-Aware Analysis** - Understands entry points, call graphs, and testing patterns
@@ -570,13 +576,11 @@ GOD OBJECT DETECTED: src/data_manager.rs (24 methods)
 **Alternative Names**: Each split includes up to 3 name candidates ranked by confidence, allowing you to choose the most appropriate name for your codebase conventions.
 
 ### Framework Pattern Detection
-Debtmap identifies framework-specific code patterns across Rust, Python, JavaScript, and TypeScript, improving the accuracy of responsibility classification and helping distinguish framework boilerplate from application logic.
+Debtmap identifies framework-specific code patterns in Rust, improving the accuracy of responsibility classification and helping distinguish framework boilerplate from application logic.
 
 **Supported Frameworks:**
 
 - **Rust**: Axum, Actix-Web, Tokio, Diesel, Clap
-- **Python**: FastAPI, Flask, Django, Pytest, SQLAlchemy, Click, Celery
-- **JavaScript/TypeScript**: Express.js, Fastify, React, Jest, Mocha, NestJS, Prisma
 
 **How It Works:**
 
@@ -593,20 +597,6 @@ Framework patterns are detected using a combination of:
 // Axum Web Handler - Detected as "HTTP Request Handler"
 async fn get_user(Path(user_id): Path<u32>) -> Json<User> {
     // ...
-}
-```
-
-```python
-# FastAPI Route - Detected as "HTTP Request Handler"
-@app.get("/users/{user_id}")
-async def get_user(user_id: int) -> User:
-    # ...
-```
-
-```javascript
-// React Component - Detected as "UI Component"
-function UserProfile({ userId }) {
-    return <div>Profile for {userId}</div>;
 }
 ```
 
@@ -644,16 +634,14 @@ Pattern types available:
 
 ### Test File Detection and Context-Aware Scoring
 
-Debtmap automatically identifies test files and test functions across multiple languages, then applies context-aware scoring adjustments to reduce false positives from test-specific patterns.
+Debtmap automatically identifies test files and test functions in Rust, then applies context-aware scoring adjustments to reduce false positives from test-specific patterns.
 
-**Multi-Language Test Detection:**
+**Rust Test Detection:**
 
-Debtmap detects test files using language-specific patterns:
+Debtmap detects test files using Rust-specific patterns:
 
 - **Rust**: `#[test]`, `#[cfg(test)]`, files in `tests/` directory, `_test.rs` suffix
-- **Python**: `test_*.py`, `*_test.py`, `unittest`, `pytest` imports, `def test_*()` functions
-- **JavaScript/TypeScript**: `*.test.js`, `*.spec.ts`, Jest/Mocha imports, `describe()`/`it()` blocks
-- **General**: Files in `tests/`, `test/`, `__tests__/` directories
+- **General**: Files in `tests/`, `test/` directories
 
 **Context-Aware Scoring:**
 
@@ -678,8 +666,7 @@ When debtmap identifies a test file or test function, it automatically:
 
 - **Fewer false positives** - Test code complexity doesn't dominate production priorities
 - **Better recommendations** - Test-specific refactoring guidance
-- **Language consistency** - Works across Rust, Python, JavaScript, and TypeScript
-- **Automatic detection** - No configuration needed for standard test patterns
+- **Automatic detection** - No configuration needed for standard Rust test patterns
 
 📖 **Read more:** [Testing Guide](https://iepathos.github.io/debtmap/testing-guide.html)
 
@@ -883,9 +870,8 @@ This command creates an isolated git worktree, runs iterations of automated impr
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-### Dependency Licensing Note
-
-Debtmap includes Python parsing functionality via `rustpython-parser`, which depends on `malachite` (LGPL-3.0 licensed) for arbitrary-precision arithmetic. This LGPL dependency is used only for Python AST parsing and does not affect the MIT licensing of debtmap itself. For use cases requiring strict MIT-only dependencies, Python support can be disabled or replaced with an alternative parser.
+Debtmap has no restrictive dependencies - all dependencies are MIT, Apache-2.0,
+or similarly permissive licenses.
 
 ## Debugging Call Graph Issues
 
@@ -1495,7 +1481,6 @@ Example output:
 
 ✅ **Higher accuracy:** 88% vs 50% name-based alone
 ✅ **Reduced false positives:** Multiple signals must agree
-✅ **Language-agnostic:** Works across Rust, Python, JavaScript, TypeScript
 ✅ **Explainable:** Clear evidence trail for each classification
 ✅ **Configurable:** Adjust weights for your codebase's patterns
 ✅ **Performance:** <3% overhead with parallel processing
@@ -1503,13 +1488,17 @@ Example output:
 ## Roadmap
 
 ### Language Support
-- [x] Rust - Full support with AST parsing and macro expansion
-- [ ] Python - Full support via rustpython-parser
-- [ ] JavaScript/TypeScript - Full support via tree-sitter
+- [x] Rust - Full support with AST parsing, macro expansion, and trait resolution
+- [ ] Python - Planned after Rust analysis is mature
+- [ ] JavaScript/TypeScript - Planned after Rust analysis is mature
 - [ ] Go - Planned
 - [ ] C/C++ - Planned
 - [ ] C# - Planned
 - [ ] Java - Planned
+
+**Current Focus**: Perfecting Rust analysis before expanding to other languages.
+We're building the best Rust code analyzer first, then will apply those learnings
+to other languages.
 
 ### Core Features
 - [x] Inline suppression comments
@@ -1533,8 +1522,6 @@ Example output:
 
 Built with excellent Rust crates including:
 - [syn](https://github.com/dtolnay/syn) for Rust AST parsing
-- [rustpython-parser](https://github.com/RustPython/RustPython) for Python parsing
-- [tree-sitter](https://github.com/tree-sitter/tree-sitter) for JavaScript/TypeScript parsing
 - [rayon](https://github.com/rayon-rs/rayon) for parallel processing
 - [clap](https://github.com/clap-rs/clap) for CLI parsing
 

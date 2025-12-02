@@ -31,7 +31,7 @@ pub enum FunctionalAnalysisProfile {
 
 #[derive(Parser, Debug)]
 #[command(name = "debtmap")]
-#[command(about = "Code complexity and technical debt analyzer", long_about = None)]
+#[command(about = "Rust code complexity and technical debt analyzer", long_about = None)]
 #[command(version)]
 pub struct Cli {
     #[command(subcommand)]

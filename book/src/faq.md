@@ -95,20 +95,42 @@ debtmap analyze . --lcov target/coverage/lcov.info
 
 ### What languages are supported?
 
-**Full support:**
-- Rust (via `syn` crate - complete AST analysis)
-- Python (via `rustpython` - full Python 3.x support)
+**Currently supported:**
+- Rust - Full support with AST parsing, macro expansion, and trait resolution
 
-**Partial support:**
-- JavaScript (via `tree-sitter` - ES6+, JSX)
-- TypeScript (via `tree-sitter` - basic support)
+**Planned (after Rust analysis is mature):**
+- Python (high priority)
+- JavaScript/TypeScript (high priority)
+- Go, Java, C/C++, C# (medium priority)
 
-**Planned:**
-- Go (target: Q2 2025)
-- Java (target: Q3 2025)
-- C/C++ (target: Q4 2025)
+### Why is debtmap Rust-only right now?
 
-Language support means: AST parsing, metric extraction, complexity calculation, and pattern detection.
+We're taking a focused approach to deliver the best possible Rust code
+analyzer before expanding to other languages. This strategy allows us to:
+
+1. **Perfect the core**: Get our algorithms, metrics, and UX right with one
+   language before the complexity of multi-language support
+2. **Deep integration**: Build Rust-specific features like macro expansion,
+   trait resolution, and lifetime analysis
+3. **Build trust**: Establish debtmap as the go-to Rust analyzer with a
+   strong user base
+4. **Learn once, apply broadly**: Use our learnings from Rust to build
+   better multi-language support later
+
+We will expand to other languages (Python, JavaScript/TypeScript, Go, etc.)
+once Rust analysis is mature and we have a stable foundation.
+
+### Will other languages be supported in the future?
+
+Absolutely! Multi-language support is on the roadmap. We plan to add:
+
+- Python (high priority)
+- JavaScript/TypeScript (high priority)
+- Go, Java, C/C++, C# (medium priority)
+
+The timeline depends on Rust analysis maturity and community demand.
+Follow our [GitHub milestones](https://github.com/iepathos/debtmap/milestones)
+for updates.
 
 ### Why was "branches" renamed to "est_branches"?
 
@@ -197,14 +219,14 @@ See [Prodigy Integration](prodigy-integration.md) for more CI/CD patterns.
 | **Speed** | 10-100x faster (Rust) | Slower (JVM overhead) |
 | **Coverage Integration** | ✅ Built-in LCOV | ⚠️ Enterprise only |
 | **Entropy Analysis** | ✅ Unique feature | ❌ No |
-| **Language Support** | Rust, Python, JS/TS | 25+ languages |
+| **Language Support** | Rust (focused) | 25+ languages |
 | **Setup** | Single binary | JVM + server setup |
 | **Cost** | Free, open-source | Free (basic) / Paid (advanced) |
-| **Use Case** | Fast local analysis | Enterprise dashboards |
+| **Use Case** | Rust projects | Enterprise dashboards |
 
 **When to use SonarQube:** Multi-language monorepos, enterprise compliance, centralized quality dashboards.
 
-**When to use debtmap:** Rust-focused projects, local development workflow, coverage-driven prioritization.
+**When to use debtmap:** Rust projects, local development workflow, coverage-driven prioritization, deep Rust-specific analysis.
 
 ### How is debtmap different from CodeClimate?
 
