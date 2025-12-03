@@ -18,6 +18,7 @@ mod sections;
 pub mod writer;
 
 use context::create_format_context;
+#[allow(deprecated)]
 use sections::{apply_formatted_sections, generate_formatted_sections};
 
 #[derive(Debug, Clone, Copy)]
