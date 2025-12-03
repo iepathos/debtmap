@@ -162,10 +162,10 @@ impl BehavioralCategorizer {
     /// - Computation: calculate, compute, evaluate, etc.
     /// - Filtering: filter, select, find, search, etc.
     /// - Transformation: transform, convert, map, apply, etc.
+    /// - State management: get_*, set_*, update_*, etc. (checked before DataAccess for specificity)
     /// - Data access: get, set, fetch, retrieve, access
     /// - Processing: process, handle, execute, run
     /// - Communication: send, receive, transmit, broadcast, notify
-    /// - State management: get_*, set_*, update_*, etc.
     pub fn categorize_method(method_name: &str) -> BehaviorCategory {
         let lower_name = method_name.to_lowercase();
 
@@ -221,6 +221,11 @@ impl BehavioralCategorizer {
             return BehaviorCategory::Transformation;
         }
 
+        // State management methods (check before DataAccess as it's more specific)
+        if Self::is_state_management(&lower_name) {
+            return BehaviorCategory::StateManagement;
+        }
+
         // Data access methods
         if Self::is_data_access(&lower_name) {
             return BehaviorCategory::DataAccess;
@@ -234,11 +239,6 @@ impl BehavioralCategorizer {
         // Communication methods
         if Self::is_communication(&lower_name) {
             return BehaviorCategory::Communication;
-        }
-
-        // State management methods
-        if Self::is_state_management(&lower_name) {
-            return BehaviorCategory::StateManagement;
         }
 
         // Default: domain-specific based on first word (capitalized for better naming)

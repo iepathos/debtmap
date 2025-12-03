@@ -1140,8 +1140,8 @@ pub enum SignalType {
 /// Infer responsibility category from function/method name using pattern matching.
 ///
 /// This function uses a data-driven approach to categorize functions by matching
-/// method name prefixes against predefined categories. It searches through
-/// `RESPONSIBILITY_CATEGORIES` in order and returns the first matching category.
+/// method name prefixes against predefined categories. It uses the `BehavioralCategorizer`
+/// to determine the appropriate category based on method naming patterns.
 ///
 /// # Implementation
 ///
@@ -1183,8 +1183,8 @@ pub enum SignalType {
 ///
 /// # Extending Patterns
 ///
-/// To add new patterns, modify `RESPONSIBILITY_CATEGORIES` rather than this function.
-/// See the documentation on `RESPONSIBILITY_CATEGORIES` for details.
+/// To add new patterns, modify the `BehavioralCategorizer` implementation rather than this function.
+/// See the documentation on `BehavioralCategorizer` for details on adding new behavioral categories.
 ///
 /// # Alternative
 ///

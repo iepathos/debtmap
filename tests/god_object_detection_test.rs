@@ -597,11 +597,11 @@ fn test_behavioral_decomposition_no_misc_category() {
     }
 
     // For methods that don't match standard categories, should use domain-specific name
-    let domain_method = "calculate_interest_rate";
+    let domain_method = "approve_loan_application";
     let category = BehavioralCategorizer::categorize_method(domain_method);
     match category {
         BehaviorCategory::Domain(name) => {
-            assert_eq!(name, "Calculate", "Should extract first word as domain");
+            assert_eq!(name, "Approve", "Should extract first word as domain");
         }
         _ => panic!("Expected Domain category for method '{}'", domain_method),
     }
