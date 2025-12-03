@@ -3627,6 +3627,87 @@ To migrate existing code:
 2. Use `format_priority_item_legacy` for temporary backward compatibility
 3. Update tests to use pure functions for better isolation
 
+### Formatter Module Structure (Spec 205)
+
+The formatter module has been organized into focused submodules, each with a single clear responsibility:
+
+#### Module Organization
+
+```
+src/priority/formatter/
+├── mod.rs (163 lines)          # Public API and module orchestration
+├── orchestrators.rs            # Thin formatting workflow coordinators
+├── pure.rs                     # Pure formatting functions (no I/O)
+├── writer.rs                   # I/O operations for formatted output
+├── summary.rs                  # Tiered summary display formatting
+├── recommendations.rs          # Detailed recommendation formatting
+├── sections.rs                 # Section-based formatting logic
+├── context.rs                  # Format context creation
+├── dependencies.rs             # Dependency information formatting
+└── helpers.rs                  # Shared utility functions
+```
+
+#### Module Responsibilities
+
+**mod.rs** (Public API):
+- Exports public formatting functions
+- Declares and organizes submodules
+- Re-exports helper functions from submodules
+- Contains minimal orchestration code (~163 lines)
+
+**orchestrators.rs** (Workflow Coordination):
+- `format_default_with_config()` - Delegates to recommendations module
+- `format_tail_with_config()` - Formats bottom N priority items
+- Thin wrappers that coordinate between public API and specialized modules
+
+**pure.rs** (Pure Core):
+- Pure functions with no side effects
+- Data transformations only
+- Easily testable, composable functions
+
+**writer.rs** (Imperative Shell):
+- I/O operations at system boundary
+- Applies formatted data to output buffers
+- Minimal logic, maximum effects
+
+**summary.rs** (Tiered Display):
+- `format_summary_terminal()` - Entry point for summary mode
+- Terminal formatting for tiered priority display
+- Compact item formatting for grouped display
+
+**recommendations.rs** (Detailed Formatting):
+- Detailed recommendation generation
+- Context-aware formatting based on debt patterns
+- Integration with evidence formatting
+
+**sections.rs** (Section Formatting):
+- Section-based formatting composition
+- Modular formatting pipeline
+- Composable formatting transformations
+
+**context.rs** (Context Creation):
+- Creates formatting context from debt items
+- Extracts relevant information for formatting
+- Provides unified interface for formatters
+
+**dependencies.rs** (Dependency Formatting):
+- Formats upstream/downstream dependency information
+- Call graph visualization in output
+- Dependency impact display
+
+**helpers.rs** (Utilities):
+- Shared formatting utilities
+- Color and severity helpers
+- Common formatting functions
+
+#### Module Boundaries
+
+- **No circular dependencies**: All modules follow acyclic dependency graph
+- **Clear interfaces**: Each module exports minimal public API
+- **Single responsibility**: Each module focuses on one aspect of formatting
+- **File size limit**: No file exceeds 500 lines (spec 205)
+- **Pure core separation**: I/O isolated to writer.rs and specific output modules
+
 ## Error Handling
 
 ### Resilience Strategy

@@ -1,5 +1,5 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig};
-use crate::priority::classification::CoverageLevel;
+use crate::priority::classification::{CoverageLevel, Severity};
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{score_formatter, TransitiveCoverage, UnifiedDebtItem};
 use colored::*;
@@ -1011,9 +1011,9 @@ pub fn format_priority_item_with_config(
     has_coverage_data: bool,
 ) {
     let formatter = ColoredFormatter::new(config);
-    let severity = crate::priority::formatter::get_severity_label(item.unified_score.final_score);
-    let severity_color =
-        crate::priority::formatter::get_severity_color(item.unified_score.final_score);
+    let sev = Severity::from_score(item.unified_score.final_score);
+    let severity = sev.as_str();
+    let severity_color = sev.color();
     let tree_pipe = " ";
 
     // Format and write the score header
