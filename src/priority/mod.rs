@@ -3,6 +3,7 @@ pub mod classification;
 pub mod complexity_patterns;
 pub mod coverage_propagation;
 pub mod debt_aggregator;
+pub mod detected_pattern;
 pub mod external_api_detector;
 pub mod file_metrics;
 pub mod formatted_output;
@@ -1018,6 +1019,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         }
     }
 

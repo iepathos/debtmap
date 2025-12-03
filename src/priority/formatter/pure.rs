@@ -145,10 +145,10 @@ pub fn format_priority_item(
         });
     }
 
-    // Pattern section (if detected, spec 190)
-    if let Some(ref pattern_info) = context.pattern_info {
-        let metrics: Vec<(String, String)> = pattern_info
-            .display_metrics
+    // Pattern section (if detected, spec 204: read from stored result)
+    if let Some(ref pattern) = context.pattern_info {
+        let metrics: Vec<(String, String)> = pattern
+            .display_metrics()
             .iter()
             .filter_map(|metric| {
                 let parts: Vec<&str> = metric.split(": ").collect();
@@ -161,10 +161,10 @@ pub fn format_priority_item(
             .collect();
 
         sections.push(FormattedSection::Pattern {
-            pattern_type: pattern_info.pattern_type.clone(),
-            icon: pattern_info.icon.to_string(),
+            pattern_type: pattern.type_name().to_string(),
+            icon: pattern.icon().to_string(),
             metrics,
-            confidence: pattern_info.confidence,
+            confidence: pattern.confidence,
         });
     }
 
@@ -280,6 +280,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None,
+            detected_pattern: None,
         }
     }
 

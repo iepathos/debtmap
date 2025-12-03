@@ -740,6 +740,7 @@ fn convert_error_swallowing_to_unified(
                 context_multiplier: None,
                 context_type: None,
                 language_specific: None, // No language-specific data for error swallowing items (spec 190)
+                detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
             }
         })
         .collect()

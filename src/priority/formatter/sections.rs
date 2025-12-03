@@ -146,14 +146,15 @@ fn format_complexity_section(context: &FormatContext) -> Option<String> {
     }
 }
 
-// Pure function to format pattern section (spec 190)
+// Pure function to format pattern section (spec 204)
 // Shows detected state machine or coordinator patterns with confidence
+// Reads from item.detected_pattern (single source of truth)
 fn format_pattern_section(context: &FormatContext) -> Option<String> {
-    let pattern_info = context.pattern_info.as_ref()?;
+    let pattern = context.pattern_info.as_ref()?;
 
     // Format: ├─ PATTERN: 🔄 State Machine (transitions: 4, matches: 2, actions: 8, confidence: 0.85)
-    let metrics_str = pattern_info
-        .display_metrics
+    let metrics_str = pattern
+        .display_metrics()
         .iter()
         .map(|s| s.as_str())
         .collect::<Vec<_>>()
@@ -162,10 +163,10 @@ fn format_pattern_section(context: &FormatContext) -> Option<String> {
     Some(format!(
         "{} {} {} ({}, confidence: {:.2})",
         "├─ PATTERN:".bright_blue(),
-        pattern_info.icon,
-        pattern_info.pattern_type.bright_magenta().bold(),
+        pattern.icon(),
+        pattern.type_name().bright_magenta().bold(),
         metrics_str.cyan(),
-        pattern_info.confidence
+        pattern.confidence
     ))
 }
 

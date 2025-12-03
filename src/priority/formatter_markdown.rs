@@ -1688,6 +1688,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         }
     }
 
@@ -2577,6 +2578,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         };
 
         let high_item = UnifiedDebtItem {
@@ -2640,6 +2642,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         };
 
         let moderate_item = UnifiedDebtItem {
@@ -2703,6 +2706,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         };
 
         let low_item = UnifiedDebtItem {
@@ -2766,6 +2770,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         };
 
         analysis.add_item(critical_item);
