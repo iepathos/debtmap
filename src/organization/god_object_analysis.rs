@@ -1300,10 +1300,10 @@ pub fn infer_responsibility_with_confidence(
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::normalize_category_name;
-/// assert_eq!(normalize_category_name("output"), "Rendering");
-/// assert_eq!(normalize_category_name("parsing"), "Parsing");
-/// assert_eq!(normalize_category_name("data_access"), "Data Access");
-/// assert_eq!(normalize_category_name("output"), "Rendering"); // Already normalized
+/// assert_eq!(normalize_category_name("output"), "output");
+/// assert_eq!(normalize_category_name("parsing"), "parsing");
+/// assert_eq!(normalize_category_name("data_access"), "data_access");
+/// assert_eq!(normalize_category_name("Data Access"), "data_access"); // Normalizes to lowercase with underscores
 /// ```
 pub fn normalize_category_name(old_name: &str) -> String {
     match old_name {
@@ -1861,8 +1861,8 @@ fn ensure_not_reserved(mut name: String) -> String {
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::sanitize_module_name;
-/// assert_eq!(sanitize_module_name("parsing"), "Parsing");
-/// assert_eq!(sanitize_module_name("Data  Access"), "Data Access");
+/// assert_eq!(sanitize_module_name("parsing"), "parsing");
+/// assert_eq!(sanitize_module_name("Data  Access"), "data_access");
 /// assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
 /// assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
 /// assert_eq!(sanitize_module_name("Data-Access-Layer"), "data_access_layer");
