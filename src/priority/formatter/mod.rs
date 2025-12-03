@@ -4,9 +4,7 @@
 //! including detailed recommendations and summary tables.
 
 use crate::formatting::FormattingConfig;
-use crate::priority::{
-    UnifiedAnalysis, UnifiedDebtItem,
-};
+use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
 #[path = "../formatter_verbosity.rs"]
 mod verbosity;
@@ -145,7 +143,6 @@ pub fn format_file_priority_item_with_verbosity(
     _config: FormattingConfig,
     verbosity: u8,
 ) {
-    
     use std::fmt::Write;
 
     writeln!(

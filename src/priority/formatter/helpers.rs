@@ -117,4 +117,3 @@ pub fn format_role(role: FunctionRole) -> &'static str {
         FunctionRole::Unknown => "Unknown",
     }
 }
-
