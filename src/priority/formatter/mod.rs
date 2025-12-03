@@ -1,3 +1,8 @@
+//! Terminal formatting for priority analysis results
+//!
+//! This module provides formatted output for technical debt priorities,
+//! including detailed recommendations and summary tables.
+
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::output::evidence_formatter::EvidenceFormatter;
 use crate::priority::classification::Severity;
@@ -8,13 +13,17 @@ use crate::priority::{
 use colored::*;
 use std::fmt::Write;
 
-#[path = "formatter_verbosity.rs"]
+#[path = "../formatter_verbosity.rs"]
 mod verbosity;
 
+// Submodules (spec 205: organized by responsibility)
 mod context;
 mod dependencies;
+mod helpers;
 pub mod pure;
+mod recommendations;
 mod sections;
+pub mod summary;
 pub mod writer;
 
 use context::create_format_context;
@@ -103,86 +112,7 @@ fn format_default_with_config(
     verbosity: u8,
     config: FormattingConfig,
 ) -> String {
-    // Check if summary mode is explicitly requested
-    // TODO: Add --summary flag to CLI to enable this
-    // For now, always use detailed format to preserve existing functionality
-    let mut output = String::new();
-    let version = env!("CARGO_PKG_VERSION");
-    let _formatter = ColoredFormatter::new(config);
-
-    let divider = "=".repeat(44);
-    writeln!(output, "{}", divider.bright_blue()).unwrap();
-    writeln!(
-        output,
-        "    {}",
-        format!("Debtmap v{}", version).bright_white().bold()
-    )
-    .unwrap();
-    writeln!(output, "{}", divider.bright_blue()).unwrap();
-    writeln!(output).unwrap();
-
-    let top_items = analysis.get_top_mixed_priorities(limit);
-    let count = top_items.len().min(limit);
-    writeln!(
-        output,
-        "{}",
-        format!("TOP {count} RECOMMENDATIONS")
-            .bright_yellow()
-            .bold()
-    )
-    .unwrap();
-    writeln!(output).unwrap();
-
-    // Add legend if verbosity >= 1 and coverage data is available
-    let legend = generate_legend(verbosity, analysis.has_coverage_data);
-    if !legend.is_empty() {
-        output.push_str(&legend);
-    }
-
-    for (idx, item) in top_items.iter().enumerate() {
-        format_mixed_priority_item(
-            &mut output,
-            idx + 1,
-            item,
-            verbosity,
-            config,
-            analysis.has_coverage_data,
-        );
-        writeln!(output).unwrap();
-    }
-
-    // Add summary
-    writeln!(
-        output,
-        "{}",
-        format!("TOTAL DEBT SCORE: {:.0}", analysis.total_debt_score).bright_cyan()
-    )
-    .unwrap();
-
-    writeln!(
-        output,
-        "{}",
-        format!(
-            "DEBT DENSITY: {:.1} per 1K LOC ({} total LOC)",
-            analysis.debt_density, analysis.total_lines_of_code
-        )
-        .bright_yellow()
-    )
-    .unwrap();
-
-    // Only show overall coverage if coverage data was provided (spec 108)
-    if analysis.has_coverage_data {
-        if let Some(coverage) = analysis.overall_coverage {
-            writeln!(
-                output,
-                "{}",
-                format!("OVERALL COVERAGE: {:.2}%", coverage).bright_green()
-            )
-            .unwrap();
-        }
-    }
-
-    output
+    recommendations::format_default_with_config(analysis, limit, verbosity, config)
 }
 
 #[allow(dead_code)]
@@ -236,7 +166,7 @@ fn format_tail_with_config(
 
 /// Format priorities with tiered display for terminal output (summary mode)
 pub fn format_summary_terminal(analysis: &UnifiedAnalysis, limit: usize, verbosity: u8) -> String {
-    format_tiered_terminal(analysis, limit, verbosity, FormattingConfig::default())
+    summary::format_summary_terminal(analysis, limit, verbosity)
 }
 
 /// Internal implementation of tiered display for terminal output
@@ -1540,7 +1470,7 @@ fn format_file_score_calculation_section(
     lines
 }
 
-fn format_file_priority_item_with_verbosity(
+pub(crate) fn format_file_priority_item_with_verbosity(
     output: &mut String,
     rank: usize,
     item: &priority::FileDebtItem,
@@ -1875,121 +1805,16 @@ pub(crate) fn _format_total_impact(output: &mut String, analysis: &UnifiedAnalys
     .unwrap();
 }
 
-pub fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
-    let mut parts = Vec::new();
+// Re-export helper functions from helpers module (spec 205)
+pub use helpers::{
+    extract_complexity_info, extract_dependency_info, format_debt_type, format_impact,
+    get_severity_color, get_severity_label,
+};
 
-    if impact.coverage_improvement > 0.0 {
-        // Show function-level coverage improvement
-        if impact.coverage_improvement >= 100.0 {
-            parts.push("Full test coverage".to_string());
-        } else if impact.coverage_improvement >= 50.0 {
-            parts.push(format!(
-                "+{}% function coverage",
-                impact.coverage_improvement as i32
-            ));
-        } else {
-            // For complex functions that need refactoring first
-            parts.push("Partial coverage after refactor".to_string());
-        }
-    }
-
-    if impact.complexity_reduction > 0.0 {
-        parts.push(format!(
-            "-{} complexity",
-            impact.complexity_reduction as i32
-        ));
-    }
-
-    if impact.risk_reduction > 0.0 {
-        parts.push(format!("-{:.1} risk", impact.risk_reduction));
-    }
-
-    if impact.lines_reduction > 0 {
-        parts.push(format!("-{} LOC", impact.lines_reduction));
-    }
-
-    if parts.is_empty() {
-        "Improved maintainability".to_string()
-    } else {
-        parts.join(", ")
-    }
-}
-
-pub fn format_debt_type(debt_type: &DebtType) -> &'static str {
-    match debt_type {
-        DebtType::TestingGap { .. } => "TEST GAP",
-        DebtType::ComplexityHotspot { .. } => "COMPLEXITY",
-        DebtType::DeadCode { .. } => "DEAD CODE",
-        DebtType::Duplication { .. } => "DUPLICATION",
-        DebtType::Risk { .. } => "RISK",
-        DebtType::TestComplexityHotspot { .. } => "TEST COMPLEXITY",
-        DebtType::TestTodo { .. } => "TEST TODO",
-        DebtType::TestDuplication { .. } => "TEST DUPLICATION",
-        DebtType::ErrorSwallowing { .. } => "ERROR SWALLOWING",
-        // Resource Management debt types
-        DebtType::AllocationInefficiency { .. } => "ALLOCATION",
-        DebtType::StringConcatenation { .. } => "STRING CONCAT",
-        DebtType::NestedLoops { .. } => "NESTED LOOPS",
-        DebtType::BlockingIO { .. } => "BLOCKING I/O",
-        DebtType::SuboptimalDataStructure { .. } => "DATA STRUCTURE",
-        // Organization debt types
-        DebtType::GodObject { .. } => "GOD OBJECT",
-        DebtType::GodModule { .. } => "GOD MODULE",
-        DebtType::FeatureEnvy { .. } => "FEATURE ENVY",
-        DebtType::PrimitiveObsession { .. } => "PRIMITIVE OBSESSION",
-        DebtType::MagicValues { .. } => "MAGIC VALUES",
-        // Testing quality debt types
-        DebtType::AssertionComplexity { .. } => "ASSERTION COMPLEXITY",
-        DebtType::FlakyTestPattern { .. } => "FLAKY TEST",
-        // Resource management debt types
-        DebtType::AsyncMisuse { .. } => "ASYNC MISUSE",
-        DebtType::ResourceLeak { .. } => "RESOURCE LEAK",
-        DebtType::CollectionInefficiency { .. } => "COLLECTION INEFFICIENCY",
-        // Type organization (Spec 187)
-        DebtType::ScatteredType { .. } => "SCATTERED TYPE",
-        DebtType::OrphanedFunctions { .. } => "ORPHANED FUNCTIONS",
-        DebtType::UtilitiesSprawl { .. } => "UTILITIES SPRAWL",
-    }
-}
-
+// Internal helper for formatting role (used only in this module)
 #[allow(dead_code)]
 fn format_role(role: FunctionRole) -> &'static str {
-    match role {
-        FunctionRole::PureLogic => "PureLogic",
-        FunctionRole::Orchestrator => "Orchestrator",
-        FunctionRole::IOWrapper => "IOWrapper",
-        FunctionRole::EntryPoint => "EntryPoint",
-        FunctionRole::PatternMatch => "PatternMatch",
-        FunctionRole::Debug => "Debug",
-        FunctionRole::Unknown => "Unknown",
-    }
-}
-
-pub fn get_severity_label(score: f64) -> &'static str {
-    Severity::from_score(score).as_str()
-}
-
-pub fn get_severity_color(score: f64) -> colored::Color {
-    Severity::from_score(score).color()
-}
-
-pub fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {
-    // Always show complexity metrics from the item itself, regardless of debt type
-    let cyclomatic = item.cyclomatic_complexity;
-    let cognitive = item.cognitive_complexity;
-    let branch_count = cyclomatic; // Use cyclomatic as proxy for branch count
-
-    (
-        cyclomatic,
-        cognitive,
-        branch_count,
-        item.nesting_depth,
-        item.function_length,
-    )
-}
-
-pub fn extract_dependency_info(item: &UnifiedDebtItem) -> (usize, usize) {
-    (item.upstream_dependencies, item.downstream_dependencies)
+    helpers::format_role(role)
 }
 
 #[allow(dead_code)]
