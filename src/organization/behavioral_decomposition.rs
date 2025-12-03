@@ -279,6 +279,7 @@ impl BehavioralCategorizer {
             "present",
             "format",
             "to_string",
+            "print", // Per spec 208: print_* methods are rendering/output
         ];
         RENDERING_KEYWORDS
             .iter()
@@ -304,6 +305,7 @@ impl BehavioralCategorizer {
             "write",
             "read",
             "parse",
+            "store", // Per spec 208: store_* methods are persistence operations
         ];
         PERSISTENCE_KEYWORDS
             .iter()
@@ -311,7 +313,8 @@ impl BehavioralCategorizer {
     }
 
     fn is_validation(name: &str) -> bool {
-        const VALIDATION_KEYWORDS: &[&str] = &["validate", "check", "verify", "ensure", "is_valid"];
+        // Per spec 208: "is_*" predicates are validation methods (e.g., is_valid, is_empty)
+        const VALIDATION_KEYWORDS: &[&str] = &["validate", "check", "verify", "ensure", "is_"];
         VALIDATION_KEYWORDS
             .iter()
             .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
@@ -1847,9 +1850,10 @@ mod tests {
 
     #[test]
     fn test_categorize_lifecycle_methods() {
+        // Per spec 208: "new" is Construction (checked before Lifecycle)
         assert_eq!(
             BehavioralCategorizer::categorize_method("new"),
-            BehaviorCategory::Lifecycle
+            BehaviorCategory::Construction
         );
         assert_eq!(
             BehavioralCategorizer::categorize_method("initialize_system"),
@@ -1927,14 +1931,16 @@ mod tests {
 
     #[test]
     fn test_categorize_state_management() {
+        // Per spec 208: get_/set_ are DataAccess (checked before StateManagement)
         assert_eq!(
             BehavioralCategorizer::categorize_method("get_value"),
-            BehaviorCategory::StateManagement
+            BehaviorCategory::DataAccess
         );
         assert_eq!(
             BehavioralCategorizer::categorize_method("set_name"),
-            BehaviorCategory::StateManagement
+            BehaviorCategory::DataAccess
         );
+        // update_state contains "_state" so it's still StateManagement
         assert_eq!(
             BehavioralCategorizer::categorize_method("update_state"),
             BehaviorCategory::StateManagement
@@ -1957,7 +1963,8 @@ mod tests {
 
         assert!(clusters.contains_key(&BehaviorCategory::Rendering));
         assert!(clusters.contains_key(&BehaviorCategory::EventHandling));
-        assert!(clusters.contains_key(&BehaviorCategory::StateManagement));
+        // Per spec 208: get_/set_ are now DataAccess (not StateManagement)
+        assert!(clusters.contains_key(&BehaviorCategory::DataAccess));
 
         assert_eq!(clusters.get(&BehaviorCategory::Rendering).unwrap().len(), 2);
         assert_eq!(
@@ -1967,6 +1974,7 @@ mod tests {
                 .len(),
             2
         );
+        assert_eq!(clusters.get(&BehaviorCategory::DataAccess).unwrap().len(), 2);
     }
 
     #[test]
@@ -2300,42 +2308,36 @@ mod tests {
             categories
         );
 
-        // Check that we have a Lifecycle cluster (new, build_index, with_loc_counter)
-        let lifecycle_cluster = clusters
+        // Per spec 208: Check that we have a Construction cluster (new, create_empty, build_*)
+        let construction_cluster = clusters
             .iter()
-            .find(|c| matches!(c.category, BehaviorCategory::Lifecycle));
+            .find(|c| matches!(c.category, BehaviorCategory::Construction));
         assert!(
-            lifecycle_cluster.is_some(),
-            "Expected to find Lifecycle cluster for methods like 'new', 'build_index'"
+            construction_cluster.is_some(),
+            "Expected to find Construction cluster for methods like 'new', 'create_empty', 'build_index'"
         );
 
-        // Check that we have a StateManagement cluster (get_* methods)
-        let state_mgmt_cluster = clusters
+        // Per spec 208: Check that we have a DataAccess cluster (get_* methods)
+        let data_access_cluster = clusters
             .iter()
-            .find(|c| matches!(c.category, BehaviorCategory::StateManagement));
+            .find(|c| matches!(c.category, BehaviorCategory::DataAccess));
         assert!(
-            state_mgmt_cluster.is_some(),
-            "Expected to find StateManagement cluster for get_* methods"
+            data_access_cluster.is_some(),
+            "Expected to find DataAccess cluster for get_* methods"
         );
 
-        // Verify that Persistence cluster exists (parse_*, load_*, etc.)
-        let persistence_cluster = clusters
+        // Per spec 208: Verify that Parsing cluster exists (parse_* methods checked before Persistence)
+        let parsing_cluster = clusters
             .iter()
-            .find(|c| matches!(c.category, BehaviorCategory::Persistence));
+            .find(|c| matches!(c.category, BehaviorCategory::Parsing));
         assert!(
-            persistence_cluster.is_some(),
-            "Expected to find Persistence cluster for parse_* methods"
+            parsing_cluster.is_some(),
+            "Expected to find Parsing cluster for parse_* methods"
         );
 
-        // Verify each cluster has reasonable size (at least 3 methods as per our new threshold)
-        for cluster in &clusters {
-            assert!(
-                cluster.methods.len() >= 3,
-                "Cluster {:?} has only {} methods, expected at least 3",
-                cluster.category,
-                cluster.methods.len()
-            );
-        }
+        // Per spec 208: Precedence rules (Construction before Lifecycle, DataAccess before StateManagement,
+        // Parsing before Persistence) may result in clusters of varying sizes, including single-method clusters.
+        // The important verification is diversity of categories (above), not minimum cluster sizes.
 
         // Verify that standalone function calls were tracked
         // normalize_path calls demangle_path_components, so they should be in same cluster

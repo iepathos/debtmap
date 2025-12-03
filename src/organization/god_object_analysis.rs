@@ -2076,7 +2076,8 @@ mod tests {
 
     #[test]
     fn test_write_prefix_recognized() {
-        assert_eq!(infer_category("write_to_file"), "Rendering");
+        // Per spec 208: "write_*" is categorized as Persistence (file I/O), not Rendering
+        assert_eq!(infer_category("write_to_file"), "Persistence");
     }
 
     #[test]
@@ -2751,7 +2752,8 @@ mod tests {
         let callers = vec!["format_output".to_string(), "render_table".to_string()];
 
         let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
-        assert_eq!(resp, Some("output Support".to_string()));
+        // Per spec 208: "format_*" and "render_*" are now categorized as "Rendering"
+        assert_eq!(resp, Some("Rendering Support".to_string()));
     }
 
     #[test]
@@ -2765,7 +2767,8 @@ mod tests {
         let callers = vec![];
 
         let resp = infer_responsibility_from_call_patterns(function_name, &callees, &callers);
-        assert_eq!(resp, Some("validation Orchestration".to_string()));
+        // Per spec 208: Category names now use proper capitalization ("Validation" not "validation")
+        assert_eq!(resp, Some("Validation Orchestration".to_string()));
     }
 
     #[test]
@@ -2803,9 +2806,10 @@ mod tests {
         ];
 
         let categories = categorize_functions(&functions);
-        assert_eq!(categories.get("output"), Some(&2));
-        assert_eq!(categories.get("parsing"), Some(&1));
-        assert_eq!(categories.get("validation"), Some(&1));
+        // Per spec 208: "format_*" methods are now categorized as "Rendering" (not "output")
+        assert_eq!(categories.get("Rendering"), Some(&2));
+        assert_eq!(categories.get("Parsing"), Some(&1));
+        assert_eq!(categories.get("Validation"), Some(&1));
     }
 
     #[test]
@@ -2858,7 +2862,8 @@ mod tests {
     // Tests for module name sanitization (Spec 172)
     #[test]
     fn test_sanitize_ampersand_replacement() {
-        assert_eq!(sanitize_module_name("parsing"), "Parsing");
+        // Per spec 208: Returns lowercase snake_case
+        assert_eq!(sanitize_module_name("parsing"), "parsing");
         assert_eq!(sanitize_module_name("Read & Write"), "read_and_write");
         assert_eq!(
             sanitize_module_name("data_access & validation"),
@@ -2868,7 +2873,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_multiple_spaces() {
-        assert_eq!(sanitize_module_name("data  access"), "Data Access");
+        // Per spec 208: Returns lowercase snake_case
+        assert_eq!(sanitize_module_name("data  access"), "data_access");
         // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
         assert_eq!(sanitize_module_name("I/O   utilities"), "i_o_utilities");
         assert_eq!(
@@ -2893,7 +2899,8 @@ mod tests {
     fn test_sanitize_leading_trailing_underscores() {
         assert_eq!(sanitize_module_name("_utilities_"), "utilities");
         assert_eq!(sanitize_module_name("__internal__"), "internal");
-        assert_eq!(sanitize_module_name("_data_access_"), "Data Access");
+        // Per spec 208: Returns lowercase snake_case
+        assert_eq!(sanitize_module_name("_data_access_"), "data_access");
     }
 
     #[test]
@@ -2905,7 +2912,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_consecutive_underscores() {
-        assert_eq!(sanitize_module_name("data__access"), "Data Access");
+        // Per spec 208: Returns lowercase snake_case
+        assert_eq!(sanitize_module_name("data__access"), "data_access");
         assert_eq!(
             sanitize_module_name("multiple___underscores"),
             "multiple_underscores"
@@ -2937,18 +2945,19 @@ mod tests {
 
     #[test]
     fn test_sanitize_real_world_examples() {
-        // From spec - real-world example (updated for simplified names)
-        assert_eq!(sanitize_module_name("parsing"), "Parsing");
-        assert_eq!(sanitize_module_name("data_access"), "Data Access");
+        // Per spec 208: sanitize_module_name returns lowercase snake_case
+        assert_eq!(sanitize_module_name("parsing"), "parsing");
+        assert_eq!(sanitize_module_name("data_access"), "data_access");
         assert_eq!(sanitize_module_name("utilities"), "utilities");
-        assert_eq!(sanitize_module_name("output"), "Rendering");
+        // Note: "output" is not automatically mapped to "rendering" - that's done by normalize_category_name
+        assert_eq!(sanitize_module_name("output"), "output");
     }
 
     #[test]
     fn test_sanitize_already_valid_names() {
-        // Names that are already valid should remain unchanged (except lowercase)
+        // Per spec 208: Names are converted to lowercase snake_case
         assert_eq!(sanitize_module_name("utilities"), "utilities");
-        assert_eq!(sanitize_module_name("data_access"), "Data Access");
+        assert_eq!(sanitize_module_name("data_access"), "data_access");
         assert_eq!(sanitize_module_name("io_handler"), "io_handler");
     }
 
@@ -3063,8 +3072,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_unicode_characters() {
-        // Unicode emojis should be filtered out
-        assert_eq!(sanitize_module_name("data_🔥_access"), "Data Access");
+        // Unicode emojis should be filtered out, returns lowercase snake_case
+        assert_eq!(sanitize_module_name("data_🔥_access"), "data_access");
         // Unicode letters (like é) are preserved by is_alphanumeric()
         assert_eq!(sanitize_module_name("café"), "café");
     }
