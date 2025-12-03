@@ -9,6 +9,7 @@ pub mod file_metrics;
 pub mod formatted_output;
 pub mod formatter;
 pub mod formatter_markdown;
+pub mod formatter_verbosity;
 pub mod parallel_call_graph;
 pub mod refactoring_impact;
 pub mod score_formatter;

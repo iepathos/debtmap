@@ -6,8 +6,7 @@
 use crate::formatting::FormattingConfig;
 use crate::priority::{UnifiedAnalysis, UnifiedDebtItem};
 
-#[path = "../formatter_verbosity.rs"]
-mod verbosity;
+use crate::priority::formatter_verbosity as verbosity;
 
 // Submodules (spec 205: organized by responsibility)
 mod context;

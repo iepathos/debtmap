@@ -66,8 +66,27 @@ fn verify_formatter_uses_correct_colors() {
         panic!("Formatter module directory not found at src/priority/formatter");
     }
 
-    let formatter_verbosity_content = fs::read_to_string("src/priority/formatter_verbosity.rs")
-        .expect("Could not read formatter_verbosity.rs");
+    // Read formatter_verbosity module files (was refactored into a module)
+    let mut formatter_verbosity_content = String::new();
+    let formatter_verbosity_dir = std::path::Path::new("src/priority/formatter_verbosity");
+
+    if formatter_verbosity_dir.exists() && formatter_verbosity_dir.is_dir() {
+        for entry in fs::read_dir(formatter_verbosity_dir)
+            .expect("Could not read formatter_verbosity directory")
+        {
+            let entry = entry.expect("Could not read directory entry");
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "rs") {
+                let content = fs::read_to_string(&path)
+                    .unwrap_or_else(|_| panic!("Could not read {:?}", path));
+                formatter_verbosity_content.push_str(&content);
+            }
+        }
+    } else {
+        panic!(
+            "Formatter verbosity module directory not found at src/priority/formatter_verbosity"
+        );
+    }
 
     // Check that WHY label uses bright_blue and rationale uses no color (plain text)
     // Updated for spec 139: "WHY THIS MATTERS" label format
@@ -75,7 +94,7 @@ fn verify_formatter_uses_correct_colors() {
     let formatter_has_dimmed = formatter_content.contains("rationale.dimmed()");
     let formatter_has_bright_white = formatter_content.contains("rationale.bright_white()");
 
-    // Updated for spec 139: "WHY THIS MATTERS" label format in both files
+    // Updated for spec 139: "WHY THIS MATTERS" label format in both modules
     let verbosity_why_label_blue =
         formatter_verbosity_content.contains("WHY THIS MATTERS:\".bright_blue()");
     let verbosity_has_dimmed = formatter_verbosity_content.contains("rationale.dimmed()");
@@ -96,15 +115,15 @@ fn verify_formatter_uses_correct_colors() {
         formatter_has_bright_white
     );
     println!(
-        "  formatter_verbosity.rs WHY label uses bright_blue: {}",
+        "  formatter_verbosity module WHY label uses bright_blue: {}",
         verbosity_why_label_blue
     );
     println!(
-        "  formatter_verbosity.rs uses dimmed for rationale: {}",
+        "  formatter_verbosity module uses dimmed for rationale: {}",
         verbosity_has_dimmed
     );
     println!(
-        "  formatter_verbosity.rs uses bright_white for rationale: {}",
+        "  formatter_verbosity module uses bright_white for rationale: {}",
         verbosity_has_bright_white
     );
 
@@ -127,15 +146,15 @@ fn verify_formatter_uses_correct_colors() {
 
     assert!(
         verbosity_why_label_blue,
-        "formatter_verbosity.rs should use bright_blue() for WHY label"
+        "formatter_verbosity module should use bright_blue() for WHY label"
     );
     assert!(
         !verbosity_has_dimmed,
-        "formatter_verbosity.rs should NOT use dimmed() for rationale"
+        "formatter_verbosity module should NOT use dimmed() for rationale"
     );
     assert!(
         !verbosity_has_bright_white,
-        "formatter_verbosity.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
+        "formatter_verbosity module should NOT use bright_white() for rationale (appears grey on some terminals)"
     );
 
     println!(
