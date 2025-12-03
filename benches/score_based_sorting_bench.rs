@@ -81,6 +81,7 @@ fn create_test_item(
         context_type: None,
         language_specific: None, // spec 190
         file_context: None,
+        detected_pattern: None, // spec 204
     }
 }
 
