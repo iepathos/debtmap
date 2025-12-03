@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::confidence::{MINIMUM_CONFIDENCE, UTILITIES_THRESHOLD};
+use super::confidence::MINIMUM_CONFIDENCE;
 
 /// Type of god object detection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1137,131 +1137,6 @@ pub enum SignalType {
     FrameworkPattern,
 }
 
-/// Responsibility category definition for method name classification.
-///
-/// This struct defines a single category with its name and the method name
-/// prefixes that indicate membership in that category.
-///
-/// # Examples
-///
-/// ```
-/// # use debtmap::organization::god_object_analysis::ResponsibilityCategory;
-/// let category = ResponsibilityCategory {
-///     name: "data_access",
-///     prefixes: &["get", "set"],
-/// };
-/// assert!(category.matches("get_value"));
-/// assert!(category.matches("set_config"));
-/// assert!(!category.matches("calculate_sum"));
-/// ```
-pub struct ResponsibilityCategory {
-    pub name: &'static str,
-    pub prefixes: &'static [&'static str],
-}
-
-impl ResponsibilityCategory {
-    /// Check if a method name matches any of this category's prefixes.
-    ///
-    /// # Arguments
-    ///
-    /// * `method_name` - The lowercased method name to check
-    ///
-    /// # Returns
-    ///
-    /// `true` if the method name starts with any of this category's prefixes
-    pub fn matches(&self, method_name: &str) -> bool {
-        self.prefixes
-            .iter()
-            .any(|prefix| method_name.starts_with(prefix))
-    }
-}
-
-/// Static responsibility categories ordered by specificity.
-///
-/// Categories are checked in order, so more specific categories should appear first.
-/// The "utilities" category has no prefixes and serves as a fallback for unmatched methods.
-///
-/// # Adding New Categories
-///
-/// To add a new category:
-/// 1. Insert a new `ResponsibilityCategory` entry in the appropriate position
-/// 2. Provide a descriptive name and list of prefixes
-/// 3. Add unit tests covering the new prefixes
-/// 4. Update the function documentation below
-///
-/// # Example
-///
-/// ```
-/// # use debtmap::organization::god_object_analysis::ResponsibilityCategory;
-/// let category = ResponsibilityCategory {
-///     name: "Authentication",
-///     prefixes: &["auth", "login", "logout"],
-/// };
-/// # assert!(category.matches("auth_user"));
-/// ```
-const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
-    ResponsibilityCategory {
-        name: "output",
-        prefixes: &[
-            "format", "render", "write", "print", "display", "show", "draw", "output", "emit",
-        ],
-    },
-    ResponsibilityCategory {
-        name: "parsing",
-        prefixes: &[
-            "parse",
-            "read",
-            "extract",
-            "decode",
-            "deserialize",
-            "unmarshal",
-            "scan",
-        ],
-    },
-    ResponsibilityCategory {
-        name: "filtering",
-        prefixes: &[
-            "filter", "select", "find", "search", "query", "lookup", "match",
-        ],
-    },
-    ResponsibilityCategory {
-        name: "transformation",
-        prefixes: &["transform", "convert", "map", "apply", "adapt"],
-    },
-    ResponsibilityCategory {
-        name: "data_access",
-        prefixes: &["get", "set", "fetch", "retrieve", "access"],
-    },
-    ResponsibilityCategory {
-        name: "validation",
-        prefixes: &["validate", "check", "verify", "is", "ensure", "assert"],
-    },
-    ResponsibilityCategory {
-        name: "computation",
-        prefixes: &["calculate", "compute", "evaluate", "measure"],
-    },
-    ResponsibilityCategory {
-        name: "construction",
-        prefixes: &["create", "build", "new", "make", "construct"],
-    },
-    ResponsibilityCategory {
-        name: "persistence",
-        prefixes: &["save", "load", "store", "persist", "cache"],
-    },
-    ResponsibilityCategory {
-        name: "processing",
-        prefixes: &["process", "handle", "execute", "run"],
-    },
-    ResponsibilityCategory {
-        name: "communication",
-        prefixes: &["send", "receive", "transmit", "broadcast", "notify"],
-    },
-    ResponsibilityCategory {
-        name: "utilities",
-        prefixes: &[],
-    },
-];
-
 /// Infer responsibility category from function/method name using pattern matching.
 ///
 /// This function uses a data-driven approach to categorize functions by matching
@@ -1294,9 +1169,9 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::infer_responsibility_from_method;
-/// assert_eq!(infer_responsibility_from_method("format_output"), "output");
-/// assert_eq!(infer_responsibility_from_method("parse_json"), "parsing");
-/// assert_eq!(infer_responsibility_from_method("calculate_average"), "computation");
+/// assert_eq!(infer_responsibility_from_method("format_output"), "Rendering");
+/// assert_eq!(infer_responsibility_from_method("parse_json"), "Parsing");
+/// assert_eq!(infer_responsibility_from_method("calculate_average"), "Computation");
 /// assert_eq!(infer_responsibility_from_method("helper_function"), "Helper");
 /// ```
 ///
@@ -1320,17 +1195,7 @@ const RESPONSIBILITY_CATEGORIES: &[ResponsibilityCategory] = &[
     note = "Use infer_responsibility_with_confidence for confidence-based classification"
 )]
 pub fn infer_responsibility_from_method(method_name: &str) -> String {
-    let lower = method_name.to_lowercase();
-
-    // First try the responsibility categories
-    if let Some(cat) = RESPONSIBILITY_CATEGORIES
-        .iter()
-        .find(|cat| cat.matches(&lower))
-    {
-        return cat.name.to_string();
-    }
-
-    // Fall back to behavioral categorization (Spec 178: avoid "misc" and "utilities")
+    // Use unified behavioral categorization (Spec 208)
     use crate::organization::BehavioralCategorizer;
     let category = BehavioralCategorizer::categorize_method(method_name);
     category.display_name()
@@ -1356,8 +1221,8 @@ pub fn infer_responsibility_from_method(method_name: &str) -> String {
 ///
 /// # Confidence Thresholds
 ///
-/// - Any category: ≥0.50 (MINIMUM_CONFIDENCE)
-/// - "utilities": ≥0.60 (UTILITIES_THRESHOLD) - higher bar to avoid over-classification
+/// - Recognized categories: 0.85 (high confidence)
+/// - Domain fallback: 0.45 (low confidence, rejected by MINIMUM_CONFIDENCE of 0.50)
 ///
 /// # Examples
 ///
@@ -1385,77 +1250,25 @@ pub fn infer_responsibility_with_confidence(
     method_name: &str,
     _method_body: Option<&str>,
 ) -> ClassificationResult {
-    let lower = method_name.to_lowercase();
-
-    // Try responsibility categories first
-    if let Some(cat) = RESPONSIBILITY_CATEGORIES
-        .iter()
-        .find(|cat| cat.matches(&lower))
-    {
-        let category_name = cat.name.to_string();
-
-        // Calculate confidence based on prefix match strength
-        // For now, exact prefix match = high confidence
-        let confidence = if category_name == "utilities" {
-            // "utilities" has no prefixes - should never match here
-            0.0
-        } else {
-            // Matched a specific prefix - high confidence
-            0.85
-        };
-
-        // Apply confidence thresholds
-        if confidence < MINIMUM_CONFIDENCE {
-            log::debug!(
-                "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}, signals: {:?}",
-                method_name,
-                confidence,
-                MINIMUM_CONFIDENCE,
-                vec![SignalType::NameHeuristic]
-            );
-            return ClassificationResult {
-                category: None,
-                confidence,
-                signals_used: vec![SignalType::NameHeuristic],
-            };
-        }
-
-        if category_name == "utilities" && confidence < UTILITIES_THRESHOLD {
-            log::debug!(
-                "Low confidence utilities classification for method '{}': confidence {:.2} below threshold {:.2}, signals: {:?}",
-                method_name,
-                confidence,
-                UTILITIES_THRESHOLD,
-                vec![SignalType::NameHeuristic]
-            );
-            return ClassificationResult {
-                category: None,
-                confidence,
-                signals_used: vec![SignalType::NameHeuristic],
-            };
-        }
-
-        return ClassificationResult {
-            category: Some(category_name),
-            confidence,
-            signals_used: vec![SignalType::NameHeuristic],
-        };
-    }
-
-    // Fall back to behavioral categorization
     use crate::organization::BehavioralCategorizer;
+
     let category = BehavioralCategorizer::categorize_method(method_name);
     let category_name = category.display_name();
 
-    // Behavioral categorization provides medium confidence
-    // Domain-specific categories get lower confidence than recognized patterns
+    // Assign confidence based on category type
     let confidence = match category {
         crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
-        _ => 0.65, // Above threshold for recognized behavioral patterns
+        _ => 0.85, // High confidence for recognized patterns
     };
 
     // Apply confidence thresholds
     if confidence < MINIMUM_CONFIDENCE {
+        log::debug!(
+            "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}",
+            method_name,
+            confidence,
+            MINIMUM_CONFIDENCE
+        );
         return ClassificationResult {
             category: None,
             confidence,
@@ -1487,10 +1300,10 @@ pub fn infer_responsibility_with_confidence(
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::normalize_category_name;
-/// assert_eq!(normalize_category_name("output"), "output");
-/// assert_eq!(normalize_category_name("parsing"), "parsing");
-/// assert_eq!(normalize_category_name("data_access"), "data_access");
-/// assert_eq!(normalize_category_name("output"), "output"); // Already normalized
+/// assert_eq!(normalize_category_name("output"), "Rendering");
+/// assert_eq!(normalize_category_name("parsing"), "Parsing");
+/// assert_eq!(normalize_category_name("data_access"), "Data Access");
+/// assert_eq!(normalize_category_name("output"), "Rendering"); // Already normalized
 /// ```
 pub fn normalize_category_name(old_name: &str) -> String {
     match old_name {
@@ -2048,8 +1861,8 @@ fn ensure_not_reserved(mut name: String) -> String {
 ///
 /// ```
 /// # use debtmap::organization::god_object_analysis::sanitize_module_name;
-/// assert_eq!(sanitize_module_name("parsing"), "parsing");
-/// assert_eq!(sanitize_module_name("Data  Access"), "data_access");
+/// assert_eq!(sanitize_module_name("parsing"), "Parsing");
+/// assert_eq!(sanitize_module_name("Data  Access"), "Data Access");
 /// assert_eq!(sanitize_module_name("I/O Utilities"), "i_o_utilities");
 /// assert_eq!(sanitize_module_name("User's Profile"), "users_profile");
 /// assert_eq!(sanitize_module_name("Data-Access-Layer"), "data_access_layer");
@@ -2251,106 +2064,106 @@ mod tests {
 
     #[test]
     fn test_format_prefix_recognized() {
-        assert_eq!(infer_category("format_output"), "output");
-        assert_eq!(infer_category("format_json"), "output");
-        assert_eq!(infer_category("FORMAT_DATA"), "output");
+        assert_eq!(infer_category("format_output"), "Rendering");
+        assert_eq!(infer_category("format_json"), "Rendering");
+        assert_eq!(infer_category("FORMAT_DATA"), "Rendering");
     }
 
     #[test]
     fn test_render_prefix_recognized() {
-        assert_eq!(infer_category("render_table"), "output");
+        assert_eq!(infer_category("render_table"), "Rendering");
     }
 
     #[test]
     fn test_write_prefix_recognized() {
-        assert_eq!(infer_category("write_to_file"), "output");
+        assert_eq!(infer_category("write_to_file"), "Rendering");
     }
 
     #[test]
     fn test_print_prefix_recognized() {
-        assert_eq!(infer_category("print_results"), "output");
+        assert_eq!(infer_category("print_results"), "Rendering");
     }
 
     #[test]
     fn test_parse_prefix_recognized() {
-        assert_eq!(infer_category("parse_input"), "parsing");
-        assert_eq!(infer_category("parse_json"), "parsing");
+        assert_eq!(infer_category("parse_input"), "Parsing");
+        assert_eq!(infer_category("parse_json"), "Parsing");
     }
 
     #[test]
     fn test_read_prefix_recognized() {
-        assert_eq!(infer_category("read_config"), "parsing");
+        assert_eq!(infer_category("read_config"), "Parsing");
     }
 
     #[test]
     fn test_extract_prefix_recognized() {
-        assert_eq!(infer_category("extract_data"), "parsing");
+        assert_eq!(infer_category("extract_data"), "Parsing");
     }
 
     #[test]
     fn test_filter_prefix_recognized() {
-        assert_eq!(infer_category("filter_results"), "filtering");
+        assert_eq!(infer_category("filter_results"), "Filtering");
     }
 
     #[test]
     fn test_select_prefix_recognized() {
-        assert_eq!(infer_category("select_items"), "filtering");
+        assert_eq!(infer_category("select_items"), "Filtering");
     }
 
     #[test]
     fn test_find_prefix_recognized() {
-        assert_eq!(infer_category("find_element"), "filtering");
+        assert_eq!(infer_category("find_element"), "Filtering");
     }
 
     #[test]
     fn test_transform_prefix_recognized() {
-        assert_eq!(infer_category("transform_data"), "transformation");
+        assert_eq!(infer_category("transform_data"), "Transformation");
     }
 
     #[test]
     fn test_convert_prefix_recognized() {
-        assert_eq!(infer_category("convert_to_json"), "transformation");
+        assert_eq!(infer_category("convert_to_json"), "Transformation");
     }
 
     #[test]
     fn test_map_prefix_recognized() {
-        assert_eq!(infer_category("map_values"), "transformation");
+        assert_eq!(infer_category("map_values"), "Transformation");
     }
 
     #[test]
     fn test_apply_prefix_recognized() {
-        assert_eq!(infer_category("apply_mapping"), "transformation");
+        assert_eq!(infer_category("apply_mapping"), "Transformation");
     }
 
     #[test]
     fn test_get_prefix_recognized() {
-        assert_eq!(infer_category("get_value"), "data_access");
+        assert_eq!(infer_category("get_value"), "Data Access");
     }
 
     #[test]
     fn test_set_prefix_recognized() {
-        assert_eq!(infer_category("set_value"), "data_access");
+        assert_eq!(infer_category("set_value"), "Data Access");
     }
 
     #[test]
     fn test_is_prefix_recognized() {
-        assert_eq!(infer_category("is_valid"), "validation");
-        assert_eq!(infer_category("is_empty"), "validation");
+        assert_eq!(infer_category("is_valid"), "Validation");
+        assert_eq!(infer_category("is_empty"), "Validation");
     }
 
     #[test]
     fn test_validate_prefix_recognized() {
-        assert_eq!(infer_category("validate_input"), "validation");
+        assert_eq!(infer_category("validate_input"), "Validation");
     }
 
     #[test]
     fn test_check_prefix_recognized() {
-        assert_eq!(infer_category("check_constraints"), "validation");
+        assert_eq!(infer_category("check_constraints"), "Validation");
     }
 
     #[test]
     fn test_verify_prefix_recognized() {
-        assert_eq!(infer_category("verify_signature"), "validation");
+        assert_eq!(infer_category("verify_signature"), "Validation");
     }
 
     #[test]
@@ -2390,70 +2203,70 @@ mod tests {
 
     #[test]
     fn test_case_insensitive_matching() {
-        assert_eq!(infer_category("FORMAT_OUTPUT"), "output");
-        assert_eq!(infer_category("Parse_Input"), "parsing");
-        assert_eq!(infer_category("IS_VALID"), "validation");
+        assert_eq!(infer_category("FORMAT_OUTPUT"), "Rendering");
+        assert_eq!(infer_category("Parse_Input"), "Parsing");
+        assert_eq!(infer_category("IS_VALID"), "Validation");
     }
 
     #[test]
     fn test_calculate_prefix_recognized() {
-        assert_eq!(infer_category("calculate_total"), "computation");
-        assert_eq!(infer_category("calculate_sum"), "computation");
+        assert_eq!(infer_category("calculate_total"), "Computation");
+        assert_eq!(infer_category("calculate_sum"), "Computation");
     }
 
     #[test]
     fn test_compute_prefix_recognized() {
-        assert_eq!(infer_category("compute_result"), "computation");
+        assert_eq!(infer_category("compute_result"), "Computation");
     }
 
     #[test]
     fn test_create_prefix_recognized() {
-        assert_eq!(infer_category("create_instance"), "construction");
+        assert_eq!(infer_category("create_instance"), "Construction");
     }
 
     #[test]
     fn test_build_prefix_recognized() {
-        assert_eq!(infer_category("build_object"), "construction");
+        assert_eq!(infer_category("build_object"), "Construction");
     }
 
     #[test]
     fn test_new_prefix_recognized() {
-        assert_eq!(infer_category("new_connection"), "construction");
+        assert_eq!(infer_category("new_connection"), "Construction");
     }
 
     #[test]
     fn test_save_prefix_recognized() {
-        assert_eq!(infer_category("save_to_disk"), "persistence");
+        assert_eq!(infer_category("save_to_disk"), "Persistence");
     }
 
     #[test]
     fn test_load_prefix_recognized() {
-        assert_eq!(infer_category("load_from_file"), "persistence");
+        assert_eq!(infer_category("load_from_file"), "Persistence");
     }
 
     #[test]
     fn test_store_prefix_recognized() {
-        assert_eq!(infer_category("store_data"), "persistence");
+        assert_eq!(infer_category("store_data"), "Persistence");
     }
 
     #[test]
     fn test_process_prefix_recognized() {
-        assert_eq!(infer_category("process_request"), "processing");
+        assert_eq!(infer_category("process_request"), "Processing");
     }
 
     #[test]
     fn test_handle_prefix_recognized() {
-        assert_eq!(infer_category("handle_event"), "processing");
+        assert_eq!(infer_category("handle_event"), "Event Handling");
     }
 
     #[test]
     fn test_send_prefix_recognized() {
-        assert_eq!(infer_category("send_message"), "communication");
+        assert_eq!(infer_category("send_message"), "Communication");
     }
 
     #[test]
     fn test_receive_prefix_recognized() {
-        assert_eq!(infer_category("receive_data"), "communication");
+        assert_eq!(infer_category("receive_data"), "Communication");
     }
 
     #[test]
@@ -2869,7 +2682,7 @@ mod tests {
             infer_responsibility_with_io_detection(method_name, Some(method_body), Language::Rust);
 
         // Pure functions fall back to name-based heuristics
-        assert_eq!(responsibility, "computation");
+        assert_eq!(responsibility, "Computation");
     }
 
     #[test]
@@ -2883,7 +2696,7 @@ mod tests {
             infer_responsibility_with_io_detection(method_name, method_body, Language::Rust);
 
         // Without body, falls back to name-based detection
-        assert_eq!(responsibility, "output");
+        assert_eq!(responsibility, "Rendering");
     }
 
     #[test]
@@ -3045,7 +2858,7 @@ mod tests {
     // Tests for module name sanitization (Spec 172)
     #[test]
     fn test_sanitize_ampersand_replacement() {
-        assert_eq!(sanitize_module_name("parsing"), "parsing");
+        assert_eq!(sanitize_module_name("parsing"), "Parsing");
         assert_eq!(sanitize_module_name("Read & Write"), "read_and_write");
         assert_eq!(
             sanitize_module_name("data_access & validation"),
@@ -3055,7 +2868,7 @@ mod tests {
 
     #[test]
     fn test_sanitize_multiple_spaces() {
-        assert_eq!(sanitize_module_name("data  access"), "data_access");
+        assert_eq!(sanitize_module_name("data  access"), "Data Access");
         // I/O → i_o (slash is converted to underscore, preserving letter boundaries)
         assert_eq!(sanitize_module_name("I/O   utilities"), "i_o_utilities");
         assert_eq!(
@@ -3080,7 +2893,7 @@ mod tests {
     fn test_sanitize_leading_trailing_underscores() {
         assert_eq!(sanitize_module_name("_utilities_"), "utilities");
         assert_eq!(sanitize_module_name("__internal__"), "internal");
-        assert_eq!(sanitize_module_name("_data_access_"), "data_access");
+        assert_eq!(sanitize_module_name("_data_access_"), "Data Access");
     }
 
     #[test]
@@ -3092,7 +2905,7 @@ mod tests {
 
     #[test]
     fn test_sanitize_consecutive_underscores() {
-        assert_eq!(sanitize_module_name("data__access"), "data_access");
+        assert_eq!(sanitize_module_name("data__access"), "Data Access");
         assert_eq!(
             sanitize_module_name("multiple___underscores"),
             "multiple_underscores"
@@ -3125,17 +2938,17 @@ mod tests {
     #[test]
     fn test_sanitize_real_world_examples() {
         // From spec - real-world example (updated for simplified names)
-        assert_eq!(sanitize_module_name("parsing"), "parsing");
-        assert_eq!(sanitize_module_name("data_access"), "data_access");
+        assert_eq!(sanitize_module_name("parsing"), "Parsing");
+        assert_eq!(sanitize_module_name("data_access"), "Data Access");
         assert_eq!(sanitize_module_name("utilities"), "utilities");
-        assert_eq!(sanitize_module_name("output"), "output");
+        assert_eq!(sanitize_module_name("output"), "Rendering");
     }
 
     #[test]
     fn test_sanitize_already_valid_names() {
         // Names that are already valid should remain unchanged (except lowercase)
         assert_eq!(sanitize_module_name("utilities"), "utilities");
-        assert_eq!(sanitize_module_name("data_access"), "data_access");
+        assert_eq!(sanitize_module_name("data_access"), "Data Access");
         assert_eq!(sanitize_module_name("io_handler"), "io_handler");
     }
 
@@ -3251,7 +3064,7 @@ mod tests {
     #[test]
     fn test_sanitize_unicode_characters() {
         // Unicode emojis should be filtered out
-        assert_eq!(sanitize_module_name("data_🔥_access"), "data_access");
+        assert_eq!(sanitize_module_name("data_🔥_access"), "Data Access");
         // Unicode letters (like é) are preserved by is_alphanumeric()
         assert_eq!(sanitize_module_name("café"), "café");
     }
@@ -3330,7 +3143,7 @@ mod tests {
     fn test_high_confidence_classification() {
         let result = infer_responsibility_with_confidence("parse_json", None);
         assert!(result.category.is_some());
-        assert_eq!(result.category.unwrap(), "parsing");
+        assert_eq!(result.category.unwrap(), "Parsing");
         assert!(result.confidence >= MINIMUM_CONFIDENCE);
     }
 
@@ -3375,22 +3188,20 @@ mod tests {
     }
 
     #[test]
-    fn test_utilities_category_avoided() {
-        // "utilities" category should never be returned from the prefix matching
-        // since it has no prefixes and requires higher confidence
+    fn test_domain_category_low_confidence() {
+        // Domain-specific categories (fallback) should have low confidence
+        // and be rejected by the confidence threshold
         let result = infer_responsibility_with_confidence("helper_function", None);
 
-        // Either classified to something else or refused (confidence too low)
-        if let Some(category) = result.category {
-            // If classified, should not be "utilities" unless confidence is very high
-            if category.to_lowercase().contains("util") {
-                assert!(
-                    result.confidence >= UTILITIES_THRESHOLD,
-                    "utilities classification requires confidence >= {}",
-                    UTILITIES_THRESHOLD
-                );
-            }
-        }
+        // Should be refused due to low confidence
+        assert!(
+            result.category.is_none(),
+            "Domain fallback should have low confidence and be refused"
+        );
+        assert!(
+            result.confidence < MINIMUM_CONFIDENCE,
+            "Domain category confidence should be below minimum threshold"
+        );
     }
 
     #[test]

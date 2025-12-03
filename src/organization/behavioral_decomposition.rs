@@ -22,6 +22,20 @@ pub enum BehaviorCategory {
     Validation,
     /// Pure computation: deterministic calculations with no state mutation
     Computation,
+    /// Parsing: parse, read, extract, decode, deserialize, unmarshal, scan
+    Parsing,
+    /// Filtering: filter, select, find, search, query, lookup, match
+    Filtering,
+    /// Transformation: transform, convert, map, apply, adapt
+    Transformation,
+    /// Data access: get, set, fetch, retrieve, access
+    DataAccess,
+    /// Construction: create, build, new, make, construct
+    Construction,
+    /// Processing: process, handle, execute, run
+    Processing,
+    /// Communication: send, receive, transmit, broadcast, notify
+    Communication,
     /// Domain-specific behavior with custom name
     Domain(String),
 }
@@ -37,6 +51,13 @@ impl BehaviorCategory {
             BehaviorCategory::Persistence => "Persistence".to_string(),
             BehaviorCategory::Validation => "Validation".to_string(),
             BehaviorCategory::Computation => "Computation".to_string(),
+            BehaviorCategory::Parsing => "Parsing".to_string(),
+            BehaviorCategory::Filtering => "Filtering".to_string(),
+            BehaviorCategory::Transformation => "Transformation".to_string(),
+            BehaviorCategory::DataAccess => "Data Access".to_string(),
+            BehaviorCategory::Construction => "Construction".to_string(),
+            BehaviorCategory::Processing => "Processing".to_string(),
+            BehaviorCategory::Communication => "Communication".to_string(),
             BehaviorCategory::Domain(name) => name.clone(),
         }
     }
@@ -51,6 +72,13 @@ impl BehaviorCategory {
             BehaviorCategory::Persistence => "persistence".to_string(),
             BehaviorCategory::Validation => "validation".to_string(),
             BehaviorCategory::Computation => "computation".to_string(),
+            BehaviorCategory::Parsing => "parsing".to_string(),
+            BehaviorCategory::Filtering => "filtering".to_string(),
+            BehaviorCategory::Transformation => "transformation".to_string(),
+            BehaviorCategory::DataAccess => "data_access".to_string(),
+            BehaviorCategory::Construction => "construction".to_string(),
+            BehaviorCategory::Processing => "processing".to_string(),
+            BehaviorCategory::Communication => "communication".to_string(),
             BehaviorCategory::Domain(name) => name.to_lowercase().replace(' ', "_"),
         }
     }
@@ -123,19 +151,39 @@ pub struct BehavioralCategorizer;
 impl BehavioralCategorizer {
     /// Categorize a method based on its name and signature
     ///
-    /// Uses heuristics from Spec 178:
+    /// Uses heuristics from Spec 208 (unified classification system):
+    /// - Construction: create, build, new, make, construct (checked first before lifecycle)
     /// - Lifecycle: new, create, init, destroy, etc.
+    /// - Parsing: parse, read, extract, decode, etc.
     /// - Rendering: render, draw, paint, format, etc.
     /// - Event handling: handle_*, on_*, etc.
     /// - Persistence: save, load, serialize, etc.
     /// - Validation: validate_*, check_*, verify_*, etc.
+    /// - Computation: calculate, compute, evaluate, etc.
+    /// - Filtering: filter, select, find, search, etc.
+    /// - Transformation: transform, convert, map, apply, etc.
+    /// - Data access: get, set, fetch, retrieve, access
+    /// - Processing: process, handle, execute, run
+    /// - Communication: send, receive, transmit, broadcast, notify
     /// - State management: get_*, set_*, update_*, etc.
     pub fn categorize_method(method_name: &str) -> BehaviorCategory {
         let lower_name = method_name.to_lowercase();
 
+        // Order matters: check more specific categories first
+
+        // Construction (before lifecycle to catch "create_*")
+        if Self::is_construction(&lower_name) {
+            return BehaviorCategory::Construction;
+        }
+
         // Lifecycle methods
         if Self::is_lifecycle(&lower_name) {
             return BehaviorCategory::Lifecycle;
+        }
+
+        // Parsing (check early as it's common)
+        if Self::is_parsing(&lower_name) {
+            return BehaviorCategory::Parsing;
         }
 
         // Rendering/Display methods
@@ -156,6 +204,36 @@ impl BehavioralCategorizer {
         // Validation methods
         if Self::is_validation(&lower_name) {
             return BehaviorCategory::Validation;
+        }
+
+        // Computation methods
+        if Self::is_computation(&lower_name) {
+            return BehaviorCategory::Computation;
+        }
+
+        // Filtering methods
+        if Self::is_filtering(&lower_name) {
+            return BehaviorCategory::Filtering;
+        }
+
+        // Transformation methods
+        if Self::is_transformation(&lower_name) {
+            return BehaviorCategory::Transformation;
+        }
+
+        // Data access methods
+        if Self::is_data_access(&lower_name) {
+            return BehaviorCategory::DataAccess;
+        }
+
+        // Processing methods
+        if Self::is_processing(&lower_name) {
+            return BehaviorCategory::Processing;
+        }
+
+        // Communication methods
+        if Self::is_communication(&lower_name) {
+            return BehaviorCategory::Communication;
         }
 
         // State management methods
@@ -246,6 +324,73 @@ impl BehavioralCategorizer {
             || name.starts_with("mutate_")
             || name.contains("_state")
     }
+
+    fn is_computation(name: &str) -> bool {
+        const COMPUTATION_KEYWORDS: &[&str] = &["calculate", "compute", "evaluate", "measure"];
+        COMPUTATION_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_parsing(name: &str) -> bool {
+        const PARSING_KEYWORDS: &[&str] = &[
+            "parse",
+            "read",
+            "extract",
+            "decode",
+            "deserialize",
+            "unmarshal",
+            "scan",
+        ];
+        PARSING_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_filtering(name: &str) -> bool {
+        const FILTERING_KEYWORDS: &[&str] = &[
+            "filter", "select", "find", "search", "query", "lookup", "match",
+        ];
+        FILTERING_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_transformation(name: &str) -> bool {
+        const TRANSFORMATION_KEYWORDS: &[&str] = &["transform", "convert", "map", "apply", "adapt"];
+        TRANSFORMATION_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_data_access(name: &str) -> bool {
+        const DATA_ACCESS_KEYWORDS: &[&str] = &["get", "set", "fetch", "retrieve", "access"];
+        DATA_ACCESS_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_construction(name: &str) -> bool {
+        const CONSTRUCTION_KEYWORDS: &[&str] = &["create", "build", "new", "make", "construct"];
+        CONSTRUCTION_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_processing(name: &str) -> bool {
+        const PROCESSING_KEYWORDS: &[&str] = &["process", "handle", "execute", "run"];
+        PROCESSING_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
+
+    fn is_communication(name: &str) -> bool {
+        const COMMUNICATION_KEYWORDS: &[&str] =
+            &["send", "receive", "transmit", "broadcast", "notify"];
+        COMMUNICATION_KEYWORDS
+            .iter()
+            .any(|&kw| name.starts_with(kw) || name.contains(&format!("_{}", kw)))
+    }
 }
 
 /// Cluster methods by behavioral category
@@ -268,6 +413,13 @@ pub fn cluster_methods_by_behavior(methods: &[String]) -> HashMap<BehaviorCatego
                 | BehaviorCategory::Persistence
                 | BehaviorCategory::Validation
                 | BehaviorCategory::Computation
+                | BehaviorCategory::Parsing
+                | BehaviorCategory::Filtering
+                | BehaviorCategory::Transformation
+                | BehaviorCategory::DataAccess
+                | BehaviorCategory::Construction
+                | BehaviorCategory::Processing
+                | BehaviorCategory::Communication
         ) || methods.len() >= 3 // Keep domain clusters only if they have 3+ methods
     });
 
@@ -1085,6 +1237,13 @@ fn categories_are_related(cat1: &BehaviorCategory, cat2: &BehaviorCategory) -> b
         (Rendering, Rendering) => true,
         (EventHandling, EventHandling) => true,
         (Computation, Computation) => true,
+        (Parsing, Parsing) => true,
+        (Filtering, Filtering) => true,
+        (Transformation, Transformation) => true,
+        (DataAccess, DataAccess) => true,
+        (Construction, Construction) => true,
+        (Processing, Processing) => true,
+        (Communication, Communication) => true,
 
         // Domain categories with same or similar names
         (Domain(name1), Domain(name2)) => {
@@ -1096,6 +1255,8 @@ fn categories_are_related(cat1: &BehaviorCategory, cat2: &BehaviorCategory) -> b
         // Related categories
         (Persistence, StateManagement) | (StateManagement, Persistence) => true,
         (Validation, Computation) | (Computation, Validation) => true,
+        (Parsing, DataAccess) | (DataAccess, Parsing) => true,
+        (Filtering, Transformation) | (Transformation, Filtering) => true,
 
         _ => false,
     }
@@ -1383,6 +1544,13 @@ pub fn suggest_trait_extraction(cluster: &MethodCluster, _struct_name: &str) -> 
         BehaviorCategory::Persistence => "Persistable".to_string(),
         BehaviorCategory::Validation => "Validatable".to_string(),
         BehaviorCategory::Computation => "Calculator".to_string(),
+        BehaviorCategory::Parsing => "Parser".to_string(),
+        BehaviorCategory::Filtering => "Filterable".to_string(),
+        BehaviorCategory::Transformation => "Transformer".to_string(),
+        BehaviorCategory::DataAccess => "DataAccessor".to_string(),
+        BehaviorCategory::Construction => "Constructor".to_string(),
+        BehaviorCategory::Processing => "Processor".to_string(),
+        BehaviorCategory::Communication => "Communicator".to_string(),
         BehaviorCategory::Domain(name) => format!("{}Ops", capitalize_first(name)),
     };
 
