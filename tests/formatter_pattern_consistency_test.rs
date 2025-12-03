@@ -251,9 +251,18 @@ fn test_pattern_display_format_consistency() {
 
     // Each metric should follow "key: value" format
     for metric in &metrics {
-        assert!(metric.contains(": "), "Metric '{}' should contain ': '", metric);
+        assert!(
+            metric.contains(": "),
+            "Metric '{}' should contain ': '",
+            metric
+        );
         let parts: Vec<&str> = metric.split(": ").collect();
-        assert_eq!(parts.len(), 2, "Metric '{}' should have exactly one ': ' separator", metric);
+        assert_eq!(
+            parts.len(),
+            2,
+            "Metric '{}' should have exactly one ': ' separator",
+            metric
+        );
     }
 
     // Icon should be single character emoji

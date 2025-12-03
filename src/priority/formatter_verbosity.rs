@@ -778,9 +778,7 @@ fn format_complexity_summary(
 fn format_pattern_detection(output: &mut String, item: &UnifiedDebtItem) {
     // Read stored pattern result instead of re-detecting
     if let Some(ref pattern) = item.detected_pattern {
-        let metrics_str = pattern
-            .display_metrics()
-            .join(", ");
+        let metrics_str = pattern.display_metrics().join(", ");
 
         writeln!(
             output,
