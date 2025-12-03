@@ -7,14 +7,14 @@ use std::fmt::Write;
 
 // Pure function to classify coverage percentage
 // Returns (inline_indicator, standalone_indicator) following [SEVERITY STATE] pattern
+// Note: inline_indicator includes leading space for proper formatting
 #[allow(dead_code)]
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
     let level = CoverageLevel::from_percentage(coverage_pct);
-    let tag = level.status_tag();
     match level {
-        CoverageLevel::Untested | CoverageLevel::Low | CoverageLevel::Partial => {
-            (tag, tag) // Show warning tags for low coverage
-        }
+        CoverageLevel::Untested => (" [UNTESTED]", "[UNTESTED]"),
+        CoverageLevel::Low => (" [WARN LOW]", "[WARN LOW]"),
+        CoverageLevel::Partial => (" [WARN PARTIAL]", "[WARN PARTIAL]"),
         _ => ("", ""), // No inline indicator for good coverage
     }
 }

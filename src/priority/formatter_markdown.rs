@@ -1699,7 +1699,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 0);
 
         // Check basic elements are present
-        assert!(output.contains("### #1 Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #1 Score: 8.5 [CRITICAL]"));
         assert!(output.contains("**Type:** Complexity"));
         assert!(output.contains("**Location:** `test.rs:100 test_function()`"));
         assert!(output.contains("**Action:** Refactor complex function"));
@@ -1720,7 +1720,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 2, &item, 1);
 
         // Should include main factors but not full breakdown
-        assert!(output.contains("### #2 Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #2 Score: 8.5 [CRITICAL]"));
         assert!(output.contains("Main factors"));
 
         // Should include dependencies section
