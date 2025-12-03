@@ -792,11 +792,10 @@ impl ReachingDefinitions {
                 Terminator::Branch { condition, .. } => {
                     Self::collect_var_use(condition, reaching, block.id, &mut chains);
                 }
-                Terminator::Return { value } => {
-                    if let Some(val) = value {
-                        Self::collect_var_use(val, reaching, block.id, &mut chains);
-                    }
+                Terminator::Return { value: Some(val) } => {
+                    Self::collect_var_use(val, reaching, block.id, &mut chains);
                 }
+                Terminator::Return { value: None } => {}
                 _ => {}
             }
         }
@@ -816,7 +815,7 @@ impl ReachingDefinitions {
             if def.name_id == var_id.name_id {
                 chains
                     .entry(*def)
-                    .or_insert_with(HashSet::new)
+                    .or_default()
                     .insert(block_id);
             }
         }
