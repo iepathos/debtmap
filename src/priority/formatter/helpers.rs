@@ -3,22 +3,7 @@
 //! This module contains helper functions that will be replaced by more focused
 //! formatting modules. Use these only for backward compatibility.
 
-use crate::priority::classification::Severity;
 use crate::priority::{DebtType, FunctionRole, UnifiedDebtItem};
-use colored::*;
-use std::fmt::Write;
-
-/// Get severity label for score (will be deprecated in spec 203)
-#[deprecated(since = "0.8.0", note = "Use Severity::from_score().as_str() instead")]
-pub fn get_severity_label(score: f64) -> &'static str {
-    Severity::from_score(score).as_str()
-}
-
-/// Get severity color for score (will be deprecated in spec 203)
-#[deprecated(since = "0.8.0", note = "Use Severity::from_score().color() instead")]
-pub fn get_severity_color(score: f64) -> Color {
-    Severity::from_score(score).color()
-}
 
 /// Format impact metrics (temporary, will be moved in spec 203)
 pub fn format_impact(impact: &crate::priority::ImpactMetrics) -> String {
@@ -133,38 +118,3 @@ pub fn format_role(role: FunctionRole) -> &'static str {
     }
 }
 
-/// Pure function to generate output legend explaining header tags
-/// Displayed once at the start of recommendations when verbosity >= 1
-pub fn generate_legend(verbosity: u8, has_coverage_data: bool) -> String {
-    if verbosity == 0 || !has_coverage_data {
-        return String::new();
-    }
-
-    let mut legend = String::new();
-    writeln!(legend, "{}", "Legend:".bright_white().bold()).unwrap();
-    writeln!(
-        legend,
-        "  {} Numeric priority (higher = more important)",
-        "SCORE:".bright_yellow()
-    )
-    .unwrap();
-
-    if has_coverage_data {
-        writeln!(
-            legend,
-            "  {} Coverage status (how well tested)",
-            "[ERROR/WARN/INFO/OK]:".bright_cyan()
-        )
-        .unwrap();
-    }
-
-    writeln!(
-        legend,
-        "  {} Item severity (fix urgency)",
-        "[CRITICAL/HIGH/MEDIUM/LOW]:".bright_magenta()
-    )
-    .unwrap();
-    writeln!(legend).unwrap();
-
-    legend
-}

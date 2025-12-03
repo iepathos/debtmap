@@ -1,3 +1,4 @@
+use crate::priority::classification::Severity;
 use crate::priority::detected_pattern::DetectedPattern;
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{DebtType, FunctionVisibility, UnifiedDebtItem};
@@ -49,9 +50,10 @@ pub(crate) struct SeverityInfo {
 
 impl SeverityInfo {
     fn from_score(score: f64) -> Self {
+        let severity = Severity::from_score(score);
         Self {
-            label: super::get_severity_label(score).to_string(),
-            color: super::get_severity_color(score),
+            label: severity.as_str().to_string(),
+            color: severity.color(),
         }
     }
 }

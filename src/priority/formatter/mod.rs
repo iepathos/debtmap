@@ -3,15 +3,10 @@
 //! This module provides formatted output for technical debt priorities,
 //! including detailed recommendations and summary tables.
 
-use crate::formatting::{ColoredFormatter, FormattingConfig};
-use crate::output::evidence_formatter::EvidenceFormatter;
-use crate::priority::classification::Severity;
+use crate::formatting::FormattingConfig;
 use crate::priority::{
-    self, score_formatter, DebtType, DisplayGroup, FunctionRole, Tier, UnifiedAnalysis,
-    UnifiedAnalysisQueries, UnifiedDebtItem,
+    UnifiedAnalysis, UnifiedDebtItem,
 };
-use colored::*;
-use std::fmt::Write;
 
 #[path = "../formatter_verbosity.rs"]
 mod verbosity;
@@ -57,9 +52,15 @@ pub fn format_priorities_with_config(
     config: FormattingConfig,
 ) -> String {
     match format {
-        OutputFormat::Default => orchestrators::format_default_with_config(analysis, 10, verbosity, config),
-        OutputFormat::Top(n) => orchestrators::format_default_with_config(analysis, n, verbosity, config),
-        OutputFormat::Tail(n) => orchestrators::format_tail_with_config(analysis, n, verbosity, config),
+        OutputFormat::Default => {
+            orchestrators::format_default_with_config(analysis, 10, verbosity, config)
+        }
+        OutputFormat::Top(n) => {
+            orchestrators::format_default_with_config(analysis, n, verbosity, config)
+        }
+        OutputFormat::Tail(n) => {
+            orchestrators::format_tail_with_config(analysis, n, verbosity, config)
+        }
     }
 }
 
@@ -133,8 +134,7 @@ pub fn format_priority_item_legacy(
 
 // Re-export helper functions from helpers module (spec 205)
 pub use helpers::{
-    extract_complexity_info, extract_dependency_info, format_debt_type, format_impact,
-    format_role, get_severity_color, get_severity_label,
+    extract_complexity_info, extract_dependency_info, format_debt_type, format_impact, format_role,
 };
 
 // Stub function needed by recommendations.rs (implementation delegated to sections module)
@@ -142,10 +142,10 @@ pub fn format_file_priority_item_with_verbosity(
     output: &mut String,
     rank: usize,
     item: &crate::priority::FileDebtItem,
-    config: FormattingConfig,
+    _config: FormattingConfig,
     verbosity: u8,
 ) {
-    use crate::priority::score_formatter;
+    
     use std::fmt::Write;
 
     writeln!(
@@ -154,10 +154,15 @@ pub fn format_file_priority_item_with_verbosity(
         rank,
         item.metrics.path.display(),
         item.score
-    ).unwrap();
+    )
+    .unwrap();
 
     if verbosity >= 1 {
-        writeln!(output, "  {} lines, {} functions", item.metrics.total_lines, item.metrics.function_count).unwrap();
+        writeln!(
+            output,
+            "  {} lines, {} functions",
+            item.metrics.total_lines, item.metrics.function_count
+        )
+        .unwrap();
     }
 }
-
