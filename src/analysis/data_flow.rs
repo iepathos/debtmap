@@ -358,6 +358,8 @@ pub enum ExprKind {
 pub struct DataFlowAnalysis {
     /// Liveness information (which variables are used after each point)
     pub liveness: LivenessInfo,
+    /// Reaching definitions (which definitions reach each program point)
+    pub reaching_defs: ReachingDefinitions,
     /// Escape analysis (which variables escape the function scope)
     pub escape_info: EscapeAnalysis,
     /// Taint analysis (which variables are affected by mutations)
@@ -375,11 +377,13 @@ impl DataFlowAnalysis {
     /// ```
     pub fn analyze(cfg: &ControlFlowGraph) -> Self {
         let liveness = LivenessInfo::analyze(cfg);
+        let reaching_defs = ReachingDefinitions::analyze(cfg);
         let escape = EscapeAnalysis::analyze(cfg);
         let taint = TaintAnalysis::analyze(cfg, &liveness, &escape);
 
         Self {
             liveness,
+            reaching_defs,
             escape_info: escape,
             taint_info: taint,
         }
@@ -625,6 +629,229 @@ impl LivenessInfo {
         }
 
         dead_stores
+    }
+}
+
+/// Reaching definitions analysis (forward data flow analysis).
+///
+/// Tracks which variable definitions reach each program point.
+/// This enables def-use chain construction and SSA-like analysis.
+///
+/// # Algorithm
+///
+/// Uses forward data flow analysis with gen/kill sets:
+/// - `gen[block]` = new definitions in this block
+/// - `kill[block]` = definitions this block overwrites
+/// - `reach_in[block]` = union of `reach_out[predecessor]` for all predecessors
+/// - `reach_out[block]` = (reach_in[block] - kill[block]) ∪ gen[block]
+///
+/// # Example
+///
+/// ```ignore
+/// let cfg = ControlFlowGraph::from_block(&block);
+/// let reaching = ReachingDefinitions::analyze(&cfg);
+///
+/// // Check which definitions of x reach a specific block
+/// let var_id = VarId { name_id: 0, version: 0 };
+/// if let Some(defs) = reaching.reach_in.get(&block_id) {
+///     if defs.contains(&var_id) {
+///         println!("Definition of x.0 reaches this block");
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct ReachingDefinitions {
+    /// Definitions that reach the entry of each block
+    pub reach_in: HashMap<BlockId, HashSet<VarId>>,
+    /// Definitions that reach the exit of each block
+    pub reach_out: HashMap<BlockId, HashSet<VarId>>,
+    /// Def-use chains: maps each definition to the program points where it's used
+    pub def_use_chains: HashMap<VarId, HashSet<BlockId>>,
+}
+
+impl ReachingDefinitions {
+    /// Compute reaching definitions for a CFG using forward data flow analysis.
+    pub fn analyze(cfg: &ControlFlowGraph) -> Self {
+        let mut reach_in: HashMap<BlockId, HashSet<VarId>> = HashMap::new();
+        let mut reach_out: HashMap<BlockId, HashSet<VarId>> = HashMap::new();
+
+        // Initialize all blocks
+        for block in &cfg.blocks {
+            reach_in.insert(block.id, HashSet::new());
+            reach_out.insert(block.id, HashSet::new());
+        }
+
+        // Fixed-point iteration (forward analysis)
+        let mut changed = true;
+        while changed {
+            changed = false;
+
+            for block in &cfg.blocks {
+                // Compute reach_in as union of reach_out from all predecessors
+                let mut new_reach_in = HashSet::new();
+                for pred_id in Self::get_predecessors(cfg, block.id) {
+                    if let Some(pred_out) = reach_out.get(&pred_id) {
+                        new_reach_in.extend(pred_out.iter().cloned());
+                    }
+                }
+
+                // Compute gen and kill sets for this block
+                let (gen, kill) = Self::compute_gen_kill(block);
+
+                // Compute reach_out = (reach_in - kill) ∪ gen
+                let mut new_reach_out = new_reach_in.clone();
+                new_reach_out.retain(|v| !kill.contains(&v.name_id));
+                new_reach_out.extend(gen);
+
+                // Check for changes
+                if new_reach_in != *reach_in.get(&block.id).unwrap()
+                    || new_reach_out != *reach_out.get(&block.id).unwrap()
+                {
+                    changed = true;
+                    reach_in.insert(block.id, new_reach_in);
+                    reach_out.insert(block.id, new_reach_out);
+                }
+            }
+        }
+
+        // Build def-use chains by finding where each definition is used
+        let def_use_chains = Self::build_def_use_chains(cfg, &reach_in);
+
+        ReachingDefinitions {
+            reach_in,
+            reach_out,
+            def_use_chains,
+        }
+    }
+
+    /// Compute gen and kill sets for a basic block.
+    ///
+    /// - gen: new definitions created in this block
+    /// - kill: variable name_ids whose definitions are overwritten
+    fn compute_gen_kill(block: &BasicBlock) -> (HashSet<VarId>, HashSet<u32>) {
+        let mut gen = HashSet::new();
+        let mut kill = HashSet::new();
+
+        for stmt in &block.statements {
+            if let Statement::Assign { target, .. } = stmt {
+                // This assignment kills all previous definitions of this variable
+                kill.insert(target.name_id);
+                // And generates a new definition
+                gen.insert(*target);
+            }
+        }
+
+        (gen, kill)
+    }
+
+    /// Get predecessors of a block in the CFG.
+    fn get_predecessors(cfg: &ControlFlowGraph, block_id: BlockId) -> Vec<BlockId> {
+        cfg.edges
+            .iter()
+            .filter_map(|(from, edges)| {
+                if edges.iter().any(|(to, _)| *to == block_id) {
+                    Some(*from)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Build def-use chains by identifying where each definition is used.
+    fn build_def_use_chains(
+        cfg: &ControlFlowGraph,
+        reach_in: &HashMap<BlockId, HashSet<VarId>>,
+    ) -> HashMap<VarId, HashSet<BlockId>> {
+        let mut chains: HashMap<VarId, HashSet<BlockId>> = HashMap::new();
+
+        for block in &cfg.blocks {
+            let reaching = reach_in.get(&block.id).unwrap();
+
+            // Find all variable uses in this block
+            for stmt in &block.statements {
+                match stmt {
+                    Statement::Assign { source, .. } => {
+                        // Collect variables used in the RHS
+                        Self::collect_uses(source, reaching, block.id, &mut chains);
+                    }
+                    Statement::Declare { init, .. } => {
+                        // Collect variables used in the initializer
+                        if let Some(init_rvalue) = init {
+                            Self::collect_uses(init_rvalue, reaching, block.id, &mut chains);
+                        }
+                    }
+                    Statement::Expr { .. } => {
+                        // Expression statements don't directly use variables in our CFG model
+                    }
+                }
+            }
+
+            // Check terminator for uses
+            match &block.terminator {
+                Terminator::Branch { condition, .. } => {
+                    Self::collect_var_use(condition, reaching, block.id, &mut chains);
+                }
+                Terminator::Return { value } => {
+                    if let Some(val) = value {
+                        Self::collect_var_use(val, reaching, block.id, &mut chains);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        chains
+    }
+
+    /// Collect variable uses from a VarId and update def-use chains.
+    fn collect_var_use(
+        var_id: &VarId,
+        reaching: &HashSet<VarId>,
+        block_id: BlockId,
+        chains: &mut HashMap<VarId, HashSet<BlockId>>,
+    ) {
+        // Find which reaching definition this use corresponds to
+        for def in reaching {
+            if def.name_id == var_id.name_id {
+                chains
+                    .entry(*def)
+                    .or_insert_with(HashSet::new)
+                    .insert(block_id);
+            }
+        }
+    }
+
+    /// Collect variable uses from an Rvalue and update def-use chains.
+    fn collect_uses(
+        rvalue: &Rvalue,
+        reaching: &HashSet<VarId>,
+        block_id: BlockId,
+        chains: &mut HashMap<VarId, HashSet<BlockId>>,
+    ) {
+        match rvalue {
+            Rvalue::Use(var_id) => {
+                Self::collect_var_use(var_id, reaching, block_id, chains);
+            }
+            Rvalue::BinaryOp { left, right, .. } => {
+                Self::collect_var_use(left, reaching, block_id, chains);
+                Self::collect_var_use(right, reaching, block_id, chains);
+            }
+            Rvalue::UnaryOp { operand, .. } => {
+                Self::collect_var_use(operand, reaching, block_id, chains);
+            }
+            Rvalue::Call { args, .. } => {
+                for arg in args {
+                    Self::collect_var_use(arg, reaching, block_id, chains);
+                }
+            }
+            Rvalue::FieldAccess { base, .. } | Rvalue::Ref { var: base, .. } => {
+                Self::collect_var_use(base, reaching, block_id, chains);
+            }
+            Rvalue::Constant => {
+                // Constants don't use variables
+            }
+        }
     }
 }
 

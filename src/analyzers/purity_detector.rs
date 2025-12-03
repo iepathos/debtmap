@@ -6,7 +6,7 @@ use super::closure_analyzer::{ClosureAnalyzer, ClosurePurity};
 use super::custom_macro_analyzer::{CustomMacroAnalyzer, MacroPurity};
 use super::macro_definition_collector::MacroDefinitions;
 use super::scope_tracker::{ScopeTracker, SelfKind};
-use crate::analysis::data_flow::DataFlowAnalysis;
+use crate::analysis::data_flow::{ControlFlowGraph, DataFlowAnalysis};
 use crate::core::PurityLevel;
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -158,19 +158,22 @@ impl PurityDetector {
         self.visit_block(&item_fn.block);
 
         // Perform data flow analysis to refine mutation detection
-        let data_flow = DataFlowAnalysis::from_block(&item_fn.block);
+        let cfg = ControlFlowGraph::from_block(&item_fn.block);
+        let data_flow = DataFlowAnalysis::analyze(&cfg);
 
         // Filter dead mutations from local_mutations
-        let live_mutations = self.filter_dead_mutations(&data_flow);
+        let live_mutations = self.filter_dead_mutations(&cfg, &data_flow);
 
-        // Refine purity level using data flow analysis
+        // Determine purity level based on mutations and side effects
+        // Use self.local_mutations to determine level (not live_mutations)
+        // live_mutations is used for confidence adjustment
         let purity_level = if !self.has_side_effects
             && !self.has_mutable_params
             && !self.has_io_operations
             && !self.has_unsafe_blocks
             && !self.modifies_external_state
             && !self.accesses_external_state
-            && live_mutations.is_empty()
+            && self.local_mutations.is_empty()
         {
             PurityLevel::StrictlyPure
         } else if self.has_io_operations || self.modifies_external_state {
@@ -252,10 +255,43 @@ impl PurityDetector {
         }
     }
 
-    fn filter_dead_mutations(&self, _data_flow: &DataFlowAnalysis) -> Vec<LocalMutation> {
-        // For now, return all mutations
-        // In future enhancement, filter based on liveness analysis
-        self.local_mutations.clone()
+    fn filter_dead_mutations(
+        &self,
+        cfg: &ControlFlowGraph,
+        data_flow: &DataFlowAnalysis,
+    ) -> Vec<LocalMutation> {
+        // Filter out mutations to variables with dead stores
+        // Note: Due to simplified CFG construction, we need to be conservative
+        // Only filter if we find a definite match with a dead store
+        self.local_mutations
+            .iter()
+            .filter(|mutation| {
+                // Check if this mutation target is in the dead stores set
+                // Dead stores means the variable is assigned but never read
+                let is_dead = data_flow
+                    .liveness
+                    .dead_stores
+                    .iter()
+                    .any(|dead_var| {
+                        // Get the variable name from the CFG's var_names vector
+                        // VarId.name_id indexes into this vector
+                        if let Some(var_name) = cfg.var_names.get(dead_var.name_id as usize) {
+                            // Match the mutation target against the variable name
+                            // Handle both simple names and field access patterns
+                            // Only match if the var_name is not a temp variable placeholder
+                            !var_name.starts_with("_temp")
+                                && (mutation.target == *var_name
+                                    || mutation.target.starts_with(&format!("{}.", var_name)))
+                        } else {
+                            false
+                        }
+                    });
+
+                // Keep the mutation unless we're sure it's dead
+                !is_dead
+            })
+            .cloned()
+            .collect()
     }
 
     fn has_mutable_reference(&self, pat: &Pat) -> bool {
