@@ -162,8 +162,8 @@ impl BehavioralCategorizer {
     /// - Computation: calculate, compute, evaluate, etc.
     /// - Filtering: filter, select, find, search, etc.
     /// - Transformation: transform, convert, map, apply, etc.
-    /// - State management: get_*, set_*, update_*, etc. (checked before DataAccess for specificity)
-    /// - Data access: get, set, fetch, retrieve, access
+    /// - Data access: get, set, fetch, retrieve, access (checked before StateManagement per spec 208)
+    /// - State management: update_*, mutate_*, *_state, etc.
     /// - Processing: process, handle, execute, run
     /// - Communication: send, receive, transmit, broadcast, notify
     pub fn categorize_method(method_name: &str) -> BehaviorCategory {
@@ -221,14 +221,14 @@ impl BehavioralCategorizer {
             return BehaviorCategory::Transformation;
         }
 
-        // State management methods (check before DataAccess as it's more specific)
-        if Self::is_state_management(&lower_name) {
-            return BehaviorCategory::StateManagement;
-        }
-
-        // Data access methods
+        // Data access methods (check before StateManagement per spec 208)
         if Self::is_data_access(&lower_name) {
             return BehaviorCategory::DataAccess;
+        }
+
+        // State management methods
+        if Self::is_state_management(&lower_name) {
+            return BehaviorCategory::StateManagement;
         }
 
         // Processing methods
