@@ -7,6 +7,7 @@ use super::closure_analyzer::{ClosureAnalyzer, ClosurePurity};
 use super::custom_macro_analyzer::{CustomMacroAnalyzer, MacroPurity};
 use super::macro_definition_collector::MacroDefinitions;
 use super::scope_tracker::{ScopeTracker, SelfKind};
+use crate::analysis::data_flow::DataFlowAnalysis;
 use crate::core::PurityLevel;
 use dashmap::DashMap;
 use std::sync::Arc;
@@ -157,17 +158,45 @@ impl PurityDetector {
         // Visit the function body
         self.visit_block(&item_fn.block);
 
-        let purity_level = self.determine_purity_level();
+        // Perform data flow analysis to refine mutation detection
+        let data_flow = DataFlowAnalysis::from_block(&item_fn.block);
+
+        // Filter dead mutations from local_mutations
+        let live_mutations = self.filter_dead_mutations(&data_flow);
+
+        // Check if any mutations escape function scope
+        let has_escaping_mutations = data_flow.taint_info.return_tainted;
+
+        // Refine purity level using data flow analysis
+        let purity_level = if !self.has_side_effects
+            && !self.has_mutable_params
+            && !self.has_io_operations
+            && !self.has_unsafe_blocks
+            && !self.modifies_external_state
+            && live_mutations.is_empty()
+        {
+            PurityLevel::StrictlyPure
+        } else if !self.modifies_external_state && !has_escaping_mutations {
+            PurityLevel::LocallyPure
+        } else if !self.modifies_external_state {
+            PurityLevel::ReadOnly
+        } else {
+            PurityLevel::Impure
+        };
+
+        // Adjust confidence based on data flow analysis
+        let mut confidence = self.calculate_confidence_score();
+        if live_mutations.len() < self.local_mutations.len() {
+            // Dead mutations removed → higher confidence
+            confidence *= 1.1;
+        }
 
         PurityAnalysis {
-            is_pure: !self.has_side_effects
-                && !self.has_mutable_params
-                && !self.has_io_operations
-                && !self.has_unsafe_blocks
-                && !self.modifies_external_state,
+            is_pure: purity_level == PurityLevel::StrictlyPure,
             purity_level,
             reasons: self.collect_impurity_reasons(),
-            confidence: self.calculate_confidence_score(),
+            confidence: confidence.min(1.0),
+            data_flow_info: Some(data_flow),
         }
     }
 
@@ -189,17 +218,38 @@ impl PurityDetector {
 
         self.visit_block(block);
 
-        let purity_level = self.determine_purity_level();
+        // Perform data flow analysis
+        let data_flow = DataFlowAnalysis::from_block(block);
+        let has_escaping_mutations = data_flow.taint_info.return_tainted;
+
+        let purity_level = if !self.has_side_effects
+            && !self.has_io_operations
+            && !self.has_unsafe_blocks
+            && !self.modifies_external_state
+            && !has_escaping_mutations
+        {
+            PurityLevel::StrictlyPure
+        } else if !self.modifies_external_state && !has_escaping_mutations {
+            PurityLevel::LocallyPure
+        } else if !self.modifies_external_state {
+            PurityLevel::ReadOnly
+        } else {
+            PurityLevel::Impure
+        };
 
         PurityAnalysis {
-            is_pure: !self.has_side_effects
-                && !self.has_io_operations
-                && !self.has_unsafe_blocks
-                && !self.modifies_external_state,
+            is_pure: purity_level == PurityLevel::StrictlyPure,
             purity_level,
             reasons: self.collect_impurity_reasons(),
             confidence: self.calculate_confidence_score(),
+            data_flow_info: Some(data_flow),
         }
+    }
+
+    fn filter_dead_mutations(&self, _data_flow: &DataFlowAnalysis) -> Vec<LocalMutation> {
+        // For now, return all mutations
+        // In future enhancement, filter based on liveness analysis
+        self.local_mutations.clone()
     }
 
     fn has_mutable_reference(&self, pat: &Pat) -> bool {
@@ -382,6 +432,7 @@ impl PurityDetector {
         }
     }
 
+    #[allow(dead_code)]
     fn determine_purity_level(&self) -> PurityLevel {
         // Has external side effects (I/O, external mutations, panics)?
         if self.modifies_external_state
@@ -923,6 +974,7 @@ pub struct PurityAnalysis {
     pub purity_level: PurityLevel,
     pub reasons: Vec<ImpurityReason>,
     pub confidence: f32,
+    pub data_flow_info: Option<DataFlowAnalysis>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
