@@ -436,6 +436,7 @@ fn create_temporary_debt_item(context: &RecommendationContext) -> UnifiedDebtIte
         context_multiplier: None,
         context_type: None,
         language_specific: None, // No language-specific data available in this context (spec 190)
+        detected_pattern: None,  // No pattern detection available in this context (spec 204)
     }
 }
 

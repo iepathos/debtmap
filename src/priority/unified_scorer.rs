@@ -77,6 +77,8 @@ pub struct UnifiedDebtItem {
     pub context_type: Option<crate::context::FileType>, // Detected file type for context dampening (spec 191)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub language_specific: Option<crate::core::LanguageSpecificData>, // Language-specific pattern detection (spec 190)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detected_pattern: Option<crate::priority::detected_pattern::DetectedPattern>, // Detected complexity pattern (spec 204)
 }
 
 impl UnifiedDebtItem {

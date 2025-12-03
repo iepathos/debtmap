@@ -131,6 +131,10 @@ pub fn create_unified_debt_item_enhanced(
         None
     };
 
+    // Detect complexity pattern once during construction (spec 204)
+    let detected_pattern =
+        crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
+
     let item = UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -165,6 +169,7 @@ pub fn create_unified_debt_item_enhanced(
         context_multiplier: Some(context_multiplier), // Context dampening multiplier (spec 191)
         context_type: Some(context_type),             // Detected file type (spec 191)
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
+        detected_pattern,                                  // Detected complexity pattern (spec 204)
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
@@ -352,6 +357,10 @@ fn build_unified_debt_item(
         None
     };
 
+    // Detect complexity pattern once during construction (spec 204)
+    let detected_pattern =
+        crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -386,6 +395,7 @@ fn build_unified_debt_item(
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
+        detected_pattern,                                  // Detected complexity pattern (spec 204)
     }
 }
 
@@ -518,6 +528,10 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         None
     };
 
+    // Detect complexity pattern once during construction (spec 204)
+    let detected_pattern =
+        crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -552,6 +566,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
+        detected_pattern,                                  // Detected complexity pattern (spec 204)
     }
 }
 
@@ -630,6 +645,10 @@ pub fn create_unified_debt_item_with_data_flow(
         None
     };
 
+    // Detect complexity pattern once during construction (spec 204)
+    let detected_pattern =
+        crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
+
     UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
@@ -664,6 +683,7 @@ pub fn create_unified_debt_item_with_data_flow(
         context_multiplier: Some(context_multiplier),
         context_type: Some(context_type),
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
+        detected_pattern,                                  // Detected complexity pattern (spec 204)
     }
 }
 
