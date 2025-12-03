@@ -181,6 +181,11 @@ impl BehavioralCategorizer {
             return BehaviorCategory::Lifecycle;
         }
 
+        // Validation methods (before rendering to prioritize verify_* over *_format)
+        if Self::is_validation(&lower_name) {
+            return BehaviorCategory::Validation;
+        }
+
         // Parsing (check early as it's common)
         if Self::is_parsing(&lower_name) {
             return BehaviorCategory::Parsing;
@@ -199,11 +204,6 @@ impl BehavioralCategorizer {
         // Persistence methods
         if Self::is_persistence(&lower_name) {
             return BehaviorCategory::Persistence;
-        }
-
-        // Validation methods
-        if Self::is_validation(&lower_name) {
-            return BehaviorCategory::Validation;
         }
 
         // Computation methods

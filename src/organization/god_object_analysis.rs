@@ -2759,6 +2759,20 @@ mod tests {
     }
 
     #[test]
+    fn test_validation_method_categorization() {
+        // Debug test: verify that validation methods are categorized correctly
+        let methods = vec!["validate_input", "check_bounds", "verify_format"];
+
+        for method in &methods {
+            let result = infer_responsibility_with_confidence(method, None);
+            println!("Method '{}': category={:?}, confidence={}",
+                     method, result.category, result.confidence);
+            assert_eq!(result.category, Some("Validation".to_string()),
+                      "Method '{}' should be categorized as Validation", method);
+        }
+    }
+
+    #[test]
     fn test_call_pattern_orchestration_detection() {
         let function_name = "process_data";
         let callees = vec![
