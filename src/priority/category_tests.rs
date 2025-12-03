@@ -66,6 +66,7 @@ mod tests {
             context_multiplier: None,
             context_type: None,
             language_specific: None, // spec 190
+            detected_pattern: None,
         }
     }
 

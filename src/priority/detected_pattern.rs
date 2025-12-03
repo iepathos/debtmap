@@ -18,12 +18,11 @@
 //!
 //! ```
 //! use debtmap::priority::detected_pattern::DetectedPattern;
-//! use debtmap::core::LanguageSpecificData;
 //!
+//! // Pattern is detected during analysis and stored in UnifiedDebtItem
+//! let language_specific = None; // No language-specific data
 //! let pattern = DetectedPattern::detect(&language_specific);
-//! if let Some(p) = pattern {
-//!     println!("{} {}", p.icon(), p.type_name());
-//! }
+//! assert!(pattern.is_none());
 //! ```
 
 use crate::core::LanguageSpecificData;
@@ -150,6 +149,10 @@ mod tests {
 
     fn create_test_rust_data_with_state_machine() -> RustPatternResult {
         RustPatternResult {
+            trait_impl: None,
+            async_patterns: vec![],
+            error_patterns: vec![],
+            builder_patterns: vec![],
             state_machine_signals: Some(StateMachineSignals {
                 transition_count: 4,
                 match_expression_count: 2,
@@ -165,6 +168,10 @@ mod tests {
 
     fn create_test_rust_data_with_coordinator() -> RustPatternResult {
         RustPatternResult {
+            trait_impl: None,
+            async_patterns: vec![],
+            error_patterns: vec![],
+            builder_patterns: vec![],
             state_machine_signals: None,
             coordinator_signals: Some(CoordinatorSignals {
                 actions: 4,
@@ -232,6 +239,10 @@ mod tests {
     #[test]
     fn state_machine_priority_over_coordinator() {
         let rust_data = RustPatternResult {
+            trait_impl: None,
+            async_patterns: vec![],
+            error_patterns: vec![],
+            builder_patterns: vec![],
             state_machine_signals: Some(StateMachineSignals {
                 transition_count: 4,
                 match_expression_count: 2,

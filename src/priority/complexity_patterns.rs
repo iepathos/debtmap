@@ -121,6 +121,10 @@ pub struct ComplexityMetrics {
 impl ComplexityPattern {
     /// Detect complexity pattern from metrics.
     ///
+    /// **Note (spec 204)**: This method should only be called during analysis/recommendation
+    /// generation. Output formatters should read from `UnifiedDebtItem.detected_pattern` instead
+    /// of calling this method to ensure consistency across all output formats.
+    ///
     /// # Pattern Detection Logic
     ///
     /// 1. **State Machine** (checked first): High-confidence state transition signals
