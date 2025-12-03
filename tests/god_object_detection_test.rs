@@ -535,9 +535,10 @@ fn test_behavioral_decomposition_with_field_tracking() {
         clusters.contains_key(&BehaviorCategory::Validation),
         "Should identify validation cluster"
     );
+    // Per spec 208: get_*/set_* are now DataAccess, not StateManagement
     assert!(
-        clusters.contains_key(&BehaviorCategory::StateManagement),
-        "Should identify state management cluster"
+        clusters.contains_key(&BehaviorCategory::DataAccess),
+        "Should identify data access cluster"
     );
 
     // Verify rendering cluster contains expected methods
@@ -583,7 +584,7 @@ fn test_behavioral_decomposition_no_misc_category() {
         ("handle_click", BehaviorCategory::EventHandling),
         ("save_state", BehaviorCategory::Persistence),
         ("validate_email", BehaviorCategory::Validation),
-        ("get_name", BehaviorCategory::StateManagement),
+        ("get_name", BehaviorCategory::DataAccess), // Per spec 208: get_* is DataAccess
         ("initialize_system", BehaviorCategory::Lifecycle),
     ];
 
@@ -597,11 +598,11 @@ fn test_behavioral_decomposition_no_misc_category() {
     }
 
     // For methods that don't match standard categories, should use domain-specific name
-    let domain_method = "calculate_interest_rate";
+    let domain_method = "approve_loan_application";
     let category = BehavioralCategorizer::categorize_method(domain_method);
     match category {
         BehaviorCategory::Domain(name) => {
-            assert_eq!(name, "Calculate", "Should extract first word as domain");
+            assert_eq!(name, "Approve", "Should extract first word as domain");
         }
         _ => panic!("Expected Domain category for method '{}'", domain_method),
     }
