@@ -5,6 +5,7 @@ pub mod coverage_propagation;
 pub mod debt_aggregator;
 pub mod external_api_detector;
 pub mod file_metrics;
+pub mod formatted_output;
 pub mod formatter;
 pub mod formatter_markdown;
 pub mod parallel_call_graph;

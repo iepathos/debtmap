@@ -13,7 +13,9 @@ mod verbosity;
 
 mod context;
 mod dependencies;
+pub mod pure;
 mod sections;
+pub mod writer;
 
 use context::create_format_context;
 use sections::{apply_formatted_sections, generate_formatted_sections};
