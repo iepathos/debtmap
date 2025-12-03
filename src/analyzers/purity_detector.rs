@@ -1,6 +1,5 @@
 use syn::{
-    visit::Visit, Block, Expr, ExprCall, ExprClosure, ExprField, ExprMethodCall, ItemFn, Local,
-    Pat, Stmt,
+    visit::Visit, Block, Expr, ExprClosure, ExprField, ExprMethodCall, ItemFn, Local, Pat, Stmt,
 };
 
 use super::closure_analyzer::{ClosureAnalyzer, ClosurePurity};
@@ -164,24 +163,25 @@ impl PurityDetector {
         // Filter dead mutations from local_mutations
         let live_mutations = self.filter_dead_mutations(&data_flow);
 
-        // Check if any mutations escape function scope
-        let has_escaping_mutations = data_flow.taint_info.return_tainted;
-
         // Refine purity level using data flow analysis
         let purity_level = if !self.has_side_effects
             && !self.has_mutable_params
             && !self.has_io_operations
             && !self.has_unsafe_blocks
             && !self.modifies_external_state
+            && !self.accesses_external_state
             && live_mutations.is_empty()
         {
             PurityLevel::StrictlyPure
-        } else if !self.modifies_external_state && !has_escaping_mutations {
-            PurityLevel::LocallyPure
-        } else if !self.modifies_external_state {
+        } else if self.has_io_operations || self.modifies_external_state {
+            // I/O operations and external state modifications are always impure
+            PurityLevel::Impure
+        } else if self.accesses_external_state {
+            // Accesses external state but doesn't modify it
             PurityLevel::ReadOnly
         } else {
-            PurityLevel::Impure
+            // Only has local mutations, no external state access or modification
+            PurityLevel::LocallyPure
         };
 
         // Adjust confidence based on data flow analysis
@@ -197,6 +197,8 @@ impl PurityDetector {
             reasons: self.collect_impurity_reasons(),
             confidence: confidence.min(1.0),
             data_flow_info: Some(data_flow),
+            live_mutations,
+            total_mutations: self.local_mutations.len(),
         }
     }
 
@@ -220,21 +222,23 @@ impl PurityDetector {
 
         // Perform data flow analysis
         let data_flow = DataFlowAnalysis::from_block(block);
-        let has_escaping_mutations = data_flow.taint_info.return_tainted;
 
         let purity_level = if !self.has_side_effects
             && !self.has_io_operations
             && !self.has_unsafe_blocks
             && !self.modifies_external_state
-            && !has_escaping_mutations
+            && !self.accesses_external_state
         {
             PurityLevel::StrictlyPure
-        } else if !self.modifies_external_state && !has_escaping_mutations {
-            PurityLevel::LocallyPure
-        } else if !self.modifies_external_state {
+        } else if self.has_io_operations || self.modifies_external_state {
+            // I/O operations and external state modifications are always impure
+            PurityLevel::Impure
+        } else if self.accesses_external_state {
+            // Accesses external state but doesn't modify it
             PurityLevel::ReadOnly
         } else {
-            PurityLevel::Impure
+            // Only has local mutations, no external state access or modification
+            PurityLevel::LocallyPure
         };
 
         PurityAnalysis {
@@ -243,6 +247,8 @@ impl PurityDetector {
             reasons: self.collect_impurity_reasons(),
             confidence: self.calculate_confidence_score(),
             data_flow_info: Some(data_flow),
+            live_mutations: self.local_mutations.clone(),
+            total_mutations: self.local_mutations.len(),
         }
     }
 
@@ -909,22 +915,28 @@ impl<'ast> Visit<'ast> for PurityDetector {
                     }
                 }
             }
+            // Function calls might have side effects
+            Expr::Call(call) => {
+                if let Expr::Path(expr_path) = &*call.func {
+                    let path_str = quote::quote!(#expr_path).to_string();
+                    if self.is_io_call(&path_str) {
+                        self.has_io_operations = true;
+                        self.has_side_effects = true;
+                    }
+                }
+                // Continue visiting arguments but not the function path
+                // (to avoid marking function names as external state access)
+                for arg in &call.args {
+                    self.visit_expr(arg);
+                }
+                return; // Don't continue with default visiting
+            }
             // Path expressions may access external state (constants, statics, etc.)
             Expr::Path(path) => {
                 let path_str = quote::quote!(#path).to_string();
                 // Check if it's accessing a module path (like std::i32::MAX)
                 if path_str.contains("::") && !self.scope.is_local(&path_str) {
                     self.accesses_external_state = true;
-                }
-            }
-            // Function calls might have side effects
-            Expr::Call(ExprCall { func, .. }) => {
-                if let Expr::Path(expr_path) = &**func {
-                    let path_str = quote::quote!(#expr_path).to_string();
-                    if self.is_io_call(&path_str) {
-                        self.has_io_operations = true;
-                        self.has_side_effects = true;
-                    }
                 }
             }
             // Method calls might have side effects
@@ -975,6 +987,12 @@ pub struct PurityAnalysis {
     pub reasons: Vec<ImpurityReason>,
     pub confidence: f32,
     pub data_flow_info: Option<DataFlowAnalysis>,
+    /// Live local mutations (after filtering out dead stores)
+    /// This is useful for "almost pure" analysis - functions with only 1-2 live mutations
+    /// are good refactoring candidates
+    pub live_mutations: Vec<LocalMutation>,
+    /// Total mutations detected (before filtering dead stores)
+    pub total_mutations: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
