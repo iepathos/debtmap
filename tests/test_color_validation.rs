@@ -47,8 +47,25 @@ fn verify_formatter_uses_correct_colors() {
     use std::fs;
 
     // Read the formatter source files to verify color usage
-    let formatter_content =
-        fs::read_to_string("src/priority/formatter.rs").expect("Could not read formatter.rs");
+    // Note: formatter.rs has been refactored into a module, so we check the module files
+    let mut formatter_content = String::new();
+    let formatter_dir = std::path::Path::new("src/priority/formatter");
+
+    // Read all formatter module files
+    if formatter_dir.exists() && formatter_dir.is_dir() {
+        for entry in fs::read_dir(formatter_dir).expect("Could not read formatter directory") {
+            let entry = entry.expect("Could not read directory entry");
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "rs") {
+                let content = fs::read_to_string(&path)
+                    .unwrap_or_else(|_| panic!("Could not read {:?}", path));
+                formatter_content.push_str(&content);
+            }
+        }
+    } else {
+        panic!("Formatter module directory not found at src/priority/formatter");
+    }
+
     let formatter_verbosity_content = fs::read_to_string("src/priority/formatter_verbosity.rs")
         .expect("Could not read formatter_verbosity.rs");
 
@@ -67,15 +84,15 @@ fn verify_formatter_uses_correct_colors() {
 
     println!("Formatter check:");
     println!(
-        "  formatter.rs WHY label uses bright_blue: {}",
+        "  formatter module WHY label uses bright_blue: {}",
         formatter_why_label_blue
     );
     println!(
-        "  formatter.rs uses dimmed for rationale: {}",
+        "  formatter module uses dimmed for rationale: {}",
         formatter_has_dimmed
     );
     println!(
-        "  formatter.rs uses bright_white for rationale: {}",
+        "  formatter module uses bright_white for rationale: {}",
         formatter_has_bright_white
     );
     println!(
@@ -97,15 +114,15 @@ fn verify_formatter_uses_correct_colors() {
     // - Rationale should use plain text (no color modifier) for best readability
     assert!(
         formatter_why_label_blue,
-        "formatter.rs should use bright_blue() for WHY label"
+        "formatter module should use bright_blue() for WHY label"
     );
     assert!(
         !formatter_has_dimmed,
-        "formatter.rs should NOT use dimmed() for rationale"
+        "formatter module should NOT use dimmed() for rationale"
     );
     assert!(
         !formatter_has_bright_white,
-        "formatter.rs should NOT use bright_white() for rationale (appears grey on some terminals)"
+        "formatter module should NOT use bright_white() for rationale (appears grey on some terminals)"
     );
 
     assert!(

@@ -6,7 +6,8 @@ use std::path::Path;
 /// well-refactored code as specified in Spec 143 AC6.
 ///
 /// Note: Originally tested src/config.rs which has been refactored.
-/// Now tests src/priority/formatter.rs which has been well-organized into modules.
+/// Then tested src/priority/formatter.rs which has also been well-organized into modules.
+/// Now tests src/priority/formatter_markdown.rs which is a substantial, well-organized file.
 ///
 /// This test verifies:
 /// 1. Runs god object detection on a large well-refactored file
@@ -16,7 +17,7 @@ use std::path::Path;
 #[test]
 fn test_god_object_detection_on_config_rs() {
     // Read a large but well-refactored file
-    let config_path = Path::new("src/priority/formatter.rs");
+    let config_path = Path::new("src/priority/formatter_markdown.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     // Parse the file
@@ -196,7 +197,7 @@ fn test_god_object_detection_on_config_rs() {
 /// Test that verifies the struct ownership analysis produces reasonable results
 #[test]
 fn test_struct_ownership_analysis_quality() {
-    let config_path = Path::new("src/priority/formatter.rs");
+    let config_path = Path::new("src/priority/formatter_markdown.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     let file = syn::parse_file(&source_content).expect("Failed to parse test file");
@@ -235,7 +236,7 @@ fn test_struct_ownership_analysis_quality() {
 /// Test that warnings are generated for borderline module sizes
 #[test]
 fn test_module_size_warnings() {
-    let config_path = Path::new("src/priority/formatter.rs");
+    let config_path = Path::new("src/priority/formatter_markdown.rs");
     let source_content = fs::read_to_string(config_path).expect("Failed to read test file");
 
     let file = syn::parse_file(&source_content).expect("Failed to parse test file");
