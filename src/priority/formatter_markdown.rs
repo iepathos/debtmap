@@ -1,4 +1,5 @@
 use crate::formatting::FormattingConfig;
+use crate::priority::classification::Severity;
 use crate::priority::{
     CategorizedDebt, CategorySummary, CrossCategoryDependency, DebtCategory, DebtItem, DebtType,
     DisplayGroup, FileDebtItem, ImpactLevel, Tier, UnifiedAnalysis, UnifiedAnalysisQueries,
@@ -1067,13 +1068,7 @@ fn format_priority_item_markdown(
 }
 
 fn get_severity_label(score: f64) -> &'static str {
-    match score {
-        s if s >= 9.0 => "CRITICAL",
-        s if s >= 7.0 => "HIGH",
-        s if s >= 5.0 => "MEDIUM",
-        s if s >= 3.0 => "LOW",
-        _ => "MINIMAL",
-    }
+    Severity::from_score(score).as_str()
 }
 
 fn format_debt_type(debt_type: &DebtType) -> &'static str {
@@ -1365,17 +1360,20 @@ mod tests {
 
     #[test]
     fn test_get_severity_label() {
+        // New standardized thresholds: 8.0/6.0/4.0
         assert_eq!(get_severity_label(10.0), "CRITICAL");
-        assert_eq!(get_severity_label(9.5), "CRITICAL");
-        assert_eq!(get_severity_label(9.0), "CRITICAL");
-        assert_eq!(get_severity_label(8.0), "HIGH");
+        assert_eq!(get_severity_label(8.5), "CRITICAL");
+        assert_eq!(get_severity_label(8.0), "CRITICAL");
+        assert_eq!(get_severity_label(7.9), "HIGH");
         assert_eq!(get_severity_label(7.0), "HIGH");
-        assert_eq!(get_severity_label(6.0), "MEDIUM");
+        assert_eq!(get_severity_label(6.0), "HIGH");
+        assert_eq!(get_severity_label(5.9), "MEDIUM");
         assert_eq!(get_severity_label(5.0), "MEDIUM");
-        assert_eq!(get_severity_label(4.0), "LOW");
+        assert_eq!(get_severity_label(4.0), "MEDIUM");
+        assert_eq!(get_severity_label(3.9), "LOW");
         assert_eq!(get_severity_label(3.0), "LOW");
-        assert_eq!(get_severity_label(2.0), "MINIMAL");
-        assert_eq!(get_severity_label(0.5), "MINIMAL");
+        assert_eq!(get_severity_label(2.0), "LOW");
+        assert_eq!(get_severity_label(0.5), "LOW");
     }
 
     #[test]
@@ -1701,7 +1699,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 1, &item, 0);
 
         // Check basic elements are present
-        assert!(output.contains("### #1 Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #1 Score: 8.5 [CRITICAL]"));
         assert!(output.contains("**Type:** Complexity"));
         assert!(output.contains("**Location:** `test.rs:100 test_function()`"));
         assert!(output.contains("**Action:** Refactor complex function"));
@@ -1722,7 +1720,7 @@ mod tests {
         format_priority_item_markdown(&mut output, 2, &item, 1);
 
         // Should include main factors but not full breakdown
-        assert!(output.contains("### #2 Score: 8.5 [HIGH]"));
+        assert!(output.contains("### #2 Score: 8.5 [CRITICAL]"));
         assert!(output.contains("Main factors"));
 
         // Should include dependencies section

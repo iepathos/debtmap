@@ -1,5 +1,6 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::output::evidence_formatter::EvidenceFormatter;
+use crate::priority::classification::Severity;
 use crate::priority::{
     self, score_formatter, DebtType, DisplayGroup, FunctionRole, Tier, UnifiedAnalysis,
     UnifiedAnalysisQueries, UnifiedDebtItem,
@@ -1919,27 +1920,11 @@ fn format_role(role: FunctionRole) -> &'static str {
 }
 
 pub fn get_severity_label(score: f64) -> &'static str {
-    if score >= 8.0 {
-        "CRITICAL"
-    } else if score >= 6.0 {
-        "HIGH"
-    } else if score >= 4.0 {
-        "MEDIUM"
-    } else {
-        "LOW"
-    }
+    Severity::from_score(score).as_str()
 }
 
 pub fn get_severity_color(score: f64) -> colored::Color {
-    if score >= 8.0 {
-        Color::Red
-    } else if score >= 6.0 {
-        Color::Yellow
-    } else if score >= 4.0 {
-        Color::Blue
-    } else {
-        Color::Green
-    }
+    Severity::from_score(score).color()
 }
 
 pub fn extract_complexity_info(item: &UnifiedDebtItem) -> (u32, u32, u32, u32, usize) {

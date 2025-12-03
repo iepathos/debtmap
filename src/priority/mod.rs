@@ -1,4 +1,5 @@
 pub mod call_graph;
+pub mod classification;
 pub mod complexity_patterns;
 pub mod coverage_propagation;
 pub mod debt_aggregator;

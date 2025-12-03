@@ -1,4 +1,5 @@
 use crate::formatting::{ColoredFormatter, FormattingConfig};
+use crate::priority::classification::CoverageLevel;
 use crate::priority::unified_scorer::EntropyDetails;
 use crate::priority::{score_formatter, TransitiveCoverage, UnifiedDebtItem};
 use colored::*;
@@ -6,13 +7,15 @@ use std::fmt::Write;
 
 // Pure function to classify coverage percentage
 // Returns (inline_indicator, standalone_indicator) following [SEVERITY STATE] pattern
+// Note: inline_indicator includes leading space for proper formatting
 #[allow(dead_code)]
 fn classify_coverage_percentage(coverage_pct: f64) -> (&'static str, &'static str) {
-    match coverage_pct {
-        0.0 => (" [UNTESTED]", "[UNTESTED]"),
-        c if c < 20.0 => (" [WARN LOW]", "[WARN LOW]"),
-        c if c < 50.0 => (" [WARN PARTIAL]", "[WARN PARTIAL]"),
-        _ => ("", ""),
+    let level = CoverageLevel::from_percentage(coverage_pct);
+    match level {
+        CoverageLevel::Untested => (" [UNTESTED]", "[UNTESTED]"),
+        CoverageLevel::Low => (" [WARN LOW]", "[WARN LOW]"),
+        CoverageLevel::Partial => (" [WARN PARTIAL]", "[WARN PARTIAL]"),
+        _ => ("", ""), // No inline indicator for good coverage
     }
 }
 
@@ -25,13 +28,11 @@ fn get_coverage_indicator(_item: &UnifiedDebtItem, _has_coverage_data: bool) -> 
 // Pure function to format coverage status
 #[allow(dead_code)]
 fn format_coverage_status(coverage_pct: f64) -> String {
-    match coverage_pct {
-        0.0 => "[UNTESTED]".to_string(),
-        c if c < 20.0 => format!("[WARN LOW] ({:.1}%)", c),
-        c if c < 50.0 => format!("[WARN PARTIAL] ({:.1}%)", c),
-        c if c < 80.0 => format!("[INFO MODERATE] ({:.1}%)", c),
-        c if c < 95.0 => format!("[OK GOOD] ({:.1}%)", c),
-        _ => format!("[OK EXCELLENT] ({:.1}%)", coverage_pct),
+    let level = CoverageLevel::from_percentage(coverage_pct);
+    if level == CoverageLevel::Untested {
+        level.status_tag().to_string()
+    } else {
+        format!("{} ({:.1}%)", level.status_tag(), coverage_pct)
     }
 }
 
@@ -47,16 +48,26 @@ fn format_coverage_factor_description(
 
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
-        match coverage_pct {
-            0.0 => Some("[UNTESTED] (0% coverage, weight: 50%)".to_string()),
-            c if c < 20.0 => Some(format!("[WARN LOW COVERAGE] ({:.1}%, weight: 50%)", c)),
-            c if c < 50.0 => Some(format!("[WARN PARTIAL COVERAGE] ({:.1}%, weight: 50%)", c)),
-            c if c >= 95.0 => Some(format!("Excellent coverage {:.1}%", c)),
-            c if c >= 80.0 => Some(format!("Good coverage {:.1}%", c)),
-            _ if item.unified_score.coverage_factor > 3.0 => {
-                Some(format!("Line coverage {:.1}% (weight: 50%)", coverage_pct))
+        let level = CoverageLevel::from_percentage(coverage_pct);
+        match level {
+            CoverageLevel::Untested => Some("[UNTESTED] (0% coverage, weight: 50%)".to_string()),
+            CoverageLevel::Low => Some(format!(
+                "[WARN LOW COVERAGE] ({:.1}%, weight: 50%)",
+                coverage_pct
+            )),
+            CoverageLevel::Partial => Some(format!(
+                "[WARN PARTIAL COVERAGE] ({:.1}%, weight: 50%)",
+                coverage_pct
+            )),
+            CoverageLevel::Excellent => Some(format!("Excellent coverage {:.1}%", coverage_pct)),
+            CoverageLevel::Good => Some(format!("Good coverage {:.1}%", coverage_pct)),
+            CoverageLevel::Moderate => {
+                if item.unified_score.coverage_factor > 3.0 {
+                    Some(format!("Line coverage {:.1}% (weight: 50%)", coverage_pct))
+                } else {
+                    None
+                }
             }
-            _ => None,
         }
     } else if item.unified_score.coverage_factor >= 10.0 {
         Some("[UNTESTED] (no coverage data, weight: 50%)".to_string())
@@ -83,10 +94,11 @@ fn get_gap_severity_indicator(gap_percentage: f64) -> &'static str {
 fn classify_coverage_contribution(item: &UnifiedDebtItem) -> &'static str {
     if let Some(ref trans_cov) = item.transitive_coverage {
         let coverage_pct = trans_cov.direct * 100.0;
-        match coverage_pct {
-            0.0 => "CRITICAL (0% coverage)",
-            c if c < 20.0 => "HIGH (low coverage)",
-            c if c < 50.0 => "MEDIUM (partial coverage)",
+        let level = CoverageLevel::from_percentage(coverage_pct);
+        match level {
+            CoverageLevel::Untested => "CRITICAL (0% coverage)",
+            CoverageLevel::Low => "HIGH (low coverage)",
+            CoverageLevel::Partial => "MEDIUM (partial coverage)",
             _ => "LOW",
         }
     } else {
