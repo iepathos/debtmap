@@ -386,4 +386,78 @@ mod tests {
 
         assert_eq!(formatted.rank, rank);
     }
+
+    // Property-based tests with proptest
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Property: rank is always preserved in formatted output
+        #[test]
+        fn prop_rank_preserved(rank in 1usize..1000) {
+            let item = create_test_item(5.0);
+            let formatted = format_priority_item(rank, &item, 0, FormattingConfig::default(), false);
+            prop_assert_eq!(formatted.rank, rank);
+        }
+
+        /// Property: score is always preserved in formatted output
+        #[test]
+        fn prop_score_preserved(score in 0.0f64..20.0) {
+            let item = create_test_item(score);
+            let formatted = format_priority_item(1, &item, 0, FormattingConfig::default(), false);
+            prop_assert_eq!(formatted.score, score);
+        }
+
+        /// Property: formatted item always has location section
+        #[test]
+        fn prop_formatted_item_always_has_location(rank in 1usize..100, score in 0.0f64..20.0) {
+            let item = create_test_item(score);
+            let formatted = format_priority_item(rank, &item, 0, FormattingConfig::default(), false);
+
+            let has_location = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Location { .. }));
+            prop_assert!(has_location, "Formatted item must always have location section");
+        }
+
+        /// Property: formatted item always has required core sections
+        #[test]
+        fn prop_has_required_sections(rank in 1usize..100, score in 0.0f64..20.0) {
+            let item = create_test_item(score);
+            let formatted = format_priority_item(rank, &item, 0, FormattingConfig::default(), false);
+
+            let has_header = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Header { .. }));
+            let has_location = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Location { .. }));
+            let has_action = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Action { .. }));
+            let has_impact = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Impact { .. }));
+            let has_rationale = formatted.sections.iter().any(|s| matches!(s, FormattedSection::Rationale { .. }));
+
+            prop_assert!(has_header, "Must have header section");
+            prop_assert!(has_location, "Must have location section");
+            prop_assert!(has_action, "Must have action section");
+            prop_assert!(has_impact, "Must have impact section");
+            prop_assert!(has_rationale, "Must have rationale section");
+        }
+
+        /// Property: score correctly maps to severity level
+        #[test]
+        fn prop_score_maps_to_severity(score in 0.0f64..20.0) {
+            let item = create_test_item(score);
+            let formatted = format_priority_item(1, &item, 0, FormattingConfig::default(), false);
+
+            let expected_severity = Severity::from_score(score);
+            prop_assert_eq!(formatted.severity, expected_severity);
+        }
+
+        /// Property: pure function is deterministic (same inputs → same outputs)
+        #[test]
+        fn prop_deterministic(rank in 1usize..100, score in 0.0f64..20.0) {
+            let item = create_test_item(score);
+            let result1 = format_priority_item(rank, &item, 0, FormattingConfig::default(), false);
+            let result2 = format_priority_item(rank, &item, 0, FormattingConfig::default(), false);
+
+            // Compare key fields for determinism
+            prop_assert_eq!(result1.rank, result2.rank);
+            prop_assert_eq!(result1.score, result2.score);
+            prop_assert_eq!(result1.severity, result2.severity);
+            prop_assert_eq!(result1.sections.len(), result2.sections.len());
+        }
+    }
 }
