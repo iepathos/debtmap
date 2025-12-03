@@ -2182,7 +2182,8 @@ mod tests {
         let groups = group_methods_by_responsibility(&methods);
         assert!(!groups.is_empty());
         assert_eq!(groups.len(), 1);
-        assert_eq!(groups.get("output").unwrap().len(), 2);
+        // Per spec 208: format_* methods are now categorized as "Rendering" (Title Case)
+        assert_eq!(groups.get("Rendering").unwrap().len(), 2);
     }
 
     #[test]
@@ -2195,11 +2196,12 @@ mod tests {
             "is_valid".to_string(),
         ];
         let groups = group_methods_by_responsibility(&methods);
-        assert_eq!(groups.len(), 4); // Formatting & Output, Parsing & Input, Data Access, Validation
-        assert!(groups.contains_key("output"));
-        assert!(groups.contains_key("parsing"));
-        assert!(groups.contains_key("data_access"));
-        assert!(groups.contains_key("validation"));
+        // Per spec 208: Category names now use Title Case (e.g., "Rendering" not "output")
+        assert_eq!(groups.len(), 4); // Rendering, Parsing, Data Access, Validation
+        assert!(groups.contains_key("Rendering")); // format_* methods
+        assert!(groups.contains_key("Parsing")); // parse_* methods
+        assert!(groups.contains_key("Data Access")); // get_* methods
+        assert!(groups.contains_key("Validation")); // is_* methods
     }
 
     #[test]
@@ -3168,11 +3170,12 @@ mod tests {
 
     #[test]
     fn test_recognized_patterns_have_high_confidence() {
+        // Per spec 208: Category names now use Title Case (e.g., "Rendering" not "output")
         let test_cases = vec![
-            ("format_output", "output"),
-            ("parse_input", "parsing"),
-            ("validate_data", "validation"),
-            ("calculate_sum", "computation"),
+            ("format_output", "Rendering"),   // format_* is now Rendering
+            ("parse_input", "Parsing"),       // parse_* is Parsing
+            ("validate_data", "Validation"),  // validate_* is Validation
+            ("calculate_sum", "Computation"), // calculate_* is Computation
         ];
 
         for (method_name, expected_category) in test_cases {
