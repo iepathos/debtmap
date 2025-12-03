@@ -360,9 +360,29 @@ fn format_rationale_section(context: &FormatContext) -> String {
     )
 }
 
-// I/O function to apply formatted sections to output
-// Following spec 139: Header → Location → Context → Impact → Evidence → WHY → Action
+/// Legacy I/O function - mixes formatting with output operations.
+///
+/// # Deprecated
+/// This function violates the Pure Core, Imperative Shell architecture by mixing
+/// I/O operations with the sections module. For new code, use:
+/// ```ignore
+/// use crate::priority::formatter::pure::format_priority_item;
+/// use crate::priority::formatter::writer::write_priority_item;
+///
+/// let formatted = pure::format_priority_item(rank, item, verbosity, config, has_coverage);
+/// write_priority_item(&mut output, &formatted)?;
+/// ```
+///
+/// This function remains for backward compatibility with existing code paths that
+/// use the old FormattedSections struct. It should be removed in a future refactoring
+/// when all call sites migrate to the new architecture.
+#[deprecated(
+    since = "0.1.0",
+    note = "Use pure::format_priority_item + writer::write_priority_item instead"
+)]
 pub(crate) fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
+    // Legacy I/O implementation - retained for backward compatibility
+    // Following spec 139: Header → Location → Context → Impact → Evidence → WHY → Action
     writeln!(output, "{}", sections.header).unwrap();
     writeln!(output, "{}", sections.location).unwrap();
 

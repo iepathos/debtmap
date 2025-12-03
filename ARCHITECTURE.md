@@ -3441,6 +3441,192 @@ Recommendation: Initialization is appropriately complex for field count
 - **criterion**: Benchmarking framework
 - **tempfile**: Test file management
 
+## Priority Formatter: Pure Core, Imperative Shell Architecture
+
+### Design Philosophy
+
+The priority formatter implements the **Pure Core, Imperative Shell** pattern to separate formatting logic from I/O operations. This architectural pattern enables better testability, composability, and maintainability.
+
+**Location**: `src/priority/formatter/`
+
+### Architecture Layers
+
+```
+┌─────────────────────────────────────────┐
+│  Imperative Shell (I/O Boundary)        │
+│  - writer::write_priority_item()        │
+│  - File operations                       │
+│  - String mutations                      │
+└──────────────────┬──────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────┐
+│  Pure Core (Business Logic)             │
+│  - pure::format_priority_item()         │
+│  - Data transformations                  │
+│  - No side effects                       │
+└─────────────────────────────────────────┘
+```
+
+### Module Organization
+
+#### Pure Core (`pure.rs`)
+
+Contains pure functions that transform data without side effects:
+
+```rust
+// Pure function: takes inputs, returns structured data
+pub fn format_priority_item(
+    rank: usize,
+    item: &UnifiedDebtItem,
+    has_coverage_data: bool,
+) -> FormattedPriorityItem {
+    // Pure transformations only
+    // No I/O, no mutations
+    // Easily testable
+}
+```
+
+**Characteristics**:
+- Deterministic: same inputs → same outputs
+- No side effects (no I/O, no mutations)
+- Easily testable with unit tests
+- Composable and reusable
+- Returns structured data types
+
+#### Imperative Shell (`writer.rs`)
+
+Handles I/O operations and applies formatted data to output:
+
+```rust
+// I/O function: takes formatted data, performs side effects
+pub fn write_priority_item(
+    output: &mut String,
+    formatted: &FormattedPriorityItem,
+) -> std::fmt::Result {
+    // I/O at the boundary
+    // Applies pure transformations to output
+}
+```
+
+**Characteristics**:
+- Performs I/O operations
+- Mutates output buffers
+- Thin layer over pure functions
+- Minimal logic, maximum effects
+
+### Data Flow
+
+```
+Input (UnifiedDebtItem)
+    ↓
+Pure Transformation (format_priority_item)
+    ↓
+Structured Data (FormattedPriorityItem)
+    ↓
+I/O Application (write_priority_item)
+    ↓
+Output (String with formatted text)
+```
+
+### API Usage
+
+#### New API (Recommended)
+
+```rust
+use crate::priority::formatter::pure;
+use crate::priority::formatter::writer;
+
+// Step 1: Pure transformation
+let formatted = pure::format_priority_item(rank, item, has_coverage_data);
+
+// Step 2: I/O operation
+let mut output = String::new();
+writer::write_priority_item(&mut output, &formatted)?;
+```
+
+#### Legacy API (Deprecated)
+
+```rust
+use crate::priority::formatter;
+
+// Legacy: mixes logic with I/O
+let mut output = String::new();
+#[allow(deprecated)]
+formatter::format_priority_item_legacy(&mut output, rank, item, has_coverage_data);
+```
+
+### Benefits
+
+1. **Testability**: Pure functions are trivial to test
+   - No mocks needed
+   - No I/O setup/teardown
+   - Fast unit tests
+
+2. **Composability**: Pure functions compose naturally
+   ```rust
+   let formatted = items
+       .iter()
+       .map(|(rank, item)| format_priority_item(*rank, item, true))
+       .collect::<Vec<_>>();
+   ```
+
+3. **Parallelization**: Pure functions are thread-safe
+   ```rust
+   items.par_iter()
+       .map(|(rank, item)| format_priority_item(*rank, item, true))
+       .collect()
+   ```
+
+4. **Maintainability**: Clear separation of concerns
+   - Business logic isolated from I/O
+   - Easy to modify formatting without touching I/O
+   - Easy to change output targets without touching logic
+
+### Testing Strategy
+
+#### Pure Core Tests
+
+```rust
+#[test]
+fn test_format_priority_item_deterministic() {
+    let item = create_test_item();
+    let result1 = format_priority_item(1, &item, true);
+    let result2 = format_priority_item(1, &item, true);
+    assert_eq!(result1, result2); // Deterministic
+}
+```
+
+#### Property-Based Tests
+
+```rust
+proptest! {
+    #[test]
+    fn rank_preserved(rank in 1usize..1000) {
+        let item = create_test_item();
+        let formatted = format_priority_item(rank, &item, true);
+        assert_eq!(formatted.rank, rank);
+    }
+}
+```
+
+### Migration Guide
+
+To migrate existing code:
+
+1. Replace direct `format_priority_item` calls with two-step process:
+   ```rust
+   // Before:
+   format_priority_item(&mut output, rank, item, has_coverage);
+
+   // After:
+   let formatted = pure::format_priority_item(rank, item, has_coverage);
+   writer::write_priority_item(&mut output, &formatted)?;
+   ```
+
+2. Use `format_priority_item_legacy` for temporary backward compatibility
+3. Update tests to use pure functions for better isolation
+
 ## Error Handling
 
 ### Resilience Strategy

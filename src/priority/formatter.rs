@@ -13,9 +13,12 @@ mod verbosity;
 
 mod context;
 mod dependencies;
+pub mod pure;
 mod sections;
+pub mod writer;
 
 use context::create_format_context;
+#[allow(deprecated)]
 use sections::{apply_formatted_sections, generate_formatted_sections};
 
 #[derive(Debug, Clone, Copy)]
@@ -1701,7 +1704,50 @@ pub fn format_priority_item(
     let formatted_sections = generate_formatted_sections(&format_context);
 
     // Apply formatting to output (I/O at edges)
+    #[allow(deprecated)]
     apply_formatted_sections(output, formatted_sections);
+}
+
+/// Legacy API for backward compatibility. Use the new pure functions instead.
+///
+/// # Deprecated
+/// This function mixes formatting logic with I/O operations. For new code, use:
+/// ```ignore
+/// use crate::priority::formatter::pure::format_priority_item;
+/// use crate::priority::formatter::writer::write_priority_item;
+/// use crate::formatting::FormattingConfig;
+/// use std::io::Write;
+///
+/// let formatted = pure::format_priority_item(rank, item, 0, FormattingConfig::default(), has_coverage_data);
+/// let mut buffer = Vec::new();
+/// write_priority_item(&mut buffer, &formatted)?;
+/// let output = String::from_utf8(buffer)?;
+/// ```
+#[deprecated(
+    since = "0.1.0",
+    note = "Use pure::format_priority_item + writer::write_priority_item for testable, functional code"
+)]
+pub fn format_priority_item_legacy(
+    output: &mut String,
+    rank: usize,
+    item: &UnifiedDebtItem,
+    has_coverage_data: bool,
+) {
+    // Wrap pure format + write operations for backward compatibility
+    let formatted = pure::format_priority_item(
+        rank,
+        item,
+        0, // default verbosity
+        FormattingConfig::default(),
+        has_coverage_data,
+    );
+
+    // Convert String to Write-compatible buffer
+    let mut buffer = Vec::new();
+    let _ = writer::write_priority_item(&mut buffer, &formatted);
+    if let Ok(result) = String::from_utf8(buffer) {
+        output.push_str(&result);
+    }
 }
 
 #[allow(dead_code)]
