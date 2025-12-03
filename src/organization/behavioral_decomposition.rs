@@ -2118,7 +2118,10 @@ mod tests {
                 .len(),
             2
         );
-        assert_eq!(clusters.get(&BehaviorCategory::DataAccess).unwrap().len(), 2);
+        assert_eq!(
+            clusters.get(&BehaviorCategory::DataAccess).unwrap().len(),
+            2
+        );
     }
 
     #[test]
@@ -2857,10 +2860,7 @@ mod tests {
         let clusters = cluster_methods_by_behavior(&methods);
 
         // Collect all category display names (which should be Title Case)
-        let category_names: Vec<String> = clusters
-            .keys()
-            .map(|cat| cat.display_name())
-            .collect();
+        let category_names: Vec<String> = clusters.keys().map(|cat| cat.display_name()).collect();
 
         // Check for duplicates (case-insensitive comparison)
         let mut seen_lower = std::collections::HashSet::new();
@@ -2902,8 +2902,14 @@ mod tests {
 
         assert!(has_rendering, "Expected 'Rendering' category (Title Case)");
         assert!(has_parsing, "Expected 'Parsing' category (Title Case)");
-        assert!(has_data_access, "Expected 'Data Access' category (Title Case)");
-        assert!(has_validation, "Expected 'Validation' category (Title Case)");
+        assert!(
+            has_data_access,
+            "Expected 'Data Access' category (Title Case)"
+        );
+        assert!(
+            has_validation,
+            "Expected 'Validation' category (Title Case)"
+        );
 
         // Verify NO lowercase versions exist
         assert!(

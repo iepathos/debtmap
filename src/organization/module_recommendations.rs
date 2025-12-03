@@ -441,34 +441,19 @@ fn generate_responsibility(category: &BehaviorCategory, method_count: usize) -> 
             )
         }
         BehaviorCategory::Parsing => {
-            format!(
-                "Parses and extracts data ({} methods)",
-                method_count
-            )
+            format!("Parses and extracts data ({} methods)", method_count)
         }
         BehaviorCategory::Filtering => {
-            format!(
-                "Filters and queries data ({} methods)",
-                method_count
-            )
+            format!("Filters and queries data ({} methods)", method_count)
         }
         BehaviorCategory::Transformation => {
-            format!(
-                "Transforms and converts data ({} methods)",
-                method_count
-            )
+            format!("Transforms and converts data ({} methods)", method_count)
         }
         BehaviorCategory::DataAccess => {
-            format!(
-                "Accesses and retrieves data ({} methods)",
-                method_count
-            )
+            format!("Accesses and retrieves data ({} methods)", method_count)
         }
         BehaviorCategory::Construction => {
-            format!(
-                "Constructs and creates objects ({} methods)",
-                method_count
-            )
+            format!("Constructs and creates objects ({} methods)", method_count)
         }
         BehaviorCategory::Processing => {
             format!(

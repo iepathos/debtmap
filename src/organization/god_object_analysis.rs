@@ -2765,10 +2765,16 @@ mod tests {
 
         for method in &methods {
             let result = infer_responsibility_with_confidence(method, None);
-            println!("Method '{}': category={:?}, confidence={}",
-                     method, result.category, result.confidence);
-            assert_eq!(result.category, Some("Validation".to_string()),
-                      "Method '{}' should be categorized as Validation", method);
+            println!(
+                "Method '{}': category={:?}, confidence={}",
+                method, result.category, result.confidence
+            );
+            assert_eq!(
+                result.category,
+                Some("Validation".to_string()),
+                "Method '{}' should be categorized as Validation",
+                method
+            );
         }
     }
 
