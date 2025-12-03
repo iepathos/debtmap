@@ -12,10 +12,12 @@
 //! - Multi-signal aggregation for high-accuracy responsibility classification
 //! - Type signature-based classification for improved responsibility detection
 //! - Effect-based analysis patterns for testability and composability (Spec 207)
+//! - Data flow analysis for state transition and mutation tracking (Spec 201)
 
 pub mod attribution;
 pub mod call_graph;
 pub mod context_detection;
+pub mod data_flow;
 pub mod diagnostics;
 pub mod effects;
 pub mod file_context;
@@ -41,6 +43,9 @@ pub use call_graph::{
     FunctionPointerTracker, RustCallGraph, RustCallGraphBuilder, TraitRegistry,
 };
 pub use context_detection::{ContextAnalysis, ContextDetector, FunctionContext};
+pub use data_flow::{
+    ControlFlowGraph, DataFlowAnalysis, EscapeAnalysis, LivenessInfo, TaintAnalysis, VarId,
+};
 pub use file_context::{FileContext, FileContextDetector, TestFileConfidence};
 pub use framework_patterns::{
     CustomPattern, FrameworkPattern as NewFrameworkPattern, FrameworkPatternRegistry, FrameworkType,
