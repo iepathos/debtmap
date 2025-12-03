@@ -415,8 +415,8 @@ impl DataFlowAnalysis {
 /// # Algorithm
 ///
 /// Uses backward data flow analysis:
-/// - `live_out[block]` = union of `live_in[successor]` for all successors
-/// - `live_in[block]` = (live_out[block] - def[block]) ∪ use[block]
+/// - `live_out\[block\]` = union of `live_in\[successor\]` for all successors
+/// - `live_in\[block\]` = (live_out\[block\] - def\[block\]) ∪ use\[block\]
 ///
 /// # Example
 ///
@@ -640,10 +640,10 @@ impl LivenessInfo {
 /// # Algorithm
 ///
 /// Uses forward data flow analysis with gen/kill sets:
-/// - `gen[block]` = new definitions in this block
-/// - `kill[block]` = definitions this block overwrites
-/// - `reach_in[block]` = union of `reach_out[predecessor]` for all predecessors
-/// - `reach_out[block]` = (reach_in[block] - kill[block]) ∪ gen[block]
+/// - `gen\[block\]` = new definitions in this block
+/// - `kill\[block\]` = definitions this block overwrites
+/// - `reach_in\[block\]` = union of `reach_out\[predecessor\]` for all predecessors
+/// - `reach_out\[block\]` = (reach_in\[block\] - kill\[block\]) ∪ gen\[block\]
 ///
 /// # Example
 ///
@@ -813,10 +813,7 @@ impl ReachingDefinitions {
         // Find which reaching definition this use corresponds to
         for def in reaching {
             if def.name_id == var_id.name_id {
-                chains
-                    .entry(*def)
-                    .or_default()
-                    .insert(block_id);
+                chains.entry(*def).or_default().insert(block_id);
             }
         }
     }
