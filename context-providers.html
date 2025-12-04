@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -200,6 +200,9 @@
 <p>Where <code>context_contribution</code> is the weighted sum of all provider contributions:</p>
 <pre><code>context_contribution = Σ(provider.contribution × provider.weight)
 </code></pre>
+<blockquote>
+<p><strong>Configuration Note</strong>: Provider-specific TOML configuration (like <code>[context.critical_path]</code>) is a planned feature not yet implemented. All providers currently use hard-coded defaults from the implementation. Use CLI flags (<code>--context</code>, <code>--context-providers</code>, <code>--disable-context</code>) to control providers. See the <a href="#enabling-context-providers">Enabling Context Providers</a> section for working examples.</p>
+</blockquote>
 <h2 id="critical-path-provider"><a class="header" href="#critical-path-provider">Critical Path Provider</a></h2>
 <p>The Critical Path provider identifies functions that lie on critical execution paths through your application. Functions on these paths have elevated risk because failures directly impact user-facing functionality.</p>
 <h3 id="entry-point-detection"><a class="header" href="#entry-point-detection">Entry Point Detection</a></h3>
@@ -881,7 +884,7 @@ let contribution = context.total_contribution();
     fn explain(&amp;self, context: &amp;Context) -&gt; String;
 }
 <span class="boring">}</span></code></pre>
-<p>See <a href="https://github.com/your-repo/debtmap/blob/main/src/risk/context/mod.rs">src/risk/context/mod.rs</a> for implementation examples.</p>
+<p>See <code>src/risk/context/mod.rs</code> for the trait definition and <code>src/risk/context/</code> for built-in provider implementations.</p>
 <h2 id="future-enhancements"><a class="header" href="#future-enhancements">Future Enhancements</a></h2>
 <h3 id="business-context-provider-planned"><a class="header" href="#business-context-provider-planned">Business Context Provider (Planned)</a></h3>
 <p>A Business context provider is defined but not yet implemented. It will support:</p>
@@ -912,8 +915,9 @@ let contribution = context.total_contribution();
 <p>You gain actionable insights for prioritizing technical debt and refactoring efforts. Start with <code>--context</code> to enable all providers, then refine based on your project’s needs.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
-<li><a href="analysis-guide.html">Analysis Guide</a> - Core analysis concepts</li>
-<li><a href="analysis-guide.html#risk-assessment">Risk Assessment</a> - Risk scoring methodology</li>
+<li><a href="analysis-guide/index.html">Analysis Guide</a> - Core analysis concepts</li>
+<li><a href="analysis-guide/risk-scoring.html">Risk Scoring</a> - Risk scoring methodology</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - File-level and function-level scoring</li>
 <li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
 <li><a href="parallel-processing.html">Parallel Processing</a> - Performance optimization</li>
 <li><a href="troubleshooting.html">Troubleshooting</a> - Common issues and solutions</li>
@@ -923,7 +927,7 @@ let contribution = context.total_contribution();
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="boilerplate-vs-complexity.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="call-graph-analysis.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -937,7 +941,7 @@ let contribution = context.total_contribution();
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="boilerplate-vs-complexity.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="call-graph-analysis.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

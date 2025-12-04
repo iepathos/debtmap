@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,16 +189,17 @@ debtmap analyze . --format json
 
 # Markdown output - documentation and reports
 debtmap analyze . --format markdown
+
+# HTML output - interactive web dashboard
+debtmap analyze . --format html
 </code></pre>
 <p>Available formats:</p>
 <ul>
 <li><strong>terminal</strong> (default): Interactive output with colors, emoji, and formatting</li>
 <li><strong>json</strong>: Structured data for programmatic processing</li>
 <li><strong>markdown</strong>: Reports suitable for documentation and PR comments</li>
+<li><strong>html</strong>: Web-viewable HTML reports with interactive dashboard</li>
 </ul>
-<blockquote>
-<p><strong>Note:</strong> The codebase also includes an <code>Html</code> format variant in <code>src/core/types.rs</code> and <code>src/analysis/diagnostics/</code>, but this is only available internally for diagnostic reporting and is not exposed as a CLI option. For HTML output, convert markdown reports using tools like pandoc (see <a href="#rendering-to-htmlpdf">Rendering to HTML/PDF</a>).</p>
-</blockquote>
 <h3 id="writing-to-files"><a class="header" href="#writing-to-files">Writing to Files</a></h3>
 <p>By default, output goes to stdout. Use <code>-o</code> or <code>--output</code> to write to a file:</p>
 <pre><code class="language-bash"># Write JSON to file
@@ -297,7 +298,7 @@ BENEFIT: Pure functions are easily testable and composable
 <li><strong>High</strong> (11-15): Extract 3-5 pure functions using decompose-then-transform strategy</li>
 <li><strong>Severe</strong> (&gt;15): Extract 5+ pure functions into modules with functional core/imperative shell</li>
 </ul>
-<p>See the <a href="./analysis-guide.html">Analysis Guide</a> for metric explanations.</p>
+<p>See the <a href="./analysis-guide/index.html">Analysis Guide</a> for metric explanations.</p>
 <h3 id="plain-terminal-mode"><a class="header" href="#plain-terminal-mode">Plain Terminal Mode</a></h3>
 <p>For environments without color support or when piping to tools, use <code>--plain</code>:</p>
 <pre><code class="language-bash"># ASCII-only output, no colors
@@ -671,94 +672,6 @@ debtmap analyze . --format json | jq .
 <li><code>TestDuplication</code>: Duplicated test code</li>
 <li><code>TestQuality</code>: Test quality issues</li>
 </ul>
-<h3 id="json-format-variants"><a class="header" href="#json-format-variants">JSON Format Variants</a></h3>
-<p>Debtmap supports two JSON output formats:</p>
-<pre><code class="language-bash"># Legacy format (default) - backward compatible
-debtmap analyze . --format json --output-format legacy
-
-# Unified format - new consistent structure
-debtmap analyze . --format json --output-format unified
-</code></pre>
-<blockquote>
-<p><strong>Note:</strong> The <code>--output-format</code> flag only applies when using <code>--format json</code>. It has no effect with markdown or terminal formats.</p>
-</blockquote>
-<h4 id="format-comparison"><a class="header" href="#format-comparison">Format Comparison</a></h4>
-<p><strong>Legacy format:</strong> Uses <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers for backward compatibility with existing tooling.</p>
-<p><strong>Unified format:</strong> Consistent structure with a <code>type</code> field, making parsing simpler and more predictable. Recommended for new integrations.</p>
-<p><strong>When to use each format:</strong></p>
-<ul>
-<li>
-<p><strong>Use legacy format if:</strong></p>
-<ul>
-<li>You have existing tooling that expects the old structure</li>
-<li>You need backward compatibility with version 1.x parsers</li>
-<li>You’re integrating with third-party tools expecting the legacy format</li>
-</ul>
-</li>
-<li>
-<p><strong>Use unified format for:</strong></p>
-<ul>
-<li>All new integrations and tooling</li>
-<li>Cleaner, more predictable JSON parsing</li>
-<li>Future-proof implementations</li>
-<li>Simpler type discrimination in statically-typed languages</li>
-</ul>
-</li>
-</ul>
-<p><strong>Migration strategy:</strong></p>
-<p>The legacy format will be maintained for backward compatibility, but unified is the recommended format going forward. If you’re starting a new integration, use unified format from the beginning. If migrating existing tooling:</p>
-<ol>
-<li>Test unified format with a subset of your codebase</li>
-<li>Update parsers to handle the <code>type</code> field instead of key-based discrimination</li>
-<li>Validate results match between legacy and unified formats</li>
-<li>Switch to unified format once validation passes</li>
-</ol>
-<h4 id="structural-differences"><a class="header" href="#structural-differences">Structural Differences</a></h4>
-<p><strong>Legacy format example:</strong></p>
-<pre><code class="language-json">{
-  "complexity": {
-    "metrics": [
-      {
-        "File": {
-          "path": "src/main.rs",
-          "functions": 12,
-          "average_complexity": 5.3
-        }
-      },
-      {
-        "Function": {
-          "name": "calculate_score",
-          "file": "src/scoring.rs",
-          "line": 42,
-          "cyclomatic": 8
-        }
-      }
-    ]
-  }
-}
-</code></pre>
-<p><strong>Unified format example:</strong></p>
-<pre><code class="language-json">{
-  "complexity": {
-    "metrics": [
-      {
-        "type": "File",
-        "path": "src/main.rs",
-        "functions": 12,
-        "average_complexity": 5.3
-      },
-      {
-        "type": "Function",
-        "name": "calculate_score",
-        "file": "src/scoring.rs",
-        "line": 42,
-        "cyclomatic": 8
-      }
-    ]
-  }
-}
-</code></pre>
-<p><strong>Key difference:</strong> Legacy uses <code>{File: {...}}</code> wrapper objects, while unified uses a flat structure with <code>"type": "File"</code> field. This makes unified format easier to parse in most programming languages.</p>
 <h3 id="risk-insights-json"><a class="header" href="#risk-insights-json">Risk Insights JSON</a></h3>
 <p>When coverage data is provided via <code>--lcov</code>, risk insights are included as part of the analysis output. The <code>write_risk_insights</code> method (found in <code>src/io/writers/json.rs</code>, <code>terminal.rs</code>, and <code>markdown/core.rs</code>) outputs risk analysis data in the following JSON structure:</p>
 <pre><code class="language-json">{
@@ -945,6 +858,79 @@ pandoc report.md -o report.html --standalone --css style.css
 # Convert to PDF
 pandoc report.md -o report.pdf --pdf-engine=xelatex
 </code></pre>
+<h2 id="html-output"><a class="header" href="#html-output">HTML Output</a></h2>
+<p>HTML format generates an interactive web dashboard with visual metrics and navigation. This format is ideal for viewing analysis results in a browser and sharing reports with stakeholders.</p>
+<p><strong>Source:</strong> <code>src/io/writers/html.rs</code>, <code>src/cli.rs:492</code></p>
+<h3 id="basic-usage-2"><a class="header" href="#basic-usage-2">Basic Usage</a></h3>
+<pre><code class="language-bash"># Generate HTML dashboard
+debtmap analyze . --format html
+
+# Save to file
+debtmap analyze . --format html -o dashboard.html
+
+# Open in browser
+debtmap analyze . --format html -o dashboard.html &amp;&amp; open dashboard.html
+</code></pre>
+<h3 id="dashboard-features"><a class="header" href="#dashboard-features">Dashboard Features</a></h3>
+<p>The HTML output provides an interactive dashboard with:</p>
+<ol>
+<li><strong>Executive Summary</strong> - High-level metrics with visual indicators</li>
+<li><strong>Debt Score Dashboard</strong> - Priority distribution (Critical, High, Medium, Low)</li>
+<li><strong>Complexity Metrics</strong> - Average complexity and function counts</li>
+<li><strong>Debt Density</strong> - Technical debt per function ratio</li>
+<li><strong>Interactive Data</strong> - Full analysis results embedded as JSON</li>
+</ol>
+<h3 id="dashboard-structure"><a class="header" href="#dashboard-structure">Dashboard Structure</a></h3>
+<p>The HTML dashboard uses an embedded template (<code>src/io/writers/templates/dashboard.html</code>) that includes:</p>
+<ul>
+<li><strong>Metrics Cards</strong> - Visual representation of key metrics</li>
+<li><strong>Priority Breakdown</strong> - Count of items by priority level</li>
+<li><strong>Health Indicators</strong> - Color-coded status based on thresholds</li>
+<li><strong>Raw Data Access</strong> - Complete JSON analysis results in the page</li>
+</ul>
+<h3 id="example-output"><a class="header" href="#example-output">Example Output</a></h3>
+<p>When you generate an HTML dashboard, it displays:</p>
+<pre><code>┌─────────────────────────────────────┐
+│     Debtmap Analysis Dashboard      │
+├─────────────────────────────────────┤
+│                                     │
+│  Total Items: 156                   │
+│  Critical: 5  High: 12              │
+│  Medium: 45   Low: 94               │
+│                                     │
+│  Total Functions: 287               │
+│  Avg Complexity: 6.3                │
+│  Debt Density: 0.54                 │
+│                                     │
+└─────────────────────────────────────┘
+</code></pre>
+<h3 id="when-to-use-html-format"><a class="header" href="#when-to-use-html-format">When to Use HTML Format</a></h3>
+<p><strong>Use HTML Format When:</strong></p>
+<ul>
+<li>Sharing reports with non-technical stakeholders</li>
+<li>Creating dashboards for team visibility</li>
+<li>Generating reports for management review</li>
+<li>Viewing analysis results in a browser</li>
+<li>Embedding reports in internal documentation sites</li>
+<li>Publishing analysis results to a web server</li>
+</ul>
+<p><strong>HTML vs Markdown:</strong></p>
+<ul>
+<li><strong>HTML</strong>: Interactive, visual dashboard with embedded data</li>
+<li><strong>Markdown</strong>: Text-based, suitable for conversion to multiple formats</li>
+<li><strong>HTML</strong>: Better for standalone viewing in browsers</li>
+<li><strong>Markdown</strong>: Better for version control and text processing</li>
+</ul>
+<h3 id="customization"><a class="header" href="#customization">Customization</a></h3>
+<p>The HTML output uses a built-in template. For custom styling, you can:</p>
+<ol>
+<li>Generate the HTML file</li>
+<li>Extract and modify the CSS within the file</li>
+<li>Serve with custom stylesheets</li>
+</ol>
+<blockquote>
+<p><strong>Note:</strong> Direct template customization requires modifying <code>src/io/writers/templates/dashboard.html</code> in the debtmap source code.</p>
+</blockquote>
 <h2 id="tool-integration"><a class="header" href="#tool-integration">Tool Integration</a></h2>
 <h3 id="cicd-pipelines"><a class="header" href="#cicd-pipelines">CI/CD Pipelines</a></h3>
 <p>Debtmap JSON output integrates seamlessly with CI/CD systems.</p>
@@ -1272,6 +1258,14 @@ debtmap analyze . --summary --min-priority medium
 <li>Archiving analysis results</li>
 <li>Producing executive summaries</li>
 </ul>
+<p><strong>Use HTML Format When:</strong></p>
+<ul>
+<li>Viewing analysis in a web browser</li>
+<li>Sharing visual dashboards with stakeholders</li>
+<li>Publishing reports to internal documentation sites</li>
+<li>Creating interactive reports for management review</li>
+<li>Embedding analysis results in web applications</li>
+</ul>
 <h3 id="quick-reference-table"><a class="header" href="#quick-reference-table">Quick Reference Table</a></h3>
 <div class="table-wrapper">
 <table>
@@ -1282,6 +1276,7 @@ debtmap analyze . --summary --min-priority medium
 <tr><td>Terminal</td><td>Development</td><td>No</td><td>Yes</td><td>.txt</td></tr>
 <tr><td>JSON</td><td>Automation</td><td>Yes</td><td>No</td><td>.json</td></tr>
 <tr><td>Markdown</td><td>Documentation</td><td>Partially</td><td>Yes</td><td>.md</td></tr>
+<tr><td>HTML</td><td>Visualization</td><td>Partially</td><td>Yes</td><td>.html</td></tr>
 </tbody>
 </table>
 </div>
@@ -1353,7 +1348,7 @@ fi
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="./getting-started.html">Getting Started</a> - Basic usage and examples</li>
-<li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding metrics and scores</li>
+<li><a href="./analysis-guide/index.html">Analysis Guide</a> - Understanding metrics and scores</li>
 <li><a href="./configuration.html">Configuration</a> - Customizing analysis behavior</li>
 </ul>
 

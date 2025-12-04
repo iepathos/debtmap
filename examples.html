@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -261,18 +261,20 @@ debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 <li><strong>Lenient</strong>: Higher thresholds designed for legacy codebases with existing technical debt</li>
 </ul>
 <p><strong>Preset Threshold Values:</strong></p>
+<p>These presets control the minimum complexity levels that trigger debt flagging. Source: <code>src/complexity/threshold_manager.rs:120-148</code></p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Preset</th><th>Complexity</th><th>Duplication</th><th>Max Function Lines</th><th>Max Nesting Depth</th></tr>
+<tr><th>Preset</th><th>Min Cyclomatic</th><th>Min Cognitive</th><th>Min Function Lines</th></tr>
 </thead>
 <tbody>
-<tr><td>Strict</td><td>8</td><td>30</td><td>30</td><td>3</td></tr>
-<tr><td>Balanced</td><td>10</td><td>50</td><td>50</td><td>4</td></tr>
-<tr><td>Lenient</td><td>15</td><td>75</td><td>80</td><td>5</td></tr>
+<tr><td>Strict</td><td>3</td><td>7</td><td>15</td></tr>
+<tr><td>Balanced</td><td>5</td><td>10</td><td>20</td></tr>
+<tr><td>Lenient</td><td>10</td><td>20</td><td>50</td></tr>
 </tbody>
 </table>
 </div>
+<p><strong>Note</strong>: These are minimum thresholds for flagging functions. Functions below these thresholds are considered simple and won’t appear in debt reports.</p>
 <h3 id="god-object-detection"><a class="header" href="#god-object-detection">God Object Detection</a></h3>
 <p>Identify classes and modules with too many responsibilities:</p>
 <pre><code class="language-bash"># Standard analysis includes god object detection
@@ -280,6 +282,9 @@ debtmap analyze .
 
 # Disable god object detection for specific run
 debtmap analyze . --no-god-object
+
+# Show detailed module split recommendations (experimental)
+debtmap analyze . --show-splits
 </code></pre>
 <p>God objects are flagged with detailed metrics:</p>
 <ul>
@@ -288,6 +293,11 @@ debtmap analyze . --no-god-object
 <li>God object score (0-100%)</li>
 <li>Recommendations for splitting</li>
 </ul>
+<p><strong>The <code>--show-splits</code> option provides experimental decomposition suggestions:</strong></p>
+<pre><code class="language-bash"># Get detailed recommendations for breaking up large modules
+debtmap analyze . --show-splits
+</code></pre>
+<p>This shows suggested module boundaries, responsibility groupings, and how to decompose large files into smaller, focused modules.</p>
 <h4 id="purity-weighted-god-object-scoring"><a class="header" href="#purity-weighted-god-object-scoring">Purity-Weighted God Object Scoring</a></h4>
 <p>Debtmap uses purity analysis to distinguish functional programming patterns from actual god objects. Enable verbose mode to see purity distribution:</p>
 <pre><code class="language-bash"># See purity distribution in god object analysis
@@ -764,46 +774,6 @@ debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
 <li>Debug: Troubleshooting debtmap behavior</li>
 </ul>
 <p>Great for documentation or PR comments.</p>
-<h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
-<blockquote>
-<p><strong>Note</strong>: <code>--format</code> selects the output type (json/markdown/terminal), while <code>--output-format</code> selects the JSON structure variant (unified/legacy). They serve different purposes and can be used together.</p>
-</blockquote>
-<pre><code class="language-bash"># JSON output (default is legacy format)
-debtmap analyze . --format json
-
-# Unified JSON format (alternative to legacy)
-debtmap analyze . --format json --output-format unified
-
-# Legacy JSON format (default, for backward compatibility)
-debtmap analyze . --format json --output-format legacy
-
-# Output format options: terminal, json, markdown
-debtmap analyze . --format terminal
-</code></pre>
-<p><strong>Unified vs Legacy JSON Formats:</strong></p>
-<p>The unified format provides a consistent structure with a <code>type</code> field to distinguish between different item types, replacing the File/Function wrapper objects used in legacy format.</p>
-<p><strong>Legacy format (default):</strong></p>
-<pre><code class="language-json">{
-  "items": [
-    {"File": {"path": "src/main.rs", "score": 45.2}},
-    {"Function": {"name": "process", "complexity": 12}}
-  ]
-}
-</code></pre>
-<p><strong>Unified format:</strong></p>
-<pre><code class="language-json">{
-  "items": [
-    {"type": "file", "path": "src/main.rs", "score": 45.2},
-    {"type": "function", "name": "process", "complexity": 12}
-  ]
-}
-</code></pre>
-<p><strong>Key differences:</strong></p>
-<ul>
-<li><strong>Unified format</strong>: Consistent structure with <code>type</code> discriminator field, easier to parse programmatically, better for new integrations</li>
-<li><strong>Legacy format</strong>: Uses wrapper objects for backward compatibility with existing tooling and scripts</li>
-</ul>
-<p>Use unified format for new integrations and tools. Use legacy format when working with existing debtmap analysis pipelines.</p>
 <h2 id="advanced-usage"><a class="header" href="#advanced-usage">Advanced Usage</a></h2>
 <h3 id="design-pattern-detection"><a class="header" href="#design-pattern-detection">Design Pattern Detection</a></h3>
 <p>Detect design patterns in your codebase to understand architectural choices and identify potential overuse of certain patterns:</p>
@@ -895,11 +865,30 @@ debtmap analyze . --context --context-providers dependency
 debtmap analyze . --context --disable-context git_history
 </code></pre>
 <h3 id="multi-pass-analysis-1"><a class="header" href="#multi-pass-analysis-1">Multi-Pass Analysis</a></h3>
-<pre><code class="language-bash"># Multi-pass with attribution tracking
-debtmap analyze . --multi-pass --attribution
+<p>Multi-pass analysis is enabled by default for deeper analysis with context awareness:</p>
+<pre><code class="language-bash"># Multi-pass analysis is default behavior (no flag needed)
+debtmap analyze .
 
-# Shows which functions contribute to which patterns
+# Multi-pass with attribution tracking
+debtmap analyze . --attribution
+
+# Disable multi-pass for single-pass performance mode
+debtmap analyze . --no-multi-pass
 </code></pre>
+<p><strong>When to use <code>--no-multi-pass</code>:</strong></p>
+<ul>
+<li><strong>Performance-critical CI environments</strong>: Faster analysis for large codebases</li>
+<li><strong>Quick validation</strong>: When you need fast feedback</li>
+<li><strong>Single-file analysis</strong>: When deep context isn’t needed</li>
+</ul>
+<p><strong>Performance comparison example:</strong></p>
+<pre><code class="language-bash"># Fast single-pass (skip context analysis)
+time debtmap analyze . --no-multi-pass
+
+# Default multi-pass (includes context analysis)
+time debtmap analyze .
+</code></pre>
+<p>Multi-pass analysis provides better prioritization by analyzing dependencies and relationships across files, but single-pass mode can be 2-3x faster for large codebases.</p>
 <h3 id="aggregation-methods"><a class="header" href="#aggregation-methods">Aggregation Methods</a></h3>
 <pre><code class="language-bash"># Use logarithmic sum for aggregation
 debtmap analyze . --aggregation-method logarithmic_sum
@@ -1329,7 +1318,7 @@ debtmap compare \
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
 <li><a href="cli-reference.html">CLI Reference</a> - Complete CLI documentation</li>
-<li><a href="analysis-guide.html">Analysis Guide</a> - Understanding analysis results</li>
+<li><a href="analysis-guide/index.html">Analysis Guide</a> - Understanding analysis results</li>
 <li><a href="configuration.html">Configuration</a> - Advanced configuration options</li>
 </ul>
 

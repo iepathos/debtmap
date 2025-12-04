@@ -1,0 +1,711 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Debt Patterns - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-08429e26.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-c7b19542.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="debt-patterns"><a class="header" href="#debt-patterns">Debt Patterns</a></h1>
+<h2 id="debt-patterns-1"><a class="header" href="#debt-patterns-1">Debt Patterns</a></h2>
+<p>Debtmap detects 27 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.</p>
+<p><strong>Source</strong>: All debt types and category mappings verified from src/priority/mod.rs:158-347</p>
+<h3 id="debt-type-enum"><a class="header" href="#debt-type-enum">Debt Type Enum</a></h3>
+<p>The <code>DebtType</code> enum defines all specific debt patterns that Debtmap can detect.</p>
+<p><strong>Note</strong>: Each <code>DebtType</code> variant carries structured diagnostic data specific to that pattern. For example, <code>ComplexityHotspot</code> includes <code>cyclomatic</code>, <code>cognitive</code>, and <code>adjusted_cyclomatic</code> (entropy-adjusted) fields that provide detailed metrics for the detected issue. This structured data enables precise prioritization and actionable recommendations.</p>
+<p><strong>Source</strong>: DebtType structure defined in src/priority/mod.rs:158-288</p>
+<p><strong>Testing Debt:</strong></p>
+<ul>
+<li><code>TestingGap</code> - Functions with insufficient test coverage</li>
+<li><code>TestTodo</code> - TODO comments in test code</li>
+<li><code>TestComplexity</code> - Test functions exceeding complexity thresholds</li>
+<li><code>TestDuplication</code> - Duplicated code in test files</li>
+<li><code>TestComplexityHotspot</code> - Complex test logic that’s hard to maintain</li>
+<li><code>AssertionComplexity</code> - Complex test assertions</li>
+<li><code>FlakyTestPattern</code> - Non-deterministic test behavior</li>
+</ul>
+<p><strong>Architecture Debt:</strong></p>
+<ul>
+<li><code>GodObject</code> - Classes with too many responsibilities</li>
+<li><code>GodModule</code> - Modules with too many responsibilities</li>
+<li><code>FeatureEnvy</code> - Using more data from other objects than own</li>
+<li><code>PrimitiveObsession</code> - Overusing basic types instead of domain objects</li>
+<li><code>ScatteredType</code> - Types with methods scattered across multiple files</li>
+<li><code>OrphanedFunctions</code> - Functions that should be methods on a type</li>
+<li><code>UtilitiesSprawl</code> - Utility modules with poor cohesion</li>
+</ul>
+<p><strong>Performance Debt:</strong></p>
+<ul>
+<li><code>AllocationInefficiency</code> - Inefficient memory allocations</li>
+<li><code>StringConcatenation</code> - Inefficient string building in loops</li>
+<li><code>NestedLoops</code> - Multiple nested iterations (O(n²) or worse)</li>
+<li><code>BlockingIO</code> - Blocking I/O in async contexts</li>
+<li><code>SuboptimalDataStructure</code> - Wrong data structure for access pattern</li>
+<li><code>AsyncMisuse</code> - Improper async/await usage</li>
+<li><code>ResourceLeak</code> - Resources not properly released</li>
+<li><code>CollectionInefficiency</code> - Inefficient collection operations</li>
+</ul>
+<p><strong>Code Quality Debt:</strong></p>
+<ul>
+<li><code>ComplexityHotspot</code> - Functions exceeding complexity thresholds</li>
+<li><code>DeadCode</code> - Unreachable or unused code</li>
+<li><code>MagicValues</code> - Unexplained literal values</li>
+<li><code>Risk</code> - High-risk code (complex + poorly tested)</li>
+<li><code>Duplication</code> - Duplicated code blocks</li>
+<li><code>ErrorSwallowing</code> - Errors caught but ignored</li>
+</ul>
+<h3 id="debt-categories"><a class="header" href="#debt-categories">Debt Categories</a></h3>
+<p>The <code>DebtCategory</code> enum groups debt types into strategic categories:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum DebtCategory {
+    Architecture,  // Structure, design, complexity
+    Testing,       // Coverage, test quality
+    Performance,   // Speed, memory, efficiency
+    CodeQuality,   // Maintainability, readability
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Category Mapping:</strong></p>
+<p><strong>Source</strong>: Verified from src/priority/mod.rs:309-347</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Debt Type</th><th>Category</th><th>Strategic Focus</th></tr>
+</thead>
+<tbody>
+<tr><td>GodObject, GodModule, FeatureEnvy, PrimitiveObsession, ScatteredType, OrphanedFunctions, UtilitiesSprawl</td><td>Architecture</td><td>Structural improvements, design patterns, type organization</td></tr>
+<tr><td>TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern</td><td>Testing</td><td>Test coverage, test quality</td></tr>
+<tr><td>AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency</td><td>Performance</td><td>Runtime efficiency, resource usage</td></tr>
+<tr><td>ComplexityHotspot, DeadCode, MagicValues, Risk, Duplication, ErrorSwallowing</td><td>CodeQuality</td><td>Maintainability, reliability, code clarity</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Language-Specific Debt Patterns:</strong></p>
+<p>Some debt patterns only apply to languages with specific features:</p>
+<ul>
+<li><strong>BlockingIO, AsyncMisuse</strong>: Async-capable languages (Rust)</li>
+<li><strong>AllocationInefficiency, ResourceLeak</strong>: Languages with manual memory management (Rust)</li>
+<li><strong>Error handling patterns</strong>: Vary by language error model (Result in Rust)</li>
+</ul>
+<p>Debtmap automatically applies only the relevant debt patterns during analysis.</p>
+<h3 id="examples-by-category"><a class="header" href="#examples-by-category">Examples by Category</a></h3>
+<h4 id="architecture-debt"><a class="header" href="#architecture-debt">Architecture Debt</a></h4>
+<p><strong>GodObject / GodModule</strong>: Too many responsibilities</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// God module: handles parsing, validation, storage, notifications
+mod user_service {
+    fn parse_user() { /* ... */ }
+    fn validate_user() { /* ... */ }
+    fn save_user() { /* ... */ }
+    fn send_email() { /* ... */ }
+    fn log_activity() { /* ... */ }
+    // ... 20+ more functions
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Complexity-weighted scoring system (see detailed explanation below)
+<strong>Action</strong>: Split into focused modules (parser, validator, repository, notifier)</p>
+<h4 id="complexity-weighted-god-object-detection"><a class="header" href="#complexity-weighted-god-object-detection">Complexity-Weighted God Object Detection</a></h4>
+<p>Debtmap uses <strong>complexity-weighted scoring</strong> for god object detection to reduce false positives on well-refactored code. This ensures that a file with 100 simple helper functions doesn’t rank higher than a file with 10 complex functions.</p>
+<p><strong>The Problem:</strong></p>
+<p>Traditional god object detection counts methods:</p>
+<ul>
+<li>File A: 100 methods (average complexity: 1.5) → Flagged as god object</li>
+<li>File B: 10 methods (average complexity: 17.0) → Not flagged</li>
+</ul>
+<p>But File A might be a well-organized utility module with many small helpers, while File B is truly problematic with highly complex functions that need refactoring.</p>
+<p><strong>The Solution:</strong></p>
+<p>Debtmap weights each function by its cyclomatic complexity using this formula:</p>
+<pre><code>weight = (max(1, complexity) / 3)^1.5
+</code></pre>
+<p><strong>Weight Examples:</strong></p>
+<ul>
+<li>Simple helper (complexity 1): weight ≈ 0.19</li>
+<li>Baseline function (complexity 3): weight = 1.0</li>
+<li>Moderate function (complexity 9): weight ≈ 5.2</li>
+<li>Complex function (complexity 17): weight ≈ 13.5</li>
+<li>Critical function (complexity 33): weight ≈ 36.5</li>
+</ul>
+<p><strong>God Object Score Calculation:</strong></p>
+<pre><code>weighted_method_count = sum(weight for each function)
+complexity_penalty = 0.7 if avg_complexity &lt; 3, 1.0 if 3-10, 1.5 if &gt; 10
+
+god_object_score = (
+    (weighted_method_count / threshold) * 40% +
+    (field_count / threshold) * 20% +
+    (responsibility_count / threshold) * 15% +
+    (lines_of_code / 500) * 25%
+) * complexity_penalty
+</code></pre>
+<p><strong>Threshold</strong>: God object detected if <code>score &gt;= 70.0</code></p>
+<p><strong>Real-World Example:</strong></p>
+<pre><code>shared_cache.rs:
+  - 100 functions, average complexity: 1.5
+  - Weighted score: ~19.0 (100 * 0.19)
+  - God object score: 45.2
+  - Result: Not a god object ✓
+
+legacy_parser.rs:
+  - 10 functions, average complexity: 17.0
+  - Weighted score: ~135.0 (10 * 13.5)
+  - God object score: 87.3
+  - Result: God object detected ✓
+</code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li><strong>Reduces false positives</strong> on utility modules with many simple functions</li>
+<li><strong>Focuses attention</strong> on truly problematic complex modules</li>
+<li><strong>Rewards good refactoring</strong> - breaking large functions into small helpers improves score</li>
+<li><strong>Aligns with reality</strong> - complexity matters more than count for maintainability</li>
+</ul>
+<p><strong>How to View:</strong></p>
+<p>When Debtmap detects a god object, the output includes:</p>
+<ul>
+<li>Raw method count</li>
+<li>Weighted method count</li>
+<li>Average complexity</li>
+<li>God object score</li>
+<li>Recommended module splits based on responsibility clustering</li>
+</ul>
+<h4 id="type-organization-debt"><a class="header" href="#type-organization-debt">Type Organization Debt</a></h4>
+<p><strong>Source</strong>: Type organization patterns defined in src/priority/mod.rs:273-288, detection logic in src/organization/codebase_type_analyzer.rs</p>
+<p>These patterns detect issues with how types and their associated functions are organized across the codebase.</p>
+<p><strong>ScatteredType</strong>: Type with methods scattered across multiple files</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Type definition in types/user.rs
+pub struct User {
+    id: UserId,
+    name: String,
+}
+
+// Methods scattered across files:
+// In modules/auth.rs:
+impl User {
+    fn authenticate(&amp;self) -&gt; Result&lt;Session&gt; { /* ... */ }
+}
+
+// In modules/validation.rs:
+impl User {
+    fn validate_email(&amp;self) -&gt; Result&lt;()&gt; { /* ... */ }
+}
+
+// In modules/persistence.rs:
+impl User {
+    fn save(&amp;self) -&gt; Result&lt;()&gt; { /* ... */ }
+}
+
+// Problem: User methods spread across 4+ files!
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Type has methods in 2+ files (severity: Low=2 files, Medium=3-5 files, High=6+ files)
+<strong>Action</strong>: Consolidate methods into primary file or create focused trait implementations
+<strong>Source</strong>: Detection criteria from src/organization/codebase_type_analyzer.rs:46-47</p>
+<p><strong>OrphanedFunctions</strong>: Functions that should be methods on a type</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Orphaned functions operating on User
+fn validate_user_email(user: &amp;User) -&gt; Result&lt;()&gt; {
+    // Email validation logic
+}
+
+fn calculate_user_age(user: &amp;User) -&gt; u32 {
+    // Age calculation from birthdate
+}
+
+fn format_user_display(user: &amp;User) -&gt; String {
+    // Display formatting
+}
+
+// Good: Functions converted to methods
+impl User {
+    fn validate_email(&amp;self) -&gt; Result&lt;()&gt; { /* ... */ }
+    fn age(&amp;self) -&gt; u32 { /* ... */ }
+    fn display(&amp;self) -&gt; String { /* ... */ }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Multiple functions with shared type parameter pattern (e.g., all take <code>&amp;User</code>)
+<strong>Action</strong>: Convert functions to methods on the target type
+<strong>Source</strong>: Detection in src/organization/codebase_type_analyzer.rs:58-71</p>
+<p><strong>UtilitiesSprawl</strong>: Utility module with poor cohesion</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: utils.rs with mixed responsibilities
+mod utils {
+    fn parse_date(s: &amp;str) -&gt; Date { /* ... */ }
+    fn validate_email(s: &amp;str) -&gt; bool { /* ... */ }
+    fn calculate_hash(data: &amp;[u8]) -&gt; Hash { /* ... */ }
+    fn format_currency(amount: f64) -&gt; String { /* ... */ }
+    fn send_notification(msg: &amp;str) { /* ... */ }
+    // ... 20+ more unrelated functions
+}
+
+// Good: Focused modules
+mod date_utils { fn parse(s: &amp;str) -&gt; Date { /* ... */ } }
+mod validators { fn email(s: &amp;str) -&gt; bool { /* ... */ } }
+mod crypto { fn hash(data: &amp;[u8]) -&gt; Hash { /* ... */ } }
+mod formatters { fn currency(amount: f64) -&gt; String { /* ... */ } }
+mod notifications { fn send(msg: &amp;str) { /* ... */ } }
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Utility module has many functions operating on diverse types with low cohesion
+<strong>Action</strong>: Split into focused modules based on domain or responsibility
+<strong>Source</strong>: Detection in src/organization/codebase_type_analyzer.rs:74-80</p>
+<h4 id="testing-debt"><a class="header" href="#testing-debt">Testing Debt</a></h4>
+<p><strong>TestingGap</strong>: Functions with insufficient test coverage</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// 0% coverage - critical business logic untested
+fn calculate_tax(amount: f64, region: &amp;str) -&gt; f64 {
+    // Complex tax calculation logic
+    // No tests exist for this function!
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Coverage data shows function has &lt; 80% line coverage
+<strong>Action</strong>: Add unit tests to cover all branches and edge cases</p>
+<p><strong>TestComplexity</strong>: Test functions too complex</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn complex_test() {
+    // Cyclomatic: 12 (too complex for a test)
+    for input in test_cases {
+        if input.is_special() {
+            match input.type {
+                /* complex test logic */
+            }
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Test functions with cyclomatic &gt; 10 or cognitive &gt; 15
+<strong>Action</strong>: Split into multiple focused tests, use test fixtures</p>
+<p><strong>FlakyTestPattern</strong>: Non-deterministic tests</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[test]
+fn flaky_test() {
+    let result = async_operation().await;  // Timing-dependent
+    thread::sleep(Duration::from_millis(100));  // Race condition!
+    assert_eq!(result.status, "complete");
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Pattern analysis for timing dependencies, random values
+<strong>Action</strong>: Use mocks, deterministic test data, proper async test utilities</p>
+<h4 id="performance-debt"><a class="header" href="#performance-debt">Performance Debt</a></h4>
+<p><strong>AllocationInefficiency</strong>: Excessive allocations</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Allocates on every iteration
+fn process_items(items: &amp;[Item]) -&gt; Vec&lt;String&gt; {
+    let mut results = Vec::new();
+    for item in items {
+        results.push(item.name.clone());  // Unnecessary clone
+    }
+    results
+}
+
+// Good: Pre-allocate, avoid clones
+fn process_items(items: &amp;[Item]) -&gt; Vec&lt;&amp;str&gt; {
+    items.iter().map(|item| item.name.as_str()).collect()
+}
+<span class="boring">}</span></code></pre>
+<p><strong>BlockingIO</strong>: Blocking operations in async contexts</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Blocks async runtime
+async fn load_data() -&gt; Result&lt;Data&gt; {
+    let file = std::fs::read_to_string("data.json")?;  // Blocking!
+    parse_json(&amp;file)
+}
+
+// Good: Async I/O
+async fn load_data() -&gt; Result&lt;Data&gt; {
+    let file = tokio::fs::read_to_string("data.json").await?;
+    parse_json(&amp;file)
+}
+<span class="boring">}</span></code></pre>
+<p><strong>NestedLoops</strong>: O(n²) or worse complexity</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: O(n²) nested loops
+fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;(Item, Item)&gt; {
+    let mut dupes = vec![];
+    for i in 0..items.len() {
+        for j in i+1..items.len() {
+            if items[i] == items[j] {
+                dupes.push((items[i].clone(), items[j].clone()));
+            }
+        }
+    }
+    dupes
+}
+
+// Good: O(n) with HashSet
+fn find_duplicates(items: &amp;[Item]) -&gt; Vec&lt;Item&gt; {
+    let mut seen = HashSet::new();
+    items.iter().filter(|item| !seen.insert(item)).cloned().collect()
+}
+<span class="boring">}</span></code></pre>
+<h4 id="code-quality-debt"><a class="header" href="#code-quality-debt">Code Quality Debt</a></h4>
+<p><strong>ComplexityHotspot</strong>: Functions exceeding complexity thresholds</p>
+<p><strong>Source</strong>: Categorized as CodeQuality in src/priority/mod.rs:340</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Cyclomatic: 22, Cognitive: 35
+fn process_transaction(tx: Transaction, account: &amp;mut Account) -&gt; Result&lt;Receipt&gt; {
+    if tx.amount &lt;= 0 {
+        return Err(Error::InvalidAmount);
+    }
+    if account.balance &lt; tx.amount {
+        if account.overdraft_enabled {
+            if account.overdraft_limit &gt;= tx.amount {
+                // More nested branches...
+            }
+        } else {
+            return Err(Error::InsufficientFunds);
+        }
+    }
+    // ... deeply nested logic with many branches
+    Ok(receipt)
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Cyclomatic &gt; 10 OR Cognitive &gt; 15 (configurable)
+<strong>Action</strong>: Break into smaller functions, extract validation, simplify control flow
+<strong>Note</strong>: Includes entropy-adjusted complexity (adjusted_cyclomatic) when available</p>
+<p><strong>DeadCode</strong>: Unreachable or unused code</p>
+<p><strong>Source</strong>: Categorized as CodeQuality in src/priority/mod.rs:341</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Private function never called within module
+fn obsolete_calculation(x: i32) -&gt; i32 {
+    x * 2 + 5  // Dead code - no callers
+}
+
+// Public function but no external usage
+pub fn deprecated_api(data: &amp;str) -&gt; Result&lt;()&gt; {
+    // Unreachable in practice
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Function visibility analysis + call graph shows no callers
+<strong>Action</strong>: Remove dead code or document if intentionally kept for future use</p>
+<p><strong>MagicValues</strong>: Unexplained literal values</p>
+<p><strong>Source</strong>: Categorized as CodeQuality in src/priority/mod.rs:345</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Magic numbers
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+}
+
+// Good: Named constants
+const UNIT_PRICE: f64 = 19.99;
+const SHIPPING_COST: f64 = 5.0;
+fn calculate_price(quantity: u32) -&gt; f64 {
+    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Numeric or string literals without clear context (excludes 0, 1, common patterns)
+<strong>Action</strong>: Extract to named constants or configuration</p>
+<p><strong>Duplication</strong>: Duplicated code blocks</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// File A:
+fn process_user(user: User) -&gt; Result&lt;()&gt; {
+    validate_email(&amp;user.email)?;
+    validate_age(user.age)?;
+    save_to_database(&amp;user)?;
+    send_welcome_email(&amp;user.email)?;
+    Ok(())
+}
+
+// File B: Duplicated validation
+fn process_admin(admin: Admin) -&gt; Result&lt;()&gt; {
+    validate_email(&amp;admin.email)?;  // Duplicated
+    validate_age(admin.age)?;       // Duplicated
+    save_to_database(&amp;admin)?;
+    grant_admin_privileges(&amp;admin)?;
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Similar code blocks &gt; 50 lines (configurable)
+<strong>Action</strong>: Extract shared code into reusable functions</p>
+<p><strong>ErrorSwallowing</strong>: Errors caught but ignored</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Bad: Error swallowed, no context
+match risky_operation() {
+    Ok(result) =&gt; process(result),
+    Err(_) =&gt; {}, // Silent failure!
+}
+
+// Good: Error handled with context
+match risky_operation() {
+    Ok(result) =&gt; process(result),
+    Err(e) =&gt; {
+        log::error!("Risky operation failed: {}", e);
+        return Err(e.into());
+    }
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Empty catch blocks, ignored Results
+<strong>Action</strong>: Add proper error logging and propagation</p>
+<p><strong>Risk</strong>: High-risk code (complex + poorly tested)</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Cyclomatic: 18, Coverage: 20%, Risk Score: 47.6 (HIGH)
+fn process_payment(tx: Transaction) -&gt; Result&lt;Receipt&gt; {
+    // Complex payment logic with minimal testing
+    // High risk of bugs in production
+}
+<span class="boring">}</span></code></pre>
+<p><strong>When detected</strong>: Combines complexity metrics with coverage data
+<strong>Action</strong>: Either add comprehensive tests OR refactor to reduce complexity</p>
+<h3 id="debt-scoring-formula"><a class="header" href="#debt-scoring-formula">Debt Scoring Formula</a></h3>
+<p>Each debt item gets a score based on priority and type:</p>
+<pre><code>debt_score = priority_weight × type_weight
+</code></pre>
+<p><strong>Priority weights:</strong></p>
+<ul>
+<li>Low = 1</li>
+<li>Medium = 3</li>
+<li>High = 5</li>
+<li>Critical = 10</li>
+</ul>
+<p><strong>Combined examples:</strong></p>
+<ul>
+<li>Low Todo = 1 × 1 = 1</li>
+<li>Medium Fixme = 3 × 2 = 6</li>
+<li>High Complexity = 5 × 5 = 25</li>
+<li>Critical Complexity = 10 × 5 = 50</li>
+</ul>
+<p><strong>Total debt score</strong> = Sum of all debt item scores</p>
+<p>Lower is better. Track over time to measure improvement.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../analysis-guide/complexity-metrics.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../analysis-guide/risk-scoring.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../analysis-guide/complexity-metrics.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../analysis-guide/risk-scoring.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

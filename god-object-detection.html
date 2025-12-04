@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -309,10 +309,15 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 </code></pre>
 <p><strong>Score Enforcement:</strong></p>
 <ul>
-<li>If <code>violation_count &gt; 0</code>: <code>final_score = max(base_score × 50 × violation_count, 100)</code></li>
+<li>If <code>violation_count &gt; 0</code>: <code>final_score = max(base_score × 20 × violation_count, min_score)</code>
+<ul>
+<li>Where <code>min_score</code> is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations → 70.0</li>
+</ul>
+</li>
 <li>Else: <code>final_score = base_score × 10</code></li>
 </ul>
-<p>The minimum score of 100 ensures that any god object receives sufficient priority in the technical debt analysis.</p>
+<p><strong>Source</strong>: src/organization/god_object/scoring.rs:44-90</p>
+<p>The graduated minimum scores ensure that severity matches the number of violations while preventing over-flagging of moderate files.</p>
 <h3 id="complexity-weighted-scoring"><a class="header" href="#complexity-weighted-scoring">Complexity-Weighted Scoring</a></h3>
 <p>Unlike raw method counting, this algorithm weights each method by its cyclomatic complexity. This ensures that 100 simple functions (complexity 1-3) score better than 10 highly complex functions (complexity 17+).</p>
 <p>The formula is similar to simple scoring, but uses <code>weighted_method_count</code> (sum of complexity weights) instead of raw counts:</p>
@@ -325,10 +330,11 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 <li>Otherwise: <code>1.0</code></li>
 </ul>
 <p>The final score becomes:</p>
-<pre><code>final_score = max(base_score × 50 × complexity_factor × violation_count, 100)
+<pre><code>final_score = max(base_score × 20 × complexity_factor × violation_count, min_score)
 </code></pre>
-<p>This approach better reflects the true maintainability burden of a large module.</p>
-<p>See <code>src/organization/god_object_analysis.rs:142-209</code>.</p>
+<p>Where <code>min_score</code> is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations → 70.0</p>
+<p>This approach better reflects the true maintainability burden of a large module while using conservative scaling to prevent small files from being over-flagged.</p>
+<p><strong>Source</strong>: src/organization/god_object/scoring.rs:118-178</p>
 <h3 id="purity-weighted-scoring-advanced"><a class="header" href="#purity-weighted-scoring-advanced">Purity-Weighted Scoring (Advanced)</a></h3>
 <p><strong>Available for Rust only</strong> (requires <code>syn::ItemFn</code> analysis)</p>
 <p>This advanced scoring variant combines both <strong>complexity weighting</strong> and <strong>purity analysis</strong>, building on top of complexity-weighted scoring to further reduce the impact of pure functions. This prevents pure functional modules from being unfairly penalized. The algorithm:</p>
@@ -385,29 +391,33 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 <p><strong>Impact:</strong> A file with 100 pure helper functions (total complexity 150) might have a weighted method count of only <code>150 × 0.3 = 45</code>, avoiding false positives while still catching stateful god objects with many impure methods.</p>
 <p>See <code>src/organization/god_object_detector.rs:196-258</code> and <code>src/organization/purity_analyzer.rs</code>.</p>
 <h2 id="responsibility-detection"><a class="header" href="#responsibility-detection">Responsibility Detection</a></h2>
-<p>Responsibilities are inferred from method names using common prefixes. Debtmap recognizes the following categories:</p>
+<p>Responsibilities are inferred from method names using behavioral heuristics. Debtmap recognizes the following categories based on the <code>BehaviorCategory</code> enum (src/organization/behavioral_decomposition.rs:10-41):</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Prefix(es)</th><th>Responsibility Category</th></tr>
+<tr><th>Category</th><th>Method Patterns</th><th>Examples</th></tr>
 </thead>
 <tbody>
-<tr><td><code>format</code>, <code>render</code>, <code>write</code>, <code>print</code></td><td>Formatting &amp; Output</td></tr>
-<tr><td><code>parse</code>, <code>read</code>, <code>extract</code></td><td>Parsing &amp; Input</td></tr>
-<tr><td><code>filter</code>, <code>select</code>, <code>find</code></td><td>Filtering &amp; Selection</td></tr>
-<tr><td><code>transform</code>, <code>convert</code>, <code>map</code>, <code>apply</code></td><td>Transformation</td></tr>
-<tr><td><code>get</code>, <code>set</code></td><td>Data Access</td></tr>
-<tr><td><code>validate</code>, <code>check</code>, <code>verify</code>, <code>is</code></td><td>Validation</td></tr>
-<tr><td><code>calculate</code>, <code>compute</code></td><td>Computation</td></tr>
-<tr><td><code>create</code>, <code>build</code>, <code>new</code></td><td>Construction</td></tr>
-<tr><td><code>save</code>, <code>load</code>, <code>store</code></td><td>Persistence</td></tr>
-<tr><td><code>process</code>, <code>handle</code></td><td>Processing</td></tr>
-<tr><td><code>send</code>, <code>receive</code></td><td>Communication</td></tr>
-<tr><td><em>(no prefix match)</em></td><td>Utilities</td></tr>
+<tr><td><strong>Lifecycle</strong></td><td><code>new</code>, <code>init</code>, <code>setup</code>, <code>destroy</code>, <code>cleanup</code></td><td>Initialization and teardown</td></tr>
+<tr><td><strong>State Management</strong></td><td><code>update_*</code>, <code>mutate_*</code>, <code>*_state</code></td><td>State transitions and mutations</td></tr>
+<tr><td><strong>Rendering</strong></td><td><code>render</code>, <code>draw</code>, <code>paint</code>, <code>display</code>, <code>format</code></td><td>Display and formatting</td></tr>
+<tr><td><strong>Event Handling</strong></td><td><code>handle_*</code>, <code>on_*</code></td><td>Event dispatchers and handlers</td></tr>
+<tr><td><strong>Persistence</strong></td><td><code>save</code>, <code>load</code>, <code>serialize</code>, <code>deserialize</code></td><td>Data storage and retrieval</td></tr>
+<tr><td><strong>Validation</strong></td><td><code>validate_*</code>, <code>check_*</code>, <code>verify_*</code>, <code>ensure_*</code>, <code>is_*</code></td><td>Data validation</td></tr>
+<tr><td><strong>Computation</strong></td><td><code>calculate</code>, <code>compute</code>, <code>evaluate</code></td><td>Pure deterministic calculations</td></tr>
+<tr><td><strong>Parsing</strong></td><td><code>parse</code>, <code>read</code>, <code>extract</code>, <code>decode</code>, <code>unmarshal</code>, <code>scan</code></td><td>Data parsing and reading</td></tr>
+<tr><td><strong>Filtering</strong></td><td><code>filter</code>, <code>select</code>, <code>find</code>, <code>search</code>, <code>query</code>, <code>lookup</code>, <code>match</code></td><td>Search and filtering</td></tr>
+<tr><td><strong>Transformation</strong></td><td><code>transform</code>, <code>convert</code>, <code>map</code>, <code>apply</code>, <code>adapt</code></td><td>Data transformation</td></tr>
+<tr><td><strong>Data Access</strong></td><td><code>get</code>, <code>set</code>, <code>fetch</code>, <code>retrieve</code>, <code>access</code></td><td>Getter/setter methods</td></tr>
+<tr><td><strong>Construction</strong></td><td><code>create</code>, <code>build</code>, <code>make</code>, <code>construct</code></td><td>Object construction</td></tr>
+<tr><td><strong>Processing</strong></td><td><code>process</code>, <code>handle</code>, <code>execute</code>, <code>run</code></td><td>General processing</td></tr>
+<tr><td><strong>Communication</strong></td><td><code>send</code>, <code>receive</code>, <code>transmit</code>, <code>broadcast</code>, <code>notify</code></td><td>Inter-process communication</td></tr>
+<tr><td><strong>Domain</strong></td><td><em>(no match)</em></td><td>Domain-specific with custom name</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Note:</strong> <code>Utilities</code> serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, <code>Utilities</code> is included in <code>RESPONSIBILITY_CATEGORIES</code> with an empty prefixes array (<code>prefixes: &amp;[]</code>), making it the catch-all category returned by <code>infer_responsibility_from_method</code> when no other category matches.</p>
+<p><strong>Note:</strong> The <code>Domain</code> category serves as the fallback when no behavioral pattern matches. It extracts a domain name from the method’s first word to provide context-specific categorization.</p>
+<p><strong>Classification Order</strong>: More specific categories are checked first (Construction before Lifecycle, Validation before Rendering) to ensure accurate categorization. See <code>BehavioralCategorizer::categorize_method()</code> in src/organization/behavioral_decomposition.rs:151-249.</p>
 <p><strong>Distinct Responsibility Counting:</strong> Debtmap counts the number of <strong>unique</strong> responsibility categories used by a struct/module’s methods. A high responsibility count (e.g., &gt;5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.</p>
 <p>Responsibility count directly affects:</p>
 <ul>
@@ -415,7 +425,7 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 <li>Refactoring recommendations (methods grouped by responsibility for suggested splits)</li>
 <li>Detection confidence (counted as one of the five violation criteria)</li>
 </ul>
-<p>See <code>src/organization/god_object_analysis.rs:318-388</code> for the <code>infer_responsibility_from_method</code> function.</p>
+<p>See <code>BehavioralCategorizer::categorize_method()</code> in src/organization/behavioral_decomposition.rs:151-249 and <code>infer_responsibility_with_confidence()</code> in src/organization/god_object/classifier.rs:128-163.</p>
 <h2 id="examples-and-case-studies"><a class="header" href="#examples-and-case-studies">Examples and Case Studies</a></h2>
 <h3 id="example-1-large-rust-module"><a class="header" href="#example-1-large-rust-module">Example 1: Large Rust Module</a></h3>
 <p><strong>File:</strong> <code>rust_call_graph.rs</code> with 270 standalone functions</p>
@@ -651,7 +661,7 @@ Score: 1350 (Confidence: Definite)
 <li>God objects surface in the “top 10 most problematic” lists</li>
 <li>Architectural debt is weighted appropriately alongside function-level complexity</li>
 </ul>
-<p>See file-level scoring documentation for complete details on how this multiplier integrates into the overall debt calculation.</p>
+<p>See the <a href="./scoring-strategies.html#file-level-scoring">Scoring Strategies</a> documentation for complete details on how this multiplier integrates into the overall debt calculation.</p>
 <h2 id="metrics-tracking-advanced"><a class="header" href="#metrics-tracking-advanced">Metrics Tracking (Advanced)</a></h2>
 <p>For teams tracking god object evolution over time, Debtmap provides <code>GodObjectMetrics</code> with:</p>
 <ul>
@@ -726,7 +736,7 @@ Score: 1350 (Confidence: Definite)
 <p><strong>Recommended:</strong> Start with defaults, then adjust based on your codebase’s characteristics. Use metrics tracking to monitor trends over time.</p>
 <h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
 <ul>
-<li><a href="./file-level-scoring.html">File-Level Scoring</a> - How god objects affect overall file scores</li>
+<li><a href="./scoring-strategies.html">Scoring Strategies</a> - How god objects affect overall file scores</li>
 <li><a href="./configuration.html">Configuration</a> - Complete <code>.debtmap.toml</code> reference</li>
 <li><a href="./cli-reference.html">CLI Reference</a> - All command-line options</li>
 <li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - How god objects are prioritized</li>

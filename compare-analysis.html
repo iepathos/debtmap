@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -184,7 +184,7 @@
 <ul>
 <li>✅ Target location tracking with intelligent fuzzy matching</li>
 <li>✅ Detailed improvement percentage calculations (per-item)</li>
-<li>✅ Multiple output formats (JSON, Markdown, Terminal)</li>
+<li>✅ Multiple output formats (JSON, Markdown, Terminal, HTML)</li>
 <li>✅ Implementation plan parsing for target extraction</li>
 <li>✅ Four match strategies (Exact, FunctionLevel, ApproximateName, FileLevel)</li>
 <li>✅ Resolved items tracking (debt eliminated)</li>
@@ -222,7 +222,7 @@
 <tr><td><code>--output FILE</code></td><td>No</td><td>Output file path (default: stdout)</td></tr>
 <tr><td><code>--plan FILE</code></td><td>No</td><td>Implementation plan to extract target location</td></tr>
 <tr><td><code>--target-location LOCATION</code></td><td>No</td><td>Manual target location (format: <code>file:function:line</code>)</td></tr>
-<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code>, <code>markdown</code>, or <code>terminal</code> (default: json)</td></tr>
+<tr><td><code>--format FORMAT</code></td><td>No</td><td>Output format: <code>json</code>, <code>markdown</code>, <code>terminal</code>, or <code>html</code> (default: json)</td></tr>
 </tbody>
 </table>
 </div>
@@ -388,13 +388,14 @@ fi
 <h2 id="improvement-tracking"><a class="header" href="#improvement-tracking">Improvement Tracking</a></h2>
 <p>The compare command tracks improvements as a list of <code>ImprovementItem</code> objects with detailed before/after metrics.</p>
 <h3 id="improvement-types"><a class="header" href="#improvement-types">Improvement Types</a></h3>
-<p>The <code>improvement_type</code> field indicates the kind of improvement:</p>
+<p>The <code>ImprovementType</code> enum (src/comparison/types.rs:120-126) defines four improvement categories:</p>
 <ul>
-<li><strong>Resolved</strong> - Debt item completely eliminated (no longer in after analysis)</li>
-<li><strong>ScoreReduced</strong> - Overall debt score reduced significantly (≥ 30% reduction)</li>
-<li><strong>ComplexityReduced</strong> - Cyclomatic or cognitive complexity decreased</li>
-<li><strong>CoverageImproved</strong> - Test coverage increased</li>
+<li><strong>Resolved</strong> - Debt item completely eliminated (no longer in after analysis) ✓ <em>Auto-detected</em></li>
+<li><strong>ScoreReduced</strong> - Overall debt score reduced significantly (≥ 30% reduction) ✓ <em>Auto-detected</em></li>
+<li><strong>ComplexityReduced</strong> - Cyclomatic or cognitive complexity decreased (defined but not auto-classified)</li>
+<li><strong>CoverageImproved</strong> - Test coverage increased (defined but not auto-classified)</li>
 </ul>
+<p><strong>Note</strong>: Currently, the comparator automatically detects and classifies <code>Resolved</code> and <code>ScoreReduced</code> improvements (src/comparison/comparator.rs:134-191). The <code>ComplexityReduced</code> and <code>CoverageImproved</code> types are defined in the type system but not yet auto-assigned during comparison. Future versions may extend auto-detection to classify complexity and coverage improvements.</p>
 <h3 id="improvement-items-structure"><a class="header" href="#improvement-items-structure">Improvement Items Structure</a></h3>
 <pre><code class="language-json">{
   "improvements": [
@@ -514,13 +515,13 @@ fi
 <p>The default JSON format provides complete comparison results:</p>
 <pre><code class="language-bash">debtmap compare --before before.json --after after.json --output result.json
 </code></pre>
-<p>The <code>ComparisonResult</code> JSON output includes:</p>
+<p>The <code>ComparisonResult</code> JSON output (src/comparison/types.rs:3-22) includes:</p>
 <ul>
-<li><code>metadata</code> - Comparison metadata (date, file paths, target location)</li>
+<li><code>metadata</code> - Comparison metadata (timestamp, file paths, target location)</li>
 <li><code>target_item</code> - Target item comparison with before/after metrics (if specified)</li>
 <li><code>project_health</code> - Project-wide health metrics comparison</li>
-<li><code>regressions</code> - List of new critical items</li>
-<li><code>improvements</code> - List of improved/resolved items</li>
+<li><code>regressions</code> - List of new critical items (score ≥ 60.0)</li>
+<li><code>improvements</code> - List of improved/resolved items (≥30% score reduction or resolved)</li>
 <li><code>summary</code> - Summary statistics and overall debt trend</li>
 </ul>
 <p>Example output:</p>
@@ -549,6 +550,7 @@ fi
 <p>Generate human-readable markdown reports for pull request comments:</p>
 <pre><code class="language-bash">debtmap compare --before before.json --after after.json --format markdown
 </code></pre>
+<p><strong>Implementation</strong>: src/io/writers/markdown/mod.rs, src/main.rs:1027-1072</p>
 <p>The markdown output is suitable for:</p>
 <ul>
 <li>Pull request comments</li>
@@ -560,12 +562,24 @@ fi
 <p>Display colorized output directly in the terminal:</p>
 <pre><code class="language-bash">debtmap compare --before before.json --after after.json --format terminal
 </code></pre>
+<p><strong>Implementation</strong>: src/io/writers/terminal.rs, src/main.rs:1011</p>
 <p>The terminal format provides:</p>
 <ul>
 <li>Color-coded status indicators</li>
 <li>Formatted tables for metrics</li>
 <li>Human-readable summaries</li>
 <li>Easy scanning of results</li>
+</ul>
+<h3 id="html-format"><a class="header" href="#html-format">HTML Format</a></h3>
+<p>Generate HTML reports with structured styling:</p>
+<pre><code class="language-bash">debtmap compare --before before.json --after after.json --format html
+</code></pre>
+<p><strong>Implementation</strong>: src/io/writers/html.rs</p>
+<p>The HTML format is suitable for:</p>
+<ul>
+<li>Web-based dashboards</li>
+<li>Archived reports</li>
+<li>Integration with documentation sites</li>
 </ul>
 <h2 id="cicd-integration"><a class="header" href="#cicd-integration">CI/CD Integration</a></h2>
 <h3 id="github-actions-example"><a class="header" href="#github-actions-example">GitHub Actions Example</a></h3>
@@ -1019,32 +1033,33 @@ debtmap compare \
 <p>No changes detected - either no code changes or changes were neutral to debt.</p>
 <h2 id="related-documentation"><a class="header" href="#related-documentation">Related Documentation</a></h2>
 <ul>
-<li><a href="validation.html">Validation Command</a> - Validate implementation plans match analysis</li>
-<li><a href="prodigy-integration.html">Prodigy Integration</a> - Automated refactoring workflows</li>
-<li><a href="output-formats.html">Output Formats</a> - Understanding analysis JSON structure</li>
-<li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt scores are calculated</li>
-<li><a href="ci-cd.html">CI/CD Integration</a> - Advanced pipeline configurations</li>
+<li><a href="validation-gates.html">Validation Gates</a> - Quality gate thresholds and validation strategies</li>
+<li><a href="prodigy-integration.html">Prodigy Integration</a> - Automated refactoring workflows with compare validation</li>
+<li><a href="output-formats.html">Output Formats</a> - Understanding analysis JSON structure and formatters</li>
+<li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt scores are calculated (critical ≥ 60.0, high priority ≥ 40.0)</li>
+<li><a href="threshold-configuration.html">Threshold Configuration</a> - Configuring severity thresholds for your project</li>
 </ul>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <p>The compare command provides validation for refactoring efforts:</p>
 <p><strong>Current Capabilities:</strong></p>
 <ul>
-<li>✅ Target location tracking with intelligent fuzzy matching</li>
+<li>✅ Target location tracking with intelligent fuzzy matching (4 strategies: Exact, FunctionLevel, ApproximateName, FileLevel)</li>
 <li>✅ Detect regressions (new critical items with score ≥ 60.0)</li>
-<li>✅ Track resolved items and improvements (≥30% score reduction)</li>
+<li>✅ Track resolved items and improvements (≥30% score reduction, auto-detected)</li>
 <li>✅ Detailed per-item improvement metrics with before/after scores</li>
-<li>✅ Multiple output formats (JSON, Markdown, Terminal)</li>
-<li>✅ Implementation plan parsing for target extraction</li>
+<li>✅ Multiple output formats (JSON, Markdown, Terminal, HTML)</li>
+<li>✅ Implementation plan parsing for target extraction (via <code>--plan</code> flag)</li>
 <li>✅ Project-wide health metrics and debt trends</li>
 <li>✅ Automate quality gates in CI/CD pipelines</li>
 </ul>
+<p><strong>Note</strong>: The compare command is fully implemented with all features available. For improvement classification, <code>Resolved</code> and <code>ScoreReduced</code> types are automatically detected; <code>ComplexityReduced</code> and <code>CoverageImproved</code> are defined for future use.</p>
 <p>Use the compare command regularly to maintain visibility into your codebase’s technical health and ensure continuous improvement. All features are fully implemented and ready for production use.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="analysis-guide.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="analysis-guide/example-outputs.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -1058,7 +1073,7 @@ debtmap compare \
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="analysis-guide.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="analysis-guide/example-outputs.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

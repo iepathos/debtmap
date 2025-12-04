@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -205,9 +205,9 @@ for future releases once Rust analysis reaches maturity.</p>
 <ul>
 <li><strong>Coverage-Risk Correlation</strong>: Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)</li>
 <li><strong>Multi-Factor Analysis</strong>: Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization</li>
-<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70% compared to traditional complexity-only analyzers. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
+<li><strong>Reduced False Positives</strong>: Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, significantly reducing false positives compared to traditional complexity-only analyzers. This is achieved through an advanced token classification system that categorizes code tokens and applies weighted entropy to accurately assess complexity.</li>
 <li><strong>Actionable Guidance</strong>: Provides specific recommendations like “extract nested conditions” or “split this 80-line function” with quantified impact metrics</li>
-<li><strong>Performance</strong>: Significantly faster than Java/Python-based competitors (written in Rust with parallel processing)</li>
+<li><strong>Performance</strong>: 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing providing 70-90% speedup on multi-core systems)</li>
 </ul>
 <h2 id="why-use-debtmap"><a class="header" href="#why-use-debtmap">Why Use Debtmap?</a></h2>
 <p>Debtmap helps you make data-driven decisions about where to focus your refactoring and testing efforts:</p>
@@ -215,7 +215,7 @@ for future releases once Rust analysis reaches maturity.</p>
 <li><strong>Identify Complexity</strong> - Find complex functions and modules that need refactoring, with concrete metrics showing which changes will have the most impact</li>
 <li><strong>Detect Technical Debt</strong> - Discover 30+ debt patterns including code smells, security vulnerabilities, resource management issues, and architectural problems</li>
 <li><strong>Assess Risk</strong> - Prioritize improvements based on sophisticated risk scoring that combines complexity, test coverage, and dependency impact</li>
-<li><strong>Track Quality</strong> - Monitor code quality metrics over time with the <code>compare</code> command (which can use <code>--plan</code> to automatically extract target locations from implementation plans and track improvements) to verify that refactoring efforts achieved their goals</li>
+<li><strong>Track Quality</strong> - Monitor code quality metrics over time with the <code>compare</code> command to verify that refactoring efforts achieved their goals (can optionally extract target locations from implementation plan files for focused tracking)</li>
 <li><strong>Get Actionable Recommendations</strong> - Receive specific guidance like “refactoring this will reduce complexity by 60%” or “testing this will reduce risk by 5%”</li>
 <li><strong>Automated Debt Reduction</strong> - Integrates with <a href="./prodigy-integration.html">Prodigy workflows</a> for AI-driven automated refactoring with iterative validation and testing (via external integration)</li>
 </ul>
@@ -223,15 +223,19 @@ for future releases once Rust analysis reaches maturity.</p>
 <h3 id="analysis-capabilities"><a class="header" href="#analysis-capabilities">Analysis Capabilities</a></h3>
 <ul>
 <li><strong>Rust-first analysis</strong> - Deep Rust support with AST parsing, macro expansion, trait resolution, and lifetime awareness</li>
-<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (up to 70% reduction compared to traditional analyzers)</li>
+<li><strong>Reduced false positives</strong> - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns (significantly reduces false positives compared to traditional analyzers)</li>
 <li><strong>Threshold presets</strong> - Quick setup with strict, balanced (default), or lenient presets matching different project types and quality standards</li>
 <li><strong>Comprehensive debt detection</strong> - Identifies 30+ technical debt patterns across security (5 types), code organization (god objects, feature envy, magic values), resource management (5 types), testing quality (3 types), and error handling (4 types: error swallowing, poor error propagation, panic patterns, inadequate exception handling)</li>
+<li><strong>God object detection</strong> - Identifies large classes with multiple responsibilities and provides concrete module split recommendations based on responsibility inference, method clustering, and cohesion analysis</li>
+<li><strong>Boilerplate detection</strong> - Finds repetitive patterns suitable for macro-ification, including trait implementation boilerplate, builder patterns, and delegation patterns</li>
+<li><strong>Functional programming analysis</strong> - Detects function purity (functions without side effects), tracks effects (I/O, mutation, panic), and identifies higher-order functions and functional patterns</li>
 <li><strong>Security vulnerability detection</strong> - Finds hardcoded secrets, weak crypto, SQL injection risks, and unsafe code patterns</li>
 <li><strong>Resource management analysis</strong> - Identifies inefficient allocations, nested loops, and blocking I/O patterns</li>
 <li><strong>Code organization analysis</strong> - Detects god objects, feature envy, primitive obsession, and magic values</li>
 <li><strong>Testing quality assessment</strong> - Analyzes test complexity, flaky patterns, and assertion quality</li>
 <li><strong>File-level aggregation</strong> - Multiple aggregation methods (sum, weighted, logarithmic) for identifying files needing organizational refactoring</li>
 <li><strong>Context-aware analysis</strong> - Reduces false positives through intelligent context detection (enabled by default)</li>
+<li><strong>Call graph debugging</strong> - Validate and debug call graph construction with detailed diagnostics</li>
 </ul>
 <h3 id="risk-analysis--prioritization"><a class="header" href="#risk-analysis--prioritization">Risk Analysis &amp; Prioritization</a></h3>
 <ul>
@@ -243,7 +247,7 @@ for future releases once Rust analysis reaches maturity.</p>
 </ul>
 <h3 id="performance--output"><a class="header" href="#performance--output">Performance &amp; Output</a></h3>
 <ul>
-<li><strong>Parallel processing</strong> - Built with Rust and Rayon for blazing-fast analysis of large codebases</li>
+<li><strong>Parallel processing</strong> - Built with Rust and Rayon for blazing-fast analysis (70-90% speedup on multi-core systems, 10-100x faster than Java/Python-based tools)</li>
 <li><strong>Multiple output formats</strong> - JSON (legacy and unified structures), Markdown, and human-readable terminal formats for different tool integration needs</li>
 <li><strong>Configurable thresholds</strong> - Customize complexity and duplication thresholds to match your standards</li>
 <li><strong>Verbosity controls</strong> - Multiple verbosity levels (-v, -vv, -vvv) for progressive detail</li>
@@ -261,6 +265,7 @@ for future releases once Rust analysis reaches maturity.</p>
 <li><strong><code>validate</code></strong> - Enforce quality thresholds in CI/CD pipelines</li>
 <li><strong><code>validate-improvement</code></strong> - Validate refactoring improvements against quality thresholds (automates verification that changes actually improved code quality)</li>
 <li><strong><code>compare</code></strong> - Track improvements over time and verify refactoring goals</li>
+<li><strong><code>explain-coverage</code></strong> - Debug coverage data parsing and function name matching (helps troubleshoot coverage detection issues)</li>
 <li><strong><code>init</code></strong> - Generate configuration file with sensible defaults (–force to overwrite)</li>
 </ul>
 <h2 id="target-audience"><a class="header" href="#target-audience">Target Audience</a></h2>
@@ -279,7 +284,7 @@ for future releases once Rust analysis reaches maturity.</p>
 <li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding the metrics and output</li>
 <li><a href="./output-formats.html">Output Formats</a> - JSON, Markdown, and terminal formats</li>
 </ul>
-<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview, or use <code>--top 10</code> to focus on highest-priority items. Consider <code>--threshold-preset balanced</code> for typical projects or <code>strict</code> for high-quality standards.</p>
+<p><strong>Tip:</strong> Start with <code>debtmap analyze . --summary</code> for a quick overview, or use <code>--top 10</code> to focus on highest-priority items. Use threshold presets for quick configuration: <code>--threshold-preset strict</code> for high code quality standards, <code>balanced</code> (default) for typical projects, or <code>lenient</code> for legacy or complex domains.</p>
 
                     </main>
 

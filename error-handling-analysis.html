@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,17 +178,32 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="error-handling-analysis"><a class="header" href="#error-handling-analysis">Error Handling Analysis</a></h1>
-<p>Debtmap provides comprehensive error handling analysis across all supported languages (Rust, Python, JavaScript, TypeScript), detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.</p>
+<p>Debtmap provides comprehensive error handling analysis for Rust codebases, detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.</p>
+<h2 id="implementation-status"><a class="header" href="#implementation-status">Implementation Status</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Error Swallowing</th><th>Panic Patterns</th><th>Async Errors</th><th>Context Loss</th><th>Propagation Analysis</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Rust</strong></td><td>✅ Full (7 patterns)</td><td>✅ Full (6 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (5 patterns)</td><td>✅ Full (4 patterns)</td></tr>
+<tr><td><strong>Python</strong></td><td>⚠️ Planned</td><td>⚠️ Planned</td><td>N/A</td><td>⚠️ Planned</td><td>⚠️ Planned</td></tr>
+<tr><td><strong>JavaScript/TypeScript</strong></td><td>⚠️ Limited</td><td>⚠️ Limited</td><td>⚠️ Planned</td><td>❌ Not yet</td><td>❌ Not yet</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Current Focus:</strong> Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability. Debtmap detects:</p>
+<p>Error handling issues are classified as <strong>ErrorSwallowing</strong> debt with <strong>Major severity</strong> (weight 4), reflecting their significant impact on code reliability and debuggability.</p>
+<p><strong>Fully Implemented for Rust:</strong></p>
 <ul>
-<li><strong>Error swallowing</strong>: Exception handlers that silently catch errors without logging or re-raising</li>
-<li><strong>Panic patterns</strong>: Rust code that can panic in production (unwrap, expect, panic!)</li>
-<li><strong>Error propagation issues</strong>: Missing error context in Result chains</li>
-<li><strong>Async error handling</strong>: Unhandled promise rejections, dropped futures, missing await</li>
-<li><strong>Python-specific patterns</strong>: Bare except clauses, silent exception handling</li>
+<li><strong>Error swallowing</strong> (7 patterns): Exception handlers that silently catch errors without logging or re-raising</li>
+<li><strong>Panic patterns</strong> (6 patterns): Code that can panic in production (unwrap, expect, panic!)</li>
+<li><strong>Error propagation issues</strong> (4 patterns): Missing error context in Result chains</li>
+<li><strong>Async error handling</strong> (5 patterns): Dropped futures, unhandled JoinHandles, silent task panics</li>
+<li><strong>Context loss detection</strong> (5 patterns): Error propagation without meaningful context</li>
 </ul>
-<p>All error handling patterns are filtered intelligently - code detected in test modules (e.g., <code>#[cfg(test)]</code>, <code>test_</code> prefixes) receives lower priority or is excluded entirely.</p>
+<p>All error handling patterns are filtered intelligently - code detected in test modules (e.g., <code>#[cfg(test)]</code>, <code>#[test]</code> attributes) receives lower priority or is excluded entirely.</p>
 <h2 id="rust-error-handling-analysis"><a class="header" href="#rust-error-handling-analysis">Rust Error Handling Analysis</a></h2>
 <h3 id="panic-pattern-detection"><a class="header" href="#panic-pattern-detection">Panic Pattern Detection</a></h3>
 <p>Debtmap identifies Rust code that can panic at runtime instead of returning <code>Result</code>:</p>
@@ -256,7 +271,8 @@ mod tests {
 <span class="boring">}</span></code></pre>
 <p>Debtmap detects <code>#[cfg(test)]</code> attributes and test function contexts, automatically assigning <strong>Low priority</strong> to panic patterns in test code.</p>
 <h3 id="error-propagation-analysis"><a class="header" href="#error-propagation-analysis">Error Propagation Analysis</a></h3>
-<p>Debtmap detects missing error context in Result chains:</p>
+<p>Debtmap detects missing error context in Result chains.</p>
+<p><strong>Note:</strong> Context loss detection uses AST-based heuristics without full type information. This means some edge cases may produce false positives or negatives. Type information would improve accuracy but would require a full compilation environment.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// ❌ Missing context - which file failed? What was the error?
@@ -454,8 +470,11 @@ fn load_settings() -&gt; Settings {
 </table>
 </div>
 <p>All these patterns are detected at <strong>Medium to High priority</strong> depending on context, as they represent lost error information that makes debugging difficult.</p>
-<h2 id="python-error-handling-analysis"><a class="header" href="#python-error-handling-analysis">Python Error Handling Analysis</a></h2>
-<h3 id="bare-except-clause-detection"><a class="header" href="#bare-except-clause-detection">Bare Except Clause Detection</a></h3>
+<p><strong>Source:</strong> Error swallowing patterns are defined in <code>src/debt/error_swallowing.rs:229-238</code> and comprehensively tested in <code>tests/error_swallowing_test.rs</code>.</p>
+<h2 id="python-error-handling-analysis-planned"><a class="header" href="#python-error-handling-analysis-planned">Python Error Handling Analysis (Planned)</a></h2>
+<p>⚠️ <strong>Python error handling detection is planned but not yet implemented. Currently only Rust error patterns are fully supported.</strong></p>
+<p>The patterns described below represent the intended future behavior once Python analysis is implemented.</p>
+<h3 id="bare-except-clause-detection-planned"><a class="header" href="#bare-except-clause-detection-planned">Bare Except Clause Detection (Planned)</a></h3>
 <p>Python’s bare <code>except:</code> catches all exceptions, including system exits and keyboard interrupts:</p>
 <pre><code class="language-python"># ❌ CRITICAL: Bare except catches everything
 def process_file(path):
@@ -498,7 +517,7 @@ def process_file(path):
 <li>Never use bare <code>except:</code> in production code</li>
 <li>Log exceptions with full context before suppressing</li>
 </ul>
-<h3 id="silent-exception-handling"><a class="header" href="#silent-exception-handling">Silent Exception Handling</a></h3>
+<h3 id="silent-exception-handling-planned"><a class="header" href="#silent-exception-handling-planned">Silent Exception Handling (Planned)</a></h3>
 <pre><code class="language-python"># ❌ Silent exception handling
 def get_user_age(user_id):
     try:
@@ -519,7 +538,7 @@ def get_user_age(user_id):
         logger.error(f"Database error fetching user {user_id}: {e}")
         raise  # Re-raise for caller to handle
 </code></pre>
-<h3 id="contextlib-suppress-detection"><a class="header" href="#contextlib-suppress-detection">Contextlib Suppress Detection</a></h3>
+<h3 id="contextlib-suppress-detection-planned"><a class="header" href="#contextlib-suppress-detection-planned">Contextlib Suppress Detection (Planned)</a></h3>
 <p>Python’s <code>contextlib.suppress()</code> intentionally silences exceptions, which can hide errors:</p>
 <pre><code class="language-python">from contextlib import suppress
 
@@ -561,8 +580,8 @@ def best_effort_cleanup(paths):
 <li>Operations where partial failure should be noticed</li>
 <li>Any case where debugging might be needed later</li>
 </ul>
-<h3 id="exception-flow-analysis"><a class="header" href="#exception-flow-analysis">Exception Flow Analysis</a></h3>
-<p>Debtmap tracks exception propagation through Python codebases to identify functions that can raise exceptions without proper handling. This analysis helps ensure that exceptions are either caught at appropriate levels or documented in the function’s interface.</p>
+<h3 id="exception-flow-analysis-planned"><a class="header" href="#exception-flow-analysis-planned">Exception Flow Analysis (Planned)</a></h3>
+<p>Python exception flow analysis is planned for future implementation. This would track exception propagation through Python codebases to identify functions that can raise exceptions without proper handling.</p>
 <pre><code class="language-python"># Potential issue: Exceptions may propagate unhandled
 def process_batch(items):
     for item in items:
@@ -591,30 +610,15 @@ def process_batch(items):
     return results
 </code></pre>
 <h2 id="async-error-handling"><a class="header" href="#async-error-handling">Async Error Handling</a></h2>
-<h3 id="unhandled-promise-rejections-javascripttypescript"><a class="header" href="#unhandled-promise-rejections-javascripttypescript">Unhandled Promise Rejections (JavaScript/TypeScript)</a></h3>
-<p><strong>Note:</strong> JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code.</p>
-<p><strong>Current Language Support Comparison:</strong></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Feature</th><th>Rust</th><th>Python</th><th>JavaScript/TypeScript</th></tr>
-</thead>
-<tbody>
-<tr><td>Basic error swallowing</td><td>✅ Full</td><td>✅ Full</td><td>✅ Basic</td></tr>
-<tr><td>Panic/exception patterns</td><td>✅ Full</td><td>✅ Full</td><td>⚠️ Limited</td></tr>
-<tr><td>Async error detection</td><td>✅ Full</td><td>N/A</td><td>⚠️ Limited</td></tr>
-<tr><td>Error propagation analysis</td><td>✅ Full</td><td>✅ Basic</td><td>❌ Not yet</td></tr>
-<tr><td>Context loss detection</td><td>✅ Full</td><td>⚠️ Limited</td><td>❌ Not yet</td></tr>
-</tbody>
-</table>
-</div>
-<p>Current JavaScript/TypeScript detection includes:</p>
+<h3 id="javascripttypescript-async-patterns-planned"><a class="header" href="#javascripttypescript-async-patterns-planned">JavaScript/TypeScript Async Patterns (Planned)</a></h3>
+<p>⚠️ <strong>JavaScript and TypeScript async error detection is planned but not yet fully implemented.</strong></p>
+<p><strong>Current Status:</strong></p>
 <ul>
-<li>Basic try/catch without error handling</li>
-<li>Some promise rejection patterns</li>
-<li>Complexity analysis</li>
+<li>JavaScript/TypeScript support focuses on complexity analysis and basic error patterns</li>
+<li>Async error handling detection (unhandled promise rejections, missing await) is <strong>fully implemented for Rust only</strong></li>
+<li>Enhanced JavaScript/TypeScript async error detection is planned for future releases</li>
 </ul>
-<p>Enhanced JavaScript/TypeScript async error detection is planned for future releases.</p>
+<p>The examples below show intended future behavior:</p>
 <pre><code class="language-javascript">// ❌ CRITICAL: Unhandled promise rejection
 async function loadUserData(userId) {
     const response = await fetch(`/api/users/${userId}`);
@@ -642,7 +646,7 @@ loadUserData(123).catch(err =&gt; {
     console.error("Top-level error handler:", err);
 });
 </code></pre>
-<h3 id="missing-await-detection"><a class="header" href="#missing-await-detection">Missing Await Detection</a></h3>
+<h3 id="missing-await-detection-planned"><a class="header" href="#missing-await-detection-planned">Missing Await Detection (Planned)</a></h3>
 <pre><code class="language-javascript">// ❌ HIGH: Missing await - promise dropped
 async function saveAndNotify(data) {
     await saveToDatabase(data);
@@ -657,7 +661,8 @@ async function saveAndNotify(data) {
 }
 </code></pre>
 <h3 id="async-rust-error-handling"><a class="header" href="#async-rust-error-handling">Async Rust Error Handling</a></h3>
-<p>Debtmap detects five async-specific error handling patterns in Rust:</p>
+<p>Debtmap detects five async-specific error handling patterns in Rust.</p>
+<p><strong>Note:</strong> Async error detection uses pattern matching on tokio APIs and AST-based heuristics. Some patterns (particularly <code>select!</code> macro handling and future dropping) may require manual review, as full semantic analysis would require type information.</p>
 <h4 id="1-droppedfuture---future-dropped-without-awaiting"><a class="header" href="#1-droppedfuture---future-dropped-without-awaiting">1. DroppedFuture - Future dropped without awaiting</a></h4>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -793,6 +798,7 @@ async fn process_with_timeout(data: Data) -&gt; Result&lt;()&gt; {
 </table>
 </div>
 <p>All async error patterns emphasize the importance of properly handling errors in concurrent Rust code, where failures can easily go unnoticed.</p>
+<p><strong>Source:</strong> Async error patterns are defined in <code>src/debt/async_errors.rs:205-212</code> and tested with tokio-specific patterns.</p>
 <h2 id="severity-levels-and-prioritization"><a class="header" href="#severity-levels-and-prioritization">Severity Levels and Prioritization</a></h2>
 <p>Error handling issues are assigned severity based on their impact:</p>
 <div class="table-wrapper">
@@ -856,23 +862,33 @@ fn process_transaction(tx: Transaction) -&gt; bool {  // Cyclomatic: 12, Cogniti
 </ul>
 <h2 id="configuration"><a class="header" href="#configuration">Configuration</a></h2>
 <h3 id="error-handling-configuration-options"><a class="header" href="#error-handling-configuration-options">Error Handling Configuration Options</a></h3>
-<p><strong>By default, all error handling detection is fully enabled.</strong> The configuration options below are primarily used to selectively disable specific patterns during gradual adoption or for specific project needs.</p>
+<p><strong>All Rust error handling detection is enabled by default.</strong> You typically don’t need to configure anything - Debtmap will automatically detect all error patterns in your Rust code.</p>
+<p><strong>When to Use Configuration:</strong></p>
+<ul>
+<li><strong>Gradual adoption</strong>: Disable some patterns while fixing others</li>
+<li><strong>Project-specific needs</strong>: Turn off patterns that don’t apply to your codebase</li>
+<li><strong>Performance tuning</strong>: Disable expensive analyzers if not needed</li>
+</ul>
 <p>Configure error handling analysis in <code>.debtmap.toml</code>:</p>
 <pre><code class="language-toml">[error_handling]
-# All detection patterns are enabled by default (all default to true)
-detect_panic_patterns = true     # Rust unwrap/expect/panic detection
-detect_swallowing = true         # Silent exception handling
-detect_async_errors = true       # Unhandled promises, dropped futures
-detect_context_loss = true       # Error propagation without context
-detect_propagation = true        # Error propagation analysis
+# All patterns enabled by default - only add config to DISABLE patterns
+# detect_panic_patterns = true     # Default: enabled
+# detect_swallowing = true          # Default: enabled
+# detect_async_errors = true        # Default: enabled
+# detect_context_loss = true        # Default: enabled
+# detect_propagation = true         # Default: enabled
 
-# Disable specific patterns for gradual adoption
-# detect_async_errors = false
+# Example: Gradual adoption - start with just panic patterns
+detect_panic_patterns = true       # Keep enabled
+detect_swallowing = false          # Disable initially
+detect_async_errors = false        # Disable initially
+detect_context_loss = false        # Disable initially
 </code></pre>
-<p>All error handling patterns are detected by default with the <code>ErrorSwallowing</code> debt category (weight 4). The configuration is fully implemented and functional - use it primarily to disable specific patterns when needed.</p>
+<p><strong>Default Behavior (No Configuration):</strong>
+All error handling patterns are detected with the <code>ErrorSwallowing</code> debt category (weight 4). Test code automatically receives lower priority.</p>
 <h2 id="detection-examples"><a class="header" href="#detection-examples">Detection Examples</a></h2>
 <h3 id="what-gets-detected-vs-not-detected"><a class="header" href="#what-gets-detected-vs-not-detected">What Gets Detected vs. Not Detected</a></h3>
-<p><strong>Rust examples:</strong></p>
+<h4 id="rust-examples-fully-implemented"><a class="header" href="#rust-examples-fully-implemented">Rust Examples (Fully Implemented)</a></h4>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// ❌ Detected: unwrap() in production code
@@ -899,7 +915,7 @@ let value = map.get("key").expect("missing");
 let value = map.get("key")
     .expect("Configuration must contain 'key' field");
 <span class="boring">}</span></code></pre>
-<p><strong>Python examples:</strong></p>
+<h4 id="python-examples-planned---not-yet-implemented"><a class="header" href="#python-examples-planned---not-yet-implemented">Python Examples (Planned - Not Yet Implemented)</a></h4>
 <pre><code class="language-python"># ❌ Detected: bare except
 try:
     risky_operation()
@@ -980,7 +996,8 @@ fn load_data(path: &amp;Path) -&gt; Result&lt;Data&gt; {
 <span class="boring">}</span></code></pre>
 </li>
 </ol>
-<h3 id="python-error-handling"><a class="header" href="#python-error-handling">Python Error Handling</a></h3>
+<h3 id="python-error-handling-planned---future-implementation"><a class="header" href="#python-error-handling-planned---future-implementation">Python Error Handling (Planned - Future Implementation)</a></h3>
+<p><strong>Note:</strong> Python error handling detection is planned. These best practices represent intended future behavior.</p>
 <ol>
 <li>
 <p><strong>Always use specific exception types</strong></p>
@@ -1009,7 +1026,8 @@ except Exception as e:  # Not bare except:
 </code></pre>
 </li>
 </ol>
-<h3 id="javascripttypescript-error-handling"><a class="header" href="#javascripttypescript-error-handling">JavaScript/TypeScript Error Handling</a></h3>
+<h3 id="javascripttypescript-error-handling-planned---limited-implementation"><a class="header" href="#javascripttypescript-error-handling-planned---limited-implementation">JavaScript/TypeScript Error Handling (Planned - Limited Implementation)</a></h3>
+<p><strong>Note:</strong> JavaScript/TypeScript async error detection is planned. Currently only basic patterns are supported.</p>
 <ol>
 <li>
 <p><strong>Always handle promise rejections</strong></p>
@@ -1036,13 +1054,14 @@ except Exception as e:  # Not bare except:
 </code></pre>
 </li>
 </ol>
-<h2 id="improving-error-handling-based-on-debtmap-reports"><a class="header" href="#improving-error-handling-based-on-debtmap-reports">Improving Error Handling Based on Debtmap Reports</a></h2>
+<h2 id="improving-rust-error-handling-based-on-debtmap-reports"><a class="header" href="#improving-rust-error-handling-based-on-debtmap-reports">Improving Rust Error Handling Based on Debtmap Reports</a></h2>
 <h3 id="workflow"><a class="header" href="#workflow">Workflow</a></h3>
 <ol>
 <li>
 <p><strong>Run analysis with error focus</strong></p>
 <pre><code class="language-bash">debtmap analyze --filter-categories ErrorSwallowing
 </code></pre>
+<p>Note: This analyzes Rust error patterns. Python and JavaScript/TypeScript support is limited or planned.</p>
 </li>
 <li>
 <p><strong>Review priority issues first</strong></p>

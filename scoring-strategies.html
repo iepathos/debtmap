@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -254,7 +254,7 @@ debtmap analyze . --aggregate-only --top 10
 <li>Prioritizing architectural improvements</li>
 <li>Allocating team resources</li>
 </ul>
-<p><strong>Note</strong>: File-level scoring is enabled with the <code>--aggregate-only</code> flag (a boolean flag—no value needed), which changes output to show only file-level metrics instead of function-level details.</p>
+<p><strong>Note</strong>: File-level scoring is enabled with the <code>--aggregate-only</code> flag (no argument required: use <code>debtmap analyze . --aggregate-only</code>), which changes output to show only file-level metrics instead of function-level details.</p>
 <p><strong>2. Identifying Architectural Issues</strong></p>
 <p>File-level scoring excels at finding:</p>
 <ul>
@@ -280,7 +280,7 @@ debtmap analyze . --aggregate-only --format markdown -o report.md
 <p><strong>Formula</strong>: <code>Σ(function_score × complexity_weight × coverage_weight)</code></p>
 <pre><code class="language-bash">debtmap analyze . --aggregation-method weighted_sum
 </code></pre>
-<p>Or via configuration:</p>
+<p>Or via configuration file:</p>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
 </code></pre>
@@ -344,7 +344,7 @@ method = "max_plus_average"
 <p><strong>Performance Note</strong>: All aggregation methods have O(n) complexity where n = number of functions. Performance differences are negligible for typical codebases (&lt;100k functions). Choose based on prioritization strategy, not performance concerns.</p>
 <h3 id="configuration"><a class="header" href="#configuration">Configuration</a></h3>
 <blockquote>
-<p><strong>IMPORTANT</strong>: The configuration file must be named <strong><code>.debtmap.toml</code></strong> (not <code>debtmap.yml</code> or other variants) and placed in your project root directory.</p>
+<p><strong>IMPORTANT</strong>: The configuration file must be named <strong><code>.debtmap.toml</code></strong> (not <code>debtmap.yml</code> or other variants) and placed in your project root directory. Debtmap searches for <code>.debtmap.toml</code> in the current directory, or you can specify an alternate path with <code>--config path/to/config.toml</code>.</p>
 </blockquote>
 <pre><code class="language-toml">[aggregation]
 method = "weighted_sum"
@@ -1003,7 +1003,7 @@ minimum_debt_score = 3.0
 <p>Debtmap now includes an advanced <strong>rebalanced scoring algorithm</strong> that prioritizes actual code quality issues—complexity, coverage gaps, and structural problems—over pure file size concerns.</p>
 <h3 id="enabling-rebalanced-scoring"><a class="header" href="#enabling-rebalanced-scoring">Enabling Rebalanced Scoring</a></h3>
 <blockquote>
-<p><strong>IMPORTANT</strong>: Rebalanced scoring is enabled through your <code>.debtmap.toml</code> configuration file, <strong>not via CLI flags</strong>. Add the <code>[scoring_rebalanced]</code> section to activate it.</p>
+<p><strong>IMPORTANT</strong>: Rebalanced scoring is enabled through your <code>.debtmap.toml</code> configuration file by adding the <code>[scoring_rebalanced]</code> section. This activates the rebalanced algorithm described below.</p>
 </blockquote>
 <p><strong>Default Behavior</strong>: By default, debtmap uses the standard scoring algorithm described earlier in this chapter. To use rebalanced scoring, add the <code>[scoring_rebalanced]</code> section to your config:</p>
 <pre><code class="language-toml"># .debtmap.toml
@@ -1224,12 +1224,13 @@ preset = "size-focused"
 </code></pre>
 <p><strong>Gradual Migration</strong>:</p>
 <ol>
-<li>Run analysis with both algorithms: <code>debtmap analyze . --legacy-scoring</code></li>
-<li>Compare results to understand impact</li>
+<li>Run analysis with standard scoring first (no config changes)</li>
+<li>Create a test config with <code>[scoring_rebalanced]</code> section</li>
+<li>Compare results between standard and rebalanced scoring</li>
 <li>Adjust team priorities based on new rankings</li>
 <li>Switch to rebalanced scoring after validation</li>
 </ol>
-<p>See <a href="./migration-guide.html">Migration Guide</a> for detailed migration instructions.</p>
+<p><strong>Note</strong>: There is no <code>--legacy-scoring</code> CLI flag. Switch between algorithms by modifying your configuration file (add or remove the <code>[scoring_rebalanced]</code> section).</p>
 <h3 id="configuration-reference"><a class="header" href="#configuration-reference">Configuration Reference</a></h3>
 <p>Complete configuration example:</p>
 <pre><code class="language-toml"># .debtmap.toml
@@ -1537,11 +1538,9 @@ debtmap analyze . --verbose --top 5
 </ul>
 <h3 id="see-also"><a class="header" href="#see-also">See Also</a></h3>
 <ul>
-<li><a href="./tiered-prioritization.html">Tiered Prioritization</a> - Understanding tier-based classification</li>
 <li><a href="./configuration.html">Configuration</a> - Scoring and aggregation configuration</li>
-<li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
-<li><a href="./file-classification.html">File Classification</a> - Context-aware file size thresholds (Spec 135)</li>
-<li><a href="../ARCHITECTURE.html">ARCHITECTURE.md</a> - Technical details of exponential scaling implementation</li>
+<li><a href="./analysis-guide/index.html">Analysis Guide</a> - Detailed metric explanations</li>
+<li><a href="../../ARCHITECTURE.html">ARCHITECTURE.md</a> - Technical details of exponential scaling implementation</li>
 </ul>
 
                     </main>

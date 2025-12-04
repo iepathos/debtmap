@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -539,18 +539,10 @@ debtmap analyze . --filter Architecture,Testing
 <li><strong>Markdown</strong>: Documentation-friendly format for reports</li>
 </ul>
 <p>Example JSON output:</p>
-<pre><code class="language-bash"># By default, JSON uses legacy format
+<pre><code class="language-bash"># JSON output uses unified format with consistent structure
 debtmap analyze . --format json --output report.json
-
-# For the new unified format (with consistent structure and type field):
-debtmap analyze . --format json --output-format unified --output report.json
 </code></pre>
-<p><strong>JSON Format Options:</strong></p>
-<ul>
-<li><strong>legacy</strong> (default): Uses <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers for backward compatibility with existing tools</li>
-<li><strong>unified</strong>: New format (spec 108) with consistent structure and <code>type</code> field for all items</li>
-</ul>
-<p>Recommendation: Use <code>unified</code> for new integrations, <code>legacy</code> only for compatibility with existing tooling.</p>
+<p>The JSON format uses a unified structure with a <code>type</code> field for all items, providing consistent parsing for CI/CD integrations.</p>
 <p>Example Markdown output:</p>
 <pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
 </code></pre>

@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -762,6 +762,351 @@ detect_data_flow = true               # Enable data flow analysis (default: true
 <li><strong>Data flow functions</strong> (mappers, filters) have predictable patterns that inflate metrics</li>
 </ul>
 <p>By detecting these patterns, Debtmap reduces false positives and focuses on genuine technical debt.</p>
+<h3 id="parallel-processing-configuration"><a class="header" href="#parallel-processing-configuration">Parallel Processing Configuration</a></h3>
+<p>The <strong><code>[batch_analysis]</code></strong> section configures parallel processing for analyzing large codebases:</p>
+<pre><code class="language-toml">[batch_analysis]
+fail_fast = false                   # Stop on first error (default: false)
+collect_timing = true               # Collect timing metrics (default: false)
+
+[batch_analysis.parallelism]
+enabled = true                      # Enable parallel processing (default: true)
+max_concurrency = 4                 # Maximum concurrent threads (default: number of CPU cores)
+batch_size = 100                    # Files per batch (default: 100)
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>fail_fast</code></td><td>false</td><td>Stop analysis on first error encountered</td></tr>
+<tr><td><code>collect_timing</code></td><td>false</td><td>Collect detailed timing information for performance analysis</td></tr>
+<tr><td><code>parallelism.enabled</code></td><td>true</td><td>Enable parallel processing of files</td></tr>
+<tr><td><code>parallelism.max_concurrency</code></td><td>CPU cores</td><td>Maximum number of concurrent analysis threads</td></tr>
+<tr><td><code>parallelism.batch_size</code></td><td>100</td><td>Number of files to process in each batch</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>When to Adjust:</strong></p>
+<pre><code class="language-toml"># For very large codebases
+[batch_analysis.parallelism]
+enabled = true
+max_concurrency = 8                 # Use more threads
+batch_size = 200                    # Larger batches
+
+# For memory-constrained environments
+[batch_analysis.parallelism]
+max_concurrency = 2                 # Fewer threads
+batch_size = 50                     # Smaller batches
+
+# For debugging analysis issues
+[batch_analysis]
+fail_fast = true                    # Stop on first error
+collect_timing = true               # Collect timing data
+</code></pre>
+<p>For detailed information on parallel processing, see the <a href="./parallel-processing.html">Parallel Processing</a> chapter.</p>
+<p><strong>Source:</strong> <code>src/config/parallel.rs:108-143</code> (BatchAnalysisConfig)</p>
+<h3 id="retry-configuration"><a class="header" href="#retry-configuration">Retry Configuration</a></h3>
+<p>The <strong><code>[retry]</code></strong> section configures automatic retry behavior for resilient operations:</p>
+<pre><code class="language-toml">[retry]
+enabled = true                      # Enable automatic retries (default: true)
+max_retries = 3                     # Maximum retry attempts (default: 3)
+base_delay_ms = 100                 # Initial delay in milliseconds (default: 100)
+strategy = "exponential"            # Backoff strategy (default: exponential)
+timeout_seconds = 30                # Maximum total retry time (default: 30)
+jitter_factor = 0.1                 # Randomness factor (default: 0.1)
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>enabled</code></td><td>true</td><td>Enable automatic retries on transient failures</td></tr>
+<tr><td><code>max_retries</code></td><td>3</td><td>Maximum number of retry attempts before giving up</td></tr>
+<tr><td><code>base_delay_ms</code></td><td>100</td><td>Base delay between retries in milliseconds</td></tr>
+<tr><td><code>strategy</code></td><td>exponential</td><td>Backoff strategy: constant, linear, exponential, fibonacci</td></tr>
+<tr><td><code>timeout_seconds</code></td><td>30</td><td>Maximum total time to spend retrying (seconds)</td></tr>
+<tr><td><code>jitter_factor</code></td><td>0.1</td><td>Add randomness to delays (0.0-1.0) to prevent thundering herd</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Retry Strategies:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Strategy</th><th>Delay Pattern</th><th>Use Case</th></tr>
+</thead>
+<tbody>
+<tr><td><code>constant</code></td><td>Same delay every time</td><td>Simple rate limiting</td></tr>
+<tr><td><code>linear</code></td><td>Increases linearly (100ms, 200ms, 300ms)</td><td>Moderate backoff</td></tr>
+<tr><td><code>exponential</code></td><td>Doubles each time (100ms, 200ms, 400ms)</td><td>Standard backoff (recommended)</td></tr>
+<tr><td><code>fibonacci</code></td><td>Fibonacci sequence (100ms, 100ms, 200ms, 300ms)</td><td>Gradual backoff</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example Configurations:</strong></p>
+<pre><code class="language-toml"># Aggressive retry for flaky file systems
+[retry]
+max_retries = 5
+base_delay_ms = 50
+strategy = "exponential"
+timeout_seconds = 60
+
+# Conservative retry for network operations
+[retry]
+max_retries = 2
+base_delay_ms = 500
+strategy = "linear"
+timeout_seconds = 10
+
+# Disable retries for fast failure
+[retry]
+enabled = false
+</code></pre>
+<p><strong>Source:</strong> <code>src/config/retry.rs:33-79</code> (RetryConfig), <code>src/config/retry.rs:141-155</code> (RetryStrategy)</p>
+<h3 id="advanced-analysis-settings"><a class="header" href="#advanced-analysis-settings">Advanced Analysis Settings</a></h3>
+<p>The <strong><code>[analysis]</code></strong> section configures advanced analysis features for call graph and dead code detection:</p>
+<pre><code class="language-toml">[analysis]
+enable_trait_analysis = true               # Enable trait method resolution (default: true)
+enable_function_pointer_tracking = true    # Track function pointers and closures (default: true)
+enable_framework_patterns = true           # Detect framework patterns (default: true)
+enable_cross_module_analysis = true        # Analyze cross-module dependencies (default: true)
+max_analysis_depth = 10                    # Maximum transitive analysis depth (default: 10)
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>enable_trait_analysis</code></td><td>true</td><td>Resolve trait method calls in call graph analysis</td></tr>
+<tr><td><code>enable_function_pointer_tracking</code></td><td>true</td><td>Track function pointers and closure usage</td></tr>
+<tr><td><code>enable_framework_patterns</code></td><td>true</td><td>Detect test functions, HTTP handlers, and other framework entry points</td></tr>
+<tr><td><code>enable_cross_module_analysis</code></td><td>true</td><td>Analyze dependencies across module boundaries</td></tr>
+<tr><td><code>max_analysis_depth</code></td><td>10</td><td>Maximum depth for transitive dependency analysis</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>When to Adjust:</strong></p>
+<pre><code class="language-toml"># For deep dependency analysis in large projects
+[analysis]
+max_analysis_depth = 20                    # Allow deeper transitive analysis
+
+# For faster analysis with limited resources
+[analysis]
+enable_cross_module_analysis = false       # Skip cross-module analysis
+max_analysis_depth = 5                     # Limit depth
+
+# For framework-heavy codebases (web apps, CLI apps)
+[analysis]
+enable_framework_patterns = true           # Detect entry points
+enable_trait_analysis = true               # Resolve trait methods
+</code></pre>
+<p><strong>Framework Pattern Detection:</strong></p>
+<p>When <code>enable_framework_patterns = true</code>, Debtmap recognizes common entry point patterns:</p>
+<ul>
+<li><strong>Test functions:</strong> Functions with <code>#[test]</code>, <code>#[tokio::test]</code>, or test prefixes</li>
+<li><strong>HTTP handlers:</strong> Functions with routing attributes like <code>#[get]</code>, <code>#[post]</code></li>
+<li><strong>CLI commands:</strong> Functions with CLI framework attributes</li>
+<li><strong>Main functions:</strong> Entry points like <code>main()</code> and <code>async fn main()</code></li>
+</ul>
+<p>This prevents false positives from flagging framework entry points as dead code.</p>
+<p><strong>Source:</strong> <code>src/config/core.rs:149-167</code> (AnalysisSettings)</p>
+<h3 id="state-detection-configuration"><a class="header" href="#state-detection-configuration">State Detection Configuration</a></h3>
+<p>The <strong><code>[state_detection]</code></strong> section configures detection of state machine patterns and state fields:</p>
+<pre><code class="language-toml">[state_detection]
+use_type_analysis = true              # Enable type-based detection (default: true)
+use_frequency_analysis = true         # Enable frequency analysis (default: true)
+use_pattern_recognition = true        # Enable semantic pattern recognition (default: true)
+min_enum_variants = 3                 # Minimum enum variants for state detection (default: 3)
+custom_keywords = []                  # Additional state keywords (default: [])
+custom_patterns = []                  # Additional regex patterns (default: [])
+</code></pre>
+<p><strong>Configuration Options:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>use_type_analysis</code></td><td>true</td><td>Analyze type names and structures for state indicators</td></tr>
+<tr><td><code>use_frequency_analysis</code></td><td>true</td><td>Use statistical analysis to detect state fields</td></tr>
+<tr><td><code>use_pattern_recognition</code></td><td>true</td><td>Apply semantic pattern matching for state detection</td></tr>
+<tr><td><code>min_enum_variants</code></td><td>3</td><td>Minimum variants for enum to be considered state machine</td></tr>
+<tr><td><code>custom_keywords</code></td><td>[]</td><td>Additional keywords to identify state fields</td></tr>
+<tr><td><code>custom_patterns</code></td><td>[]</td><td>Additional regex patterns for state field names</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Built-in State Keywords:</strong></p>
+<p>Debtmap recognizes these common state field patterns:</p>
+<ul>
+<li><strong>Field keywords:</strong> state, mode, status, phase, stage, step, kind, type, variant</li>
+<li><strong>Prefixes:</strong> current_, next_, prev_, target_, desired_, actual_, expected_</li>
+<li><strong>Suffixes:</strong> _state, _mode, _status, _phase, _stage, _type, _kind</li>
+</ul>
+<p><strong>Example Configurations:</strong></p>
+<pre><code class="language-toml"># Add domain-specific state keywords
+[state_detection]
+custom_keywords = ["fsm_state", "machine_state", "workflow_step"]
+custom_patterns = ["current_.*", "next_.*"]
+
+# Strict enum state detection (only large enums)
+[state_detection]
+min_enum_variants = 5
+
+# Disable frequency analysis for performance
+[state_detection]
+use_frequency_analysis = false
+</code></pre>
+<p><strong>Why State Detection Matters:</strong></p>
+<p>Functions that manage state machines or state fields naturally have higher complexity due to branching on state. Debtmap’s state detection:</p>
+<ul>
+<li>Identifies state management code</li>
+<li>Adjusts complexity scoring to account for state branching</li>
+<li>Reduces false positives from legitimate state machine patterns</li>
+</ul>
+<p><strong>Source:</strong> <code>src/analyzers/state_field_detector.rs:286-340</code> (StateDetectionConfig)</p>
+<h3 id="coverage-expectations-configuration"><a class="header" href="#coverage-expectations-configuration">Coverage Expectations Configuration</a></h3>
+<p>The <strong><code>[coverage_expectations]</code></strong> section configures role-based test coverage expectations:</p>
+<pre><code class="language-toml"># Pure functions: high expectations (90-100%)
+[coverage_expectations.pure]
+min = 90.0                            # Minimum acceptable coverage
+target = 95.0                         # Target/ideal coverage
+max = 100.0                           # Maximum meaningful coverage
+
+# Business logic: very high expectations (80-95%)
+[coverage_expectations.business_logic]
+min = 80.0
+target = 90.0
+max = 95.0
+
+# State management: high expectations (75-90%)
+[coverage_expectations.state_management]
+min = 75.0
+target = 85.0
+max = 90.0
+
+# I/O operations: moderate expectations (60-80%)
+[coverage_expectations.io_operations]
+min = 60.0
+target = 70.0
+max = 80.0
+
+# Validation: very high expectations (85-98%)
+[coverage_expectations.validation]
+min = 85.0
+target = 92.0
+max = 98.0
+
+# Error handling: high expectations (70-90%)
+[coverage_expectations.error_handling]
+min = 70.0
+target = 80.0
+max = 90.0
+
+# Configuration: moderate expectations (60-80%)
+[coverage_expectations.configuration]
+min = 60.0
+target = 70.0
+max = 80.0
+
+# Initialization: moderate expectations (50-75%)
+[coverage_expectations.initialization]
+min = 50.0
+target = 65.0
+max = 75.0
+
+# Orchestration: moderate-high expectations (65-85%)
+[coverage_expectations.orchestration]
+min = 65.0
+target = 75.0
+max = 85.0
+
+# Utilities: high expectations (75-95%)
+[coverage_expectations.utilities]
+min = 75.0
+target = 85.0
+max = 95.0
+
+# Debug/Development: low expectations (20-40%)
+[coverage_expectations.debug]
+min = 20.0
+target = 30.0
+max = 40.0
+
+# Performance optimization: low-moderate expectations (40-60%)
+[coverage_expectations.performance]
+min = 40.0
+target = 50.0
+max = 60.0
+</code></pre>
+<p><strong>Coverage Range Parameters:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Parameter</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>min</code></td><td>Minimum acceptable coverage - below this flags as high priority</td></tr>
+<tr><td><code>target</code></td><td>Target/ideal coverage - the goal for this function role</td></tr>
+<tr><td><code>max</code></td><td>Maximum meaningful coverage - diminishing returns above this</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Role-Based Rationale:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function Role</th><th>Expectations</th><th>Why?</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Pure Logic</strong></td><td>Very High (90-100%)</td><td>Easy to unit test, should have comprehensive tests</td></tr>
+<tr><td><strong>Business Logic</strong></td><td>Very High (80-95%)</td><td>Core functionality requires thorough testing</td></tr>
+<tr><td><strong>I/O Operations</strong></td><td>Moderate (60-80%)</td><td>Often integration tested rather than unit tested</td></tr>
+<tr><td><strong>Debug</strong></td><td>Low (20-40%)</td><td>Diagnostic code has low testing priority</td></tr>
+<tr><td><strong>Orchestration</strong></td><td>Moderate-High (65-85%)</td><td>Tested via higher-level tests</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Example Configurations:</strong></p>
+<pre><code class="language-toml"># Strict quality standards (increase all expectations)
+[coverage_expectations.pure]
+min = 95.0
+target = 98.0
+max = 100.0
+
+[coverage_expectations.business_logic]
+min = 90.0
+target = 95.0
+max = 98.0
+
+# Legacy codebase (lower expectations)
+[coverage_expectations.pure]
+min = 70.0
+target = 85.0
+max = 95.0
+
+[coverage_expectations.business_logic]
+min = 60.0
+target = 75.0
+max = 85.0
+</code></pre>
+<p><strong>How Coverage Expectations Work:</strong></p>
+<p>When Debtmap calculates coverage scores:</p>
+<ol>
+<li>Identifies function’s semantic role (pure, business_logic, io_operations, etc.)</li>
+<li>Looks up coverage expectations for that role</li>
+<li>Compares actual coverage to expected range</li>
+<li>Penalizes functions below <code>min</code> more heavily</li>
+<li>Rewards functions meeting or exceeding <code>target</code></li>
+</ol>
+<p>This ensures that scoring reflects realistic testing strategies rather than assuming all functions need 100% coverage.</p>
+<p><strong>Source:</strong> <code>src/priority/scoring/coverage_expectations.rs:103-173</code> (CoverageExpectations)</p>
 <h3 id="additional-advanced-options"><a class="header" href="#additional-advanced-options">Additional Advanced Options</a></h3>
 <p>Debtmap supports additional advanced configuration options:</p>
 <h4 id="lines-of-code-configuration"><a class="header" href="#lines-of-code-configuration">Lines of Code Configuration</a></h4>
@@ -1129,7 +1474,7 @@ patterns = [
 <h2 id="related-chapters"><a class="header" href="#related-chapters">Related Chapters</a></h2>
 <ul>
 <li><a href="./getting-started.html">Getting Started</a> - Initial setup and basic usage</li>
-<li><a href="./analysis-guide.html">Analysis Guide</a> - Understanding scoring and prioritization</li>
+<li><a href="./analysis-guide/index.html">Analysis Guide</a> - Understanding scoring and prioritization</li>
 <li><a href="./output-formats.html">Output Formats</a> - Formatting and exporting results</li>
 </ul>
 

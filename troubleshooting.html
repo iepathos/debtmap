@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -284,6 +284,125 @@ debtmap --coverage-file path/to/coverage.info -v
 # Ensure paths in coverage file match source paths
 # Coverage paths are relative to project root
 </code></pre>
+<h3 id="debugging-coverage-matching-with-explain-coverage"><a class="header" href="#debugging-coverage-matching-with-explain-coverage">Debugging Coverage Matching with explain-coverage</a></h3>
+<p>The <code>explain-coverage</code> command helps diagnose coverage file parsing and function name matching issues.</p>
+<p><strong>Use cases</strong>:</p>
+<ul>
+<li>Coverage data not being applied to functions</li>
+<li>Function name mismatches between coverage and source</li>
+<li>Verifying coverage file format is correct</li>
+<li>Understanding which functions have coverage data</li>
+</ul>
+<p><strong>Basic Usage</strong>:</p>
+<pre><code class="language-bash"># Debug coverage data parsing for a specific function
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file"
+
+# See detailed function matching diagnostics
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  -v
+
+# Narrow search to specific file
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "calculate_score" \
+  --file src/scoring.rs
+
+# Get JSON output for automation
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  --format json
+</code></pre>
+<p><strong>Output Format</strong>:</p>
+<p>The command shows:</p>
+<ul>
+<li>Whether coverage was found for the function</li>
+<li>Which matching strategy succeeded (exact_match, suffix_match, method_name_match, etc.)</li>
+<li>Coverage percentage if found</li>
+<li>All attempted matching strategies (with <code>-v</code>)</li>
+<li>Available functions in coverage file that partially match your query</li>
+</ul>
+<p><strong>Example Output</strong>:</p>
+<pre><code>Coverage Detection Explanation
+==============================
+
+Function: process_file
+File: src/processor.rs
+
+✓ Coverage Found!
+  Strategy: suffix_match
+  Coverage: 87.5%
+
+Matching Attempts:
+------------------
+  ✗ exact_match
+  ✓ suffix_match
+      File: src/processor.rs
+      Function: process_file
+      Coverage: 87.5%
+</code></pre>
+<p><strong>Common Issues Diagnosed</strong>:</p>
+<p><strong>Q: Function not found in coverage data?</strong></p>
+<p>A: The explain-coverage command will show available functions:</p>
+<pre><code class="language-bash">debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "my_function" \
+  -v
+
+# Output shows:
+#   Available Functions in LCOV (143 total):
+#   --------------------------------------
+#     Functions containing 'my_function':
+#       - src/module.rs::my_function_impl
+#       - src/other.rs::my_function_v2
+</code></pre>
+<p><strong>Q: Path mismatches between source and coverage?</strong></p>
+<p>A: Use <code>-v</code> to see all path matching strategies:</p>
+<pre><code class="language-bash">debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  --file src/processor.rs \
+  -v
+
+# Shows which strategies were tried:
+#   ✗ exact_match (src/processor.rs)
+#   ✓ suffix_match (./src/processor.rs)
+#   - normalized_path_match
+</code></pre>
+<p><strong>Q: Function names don’t match between coverage and source?</strong></p>
+<p>A: The command tries multiple matching strategies:</p>
+<ul>
+<li><strong>exact_match</strong>: Exact function name and file path</li>
+<li><strong>suffix_match</strong>: File path suffix matching</li>
+<li><strong>method_name_match</strong>: Method name without module prefix</li>
+<li><strong>normalized_path_match</strong>: Normalized path comparison</li>
+<li><strong>global_function_name_match</strong>: Search across all files</li>
+<li><strong>global_method_name_match</strong>: Method name search across all files</li>
+</ul>
+<pre><code class="language-bash"># See which strategy would work
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "MyStruct::method_name" \
+  -v
+</code></pre>
+<p><strong>Integration with Analysis</strong>:</p>
+<p>After diagnosing issues with explain-coverage, fix them and re-run analysis:</p>
+<pre><code class="language-bash"># Diagnose coverage issues
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "problematic_function" \
+  -v
+
+# Fix coverage paths or function names based on output
+
+# Run full analysis with coverage
+debtmap --coverage-file coverage.lcov -v
+</code></pre>
+<p>See <a href="./cli-reference.html#explain-coverage-debugging">CLI Reference - explain-coverage</a> for complete flag documentation.</p>
 <h3 id="threshold-and-preset-confusion"><a class="header" href="#threshold-and-preset-confusion">Threshold and Preset Confusion</a></h3>
 <p><strong>Problem</strong>: Unexpected filtering or priority levels</p>
 <p><strong>Solutions</strong>:</p>
@@ -324,7 +443,7 @@ debtmap --format json | jq .
 # Write to file for easier inspection
 debtmap --format json --output results.json
 </code></pre>
-<p>See the <a href="./configuration.html#output-formats">Configuration/Output Formats</a> chapter for detailed JSON structure documentation.</p>
+<p>See the <a href="./output-formats.html">Output Formats</a> chapter for detailed JSON structure documentation.</p>
 <h3 id="context-provider-errors"><a class="header" href="#context-provider-errors">Context Provider Errors</a></h3>
 <p><strong>Problem</strong>: Errors with critical_path, dependency, or git_history providers</p>
 <p><strong>Solutions</strong>:</p>
@@ -372,7 +491,13 @@ debtmap --semantic-off
 # Validate LOC consistency
 debtmap --validate-loc
 </code></pre>
-<p><strong>Note</strong>: The <code>--explain-score</code> flag is deprecated and hidden. Use <code>-v</code>, <code>-vv</code>, or <code>-vvv</code> for verbosity levels instead to see score breakdowns.</p>
+<p><strong>Note</strong>: The <code>--explain-score</code> flag has been deprecated in favor of granular verbosity levels (<code>-v</code>, <code>-vv</code>, <code>-vvv</code>). The new verbosity system provides:</p>
+<ul>
+<li>Better control over output detail level</li>
+<li>Consistent debugging across all commands</li>
+<li>Progressive information disclosure (level 1 → 2 → 3)</li>
+</ul>
+<p>Use <code>-v</code> for score breakdowns, <code>-vv</code> for detailed calculations, and <code>-vvv</code> for full debug output.</p>
 <h3 id="debugging-score-calculations"><a class="header" href="#debugging-score-calculations">Debugging Score Calculations</a></h3>
 <pre><code class="language-bash"># Use verbosity levels to see score breakdown
 debtmap -v    # Shows score factors
@@ -2157,7 +2282,7 @@ debtmap --no-parallel
 <ul>
 <li><strong><a href="./configuration.html">Configuration Guide</a></strong>: Configure debtmap behavior</li>
 <li><strong><a href="./cli-reference.html">CLI Reference</a></strong>: Complete CLI flag documentation</li>
-<li><strong><a href="./analysis-guide.html">Analysis Guide</a></strong>: Understanding analysis results</li>
+<li><strong><a href="./analysis-guide/index.html">Analysis Guide</a></strong>: Understanding analysis results</li>
 <li><strong><a href="./examples.html">Examples</a></strong>: Practical usage examples</li>
 <li><strong><a href="./api/index.html">API Documentation</a></strong>: Rust API documentation</li>
 </ul>

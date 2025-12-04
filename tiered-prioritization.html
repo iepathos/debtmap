@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -193,12 +193,23 @@
 <p><strong>Priority</strong>: Must address before adding new features</p>
 <p><strong>Weight</strong>: 1.5x (highest priority multiplier)</p>
 <p><strong>Impact</strong>: High impact on maintainability and team velocity</p>
+<p><strong>Classification Criteria</strong> (src/priority/tiers.rs:183-216):</p>
+<p>Debtmap uses sophisticated multi-factor analysis for Tier 1 classification, not just raw cyclomatic complexity. Items qualify for Tier 1 if they meet <strong>any</strong> of these criteria:</p>
+<ol>
+<li><strong>Critical Patterns</strong>: AsyncMisuse or ErrorSwallowing debt types (always Tier 1)</li>
+<li><strong>High Final Score</strong>: final_score &gt; 10.0 after exponential scaling</li>
+<li><strong>Extreme Cyclomatic</strong>: Entropy-dampened cyclomatic complexity &gt; 50</li>
+<li><strong>High Cognitive Load</strong>: Cognitive complexity &gt;= 20</li>
+<li><strong>Deep Nesting</strong>: Nesting depth &gt;= 5 levels</li>
+<li><strong>High Weighted Complexity</strong>: complexity_factor &gt; 5.0 (weighted: 30% cyclomatic + 70% cognitive)</li>
+</ol>
 <p><strong>Examples</strong>:</p>
 <ul>
-<li>Files with 15+ responsibilities</li>
-<li>Modules with 50+ methods</li>
-<li>ComplexityHotspot debt items with cyclomatic complexity &gt; 50 (extreme complexity requiring architectural redesign)</li>
-<li>God objects flagged by detection algorithms</li>
+<li>Files with 15+ responsibilities (God Objects)</li>
+<li>Modules with 50+ methods (God Modules)</li>
+<li>ComplexityHotspot debt items meeting any of the criteria above</li>
+<li>Functions with cognitive complexity &gt;= 20 (extreme mental load)</li>
+<li>Deeply nested code (5+ nesting levels)</li>
 <li>Circular dependencies affecting core modules</li>
 </ul>
 <p><strong>When to Address</strong>: Immediately, before sprint work begins. These issues compound over time and block progress.</p>
@@ -206,16 +217,32 @@
 debtmap analyze . --min-priority high --top 5
 </code></pre>
 <h3 id="tier-2-complex-untested"><a class="header" href="#tier-2-complex-untested">Tier 2: Complex Untested</a></h3>
-<p><strong>Description</strong>: Untested code with high complexity or critical dependencies. Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.</p>
+<p><strong>Description</strong>: Untested code with high complexity or critical dependencies, plus moderate complexity hotspots not severe enough for Tier 1.</p>
 <p><strong>Priority</strong>: Risk of bugs in critical paths</p>
 <p><strong>Weight</strong>: 1.0x (standard multiplier)</p>
 <p><strong>Action</strong>: Should be tested before refactoring to prevent regressions</p>
+<p><strong>Classification Criteria</strong> (src/priority/tiers.rs:257-302):</p>
+<p>Items qualify for Tier 2 through <strong>two distinct paths</strong>:</p>
+<p><strong>Path 1: Testing Gaps</strong> - Untested code meeting ANY of:</p>
+<ul>
+<li>Cyclomatic complexity ≥ 15</li>
+<li>Total dependencies ≥ 10</li>
+<li>Entry point functions with any coverage gap</li>
+</ul>
+<p><strong>Path 2: Moderate Complexity Hotspots</strong> - ComplexityHotspot items with meaningful but non-extreme complexity, meeting ANY of:</p>
+<ul>
+<li>Complexity factor &gt;= 2.0 (weighted: 30% cyclomatic + 70% cognitive, scaled 0-10)</li>
+<li>Cognitive complexity &gt;= 12 (moderate to high mental load)</li>
+<li>Nesting depth &gt;= 3 (meaningful nested control flow)</li>
+<li>Entropy-dampened cyclomatic complexity 8-50 (after filtering repetitive patterns)</li>
+</ul>
 <p><strong>Examples</strong>:</p>
 <ul>
 <li>Functions with cyclomatic complexity ≥ 15 and 0% coverage</li>
 <li>Functions with 10+ dependencies and low test coverage</li>
 <li>Business logic entry points without tests</li>
 <li>Complex error handling without validation</li>
+<li>Moderate complexity hotspots (complexity_factor &gt;= 2.0, cognitive &gt;= 12, or nesting &gt;= 3)</li>
 </ul>
 <p><strong>When to Address</strong>: Within current sprint. Add tests before making changes.</p>
 <pre><code class="language-bash"># See Tier 2 testing gaps
@@ -388,7 +415,7 @@ Low (score &lt; 50)
     "score_distribution": {
       "critical": 2,
       "high": 5,
-      "medium": 12,
+      "moderate": 12,
       "low": 45
     }
   },
@@ -418,11 +445,12 @@ Low (score &lt; 50)
 </code></pre>
 <p>The <code>priority</code> field is derived from the <code>score</code> field using these thresholds:</p>
 <ul>
-<li><code>critical</code>: score &gt;= 100.0</li>
-<li><code>high</code>: score &gt;= 50.0</li>
-<li><code>medium</code>: score &gt;= 20.0</li>
-<li><code>low</code>: score &lt; 20.0</li>
+<li><code>critical</code>: score &gt;= 90.0</li>
+<li><code>high</code>: score &gt;= 70.0</li>
+<li><code>moderate</code>: score &gt;= 50.0</li>
+<li><code>low</code>: score &lt; 50.0</li>
 </ul>
+<p><strong>Source</strong>: Priority tier thresholds defined in src/priority/mod.rs:478-484</p>
 <p><strong>Note</strong>: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <p><strong>Issue</strong>: Too many Tier 1 items</p>
@@ -445,7 +473,7 @@ minimum_cyclomatic_complexity = 2
 <ul>
 <li><a href="./scoring-strategies.html">Scoring Strategies</a> - Understanding file-level vs function-level scoring</li>
 <li><a href="./configuration.html">Configuration</a> - Complete configuration reference</li>
-<li><a href="./analysis-guide.html">Analysis Guide</a> - Detailed metric explanations</li>
+<li><a href="./analysis-guide/index.html">Analysis Guide</a> - Detailed metric explanations and analysis techniques</li>
 </ul>
 
                     </main>

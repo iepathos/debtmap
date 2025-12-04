@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -298,61 +298,63 @@ fn get_worker_count(jobs: usize) -&gt; usize {
 <li>Enables reproducible benchmarking</li>
 </ul>
 <h3 id="parallel-file-processing"><a class="header" href="#parallel-file-processing">Parallel File Processing</a></h3>
-<p><strong>Phase 1: Parallel File Parsing</strong></p>
-<p>Files are parsed concurrently using Rayon’s parallel iterators:</p>
+<p><strong>Phase 1: Parallel File I/O and Sequential Parsing</strong></p>
+<p>File reading is parallelized, but AST parsing is sequential due to <code>syn::File</code> not being <code>Send</code>:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs (parallel_parse_files method)
-let parsed_files: Vec&lt;_&gt; = rust_files
-    .par_iter()  // Convert to parallel iterator
+</span>// From src/builders/parallel_call_graph.rs:115-143
+// Step 1: Read file contents in parallel (I/O bound)
+let file_contents: Vec&lt;_&gt; = rust_files
+    .par_iter()  // Parallel I/O operations
     .filter_map(|file_path| {
         let content = io::read_file(file_path).ok()?;
-
-        // Update progress atomically
-        parallel_graph.stats().increment_files();
-
         Some((file_path.clone(), content))
     })
     .collect();
+
+// Step 2: Parse files to AST (sequential - syn::File not Send)
+let parsed_files: Vec&lt;_&gt; = file_contents
+    .iter()
+    .enumerate()
+    .filter_map(|(idx, (file_path, content))| {
+        let parsed = syn::parse_file(content).ok()?;
+        parallel_graph.stats().increment_files();
+        Some((file_path.clone(), parsed))
+    })
+    .collect();
 <span class="boring">}</span></code></pre>
-<p>Key features:</p>
+<p><strong>Key features:</strong></p>
 <ul>
-<li><code>.par_iter()</code> converts a sequential iterator to a parallel one</li>
-<li>Each file is read independently on a worker thread</li>
-<li>Progress tracking uses atomic counters (see <a href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a>)</li>
+<li><strong>Parallel I/O</strong>: File reading uses <code>.par_iter()</code> to maximize disk throughput</li>
+<li><strong>Sequential parsing</strong>: AST parsing is sequential because <code>syn::File</code> lacks <code>Send</code> bound</li>
+<li><strong>Why this works</strong>: I/O operations dominate analysis time, so parallelizing file reads provides most of the speedup</li>
+<li>Progress tracking uses atomic counters and unified progress system (see <a href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a>)</li>
 </ul>
-<p><strong>Phase 2: Parallel Multi-File Extraction</strong></p>
-<p>Files are grouped into chunks for optimal parallelization:</p>
+<p><strong>Phase 2: All-Files-At-Once Extraction</strong></p>
+<p>All files are processed together without chunking to enable optimal cross-file call resolution:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// From src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)
-let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
+</span>// From src/builders/parallel_call_graph.rs:152-176
+// Process ALL files at once (no chunking)
+// This enables optimal cross-file call resolution with a single PathResolver
+let files_for_extraction: Vec&lt;_&gt; = parsed_files
+    .iter()
+    .map(|(path, parsed)| (parsed.clone(), path.clone()))
+    .collect();
 
-parsed_files.par_chunks(chunk_size).for_each(|chunk| {
-    // Parse syn files within each chunk
-    let parsed_chunk: Vec&lt;_&gt; = chunk
-        .iter()
-        .filter_map(|(path, content)| {
-            syn::parse_file(content)
-                .ok()
-                .map(|parsed| (parsed, path.clone()))
-        })
-        .collect();
+// Extract call graph for all files with full cross-file resolution
+// Internal implementation may use Rayon parallel iterators
+let graph = extract_call_graph_multi_file(&amp;files_for_extraction);
 
-    if !parsed_chunk.is_empty() {
-        // Extract call graph for this chunk
-        let chunk_graph = extract_call_graph_multi_file(&amp;parsed_chunk);
-
-        // Merge into main graph concurrently
-        parallel_graph.merge_concurrent(chunk_graph);
-    }
-});
+// Merge into main graph
+parallel_graph.merge_concurrent(graph);
 <span class="boring">}</span></code></pre>
-<p>This chunking strategy balances parallelism with overhead:</p>
+<p><strong>Design rationale:</strong></p>
 <ul>
-<li>Minimum chunk size of 10 files prevents excessive overhead</li>
-<li>Dynamic chunk sizing based on available threads</li>
-<li>Each chunk produces a local call graph that’s merged concurrently</li>
+<li><strong>No chunking</strong>: All files processed together for complete visibility</li>
+<li><strong>Optimal cross-file resolution</strong>: Single <code>PathResolver</code> sees all functions across entire codebase</li>
+<li><strong>Internal parallelism</strong>: The <code>extract_call_graph_multi_file</code> function may parallelize internally using Rayon</li>
+<li><strong>Simplified merging</strong>: One merge operation instead of per-chunk merges</li>
 </ul>
 <p><strong>AST Parsing Optimization (Spec 132)</strong></p>
 <p>Prior to spec 132, files were parsed twice during call graph construction:</p>
@@ -540,7 +542,14 @@ files.par_iter()
 </ul>
 <p>For memory-constrained environments, use <code>--jobs 2-4</code> or <code>--no-parallel</code> to reduce parallel overhead.</p>
 <h2 id="parallel-call-graph-statistics"><a class="header" href="#parallel-call-graph-statistics">Parallel Call Graph Statistics</a></h2>
-<p>Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads.</p>
+<p>Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads. These statistics are integrated with a unified progress system that provides consolidated reporting across all analysis phases.</p>
+<h3 id="unified-progress-system-integration"><a class="header" href="#unified-progress-system-integration">Unified Progress System Integration</a></h3>
+<p>Parallel statistics now integrate with <code>crate::io::progress::AnalysisProgress</code> (src/builders/parallel_call_graph.rs:134-139), which replaced older per-phase progress bars. This provides:</p>
+<ul>
+<li><strong>Consolidated progress reporting</strong>: Single progress view showing “3/4 Building call graph”</li>
+<li><strong>Cross-phase coordination</strong>: Progress updates coordinated across parsing, extraction, and analysis phases</li>
+<li><strong>Reduced visual clutter</strong>: Replaces multiple progress bars with unified display</li>
+</ul>
 <h3 id="parallelstats-structure"><a class="header" href="#parallelstats-structure">ParallelStats Structure</a></h3>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -639,6 +648,7 @@ let resolutions: Vec&lt;(FunctionCall, FunctionId)&gt; = calls_to_resolve
 <li><strong>Immutable data</strong>: All inputs are read-only during the parallel phase</li>
 <li><strong>Independent operations</strong>: Each call resolution is independent of others</li>
 <li><strong>Parallel efficiency</strong>: Utilizes all available CPU cores</li>
+<li><strong>Sophisticated matching</strong>: <code>resolve_call_with_advanced_matching</code> delegates to <code>CallResolver</code> (src/analyzers/call_graph/call_resolution.rs:44-58) which handles associated functions, qualified paths, and type hints</li>
 </ul>
 <p><strong>Phase 2: Sequential Updates (Mutation)</strong></p>
 <p>The second phase applies all resolutions to the graph sequentially:</p>

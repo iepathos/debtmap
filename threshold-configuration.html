@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -237,7 +237,7 @@
 <pre><code class="language-bash">debtmap analyze . --threshold-preset lenient
 </code></pre>
 <h2 id="understanding-complexity-thresholds"><a class="header" href="#understanding-complexity-thresholds">Understanding Complexity Thresholds</a></h2>
-<p>Debtmap tracks multiple complexity metrics. A function must exceed <strong>ALL</strong> thresholds to be flagged:</p>
+<p>Debtmap tracks multiple complexity metrics and uses <strong>conjunction logic</strong>: a function must exceed <strong>ALL</strong> thresholds to be flagged as technical debt.</p>
 <h3 id="cyclomatic-complexity"><a class="header" href="#cyclomatic-complexity">Cyclomatic Complexity</a></h3>
 <p>Counts decision points in code: <code>if</code>, <code>while</code>, <code>for</code>, <code>match</code>, <code>&amp;&amp;</code>, <code>||</code>, etc.</p>
 <ul>
@@ -272,26 +272,31 @@
 <li><strong>Match arms</strong>: Flags large match/switch statements (default: 4)</li>
 <li><strong>If-else chains</strong>: Flags long conditional chains (default: 3)</li>
 </ul>
-<p><strong>Important</strong>: Functions are flagged when they meet ALL of these conditions simultaneously:</p>
+<p><strong>Critical</strong>: Debtmap uses <strong>conjunction logic</strong> - functions are flagged only when they meet <strong>ALL</strong> of these conditions simultaneously:</p>
 <ul>
 <li>Cyclomatic complexity &gt;= adjusted cyclomatic threshold</li>
 <li>Cognitive complexity &gt;= adjusted cognitive threshold</li>
 <li>Function length &gt;= minimum function length</li>
 <li>Total complexity (cyclomatic + cognitive) &gt;= adjusted total threshold</li>
 </ul>
-<p>The thresholds are first adjusted by role-based multipliers, then all four checks must pass for the function to be flagged. This is a conjunction (AND) of individual threshold checks.</p>
+<p>The thresholds are first adjusted by role-based multipliers, then all four checks must pass for the function to be flagged.</p>
 <h3 id="threshold-validation"><a class="header" href="#threshold-validation">Threshold Validation</a></h3>
-<p>All threshold configurations are validated to ensure they are positive (non-zero) values. The following validation rules apply:</p>
+<p>Debtmap validates critical thresholds to prevent misconfiguration. The following validation rules apply (src/complexity/threshold_manager.rs:191-217):</p>
+<p><strong>Core Complexity Metrics</strong> (must not be zero):</p>
 <ul>
 <li><code>minimum_total_complexity</code> &gt; 0</li>
 <li><code>minimum_cyclomatic_complexity</code> &gt; 0</li>
 <li><code>minimum_cognitive_complexity</code> &gt; 0</li>
-<li><code>minimum_match_arms</code> &gt; 0</li>
-<li><code>minimum_if_else_chain</code> &gt; 0</li>
-<li><code>minimum_function_length</code> &gt; 0</li>
-<li>All role multipliers &gt; 0</li>
 </ul>
-<p>If any threshold is set to zero or a negative value, Debtmap will reject the configuration and use default values instead. This ensures that thresholds are always meaningful and prevent misconfiguration.</p>
+<p><strong>Role Multipliers</strong> (must be positive):</p>
+<ul>
+<li><code>entry_point_multiplier</code> &gt; 0</li>
+<li><code>core_logic_multiplier</code> &gt; 0</li>
+<li><code>utility_multiplier</code> &gt; 0</li>
+<li><code>test_function_multiplier</code> &gt; 0</li>
+</ul>
+<p><strong>Note</strong>: Structural thresholds (<code>minimum_match_arms</code>, <code>minimum_if_else_chain</code>, <code>minimum_function_length</code>) are not validated and can be set to any value including zero. Zero values effectively disable those checks.</p>
+<p>If any validated field fails validation, Debtmap will reject the configuration with an error message and use default values instead.</p>
 <h2 id="role-based-multipliers"><a class="header" href="#role-based-multipliers">Role-Based Multipliers</a></h2>
 <p>Debtmap automatically adjusts thresholds based on function role, recognizing that different types of functions have different complexity expectations:</p>
 <div class="table-wrapper">
@@ -399,7 +404,7 @@ utility_multiplier = 0.8            # Getters, setters, helpers
 test_function_multiplier = 2.0      # Unit tests, integration tests
 </code></pre>
 <p><strong>Note</strong>: The multipliers are applied to thresholds before comparison. For example, with <code>entry_point_multiplier = 1.5</code> and <code>minimum_cyclomatic_complexity = 5</code>, an entry point function would be flagged at cyclomatic complexity 7.5 (5 × 1.5).</p>
-<p><strong>Validation</strong>: All threshold values must be positive (&gt; 0). Zero or negative values will cause validation errors and Debtmap will use default values instead. This ensures that thresholds are always meaningful and prevents misconfiguration.</p>
+<p><strong>Validation</strong>: Core complexity metrics (<code>minimum_total_complexity</code>, <code>minimum_cyclomatic_complexity</code>, <code>minimum_cognitive_complexity</code>) and all role multipliers must be positive (&gt; 0). Zero or negative values for these fields will cause validation errors and Debtmap will use default values. Structural thresholds (<code>minimum_match_arms</code>, <code>minimum_if_else_chain</code>, <code>minimum_function_length</code>) are not validated and can be set to zero to disable those checks.</p>
 <h3 id="complete-example"><a class="header" href="#complete-example">Complete Example</a></h3>
 <pre><code class="language-toml"># Legacy threshold settings (simple configuration)
 # Note: For comprehensive control, use [complexity_thresholds] instead

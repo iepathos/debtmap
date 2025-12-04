@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -244,6 +244,8 @@ use crate::auth::authenticate; // Creates cycle: auth → session → auth
 <p><strong>Implementation:</strong> <code>src/debt/coupling.rs:6-30</code></p>
 <h3 id="efferent-coupling-ce"><a class="header" href="#efferent-coupling-ce">Efferent Coupling (Ce)</a></h3>
 <p><strong>Efferent coupling</strong> is the number of modules this module depends on. High efferent coupling means this module has many dependencies.</p>
+<p><strong>Note on Abstractness:</strong> The <code>abstractness</code> field in <code>CouplingMetrics</code> requires advanced type analysis to calculate properly. The current implementation uses a placeholder value (0.0) as full abstractness calculation would need semantic analysis of trait definitions, abstract types, and implementation ratios. This is similar to the cohesion analysis limitation documented below (see “Cohesion Analysis” section).</p>
+<p><strong>Source:</strong> <code>src/debt/coupling.rs:44</code></p>
 <h3 id="example-coupling-analysis"><a class="header" href="#example-coupling-analysis">Example Coupling Analysis</a></h3>
 <pre><code>Module: api_handler
   Afferent coupling (Ca): 8  // 8 modules depend on api_handler
@@ -480,9 +482,10 @@ threshold_duplication = 50  # Default value
 <h3 id="current-limitations"><a class="header" href="#current-limitations">Current Limitations</a></h3>
 <ul>
 <li><strong>Exact matching only</strong> - Currently uses hash-based exact matching</li>
-<li><strong>similarity_threshold parameter</strong> - Defined but not implemented yet</li>
-<li><strong>Future enhancement</strong> - Fuzzy matching for near-duplicates</li>
+<li><strong>similarity_threshold parameter</strong> - Defined in function signature but not implemented yet</li>
+<li><strong>Future enhancement</strong> - Fuzzy matching for near-duplicates using similarity algorithms (e.g., Levenshtein distance, token-based similarity)</li>
 </ul>
+<p>The <code>similarity_threshold</code> parameter exists for future extensibility but is currently unused. All duplication detection uses exact hash matching. Track progress on fuzzy matching in the project’s issue tracker or roadmap.</p>
 <h2 id="refactoring-recommendations-4"><a class="header" href="#refactoring-recommendations-4">Refactoring Recommendations</a></h2>
 <p>Debtmap provides specific refactoring recommendations for each architectural issue:</p>
 <h3 id="for-circular-dependencies"><a class="header" href="#for-circular-dependencies">For Circular Dependencies</a></h3>
@@ -696,7 +699,7 @@ threshold_duplication = 50  # Default value
 </code></pre>
 <p><strong>Configuration reference:</strong> <code>src/cli.rs:69</code> (threshold_duplication flag definition)</p>
 <h3 id="hardcoded-thresholds"><a class="header" href="#hardcoded-thresholds">Hardcoded Thresholds</a></h3>
-<p><strong>Note:</strong> Most architectural thresholds are currently hardcoded in the implementation and cannot be configured:</p>
+<p><strong>Note:</strong> Most architectural thresholds are currently hardcoded in the implementation and cannot be configured. These thresholds are based on industry-standard metrics from Robert C. Martin’s research and empirical software engineering studies:</p>
 <ul>
 <li><strong>Coupling threshold:</strong> 5 (modules with &gt;5 dependencies are flagged)</li>
 <li><strong>Instability threshold:</strong> 0.8 (for SDP violations)</li>
@@ -715,7 +718,8 @@ threshold_duplication = 50  # Default value
 </ul>
 </li>
 </ul>
-<p><strong>Source:</strong> <code>src/debt/coupling.rs:70-76</code> (hardcoded threshold definitions)</p>
+<p>These values represent widely-accepted boundaries in software architecture literature. While they work well for most projects, configurable thresholds may be added in a future release to support domain-specific tuning.</p>
+<p><strong>Source:</strong> <code>src/debt/coupling.rs:70-76, 130, 145</code> (hardcoded threshold definitions)</p>
 <p>See <a href="configuration.html">Configuration</a> for complete options.</p>
 <h2 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h2>
 <h3 id="no-circular-dependencies-detected-but-build-fails"><a class="header" href="#no-circular-dependencies-detected-but-build-fails">“No circular dependencies detected but build fails”</a></h3>
@@ -742,7 +746,7 @@ threshold_duplication = 50  # Default value
 </ul>
 <h3 id="related-topics"><a class="header" href="#related-topics">Related Topics</a></h3>
 <ul>
-<li><a href="analysis-guide.html">Analysis Guide</a> - Complete analysis workflow</li>
+<li><a href="analysis-guide/index.html">Analysis Guide</a> - Complete analysis workflow</li>
 <li><a href="configuration.html">Configuration</a> - Configuration options</li>
 <li><a href="entropy-analysis.html">Entropy Analysis</a> - Complexity vs. entropy</li>
 <li><a href="scoring-strategies.html">Scoring Strategies</a> - How debt is scored</li>
@@ -757,7 +761,7 @@ threshold_duplication = 50  # Default value
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="boilerplate-vs-complexity.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="boilerplate-detection.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -771,7 +775,7 @@ threshold_duplication = 50  # Default value
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="boilerplate-vs-complexity.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="boilerplate-detection.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

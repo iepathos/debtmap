@@ -1,0 +1,767 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Advanced Features - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-08429e26.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-c7b19542.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="advanced-features"><a class="header" href="#advanced-features">Advanced Features</a></h1>
+<h2 id="advanced-features-1"><a class="header" href="#advanced-features-1">Advanced Features</a></h2>
+<h3 id="purity-detection"><a class="header" href="#purity-detection">Purity Detection</a></h3>
+<p>Debtmap detects pure functions - those without side effects that always return the same output for the same input.</p>
+<p><strong>What makes a function pure:</strong></p>
+<ul>
+<li>No I/O operations (file, network, database)</li>
+<li>No mutable global state</li>
+<li>No random number generation</li>
+<li>No system calls</li>
+<li>Deterministic output</li>
+</ul>
+<p><strong>Purity detection is optional:</strong></p>
+<ul>
+<li>Both <code>is_pure</code> and <code>purity_confidence</code> are <code>Option</code> types</li>
+<li>May be <code>None</code> for some functions or languages where detection is not available</li>
+<li>Rust has the most comprehensive purity detection support</li>
+</ul>
+<p><strong>Three-level purity classification:</strong>
+The <code>purity_level</code> field provides a more nuanced classification than the binary <code>is_pure</code>:</p>
+<ul>
+<li><strong>Pure</strong>: No side effects detected, deterministic output</li>
+<li><strong>ProbablyPure</strong>: Mostly pure with minor suspicious patterns</li>
+<li><strong>Impure</strong>: Clear side effects or non-deterministic behavior</li>
+</ul>
+<p>This three-level classification (available in <code>src/core/mod.rs:91</code>) complements the confidence scoring for more precise analysis.</p>
+<p><strong>Confidence scoring (when available):</strong></p>
+<ul>
+<li><strong>0.9-1.0</strong>: Very confident (no side effects detected)</li>
+<li><strong>0.7-0.8</strong>: Likely pure (minimal suspicious patterns)</li>
+<li><strong>0.5-0.6</strong>: Uncertain (some suspicious patterns)</li>
+<li><strong>0.0-0.4</strong>: Likely impure (side effects detected)</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Pure: confidence = 0.95
+fn calculate_total(items: &amp;[Item]) -&gt; f64 {
+    items.iter().map(|i| i.price).sum()
+}
+
+// Impure: confidence = 0.1 (I/O detected)
+fn save_total(items: &amp;[Item]) -&gt; Result&lt;()&gt; {
+    let total = items.iter().map(|i| i.price).sum();
+    write_to_file(total)  // Side effect!
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Pure functions are easier to test</li>
+<li>Can be safely cached or memoized</li>
+<li>Safe to parallelize</li>
+<li>Easier to reason about</li>
+</ul>
+<h3 id="data-flow-analysis"><a class="header" href="#data-flow-analysis">Data Flow Analysis</a></h3>
+<p>Debtmap builds a comprehensive <code>DataFlowGraph</code> that extends basic call graph analysis with variable dependencies, data transformations, I/O operations, and purity tracking.</p>
+<h4 id="call-graph-foundation"><a class="header" href="#call-graph-foundation">Call Graph Foundation</a></h4>
+<p><strong>Upstream callers</strong> - Who calls this function</p>
+<ul>
+<li>Indicates impact radius</li>
+<li>More callers = higher impact if it breaks</li>
+</ul>
+<p><strong>Downstream callees</strong> - What this function calls</p>
+<ul>
+<li>Indicates dependencies</li>
+<li>More callees = more integration testing needed</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-json">{
+  "name": "process_payment",
+  "upstream_callers": [
+    "handle_checkout",
+    "process_subscription",
+    "handle_refund"
+  ],
+  "downstream_callees": [
+    "validate_payment_method",
+    "calculate_fees",
+    "record_transaction",
+    "send_receipt"
+  ]
+}
+</code></pre>
+<h4 id="variable-dependency-tracking"><a class="header" href="#variable-dependency-tracking">Variable Dependency Tracking</a></h4>
+<p><code>DataFlowGraph</code> tracks which variables each function depends on:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataFlowGraph {
+    // Maps function_id -&gt; set of variable names used
+    variable_dependencies: HashMap&lt;String, HashSet&lt;String&gt;&gt;,
+    // ...
+}
+<span class="boring">}</span></code></pre>
+<p><strong>What it tracks:</strong></p>
+<ul>
+<li>Local variables accessed in function body</li>
+<li>Function parameters</li>
+<li>Captured variables (closures)</li>
+</ul>
+<p><strong>Benefits:</strong></p>
+<ul>
+<li>Identify functions coupled through shared state</li>
+<li>Detect potential side effect chains</li>
+<li>Guide refactoring to reduce coupling</li>
+</ul>
+<p><strong>Example output:</strong></p>
+<pre><code class="language-json">{
+  "function": "calculate_total",
+  "variable_dependencies": ["items", "tax_rate", "discount", "total"],
+  "parameter_count": 3,
+  "local_var_count": 1
+}
+</code></pre>
+<h4 id="data-transformation-patterns"><a class="header" href="#data-transformation-patterns">Data Transformation Patterns</a></h4>
+<p><code>DataFlowGraph</code> identifies common functional programming patterns:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum TransformationType {
+    Map,        // Transform each element
+    Filter,     // Select subset of elements
+    Reduce,     // Aggregate to single value
+    FlatMap,    // Transform and flatten
+    Unknown,    // Other transformations
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Pattern detection:</strong></p>
+<ul>
+<li>Recognizes iterator chains (<code>.map()</code>, <code>.filter()</code>, <code>.fold()</code>)</li>
+<li>Identifies functional vs imperative data flow</li>
+<li>Tracks input/output variable relationships</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Detected as: Filter → Map → Reduce pattern
+fn total_active_users(users: &amp;[User]) -&gt; f64 {
+    users.iter()
+        .filter(|u| u.active)      // Filter transformation
+        .map(|u| u.balance)        // Map transformation
+        .sum()                      // Reduce transformation
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Transformation metadata:</strong></p>
+<pre><code class="language-json">{
+  "function": "total_active_users",
+  "input_vars": ["users"],
+  "output_vars": ["sum_result"],
+  "transformation_type": "Reduce",
+  "is_functional_style": true,
+  "pipeline_length": 3
+}
+</code></pre>
+<h4 id="io-operation-detection"><a class="header" href="#io-operation-detection">I/O Operation Detection</a></h4>
+<p>Tracks functions performing I/O operations for purity and performance analysis:</p>
+<p><strong>I/O categories tracked:</strong></p>
+<ul>
+<li><strong>File I/O</strong>: <code>std::fs</code>, <code>File::open</code>, <code>read_to_string</code></li>
+<li><strong>Network I/O</strong>: HTTP requests, socket operations</li>
+<li><strong>Database I/O</strong>: SQL queries, ORM operations</li>
+<li><strong>System calls</strong>: Process spawning, environment access</li>
+<li><strong>Blocking operations</strong>: <code>thread::sleep</code>, synchronous I/O in async</li>
+</ul>
+<p><strong>Example detection:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Detected I/O operations: FileRead, FileWrite
+fn save_config(config: &amp;Config, path: &amp;Path) -&gt; Result&lt;()&gt; {
+    let json = serde_json::to_string(config)?;  // No I/O
+    std::fs::write(path, json)?;                 // FileWrite detected
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<p><strong>I/O metadata:</strong></p>
+<pre><code class="language-json">{
+  "function": "save_config",
+  "io_operations": ["FileWrite"],
+  "is_blocking": true,
+  "affects_purity": true,
+  "async_safe": false
+}
+</code></pre>
+<h4 id="purity-analysis-integration"><a class="header" href="#purity-analysis-integration">Purity Analysis Integration</a></h4>
+<p><code>DataFlowGraph</code> integrates with purity detection to provide comprehensive side effect analysis:</p>
+<p><strong>Side effect tracking:</strong></p>
+<ul>
+<li>I/O operations (file, network, console)</li>
+<li>Global state mutations</li>
+<li>Random number generation</li>
+<li>System time access</li>
+<li>Non-deterministic behavior</li>
+</ul>
+<p><strong>Purity confidence factors:</strong></p>
+<ul>
+<li><strong>1.0</strong>: Pure mathematical function, no side effects</li>
+<li><strong>0.8</strong>: Pure with deterministic data transformations</li>
+<li><strong>0.5</strong>: Mixed - some suspicious patterns</li>
+<li><strong>0.2</strong>: Likely impure - I/O detected</li>
+<li><strong>0.0</strong>: Definitely impure - multiple side effects</li>
+</ul>
+<p><strong>Example analysis:</strong></p>
+<pre><code class="language-json">{
+  "function": "calculate_discount",
+  "is_pure": true,
+  "purity_confidence": 0.95,
+  "side_effects": [],
+  "deterministic": true,
+  "safe_to_parallelize": true,
+  "safe_to_cache": true
+}
+</code></pre>
+<h4 id="modification-impact-analysis"><a class="header" href="#modification-impact-analysis">Modification Impact Analysis</a></h4>
+<p><code>DataFlowGraph</code> calculates the impact of modifying a function:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct ModificationImpact {
+    pub function_name: String,
+    pub affected_functions: Vec&lt;String&gt;,  // Upstream callers
+    pub dependency_count: usize,          // Downstream callees
+    pub has_side_effects: bool,
+    pub risk_level: RiskLevel,
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Risk level calculation:</strong></p>
+<ul>
+<li><strong>Critical</strong>: Many upstream callers + side effects + low test coverage</li>
+<li><strong>High</strong>: Many callers OR side effects with moderate coverage</li>
+<li><strong>Medium</strong>: Few callers with side effects OR many callers with good coverage</li>
+<li><strong>Low</strong>: Few callers, no side effects, or well-tested</li>
+</ul>
+<p><strong>Example impact analysis:</strong></p>
+<pre><code class="language-json">{
+  "function": "validate_payment_method",
+  "modification_impact": {
+    "affected_functions": 4,
+    "dependency_count": 8,
+    "has_side_effects": true,
+    "risk_level": "High"
+  }
+}
+</code></pre>
+<p><strong>Note</strong>: The <code>affected_functions</code> field contains the count of upstream callers. The actual function names can be obtained from the <code>upstream_callers</code> field in the function metadata.</p>
+<p><strong>Using modification impact:</strong></p>
+<pre><code class="language-bash"># Analyze impact before refactoring
+debtmap analyze . --format json | jq '.functions[] | select(.name == "validate_payment_method") | .modification_impact'
+</code></pre>
+<p><strong>Impact analysis uses:</strong></p>
+<ul>
+<li><strong>Refactoring planning</strong>: Understand blast radius before changes</li>
+<li><strong>Test prioritization</strong>: Focus tests on high-impact functions</li>
+<li><strong>Code review</strong>: Flag high-risk changes for extra scrutiny</li>
+<li><strong>Dependency management</strong>: Identify tightly coupled components</li>
+</ul>
+<h4 id="dataflowgraph-methods"><a class="header" href="#dataflowgraph-methods">DataFlowGraph Methods</a></h4>
+<p>Key methods for data flow analysis:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Add function with its dependencies
+pub fn add_function(&amp;mut self, function_id: String, callees: Vec&lt;String&gt;)
+
+// Track variable dependencies
+pub fn add_variable_dependency(&amp;mut self, function_id: String, var_name: String)
+
+// Record I/O operations
+pub fn add_io_operation(&amp;mut self, function_id: String, io_type: IoType)
+
+// Calculate modification impact
+pub fn calculate_modification_impact(&amp;self, function_id: &amp;str) -&gt; ModificationImpact
+
+// Get all functions affected by a change
+pub fn get_affected_functions(&amp;self, function_id: &amp;str) -&gt; Vec&lt;String&gt;
+
+// Find functions with side effects
+pub fn find_functions_with_side_effects(&amp;self) -&gt; Vec&lt;String&gt;
+<span class="boring">}</span></code></pre>
+<p><strong>Integration in analysis pipeline:</strong></p>
+<ol>
+<li>Parser builds initial call graph</li>
+<li>DataFlowGraph extends with variable/I/O tracking</li>
+<li>Purity analyzer adds side effect information</li>
+<li>Modification impact calculated for each function</li>
+<li>Results used in prioritization and risk scoring</li>
+</ol>
+<p><strong>Connection to Unified Scoring:</strong></p>
+<p>The dependency analysis from DataFlowGraph directly feeds into the <strong>unified scoring system’s dependency factor</strong> (20% weight):</p>
+<ul>
+<li><strong>Dependency Factor Calculation</strong>: Functions with high upstream caller count or on critical paths from entry points receive higher dependency scores (8-10)</li>
+<li><strong>Isolated Utilities</strong>: Functions with few or no callers score lower (1-3) on dependency factor</li>
+<li><strong>Impact Prioritization</strong>: This helps prioritize functions where bugs have wider impact across the codebase</li>
+<li><strong>Modification Risk</strong>: The modification impact analysis uses dependency data to calculate blast radius when changes are made</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code>Function: validate_payment_method
+  Upstream callers: 4 (high impact)
+  → Dependency Factor: 8.0
+
+Function: format_currency_string
+  Upstream callers: 0 (utility)
+  → Dependency Factor: 1.5
+
+Both have same complexity, but validate_payment_method gets higher unified score
+due to its critical role in the call graph.
+</code></pre>
+<p>This integration ensures that the unified scoring system considers not just internal function complexity and test coverage, but also the function’s importance in the broader codebase architecture.</p>
+<h3 id="entropy-based-complexity"><a class="header" href="#entropy-based-complexity">Entropy-Based Complexity</a></h3>
+<p>Advanced pattern detection to reduce false positives.</p>
+<p><strong>Token Classification:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>enum TokenType {
+    Variable,     // Weight: 1.0
+    Method,       // Weight: 1.5 (more important)
+    Literal,      // Weight: 0.5 (less important)
+    Keyword,      // Weight: 0.8
+    Operator,     // Weight: 0.6
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Shannon Entropy Calculation:</strong></p>
+<pre><code>H(X) = -Σ p(x) × log₂(p(x))
+</code></pre>
+<p>where p(x) is the probability of each token type.</p>
+<p><strong>Dampening Decision:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if entropy_score.token_entropy &lt; 0.4
+   &amp;&amp; entropy_score.pattern_repetition &gt; 0.6
+   &amp;&amp; entropy_score.branch_similarity &gt; 0.7
+{
+    // Apply dampening
+    effective_complexity = base_complexity × (1 - dampening_factor);
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Output explanation:</strong></p>
+<pre><code>Function: validate_input
+  Cyclomatic: 15 → Effective: 5
+  Reasoning:
+    - High pattern repetition detected (85%)
+    - Low token entropy indicates simple patterns (0.32)
+    - Similar branch structures found (92% similarity)
+    - Complexity reduced by 67% due to pattern-based code
+</code></pre>
+<h3 id="entropy-analysis-caching"><a class="header" href="#entropy-analysis-caching">Entropy Analysis Caching</a></h3>
+<p><code>EntropyAnalyzer</code> includes an LRU-style cache for performance optimization when analyzing large codebases or performing repeated analysis.</p>
+<h4 id="cache-structure"><a class="header" href="#cache-structure">Cache Structure</a></h4>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>struct CacheEntry {
+    score: EntropyScore,
+    timestamp: Instant,
+    hit_count: usize,
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Cache configuration:</strong></p>
+<ul>
+<li><strong>Default size</strong>: 1000 entries</li>
+<li><strong>Eviction policy</strong>: LRU (Least Recently Used)</li>
+<li><strong>Memory per entry</strong>: ~128 bytes</li>
+<li><strong>Total memory overhead</strong>: ~128 KB for default size</li>
+</ul>
+<h4 id="cache-statistics"><a class="header" href="#cache-statistics">Cache Statistics</a></h4>
+<p>The analyzer tracks cache performance:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CacheStats {
+    pub hits: usize,
+    pub misses: usize,
+    pub evictions: usize,
+    pub hit_rate: f64,
+    pub memory_usage: usize,
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Example stats output:</strong></p>
+<pre><code class="language-json">{
+  "entropy_cache_stats": {
+    "hits": 3427,
+    "misses": 1573,
+    "evictions": 573,
+    "hit_rate": 0.685,
+    "memory_usage": 128000
+  }
+}
+</code></pre>
+<p><strong>Hit rate interpretation:</strong></p>
+<ul>
+<li><strong>&gt; 0.7</strong>: Excellent - many repeated analyses, cache is effective</li>
+<li><strong>0.4-0.7</strong>: Good - moderate reuse, typical for incremental analysis</li>
+<li><strong>&lt; 0.4</strong>: Low - mostly unique functions, cache less helpful</li>
+</ul>
+<h4 id="performance-benefits"><a class="header" href="#performance-benefits">Performance Benefits</a></h4>
+<p><strong>Typical performance gains:</strong></p>
+<ul>
+<li><strong>Cold analysis</strong>: 100ms baseline (no cache benefit)</li>
+<li><strong>Incremental analysis</strong>: 30-40ms (~60-70% faster) for unchanged functions</li>
+<li><strong>Re-analysis</strong>: 15-20ms (~80-85% faster) for recently analyzed functions</li>
+</ul>
+<p><strong>Best for:</strong></p>
+<ul>
+<li><strong>Watch mode</strong>: Analyzing on file save (repeated analysis of same files)</li>
+<li><strong>CI/CD</strong>: Comparing feature branch to main (overlap in functions)</li>
+<li><strong>Large codebases</strong>: Many similar functions benefit from pattern caching</li>
+</ul>
+<p><strong>Memory estimation:</strong></p>
+<pre><code>Total cache memory = entry_count × 128 bytes
+
+Examples:
+- 1,000 entries: ~128 KB (default)
+- 5,000 entries: ~640 KB (large projects)
+- 10,000 entries: ~1.25 MB (very large)
+</code></pre>
+<h4 id="cache-management"><a class="header" href="#cache-management">Cache Management</a></h4>
+<p><strong>Automatic eviction:</strong></p>
+<ul>
+<li>When cache reaches size limit, oldest entries evicted</li>
+<li>Hit count influences retention (frequently accessed stay longer)</li>
+<li>Timestamp used for LRU ordering</li>
+</ul>
+<p><strong>Cache invalidation:</strong></p>
+<ul>
+<li>Function source changes invalidate entry</li>
+<li>Cache cleared between major analysis runs</li>
+<li>No manual invalidation needed</li>
+</ul>
+<p><strong>Configuration (if exposed in future):</strong></p>
+<pre><code class="language-toml">[entropy.cache]
+enabled = true
+size = 1000           # Number of entries
+ttl_seconds = 3600    # Optional: expire after 1 hour
+</code></pre>
+<h3 id="context-aware-analysis"><a class="header" href="#context-aware-analysis">Context-Aware Analysis</a></h3>
+<p>Debtmap adjusts analysis based on code context:</p>
+<p><strong>Pattern Recognition:</strong></p>
+<ul>
+<li>Validation patterns (repetitive checks)</li>
+<li>Dispatcher patterns (routing logic)</li>
+<li>Builder patterns (fluent APIs)</li>
+<li>Configuration parsers (key-value processing)</li>
+</ul>
+<p><strong>Adjustment Strategies:</strong></p>
+<ul>
+<li>Reduce false positives for recognized patterns</li>
+<li>Apply appropriate thresholds by pattern type</li>
+<li>Consider pattern confidence in scoring</li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Recognized as "validation_pattern"
+// Complexity dampening applied
+fn validate_user_input(input: &amp;UserInput) -&gt; Result&lt;()&gt; {
+    if input.name.is_empty() { return Err(Error::EmptyName); }
+    if input.email.is_empty() { return Err(Error::EmptyEmail); }
+    if input.age &lt; 13 { return Err(Error::TooYoung); }
+    // ... more similar validations
+    Ok(())
+}
+<span class="boring">}</span></code></pre>
+<h3 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h3>
+<p>Debtmap parses LCOV coverage data for risk analysis:</p>
+<p><strong>LCOV Support:</strong></p>
+<ul>
+<li>Standard format from most coverage tools</li>
+<li>Line-level coverage tracking</li>
+<li>Function-level aggregation</li>
+</ul>
+<p><strong>Coverage Index:</strong></p>
+<ul>
+<li>O(1) exact name lookups (~0.5μs)</li>
+<li>O(log n) line-based fallback (~5-8μs)</li>
+<li>~200 bytes per function</li>
+<li>Thread-safe (<code>Arc&lt;CoverageIndex&gt;</code>)</li>
+</ul>
+<h4 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h4>
+<p><strong>Index Build Performance:</strong></p>
+<ul>
+<li>Index construction: O(n), approximately 20-30ms for 5,000 functions</li>
+<li>Memory usage: ~200 bytes per record (~2MB for 5,000 functions)</li>
+<li>Scales linearly with function count</li>
+</ul>
+<p><strong>Lookup Performance:</strong></p>
+<ul>
+<li>Exact match (function name): O(1) average, ~0.5μs per lookup</li>
+<li>Line-based fallback: O(log n), ~5-8μs per lookup</li>
+<li>Cache-friendly data structure for hot paths</li>
+</ul>
+<p><strong>Analysis Overhead:</strong></p>
+<ul>
+<li>Coverage integration overhead: ~2.5x baseline analysis time</li>
+<li>Target overhead: ≤3x (maintained through optimizations)</li>
+<li>Example timing: 53ms baseline → 130ms with coverage (2.45x overhead)</li>
+<li>Overhead includes index build + lookups + coverage propagation</li>
+</ul>
+<p><strong>When to use coverage integration:</strong></p>
+<ul>
+<li><strong>Skip coverage</strong> (faster iteration): For rapid development iteration or quick local checks, omit <code>--lcov</code> to get baseline results 2.5x faster</li>
+<li><strong>Include coverage</strong> (comprehensive analysis): Use coverage integration for final validation, sprint planning, and CI/CD gates where comprehensive risk analysis is needed</li>
+</ul>
+<p><strong>Thread Safety:</strong></p>
+<ul>
+<li>Coverage index wrapped in <code>Arc&amp;lt;CoverageIndex&amp;gt;</code> for lock-free parallel access</li>
+<li>Multiple analyzer threads can query coverage simultaneously</li>
+<li>No contention on reads, suitable for parallel analysis pipelines</li>
+</ul>
+<p><strong>Memory Footprint:</strong></p>
+<pre><code>Total memory = (function_count × 200 bytes) + index overhead
+
+Examples:
+- 1,000 functions: ~200 KB
+- 5,000 functions: ~2 MB
+- 10,000 functions: ~4 MB
+</code></pre>
+<p><strong>Scalability:</strong></p>
+<ul>
+<li>Tested with codebases up to 10,000 functions</li>
+<li>Performance remains predictable and acceptable</li>
+<li>Memory usage stays bounded and reasonable</li>
+</ul>
+<p><strong>Generating coverage:</strong></p>
+<pre><code class="language-bash"># Rust (using cargo-tarpaulin)
+cargo tarpaulin --out lcov --output-dir target/coverage
+
+# Or using cargo-llvm-cov
+cargo llvm-cov --lcov --output-path target/coverage/lcov.info
+</code></pre>
+<p><strong>Using with Debtmap:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov target/coverage/lcov.info
+</code></pre>
+<p><strong>Coverage dampening:</strong>
+When coverage data is provided, debt scores are dampened for well-tested code:</p>
+<pre><code>final_score = base_score × (1 - coverage_percentage)
+</code></pre>
+<p>This ensures well-tested complex code gets lower priority than untested simple code.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../analysis-guide/analyzer-types.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../analysis-guide/example-outputs.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../analysis-guide/analyzer-types.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../analysis-guide/example-outputs.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

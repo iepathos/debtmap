@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -426,14 +426,30 @@ let values = items.iter()
 <h2 id="purity-analysis"><a class="header" href="#purity-analysis">Purity Analysis</a></h2>
 <p>Debtmap analyzes functions to determine their purity level - whether they have side effects and mutable state.</p>
 <h3 id="purity-levels"><a class="header" href="#purity-levels">Purity Levels</a></h3>
-<p>Functions are classified into three purity levels for god object weighting (defined in <code>src/organization/purity_analyzer.rs</code>):</p>
+<p>Functions are classified into three purity levels for god object weighting (defined in <code>src/organization/purity_analyzer.rs:19-26</code>):</p>
 <blockquote>
 <p><strong>Note:</strong> Debtmap has two purity analysis systems serving different purposes:</p>
 <ol>
-<li><strong>PurityLevel</strong> (three levels) - Used for god object scoring with weight multipliers (this section)</li>
-<li><strong>PurityLevel</strong> (four levels) - Used in <code>src/analysis/purity_analysis.rs</code> for detailed responsibility classification (Strictly Pure, Locally Pure, Read-Only, Impure)</li>
+<li>
+<p><strong>Three-level system</strong> (this section) - Used for god object scoring with weight multipliers:</p>
+<ul>
+<li>Defined in <code>src/organization/purity_analyzer.rs</code></li>
+<li>Categories: Pure, ProbablyPure, Impure</li>
+<li>Purpose: Dampen god object scores for pure functions via weight multipliers (0.3, 0.5, 1.0)</li>
+</ul>
+</li>
+<li>
+<p><strong>Four-level system</strong> - Used for detailed responsibility classification:</p>
+<ul>
+<li>Defined in <code>src/core/mod.rs:47-60</code> and <code>src/analysis/purity_analysis.rs:34-43</code></li>
+<li>Categories: StrictlyPure, LocallyPure, ReadOnly, Impure</li>
+<li>Purpose: Fine-grained analysis of function behavior and side effects</li>
+<li>Used in responsibility analysis and technical debt assessment</li>
+</ul>
+</li>
 </ol>
-<p>This chapter focuses on the three-level system for god object integration.</p>
+<p>The three-level system provides a simplified classification optimized for god object detection. The four-level system offers more granular distinctions (e.g., builder patterns with local mutations vs. read-only accessors).</p>
+<p>This chapter focuses on the three-level system used for god object integration. For detailed responsibility classification, see <a href="./responsibility-analysis.html">Responsibility Analysis</a>.</p>
 </blockquote>
 <h4 id="pure-weight-03"><a class="header" href="#pure-weight-03">Pure (Weight 0.3)</a></h4>
 <p>Guaranteed no side effects:</p>
@@ -1039,12 +1055,11 @@ items.map(process_item)
 </ul>
 <h2 id="related-chapters"><a class="header" href="#related-chapters">Related Chapters</a></h2>
 <ul>
-<li><a href="analysis-guide.html">Analysis Guide</a> - Understanding analysis types</li>
-<li><a href="./complexity-analysis.html">Complexity Analysis</a> - How functional patterns affect complexity metrics</li>
-<li><a href="./scoring.html">Scoring Strategies</a> - Integration with overall technical debt scoring</li>
-<li><a href="./god-objects.html">God Object Detection</a> - How purity weights reduce false positives</li>
+<li><a href="analysis-guide/index.html">Analysis Guide</a> - Understanding analysis types and methodologies</li>
+<li><a href="analysis-guide/complexity-metrics.html">Complexity Metrics</a> - How functional patterns affect complexity metrics</li>
+<li><a href="./scoring-strategies.html">Scoring Strategies</a> - Integration with overall technical debt scoring</li>
+<li><a href="./god-object-detection.html">God Object Detection</a> - How purity weights reduce false positives</li>
 <li><a href="./configuration.html">Configuration</a> - Advanced functional analysis configuration options</li>
-<li><a href="refactoring-guide.html">Refactoring</a> - Extracting pure functions</li>
 </ul>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <p>Functional composition analysis helps you:</p>

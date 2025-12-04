@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -330,12 +330,35 @@ Compares two analysis results and generates a diff showing improvements or regre
 <li><code>--quiet</code> - Suppress console output (useful for automation)</li>
 </ul>
 <p><strong>Description:</strong>
-Validates improvement quality by analyzing comparison output from <code>debtmap compare</code>. Calculates a composite improvement score based on:</p>
+Validates improvement quality by analyzing comparison output from <code>debtmap compare</code>. Calculates a composite improvement score based on weighted components:</p>
+<p><strong>Composite Score Calculation:</strong></p>
+<ol>
+<li>
+<p><strong>Target Item Improvement (50% weight)</strong> - Measures direct improvement to the specific target item being fixed</p>
 <ul>
-<li>Target item improvement (50% weight)</li>
-<li>Overall project health (30% weight)</li>
-<li>Absence of regressions (20% weight)</li>
+<li>Compares complexity, debt score, and other metrics before/after</li>
+<li>Weight: 0.5 × (target improvement percentage)</li>
 </ul>
+</li>
+<li>
+<p><strong>Overall Project Health (30% weight)</strong> - Evaluates project-wide quality changes</p>
+<ul>
+<li>Analyzes aggregate metrics across entire codebase</li>
+<li>Considers new issues introduced, total debt changes</li>
+<li>Weight: 0.3 × (project health percentage)</li>
+</ul>
+</li>
+<li>
+<p><strong>Absence of Regressions (20% weight)</strong> - Penalizes introduction of new technical debt</p>
+<ul>
+<li>Checks for new high-priority issues in other parts of codebase</li>
+<li>Ensures improvements don’t shift complexity elsewhere</li>
+<li>Weight: 0.2 × (regression-free percentage)</li>
+</ul>
+</li>
+</ol>
+<p><strong>Final Score:</strong> <code>composite_score = (0.5 × target) + (0.3 × health) + (0.2 × no_regressions)</code></p>
+<p>The default threshold (75%) requires strong improvement in the target item while maintaining overall project quality.</p>
 <p>When <code>--previous-validation</code> is provided, tracks progress trends across multiple attempts and provides recommendations for continuing or adjusting the improvement approach.</p>
 <p><strong>Example:</strong></p>
 <pre><code class="language-bash"># Basic validation
@@ -392,12 +415,6 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <p><strong>Format Options:</strong></p>
 <ul>
 <li><code>-f, --format &lt;FORMAT&gt;</code> - Output format: json, markdown, terminal (default: terminal for analyze)</li>
-<li><code>--output-format &lt;JSON_FORMAT&gt;</code> - JSON structure format: legacy or unified (default: legacy)
-<ul>
-<li><code>legacy</code> - Current format with <code>{File: {...}}</code> and <code>{Function: {...}}</code> wrappers</li>
-<li><code>unified</code> - New format with consistent structure and ‘type’ field</li>
-</ul>
-</li>
 <li><code>-o, --output &lt;OUTPUT&gt;</code> - Output file path (defaults to stdout)</li>
 <li><code>--plain</code> - Plain output mode: ASCII-only, no colors, no emoji, machine-parseable</li>
 </ul>
@@ -597,6 +614,15 @@ debtmap init --force
 <h3 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h3>
 <ul>
 <li>
+<p><code>DEBTMAP_CONFIG</code> - Custom config file path (same as <code>--config</code> global flag)</p>
+<ul>
+<li>Example: <code>export DEBTMAP_CONFIG=/path/to/debtmap.toml</code></li>
+<li>Overrides default configuration file locations</li>
+<li>Useful for CI/CD environments with centralized config</li>
+<li>Source: src/cli.rs:45</li>
+</ul>
+</li>
+<li>
 <p><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)</p>
 <ul>
 <li>Example: <code>export DEBTMAP_JOBS=8  # Same as --jobs 8</code></li>
@@ -611,6 +637,24 @@ debtmap init --force
 <li>Set to <code>1</code> or <code>true</code> to disable multi-pass analysis by default</li>
 <li>Useful for CI/CD environments where performance is critical</li>
 <li>Can be overridden by command-line flags</li>
+</ul>
+</li>
+<li>
+<p><code>PRODIGY_AUTOMATION</code> - Enable automation mode for <code>validate-improvement</code> command</p>
+<ul>
+<li>Example: <code>export PRODIGY_AUTOMATION=true</code></li>
+<li>Set to <code>true</code> to enable automation mode (suppresses interactive prompts)</li>
+<li>Used in automated workflows for continuous improvement validation</li>
+<li>Source: src/main.rs:549</li>
+</ul>
+</li>
+<li>
+<p><code>PRODIGY_VALIDATION</code> - Alternative flag for automation mode (same effect as <code>PRODIGY_AUTOMATION</code>)</p>
+<ul>
+<li>Example: <code>export PRODIGY_VALIDATION=true</code></li>
+<li>Set to <code>true</code> to enable automation mode</li>
+<li>Provided for backward compatibility with existing workflows</li>
+<li>Source: src/main.rs:552</li>
 </ul>
 </li>
 </ul>
@@ -1005,7 +1049,7 @@ See Prodigy documentation for detailed usage instructions.</p>
 <ul>
 <li><a href="./configuration.html">Configuration Format</a> - Detailed configuration file format</li>
 <li><a href="./output-formats.html">Output Formats</a> - Understanding JSON, Markdown, and Terminal output</li>
-<li><a href="./coverage.html">Coverage Integration</a> - Integrating test coverage data</li>
+<li><a href="./coverage-integration.html">Coverage Integration</a> - Integrating test coverage data</li>
 <li><a href="./context-providers.html">Context Providers</a> - Understanding context-aware analysis</li>
 <li><a href="./examples.html">Examples</a> - More comprehensive usage examples</li>
 </ul>
@@ -1018,7 +1062,7 @@ See Prodigy documentation for detailed usage instructions.</p>
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="analysis-guide.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="analysis-guide/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -1032,7 +1076,7 @@ See Prodigy documentation for detailed usage instructions.</p>
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="analysis-guide.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="analysis-guide/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

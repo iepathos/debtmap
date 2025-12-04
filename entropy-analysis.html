@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -475,7 +475,7 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 <li>
 <p><strong>Dampening thresholds</strong> - Some are configurable, some are hardcoded (<code>src/complexity/entropy.rs:185-195</code>):</p>
 <ul>
-<li><strong>Entropy factor threshold: 0.4</strong> - Hardcoded internally (not configurable)</li>
+<li><strong>Entropy factor threshold: 0.4</strong> - Hardcoded in implementation (src/complexity/entropy.rs:192). Although an <code>entropy_threshold</code> field exists in the config struct (src/config/languages.rs:84), it is not wired up to be used in the actual dampening calculation. The value 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.</li>
 <li><strong>Branch threshold: 0.8</strong> - Configurable via <code>branch_threshold</code> in config file</li>
 <li><strong>Pattern threshold: 0.7/1.0</strong> - Configurable via <code>pattern_threshold</code> in config file</li>
 </ul>
@@ -629,7 +629,7 @@ max_branch_reduction = 0.12
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="why-debtmap.html">Why Debtmap?</a> - Real-world examples of entropy analysis</li>
-<li><a href="analysis-guide.html">Analysis Guide</a> - General analysis concepts</li>
+<li><a href="analysis-guide/index.html">Analysis Guide</a> - General analysis concepts</li>
 <li><a href="configuration.html">Configuration</a> - Complete configuration reference</li>
 </ul>
 

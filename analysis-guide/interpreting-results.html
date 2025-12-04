@@ -1,0 +1,947 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Interpreting Results - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-08429e26.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-c7b19542.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h1>
+<h2 id="interpreting-results-1"><a class="header" href="#interpreting-results-1">Interpreting Results</a></h2>
+<h3 id="understanding-output-formats"><a class="header" href="#understanding-output-formats">Understanding Output Formats</a></h3>
+<p>Debtmap provides three output formats:</p>
+<p><strong>Terminal</strong> (default): Human-readable with colors and tables</p>
+<pre><code class="language-bash">debtmap analyze .
+</code></pre>
+<p><strong>JSON</strong>: Machine-readable for CI/CD integration</p>
+<pre><code class="language-bash">debtmap analyze . --format json --output report.json
+</code></pre>
+<p><strong>Markdown</strong>: Documentation-friendly</p>
+<pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
+</code></pre>
+<h3 id="json-structure"><a class="header" href="#json-structure">JSON Structure</a></h3>
+<p>Debtmap uses a unified JSON format (spec 108) that provides consistent structure for all debt items. The output is generated by converting the internal <code>UnifiedAnalysis</code> to <code>UnifiedOutput</code> format (src/output/unified.rs).</p>
+<p><strong>Top-level JSON structure:</strong></p>
+<pre><code class="language-json">{
+  "format_version": "1.0",
+  "metadata": {
+    "debtmap_version": "0.2.0",
+    "generated_at": "2025-12-04T12:00:00Z",
+    "project_root": "/path/to/project",
+    "analysis_type": "full"
+  },
+  "summary": {
+    "total_items": 45,
+    "total_debt_score": 2847.3,
+    "debt_density": 113.89,
+    "total_loc": 25000,
+    "by_type": {
+      "File": 3,
+      "Function": 42
+    },
+    "by_category": {
+      "Architecture": 5,
+      "Testing": 23,
+      "Performance": 7,
+      "CodeQuality": 10
+    },
+    "score_distribution": {
+      "critical": 2,
+      "high": 8,
+      "medium": 18,
+      "low": 17
+    }
+  },
+  "items": [ /* array of UnifiedDebtItemOutput */ ]
+}
+</code></pre>
+<p><strong>Individual debt item structure (function-level):</strong></p>
+<pre><code class="language-json">{
+  "type": "Function",
+  "score": 87.3,
+  "category": "Testing",
+  "priority": "high",
+  "location": {
+    "file": "src/main.rs",
+    "line": 42,
+    "function": "process_data"
+  },
+  "metrics": {
+    "cyclomatic_complexity": 15,
+    "cognitive_complexity": 22,
+    "length": 68,
+    "nesting_depth": 4,
+    "coverage": 0.0,
+    "uncovered_lines": [42, 43, 44, 45, 46],
+    "entropy_score": 0.65
+  },
+  "debt_type": {
+    "ComplexityHotspot": {
+      "cyclomatic": 15,
+      "cognitive": 22,
+      "adjusted_cyclomatic": null
+    }
+  },
+  "function_role": "BusinessLogic",
+  "purity_analysis": {
+    "is_pure": false,
+    "confidence": 0.8,
+    "side_effects": ["file_io", "network"]
+  },
+  "dependencies": {
+    "upstream_count": 2,
+    "downstream_count": 3,
+    "upstream_callers": ["main", "process_request"],
+    "downstream_callees": ["validate", "save", "notify"]
+  },
+  "recommendation": {
+    "action": "Add test coverage for complex function",
+    "priority": "High",
+    "implementation_steps": [
+      "Write unit tests covering all 15 branches",
+      "Consider extracting validation logic to reduce complexity"
+    ]
+  },
+  "impact": {
+    "coverage_improvement": 0.85,
+    "complexity_reduction": 12.0,
+    "risk_reduction": 3.7
+  },
+  "adjusted_complexity": {
+    "dampened_cyclomatic": 12.5,
+    "dampening_factor": 0.83
+  },
+  "complexity_pattern": "validation",
+  "pattern_type": "state_machine",
+  "pattern_confidence": 0.72
+}
+</code></pre>
+<p><strong>Source:</strong> JSON structure defined in src/output/unified.rs:18-24 (UnifiedOutput), lines 66-71 (UnifiedDebtItemOutput enum), lines 156-183 (FunctionDebtItemOutput)</p>
+<p><strong>Note:</strong> The <code>"type"</code> field uses a tagged enum format where the value is either <code>"Function"</code> or <code>"File"</code>. All items have consistent top-level fields (<code>score</code>, <code>category</code>, <code>priority</code>, <code>location</code>) regardless of type, simplifying filtering and sorting across mixed results.</p>
+<h3 id="reading-function-metrics"><a class="header" href="#reading-function-metrics">Reading Function Metrics</a></h3>
+<p><strong>Key fields in <code>metrics</code> object:</strong></p>
+<ul>
+<li><code>cyclomatic_complexity</code>: Decision points - guides test case count (src/output/unified.rs:195)</li>
+<li><code>cognitive_complexity</code>: Understanding difficulty - guides refactoring priority</li>
+<li><code>length</code>: Lines of code - signals SRP violations</li>
+<li><code>nesting_depth</code>: Indentation depth - signals need for extraction</li>
+<li><code>coverage</code>: Test coverage percentage (0.0-1.0, optional if no coverage data)</li>
+<li><code>uncovered_lines</code>: Array of line numbers not covered by tests (optional)</li>
+<li><code>entropy_score</code>: Pattern analysis score for false positive reduction (0.0-1.0, optional)</li>
+</ul>
+<p><strong>Fields at item level:</strong></p>
+<ul>
+<li><code>function_role</code>: Function importance (<code>"EntryPoint"</code>, <code>"BusinessLogic"</code>, <code>"Utility"</code>, <code>"TestHelper"</code>) - affects score multiplier (src/priority/mod.rs:231)</li>
+<li><code>purity_analysis</code>: Whether function has side effects (optional) - affects testability assessment
+<ul>
+<li><code>is_pure</code>: Boolean indicating no side effects</li>
+<li><code>confidence</code>: How certain (0.0-1.0)</li>
+<li><code>side_effects</code>: Array of detected side effect types (e.g., “file_io”, “network”, “mutation”)</li>
+</ul>
+</li>
+<li><code>dependencies</code>: Call graph relationships
+<ul>
+<li><code>upstream_count</code>: Number of functions that call this one (impact radius)</li>
+<li><code>downstream_count</code>: Number of functions this calls (complexity)</li>
+<li><code>upstream_callers</code>: Names of calling functions (optional, included if count &gt; 0)</li>
+<li><code>downstream_callees</code>: Names of called functions (optional, included if count &gt; 0)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Complexity adjustment fields:</strong></p>
+<ul>
+<li><code>adjusted_complexity</code>: Entropy-based dampening applied (optional, included when dampening factor &lt; 1.0)
+<ul>
+<li><code>dampened_cyclomatic</code>: Reduced complexity after pattern analysis</li>
+<li><code>dampening_factor</code>: Multiplier applied (e.g., 0.83 = 17% reduction)</li>
+</ul>
+</li>
+<li><code>complexity_pattern</code>: Detected pattern name (e.g., “validation”, “dispatch”, “error_handling”)</li>
+<li><code>pattern_type</code>: Pattern category (e.g., “state_machine”, “coordinator”) - high-level classification</li>
+<li><code>pattern_confidence</code>: Confidence in pattern detection (0.0-1.0, shown if ≥ 0.5)</li>
+</ul>
+<p><strong>Pattern detection and complexity adjustment:</strong></p>
+<p>Debtmap detects common code patterns that appear complex but are actually maintainable (src/complexity/entropy_analysis.rs). When detected with high confidence (≥ 0.5), complexity metrics are dampened:</p>
+<p><strong>Validation patterns</strong> - Repetitive input checking:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Appears complex (cyclomatic = 15) but is repetitive
+if field1.is_empty() { return Err(...) }
+if field2.is_empty() { return Err(...) }
+// ... repeated for many fields
+<span class="boring">}</span></code></pre>
+<p>Dampening: ~20-40% reduction if similarity is high</p>
+<p><strong>State machine patterns</strong> - Structured state transitions:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>match state {
+    State::Init =&gt; { /* transition logic */ }
+    State::Running =&gt; { /* transition logic */ }
+    // ... many similar cases
+}
+<span class="boring">}</span></code></pre>
+<p>Dampening: ~30-50% reduction for consistent transition logic</p>
+<p><strong>Error handling patterns</strong> - Systematic error checking:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let x = operation1().map_err(|e| /* wrap error */)?;
+let y = operation2().map_err(|e| /* wrap error */)?;
+// ... repeated error wrapping
+<span class="boring">}</span></code></pre>
+<p>Dampening: ~15-30% reduction for consistent error propagation</p>
+<p><strong>When to trust adjusted_complexity:</strong></p>
+<ul>
+<li><code>pattern_confidence ≥ 0.7</code>: High confidence, use <code>dampened_cyclomatic</code> for priority decisions</li>
+<li><code>pattern_confidence 0.5-0.7</code>: Moderate confidence, consider both original and dampened values</li>
+<li><code>pattern_confidence &lt; 0.5</code> or missing: Use original <code>cyclomatic_complexity</code></li>
+</ul>
+<p><strong>Entropy score interpretation:</strong></p>
+<ul>
+<li><code>entropy_score ≥ 0.7</code>: High entropy, genuinely complex code - prioritize refactoring</li>
+<li><code>entropy_score 0.4-0.7</code>: Moderate entropy, some repetition - review manually</li>
+<li><code>entropy_score &lt; 0.4</code>: Low entropy, highly repetitive pattern - likely false positive if flagged complex</li>
+</ul>
+<h3 id="prioritizing-work"><a class="header" href="#prioritizing-work">Prioritizing Work</a></h3>
+<p>Debtmap provides multiple prioritization strategies, with <strong>unified scoring (0-10 scale)</strong> as the recommended default for most workflows:</p>
+<p><strong>1. By Unified Score (default - recommended)</strong></p>
+<pre><code class="language-bash">debtmap analyze . --top 10
+</code></pre>
+<p>Shows top 10 items by <strong>combined complexity, coverage, and dependency factors</strong>, weighted and adjusted by function role.</p>
+<p><strong>Why use unified scoring:</strong></p>
+<ul>
+<li>Balances complexity (40%), coverage (40%), and dependency impact (20%)</li>
+<li>Adjusts for function importance (entry points prioritized over utilities)</li>
+<li>Normalized 0-10 scale is intuitive and consistent</li>
+<li>Reduces false positives through coverage propagation</li>
+<li>Best for <strong>sprint planning</strong> and <strong>function-level refactoring decisions</strong></li>
+</ul>
+<p><strong>Example:</strong></p>
+<pre><code class="language-bash"># Show top 20 critical items
+debtmap analyze . --min-priority 7.0 --top 20
+
+# Focus on high-impact functions (score &gt;= 7.0)
+debtmap analyze . --format json | jq '.functions[] | select(.unified_score &gt;= 7.0)'
+</code></pre>
+<p><strong>2. By Risk Category (legacy compatibility)</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority high
+</code></pre>
+<p>Shows only HIGH and CRITICAL priority items using legacy risk scoring.</p>
+<p><strong>Note:</strong> Legacy risk scoring uses additive formulas and unbounded scales. Prefer unified scoring for new workflows.</p>
+<p><strong>3. By Debt Type</strong></p>
+<pre><code class="language-bash">debtmap analyze . --filter Architecture,Testing
+</code></pre>
+<p>Focuses on specific categories:</p>
+<ul>
+<li><code>Architecture</code>: God objects, complexity, dead code</li>
+<li><code>Testing</code>: Coverage gaps, test quality</li>
+<li><code>Performance</code>: Resource leaks, inefficiencies</li>
+<li><code>CodeQuality</code>: Code smells, maintainability</li>
+</ul>
+<p><strong>4. By ROI (with coverage)</strong></p>
+<pre><code class="language-bash">debtmap analyze . --lcov coverage.lcov --top 20
+</code></pre>
+<p>Prioritizes by return on investment for testing/refactoring. Combines unified scoring with test effort estimates to identify high-value work.</p>
+<p><strong>Choosing the right strategy:</strong></p>
+<ul>
+<li><strong>Sprint planning for developers</strong>: Use unified scoring (<code>--top N</code>)</li>
+<li><strong>Architectural review</strong>: Use tiered prioritization (<code>--summary</code>)</li>
+<li><strong>Category-focused work</strong>: Use debt type filtering (<code>--filter</code>)</li>
+<li><strong>Testing priorities</strong>: Use ROI analysis with coverage data (<code>--lcov</code>)</li>
+<li><strong>Historical comparisons</strong>: Use legacy risk scoring (for consistency with old reports)</li>
+</ul>
+<h3 id="tiered-prioritization"><a class="header" href="#tiered-prioritization">Tiered Prioritization</a></h3>
+<p><strong>Note:</strong> Tiered prioritization uses <strong>traditional debt scoring</strong> (additive, higher = worse) and is complementary to the unified scoring system (0-10 scale). Both systems can be used together:</p>
+<ul>
+<li><strong>Unified scoring</strong> (0-10 scale): Best for <strong>function-level prioritization</strong> and sprint planning</li>
+<li><strong>Tiered prioritization</strong> (debt tiers): Best for <strong>architectural focus</strong> and strategic debt planning</li>
+</ul>
+<p>Use <code>--summary</code> for tiered view focusing on architectural issues, or default output for function-level unified scores.</p>
+<p>Debtmap uses a tier-based system to map debt scores to actionable priority levels. Each tier includes effort estimates and strategic guidance for efficient debt remediation.</p>
+<h4 id="tier-levels"><a class="header" href="#tier-levels">Tier Levels</a></h4>
+<p>The <code>Tier</code> enum defines four priority levels based on score thresholds:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum Tier {
+    Critical,  // Score ≥ 90
+    High,      // Score 70-89.9
+    Moderate,  // Score 50-69.9
+    Low,       // Score &lt; 50
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Score-to-Tier Mapping:</strong></p>
+<ul>
+<li><strong>Critical</strong> (≥ 90): Immediate action required - blocks progress</li>
+<li><strong>High</strong> (70-89.9): Should be addressed this sprint</li>
+<li><strong>Moderate</strong> (50-69.9): Plan for next sprint</li>
+<li><strong>Low</strong> (&lt; 50): Background maintenance work</li>
+</ul>
+<h4 id="effort-estimates-per-tier"><a class="header" href="#effort-estimates-per-tier">Effort Estimates Per Tier</a></h4>
+<p>Each tier includes estimated effort based on typical remediation patterns:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Tier</th><th>Estimated Effort</th><th>Typical Work</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Critical</strong></td><td>1-2 days</td><td>Major refactoring, comprehensive testing, architectural changes</td></tr>
+<tr><td><strong>High</strong></td><td>2-4 hours</td><td>Extract functions, add test coverage, fix resource leaks</td></tr>
+<tr><td><strong>Moderate</strong></td><td>1-2 hours</td><td>Simplify logic, reduce duplication, improve error handling</td></tr>
+<tr><td><strong>Low</strong></td><td>30 minutes</td><td>Address TODOs, minor cleanup, documentation</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Effort calculation considers:</strong></p>
+<ul>
+<li>Complexity metrics (cyclomatic, cognitive)</li>
+<li>Test coverage gaps</li>
+<li>Number of dependencies (upstream/downstream)</li>
+<li>Debt category (Architecture debt takes longer than CodeQuality)</li>
+</ul>
+<h4 id="tiered-display-grouping"><a class="header" href="#tiered-display-grouping">Tiered Display Grouping</a></h4>
+<p><strong>Note:</strong> <code>TieredDisplay</code> is an internal structure (src/priority/mod.rs:515) used for terminal output formatting and is <strong>not serialized to JSON</strong>. JSON output includes individual items with their <code>priority</code> field (<code>critical</code>, <code>high</code>, <code>medium</code>, <code>low</code>) based on score thresholds (src/output/unified.rs:74-81).</p>
+<p>The internal <code>TieredDisplay</code> structure groups similar debt items for batch action recommendations in terminal output:</p>
+<p><strong>Grouping strategy:</strong></p>
+<ul>
+<li>Groups items by tier (Critical/High/Moderate/Low) and similarity pattern</li>
+<li>Prevents grouping of god objects (always show individually)</li>
+<li>Prevents grouping of Critical items (each needs individual attention)</li>
+<li>Suggests batch actions for similar Low/Moderate items in terminal output</li>
+</ul>
+<p><strong>To view tiered grouping in JSON, use priority filtering:</strong></p>
+<pre><code class="language-bash"># Get all Critical items (priority: "critical")
+debtmap analyze . --format json | jq '.items[] | select(.priority == "critical")'
+
+# Get High priority items
+debtmap analyze . --format json | jq '.items[] | select(.priority == "high")'
+
+# Count items by priority
+debtmap analyze . --format json | jq '.summary.score_distribution'
+</code></pre>
+<p>The <code>score_distribution</code> in the summary provides counts for each priority tier.</p>
+<h4 id="using-tiered-prioritization"><a class="header" href="#using-tiered-prioritization">Using Tiered Prioritization</a></h4>
+<p><strong>1. Start with Critical tier:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority critical
+</code></pre>
+<p>Focus on items with score ≥ 90. These typically represent:</p>
+<ul>
+<li>Complex functions with 0% coverage</li>
+<li>God objects blocking feature development</li>
+<li>Critical resource leaks or security issues</li>
+</ul>
+<p><strong>2. Plan High tier work:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority high --format json &gt; sprint-plan.json
+</code></pre>
+<p>Schedule 2-4 hours per item for this sprint. Look for:</p>
+<ul>
+<li>Functions approaching complexity thresholds</li>
+<li>Moderate coverage gaps on important code paths</li>
+<li>Performance bottlenecks with clear solutions</li>
+</ul>
+<p><strong>3. Batch Moderate tier items:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --min-priority moderate
+</code></pre>
+<p>Review batch recommendations. Examples:</p>
+<ul>
+<li>“10 validation functions detected - extract common pattern”</li>
+<li>“5 similar test files with duplication - create shared fixtures”</li>
+<li>“8 functions with magic values - create constants module”</li>
+</ul>
+<p><strong>4. Schedule Low tier background work:</strong>
+Address during slack time or as warm-up tasks for new contributors.</p>
+<h4 id="strategic-guidance-by-tier"><a class="header" href="#strategic-guidance-by-tier">Strategic Guidance by Tier</a></h4>
+<p><strong>Critical Tier Strategy:</strong></p>
+<ul>
+<li><strong>Block new features</strong> until addressed</li>
+<li><strong>Pair programming</strong> recommended for complex items</li>
+<li><strong>Architectural review</strong> before major refactoring</li>
+<li><strong>Comprehensive testing</strong> after changes</li>
+</ul>
+<p><strong>High Tier Strategy:</strong></p>
+<ul>
+<li><strong>Sprint planning priority</strong></li>
+<li><strong>Impact analysis</strong> before changes</li>
+<li><strong>Code review</strong> from senior developers</li>
+<li><strong>Integration testing</strong> after changes</li>
+</ul>
+<p><strong>Moderate Tier Strategy:</strong></p>
+<ul>
+<li><strong>Batch similar items</strong> for efficiency</li>
+<li><strong>Extract patterns</strong> across multiple files</li>
+<li><strong>Incremental improvement</strong> over multiple PRs</li>
+<li><strong>Regression testing</strong> for affected areas</li>
+</ul>
+<p><strong>Low Tier Strategy:</strong></p>
+<ul>
+<li><strong>Good first issues</strong> for new contributors</li>
+<li><strong>Documentation improvements</strong></li>
+<li><strong>Code cleanup</strong> during refactoring nearby code</li>
+<li><strong>Technical debt gardening</strong> sessions</li>
+</ul>
+<h3 id="categorized-debt-analysis"><a class="header" href="#categorized-debt-analysis">Categorized Debt Analysis</a></h3>
+<p><strong>Note:</strong> <code>CategorizedDebt</code> is an internal analysis structure (src/priority/mod.rs:419) used for query operations and markdown formatting. It is <strong>not serialized to JSON output</strong>. The JSON output uses <code>by_category</code> in the summary section instead (see JSON Structure above).</p>
+<p>Debtmap’s internal <code>CategorizedDebt</code> analysis groups debt items by category and identifies cross-category dependencies. This analysis powers the markdown output and internal query methods but is not directly exposed in JSON format.</p>
+<h4 id="categorysummary"><a class="header" href="#categorysummary">CategorySummary</a></h4>
+<p>Each category gets a summary with metrics for planning:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CategorySummary {
+    pub category: DebtCategory,
+    pub total_score: f64,
+    pub item_count: usize,
+    pub estimated_effort_hours: f64,
+    pub average_severity: f64,
+    pub top_items: Vec&lt;DebtItem&gt;,  // Up to 5 highest priority
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Effort estimation formulas:</strong></p>
+<ul>
+<li><strong>Architecture debt</strong>: <code>complexity_score / 10 × 2</code> hours (structural changes take longer)</li>
+<li><strong>Testing debt</strong>: <code>complexity_score / 10 × 1.5</code> hours (writing tests)</li>
+<li><strong>Performance debt</strong>: <code>complexity_score / 10 × 1.8</code> hours (profiling + optimization)</li>
+<li><strong>CodeQuality debt</strong>: <code>complexity_score / 10 × 1.2</code> hours (refactoring)</li>
+</ul>
+<p><strong>Example category summary:</strong></p>
+<pre><code class="language-json">{
+  "category": "Architecture",
+  "total_score": 487.5,
+  "item_count": 15,
+  "estimated_effort_hours": 97.5,
+  "average_severity": 32.5,
+  "top_items": [
+    {
+      "debt_type": "GodObject",
+      "file": "src/services/user_service.rs",
+      "score": 95.0,
+      "estimated_effort_hours": 16.0
+    },
+    {
+      "debt_type": "ComplexityHotspot",
+      "file": "src/payments/processor.rs",
+      "score": 87.3,
+      "estimated_effort_hours": 14.0
+    }
+  ]
+}
+</code></pre>
+<h4 id="cross-category-dependencies"><a class="header" href="#cross-category-dependencies">Cross-Category Dependencies</a></h4>
+<p><code>CrossCategoryDependency</code> identifies blocking relationships between different debt categories:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct CrossCategoryDependency {
+    pub from_category: DebtCategory,
+    pub to_category: DebtCategory,
+    pub blocking_items: Vec&lt;(DebtItem, DebtItem)&gt;,
+    pub impact_level: ImpactLevel,  // Critical, High, Medium, Low
+    pub recommendation: String,
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Common dependency patterns:</strong></p>
+<p><strong>1. Architecture blocks Testing:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: God objects are too complex to test effectively</li>
+<li><strong>Example</strong>: <code>UserService</code> has 50+ functions, making comprehensive testing impractical</li>
+<li><strong>Impact</strong>: Critical - cannot improve test coverage without refactoring</li>
+<li><strong>Recommendation</strong>: “Split god object into 4-5 focused modules before adding tests”</li>
+</ul>
+<p><strong>2. Async issues require Architecture changes:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: Blocking I/O in async contexts requires architectural redesign</li>
+<li><strong>Example</strong>: Sync database calls in async handlers</li>
+<li><strong>Impact</strong>: High - performance problems require design changes</li>
+<li><strong>Recommendation</strong>: “Introduce async database layer before optimizing handlers”</li>
+</ul>
+<p><strong>3. Complexity affects Testability:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: High cyclomatic complexity makes thorough testing difficult</li>
+<li><strong>Example</strong>: Function with 22 branches needs 22+ test cases</li>
+<li><strong>Impact</strong>: High - testing effort grows exponentially with complexity</li>
+<li><strong>Recommendation</strong>: “Reduce complexity to &lt; 10 before writing comprehensive tests”</li>
+</ul>
+<p><strong>4. Performance requires Architecture:</strong></p>
+<ul>
+<li><strong>Pattern</strong>: O(n²) nested loops need different data structures</li>
+<li><strong>Example</strong>: Linear search in loops should use HashMap</li>
+<li><strong>Impact</strong>: Medium - optimization requires structural changes</li>
+<li><strong>Recommendation</strong>: “Refactor data structure before micro-optimizations”</li>
+</ul>
+<p><strong>Example cross-category dependency:</strong></p>
+<pre><code class="language-json">{
+  "from_category": "Architecture",
+  "to_category": "Testing",
+  "impact_level": "Critical",
+  "blocking_items": [
+    {
+      "blocker": {
+        "debt_type": "GodObject",
+        "file": "src/services/user_service.rs",
+        "functions": 52,
+        "score": 95.0
+      },
+      "blocked": {
+        "debt_type": "TestingGap",
+        "file": "src/services/user_service.rs",
+        "coverage": 15,
+        "score": 78.0
+      }
+    }
+  ],
+  "recommendation": "Split UserService into focused modules (auth, profile, settings, notifications) before attempting to improve test coverage. Current structure makes comprehensive testing impractical.",
+  "estimated_unblock_effort_hours": 16.0
+}
+</code></pre>
+<h4 id="using-category-based-analysis"><a class="header" href="#using-category-based-analysis">Using Category-Based Analysis</a></h4>
+<p><strong>View category distribution in JSON:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --format json | jq '.summary.by_category'
+</code></pre>
+<p>This shows item counts per category (Architecture, Testing, Performance, CodeQuality).</p>
+<p><strong>Filter items by category:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --format json | jq '.items[] | select(.category == "Architecture")'
+</code></pre>
+<p><strong>Focus on specific category with CLI:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --filter Architecture --top 10
+</code></pre>
+<p><strong>Generate markdown for detailed category analysis:</strong></p>
+<pre><code class="language-bash">debtmap analyze . --format markdown --output report.md
+</code></pre>
+<p>The markdown format includes full CategorySummary details with effort estimates and cross-category dependency analysis.</p>
+<p><strong>Strategic planning workflow:</strong></p>
+<ol>
+<li>
+<p><strong>Review category summaries:</strong></p>
+<ul>
+<li>Identify which category has highest total score</li>
+<li>Check estimated effort hours per category</li>
+<li>Note average severity to gauge urgency</li>
+</ul>
+</li>
+<li>
+<p><strong>Check cross-category dependencies:</strong></p>
+<ul>
+<li>Find Critical and High impact blockers</li>
+<li>Prioritize blockers before blocked items</li>
+<li>Plan architectural changes before optimization</li>
+</ul>
+</li>
+<li>
+<p><strong>Plan remediation order:</strong></p>
+<pre><code>Example decision tree:
+- Architecture score &gt; 400? → Address god objects first
+- Testing gap with low complexity? → Quick wins, add tests
+- Performance issues + architecture debt? → Refactor structure first
+- High code quality debt but good architecture? → Incremental cleanup
+</code></pre>
+</li>
+<li>
+<p><strong>Use category-specific strategies:</strong></p>
+<ul>
+<li><strong>Architecture</strong>: Pair programming, design reviews, incremental refactoring</li>
+<li><strong>Testing</strong>: TDD for new code, characterization tests for legacy</li>
+<li><strong>Performance</strong>: Profiling first, optimize hot paths, avoid premature optimization</li>
+<li><strong>CodeQuality</strong>: Code review focus, linting rules, consistent patterns</li>
+</ul>
+</li>
+</ol>
+<p><strong>Note on output formats:</strong> CategorySummary and CrossCategoryDependency details are available in markdown format only. The JSON output provides category counts in <code>summary.by_category</code> and you can filter items by category using the <code>category</code> field on each item.</p>
+<h3 id="debt-density-metric"><a class="header" href="#debt-density-metric">Debt Density Metric</a></h3>
+<p>Debt density normalizes technical debt scores across projects of different sizes, providing a per-1000-lines-of-code metric for fair comparison.</p>
+<h4 id="formula"><a class="header" href="#formula">Formula</a></h4>
+<pre><code>debt_density = (total_debt_score / total_lines_of_code) × 1000
+</code></pre>
+<p><strong>Example calculation:</strong></p>
+<pre><code>Project A:
+  - Total debt score: 1,250
+  - Total lines of code: 25,000
+  - Debt density: (1,250 / 25,000) × 1000 = 50
+
+Project B:
+  - Total debt score: 2,500
+  - Total lines of code: 50,000
+  - Debt density: (2,500 / 50,000) × 1000 = 50
+</code></pre>
+<p>Projects A and B have <strong>equal debt density</strong> (50) despite B having twice the absolute debt, because B is also twice as large. They have proportionally similar technical debt.</p>
+<h4 id="interpretation-guidelines"><a class="header" href="#interpretation-guidelines">Interpretation Guidelines</a></h4>
+<p>Use these thresholds to assess codebase health:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Debt Density</th><th>Assessment</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>0-50</strong></td><td>Clean</td><td>Well-maintained codebase, minimal debt</td></tr>
+<tr><td><strong>51-100</strong></td><td>Moderate</td><td>Typical technical debt, manageable</td></tr>
+<tr><td><strong>101-150</strong></td><td>High</td><td>Significant debt, prioritize remediation</td></tr>
+<tr><td><strong>150+</strong></td><td>Critical</td><td>Severe debt burden, may impede development</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Context matters:</strong></p>
+<ul>
+<li><strong>Early-stage projects</strong>: Often have higher density (rapid iteration)</li>
+<li><strong>Mature projects</strong>: Should trend toward lower density over time</li>
+<li><strong>Legacy systems</strong>: May have high density, track trend over time</li>
+<li><strong>Greenfield rewrites</strong>: Aim for density &lt; 50</li>
+</ul>
+<h4 id="using-debt-density"><a class="header" href="#using-debt-density">Using Debt Density</a></h4>
+<p><strong>1. Compare projects fairly:</strong></p>
+<pre><code class="language-bash"># Small microservice (5,000 LOC, debt = 250)
+# Debt density: 50
+
+# Large monolith (100,000 LOC, debt = 5,000)
+# Debt density: 50
+
+# Equal health despite size difference
+</code></pre>
+<p><strong>2. Track improvement over time:</strong></p>
+<pre><code>Sprint 1: 50,000 LOC, debt = 7,500, density = 150 (High)
+Sprint 5: 52,000 LOC, debt = 6,500, density = 125 (Improving)
+Sprint 10: 54,000 LOC, debt = 4,860, density = 90 (Moderate)
+</code></pre>
+<p><strong>3. Set team goals:</strong></p>
+<pre><code>Current density: 120
+Target density: &lt; 80 (by Q4)
+Reduction needed: 40 points
+
+Strategy:
+- Fix 2-3 Critical items per sprint
+- Prevent new debt (enforce thresholds)
+- Refactor before adding features in high-debt modules
+</code></pre>
+<p><strong>4. Benchmark across teams/projects:</strong></p>
+<pre><code class="language-json">{
+  "team_metrics": [
+    {
+      "project": "auth-service",
+      "debt_density": 45,
+      "assessment": "Clean",
+      "trend": "stable"
+    },
+    {
+      "project": "billing-service",
+      "debt_density": 95,
+      "assessment": "Moderate",
+      "trend": "improving"
+    },
+    {
+      "project": "legacy-api",
+      "debt_density": 165,
+      "assessment": "Critical",
+      "trend": "worsening"
+    }
+  ]
+}
+</code></pre>
+<h4 id="limitations"><a class="header" href="#limitations">Limitations</a></h4>
+<p><strong>Debt density doesn’t account for:</strong></p>
+<ul>
+<li><strong>Code importance</strong>: 100 LOC in payment logic ≠ 100 LOC in logging utils</li>
+<li><strong>Complexity distribution</strong>: One 1000-line god object vs. 1000 simple functions</li>
+<li><strong>Test coverage</strong>: 50% coverage on critical paths vs. low-priority features</li>
+<li><strong>Team familiarity</strong>: New codebase vs. well-understood legacy system</li>
+</ul>
+<p><strong>Best practices:</strong></p>
+<ul>
+<li>Use density as <strong>one metric among many</strong></li>
+<li>Combine with category analysis and tiered prioritization</li>
+<li>Focus on <strong>trend</strong> (improving/stable/worsening) over absolute number</li>
+<li>Consider <strong>debt per module</strong> for more granular insights</li>
+</ul>
+<h4 id="debt-density-in-cicd"><a class="header" href="#debt-density-in-cicd">Debt Density in CI/CD</a></h4>
+<p><strong>Track density over time:</strong></p>
+<pre><code class="language-bash"># Generate report with density
+debtmap analyze . --format json --output debt-report.json
+
+# Extract density for trending
+DENSITY=$(jq '.debt_density' debt-report.json)
+
+# Store in metrics database
+echo "debtmap.density:${DENSITY}|g" | nc -u -w0 statsd 8125
+</code></pre>
+<p><strong>Set threshold gates:</strong></p>
+<pre><code class="language-yaml"># .github/workflows/debt-check.yml
+- name: Check debt density
+  run: |
+    DENSITY=$(debtmap analyze . --format json | jq '.debt_density')
+    if (( $(echo "$DENSITY &gt; 150" | bc -l) )); then
+      echo "❌ Debt density too high: $DENSITY (limit: 150)"
+      exit 1
+    fi
+    echo "✅ Debt density acceptable: $DENSITY"
+</code></pre>
+<h3 id="actionable-insights"><a class="header" href="#actionable-insights">Actionable Insights</a></h3>
+<p>Each recommendation includes:</p>
+<p><strong>ACTION</strong>: What to do</p>
+<ul>
+<li>“Add 6 unit tests for full coverage”</li>
+<li>“Refactor into 3 smaller functions”</li>
+<li>“Extract validation to separate function”</li>
+</ul>
+<p><strong>IMPACT</strong>: Expected improvement</p>
+<ul>
+<li>“Full test coverage, -3.7 risk”</li>
+<li>“Reduce complexity from 22 to 8”</li>
+<li>“Eliminate 120 lines of duplication”</li>
+</ul>
+<p><strong>WHY</strong>: Rationale</p>
+<ul>
+<li>“Business logic with 0% coverage, manageable complexity”</li>
+<li>“High complexity with low coverage threatens stability”</li>
+<li>“Repeated validation pattern across 5 files”</li>
+</ul>
+<p><strong>Example workflow:</strong></p>
+<ol>
+<li>Run analysis with coverage: <code>debtmap analyze . --lcov coverage.lcov</code></li>
+<li>Filter to CRITICAL items: <code>--min-priority critical</code></li>
+<li>Review top 5 recommendations</li>
+<li>Start with highest ROI items</li>
+<li>Rerun analysis to track progress</li>
+</ol>
+<h3 id="common-patterns-to-recognize"><a class="header" href="#common-patterns-to-recognize">Common Patterns to Recognize</a></h3>
+<p><strong>Pattern 1: High Complexity, Well Tested</strong></p>
+<pre><code>Complexity: 25, Coverage: 95%, Risk: LOW
+</code></pre>
+<p>This is actually good! Complex but thoroughly tested code. Learn from this approach.</p>
+<p><strong>Pattern 2: Moderate Complexity, No Tests</strong></p>
+<pre><code>Complexity: 12, Coverage: 0%, Risk: CRITICAL
+</code></pre>
+<p>Highest priority - manageable complexity, should be easy to test.</p>
+<p><strong>Pattern 3: Low Complexity, No Tests</strong></p>
+<pre><code>Complexity: 3, Coverage: 0%, Risk: LOW
+</code></pre>
+<p>Low priority - simple code, less risky without tests.</p>
+<p><strong>Pattern 4: Repetitive High Complexity (Dampened)</strong></p>
+<pre><code>Cyclomatic: 20, Effective: 7 (65% dampened), Risk: LOW
+</code></pre>
+<p>Validation or dispatch pattern - looks complex but is repetitive. Lower priority.</p>
+<p><strong>Pattern 5: God Object</strong></p>
+<pre><code>File: services.rs, Functions: 50+, Responsibilities: 15+
+</code></pre>
+<p>Architectural issue - split before adding features.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../analysis-guide/risk-scoring.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../analysis-guide/analyzer-types.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../analysis-guide/risk-scoring.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../analysis-guide/analyzer-types.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

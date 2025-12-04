@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
+            window.path_to_searchindex_js = "searchindex-08429e26.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-f78e0b5d.js"></script>
+        <script src="toc-c7b19542.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -401,6 +401,7 @@ echo $?
 <li><strong><code>0</code></strong> - Success: All thresholds passed</li>
 <li><strong>Non-zero</strong> - Failure: One or more thresholds exceeded or errors occurred</li>
 </ul>
+<p><strong>Implementation detail:</strong> When validation fails, the command uses <code>anyhow::bail!("Validation failed")</code> to return a non-zero exit code. This ensures the failure propagates correctly to CI/CD systems (src/commands/validate.rs:166).</p>
 <h3 id="using-exit-codes-in-ci"><a class="header" href="#using-exit-codes-in-ci">Using Exit Codes in CI</a></h3>
 <p>Exit codes integrate naturally with CI/CD systems:</p>
 <p><strong>GitHub Actions:</strong></p>
@@ -423,52 +424,47 @@ else
 fi
 </code></pre>
 <h3 id="understanding-validation-output"><a class="header" href="#understanding-validation-output">Understanding Validation Output</a></h3>
+<p>The validate command uses the actual validation output format from src/utils/validation_printer.rs.</p>
 <p><strong>Success output:</strong></p>
-<pre><code>✅ Validation PASSED
+<pre><code>[OK] Validation PASSED
 
-Metrics:
-  Average Complexity: 7.2 / 10.0 ✓
-  Debt Density: 32.5 / 50.0 ✓
-  Codebase Risk: 5.8 / 7.0 ✓
-  Total Debt Score: 1250 / 10000 ✓
+  Primary Quality Metrics:
+    Debt Density: 32.5 per 1K LOC (threshold: 50.0)
+       └─ Using 65% of max density (35% headroom)
+    Average complexity: 7.2 (threshold: 10.0)
+    Codebase risk score: 5.8 (threshold: 7.0)
+
+  Codebase Statistics (informational):
+    High complexity functions: 8
+    Technical debt items: 42
+    Total debt score: 1250 (safety net threshold: 10000)
+
+  All validation checks passed
 </code></pre>
 <p><strong>Failure output:</strong></p>
-<pre><code>❌ Validation FAILED
+<pre><code>[ERROR] Validation FAILED - Some metrics exceed thresholds
 
-Metrics:
-  Average Complexity: 12.3 / 10.0 ✗ EXCEEDED
-  Debt Density: 65.8 / 50.0 ✗ EXCEEDED
-  Codebase Risk: 5.2 / 7.0 ✓
-  Total Debt Score: 2100 / 10000 ✓
+  Primary Quality Metrics:
+    Debt Density: 65.8 per 1K LOC (threshold: 50.0)
+       └─ Using 132% of max density (-32% headroom)
+    Average complexity: 12.3 (threshold: 10.0)
+    Codebase risk score: 5.2 (threshold: 7.0)
 
-Failed checks: 2
+  Codebase Statistics (informational):
+    High complexity functions: 25
+    Technical debt items: 87
+    Total debt score: 2100 (safety net threshold: 10000)
+
+  Failed checks:
+    [ERROR] Average complexity: 12.3 &gt; 10.0
+    [ERROR] Debt density: 65.8 per 1K LOC &gt; 50.0
 </code></pre>
-<h3 id="summary-output-format"><a class="header" href="#summary-output-format">Summary Output Format</a></h3>
-<p>For compact output suitable for CI logs, use the <code>--summary</code> or <code>-s</code> flag:</p>
-<pre><code class="language-bash">debtmap validate . --summary
-# or
-debtmap validate . -s
-</code></pre>
-<p><strong>Summary format output:</strong></p>
-<pre><code>✅ Validation PASSED
-
-Priority Tiers:
-  P0 (Critical): 2 items
-  P1 (High): 8 items
-  P2 (Medium): 15 items
-  P3 (Low): 23 items
-
-Top Issues:
-  1. Complex authentication logic (complexity: 28)
-  2. Database connection pool (risk: 9.2)
-  3. Untested error handler (coverage: 0%)
-</code></pre>
-<p>The summary format provides:</p>
+<p>The output format emphasizes:</p>
 <ul>
-<li>Tiered priority counts instead of individual item details</li>
-<li>Top violating functions for quick triage</li>
-<li>Compact format ideal for CI/CD logs</li>
-<li>Same pass/fail determination as standard format</li>
+<li><strong>Debt Density as the primary metric</strong> - shown first with percentage usage</li>
+<li><strong>Headroom visualization</strong> - shows how much threshold capacity remains</li>
+<li><strong>Clear failure indicators</strong> - <code>[ERROR]</code> prefix for failed checks</li>
+<li><strong>Informational statistics</strong> - absolute counts shown as context, not validation criteria</li>
 </ul>
 <h2 id="coverage-integration"><a class="header" href="#coverage-integration">Coverage Integration</a></h2>
 <p>Integrate test coverage data to enable risk-based validation:</p>
@@ -763,6 +759,10 @@ New: max_debt_density = (100 / 10000) × 1000 = 10.0
 <li>Coverage loading time</li>
 <li>Individual analysis phase durations</li>
 </ul>
+<p><strong>Suppressing timing output:</strong></p>
+<pre><code class="language-bash"># Set DEBTMAP_QUIET to disable timing information (src/commands/validate.rs:406)
+DEBTMAP_QUIET=1 debtmap validate .
+</code></pre>
 <p><strong>Level 2: Detailed breakdown (<code>-vv</code>)</strong></p>
 <pre><code class="language-bash">debtmap validate . -vv
 </code></pre>
@@ -794,12 +794,12 @@ debtmap validate . -vv
 debtmap validate . --top 10 -v
 </code></pre>
 <p><strong>Issue: Output is too verbose for CI logs</strong></p>
-<pre><code class="language-bash"># Solution: Use --summary flag for compact tiered output
-debtmap validate . --summary
-# or
-debtmap validate . -s
+<pre><code class="language-bash"># Solution: Use lower verbosity or filter output
+debtmap validate . --top 10   # Show only top 10 issues
+# or reduce output detail
+debtmap validate .            # Default verbosity (clean output)
 </code></pre>
-<p>This provides a condensed view focused on priority tiers rather than individual items.</p>
+<p>At default verbosity (0), validation output is already concise and CI-friendly, showing only metrics and pass/fail status.</p>
 <p><strong>Issue: Validation passes locally but fails in CI</strong></p>
 <pre><code class="language-bash"># Possible causes:
 # 1. Different code (stale local branch)

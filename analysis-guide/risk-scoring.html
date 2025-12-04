@@ -1,0 +1,884 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Risk Scoring - Debtmap Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Comprehensive guide to Debtmap code complexity and technical debt analyzer">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-2459343d.css">
+        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "rust";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-08429e26.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-c7b19542.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Debtmap Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/iepathos/debtmap" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="risk-scoring"><a class="header" href="#risk-scoring">Risk Scoring</a></h1>
+<p>Debtmap’s risk scoring identifies code that is both complex AND poorly tested - the true risk hotspots.</p>
+<h2 id="unified-scoring-system"><a class="header" href="#unified-scoring-system">Unified Scoring System</a></h2>
+<p>Debtmap uses a <strong>unified scoring system</strong> (0-10 scale) as the primary prioritization mechanism. This multi-factor approach balances complexity, test coverage, and dependency impact, adjusted by function role.</p>
+<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:22-291</a></p>
+<h3 id="score-scale-and-priority-classifications"><a class="header" href="#score-scale-and-priority-classifications">Score Scale and Priority Classifications</a></h3>
+<p>Functions receive scores from 0 (minimal risk) to 10 (critical risk):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Score Range</th><th>Priority</th><th>Description</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>9.0-10.0</strong></td><td>Critical</td><td>Severe risk requiring immediate attention</td><td>Address immediately</td></tr>
+<tr><td><strong>7.0-8.9</strong></td><td>High</td><td>Significant risk, should be addressed soon</td><td>Plan for this sprint</td></tr>
+<tr><td><strong>5.0-6.9</strong></td><td>Medium</td><td>Moderate risk, plan for future work</td><td>Schedule for next sprint</td></tr>
+<tr><td><strong>3.0-4.9</strong></td><td>Low</td><td>Minor risk, lower priority</td><td>Monitor and address as time permits</td></tr>
+<tr><td><strong>0.0-2.9</strong></td><td>Minimal</td><td>Well-managed code</td><td>Continue monitoring</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="scoring-formula"><a class="header" href="#scoring-formula">Scoring Formula</a></h3>
+<p>The unified score combines three weighted factors:</p>
+<pre><code>Base Score = (Complexity Factor × Weight) + (Coverage Factor × Weight) + (Dependency Factor × Weight)
+
+Final Score = Base Score × Role Multiplier × Purity Adjustment
+</code></pre>
+<p><strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:170-291</a> (calculate_unified_priority_with_debt)</p>
+<h4 id="dynamic-weight-adjustment"><a class="header" href="#dynamic-weight-adjustment">Dynamic Weight Adjustment</a></h4>
+<p><strong>IMPORTANT</strong>: Weights are dynamically adjusted based on coverage data availability.</p>
+<p><strong>When coverage data is available</strong> (default):</p>
+<ul>
+<li><strong>Complexity</strong>: ~35-40% (via complexity_factor)</li>
+<li><strong>Coverage</strong>: ~35-40% (via coverage multiplier dampening)</li>
+<li><strong>Dependency</strong>: ~20-25%</li>
+</ul>
+<p><strong>When coverage data is NOT available</strong>:</p>
+<ul>
+<li><strong>Complexity</strong>: 50%</li>
+<li><strong>Dependency</strong>: 25%</li>
+<li><strong>Debt patterns</strong>: 25% (reserved for additive adjustments)</li>
+</ul>
+<p><strong>Source</strong>:</p>
+<ul>
+<li>With coverage: <a href="../../src/priority/scoring/calculation.rs">src/priority/scoring/calculation.rs:68-82</a> (calculate_base_score_with_coverage_multiplier)</li>
+<li>Without coverage: <a href="../../src/priority/scoring/calculation.rs">src/priority/scoring/calculation.rs:119-129</a> (calculate_base_score_no_coverage)</li>
+</ul>
+<p>These weights can be adjusted in <code>.debtmap.toml</code> to match your team’s priorities.</p>
+<h4 id="factor-calculations"><a class="header" href="#factor-calculations">Factor Calculations</a></h4>
+<p><strong>Complexity Factor</strong> (0-10 scale):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/priority/scoring/calculation.rs:54-59
+Complexity Factor = (raw_complexity / 2.0).clamp(0.0, 10.0)
+
+// Where raw_complexity is weighted combination:
+// Default: 30% cyclomatic + 70% cognitive
+// For orchestrators: 25% cyclomatic + 75% cognitive
+<span class="boring">}</span></code></pre>
+<p>Maps normalized complexity (0-20 range) to 0-10 scale. Uses configurable weights that prioritize cognitive complexity (70%) over cyclomatic complexity (30%) as it correlates better with defect density.</p>
+<p><strong>Source</strong>: <a href="../../src/config/scoring.rs">src/config/scoring.rs:221-267</a> (ComplexityWeightsConfig)</p>
+<p><strong>Coverage Factor</strong> (0-10 scale):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/priority/scoring/calculation.rs:8-21
+Coverage Multiplier = 1.0 - coverage_percentage
+
+// Applied as dampening:
+Base Score × Coverage Multiplier
+<span class="boring">}</span></code></pre>
+<p>Coverage acts as a <strong>dampening multiplier</strong>:</p>
+<ul>
+<li>0% coverage → multiplier = 1.0 (no dampening)</li>
+<li>50% coverage → multiplier = 0.5 (50% reduction)</li>
+<li>100% coverage → multiplier = 0.0 (maximum dampening)</li>
+</ul>
+<p>Uncovered complex code scores higher than uncovered simple code. Well-tested code gets lower scores.</p>
+<p><strong>Dependency Factor</strong> (0-10 scale):</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/priority/scoring/calculation.rs:61-66
+Dependency Factor = (upstream_caller_count / 2.0).min(10.0)
+<span class="boring">}</span></code></pre>
+<p>Based on call graph analysis with linear scaling:</p>
+<ul>
+<li>0-1 upstream callers → score 0-0.5 (low impact)</li>
+<li>2-4 upstream callers → score 1.0-2.0 (moderate impact)</li>
+<li>5+ upstream callers → score 2.5-10.0 (high impact, capped at 10.0)</li>
+</ul>
+<p><strong>Critical path bonus</strong>: Functions on critical paths from entry points receive additional dependency weight.</p>
+<h3 id="role-based-prioritization"><a class="header" href="#role-based-prioritization">Role-Based Prioritization</a></h3>
+<p>The unified score is multiplied by a <strong>role multiplier</strong> based on the function’s semantic classification.</p>
+<p><strong>Source</strong>: <a href="../../src/priority/semantic_classifier/mod.rs">src/priority/semantic_classifier/mod.rs:24-33</a> (FunctionRole enum)</p>
+<h4 id="role-multipliers"><a class="header" href="#role-multipliers">Role Multipliers</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Role</th><th>Multiplier</th><th>Description</th><th>When Applied</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>EntryPoint</strong></td><td>1.5×</td><td>main(), HTTP handlers, API endpoints</td><td>User-facing code where bugs have immediate impact</td></tr>
+<tr><td><strong>PureLogic</strong> (complex)</td><td>1.3×</td><td>Business logic with complexity &gt; 5.0</td><td>Critical domain functions</td></tr>
+<tr><td><strong>PureLogic</strong> (simple)</td><td>1.0×</td><td>Business logic with complexity ≤ 5.0</td><td>Baseline importance for domain code</td></tr>
+<tr><td><strong>Orchestrator</strong></td><td>0.8×</td><td>Coordinates 5+ other functions</td><td>Delegation-heavy code with low cognitive load</td></tr>
+<tr><td><strong>PatternMatch</strong></td><td>0.6×</td><td>Simple pattern matching functions</td><td>Low complexity branching logic</td></tr>
+<tr><td><strong>IOWrapper</strong></td><td>0.5×</td><td>Thin I/O layer (file, network, database)</td><td>Simple wrappers around external systems</td></tr>
+<tr><td><strong>Debug</strong></td><td>0.3×</td><td>Debug/diagnostic functions</td><td>Lowest test priority</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Source</strong>:</p>
+<ul>
+<li>Multiplier values: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:385-399</a> (calculate_role_multiplier)</li>
+<li>Configuration defaults: <a href="../../src/config/scoring.rs">src/config/scoring.rs:147-220</a> (RoleMultipliers)</li>
+</ul>
+<p><strong>Note</strong>: PureLogic has a <strong>dynamic multiplier</strong> that adjusts based on complexity. Simple business logic (≤ 5.0 complexity) gets baseline priority, while complex business logic (&gt; 5.0) receives elevated priority (1.3×).</p>
+<h4 id="how-role-classification-works"><a class="header" href="#how-role-classification-works">How Role Classification Works</a></h4>
+<p>Debtmap identifies function roles through a rule-based classifier with specific detection heuristics:</p>
+<p><strong>Source</strong>: <a href="../../src/priority/semantic_classifier/mod.rs">src/priority/semantic_classifier/mod.rs:46-114</a> (classify_by_rules)</p>
+<p><strong>Detection Rules (in priority order):</strong></p>
+<ol>
+<li>
+<p><strong>EntryPoint</strong> - Detected by:</p>
+<ul>
+<li>Name patterns: <code>main</code>, <code>handle_*</code>, <code>run_*</code></li>
+<li>Call graph analysis: no upstream callers (entry point to call graph)</li>
+<li><strong>Source</strong>: Line 54</li>
+</ul>
+</li>
+<li>
+<p><strong>Debug</strong> - Detected by:</p>
+<ul>
+<li>Name patterns: <code>debug_*</code>, <code>dump_*</code>, <code>log_*</code>, <code>print_*</code>, <code>display_*</code>, <code>trace_*</code>, <code>*_diagnostics</code>, <code>*_debug</code>, <code>*_stats</code></li>
+<li>Complexity limit: cognitive ≤ 10</li>
+<li><strong>Source</strong>: Line 59, <a href="../../src/priority/semantic_classifier/classifiers.rs">src/priority/semantic_classifier/classifiers.rs:14-65</a></li>
+</ul>
+</li>
+<li>
+<p><strong>Constructors</strong> (classified as PureLogic) - Detected by:</p>
+<ul>
+<li>Name patterns: <code>new</code>, <code>with_*</code>, <code>from_*</code>, <code>default</code>, <code>create_*</code>, <code>make_*</code>, <code>build_*</code></li>
+<li>Complexity thresholds: cyclomatic ≤ 2, cognitive ≤ 3, length &lt; 15, nesting ≤ 1</li>
+<li><strong>Source</strong>: Line 64, <a href="../../src/priority/semantic_classifier/classifiers.rs">src/priority/semantic_classifier/classifiers.rs:67-115</a></li>
+</ul>
+</li>
+<li>
+<p><strong>Accessors</strong> (classified as IOWrapper) - Detected by:</p>
+<ul>
+<li>Name patterns: <code>get_*</code>, <code>is_*</code>, <code>has_*</code>, <code>can_*</code>, <code>should_*</code>, <code>as_*</code>, <code>to_*</code>, single-word accessors (<code>id</code>, <code>name</code>, <code>value</code>, etc.)</li>
+<li>Complexity thresholds: cyclomatic ≤ 2, cognitive ≤ 1, length &lt; 10, nesting ≤ 1</li>
+<li><strong>Source</strong>: Line 77, <a href="../../src/priority/semantic_classifier/mod.rs">src/priority/semantic_classifier/mod.rs:147-177</a> (is_accessor_method)</li>
+</ul>
+</li>
+<li>
+<p><strong>PatternMatch</strong> - Detected by:</p>
+<ul>
+<li>Simple match/if-else chains</li>
+<li>Low complexity relative to branch count</li>
+<li><strong>Source</strong>: Line 99</li>
+</ul>
+</li>
+<li>
+<p><strong>IOWrapper</strong> - Detected by:</p>
+<ul>
+<li>Simple file/network/database operations</li>
+<li>Thin wrapper around I/O primitives</li>
+<li><strong>Source</strong>: Line 104</li>
+</ul>
+</li>
+<li>
+<p><strong>Orchestrator</strong> - Detected by:</p>
+<ul>
+<li>High delegation ratio (calls 5+ functions)</li>
+<li>Low cognitive complexity relative to cyclomatic complexity</li>
+<li>Coordinates other functions without complex logic</li>
+<li><strong>Source</strong>: Line 109</li>
+</ul>
+</li>
+<li>
+<p><strong>PureLogic</strong> (default) - Applied when:</p>
+<ul>
+<li>None of the above patterns match</li>
+<li>Assumed to be core business logic</li>
+</ul>
+</li>
+</ol>
+<h4 id="example-same-complexity-different-priorities"><a class="header" href="#example-same-complexity-different-priorities">Example: Same Complexity, Different Priorities</a></h4>
+<p>Consider a function with base score 8.0:</p>
+<pre><code>If classified as EntryPoint:
+  Final Score = 8.0 × 1.5 = 12.0 (capped at 10.0) → CRITICAL priority
+
+If classified as PureLogic (complex):
+  Final Score = 8.0 × 1.3 = 10.4 (capped at 10.0) → CRITICAL priority
+
+If classified as PureLogic (simple):
+  Final Score = 8.0 × 1.0 = 8.0 → HIGH priority
+
+If classified as Orchestrator:
+  Final Score = 8.0 × 0.8 = 6.4 → MEDIUM priority
+
+If classified as IOWrapper:
+  Final Score = 8.0 × 0.5 = 4.0 → LOW priority
+</code></pre>
+<p>This ensures that complex code in critical paths gets higher priority than equally complex utility code.</p>
+<p><strong>Real Example from Codebase</strong>:</p>
+<p>A payment processing function with cyclomatic complexity 18 and cognitive complexity 25:</p>
+<ul>
+<li>If it directly implements business logic → <strong>PureLogic (complex)</strong> → 1.3× multiplier</li>
+<li>If it mainly delegates to other payment functions → <strong>Orchestrator</strong> → 0.8× multiplier</li>
+<li>If it’s a thin wrapper around a payment API → <strong>IOWrapper</strong> → 0.5× multiplier</li>
+</ul>
+<h3 id="coverage-propagation"><a class="header" href="#coverage-propagation">Coverage Propagation</a></h3>
+<p>Coverage impact flows through the call graph using <strong>transitive coverage</strong> and <strong>indirect coverage</strong> analysis.</p>
+<p><strong>Source</strong>: <a href="../../src/priority/coverage_propagation.rs">src/priority/coverage_propagation.rs:291-387</a></p>
+<h4 id="how-it-works"><a class="header" href="#how-it-works">How It Works</a></h4>
+<p>Transitive coverage is calculated via call graph traversal with distance-based dampening:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/priority/coverage_propagation.rs:342-364
+Indirect Coverage = Σ(Caller Coverage × 0.7^distance)
+
+Where:
+- distance = hops from tested code (MAX_DEPTH = 3)
+- DISTANCE_DISCOUNT = 0.7 (70% per hop)
+- Well-tested threshold = 0.8 (80% coverage)
+<span class="boring">}</span></code></pre>
+<p><strong>Implementation Details</strong>:</p>
+<ol>
+<li><strong>Transitive coverage</strong> is calculated via recursive call graph traversal</li>
+<li>Results are stored in <code>UnifiedDebtItem.transitive_coverage</code> field (<strong>Source</strong>: <a href="../../src/priority/unified_scorer.rs">src/priority/unified_scorer.rs:50</a>)</li>
+<li>Weights decay exponentially with call graph depth:
+<ul>
+<li>1 hop away: contribution × 0.7</li>
+<li>2 hops away: contribution × 0.49 (0.7²)</li>
+<li>3 hops away: contribution × 0.343 (0.7³)</li>
+</ul>
+</li>
+<li>Used to adjust coverage factor in scoring, reducing false positives for utility functions</li>
+</ol>
+<h4 id="coverage-urgency-calculation"><a class="header" href="#coverage-urgency-calculation">Coverage Urgency Calculation</a></h4>
+<p>The system calculates <strong>coverage urgency</strong> (0-10 scale) by blending direct and transitive coverage:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/priority/coverage_propagation.rs:237-270
+Effective Coverage = (Direct Coverage × 0.7) + (Transitive Coverage × 0.3)
+
+Coverage Urgency = (1.0 - Effective Coverage) × Complexity Weight × 10.0
+<span class="boring">}</span></code></pre>
+<p>Complexity weighting uses logarithmic scaling to prioritize complex functions.</p>
+<h4 id="example-scenarios"><a class="header" href="#example-scenarios">Example Scenarios</a></h4>
+<p><strong>Scenario 1: Untested function with well-tested callers</strong></p>
+<pre><code>Function A: 0% direct coverage
+  Called by (1 hop):
+    - handle_request (95% coverage): contributes 95% × 0.7 = 66.5%
+    - process_payment (90% coverage): contributes 90% × 0.7 = 63%
+    - validate_order (88% coverage): contributes 88% × 0.7 = 61.6%
+
+Indirect coverage: ~66% (highest contributor)
+Effective coverage: (0% × 0.7) + (66% × 0.3) = ~20%
+Final priority: Lower than isolated 0% coverage function
+</code></pre>
+<p><strong>Scenario 2: Untested function on critical path</strong></p>
+<pre><code>Function B: 0% direct coverage
+  Called by (1 hop):
+    - main (0% coverage): contributes 0% × 0.7 = 0%
+    - startup (10% coverage): contributes 10% × 0.7 = 7%
+
+Indirect coverage: ~7% (minimal coverage benefit)
+Effective coverage: (0% × 0.7) + (7% × 0.3) = ~2%
+Final priority: Higher - on critical path with no safety net
+</code></pre>
+<p><strong>Scenario 3: Multi-hop propagation</strong></p>
+<pre><code>Function C: 0% direct coverage
+  Called by utility_helper (40% coverage, 1 hop):
+    utility_helper is called by:
+      - api_handler (95% coverage, 2 hops): contributes 95% × 0.7² = 46.6%
+
+Indirect coverage via 2-hop path: ~46%
+Effective coverage: ~14%
+Final priority: Moderate - benefits from indirect testing
+</code></pre>
+<p>Coverage propagation prevents false alarms about utility functions called only by well-tested code, while highlighting genuinely risky untested code on critical paths.</p>
+<h3 id="unified-score-example"><a class="header" href="#unified-score-example">Unified Score Example</a></h3>
+<p>Updated example using actual implementation:</p>
+<pre><code>Function: process_payment
+  Location: src/payments.rs:145
+
+Metrics:
+  - Cyclomatic complexity: 18
+  - Cognitive complexity: 25
+  - Test coverage: 20%
+  - Upstream callers: 3
+  - Classified role: PureLogic (complex, since complexity &gt; 5.0)
+
+Step 1: Calculate raw complexity
+  Raw Complexity = (cyclomatic × 0.3) + (cognitive × 0.7)
+                 = (18 × 0.3) + (25 × 0.7)
+                 = 5.4 + 17.5
+                 = 22.9
+
+Step 2: Normalize to 0-10 scale
+  Complexity Factor = (22.9 / 2.0).clamp(0.0, 10.0)
+                    = 10.0 (capped)
+  // Source: src/priority/scoring/calculation.rs:54-59
+
+Step 3: Calculate coverage multiplier
+  Coverage Multiplier = 1.0 - 0.20 = 0.80
+  // Source: src/priority/scoring/calculation.rs:8-21
+
+Step 4: Calculate dependency factor
+  Dependency Factor = (3 / 2.0).min(10.0) = 1.5
+  // Source: src/priority/scoring/calculation.rs:61-66
+
+Step 5: Calculate base score (with dynamic weights)
+  Base Score = (Complexity Factor × weight) + (Coverage dampening) + (Dependency Factor × weight)
+
+  // Actual implementation uses coverage as dampening multiplier
+  Base = ((10.0 × 0.35) + (1.5 × 0.20)) × 0.80
+       = (3.5 + 0.3) × 0.80
+       = 3.04
+  // Source: src/priority/scoring/calculation.rs:68-82
+
+Step 6: Apply role multiplier
+  Role Multiplier = 1.3 (PureLogic with complexity &gt; 5.0)
+  // Source: src/priority/unified_scorer.rs:385-399
+
+  Final Score = 3.04 × 1.3 = 3.95 → LOW priority
+
+Note: The 20% coverage dampening significantly reduces the final score.
+If this function had 0% coverage:
+  Coverage Multiplier = 1.0 (no dampening)
+  Base Score = 3.8
+  Final Score = 3.8 × 1.3 = 4.94 → LOW priority
+
+If this function had 0% coverage AND higher dependency (8 callers):
+  Dependency Factor = (8 / 2.0).min(10.0) = 4.0
+  Base Score = ((10.0 × 0.35) + (4.0 × 0.20)) × 1.0 = 4.3
+  Final Score = 4.3 × 1.3 = 5.59 → MEDIUM priority
+</code></pre>
+<p><strong>Key Insight</strong>: Coverage acts as a <strong>dampening multiplier</strong>, not an additive factor. The example in the original documentation overestimated risk by treating coverage as additive. The actual implementation properly dampens scores for tested code.</p>
+<h3 id="legacy-risk-scoring-pre-02x"><a class="header" href="#legacy-risk-scoring-pre-02x">Legacy Risk Scoring (Pre-0.2.x)</a></h3>
+<p>Prior to the unified scoring system, Debtmap used a simpler additive risk formula. This is still available for compatibility but unified scoring is now the default and provides better prioritization.</p>
+<h3 id="risk-categories"><a class="header" href="#risk-categories">Risk Categories</a></h3>
+<p><strong>Note:</strong> The <code>RiskLevel</code> enum (Low, Medium, High, Critical) is used for <strong>legacy risk scoring compatibility</strong>. When using <strong>unified scoring</strong> (0-10 scale), refer to the priority classifications shown in the Unified Scoring System section above.</p>
+<h4 id="legacy-risklevel-enum"><a class="header" href="#legacy-risklevel-enum">Legacy RiskLevel Enum</a></h4>
+<p>For legacy risk scoring, Debtmap classifies functions into four risk levels:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub enum RiskLevel {
+    Low,       // Score &lt; 10
+    Medium,    // Score 10-24
+    High,      // Score 25-49
+    Critical,  // Score ≥ 50
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Critical</strong> (legacy score ≥ 50)</p>
+<ul>
+<li>High complexity (cyclomatic &gt; 15) AND low coverage (&lt; 30%)</li>
+<li>Untested code that’s likely to break and hard to fix</li>
+<li><strong>Action</strong>: Immediate attention required - add tests or refactor</li>
+</ul>
+<p><strong>High</strong> (legacy score 25-49)</p>
+<ul>
+<li>High complexity (cyclomatic &gt; 10) AND moderate coverage (&lt; 60%)</li>
+<li>Risky code with incomplete testing</li>
+<li><strong>Action</strong>: Should be addressed soon</li>
+</ul>
+<p><strong>Medium</strong> (legacy score 10-24)</p>
+<ul>
+<li>Moderate complexity (cyclomatic &gt; 5) AND low coverage (&lt; 50%)</li>
+<li>OR: High complexity with good coverage</li>
+<li><strong>Action</strong>: Plan for next sprint</li>
+</ul>
+<p><strong>Low</strong> (legacy score &lt; 10)</p>
+<ul>
+<li>Low complexity OR high coverage</li>
+<li>Well-managed code</li>
+<li><strong>Action</strong>: Monitor, low priority</li>
+</ul>
+<h4 id="unified-scoring-priority-levels"><a class="header" href="#unified-scoring-priority-levels">Unified Scoring Priority Levels</a></h4>
+<p>When using unified scoring (default), functions are classified using the 0-10 scale:</p>
+<ul>
+<li><strong>Critical</strong> (9.0-10.0): Immediate attention</li>
+<li><strong>High</strong> (7.0-8.9): Address this sprint</li>
+<li><strong>Medium</strong> (5.0-6.9): Plan for next sprint</li>
+<li><strong>Low</strong> (3.0-4.9): Monitor and address as time permits</li>
+<li><strong>Minimal</strong> (0.0-2.9): Well-managed code</li>
+</ul>
+<p><strong>Well-tested complex code</strong> is an <strong>outcome</strong> in both systems, not a separate category:</p>
+<ul>
+<li>Complex function (cyclomatic 18, cognitive 25) with 95% coverage</li>
+<li>Unified score: ~2.5 (Minimal priority due to coverage dampening)</li>
+<li>Legacy risk score: ~8 (Low risk)</li>
+<li>Falls into low-priority categories because good testing mitigates complexity</li>
+<li>This is the desired state for inherently complex business logic</li>
+</ul>
+<h3 id="legacy-risk-calculation"><a class="header" href="#legacy-risk-calculation">Legacy Risk Calculation</a></h3>
+<p><strong>Note:</strong> The legacy risk calculation is still supported for compatibility but has been superseded by the unified scoring system (see above). Unified scoring provides better prioritization through its multi-factor, weighted approach with role-based adjustments.</p>
+<p>The legacy risk score uses a simpler additive formula:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>risk_score = complexity_factor + coverage_factor + debt_factor
+
+where:
+  complexity_factor = (cyclomatic / 5) + (cognitive / 10)
+  coverage_factor = (1 - coverage_percentage) × 50
+  debt_factor = debt_score / 10  // If debt data available
+<span class="boring">}</span></code></pre>
+<p><strong>Note on debt_score</strong>: The <code>debt_score</code> comes from <strong>DebtAggregator</strong> which combines multiple debt dimensions:</p>
+<ul>
+<li>Testing debt (unwrap calls, untested error paths)</li>
+<li>Resource debt (unclosed files, memory leaks)</li>
+<li>Duplication debt (code clones)</li>
+</ul>
+<p><strong>Source</strong>: <a href="../../src/priority/debt_aggregator/">src/priority/debt_aggregator/</a></p>
+<p><strong>Example (legacy scoring):</strong></p>
+<pre><code>Function: process_payment
+  - Cyclomatic complexity: 18
+  - Cognitive complexity: 25
+  - Coverage: 20%
+  - Debt score: 15 (from DebtAggregator)
+
+Calculation:
+  complexity_factor = (18 / 5) + (25 / 10) = 3.6 + 2.5 = 6.1
+  coverage_factor = (1 - 0.20) × 50 = 40
+  debt_factor = 15 / 10 = 1.5
+
+  risk_score = 6.1 + 40 + 1.5 = 47.6 (HIGH RISK)
+</code></pre>
+<p><strong>When to use legacy scoring:</strong></p>
+<ul>
+<li>Comparing with historical data from older Debtmap versions</li>
+<li>Teams with existing workflows built around the old scale</li>
+<li>Gradual migration to unified scoring</li>
+</ul>
+<p><strong>Why unified scoring is better:</strong></p>
+<ul>
+<li>Normalized 0-10 scale is more intuitive</li>
+<li>Dynamic weights adjust based on coverage data availability</li>
+<li>Role multipliers adjust priority based on function importance</li>
+<li>Coverage propagation reduces false positives for utility functions</li>
+<li>Purity adjustments reward functional programming patterns</li>
+</ul>
+<h3 id="test-effort-assessment"><a class="header" href="#test-effort-assessment">Test Effort Assessment</a></h3>
+<p>Debtmap estimates testing difficulty based on complexity metrics using an advanced effort model.</p>
+<p><strong>Source</strong>: <a href="../../src/risk/roi/effort.rs">src/risk/roi/effort.rs</a> (AdvancedEffortModel)</p>
+<h4 id="how-effort-is-calculated"><a class="header" href="#how-effort-is-calculated">How Effort is Calculated</a></h4>
+<p>Test effort estimation involves two components:</p>
+<ol>
+<li>
+<p><strong>Test case count</strong>: Estimated from <strong>cyclomatic complexity</strong> (branch coverage)</p>
+<ul>
+<li>Each branch represents a code path that needs testing</li>
+<li>Formula approximates test cases needed for comprehensive branch coverage</li>
+</ul>
+</li>
+<li>
+<p><strong>Time estimate</strong>: Calculated from <strong>cognitive complexity</strong> (comprehension difficulty)</p>
+<ul>
+<li>Higher cognitive complexity means more time to understand and write tests</li>
+<li>Includes setup cost, assertion cost, and complexity multipliers</li>
+<li>Optional learning system can adjust estimates based on historical data</li>
+</ul>
+</li>
+</ol>
+<p><strong>Difficulty Levels:</strong></p>
+<ul>
+<li><strong>Trivial</strong> (cognitive &lt; 5): 1-2 test cases, &lt; 1 hour</li>
+<li><strong>Simple</strong> (cognitive 5-10): 3-5 test cases, 1-2 hours</li>
+<li><strong>Moderate</strong> (cognitive 10-20): 6-10 test cases, 2-4 hours</li>
+<li><strong>Complex</strong> (cognitive 20-40): 11-20 test cases, 4-8 hours</li>
+<li><strong>VeryComplex</strong> (cognitive &gt; 40): 20+ test cases, 8+ hours</li>
+</ul>
+<p><strong>Test Effort includes:</strong></p>
+<ul>
+<li><strong>Cognitive load</strong>: How hard to understand the function</li>
+<li><strong>Branch count</strong> (cyclomatic): Number of paths to test</li>
+<li><strong>Recommended test cases</strong>: Estimated from cyclomatic complexity</li>
+<li><strong>Estimated hours</strong>: Derived from cognitive complexity with setup overhead</li>
+</ul>
+<h3 id="risk-distribution"><a class="header" href="#risk-distribution">Risk Distribution</a></h3>
+<p>Debtmap provides codebase-wide risk metrics:</p>
+<pre><code class="language-json">{
+  "risk_distribution": {
+    "critical_count": 12,
+    "high_count": 45,
+    "medium_count": 123,
+    "low_count": 456,
+    "minimal_count": 234,
+    "total_functions": 870
+  },
+  "codebase_risk_score": 1247.5
+}
+</code></pre>
+<p><strong>Interpreting distribution:</strong></p>
+<ul>
+<li><strong>Healthy codebase</strong>: Most functions in Low/Minimal priority (unified scoring) or Low/WellTested (legacy)</li>
+<li><strong>Needs attention</strong>: Many Critical/High priority functions</li>
+<li><strong>Technical debt</strong>: High codebase risk score</li>
+</ul>
+<h4 id="legacy-vs-unified-risk-distribution-fields"><a class="header" href="#legacy-vs-unified-risk-distribution-fields">Legacy vs Unified Risk Distribution Fields</a></h4>
+<p><strong>IMPORTANT</strong>: The field names differ between legacy and unified scoring systems:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Unified Scoring (0-10 scale)</th><th>Legacy Scoring (RiskCategory enum)</th></tr>
+</thead>
+<tbody>
+<tr><td><code>minimal_count</code> (0-2.9)</td><td>Not present</td></tr>
+<tr><td><code>low_count</code> (3.0-4.9)</td><td><code>low_count</code></td></tr>
+<tr><td><code>medium_count</code> (5.0-6.9)</td><td><code>medium_count</code></td></tr>
+<tr><td><code>high_count</code> (7.0-8.9)</td><td><code>high_count</code></td></tr>
+<tr><td><code>critical_count</code> (9.0-10.0)</td><td><code>critical_count</code></td></tr>
+<tr><td>Not present</td><td><code>well_tested_count</code> (legacy outcome)</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Sources</strong>:</p>
+<ul>
+<li>Unified priority tiers: <a href="../../src/priority/tiers.rs">src/priority/tiers.rs</a></li>
+<li>Legacy RiskCategory enum: <a href="../../src/risk/mod.rs">src/risk/mod.rs:36-42</a></li>
+</ul>
+<p><strong>Note on minimal_count:</strong></p>
+<p>In unified scoring (0-10 scale), <code>minimal_count</code> represents functions scoring 0-2.9, which includes:</p>
+<ul>
+<li>Simple utility functions with low complexity</li>
+<li>Helper functions with minimal risk</li>
+<li>Well-tested complex code that scores low due to coverage dampening</li>
+</ul>
+<p>This is not a separate risk category but an <strong>outcome</strong> of the unified scoring system. Complex business logic with 95% test coverage appropriately receives a minimal score (0-2.9), reflecting that good testing mitigates complexity risk.</p>
+<p><strong>When using legacy scoring</strong>, there is <strong>NO</strong> <code>minimal_count</code> field. Instead, you’ll see <code>well_tested_count</code> which represents functions that are both complex and well-tested (the desired outcome).</p>
+<h3 id="testing-recommendations"><a class="header" href="#testing-recommendations">Testing Recommendations</a></h3>
+<p>When coverage data is provided, Debtmap generates prioritized testing recommendations with ROI analysis.</p>
+<p><strong>Source</strong>: <a href="../../src/risk/roi/mod.rs">src/risk/roi/mod.rs:66-113</a></p>
+<h4 id="roi-calculation"><a class="header" href="#roi-calculation">ROI Calculation</a></h4>
+<p>The ROI calculation is much richer than a simple risk/effort ratio. It includes cascade impacts, module multipliers, and complexity weighting:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Source: src/risk/roi/mod.rs:66-113
+ROI = ((Direct_Impact × Module_Multiplier) + (Cascade_Impact × Cascade_Weight))
+      × Dependency_Factor × Complexity_Weight / Adjusted_Effort
+<span class="boring">}</span></code></pre>
+<p><strong>Formula Components:</strong></p>
+<ol>
+<li>
+<p><strong>Direct Impact</strong>: Risk reduction from testing this function directly</p>
+</li>
+<li>
+<p><strong>Module Multiplier</strong> (based on module type):</p>
+<ul>
+<li>EntryPoint = 2.0 (highest priority for user-facing code)</li>
+<li>Core = 1.5 (domain logic)</li>
+<li>Api = 1.2 (API endpoints)</li>
+<li>Model = 1.1 (data models)</li>
+<li>IO = 1.0 (baseline for I/O operations)</li>
+</ul>
+</li>
+<li>
+<p><strong>Cascade Impact</strong>: Risk reduction in dependent functions</p>
+<ul>
+<li>Calculated using cascade analyzer</li>
+<li><strong>Cascade Weight</strong>: Configurable (default 0.5)</li>
+<li><strong>Max Cascade Depth</strong>: 3 hops (configurable)</li>
+</ul>
+</li>
+<li>
+<p><strong>Dependency Factor</strong>: Amplifies ROI based on number of dependents</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>Dependency_Factor = 1.0 + min(dependent_count × 0.1, 1.0)
+<span class="boring">}</span></code></pre>
+<ul>
+<li>Capped at 2.0× multiplier</li>
+<li>Rewards testing functions with many dependents</li>
+</ul>
+</li>
+<li>
+<p><strong>Complexity Weight</strong>: Penalizes trivial delegation functions</p>
+<ul>
+<li>(cyclomatic=1, cognitive=0-1): 0.1 (trivial delegation)</li>
+<li>(cyclomatic=1, cognitive=2-3): 0.3 (very simple)</li>
+<li>(cyclomatic=2-3, any): 0.5 (simple)</li>
+<li>(cyclomatic=4-5, any): 0.7 (moderate)</li>
+<li>Other: 1.0 (complex, full weight)</li>
+</ul>
+</li>
+<li>
+<p><strong>Adjusted Effort</strong>: Base effort adjusted by learning system (if enabled)</p>
+<ul>
+<li>Learning system tracks historical test writing effort</li>
+<li>Adjusts estimates based on actual time spent</li>
+</ul>
+</li>
+</ol>
+<p><strong>ROI Scaling</strong> (for intuitive 0-10 scale):</p>
+<ul>
+<li>raw_roi &gt; 20.0: <code>10.0 + ln(raw_roi - 20.0)</code> (logarithmic dampening)</li>
+<li>10.0 &lt; raw_roi ≤ 20.0: <code>5.0 + (raw_roi - 20.0) × 0.5</code> (linear dampening)</li>
+<li>Otherwise: raw_roi (no scaling)</li>
+</ul>
+<p><strong>Sources</strong>:</p>
+<ul>
+<li>ROI model: <a href="../../src/risk/roi/models.rs">src/risk/roi/models.rs:4-11</a></li>
+<li>Effort estimation: <a href="../../src/risk/roi/effort.rs">src/risk/roi/effort.rs</a></li>
+<li>Cascade impact: <a href="../../src/risk/roi/cascade.rs">src/risk/roi/cascade.rs</a></li>
+</ul>
+<h4 id="example-roi-output"><a class="header" href="#example-roi-output">Example ROI Output</a></h4>
+<pre><code class="language-json">{
+  "function": "process_transaction",
+  "file": "src/payments.rs",
+  "line": 145,
+  "current_risk": 47.6,
+  "potential_risk_reduction": 35.2,
+  "test_effort_estimate": {
+    "estimated_difficulty": "Complex",
+    "cognitive_load": 25,
+    "branch_count": 18,
+    "recommended_test_cases": 12,
+    "estimated_hours": 6.5
+  },
+  "roi": 8.2,
+  "roi_breakdown": {
+    "direct_impact": 35.2,
+    "module_multiplier": 1.5,
+    "cascade_impact": 12.4,
+    "cascade_weight": 0.5,
+    "dependency_factor": 1.3,
+    "complexity_weight": 1.0,
+    "adjusted_effort": 6.5
+  },
+  "rationale": "High complexity with low coverage (20%) and 3 downstream dependencies. Testing will reduce risk by 74%. Cascade effect improves 8 dependent functions.",
+  "dependencies": {
+    "upstream_callers": ["handle_payment_request"],
+    "downstream_callees": ["validate_amount", "check_balance", "record_transaction"],
+    "dependent_count": 13
+  },
+  "confidence": 0.85
+}
+</code></pre>
+<p><strong>Interpreting ROI:</strong></p>
+<ul>
+<li><strong>ROI &gt; 5.0</strong>: Excellent return on investment, prioritize highly</li>
+<li><strong>ROI 3.0-5.0</strong>: Good return, address soon</li>
+<li><strong>ROI 1.0-3.0</strong>: Moderate return, plan for future work</li>
+<li><strong>ROI &lt; 1.0</strong>: Low return, consider other priorities</li>
+</ul>
+<p><strong>Key Insight</strong>: The cascade impact calculation means that testing a critical utility function with many dependents can have higher ROI than testing a complex but isolated function. This helps identify “force multiplier” tests that improve coverage across multiple modules.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../analysis-guide/debt-patterns.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../analysis-guide/interpreting-results.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../analysis-guide/debt-patterns.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../analysis-guide/interpreting-results.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-c2a407aa.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
