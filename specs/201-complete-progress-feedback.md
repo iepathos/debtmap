@@ -45,9 +45,10 @@ Eliminate all progress feedback gaps by adding spinners for hidden work and fixi
 
 ### Functional Requirements
 
-1. **Multi-Pass Analysis Feedback**
-   - Show spinner during multi-pass analysis between phase 2 and 3
-   - Display message: "Analyzing code patterns"
+1. **Call Graph Preparation Feedback**
+   - Show spinner during call graph initialization between phase 2 and 3
+   - Display message: "Preparing call graph analysis"
+   - Covers `build_initial_call_graph()` and optional multi-pass analysis
    - Clear spinner when complete without leaving artifacts
 
 2. **Coverage Loading Feedback**
@@ -75,9 +76,10 @@ Eliminate all progress feedback gaps by adding spinners for hidden work and fixi
 
 ## Acceptance Criteria
 
-- [ ] Multi-pass analysis shows spinner with "Analyzing code patterns" message
-- [ ] Spinner appears immediately when multi-pass analysis starts
-- [ ] Spinner clears cleanly without leaving text artifacts
+- [ ] Call graph preparation shows spinner with "Preparing call graph analysis" message
+- [ ] Spinner covers both `build_initial_call_graph()` and optional `perform_multi_pass_analysis()`
+- [ ] Spinner appears immediately after phase 2 completes
+- [ ] Spinner clears cleanly before phase 3 starts
 - [ ] Coverage loading shows spinner with "Loading coverage data" message
 - [ ] Coverage spinner only appears when coverage file is provided
 - [ ] Phase 4 progress shows format `X/Y` where X=resolved, Y=total_examined
@@ -90,9 +92,9 @@ Eliminate all progress feedback gaps by adding spinners for hidden work and fixi
 
 ### Implementation Approach
 
-#### 1. Multi-Pass Analysis Spinner
+#### 1. Call Graph Preparation Spinner
 
-**Location**: `src/builders/unified_analysis.rs:138-143`
+**Location**: `src/builders/unified_analysis.rs:138-149`
 
 **Current Code**:
 ```rust
@@ -102,24 +104,34 @@ if multi_pass {
     perform_multi_pass_analysis(results, show_attribution)?;  // ← No feedback!
 }
 
+// Progress tracking
+let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+// Phase 3: Building call graph (spec 195)
 crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(2));
 ```
 
+**Problem**: Phase 3 shows "Building call graph..." immediately, but actual work hasn't started yet, creating perceived hang.
+
 **Solution**:
 ```rust
+// Show spinner for call graph preparation
+let spinner = crate::progress::ProgressManager::global()
+    .map(|pm| pm.create_spinner("Preparing call graph analysis"))
+    .unwrap_or_else(indicatif::ProgressBar::hidden);
+
 let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
-// Show spinner for multi-pass analysis
 if multi_pass {
-    let spinner = crate::progress::ProgressManager::global()
-        .map(|pm| pm.create_spinner("Analyzing code patterns"))
-        .unwrap_or_else(indicatif::ProgressBar::hidden);
-
     perform_multi_pass_analysis(results, show_attribution)?;
-
-    spinner.finish_and_clear();
 }
 
+spinner.finish_and_clear();
+
+// Progress tracking
+let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+// Phase 3: Building call graph (spec 195)
 crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(2));
 ```
 
@@ -280,15 +292,17 @@ fn test_trait_resolution_stats_accuracy() {
 
 ### User Acceptance
 ```bash
-# Before: Hangs for 2-3 seconds
+# Before: Hangs with no feedback
 ✓ 2/4 Analyzing complexity...463/463 (100%) - 0s
-[HANG - no feedback for 2-3s]
-→ 3/4 Building call graph...
+[HANG - "preparing" phase invisible]
+→ 3/4 Building call graph...                    [shows but no progress yet]
+[HANG - coverage loading invisible]
+✓ 4/4 Resolving dependencies...0/0 (0%) - 0s    [meaningless count]
 
 # After: Continuous feedback
 ✓ 2/4 Analyzing complexity...463/463 (100%) - 0s
-⠋ Analyzing code patterns
-✓ 3/4 Building call graph...19344/19344 (100%) - 11s
+⠋ Preparing call graph analysis
+→ 3/4 Building call graph...19344/19344 (100%) - 11s
 ⠙ Loading coverage data
 ✓ 4/4 Refining analysis...127/450 (28%) - 0s
 ```
