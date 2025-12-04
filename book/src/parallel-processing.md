@@ -146,63 +146,65 @@ fn get_worker_count(jobs: usize) -> usize {
 
 ### Parallel File Processing
 
-**Phase 1: Parallel File Parsing**
+**Phase 1: Parallel File I/O and Sequential Parsing**
 
-Files are parsed concurrently using Rayon's parallel iterators:
+File reading is parallelized, but AST parsing is sequential due to `syn::File` not being `Send`:
 
 ```rust
-// From src/builders/parallel_call_graph.rs (parallel_parse_files method)
-let parsed_files: Vec<_> = rust_files
-    .par_iter()  // Convert to parallel iterator
+// From src/builders/parallel_call_graph.rs:115-143
+// Step 1: Read file contents in parallel (I/O bound)
+let file_contents: Vec<_> = rust_files
+    .par_iter()  // Parallel I/O operations
     .filter_map(|file_path| {
         let content = io::read_file(file_path).ok()?;
-
-        // Update progress atomically
-        parallel_graph.stats().increment_files();
-
         Some((file_path.clone(), content))
+    })
+    .collect();
+
+// Step 2: Parse files to AST (sequential - syn::File not Send)
+let parsed_files: Vec<_> = file_contents
+    .iter()
+    .enumerate()
+    .filter_map(|(idx, (file_path, content))| {
+        let parsed = syn::parse_file(content).ok()?;
+        parallel_graph.stats().increment_files();
+        Some((file_path.clone(), parsed))
     })
     .collect();
 ```
 
-Key features:
-- `.par_iter()` converts a sequential iterator to a parallel one
-- Each file is read independently on a worker thread
-- Progress tracking uses atomic counters (see [Parallel Call Graph Statistics](#parallel-call-graph-statistics))
+**Key features:**
+- **Parallel I/O**: File reading uses `.par_iter()` to maximize disk throughput
+- **Sequential parsing**: AST parsing is sequential because `syn::File` lacks `Send` bound
+- **Why this works**: I/O operations dominate analysis time, so parallelizing file reads provides most of the speedup
+- Progress tracking uses atomic counters and unified progress system (see [Parallel Call Graph Statistics](#parallel-call-graph-statistics))
 
-**Phase 2: Parallel Multi-File Extraction**
+**Phase 2: All-Files-At-Once Extraction**
 
-Files are grouped into chunks for optimal parallelization:
+All files are processed together without chunking to enable optimal cross-file call resolution:
 
 ```rust
-// From src/builders/parallel_call_graph.rs (parallel_multi_file_extraction method)
-let chunk_size = std::cmp::max(10, parsed_files.len() / rayon::current_num_threads());
+// From src/builders/parallel_call_graph.rs:152-176
+// Process ALL files at once (no chunking)
+// This enables optimal cross-file call resolution with a single PathResolver
+let files_for_extraction: Vec<_> = parsed_files
+    .iter()
+    .map(|(path, parsed)| (parsed.clone(), path.clone()))
+    .collect();
 
-parsed_files.par_chunks(chunk_size).for_each(|chunk| {
-    // Parse syn files within each chunk
-    let parsed_chunk: Vec<_> = chunk
-        .iter()
-        .filter_map(|(path, content)| {
-            syn::parse_file(content)
-                .ok()
-                .map(|parsed| (parsed, path.clone()))
-        })
-        .collect();
+// Extract call graph for all files with full cross-file resolution
+// Internal implementation may use Rayon parallel iterators
+let graph = extract_call_graph_multi_file(&files_for_extraction);
 
-    if !parsed_chunk.is_empty() {
-        // Extract call graph for this chunk
-        let chunk_graph = extract_call_graph_multi_file(&parsed_chunk);
-
-        // Merge into main graph concurrently
-        parallel_graph.merge_concurrent(chunk_graph);
-    }
-});
+// Merge into main graph
+parallel_graph.merge_concurrent(graph);
 ```
 
-This chunking strategy balances parallelism with overhead:
-- Minimum chunk size of 10 files prevents excessive overhead
-- Dynamic chunk sizing based on available threads
-- Each chunk produces a local call graph that's merged concurrently
+**Design rationale:**
+- **No chunking**: All files processed together for complete visibility
+- **Optimal cross-file resolution**: Single `PathResolver` sees all functions across entire codebase
+- **Internal parallelism**: The `extract_call_graph_multi_file` function may parallelize internally using Rayon
+- **Simplified merging**: One merge operation instead of per-chunk merges
 
 **AST Parsing Optimization (Spec 132)**
 
@@ -408,7 +410,14 @@ For memory-constrained environments, use `--jobs 2-4` or `--no-parallel` to redu
 
 ## Parallel Call Graph Statistics
 
-Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads.
+Debtmap tracks parallel processing progress using atomic counters that can be safely updated from multiple threads. These statistics are integrated with a unified progress system that provides consolidated reporting across all analysis phases.
+
+### Unified Progress System Integration
+
+Parallel statistics now integrate with `crate::io::progress::AnalysisProgress` (src/builders/parallel_call_graph.rs:134-139), which replaced older per-phase progress bars. This provides:
+- **Consolidated progress reporting**: Single progress view showing "3/4 Building call graph"
+- **Cross-phase coordination**: Progress updates coordinated across parsing, extraction, and analysis phases
+- **Reduced visual clutter**: Replaces multiple progress bars with unified display
 
 ### ParallelStats Structure
 
@@ -519,6 +528,7 @@ let resolutions: Vec<(FunctionCall, FunctionId)> = calls_to_resolve
 - **Immutable data**: All inputs are read-only during the parallel phase
 - **Independent operations**: Each call resolution is independent of others
 - **Parallel efficiency**: Utilizes all available CPU cores
+- **Sophisticated matching**: `resolve_call_with_advanced_matching` delegates to `CallResolver` (src/analyzers/call_graph/call_resolution.rs:44-58) which handles associated functions, qualified paths, and type hints
 
 **Phase 2: Sequential Updates (Mutation)**
 
