@@ -24,11 +24,23 @@ The configuration examples below control the RecommendationTier classification l
 
 **Impact**: High impact on maintainability and team velocity
 
+**Classification Criteria** (src/priority/tiers.rs:183-216):
+
+Debtmap uses sophisticated multi-factor analysis for Tier 1 classification, not just raw cyclomatic complexity. Items qualify for Tier 1 if they meet **any** of these criteria:
+
+1. **Critical Patterns**: AsyncMisuse or ErrorSwallowing debt types (always Tier 1)
+2. **High Final Score**: final_score > 10.0 after exponential scaling
+3. **Extreme Cyclomatic**: Entropy-dampened cyclomatic complexity > 50
+4. **High Cognitive Load**: Cognitive complexity >= 20
+5. **Deep Nesting**: Nesting depth >= 5 levels
+6. **High Weighted Complexity**: complexity_factor > 5.0 (weighted: 30% cyclomatic + 70% cognitive)
+
 **Examples**:
-- Files with 15+ responsibilities
-- Modules with 50+ methods
-- ComplexityHotspot debt items with cyclomatic complexity > 50 (extreme complexity requiring architectural redesign)
-- God objects flagged by detection algorithms
+- Files with 15+ responsibilities (God Objects)
+- Modules with 50+ methods (God Modules)
+- ComplexityHotspot debt items meeting any of the criteria above
+- Functions with cognitive complexity >= 20 (extreme mental load)
+- Deeply nested code (5+ nesting levels)
 - Circular dependencies affecting core modules
 
 **When to Address**: Immediately, before sprint work begins. These issues compound over time and block progress.
@@ -40,7 +52,7 @@ debtmap analyze . --min-priority high --top 5
 
 ### Tier 2: Complex Untested
 
-**Description**: Untested code with high complexity or critical dependencies. Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.
+**Description**: Untested code with high complexity or critical dependencies, plus moderate complexity hotspots not severe enough for Tier 1.
 
 **Priority**: Risk of bugs in critical paths
 
@@ -48,11 +60,27 @@ debtmap analyze . --min-priority high --top 5
 
 **Action**: Should be tested before refactoring to prevent regressions
 
+**Classification Criteria** (src/priority/tiers.rs:257-302):
+
+Items qualify for Tier 2 through **two distinct paths**:
+
+**Path 1: Testing Gaps** - Untested code meeting ANY of:
+- Cyclomatic complexity ≥ 15
+- Total dependencies ≥ 10
+- Entry point functions with any coverage gap
+
+**Path 2: Moderate Complexity Hotspots** - ComplexityHotspot items with meaningful but non-extreme complexity, meeting ANY of:
+- Complexity factor >= 2.0 (weighted: 30% cyclomatic + 70% cognitive, scaled 0-10)
+- Cognitive complexity >= 12 (moderate to high mental load)
+- Nesting depth >= 3 (meaningful nested control flow)
+- Entropy-dampened cyclomatic complexity 8-50 (after filtering repetitive patterns)
+
 **Examples**:
 - Functions with cyclomatic complexity ≥ 15 and 0% coverage
 - Functions with 10+ dependencies and low test coverage
 - Business logic entry points without tests
 - Complex error handling without validation
+- Moderate complexity hotspots (complexity_factor >= 2.0, cognitive >= 12, or nesting >= 3)
 
 **When to Address**: Within current sprint. Add tests before making changes.
 
@@ -280,7 +308,7 @@ JSON output uses the same **score-based priority** levels as terminal output:
     "score_distribution": {
       "critical": 2,
       "high": 5,
-      "medium": 12,
+      "moderate": 12,
       "low": 45
     }
   },
@@ -310,10 +338,12 @@ JSON output uses the same **score-based priority** levels as terminal output:
 ```
 
 The `priority` field is derived from the `score` field using these thresholds:
-- `critical`: score >= 100.0
-- `high`: score >= 50.0
-- `medium`: score >= 20.0
-- `low`: score < 20.0
+- `critical`: score >= 90.0
+- `high`: score >= 70.0
+- `moderate`: score >= 50.0
+- `low`: score < 50.0
+
+**Source**: Priority tier thresholds defined in src/priority/mod.rs:478-484
 
 **Note**: While RecommendationTier (T1-T4) classifications exist internally for applying tier weights, they are not included in JSON output. The output shows final calculated scores and their corresponding priority levels.
 
@@ -348,4 +378,4 @@ minimum_cyclomatic_complexity = 2
 
 - [Scoring Strategies](./scoring-strategies.md) - Understanding file-level vs function-level scoring
 - [Configuration](./configuration.md) - Complete configuration reference
-- [Analysis Guide](./analysis-guide.md) - Detailed metric explanations
+- [Analysis Guide](./analysis-guide/index.md) - Detailed metric explanations and analysis techniques
