@@ -16,8 +16,8 @@ fn test_clean_dispatcher_not_in_json_output() {
     let output_path = temp_dir.path().join("output.json");
 
     // Use the clean dispatcher fixture
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/clean_dispatcher");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
     // Run debtmap analyze with JSON output
     let output = Command::new("cargo")
@@ -102,8 +102,8 @@ fn test_clean_dispatcher_not_in_json_output() {
 /// Test that clean dispatchers don't appear in terminal output
 #[test]
 fn test_clean_dispatcher_not_in_terminal_output() {
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/clean_dispatcher");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
     // Run debtmap analyze with default terminal output
     let output = Command::new("cargo")
@@ -162,8 +162,8 @@ fn test_clean_dispatcher_not_in_markdown_output() {
     let temp_dir = TempDir::new().unwrap();
     let output_path = temp_dir.path().join("output.md");
 
-    let test_codebase = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/data/fixtures/clean_dispatcher");
+    let test_codebase =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/fixtures/clean_dispatcher");
 
     // Run debtmap analyze with markdown output
     let output = Command::new("cargo")

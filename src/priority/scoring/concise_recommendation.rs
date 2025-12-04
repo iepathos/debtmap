@@ -1658,11 +1658,11 @@ mod tests {
     fn test_clean_dispatcher_returns_none() {
         // Clean dispatcher with no inline logic should return None
         let result = generate_dispatcher_recommendation(
-            10,    // branch_count
-            0.5,   // cognitive_ratio
-            0,     // inline_logic_branches (clean dispatcher)
-            10,    // cyclomatic
-            5,     // cognitive
+            10,  // branch_count
+            0.5, // cognitive_ratio
+            0,   // inline_logic_branches (clean dispatcher)
+            10,  // cyclomatic
+            5,   // cognitive
             &create_test_metrics(10, 5),
         );
 
@@ -1676,11 +1676,11 @@ mod tests {
     fn test_dispatcher_with_inline_logic_returns_some() {
         // Dispatcher with inline logic should return a recommendation
         let result = generate_dispatcher_recommendation(
-            10,    // branch_count
-            0.5,   // cognitive_ratio
-            3,     // inline_logic_branches (has inline logic)
-            15,    // cyclomatic
-            10,    // cognitive
+            10,  // branch_count
+            0.5, // cognitive_ratio
+            3,   // inline_logic_branches (has inline logic)
+            15,  // cyclomatic
+            10,  // cognitive
             &create_test_metrics(15, 10),
         );
 
@@ -1716,6 +1716,9 @@ mod tests {
         //     ComplexityPattern::Dispatcher { ... } => generate_dispatcher_recommendation(...)?,
 
         // This test serves as documentation of this behavior.
-        assert!(true, "Propagation verified by code structure and test_clean_dispatcher_returns_none");
+        assert!(
+            true,
+            "Propagation verified by code structure and test_clean_dispatcher_returns_none"
+        );
     }
 }
