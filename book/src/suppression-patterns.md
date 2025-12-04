@@ -605,7 +605,7 @@ Function-level exclusions by name pattern are not yet implemented. To suppress s
 
 - [Configuration](configuration.md) - Full `.debtmap.toml` reference
 - [CLI Reference](cli-reference.md) - Command-line analysis options
-- [Analysis Guide](analysis-guide.md) - Understanding debt detection
+- [Analysis Guide](analysis-guide/index.md) - Understanding debt detection
 - [Output Formats](output-formats.md) - Viewing suppressed items in reports
 
 ## Summary
