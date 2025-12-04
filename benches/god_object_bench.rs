@@ -10,8 +10,9 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use debtmap::organization::{
-    calculate_god_object_score, determine_confidence, group_methods_by_responsibility,
-    recommend_module_splits, GodObjectDetector, GodObjectThresholds,
+    calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
+    group_methods_by_responsibility, recommend_module_splits, GodObjectDetector,
+    GodObjectThresholds,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -28,6 +29,24 @@ fn bench_calculate_score(c: &mut Criterion) {
                 black_box(15),  // field_count
                 black_box(6),   // responsibility_count
                 black_box(500), // lines_of_code
+                black_box(&thresholds),
+            )
+        })
+    });
+}
+
+/// Benchmark complexity-weighted god object score calculation (pure function)
+fn bench_calculate_score_weighted(c: &mut Criterion) {
+    let thresholds = GodObjectThresholds::for_rust();
+
+    c.bench_function("calculate_god_object_score_weighted", |b| {
+        b.iter(|| {
+            calculate_god_object_score_weighted(
+                black_box(25.0), // weighted_method_count
+                black_box(15),   // field_count
+                black_box(6),    // responsibility_count
+                black_box(500),  // lines_of_code
+                black_box(5.0),  // avg_complexity
                 black_box(&thresholds),
             )
         })
@@ -142,6 +161,7 @@ fn bench_enhanced_analysis(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_calculate_score,
+    bench_calculate_score_weighted,
     bench_determine_confidence,
     bench_group_methods,
     bench_recommend_splits,

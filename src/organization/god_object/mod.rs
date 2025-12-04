@@ -17,6 +17,7 @@ pub mod classification_types;
 pub mod core_types;
 pub mod metrics;
 pub mod metrics_types;
+pub mod scoring;
 pub mod split_types;
 pub mod thresholds;
 pub mod types;
@@ -25,6 +26,7 @@ pub mod types;
 pub use classification_types::*;
 pub use core_types::*;
 pub use metrics_types::*;
+pub use scoring::*;
 pub use split_types::*;
 pub use thresholds::*;
 
