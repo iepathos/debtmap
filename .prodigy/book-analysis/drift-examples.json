@@ -1,0 +1,103 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "examples",
+  "chapter_title": "Examples",
+  "chapter_file": "book/src/examples.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Good comprehensive examples with current CLI syntax, but contains some incorrect information about output formats and threshold presets, plus broken internal links",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 1 broken internal link",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "target": "analysis-guide.md",
+          "current_file": "book/src/examples.md",
+          "expected_path": "book/src/analysis-guide.md",
+          "actual_path": "book/src/analysis-guide/ (directory)",
+          "suggested_fix": "analysis-guide/index.md"
+        }
+      ],
+      "fix_suggestion": "Update link from 'analysis-guide.md' to 'analysis-guide/index.md' since the analysis-guide chapter was migrated to multi-subsection structure."
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "Understanding Output Formats",
+      "description": "Documentation describes --output-format option that doesn't exist in CLI",
+      "current_content": "Lines 693-739 describe --output-format flag with 'unified' and 'legacy' values for JSON structure variants",
+      "should_be": "This option doesn't exist in current implementation. Only --format option exists with values: json, markdown, terminal, html",
+      "fix_suggestion": "Remove entire section about --output-format (lines 693-739). If unified/legacy JSON formats are planned features, move to a 'Planned Features' section or remove entirely.",
+      "source_reference": "src/cli.rs:488-493 OutputFormat enum only has Json, Markdown, Terminal, Html"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Custom Thresholds - Preset Threshold Values",
+      "description": "Threshold preset table shows incorrect values that don't match actual implementation",
+      "current_content": "Table at lines 96-101 shows:\nStrict: complexity=8, duplication=30, max_function_lines=30, max_nesting_depth=3\nBalanced: complexity=10, duplication=50, max_function_lines=50, max_nesting_depth=4\nLenient: complexity=15, duplication=75, max_function_lines=80, max_nesting_depth=5",
+      "should_be": "Threshold presets control internal complexity thresholds, not CLI argument defaults. Actual preset values:\nStrict: minimum_cyclomatic_complexity=3, minimum_cognitive_complexity=7, minimum_function_length=15\nBalanced: minimum_cyclomatic_complexity=5, minimum_cognitive_complexity=10, minimum_function_length=20\nLenient: minimum_cyclomatic_complexity=10, minimum_cognitive_complexity=20, minimum_function_length=50",
+      "fix_suggestion": "Update table to reflect actual ComplexityThresholds values from presets, or clarify that table shows recommended CLI argument values to use with each preset philosophy",
+      "source_reference": "src/complexity/threshold_manager.rs:120-148"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "God Object Detection",
+      "description": "Missing mention of --show-splits option in god object section",
+      "feature_reference": "cli_interface.commands.analyze.capabilities",
+      "fix_suggestion": "Add example using --show-splits option which is mentioned in CLI help but not demonstrated in examples",
+      "source_reference": "src/cli.rs:299-303"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Advanced Usage",
+      "description": "Missing example of --no-multi-pass flag",
+      "feature_reference": "cli_interface.commands.analyze.capabilities",
+      "fix_suggestion": "Section mentions multi-pass analysis with --multi-pass and --attribution but doesn't show --no-multi-pass for single-pass performance mode",
+      "source_reference": "src/cli.rs:171-173"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all major use cases (Rust, Python, JavaScript/TypeScript)",
+    "Excellent CI/CD integration examples for GitHub Actions, GitLab CI, CircleCI",
+    "Clear progression from basic to advanced usage",
+    "Good use of real-world examples from debtmap's own CI workflow",
+    "Helpful interpretation guidance for output and metrics",
+    "Well-organized table of contents and cross-references",
+    "Examples are copy-paste ready with proper syntax",
+    "Good coverage of filtering, grouping, and output format options",
+    "Comprehensive compare command documentation",
+    "Excellent explanation of purity-weighted god object scoring"
+  ],
+  "improvement_suggestions": [
+    "Remove or correct the --output-format section to avoid user confusion",
+    "Fix broken link to analysis-guide chapter",
+    "Correct threshold preset table or clarify its purpose",
+    "Add example using --show-splits for god object decomposition",
+    "Add brief example of --no-multi-pass for performance comparison",
+    "Consider adding troubleshooting section for common errors",
+    "Add note about default path being '.' for analyze command"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:35:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Analyzing Rust projects",
+      "Python analysis",
+      "JavaScript/TypeScript",
+      "CI integration"
+    ],
+    "validation_focus": "Ensure examples use current CLI syntax and options",
+    "links_validated": {
+      "total_internal_links": 4,
+      "broken_links": 1,
+      "valid_links": 3
+    }
+  }
+}
