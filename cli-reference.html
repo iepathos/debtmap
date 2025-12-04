@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-28e21e55.js";
+            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -450,8 +450,8 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <ul>
 <li><code>--semantic-off</code> - Disable semantic analysis (fallback mode)</li>
 <li><code>--no-context-aware</code> - Disable context-aware false positive reduction (enabled by default)</li>
-<li><code>--multi-pass</code> - Enable multi-pass analysis with attribution</li>
-<li><code>--attribution</code> - Show complexity attribution details</li>
+<li><code>--no-multi-pass</code> - Disable multi-pass analysis (use single-pass for performance)</li>
+<li><code>--attribution</code> - Show complexity attribution details (requires multi-pass, which is the default)</li>
 </ul>
 <p><strong>Functional Programming Analysis:</strong></p>
 <ul>
@@ -596,11 +596,21 @@ debtmap init --force
 </code></pre>
 <h3 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h3>
 <ul>
-<li><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)
+<li>
+<p><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)</p>
 <ul>
 <li>Example: <code>export DEBTMAP_JOBS=8  # Same as --jobs 8</code></li>
 <li>Use <code>0</code> to utilize all available CPU cores</li>
 <li>Controls thread pool size for parallel call graph construction</li>
+</ul>
+</li>
+<li>
+<p><code>DEBTMAP_SINGLE_PASS</code> - Disable multi-pass analysis globally (same as <code>--no-multi-pass</code> flag)</p>
+<ul>
+<li>Example: <code>export DEBTMAP_SINGLE_PASS=1  # Disable multi-pass analysis</code></li>
+<li>Set to <code>1</code> or <code>true</code> to disable multi-pass analysis by default</li>
+<li>Useful for CI/CD environments where performance is critical</li>
+<li>Can be overridden by command-line flags</li>
 </ul>
 </li>
 </ul>

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-28e21e55.js";
+            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -182,7 +182,7 @@
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
 <ol>
-<li><strong>Analysis is slow</strong>: Adjust threads with <code>--jobs</code> or use <code>--semantic-off</code> for faster fallback mode</li>
+<li><strong>Analysis is slow</strong>: Adjust threads with <code>--jobs</code>, use <code>--no-multi-pass</code> for faster single-pass analysis, or use <code>--semantic-off</code> for faster fallback mode</li>
 <li><strong>Parse errors</strong>: Use <code>--semantic-off</code> for faster fallback mode or exclude problematic files</li>
 <li><strong>No output</strong>: Increase verbosity with <code>-v</code> or lower <code>--min-priority</code></li>
 <li><strong>Inconsistent results</strong>: Check if coverage file changed or context providers are enabled</li>
@@ -228,11 +228,17 @@ debtmap path/to/subset
 <pre><code class="language-bash"># Use all available CPU cores
 debtmap --jobs 0
 
+# Disable multi-pass analysis for faster single-pass (slightly less detailed)
+debtmap --no-multi-pass
+
 # Try faster fallback mode (less accurate)
 debtmap --semantic-off
 
 # Use plain output for faster terminal rendering
 debtmap --plain
+
+# Or set environment variable to disable multi-pass globally
+export DEBTMAP_SINGLE_PASS=1
 </code></pre>
 <p>See <a href="#performance-tips">Performance Tips</a> for detailed optimization strategies.</p>
 <h3 id="file-permission-errors"><a class="header" href="#file-permission-errors">File Permission Errors</a></h3>
@@ -410,7 +416,10 @@ debtmap --no-parallel
 <li><strong>Use <code>--no-parallel</code></strong>: Debugging concurrency issues</li>
 </ul>
 <h3 id="analysis-optimizations"><a class="header" href="#analysis-optimizations">Analysis Optimizations</a></h3>
-<pre><code class="language-bash"># Fast mode: disable semantic analysis
+<pre><code class="language-bash"># Faster: disable multi-pass analysis (single-pass mode)
+debtmap --no-multi-pass
+
+# Fast mode: disable semantic analysis
 debtmap --semantic-off
 
 # Plain output: faster terminal rendering
@@ -432,7 +441,8 @@ debtmap --min-priority 4 --top 20
 <tr><th>Configuration</th><th>Speed</th><th>Accuracy</th></tr>
 </thead>
 <tbody>
-<tr><td>Default</td><td>Fast</td><td>High</td></tr>
+<tr><td>Default (multi-pass)</td><td>Fast</td><td>Highest</td></tr>
+<tr><td><code>--no-multi-pass</code></td><td>Faster</td><td>High</td></tr>
 <tr><td><code>--semantic-off</code></td><td>Fastest</td><td>Medium</td></tr>
 <tr><td><code>--no-parallel</code></td><td>Slowest</td><td>High</td></tr>
 <tr><td><code>--jobs 4</code></td><td>Medium</td><td>High</td></tr>
@@ -606,19 +616,23 @@ debtmap --context -v | grep "context provider"
 <h2 id="advanced-analysis-troubleshooting"><a class="header" href="#advanced-analysis-troubleshooting">Advanced Analysis Troubleshooting</a></h2>
 <p>Advanced CLI flags for specialized analysis scenarios.</p>
 <h3 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h3>
-<p><strong>Flag</strong>: <code>--multi-pass</code></p>
-<p>Multi-pass analysis performs multiple iterations to refine results.</p>
-<pre><code class="language-bash"># Enable multi-pass analysis
-debtmap --multi-pass
+<p>Multi-pass analysis is <strong>enabled by default</strong> and performs two iterations (raw and normalized) to distinguish logical complexity from formatting artifacts.</p>
+<pre><code class="language-bash"># Multi-pass analysis runs by default
+debtmap analyze .
 
-# Useful for complex projects with intricate dependencies
-# May increase analysis time but improve accuracy
+# Disable for performance-critical scenarios
+debtmap --no-multi-pass
+
+# Or use environment variable
+export DEBTMAP_SINGLE_PASS=1
+debtmap analyze .
 </code></pre>
-<p><strong>When to use</strong>:</p>
+<p><strong>When to disable (<code>--no-multi-pass</code>)</strong>:</p>
 <ul>
-<li>Complex dependency graphs</li>
-<li>Large codebases with deep nesting</li>
-<li>When single-pass results seem incomplete</li>
+<li>Performance-critical CI/CD pipelines</li>
+<li>Very large codebases (&gt;100k LOC)</li>
+<li>Quick complexity checks during development</li>
+<li>When formatting is already standardized</li>
 </ul>
 <h3 id="attribution-output"><a class="header" href="#attribution-output">Attribution Output</a></h3>
 <p><strong>Flag</strong>: <code>--show-attribution</code></p>
@@ -1112,14 +1126,14 @@ debtmap path/to/file.rs -vv
 <li>Libraries where everything is intentionally public</li>
 </ul>
 <h3 id="combining-advanced-flags"><a class="header" href="#combining-advanced-flags">Combining Advanced Flags</a></h3>
-<pre><code class="language-bash"># Comprehensive analysis with all features
-debtmap --multi-pass --attribution --context -vv
+<pre><code class="language-bash"># Comprehensive analysis with all features (multi-pass is default)
+debtmap --attribution --context -vv
 
 # Minimal filtering for exploration
 debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
-# Performance-focused advanced analysis
-debtmap --multi-pass --jobs 8
+# Performance-focused analysis (disable multi-pass)
+debtmap --no-multi-pass --jobs 8
 
 # Summary view with aggregated scores
 debtmap --detail-level summary --aggregate-only
@@ -1819,6 +1833,9 @@ debtmap validate-improvement \
 <p>A: Check several factors:</p>
 <pre><code class="language-bash"># Use all CPU cores
 debtmap --jobs 0
+
+# Disable multi-pass for faster single-pass analysis
+debtmap --no-multi-pass
 
 # Try faster fallback mode
 debtmap --semantic-off

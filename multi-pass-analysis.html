@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-28e21e55.js";
+            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -178,7 +178,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h1>
-<p>Multi-pass analysis is an advanced feature that performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
+<p>Multi-pass analysis is enabled by default in debtmap. It performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
 <p>Traditional complexity analysis treats all code as-is, which means formatting choices like multiline expressions, whitespace, and indentation can artificially inflate complexity metrics. Multi-pass analysis solves this problem by:</p>
 <ol>
@@ -242,18 +242,21 @@
 <p><strong>Note</strong>: Pattern complexity analysis is part of the standard multi-pass analysis. No additional configuration is required to enable pattern detection.</p>
 </blockquote>
 <h2 id="cli-usage"><a class="header" href="#cli-usage">CLI Usage</a></h2>
-<p>Enable multi-pass analysis with the <code>--multi-pass</code> flag:</p>
-<pre><code class="language-bash"># Basic multi-pass analysis
-debtmap analyze . --multi-pass
+<p>Multi-pass analysis runs by default. You can disable it if needed for performance-constrained scenarios:</p>
+<pre><code class="language-bash"># Basic analysis (multi-pass enabled by default)
+debtmap analyze .
 
 # Multi-pass with detailed attribution breakdown
-debtmap analyze . --multi-pass --attribution
+debtmap analyze . --attribution
 
 # Control detail level
-debtmap analyze . --multi-pass --attribution --detail-level comprehensive
+debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --multi-pass --attribution --json
+debtmap analyze . --attribution --json
+
+# Disable multi-pass for faster single-pass analysis
+debtmap analyze . --no-multi-pass
 </code></pre>
 <h3 id="available-flags"><a class="header" href="#available-flags">Available Flags</a></h3>
 <div class="table-wrapper">
@@ -262,15 +265,15 @@ debtmap analyze . --multi-pass --attribution --json
 <tr><th>Flag</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>--multi-pass</code></td><td>Enable two-pass analysis (raw + normalized)</td></tr>
-<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires <code>--multi-pass</code>)</td></tr>
+<tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
+<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
 <tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code></td></tr>
 <tr><td><code>--json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
 </div>
 <blockquote>
-<p><strong>Note</strong>: The <code>--attribution</code> flag requires <code>--multi-pass</code> to be enabled, as attribution depends on comparing raw and normalized analyses.</p>
+<p><strong>Note</strong>: The <code>--attribution</code> flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use <code>--no-multi-pass</code> only when performance is critical.</p>
 </blockquote>
 <h2 id="attribution-engine"><a class="header" href="#attribution-engine">Attribution Engine</a></h2>
 <p>The attribution engine breaks down complexity into three main categories, each with detailed tracking and suggestions.</p>
@@ -749,7 +752,8 @@ let analyzer = MultiPassAnalyzer::new(options);
 </table>
 </div>
 <h2 id="use-cases"><a class="header" href="#use-cases">Use Cases</a></h2>
-<h3 id="when-to-use-multi-pass-analysis"><a class="header" href="#when-to-use-multi-pass-analysis">When to Use Multi-Pass Analysis</a></h3>
+<h3 id="when-to-use-multi-pass-analysis-default"><a class="header" href="#when-to-use-multi-pass-analysis-default">When to Use Multi-Pass Analysis (Default)</a></h3>
+<p>Multi-pass analysis is the default because it provides the most valuable insights:</p>
 <p><strong>Refactoring Validation</strong></p>
 <ul>
 <li>Compare before/after complexity to validate refactoring</li>
@@ -780,18 +784,24 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li>Separate signal (logic) from noise (formatting)</li>
 <li>Identify complexity hotspots for architectural review</li>
 </ul>
-<h3 id="when-to-use-standard-analysis"><a class="header" href="#when-to-use-standard-analysis">When to Use Standard Analysis</a></h3>
-<p><strong>Quick Feedback</strong></p>
+<h3 id="when-to-disable-multi-pass-no-multi-pass"><a class="header" href="#when-to-disable-multi-pass-no-multi-pass">When to Disable Multi-Pass (–no-multi-pass)</a></h3>
+<p>Use <code>--no-multi-pass</code> for single-pass analysis only when:</p>
+<p><strong>Performance is Critical</strong></p>
 <ul>
 <li>Fast complexity checks during development</li>
-<li>CI/CD gates that need speed</li>
-<li>Large codebases where overhead matters</li>
+<li>CI/CD gates where every second matters</li>
+<li>Very large codebases (&gt;100k LOC) where overhead is significant</li>
 </ul>
-<p><strong>Sufficient Metrics</strong></p>
+<p><strong>Simple Use Cases</strong></p>
 <ul>
 <li>When overall complexity trends are enough</li>
 <li>No need for detailed attribution</li>
 <li>Formatting is already standardized</li>
+</ul>
+<p><strong>Resource Constraints</strong></p>
+<ul>
+<li>Limited CPU or memory available</li>
+<li>Running on CI infrastructure with strict time limits</li>
 </ul>
 <h2 id="future-enhancements"><a class="header" href="#future-enhancements">Future Enhancements</a></h2>
 <h3 id="spec-84-detailed-ast-based-source-mapping"><a class="header" href="#spec-84-detailed-ast-based-source-mapping">Spec 84: Detailed AST-Based Source Mapping</a></h3>
@@ -838,7 +848,7 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li>Better complexity trend tracking at fine granularity</li>
 </ul>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
-<p>Multi-pass analysis provides deep insights into your code’s complexity by:</p>
+<p>Multi-pass analysis (enabled by default) provides deep insights into your code’s complexity by:</p>
 <ol>
 <li><strong>Separating signal from noise</strong> - Distinguishing logical complexity from formatting artifacts</li>
 <li><strong>Attributing complexity sources</strong> - Identifying what contributes to complexity and why</li>
@@ -846,8 +856,8 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li><strong>Validating refactoring</strong> - Comparing before/after to prove complexity reduction</li>
 <li><strong>Monitoring performance</strong> - Ensuring overhead stays within acceptable bounds</li>
 </ol>
-<p>Use <code>--multi-pass --attribution</code> when you need detailed complexity analysis and targeted refactoring guidance. The overhead (typically 15-25%) is worthwhile when you need to understand <em>why</em> code is complex and <em>how</em> to improve it.</p>
-<p>For quick complexity checks and CI/CD integration, standard single-pass analysis is usually sufficient. Save multi-pass analysis for deep dives, refactoring validation, and complexity investigations.</p>
+<p>Multi-pass analysis runs by default, providing the most valuable insights out of the box. The overhead (typically 15-25%) is worthwhile for understanding <em>why</em> code is complex and <em>how</em> to improve it.</p>
+<p>For performance-critical scenarios or very large codebases, use <code>--no-multi-pass</code> to disable multi-pass analysis and run faster single-pass analysis instead. You can also use the <code>DEBTMAP_SINGLE_PASS=1</code> environment variable to disable multi-pass analysis globally.</p>
 <hr>
 <p><strong>See Also:</strong></p>
 <ul>

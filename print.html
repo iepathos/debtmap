@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-28e21e55.js";
+            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -734,7 +734,7 @@ debtmap analyze . --detail-level high       # More detailed output
 <pre><code class="language-bash"># Analysis behavior
 --semantic-off              # Disable semantic analysis
 --no-context-aware          # Disable context-aware analysis
---multi-pass                # Enable multi-pass analysis for deeper insights
+--no-multi-pass             # Disable multi-pass analysis (for performance-critical scenarios)
 --validate-loc              # Validate lines of code calculations
 
 # Rust-specific options
@@ -1286,8 +1286,8 @@ debtmap explain-coverage . --coverage-file coverage.lcov --function "my_function
 <ul>
 <li><code>--semantic-off</code> - Disable semantic analysis (fallback mode)</li>
 <li><code>--no-context-aware</code> - Disable context-aware false positive reduction (enabled by default)</li>
-<li><code>--multi-pass</code> - Enable multi-pass analysis with attribution</li>
-<li><code>--attribution</code> - Show complexity attribution details</li>
+<li><code>--no-multi-pass</code> - Disable multi-pass analysis (use single-pass for performance)</li>
+<li><code>--attribution</code> - Show complexity attribution details (requires multi-pass, which is the default)</li>
 </ul>
 <p><strong>Functional Programming Analysis:</strong></p>
 <ul>
@@ -1432,11 +1432,21 @@ debtmap init --force
 </code></pre>
 <h3 id="environment-variables"><a class="header" href="#environment-variables">Environment Variables</a></h3>
 <ul>
-<li><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)
+<li>
+<p><code>DEBTMAP_JOBS</code> - Number of threads for parallel processing (same as <code>--jobs</code> / <code>-j</code> flag)</p>
 <ul>
 <li>Example: <code>export DEBTMAP_JOBS=8  # Same as --jobs 8</code></li>
 <li>Use <code>0</code> to utilize all available CPU cores</li>
 <li>Controls thread pool size for parallel call graph construction</li>
+</ul>
+</li>
+<li>
+<p><code>DEBTMAP_SINGLE_PASS</code> - Disable multi-pass analysis globally (same as <code>--no-multi-pass</code> flag)</p>
+<ul>
+<li>Example: <code>export DEBTMAP_SINGLE_PASS=1  # Disable multi-pass analysis</code></li>
+<li>Set to <code>1</code> or <code>true</code> to disable multi-pass analysis by default</li>
+<li>Useful for CI/CD environments where performance is critical</li>
+<li>Can be overridden by command-line flags</li>
 </ul>
 </li>
 </ul>
@@ -15667,7 +15677,7 @@ Score: 1350 (Confidence: Definite)
 <p>By combining quantitative metrics (method count, LOC, complexity) with qualitative analysis (responsibility detection, purity), Debtmap helps teams systematically address architectural debt.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="multi-pass-analysis"><a class="header" href="#multi-pass-analysis">Multi-Pass Analysis</a></h1>
-<p>Multi-pass analysis is an advanced feature that performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
+<p>Multi-pass analysis is enabled by default in debtmap. It performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.</p>
 <h2 id="overview-12"><a class="header" href="#overview-12">Overview</a></h2>
 <p>Traditional complexity analysis treats all code as-is, which means formatting choices like multiline expressions, whitespace, and indentation can artificially inflate complexity metrics. Multi-pass analysis solves this problem by:</p>
 <ol>
@@ -15731,18 +15741,21 @@ Score: 1350 (Confidence: Definite)
 <p><strong>Note</strong>: Pattern complexity analysis is part of the standard multi-pass analysis. No additional configuration is required to enable pattern detection.</p>
 </blockquote>
 <h2 id="cli-usage-1"><a class="header" href="#cli-usage-1">CLI Usage</a></h2>
-<p>Enable multi-pass analysis with the <code>--multi-pass</code> flag:</p>
-<pre><code class="language-bash"># Basic multi-pass analysis
-debtmap analyze . --multi-pass
+<p>Multi-pass analysis runs by default. You can disable it if needed for performance-constrained scenarios:</p>
+<pre><code class="language-bash"># Basic analysis (multi-pass enabled by default)
+debtmap analyze .
 
 # Multi-pass with detailed attribution breakdown
-debtmap analyze . --multi-pass --attribution
+debtmap analyze . --attribution
 
 # Control detail level
-debtmap analyze . --multi-pass --attribution --detail-level comprehensive
+debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --multi-pass --attribution --json
+debtmap analyze . --attribution --json
+
+# Disable multi-pass for faster single-pass analysis
+debtmap analyze . --no-multi-pass
 </code></pre>
 <h3 id="available-flags"><a class="header" href="#available-flags">Available Flags</a></h3>
 <div class="table-wrapper">
@@ -15751,15 +15764,15 @@ debtmap analyze . --multi-pass --attribution --json
 <tr><th>Flag</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>--multi-pass</code></td><td>Enable two-pass analysis (raw + normalized)</td></tr>
-<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires <code>--multi-pass</code>)</td></tr>
+<tr><td><code>--no-multi-pass</code></td><td>Disable multi-pass analysis (use single-pass for performance)</td></tr>
+<tr><td><code>--attribution</code></td><td>Show detailed complexity attribution breakdown (requires multi-pass)</td></tr>
 <tr><td><code>--detail-level &lt;level&gt;</code></td><td>Set output detail: <code>summary</code>, <code>standard</code>, <code>comprehensive</code>, <code>debug</code></td></tr>
 <tr><td><code>--json</code></td><td>Output results in JSON format</td></tr>
 </tbody>
 </table>
 </div>
 <blockquote>
-<p><strong>Note</strong>: The <code>--attribution</code> flag requires <code>--multi-pass</code> to be enabled, as attribution depends on comparing raw and normalized analyses.</p>
+<p><strong>Note</strong>: The <code>--attribution</code> flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use <code>--no-multi-pass</code> only when performance is critical.</p>
 </blockquote>
 <h2 id="attribution-engine"><a class="header" href="#attribution-engine">Attribution Engine</a></h2>
 <p>The attribution engine breaks down complexity into three main categories, each with detailed tracking and suggestions.</p>
@@ -16238,7 +16251,8 @@ let analyzer = MultiPassAnalyzer::new(options);
 </table>
 </div>
 <h2 id="use-cases-5"><a class="header" href="#use-cases-5">Use Cases</a></h2>
-<h3 id="when-to-use-multi-pass-analysis"><a class="header" href="#when-to-use-multi-pass-analysis">When to Use Multi-Pass Analysis</a></h3>
+<h3 id="when-to-use-multi-pass-analysis-default"><a class="header" href="#when-to-use-multi-pass-analysis-default">When to Use Multi-Pass Analysis (Default)</a></h3>
+<p>Multi-pass analysis is the default because it provides the most valuable insights:</p>
 <p><strong>Refactoring Validation</strong></p>
 <ul>
 <li>Compare before/after complexity to validate refactoring</li>
@@ -16269,18 +16283,24 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li>Separate signal (logic) from noise (formatting)</li>
 <li>Identify complexity hotspots for architectural review</li>
 </ul>
-<h3 id="when-to-use-standard-analysis"><a class="header" href="#when-to-use-standard-analysis">When to Use Standard Analysis</a></h3>
-<p><strong>Quick Feedback</strong></p>
+<h3 id="when-to-disable-multi-pass-no-multi-pass"><a class="header" href="#when-to-disable-multi-pass-no-multi-pass">When to Disable Multi-Pass (–no-multi-pass)</a></h3>
+<p>Use <code>--no-multi-pass</code> for single-pass analysis only when:</p>
+<p><strong>Performance is Critical</strong></p>
 <ul>
 <li>Fast complexity checks during development</li>
-<li>CI/CD gates that need speed</li>
-<li>Large codebases where overhead matters</li>
+<li>CI/CD gates where every second matters</li>
+<li>Very large codebases (&gt;100k LOC) where overhead is significant</li>
 </ul>
-<p><strong>Sufficient Metrics</strong></p>
+<p><strong>Simple Use Cases</strong></p>
 <ul>
 <li>When overall complexity trends are enough</li>
 <li>No need for detailed attribution</li>
 <li>Formatting is already standardized</li>
+</ul>
+<p><strong>Resource Constraints</strong></p>
+<ul>
+<li>Limited CPU or memory available</li>
+<li>Running on CI infrastructure with strict time limits</li>
 </ul>
 <h2 id="future-enhancements-1"><a class="header" href="#future-enhancements-1">Future Enhancements</a></h2>
 <h3 id="spec-84-detailed-ast-based-source-mapping"><a class="header" href="#spec-84-detailed-ast-based-source-mapping">Spec 84: Detailed AST-Based Source Mapping</a></h3>
@@ -16327,7 +16347,7 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li>Better complexity trend tracking at fine granularity</li>
 </ul>
 <h2 id="summary-7"><a class="header" href="#summary-7">Summary</a></h2>
-<p>Multi-pass analysis provides deep insights into your code’s complexity by:</p>
+<p>Multi-pass analysis (enabled by default) provides deep insights into your code’s complexity by:</p>
 <ol>
 <li><strong>Separating signal from noise</strong> - Distinguishing logical complexity from formatting artifacts</li>
 <li><strong>Attributing complexity sources</strong> - Identifying what contributes to complexity and why</li>
@@ -16335,8 +16355,8 @@ let analyzer = MultiPassAnalyzer::new(options);
 <li><strong>Validating refactoring</strong> - Comparing before/after to prove complexity reduction</li>
 <li><strong>Monitoring performance</strong> - Ensuring overhead stays within acceptable bounds</li>
 </ol>
-<p>Use <code>--multi-pass --attribution</code> when you need detailed complexity analysis and targeted refactoring guidance. The overhead (typically 15-25%) is worthwhile when you need to understand <em>why</em> code is complex and <em>how</em> to improve it.</p>
-<p>For quick complexity checks and CI/CD integration, standard single-pass analysis is usually sufficient. Save multi-pass analysis for deep dives, refactoring validation, and complexity investigations.</p>
+<p>Multi-pass analysis runs by default, providing the most valuable insights out of the box. The overhead (typically 15-25%) is worthwhile for understanding <em>why</em> code is complex and <em>how</em> to improve it.</p>
+<p>For performance-critical scenarios or very large codebases, use <code>--no-multi-pass</code> to disable multi-pass analysis and run faster single-pass analysis instead. You can also use the <code>DEBTMAP_SINGLE_PASS=1</code> environment variable to disable multi-pass analysis globally.</p>
 <hr>
 <p><strong>See Also:</strong></p>
 <ul>
@@ -23777,7 +23797,7 @@ debtmap compare main --show-new-only
 <h2 id="quick-fixes-for-common-issues"><a class="header" href="#quick-fixes-for-common-issues">Quick Fixes for Common Issues</a></h2>
 <p>If you’re experiencing problems, try these first:</p>
 <ol>
-<li><strong>Analysis is slow</strong>: Adjust threads with <code>--jobs</code> or use <code>--semantic-off</code> for faster fallback mode</li>
+<li><strong>Analysis is slow</strong>: Adjust threads with <code>--jobs</code>, use <code>--no-multi-pass</code> for faster single-pass analysis, or use <code>--semantic-off</code> for faster fallback mode</li>
 <li><strong>Parse errors</strong>: Use <code>--semantic-off</code> for faster fallback mode or exclude problematic files</li>
 <li><strong>No output</strong>: Increase verbosity with <code>-v</code> or lower <code>--min-priority</code></li>
 <li><strong>Inconsistent results</strong>: Check if coverage file changed or context providers are enabled</li>
@@ -23823,11 +23843,17 @@ debtmap path/to/subset
 <pre><code class="language-bash"># Use all available CPU cores
 debtmap --jobs 0
 
+# Disable multi-pass analysis for faster single-pass (slightly less detailed)
+debtmap --no-multi-pass
+
 # Try faster fallback mode (less accurate)
 debtmap --semantic-off
 
 # Use plain output for faster terminal rendering
 debtmap --plain
+
+# Or set environment variable to disable multi-pass globally
+export DEBTMAP_SINGLE_PASS=1
 </code></pre>
 <p>See <a href="#performance-tips">Performance Tips</a> for detailed optimization strategies.</p>
 <h3 id="file-permission-errors"><a class="header" href="#file-permission-errors">File Permission Errors</a></h3>
@@ -24005,7 +24031,10 @@ debtmap --no-parallel
 <li><strong>Use <code>--no-parallel</code></strong>: Debugging concurrency issues</li>
 </ul>
 <h3 id="analysis-optimizations"><a class="header" href="#analysis-optimizations">Analysis Optimizations</a></h3>
-<pre><code class="language-bash"># Fast mode: disable semantic analysis
+<pre><code class="language-bash"># Faster: disable multi-pass analysis (single-pass mode)
+debtmap --no-multi-pass
+
+# Fast mode: disable semantic analysis
 debtmap --semantic-off
 
 # Plain output: faster terminal rendering
@@ -24027,7 +24056,8 @@ debtmap --min-priority 4 --top 20
 <tr><th>Configuration</th><th>Speed</th><th>Accuracy</th></tr>
 </thead>
 <tbody>
-<tr><td>Default</td><td>Fast</td><td>High</td></tr>
+<tr><td>Default (multi-pass)</td><td>Fast</td><td>Highest</td></tr>
+<tr><td><code>--no-multi-pass</code></td><td>Faster</td><td>High</td></tr>
 <tr><td><code>--semantic-off</code></td><td>Fastest</td><td>Medium</td></tr>
 <tr><td><code>--no-parallel</code></td><td>Slowest</td><td>High</td></tr>
 <tr><td><code>--jobs 4</code></td><td>Medium</td><td>High</td></tr>
@@ -24201,19 +24231,23 @@ debtmap --context -v | grep "context provider"
 <h2 id="advanced-analysis-troubleshooting"><a class="header" href="#advanced-analysis-troubleshooting">Advanced Analysis Troubleshooting</a></h2>
 <p>Advanced CLI flags for specialized analysis scenarios.</p>
 <h3 id="multi-pass-analysis-2"><a class="header" href="#multi-pass-analysis-2">Multi-Pass Analysis</a></h3>
-<p><strong>Flag</strong>: <code>--multi-pass</code></p>
-<p>Multi-pass analysis performs multiple iterations to refine results.</p>
-<pre><code class="language-bash"># Enable multi-pass analysis
-debtmap --multi-pass
+<p>Multi-pass analysis is <strong>enabled by default</strong> and performs two iterations (raw and normalized) to distinguish logical complexity from formatting artifacts.</p>
+<pre><code class="language-bash"># Multi-pass analysis runs by default
+debtmap analyze .
 
-# Useful for complex projects with intricate dependencies
-# May increase analysis time but improve accuracy
+# Disable for performance-critical scenarios
+debtmap --no-multi-pass
+
+# Or use environment variable
+export DEBTMAP_SINGLE_PASS=1
+debtmap analyze .
 </code></pre>
-<p><strong>When to use</strong>:</p>
+<p><strong>When to disable (<code>--no-multi-pass</code>)</strong>:</p>
 <ul>
-<li>Complex dependency graphs</li>
-<li>Large codebases with deep nesting</li>
-<li>When single-pass results seem incomplete</li>
+<li>Performance-critical CI/CD pipelines</li>
+<li>Very large codebases (&gt;100k LOC)</li>
+<li>Quick complexity checks during development</li>
+<li>When formatting is already standardized</li>
 </ul>
 <h3 id="attribution-output"><a class="header" href="#attribution-output">Attribution Output</a></h3>
 <p><strong>Flag</strong>: <code>--show-attribution</code></p>
@@ -24707,14 +24741,14 @@ debtmap path/to/file.rs -vv
 <li>Libraries where everything is intentionally public</li>
 </ul>
 <h3 id="combining-advanced-flags"><a class="header" href="#combining-advanced-flags">Combining Advanced Flags</a></h3>
-<pre><code class="language-bash"># Comprehensive analysis with all features
-debtmap --multi-pass --attribution --context -vv
+<pre><code class="language-bash"># Comprehensive analysis with all features (multi-pass is default)
+debtmap --attribution --context -vv
 
 # Minimal filtering for exploration
 debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
-# Performance-focused advanced analysis
-debtmap --multi-pass --jobs 8
+# Performance-focused analysis (disable multi-pass)
+debtmap --no-multi-pass --jobs 8
 
 # Summary view with aggregated scores
 debtmap --detail-level summary --aggregate-only
@@ -25414,6 +25448,9 @@ debtmap validate-improvement \
 <p>A: Check several factors:</p>
 <pre><code class="language-bash"># Use all CPU cores
 debtmap --jobs 0
+
+# Disable multi-pass for faster single-pass analysis
+debtmap --no-multi-pass
 
 # Try faster fallback mode
 debtmap --semantic-off

@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-28e21e55.js";
+            window.path_to_searchindex_js = "searchindex-c55bfb7a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f78e0b5d.js"></script>
@@ -358,7 +358,7 @@ debtmap analyze . --detail-level high       # More detailed output
 <pre><code class="language-bash"># Analysis behavior
 --semantic-off              # Disable semantic analysis
 --no-context-aware          # Disable context-aware analysis
---multi-pass                # Enable multi-pass analysis for deeper insights
+--no-multi-pass             # Disable multi-pass analysis (for performance-critical scenarios)
 --validate-loc              # Validate lines of code calculations
 
 # Rust-specific options
