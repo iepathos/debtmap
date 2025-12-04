@@ -1,0 +1,79 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "multi-pass-analysis",
+  "chapter_title": "Multi-Pass Analysis",
+  "chapter_file": "book/src/multi-pass-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Good comprehensive documentation with minor broken links and one incorrect CLI flag reference. Content accurately reflects implementation with detailed examples and explanations.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 1 broken internal link in 'See Also' section",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "analysis-guide.md",
+          "expected_path": "book/src/analysis-guide.md",
+          "current_file": "book/src/multi-pass-analysis.md",
+          "exists": false,
+          "suggestion": "analysis-guide/index.md",
+          "reason": "Chapter migrated to multi-subsection structure"
+        }
+      ],
+      "fix_suggestion": "Update link from 'analysis-guide.md' to 'analysis-guide/index.md' to reflect the multi-subsection chapter structure"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "CLI Usage - Available Flags",
+      "description": "Documentation shows '--detail-level <level>' with lowercase values but DetailLevel enum uses capitalized variants",
+      "current_content": "Set output detail: `summary`, `standard`, `comprehensive`, `debug`",
+      "should_be": "Based on enum definition, values should be 'Summary', 'Standard', 'Comprehensive', 'Debug' (capitalized), OR documentation should clarify that CLI accepts lowercase and converts internally",
+      "fix_suggestion": "Clarify that CLI accepts lowercase values: 'Note: CLI accepts lowercase values (summary, standard, comprehensive, debug) and converts them internally'",
+      "source_reference": "src/analysis/diagnostics/mod.rs:93-99 (DetailLevel enum)",
+      "analysis": "The documentation shows lowercase examples which may or may not match CLI parsing. Need to verify if clap's value parser accepts lowercase and converts to enum variants."
+    }
+  ],
+  "positive_aspects": [
+    "Excellent comprehensive coverage of multi-pass analysis feature",
+    "Clear diagrams showing the two-pass analysis process",
+    "Detailed examples with code snippets for both Rust API and CLI usage",
+    "Good explanation of attribution categories (logical, formatting, pattern)",
+    "Well-structured performance considerations section",
+    "Accurate representation of implementation details from source code",
+    "Clear use cases section explaining when to use/not use multi-pass",
+    "Forward-looking section on Spec 84 improvements",
+    "Comprehensive configuration options table with accurate field descriptions",
+    "Good comparative analysis examples"
+  ],
+  "improvement_suggestions": [
+    "Fix broken link to analysis-guide.md (should be analysis-guide/index.md)",
+    "Clarify DetailLevel case sensitivity in CLI examples",
+    "Consider adding a troubleshooting section for common multi-pass issues",
+    "Add examples of performance overhead in real-world scenarios",
+    "Consider mentioning DEBTMAP_SINGLE_PASS environment variable earlier in the document",
+    "Add cross-references to other multi-pass related features"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Multi-pass analysis overview",
+      "Complexity attribution",
+      "Attribution display options",
+      "Configuration and usage",
+      "Performance considerations"
+    ],
+    "validation_focus": "Check that multi-pass analysis and attribution features are documented",
+    "internal_links_found": 5,
+    "broken_links_found": 1,
+    "valid_links": [
+      "scoring-strategies.md",
+      "coverage-integration.md",
+      "examples.md"
+    ]
+  }
+}

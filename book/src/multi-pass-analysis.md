@@ -93,7 +93,7 @@ debtmap analyze . --no-multi-pass
 |------|-------------|
 | `--no-multi-pass` | Disable multi-pass analysis (use single-pass for performance) |
 | `--attribution` | Show detailed complexity attribution breakdown (requires multi-pass) |
-| `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` |
+| `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` (CLI accepts lowercase values) |
 | `--json` | Output results in JSON format |
 
 > **Note**: The `--attribution` flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use `--no-multi-pass` only when performance is critical.
@@ -709,7 +709,7 @@ For performance-critical scenarios or very large codebases, use `--no-multi-pass
 ---
 
 **See Also:**
-- [Analysis Guide](analysis-guide.md) - General analysis capabilities
+- [Analysis Guide](analysis-guide/index.md) - General analysis capabilities
 - [Scoring Strategies](scoring-strategies.md) - How complexity affects debt scores
 - [Coverage Integration](coverage-integration.md) - Combining complexity with coverage
 - [Examples](examples.md) - Real-world multi-pass analysis examples
