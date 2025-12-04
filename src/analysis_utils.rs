@@ -12,7 +12,6 @@ use std::thread;
 use std::time::Duration;
 
 pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
-    use crate::progress::{ProgressManager, TEMPLATE_FILE_ANALYSIS};
     use indicatif::ParallelProgressIterator;
 
     // Only apply file limit if explicitly set by user
@@ -41,26 +40,30 @@ pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
         }
     };
 
-    // Create progress bar using global progress manager
-    let progress = ProgressManager::global().map(|pm| {
-        let pb = pm.create_bar(total_files as u64, TEMPLATE_FILE_ANALYSIS);
-        pb.set_message("Analyzing files");
-        pb
-    });
+    // Use atomic counter for live progress updates
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let processed_count = Arc::new(AtomicUsize::new(0));
+    let processed_count_clone = Arc::clone(&processed_count);
 
     let results: Vec<FileMetrics> = files_to_process
         .par_iter()
-        .progress_with(
-            progress
-                .clone()
-                .unwrap_or_else(indicatif::ProgressBar::hidden),
-        )
-        .filter_map(|path| analyze_single_file(path.as_path()))
-        .collect();
+        .filter_map(|path| {
+            let result = analyze_single_file(path.as_path());
 
-    if let Some(pb) = progress {
-        pb.finish_with_message(format!("Analyzed {} files", results.len()));
-    }
+            // Update progress after each file
+            let current = processed_count_clone.fetch_add(1, Ordering::Relaxed) + 1;
+            crate::io::progress::AnalysisProgress::with_global(|p| {
+                p.update_progress(crate::io::progress::PhaseProgress::Progress {
+                    current,
+                    total: total_files,
+                });
+            });
+
+            result
+        })
+        .collect();
 
     results
 }

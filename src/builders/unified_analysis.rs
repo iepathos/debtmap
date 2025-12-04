@@ -228,11 +228,9 @@ fn perform_unified_analysis_computation(
     // Run inter-procedural purity propagation (spec 156)
     let purity_propagation_start = std::time::Instant::now();
     enriched_metrics = run_purity_propagation(&enriched_metrics, &call_graph);
-    let purity_propagation_time = purity_propagation_start.elapsed();
+    let _purity_propagation_time = purity_propagation_start.elapsed();
 
-    if !quiet_mode {
-        eprintln!("Purity propagation: {:?}", purity_propagation_time);
-    }
+    // Progress is already tracked by unified AnalysisProgress system
 
     let result = create_unified_analysis_with_exclusions_and_timing(
         &enriched_metrics,
@@ -397,43 +395,21 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
     use std::time::Instant;
     let start = Instant::now();
-    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    let _quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+
+    // Progress is tracked by unified AnalysisProgress system - no individual step output needed
 
     // Step 1: Initialize unified analysis with data flow graph
-    let step_start = Instant::now();
     let mut unified = UnifiedAnalysis::new(call_graph.clone());
-    if !quiet_mode {
-        eprintln!(
-            "  [TIME]Data flow graph creation: {:?}",
-            step_start.elapsed()
-        );
-    }
 
     // Step 2: Populate purity analysis
-    let step_start = Instant::now();
     unified.populate_purity_analysis(metrics);
-    if !quiet_mode {
-        eprintln!(
-            "  [TIME]Purity analysis ({} functions): {:?}",
-            metrics.len(),
-            step_start.elapsed()
-        );
-    }
 
     // Step 3: Find test-only functions
-    let step_start = Instant::now();
     let test_only_functions: HashSet<_> =
         call_graph.find_test_only_functions().into_iter().collect();
-    if !quiet_mode {
-        eprintln!(
-            "  [TIME]Test function detection ({} found): {:?}",
-            test_only_functions.len(),
-            step_start.elapsed()
-        );
-    }
 
     // Step 4: Setup debt aggregator
-    let step_start = Instant::now();
     let mut debt_aggregator = DebtAggregator::new();
     if let Some(debt_items) = debt_items {
         let function_mappings: Vec<(AggregatorFunctionId, usize, usize)> = metrics
@@ -447,17 +423,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
         let debt_items_vec: Vec<DebtItem> = debt_items.to_vec();
         debt_aggregator.aggregate_debt(debt_items_vec, &function_mappings);
     }
-    if !quiet_mode {
-        eprintln!("  [TIME]Debt aggregator setup: {:?}", step_start.elapsed());
-    }
 
     // Step 5: Per-function debt analysis (main loop)
-    let step_start = Instant::now();
-    let mut processed_count = 0;
-    let mut skipped_count = 0;
     for metric in metrics {
         if should_skip_metric_for_debt_analysis(metric, call_graph, &test_only_functions) {
-            skipped_count += 1;
             continue;
         }
         let item = create_debt_item_from_metric_with_aggregator(
@@ -470,46 +439,22 @@ fn create_unified_analysis_with_exclusions_and_timing(
             Some(&unified.data_flow_graph),
         );
         unified.add_item(item);
-        processed_count += 1;
-    }
-    if !quiet_mode {
-        eprintln!(
-            "  [TIME]Per-function analysis ({} processed, {} skipped): {:?}",
-            processed_count,
-            skipped_count,
-            step_start.elapsed()
-        );
     }
 
     // Step 6: Error swallowing analysis
-    let step_start = Instant::now();
-    let mut error_swallow_count = 0;
     if let Some(debt_items) = debt_items {
         let error_swallowing_items = convert_error_swallowing_to_unified(debt_items, call_graph);
-        error_swallow_count = error_swallowing_items.len();
         for item in error_swallowing_items {
             unified.add_item(item);
         }
     }
-    if !quiet_mode && error_swallow_count > 0 {
-        eprintln!(
-            "  [TIME]Error swallowing conversion ({} items): {:?}",
-            error_swallow_count,
-            step_start.elapsed()
-        );
-    }
 
     // Step 7: File-level analysis
-    let step_start = Instant::now();
     analyze_files_for_debt(&mut unified, metrics, coverage_data, no_god_object);
-    if !quiet_mode {
-        eprintln!("  [TIME]File-level analysis: {:?}", step_start.elapsed());
-    }
 
     // Step 8: File aggregation has been removed - skip to step 9
 
     // Step 9: Final sorting and impact calculation
-    let step_start = Instant::now();
     unified.sort_by_priority();
     unified.calculate_total_impact();
 
@@ -521,14 +466,6 @@ fn create_unified_analysis_with_exclusions_and_timing(
     }
 
     let total_time = start.elapsed();
-
-    if !quiet_mode {
-        eprintln!(
-            "  [TIME]Final sorting & impact calc: {:?}",
-            step_start.elapsed()
-        );
-        eprintln!("  [TIME]TOTAL unified analysis time: {:?}", total_time);
-    }
 
     // Attach timing information for sequential analysis (spec 130)
     // Note: Sequential analysis doesn't track individual phase timings,
@@ -1192,10 +1129,8 @@ fn integrate_trait_resolution(
     // Detect common trait patterns (Default, Clone, etc.) and mark them as entry points
     trait_registry.detect_common_trait_patterns(call_graph);
 
-    // Create spinner for trait resolution (count unknown upfront)
-    let progress = crate::progress::ProgressManager::global()
-        .map(|pm| pm.create_spinner("Resolving trait method calls"))
-        .unwrap_or_else(indicatif::ProgressBar::hidden);
+    // Suppress spinner - unified progress system already shows "4/4 Resolving dependencies"
+    let progress = indicatif::ProgressBar::hidden();
 
     // Resolve trait method calls to concrete implementations
     let resolved_count =

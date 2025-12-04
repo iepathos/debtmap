@@ -8,7 +8,7 @@ use crate::{
         file_metrics::FileDebtItem,
         UnifiedAnalysis, UnifiedAnalysisUtils, UnifiedDebtItem,
     },
-    progress::{ProgressManager, TEMPLATE_FILE_ANALYSIS},
+    progress::ProgressManager,
     risk::lcov::LcovData,
 };
 use indicatif::ParallelProgressIterator;
@@ -403,24 +403,14 @@ impl ParallelUnifiedAnalysisBuilder {
 
         let timings = Arc::new(Mutex::new(self.timings.clone()));
 
-        // Create progress spinners for Phase 1 tasks if progress manager is available
-        // Show initialization progress at all verbosity levels (these are key phases)
-        let (df_progress, purity_progress, test_progress, debt_progress) =
-            if let Some(pm) = ProgressManager::global() {
-                (
-                    pm.create_spinner("Initializing data flow graph"),
-                    pm.create_spinner("Analyzing function purity"),
-                    pm.create_spinner("Detecting test functions"),
-                    pm.create_spinner("Aggregating debt items"),
-                )
-            } else {
-                (
-                    indicatif::ProgressBar::hidden(),
-                    indicatif::ProgressBar::hidden(),
-                    indicatif::ProgressBar::hidden(),
-                    indicatif::ProgressBar::hidden(),
-                )
-            };
+        // Suppress old progress spinners - unified system already shows "4/4 Resolving dependencies"
+        // These sub-tasks are handled silently by the unified progress system
+        let (df_progress, purity_progress, test_progress, debt_progress) = (
+            indicatif::ProgressBar::hidden(),
+            indicatif::ProgressBar::hidden(),
+            indicatif::ProgressBar::hidden(),
+            indicatif::ProgressBar::hidden(),
+        );
 
         let df_progress = Arc::new(df_progress);
         let purity_progress = Arc::new(purity_progress);
@@ -602,17 +592,8 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
 
-        // Create progress bar for function analysis using global progress manager
-        let progress = ProgressManager::global().map(|pm| {
-            let pb = pm.create_bar(
-                metrics.len() as u64,
-                crate::progress::TEMPLATE_FUNCTION_ANALYSIS,
-            );
-            pb.set_message("Analyzing functions");
-            // Enable steady tick for CPU-intensive parallel processing
-            pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            pb
-        });
+        // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
+        let progress: Option<indicatif::ProgressBar> = None;
 
         // Create analysis context for the pipeline
         let context = FunctionAnalysisContext {
@@ -720,15 +701,8 @@ impl ParallelUnifiedAnalysisBuilder {
                 .push(metric);
         }
 
-        // Create progress bar if global progress manager is available
-        // Show file analysis progress at all verbosity levels (it's a major phase)
-        let progress = ProgressManager::global()
-            .map(|pm| {
-                let pb = pm.create_bar(files_map.len() as u64, TEMPLATE_FILE_ANALYSIS);
-                pb.set_message("Analyzing files (detecting god objects, calculating metrics)");
-                pb
-            })
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
+        // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
+        let progress = indicatif::ProgressBar::hidden();
 
         // Analyze files in parallel with progress tracking
         let file_items: Vec<FileDebtItem> = files_map

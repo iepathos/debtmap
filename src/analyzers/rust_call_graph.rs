@@ -42,18 +42,9 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     // Phase 1: Extract all functions, collect unresolved calls, and analyze imports
     let phase1_start = std::time::Instant::now();
     let total_files = files.len();
-    let phase1_progress = crate::progress::ProgressManager::global()
-        .map(|pm| {
-            let pb = pm.create_bar(
-                total_files as u64,
-                "{msg} {pos}/{len} files ({percent}%) - {eta}",
-            );
-            pb.set_message("Analyzing functions and imports");
-            pb
-        })
-        .unwrap_or_else(indicatif::ProgressBar::hidden);
 
-    for (file, path) in files {
+    // Update unified progress as files are processed
+    for (_idx, (file, path)) in files.iter().enumerate() {
         let mut extractor = CallGraphExtractor::new(path.clone());
         // Extract functions and collect unresolved calls
         extractor.extract_phase1(file);
@@ -67,7 +58,14 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         // Analyze imports for this file
         path_resolver_builder = path_resolver_builder.analyze_file(path.clone(), file);
 
-        phase1_progress.inc(1);
+        // Report progress to unified system
+        let node_count = combined_graph.node_count();
+        crate::io::progress::AnalysisProgress::with_global(|p| {
+            p.update_progress(crate::io::progress::PhaseProgress::Progress {
+                current: node_count,
+                total: node_count, // We don't know total yet, show current
+            });
+        });
     }
 
     let phase1_duration = phase1_start.elapsed();
@@ -78,13 +76,6 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         combined_graph.get_all_functions().count(),
         all_unresolved_calls.len()
     );
-
-    phase1_progress.finish_with_message(format!(
-        "Analyzed {} files, {} unresolved calls ({}s)",
-        total_files,
-        all_unresolved_calls.len(),
-        phase1_duration.as_secs()
-    ));
 
     let resolver_build_start = std::time::Instant::now();
     let path_resolver = path_resolver_builder
@@ -102,17 +93,8 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     let mut resolved_calls = Vec::new();
 
     let total_unresolved = all_unresolved_calls.len();
-    let phase2_progress = crate::progress::ProgressManager::global()
-        .map(|pm| {
-            let pb = pm.create_bar(
-                total_unresolved as u64,
-                "{msg} {pos}/{len} calls ({percent}%) - {eta}",
-            );
-            pb.set_message("Resolving function calls");
-            pb
-        })
-        .unwrap_or_else(indicatif::ProgressBar::hidden);
 
+    // Suppress old progress bars - unified system already shows "3/4 Building call graph"
     let mut call_resolver_hits = 0;
     let mut path_resolver_hits = 0;
     let mut unresolved_count = 0;
@@ -152,9 +134,15 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
                 }
             }
 
-            // Update progress every 100 calls to avoid overhead
-            if idx % 100 == 0 || idx == total_unresolved - 1 {
-                phase2_progress.set_position((idx + 1) as u64);
+            // Update unified progress periodically (every 500 calls to avoid overhead)
+            if idx % 500 == 0 {
+                let total_nodes = combined_graph.node_count();
+                crate::io::progress::AnalysisProgress::with_global(|p| {
+                    p.update_progress(crate::io::progress::PhaseProgress::Progress {
+                        current: total_nodes,
+                        total: total_nodes,
+                    });
+                });
             }
 
             // Log progress every 1000 calls
@@ -181,13 +169,6 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
         unresolved_count
     );
 
-    phase2_progress.finish_with_message(format!(
-        "Resolved {}/{} calls ({}s)",
-        resolved_calls.len(),
-        total_unresolved,
-        phase2_duration.as_secs()
-    ));
-
     // Add all resolved calls
     for call in resolved_calls {
         combined_graph.add_call(call);
@@ -199,6 +180,15 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     combined_graph.resolve_cross_file_calls();
     let phase3_duration = phase3_start.elapsed();
     log::info!("Phase 3 completed in {:.2}s", phase3_duration.as_secs_f64());
+
+    // Update unified progress with final node count
+    let final_node_count = combined_graph.node_count();
+    crate::io::progress::AnalysisProgress::with_global(|p| {
+        p.update_progress(crate::io::progress::PhaseProgress::Progress {
+            current: final_node_count,
+            total: final_node_count,
+        });
+    });
 
     let total_duration = start_time.elapsed();
     log::info!(

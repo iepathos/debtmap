@@ -8,7 +8,6 @@ use crate::{
         call_graph::{CallGraph, FunctionId},
         parallel_call_graph::{ParallelCallGraph, ParallelConfig},
     },
-    progress::ProgressManager,
 };
 use anyhow::{Context, Result};
 use rayon::prelude::*;
@@ -110,15 +109,8 @@ impl ParallelCallGraphBuilder {
         rust_files: &[PathBuf],
         parallel_graph: &Arc<ParallelCallGraph>,
     ) -> Result<Vec<(PathBuf, syn::File)>> {
-        // Create progress bar using global progress manager
-        let progress = ProgressManager::global().map(|pm| {
-            let pb = pm.create_bar(
-                rust_files.len() as u64,
-                crate::progress::TEMPLATE_CALL_GRAPH,
-            );
-            pb.set_message("Building call graph");
-            pb
-        });
+        // Suppress old progress bars when unified progress system is active
+        // The unified system already shows "3/4 Building call graph"
 
         // Step 1: Read file contents in parallel (I/O bound)
         let file_contents: Vec<_> = rust_files
@@ -130,24 +122,25 @@ impl ParallelCallGraphBuilder {
             .collect();
 
         // Step 2: Parse files to AST (cannot be parallelized due to syn::File not being Send)
+        let total_files = file_contents.len();
         let parsed_files: Vec<_> = file_contents
             .iter()
-            .filter_map(|(file_path, content)| {
+            .enumerate()
+            .filter_map(|(idx, (file_path, content))| {
                 let parsed = syn::parse_file(content).ok()?;
                 parallel_graph.stats().increment_files();
 
-                if let Some(ref pb) = progress {
-                    pb.inc(1);
-                }
+                // Update unified progress
+                crate::io::progress::AnalysisProgress::with_global(|p| {
+                    p.update_progress(crate::io::progress::PhaseProgress::Progress {
+                        current: idx + 1,
+                        total: total_files,
+                    });
+                });
 
                 Some((file_path.clone(), parsed))
             })
             .collect();
-
-        // Finish progress bar with completion message
-        if let Some(pb) = progress {
-            pb.finish_with_message("Call graph complete");
-        }
 
         Ok(parsed_files)
     }
@@ -201,18 +194,7 @@ impl ParallelCallGraphBuilder {
         let base_graph = parallel_graph.to_call_graph();
         let mut enhanced_builder = RustCallGraphBuilder::from_base_graph(base_graph);
 
-        // Create progress bar for enhanced analysis
-        let progress = crate::progress::ProgressManager::global()
-            .map(|pm| {
-                let pb = pm.create_bar(
-                    workspace_files.len() as u64,
-                    "{msg} {pos}/{len} files ({percent}%) - {eta}",
-                );
-                pb.set_message("Enhanced call graph analysis");
-                pb
-            })
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
-
+        // Suppress old progress bars - unified system already shows "3/4 Building call graph"
         // Process files sequentially for enhanced analysis
         // (This is complex to parallelize due to shared state)
         for (file_path, parsed) in &workspace_files {
@@ -221,26 +203,13 @@ impl ParallelCallGraphBuilder {
                 .analyze_trait_dispatch(file_path, parsed)?
                 .analyze_function_pointers(file_path, parsed)?
                 .analyze_framework_patterns(file_path, parsed)?;
-            progress.inc(1);
         }
 
-        progress.finish_with_message("Enhanced analysis complete");
-
-        // Cross-module analysis
-        let cross_module_progress = crate::progress::ProgressManager::global()
-            .map(|pm| pm.create_spinner("Analyzing cross-module calls"))
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
-
+        // Cross-module analysis (no progress bar needed)
         enhanced_builder.analyze_cross_module(&workspace_files)?;
-        cross_module_progress.finish_with_message("Cross-module analysis complete");
 
         // Finalize trait analysis - detect patterns ONCE after all files processed
-        let trait_progress = crate::progress::ProgressManager::global()
-            .map(|pm| pm.create_spinner("Resolving trait patterns and method calls"))
-            .unwrap_or_else(indicatif::ProgressBar::hidden);
-
         enhanced_builder.finalize_trait_analysis()?;
-        trait_progress.finish_with_message("Trait resolution complete");
 
         // Extract results
         let enhanced_graph = enhanced_builder.build();

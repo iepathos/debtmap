@@ -182,8 +182,10 @@ impl AnalysisProgress {
                 .map(|d| format!(" - {}s", d.as_secs()))
                 .unwrap_or_default();
 
+            // Clear the line first, then write new content
+            // Use ANSI escape code to clear from cursor to end of line: \x1b[K
             eprint!(
-                "\r{} {}/{} {}...{:30}{}",
+                "\r\x1b[K{} {}/{} {}...{}{}",
                 indicator, phase_num, total_phases, phase.name, progress_str, duration_str
             );
 
