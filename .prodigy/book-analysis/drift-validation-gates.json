@@ -1,0 +1,100 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "validation-gates",
+  "chapter_title": "Validation and Quality Gates",
+  "chapter_file": "book/src/validation-gates.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and well-structured, but contains incorrect information about the --summary flag implementation and references CLI output format that doesn't match the actual implementation. The core concepts and workflows are accurate.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Summary Output Format",
+      "description": "Documentation describes a --summary/-s flag for the validate command that exists in the CLI definition but is not actually implemented in ValidateConfig or used anywhere in the validation logic",
+      "current_content": "For compact output suitable for CI logs, use the `--summary` or `-s` flag:\n\n```bash\ndebtmap validate . --summary\n# or\ndebtmap validate . -s\n```",
+      "should_be": "The --summary flag is defined in CLI but not implemented. Either implement it or remove documentation until feature is complete.",
+      "fix_suggestion": "Remove the Summary Output Format section (lines 299-330) until the --summary flag is properly implemented in ValidateConfig and validation_printer",
+      "source_reference": "src/cli.rs:105,362 defines summary: bool but src/commands/validate.rs:ValidateConfig lacks this field"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "Summary Output Format",
+      "description": "Documentation shows tiered priority output format that is not produced by the validate command",
+      "current_content": "**Summary format output:**\n```\n✅ Validation PASSED\n\nPriority Tiers:\n  P0 (Critical): 2 items\n  P1 (High): 8 items\n  P2 (Medium): 15 items\n  P3 (Low): 23 items\n\nTop Issues:\n  1. Complex authentication logic (complexity: 28)\n  2. Database connection pool (risk: 9.2)\n  3. Untested error handler (coverage: 0%)\n```",
+      "should_be": "Actual validation output format from validation_printer.rs shows metrics and thresholds, not priority tiers",
+      "fix_suggestion": "Replace example output with actual format from validation_printer::print_validation_success() and print_validation_failure_with_details()",
+      "source_reference": "src/utils/validation_printer.rs:4-33 shows actual output format"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "medium",
+      "section": "Understanding Validation Output",
+      "description": "Success and failure output examples show checkmarks/X symbols that aren't in the actual implementation",
+      "current_content": "**Success output:**\n```\n✅ Validation PASSED\n\nMetrics:\n  Average Complexity: 7.2 / 10.0 ✓\n  Debt Density: 32.5 / 50.0 ✓\n  Codebase Risk: 5.8 / 7.0 ✓\n  Total Debt Score: 1250 / 10000 ✓\n```",
+      "should_be": "Actual output uses [OK] prefix and different format per validation_printer.rs",
+      "fix_suggestion": "Update examples to match actual validation_printer output format with '[OK]' or '[ERROR]' prefixes",
+      "source_reference": "src/utils/validation_printer.rs:5,20 shows actual output format with [OK] and [ERROR] prefixes"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Troubleshooting",
+      "description": "Documentation mentions --summary flag in troubleshooting section but flag is not implemented",
+      "current_content": "**Issue: Output is too verbose for CI logs**\n```bash\n# Solution: Use --summary flag for compact tiered output\ndebtmap validate . --summary\n# or\ndebtmap validate . -s\n```",
+      "should_be": "Remove --summary flag references until implemented, suggest other verbosity controls",
+      "fix_suggestion": "Replace with: Use lower verbosity levels or filter output with --top flag",
+      "source_reference": "src/commands/validate.rs:11-29 ValidateConfig has verbosity and top, not summary"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Exit Codes and CI Integration",
+      "description": "Documentation doesn't explain the actual exit code behavior when validation fails",
+      "current_content": "**Exit codes:**\n- **`0`** - Success: All thresholds passed\n- **Non-zero** - Failure: One or more thresholds exceeded or errors occurred",
+      "should_be": "Add detail that failure returns anyhow::bail! with 'Validation failed' message",
+      "fix_suggestion": "Add note: 'The validate command uses anyhow::bail! to return a non-zero exit code with the message \"Validation failed\" when thresholds are exceeded.'",
+      "source_reference": "src/commands/validate.rs:166 shows anyhow::bail!(\"Validation failed\")"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of density-based validation concept with clear rationale",
+    "Excellent explanation of why density metrics are superior to absolute counts",
+    "Clear migration guidance from deprecated thresholds with timeline",
+    "Well-structured CI/CD integration examples for GitHub Actions, GitLab CI, and CircleCI",
+    "Good coverage of context-aware validation and coverage integration",
+    "Helpful troubleshooting section with practical debugging advice",
+    "Accurate documentation of core validation metrics and thresholds",
+    "Good progressive threshold tightening recommendations",
+    "Accurate semantic-off flag documentation with clear use cases"
+  ],
+  "improvement_suggestions": [
+    "Implement the --summary flag feature or remove all references to it",
+    "Update all output format examples to match actual validation_printer.rs implementation",
+    "Add examples of actual validation output captured from running the command",
+    "Consider adding a section on how validation integrates with the unified analysis pipeline (spec 130)",
+    "Add information about timing output at different verbosity levels",
+    "Document the DEBTMAP_QUIET environment variable mentioned in display_timing_information",
+    "Add examples of JSON validation output format for programmatic consumption",
+    "Clarify that validation uses the same analysis pipeline as analyze command for consistency"
+  ],
+  "cross_references": [
+    "configuration.md",
+    "examples.md",
+    "cli-reference.md"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Validate command usage",
+      "Debt density thresholds",
+      "Quality gate configuration",
+      "CI/CD integration",
+      "Exit codes and automation",
+      "Deprecated threshold migration"
+    ],
+    "validation_focus": "Check that validate command and quality gate configuration are documented"
+  }
+}
