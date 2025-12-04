@@ -2297,7 +2297,69 @@ Debtmap uses a priority-based classification algorithm:
 
 #### Implementation Details
 
-**Location**: `src/organization/god_object_detector.rs`
+**Module Structure** (Spec 181i - Functional Refactoring):
+
+The god object detection system has been refactored into a modular, functional architecture. All components are organized under `src/organization/god_object/`:
+
+```
+src/organization/god_object/
+├── mod.rs              # Public API and module coordination
+├── types.rs            # Core data structures (GodObjectAnalysis, StructMetrics, etc.)
+├── thresholds.rs       # Configuration and threshold definitions
+├── predicates.rs       # Pure predicate functions for classification logic
+├── scoring.rs          # Pure scoring calculations (god object score, ratios)
+├── classifier.rs       # Domain classification and responsibility grouping
+├── recommender.rs      # Recommendation generation (module splits, refactoring advice)
+├── detector.rs         # Orchestration layer (coordinates pure functions)
+├── ast_visitor.rs      # I/O shell (AST traversal and data extraction)
+└── legacy_compat.rs    # Backward compatibility shims (deprecated)
+```
+
+**Design Principles**:
+- **Pure Functions**: All business logic is implemented as pure, testable functions
+- **Separation of Concerns**: I/O (AST visiting) is separated from computation (scoring, classification)
+- **Immutable Data Flow**: Data structures are transformed through functional pipelines
+- **Type Safety**: Strong typing ensures correctness at compile time
+- **Composability**: Small, focused functions compose into complex analysis
+
+**Key Components**:
+
+1. **types.rs**: Core data structures representing analysis results
+   - `GodObjectAnalysis`: Complete analysis result
+   - `StructMetrics`: Metrics for individual structs
+   - `ModuleSplit`: Recommended module split structure
+
+2. **predicates.rs**: Boolean classification functions
+   - `is_god_object()`: Determines if metrics exceed thresholds
+   - `is_high_priority()`: Priority classification
+   - Pure functions returning `bool` based on metrics
+
+3. **scoring.rs**: Numeric scoring calculations
+   - `calculate_god_object_score()`: Main scoring algorithm
+   - `calculate_struct_ratio()`: Ratio calculations
+   - Pure functions returning scores/ratios
+
+4. **classifier.rs**: Domain and responsibility classification
+   - `classify_struct_domain()`: Domain classification logic
+   - `group_methods_by_responsibility()`: Method grouping
+   - Pure functions operating on method/field data
+
+5. **recommender.rs**: Recommendation generation
+   - `recommend_module_splits()`: Generate split recommendations
+   - `suggest_module_splits_by_domain()`: Domain-based splitting
+   - Pure functions producing actionable advice
+
+6. **detector.rs**: Orchestration layer
+   - Coordinates calls to pure functions
+   - Manages analysis workflow
+   - Minimal logic, mostly function composition
+
+7. **ast_visitor.rs**: I/O boundary
+   - Traverses Rust AST using `syn` crate
+   - Extracts data into pure data structures
+   - Only component with side effects
+
+**Historical Note**: Previously implemented in monolithic files (`god_object_detector.rs`, `god_object_analysis.rs`) with mixed concerns. Refactored in spec 181i to achieve functional purity and improved testability.
 
 **Classification Logic**:
 ```rust

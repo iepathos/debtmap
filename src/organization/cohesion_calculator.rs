@@ -2,7 +2,7 @@
 ///
 /// This module calculates how tightly related the methods within a proposed module are
 /// by analyzing function call patterns. High cohesion indicates methods work together frequently.
-use crate::organization::god_object_analysis::ModuleSplit;
+use crate::organization::god_object::types::ModuleSplit;
 use crate::organization::struct_ownership::StructOwnershipAnalyzer;
 use crate::priority::call_graph::CallGraph;
 use std::collections::HashSet;
@@ -89,8 +89,8 @@ fn extract_struct_name(full_name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::organization::god_object_analysis::ModuleSplit;
-    use crate::organization::god_object_analysis::Priority;
+    use crate::organization::god_object::types::ModuleSplit;
+    use crate::organization::god_object::types::Priority;
     use crate::organization::struct_ownership::StructOwnershipAnalyzer;
     use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
     use std::path::PathBuf;

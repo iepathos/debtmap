@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **God Object Detector Refactoring** (Spec 181i - Phase 9)
+  - Completed migration of god object detection to pure functional architecture
+  - Extracted pure functions for scoring, classification, and recommendation logic
+  - Separated I/O operations (AST visiting) from pure computation
+  - Organized into modular structure: types, thresholds, predicates, scoring, classifier, recommender, detector, ast_visitor
+  - Removed legacy monolithic implementations (god_object_detector.rs, god_object_analysis.rs)
+  - Improved testability and maintainability through functional composition
+  - Updated ARCHITECTURE.md with new module structure documentation
+
 ## [0.7.0] - 2025-12-02
 
 ### Added

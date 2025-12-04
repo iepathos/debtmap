@@ -10,7 +10,7 @@
 //! - Mixed data types (modules operating on unrelated types)
 
 use crate::analyzers::type_registry::MethodSignature;
-use crate::organization::god_object_analysis::ModuleSplit;
+use crate::organization::god_object::types::ModuleSplit;
 use std::collections::HashMap;
 
 /// Anti-pattern detector for analyzing module splits

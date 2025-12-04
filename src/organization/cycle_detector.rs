@@ -2,7 +2,7 @@
 ///
 /// This module detects cycles in the dependency graph between proposed module splits
 /// using depth-first search.
-use crate::organization::god_object_analysis::ModuleSplit;
+use crate::organization::god_object::types::ModuleSplit;
 use std::collections::{HashMap, HashSet};
 
 /// Detect circular dependencies in module splits
@@ -81,7 +81,7 @@ fn dfs_find_cycles(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::organization::god_object_analysis::{ModuleSplit, Priority};
+    use crate::organization::god_object::types::{ModuleSplit, Priority};
 
     fn create_split_with_deps(name: &str, deps_in: Vec<&str>, _deps_out: Vec<&str>) -> ModuleSplit {
         ModuleSplit {

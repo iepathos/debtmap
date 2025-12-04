@@ -28,7 +28,6 @@ pub mod domain_diversity;
 pub mod domain_patterns;
 pub mod file_classifier;
 pub mod god_object;
-pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod hidden_type_extractor;
 pub mod integrated_analyzer;
@@ -44,17 +43,57 @@ pub mod struct_ownership;
 pub mod trait_pattern_analyzer;
 pub mod type_based_clustering;
 
-pub use god_object_analysis::{
-    calculate_domain_diversity_from_structs, calculate_god_object_score,
-    calculate_god_object_score_weighted, calculate_struct_ratio, count_distinct_domains,
-    determine_confidence, determine_cross_domain_severity, group_methods_by_responsibility,
-    group_methods_by_responsibility_with_domain_patterns, infer_responsibility_with_confidence,
-    recommend_module_splits, recommend_module_splits_enhanced,
-    recommend_module_splits_with_evidence, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
-    SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
+// Re-export god object functionality from new modular structure
+pub use god_object::{
+    // Scoring
+    calculate_god_object_score,
+    calculate_god_object_score_weighted,
+    calculate_struct_ratio,
+    classify_struct_domain,
+    count_distinct_domains,
+    // Classification
+    determine_confidence,
+    determine_cross_domain_severity,
+    extract_domain_from_name,
+    group_methods_by_responsibility,
+    infer_responsibility_with_confidence,
+    recommend_module_splits,
+    recommend_module_splits_enhanced,
+    recommend_module_splits_enhanced_with_evidence,
+    recommend_module_splits_with_evidence,
+    // Recommendations
+    suggest_module_splits_by_domain,
+    // Types
+    ClassificationResult,
+    DetectionType,
+    EnhancedGodObjectAnalysis,
+    FunctionVisibilityBreakdown,
+    GodObjectAnalysis,
+    GodObjectConfidence,
+    // Detector
+    GodObjectDetector,
+    // Thresholds
+    GodObjectThresholds,
+    GodObjectType,
+    InterfaceEstimate,
+    MergeRecord,
+    MetricInconsistency,
+    ModuleSplit,
+    Priority,
+    PurityDistribution,
+    RecommendationSeverity,
+    SignalType,
+    SplitAnalysisMethod,
+    StageType,
+    StructMetrics,
+    StructWithMethods,
+};
+
+// Legacy re-exports for backward compatibility (deprecated)
+#[allow(deprecated)]
+pub use god_object::legacy_compat::{
+    calculate_domain_diversity_from_structs, group_methods_by_responsibility_with_domain_patterns,
+    suggest_splits_by_struct_grouping,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;
@@ -328,14 +367,13 @@ pub enum MaintainabilityImpact {
 }
 
 mod feature_envy_detector;
-mod god_object_detector;
 mod magic_value_detector;
 mod parameter_analyzer;
 mod primitive_obsession_detector;
 mod struct_init_detector;
 
 pub use feature_envy_detector::FeatureEnvyDetector;
-pub use god_object_detector::GodObjectDetector;
+// GodObjectDetector is already exported above from god_object module
 pub use magic_value_detector::MagicValueDetector;
 pub use parameter_analyzer::ParameterAnalyzer;
 pub use primitive_obsession_detector::PrimitiveObsessionDetector;

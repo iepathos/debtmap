@@ -1,15 +1,59 @@
-//! God Object Detection Modules
+//! God Object Detection Module
 //!
-//! This module contains specialized components for detecting and analyzing god objects:
-//! - `ast_visitor`: AST traversal and data collection
-//! - `metrics`: Scoring and metric calculations
-//! - `classifier`: Pattern detection and classification
-//! - `recommender`: Recommendation generation
+//! Refactored following Stillwater principles (Pure Core, Imperative Shell).
+//!
+//! ## Architecture
+//!
+//! **Pure Core** (business logic):
+//! - `types` - Data structures (re-exports from sub-modules)
+//! - `thresholds` - Configuration
+//! - `predicates` - Detection predicates
+//! - `scoring` - Scoring algorithms
+//! - `classifier` - Classification logic
+//! - `recommender` - Recommendation generation
+//!
+//! **Orchestration**:
+//! - `detector` - Composes pure functions into pipeline
+//!
+//! **I/O Shell**:
+//! - `ast_visitor` - AST traversal
 
+// Sub-modules for type organization (need to be public for types.rs to re-export)
+pub mod classification_types;
+pub mod core_types;
+pub mod metrics_types;
+pub mod split_types;
+
+// Main modules
 pub mod ast_visitor;
+pub mod classifier;
+pub mod detector;
+pub mod predicates;
+pub mod recommender;
+pub mod scoring;
+pub mod thresholds;
+pub mod types;
+
+// Legacy compatibility - kept for one release cycle
+pub mod legacy_compat;
 pub mod metrics;
 
+// Re-exports for public API
 pub use ast_visitor::{
     FunctionParameter, FunctionWeight, ModuleFunctionInfo, Responsibility, TypeAnalysis,
     TypeVisitor,
 };
+pub use classifier::{
+    calculate_struct_ratio, classify_struct_domain, count_distinct_domains, determine_confidence,
+    extract_domain_from_name, group_methods_by_responsibility,
+    infer_responsibility_with_confidence,
+};
+pub use detector::GodObjectDetector;
+pub use recommender::{
+    determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
+    recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,
+    recommend_module_splits_with_evidence, sanitize_module_name, suggest_module_splits_by_domain,
+};
+pub use scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
+pub use thresholds::*;
+pub use types::*;

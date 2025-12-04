@@ -12,9 +12,9 @@
 use crate::organization::{
     anti_pattern_detector::{AntiPattern, AntiPatternDetector, AntiPatternSeverity},
     data_flow_analyzer::DataFlowAnalyzer,
-    god_object_analysis::{GodObjectAnalysis, ModuleSplit, SplitAnalysisMethod},
     hidden_type_extractor::{HiddenType, HiddenTypeExtractor},
     type_based_clustering::{MethodSignature, TypeAffinityAnalyzer},
+    GodObjectAnalysis, ModuleSplit, SplitAnalysisMethod,
 };
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};

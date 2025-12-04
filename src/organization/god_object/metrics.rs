@@ -9,8 +9,8 @@ use crate::analysis::FunctionCounts;
 use crate::organization::{
     aggregate_weighted_complexity, calculate_avg_complexity, calculate_complexity_weight,
     calculate_god_object_score, calculate_god_object_score_weighted,
-    god_object_analysis::FunctionVisibilityBreakdown, group_methods_by_responsibility,
-    DetectionType, FunctionComplexityInfo, GodObjectThresholds, PurityAnalyzer, PurityDistribution,
+    group_methods_by_responsibility, DetectionType, FunctionComplexityInfo,
+    FunctionVisibilityBreakdown, GodObjectThresholds, PurityAnalyzer, PurityDistribution,
     PurityLevel, StructMetrics,
 };
 use std::collections::HashMap;
