@@ -93,34 +93,38 @@ This will:
 
 ### Phase 4: Execute Chapter Splitting
 
+**Iteration Strategy:**
+
+This phase must process ALL chapters in the split list sequentially. Use the SlashCommand tool to invoke the worker command for each chapter.
+
+**CRITICAL:** You must iterate through the ENTIRE split list. Do not stop after the first chapter. Process all chapters identified in Phase 2.
+
 **For Each Chapter in Split List:**
 
 1. **Announce Current Chapter:**
+   Print to user:
    ```
    📖 Splitting chapter {N}/{total}: {chapter-title}
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ```
 
-2. **Invoke Split Command:**
-   Use the Read tool to execute the split command:
-   ```bash
-   /prodigy-create-chapter-subsections \
-     --project {project-name} \
-     --chapter {chapter-id} \
-     --chapters {chapters-file} \
-     --book-dir {book-dir} \
-     --structure-report {structure-report-path}
+2. **Invoke Split Command Using SlashCommand Tool:**
+   Use the SlashCommand tool to execute:
+   ```
+   /prodigy-create-chapter-subsections --project {project-name} --chapter {chapter-id} --chapters {chapters-file} --book-dir {book-dir} --structure-report {structure-report-path} --no-commit
    ```
 
+   **CRITICAL:** Add `--no-commit` flag to prevent the worker from creating individual commits. The orchestrator will create ONE comprehensive commit at the end (Phase 7).
+
 3. **Verify Success:**
-   - Check that command completed without errors
-   - Verify expected files were created
-   - Confirm chapters.json was updated
+   - Check that SlashCommand completed without errors
+   - Verify expected files were created (directory, index.md, subsections)
+   - Confirm chapters.json was updated with new multi-subsection structure
 
 4. **Track Progress:**
-   - Count successful splits
-   - Record any failures
-   - Continue with remaining chapters even if one fails
+   - Increment successful_splits counter
+   - If error occurs, append to failures list but CONTINUE with remaining chapters
+   - Do NOT abort on first failure - process all chapters
 
 5. **Display Result:**
    ```
@@ -130,6 +134,27 @@ This will:
    ```
    ❌ Failed to split {chapter-title}: {error-message}
    ```
+
+**Concrete Example:**
+
+If split list contains ["cli-reference", "analysis-guide", "configuration"], you must:
+
+```
+1. Print "📖 Splitting chapter 1/3: CLI Reference"
+2. Call SlashCommand with: /prodigy-create-chapter-subsections --project Debtmap --chapter cli-reference --chapters workflows/data/prodigy-chapters.json --book-dir book --structure-report .prodigy/book-analysis/structure-report.json --no-commit
+3. Wait for completion, check result
+4. Print "✅ Successfully split CLI Reference into 4 subsections"
+5. Print "📖 Splitting chapter 2/3: Analysis Guide"
+6. Call SlashCommand with: /prodigy-create-chapter-subsections --project Debtmap --chapter analysis-guide ...
+7. Continue until all 3 chapters processed
+8. Proceed to Phase 5 verification
+```
+
+**Required Iteration Logic:**
+- Must process chapters sequentially (not in parallel, to avoid file conflicts)
+- Must NOT stop on first failure - collect all errors and continue
+- Must reach Phase 5 verification even if some splits failed
+- Must create commit (Phase 7) even if some splits failed (commit what succeeded)
 
 ### Phase 5: Verify Structural Integrity
 
@@ -186,6 +211,20 @@ This will:
 
 ### Phase 7: Create Git Commit
 
+**Check if Commit is Needed:**
+
+If no chapters were split (split list was empty in Phase 2):
+- Print: "✅ No chapters needed splitting - no commit required"
+- Exit successfully (this is valid - workflow should continue)
+
+If chapters were split but all failed:
+- Print: "⚠️  All chapter splits failed - no changes to commit"
+- Print: "Review errors above and retry failed chapters manually"
+- Exit with warning status
+
+If at least one chapter was successfully split:
+- Proceed to create commit
+
 **Stage All Changes:**
 1. New directories and subsection files
 2. Updated chapters.json
@@ -215,6 +254,9 @@ in the map phase, where each subsection gets focused attention.
 git add -A
 git commit -m "{commit-message}"
 ```
+
+**After Commit Success:**
+Print: "✅ Successfully committed chapter splits"
 
 ### Error Handling
 

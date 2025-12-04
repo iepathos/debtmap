@@ -41,8 +41,9 @@ setup:
   # Step 4: Automatically split all oversized chapters into subsections
   # This runs BEFORE map phase so agents process optimally-sized chapters
   # Reads structure-report.json and orchestrates splitting of high-priority chapters
+  # NOTE: This command creates a comprehensive commit in Phase 7 after splitting all chapters
+  #       OR exits successfully if no chapters need splitting (valid success state)
   - claude: "/prodigy-split-oversized-chapters --project $PROJECT_NAME --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR --structure-report $ANALYSIS_DIR/structure-report.json"
-    commit_required: true
 
   # Step 5: Regenerate flattened-items.json after structure changes
   # This ensures map phase processes all chapters (including newly split subsections)

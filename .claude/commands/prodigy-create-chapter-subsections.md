@@ -14,6 +14,7 @@ This command performs **structure migration** - converting a flat single-file ch
 - `--book-dir <path>` - Book directory path (e.g., "book")
 - `--structure-report <path>` - Optional path to structure report from analysis command
 - `--dry-run` - Preview changes without modifying files (default: false)
+- `--no-commit` - Skip git commit at the end (default: false, used when orchestrator will commit)
 
 ## Execute
 
@@ -27,6 +28,7 @@ Extract all required parameters:
 - `--book-dir`: Book directory path (default: "book")
 - `--structure-report`: Optional path to structure analysis report
 - `--dry-run`: If true, show what would be done without modifying files
+- `--no-commit`: If true, skip git commit at the end (default: false)
 
 **Validate Parameters:**
 - Ensure `--chapter` is provided and not empty
@@ -348,7 +350,7 @@ For each subsection:
 }
 ```
 
-### Phase 10: Display Summary and Commit
+### Phase 10: Display Summary and Optional Commit
 
 **Print User-Friendly Summary:**
 
@@ -394,7 +396,14 @@ Status: ✅ Migration successful
   3. Commit changes when satisfied
 ```
 
-**Stage and Commit Changes (if not dry-run):**
+**Stage and Commit Changes (if applicable):**
+
+**If `--no-commit` flag is provided:**
+- Print: "⏭️  Skipping commit (orchestrator will commit all changes together)"
+- Do NOT stage or commit files
+- Exit successfully
+
+**If `--no-commit` is NOT provided AND not in dry-run mode:**
 
 If running in automation mode (PRODIGY_AUTOMATION=true) and not dry-run:
 
@@ -520,12 +529,20 @@ This command does ONE thing: migrate a chapter structure. It does NOT:
   --book-dir book \
   --dry-run
 
-# Execute migration
+# Execute migration with commit
 /prodigy-create-chapter-subsections \
   --project Debtmap \
   --chapter configuration \
   --chapters workflows/data/prodigy-chapters.json \
   --book-dir book
+
+# Execute migration without commit (for orchestrator use)
+/prodigy-create-chapter-subsections \
+  --project Debtmap \
+  --chapter configuration \
+  --chapters workflows/data/prodigy-chapters.json \
+  --book-dir book \
+  --no-commit
 
 # Use structure analysis recommendations
 /prodigy-create-chapter-subsections \
