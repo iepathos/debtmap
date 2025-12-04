@@ -400,6 +400,46 @@
       "validation": "Check that dead code analysis and public API detection are documented",
       "auto_generated": true,
       "source_feature": "dead_code_analysis"
+    },
+    {
+      "id": "call-graph-analysis",
+      "title": "Call Graph Analysis",
+      "file": "book/src/call-graph-analysis.md",
+      "topics": [
+        "AST-based call graph construction",
+        "Trait method resolution",
+        "Macro expansion tracking",
+        "Import and module path resolution",
+        "Caller/callee relationship tracking",
+        "Critical path identification",
+        "Circular dependency detection",
+        "Call graph validation and debugging",
+        "Parallel call graph construction",
+        "External crate call filtering",
+        "Dependency display in output",
+        "Configurable caller/callee limits"
+      ],
+      "validation": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
+      "auto_generated": true,
+      "source_feature": "call_graph_analysis"
+    },
+    {
+      "id": "boilerplate-detection",
+      "title": "Boilerplate Detection",
+      "file": "book/src/boilerplate-detection.md",
+      "topics": [
+        "Detection criteria for repetitive patterns",
+        "Trait implementation analysis",
+        "Method uniformity calculation",
+        "Pattern types (trait implementations, builders, state machines)",
+        "Boilerplate scoring algorithm",
+        "Macro-ification recommendations",
+        "Configuration and thresholds",
+        "Alternative approaches (code generation, generics)"
+      ],
+      "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
+      "auto_generated": true,
+      "source_feature": "boilerplate_detection"
     }
   ]
 }

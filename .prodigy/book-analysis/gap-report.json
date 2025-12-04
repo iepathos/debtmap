@@ -1,0 +1,67 @@
+{
+  "analysis_date": "2025-12-04T00:00:00Z",
+  "features_analyzed": 14,
+  "documented_topics": 26,
+  "gaps_found": 2,
+  "gaps": [
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "call_graph_analysis",
+      "feature_description": "Function call relationship tracking and analysis",
+      "recommended_chapter_id": "call-graph-analysis",
+      "recommended_title": "Call Graph Analysis",
+      "recommended_location": "book/src/call-graph-analysis.md"
+    },
+    {
+      "severity": "high",
+      "type": "missing_chapter",
+      "feature_category": "boilerplate_detection",
+      "feature_description": "Identification of repetitive patterns suitable for macro-ification",
+      "recommended_chapter_id": "boilerplate-detection",
+      "recommended_title": "Boilerplate Detection",
+      "recommended_location": "book/src/boilerplate-detection.md"
+    }
+  ],
+  "actions_taken": [
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "call-graph-analysis",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_chapter_definition",
+      "chapter_id": "boilerplate-detection",
+      "file_path": "workflows/data/prodigy-chapters.json"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/call-graph-analysis.md",
+      "type": "chapter"
+    },
+    {
+      "action": "created_stub_file",
+      "file_path": "book/src/boilerplate-detection.md",
+      "type": "chapter"
+    },
+    {
+      "action": "updated_summary",
+      "file_path": "book/src/SUMMARY.md",
+      "items_added": [
+        {
+          "type": "chapter",
+          "id": "call-graph-analysis"
+        },
+        {
+          "type": "chapter",
+          "id": "boilerplate-detection"
+        }
+      ]
+    },
+    {
+      "action": "generated_flattened_items",
+      "file_path": ".prodigy/book-analysis/flattened-items.json",
+      "item_count": 28
+    }
+  ]
+}

@@ -18,7 +18,9 @@
 
 - [Architecture](architecture.md)
 - [Architectural Analysis](architectural-analysis.md)
+- [Boilerplate Detection](boilerplate-detection.md)
 - [Boilerplate vs Complexity](boilerplate-vs-complexity.md)
+- [Call Graph Analysis](call-graph-analysis.md)
 - [Context Providers](context-providers.md)
 - [Coverage Analysis](coverage-analysis.md)
 - [Coverage Integration](coverage-integration.md)
