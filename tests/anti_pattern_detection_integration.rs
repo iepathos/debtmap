@@ -7,7 +7,7 @@ use debtmap::analyzers::type_registry::MethodSignature;
 use debtmap::organization::anti_pattern_detector::{
     AntiPatternDetector, AntiPatternSeverity, AntiPatternType,
 };
-use debtmap::organization::god_object_analysis::ModuleSplit;
+use debtmap::organization::god_object::types::ModuleSplit;
 
 /// Test detecting utilities and technical grouping anti-patterns in behavioral splits
 #[test]

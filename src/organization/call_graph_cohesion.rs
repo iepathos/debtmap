@@ -7,7 +7,7 @@ use crate::organization::cohesion_calculator::calculate_cohesion_score;
 use crate::organization::cohesion_priority::assign_cohesion_based_priority;
 use crate::organization::cycle_detector::detect_circular_dependencies;
 use crate::organization::dependency_analyzer::extract_dependencies;
-use crate::organization::god_object_analysis::ModuleSplit;
+use crate::organization::god_object::types::ModuleSplit;
 use crate::organization::struct_ownership::StructOwnershipAnalyzer;
 use std::path::Path;
 
@@ -69,7 +69,7 @@ pub fn enhance_splits_with_cohesion(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::organization::god_object_analysis::{ModuleSplit, Priority};
+    use crate::organization::god_object::types::{ModuleSplit, Priority};
 
     fn create_test_code() -> String {
         r#"

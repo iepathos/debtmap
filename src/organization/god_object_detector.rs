@@ -1,11 +1,11 @@
+use super::god_object::thresholds::*;
+use super::god_object::types::*;
 use super::semantic_naming::SemanticNameGenerator;
 use super::{
     calculate_god_object_score, determine_confidence,
     god_object::{metrics, TypeAnalysis, TypeVisitor},
-    group_methods_by_responsibility, suggest_module_splits_by_domain, DetectionType,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectThresholds, GodObjectType,
-    MaintainabilityImpact, ModuleSplit, OrganizationAntiPattern, OrganizationDetector, Priority,
-    RecommendationSeverity, ResponsibilityGroup, StructMetrics,
+    group_methods_by_responsibility, suggest_module_splits_by_domain, MaintainabilityImpact,
+    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
 };
 use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use std::collections::{HashMap, HashSet};
@@ -80,25 +80,6 @@ impl<'a> FieldAccessProvider for FieldAccessAdapter<'a> {
     }
 }
 
-/// Minimum standalone functions required to trigger hybrid detection.
-///
-/// Files with fewer standalone functions are assumed to have helper
-/// functions that complement the primary struct's impl methods.
-///
-/// Chosen based on analysis of Rust projects: 50+ functions typically
-/// indicates a functional module rather than helpers.
-const HYBRID_STANDALONE_THRESHOLD: usize = 50;
-
-/// Dominance ratio: standalone functions must exceed impl methods by this factor.
-///
-/// Prevents false positives for balanced OOP/functional modules. A ratio of 3:1
-/// ensures standalone functions truly dominate the file's purpose.
-///
-/// Examples:
-/// - 60 standalone, 15 impl → 60 > 45? Yes → Hybrid
-/// - 60 standalone, 25 impl → 60 > 75? No → God Class
-const HYBRID_DOMINANCE_RATIO: usize = 3;
-
 /// Parameters for god object classification
 struct GodObjectClassificationParams<'a> {
     per_struct_metrics: &'a [StructMetrics],
@@ -121,26 +102,6 @@ struct DomainAnalysisParams<'a> {
     field_tracker: Option<&'a crate::organization::FieldAccessTracker>,
     responsibility_groups: &'a HashMap<String, Vec<String>>,
     ast: &'a syn::File,
-}
-
-pub struct GodObjectDetector {
-    max_methods: usize,
-    max_fields: usize,
-    max_responsibilities: usize,
-    location_extractor: Option<UnifiedLocationExtractor>,
-    source_content: Option<String>,
-}
-
-impl Default for GodObjectDetector {
-    fn default() -> Self {
-        Self {
-            max_methods: 15,
-            max_fields: 10,
-            max_responsibilities: 3,
-            location_extractor: None,
-            source_content: None,
-        }
-    }
 }
 
 impl GodObjectDetector {
@@ -2063,7 +2024,7 @@ impl GodObjectDetector {
         total_methods: usize,
         source_content: &Option<String>,
     ) -> (
-        Option<crate::organization::god_object_analysis::FunctionVisibilityBreakdown>,
+        Option<crate::organization::FunctionVisibilityBreakdown>,
         Option<crate::analysis::ModuleStructure>,
     ) {
         // Calculate visibility breakdown for Rust files (Spec 134)
@@ -3988,35 +3949,38 @@ mod tests {
 
     #[test]
     fn test_classify_struct_domain_scoring() {
-        use crate::organization::god_object_analysis::classify_struct_domain;
+        use crate::organization::domain_classifier::classify_struct_domain_enhanced as classify_struct_domain;
 
-        assert_eq!(classify_struct_domain("ScoringWeights"), "scoring");
-        assert_eq!(classify_struct_domain("RoleMultipliers"), "scoring");
-        assert_eq!(classify_struct_domain("ComplexityFactor"), "scoring");
+        assert_eq!(classify_struct_domain("ScoringWeights", &[]), "scoring");
+        assert_eq!(classify_struct_domain("RoleMultipliers", &[]), "scoring");
+        assert_eq!(classify_struct_domain("ComplexityFactor", &[]), "scoring");
     }
 
     #[test]
     fn test_classify_struct_domain_thresholds() {
-        use crate::organization::god_object_analysis::classify_struct_domain;
+        use crate::organization::domain_classifier::classify_struct_domain_enhanced as classify_struct_domain;
 
-        assert_eq!(classify_struct_domain("ThresholdLimits"), "thresholds");
-        assert_eq!(classify_struct_domain("MaxBounds"), "thresholds");
+        assert_eq!(classify_struct_domain("ThresholdLimits", &[]), "thresholds");
+        assert_eq!(classify_struct_domain("MaxBounds", &[]), "thresholds");
     }
 
     #[test]
     fn test_classify_struct_domain_detection() {
-        use crate::organization::god_object_analysis::classify_struct_domain;
+        use crate::organization::domain_classifier::classify_struct_domain_enhanced as classify_struct_domain;
 
-        assert_eq!(classify_struct_domain("OrchestratorDetector"), "detection");
-        assert_eq!(classify_struct_domain("PatternChecker"), "detection");
+        assert_eq!(
+            classify_struct_domain("OrchestratorDetector", &[]),
+            "detection"
+        );
+        assert_eq!(classify_struct_domain("PatternChecker", &[]), "detection");
     }
 
     #[test]
     fn test_classify_struct_domain_config() {
-        use crate::organization::god_object_analysis::classify_struct_domain;
+        use crate::organization::domain_classifier::classify_struct_domain_enhanced as classify_struct_domain;
 
-        assert_eq!(classify_struct_domain("AppConfig"), "core_config");
-        assert_eq!(classify_struct_domain("UserSettings"), "core_config");
+        assert_eq!(classify_struct_domain("AppConfig", &[]), "config");
+        assert_eq!(classify_struct_domain("UserSettings", &[]), "config");
     }
 
     // Spec 134 Phase 2: Tests for impl method visibility tracking
@@ -4271,7 +4235,7 @@ mod tests {
     #[test]
     fn test_integrate_visibility_into_counts() {
         use crate::analysis::FunctionCounts;
-        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+        use crate::organization::god_object::types::FunctionVisibilityBreakdown;
 
         let original_counts = FunctionCounts {
             module_level_functions: 5,
@@ -4307,7 +4271,7 @@ mod tests {
     #[test]
     fn test_integrate_visibility_all_public() {
         use crate::analysis::FunctionCounts;
-        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+        use crate::organization::god_object::types::FunctionVisibilityBreakdown;
 
         let original_counts = FunctionCounts {
             module_level_functions: 20,
@@ -4335,7 +4299,7 @@ mod tests {
     #[test]
     fn test_integrate_visibility_all_private() {
         use crate::analysis::FunctionCounts;
-        use crate::organization::god_object_analysis::FunctionVisibilityBreakdown;
+        use crate::organization::god_object::types::FunctionVisibilityBreakdown;
 
         let original_counts = FunctionCounts {
             module_level_functions: 0,

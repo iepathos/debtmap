@@ -2,7 +2,7 @@
 ///
 /// This module extracts dependency information to identify which external modules
 /// a proposed module depends on and which modules depend on it.
-use crate::organization::god_object_analysis::ModuleSplit;
+use crate::organization::god_object::types::ModuleSplit;
 use crate::organization::struct_ownership::StructOwnershipAnalyzer;
 use crate::priority::call_graph::CallGraph;
 use std::collections::HashSet;
@@ -81,8 +81,8 @@ pub fn estimate_interface_size(
     call_graph: &CallGraph,
     _ownership: &StructOwnershipAnalyzer,
     all_structs: &[String],
-) -> crate::organization::god_object_analysis::InterfaceEstimate {
-    use crate::organization::god_object_analysis::InterfaceEstimate;
+) -> crate::organization::InterfaceEstimate {
+    use crate::organization::InterfaceEstimate;
     use std::collections::HashSet;
 
     let structs_in_module: HashSet<&str> =
@@ -133,7 +133,7 @@ fn extract_struct_name(full_name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::organization::god_object_analysis::{ModuleSplit, Priority};
+    use crate::organization::god_object::types::{ModuleSplit, Priority};
     use crate::organization::struct_ownership::StructOwnershipAnalyzer;
     use crate::priority::call_graph::{CallGraph, CallType, FunctionCall, FunctionId};
     use std::path::PathBuf;

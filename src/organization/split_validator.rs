@@ -5,7 +5,7 @@
 /// - Merges undersized splits with semantically similar clusters
 /// - Validates cohesion scores to prevent low-quality splits
 /// - Ensures balanced distribution across splits
-use super::god_object_analysis::{MergeRecord, ModuleSplit, Priority};
+use super::{MergeRecord, ModuleSplit, Priority};
 
 /// Configuration for split size validation (Spec 190)
 #[derive(Debug, Clone)]

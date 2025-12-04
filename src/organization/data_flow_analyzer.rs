@@ -3,7 +3,7 @@
 //! This module analyzes how data types flow through method calls to detect
 //! functional transformation pipelines (Input → Transform → Output).
 
-use crate::organization::god_object_analysis::{ModuleSplit, StageType};
+use crate::organization::god_object::types::{ModuleSplit, StageType};
 use crate::organization::type_based_clustering::{MethodSignature, TypeInfo};
 use std::collections::{HashMap, HashSet, VecDeque};
 

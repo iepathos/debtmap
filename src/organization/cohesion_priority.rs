@@ -2,7 +2,7 @@
 ///
 /// This module assigns priorities to module split recommendations based on
 /// their cohesion scores and whether they're involved in circular dependencies.
-use crate::organization::god_object_analysis::{ModuleSplit, Priority};
+use crate::organization::god_object::types::{ModuleSplit, Priority};
 use std::collections::HashSet;
 
 /// Assign priorities based on cohesion score and dependency quality
@@ -70,7 +70,7 @@ pub fn assign_cohesion_based_priority(splits: &mut [ModuleSplit], cycles: &[Vec<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::organization::god_object_analysis::ModuleSplit;
+    use crate::organization::god_object::types::ModuleSplit;
 
     fn create_test_split(name: &str, cohesion: f64) -> ModuleSplit {
         ModuleSplit {

@@ -51,10 +51,15 @@ pub use god_object_analysis::{
     group_methods_by_responsibility_with_domain_patterns, infer_responsibility_with_confidence,
     recommend_module_splits, recommend_module_splits_enhanced,
     recommend_module_splits_with_evidence, suggest_module_splits_by_domain,
-    suggest_splits_by_struct_grouping, ClassificationResult, DetectionType,
-    EnhancedGodObjectAnalysis, GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds,
-    GodObjectType, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity, SignalType,
-    SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
+    suggest_splits_by_struct_grouping,
+};
+
+pub use god_object::types::{
+    ClassificationResult, DetectionType, EnhancedGodObjectAnalysis, FunctionVisibilityBreakdown,
+    GodObjectAnalysis, GodObjectConfidence, GodObjectThresholds, GodObjectType, InterfaceEstimate,
+    MergeRecord, MetricInconsistency, ModuleSplit, Priority, PurityDistribution,
+    RecommendationSeverity, SignalType, SplitAnalysisMethod, StageType, StructMetrics,
+    StructWithMethods,
 };
 
 pub use domain_classifier::classify_struct_domain_enhanced;
@@ -335,7 +340,7 @@ mod primitive_obsession_detector;
 mod struct_init_detector;
 
 pub use feature_envy_detector::FeatureEnvyDetector;
-pub use god_object_detector::GodObjectDetector;
+pub use god_object::types::GodObjectDetector;
 pub use magic_value_detector::MagicValueDetector;
 pub use parameter_analyzer::ParameterAnalyzer;
 pub use primitive_obsession_detector::PrimitiveObsessionDetector;
