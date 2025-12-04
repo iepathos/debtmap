@@ -169,10 +169,26 @@ debtmap validate-improvement --comparison <FILE> [OPTIONS]
 - `--quiet` - Suppress console output (useful for automation)
 
 **Description:**
-Validates improvement quality by analyzing comparison output from `debtmap compare`. Calculates a composite improvement score based on:
-- Target item improvement (50% weight)
-- Overall project health (30% weight)
-- Absence of regressions (20% weight)
+Validates improvement quality by analyzing comparison output from `debtmap compare`. Calculates a composite improvement score based on weighted components:
+
+**Composite Score Calculation:**
+1. **Target Item Improvement (50% weight)** - Measures direct improvement to the specific target item being fixed
+   - Compares complexity, debt score, and other metrics before/after
+   - Weight: 0.5 × (target improvement percentage)
+
+2. **Overall Project Health (30% weight)** - Evaluates project-wide quality changes
+   - Analyzes aggregate metrics across entire codebase
+   - Considers new issues introduced, total debt changes
+   - Weight: 0.3 × (project health percentage)
+
+3. **Absence of Regressions (20% weight)** - Penalizes introduction of new technical debt
+   - Checks for new high-priority issues in other parts of codebase
+   - Ensures improvements don't shift complexity elsewhere
+   - Weight: 0.2 × (regression-free percentage)
+
+**Final Score:** `composite_score = (0.5 × target) + (0.3 × health) + (0.2 × no_regressions)`
+
+The default threshold (75%) requires strong improvement in the target item while maintaining overall project quality.
 
 When `--previous-validation` is provided, tracks progress trends across multiple attempts and provides recommendations for continuing or adjusting the improvement approach.
 
@@ -238,9 +254,6 @@ Control how analysis results are formatted and displayed.
 
 **Format Options:**
 - `-f, --format <FORMAT>` - Output format: json, markdown, terminal (default: terminal for analyze)
-- `--output-format <JSON_FORMAT>` - JSON structure format: legacy or unified (default: legacy)
-  - `legacy` - Current format with `{File: {...}}` and `{Function: {...}}` wrappers
-  - `unified` - New format with consistent structure and 'type' field
 - `-o, --output <OUTPUT>` - Output file path (defaults to stdout)
 - `--plain` - Plain output mode: ASCII-only, no colors, no emoji, machine-parseable
 
@@ -404,6 +417,12 @@ debtmap init --force
 
 ### Environment Variables
 
+- `DEBTMAP_CONFIG` - Custom config file path (same as `--config` global flag)
+  - Example: `export DEBTMAP_CONFIG=/path/to/debtmap.toml`
+  - Overrides default configuration file locations
+  - Useful for CI/CD environments with centralized config
+  - Source: src/cli.rs:45
+
 - `DEBTMAP_JOBS` - Number of threads for parallel processing (same as `--jobs` / `-j` flag)
   - Example: `export DEBTMAP_JOBS=8  # Same as --jobs 8`
   - Use `0` to utilize all available CPU cores
@@ -414,6 +433,18 @@ debtmap init --force
   - Set to `1` or `true` to disable multi-pass analysis by default
   - Useful for CI/CD environments where performance is critical
   - Can be overridden by command-line flags
+
+- `PRODIGY_AUTOMATION` - Enable automation mode for `validate-improvement` command
+  - Example: `export PRODIGY_AUTOMATION=true`
+  - Set to `true` to enable automation mode (suppresses interactive prompts)
+  - Used in automated workflows for continuous improvement validation
+  - Source: src/main.rs:549
+
+- `PRODIGY_VALIDATION` - Alternative flag for automation mode (same effect as `PRODIGY_AUTOMATION`)
+  - Example: `export PRODIGY_VALIDATION=true`
+  - Set to `true` to enable automation mode
+  - Provided for backward compatibility with existing workflows
+  - Source: src/main.rs:552
 
 ### Getting Help
 
@@ -915,6 +946,6 @@ See Prodigy documentation for detailed usage instructions.
 
 - [Configuration Format](./configuration.md) - Detailed configuration file format
 - [Output Formats](./output-formats.md) - Understanding JSON, Markdown, and Terminal output
-- [Coverage Integration](./coverage.md) - Integrating test coverage data
+- [Coverage Integration](./coverage-integration.md) - Integrating test coverage data
 - [Context Providers](./context-providers.md) - Understanding context-aware analysis
 - [Examples](./examples.md) - More comprehensive usage examples

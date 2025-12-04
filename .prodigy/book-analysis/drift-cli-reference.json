@@ -1,0 +1,104 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "cli-reference",
+  "chapter_title": "CLI Reference",
+  "chapter_file": "book/src/cli-reference.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and mostly accurate, but contains one broken link and one option that doesn't exist in current implementation",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "See Also",
+      "description": "Found 1 broken internal link",
+      "broken_links": [
+        {
+          "link_text": "Coverage Integration",
+          "target_path": "./coverage.md",
+          "current_file": "book/src/cli-reference.md",
+          "resolved_path": "book/src/coverage.md",
+          "exists": false,
+          "suggested_fix": "coverage-integration.md",
+          "reason": "File coverage.md does not exist, but coverage-integration.md exists"
+        }
+      ],
+      "fix_suggestion": "Update link from './coverage.md' to './coverage-integration.md'",
+      "source_reference": "book/src/cli-reference.md:918"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Output Control",
+      "description": "Documentation mentions '--output-format' option that doesn't exist in CLI implementation",
+      "current_content": "- `--output-format <JSON_FORMAT>` - JSON structure format: legacy or unified (default: legacy)\n  - `legacy` - Current format with `{File: {...}}` and `{Function: {...}}` wrappers\n  - `unified` - New format with consistent structure and 'type' field",
+      "should_be": "This option should be removed - it's not implemented in the current CLI (src/cli.rs)",
+      "fix_suggestion": "Remove the '--output-format' option from documentation or implement it in CLI if it's a planned feature",
+      "source_reference": "src/cli.rs:54-63 (analyze command options)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Commands",
+      "description": "validate-improvement command description could be clearer about composite scoring methodology",
+      "fix_suggestion": "Add more detail about how the 50%/30%/20% weights are applied in the composite score calculation",
+      "source_reference": "book/src/cli-reference.md:171-176"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Environment Variables",
+      "description": "Missing documentation for DEBTMAP_CONFIG environment variable",
+      "feature_reference": "cli_interface.global_options.config",
+      "fix_suggestion": "Add DEBTMAP_CONFIG to environment variables section - it's supported as global option in CLI",
+      "source_reference": "src/cli.rs:45"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Environment Variables",
+      "description": "Missing documentation for PRODIGY_AUTOMATION and PRODIGY_VALIDATION environment variables",
+      "feature_reference": "validate_improvement.automation_mode",
+      "fix_suggestion": "Document PRODIGY_AUTOMATION and PRODIGY_VALIDATION environment variables used for automation mode detection",
+      "source_reference": "src/main.rs:548-555"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all CLI commands and options",
+    "Well-organized with clear sections and categories",
+    "Includes practical examples for all major use cases",
+    "Good use of compatibility matrix showing which options work with which commands",
+    "Excellent troubleshooting section with common issues and solutions",
+    "Best practices section provides actionable guidance",
+    "Clear explanation of option aliases and deprecated options",
+    "Includes workflow examples for CI/CD integration and comparison tracking"
+  ],
+  "improvement_suggestions": [
+    "Fix broken link to coverage.md (should be coverage-integration.md)",
+    "Remove --output-format option that doesn't exist or implement it in CLI",
+    "Add missing environment variables (DEBTMAP_CONFIG, PRODIGY_AUTOMATION, PRODIGY_VALIDATION)",
+    "Consider adding more detail about composite scoring in validate-improvement",
+    "Consider adding examples showing the difference between measured and estimated metrics",
+    "Consider adding a section about the --show-config-sources global flag",
+    "Add note about ARGUMENTS environment variable support for backward compatibility"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Commands",
+      "Arguments",
+      "Options",
+      "Configuration",
+      "Environment Variables",
+      "Workflows",
+      "Troubleshooting",
+      "Best Practices"
+    ],
+    "validation_focus": "Verify all CLI commands from src/cli/ are documented with current options",
+    "total_internal_links": 5,
+    "broken_links": 1,
+    "verified_commands": 6,
+    "documented_options": 80
+  }
+}
