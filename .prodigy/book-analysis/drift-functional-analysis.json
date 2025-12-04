@@ -1,0 +1,128 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "functional-analysis",
+  "chapter_title": "Functional Composition Analysis",
+  "chapter_file": "book/src/functional-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter is comprehensive and accurate with implementation details, but has broken cross-references and references non-existent modules. Content aligns well with actual implementation in src/analysis/functional_composition.rs, but some architectural claims cannot be verified.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 4 broken internal link(s) in 'Related Chapters' section",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "analysis-guide.md",
+          "expected_path": "book/src/analysis-guide.md",
+          "current_file": "book/src/functional-analysis.md",
+          "status": "File does not exist"
+        },
+        {
+          "link_text": "Complexity Analysis",
+          "original_target": "./complexity-analysis.md",
+          "expected_path": "book/src/complexity-analysis.md",
+          "current_file": "book/src/functional-analysis.md",
+          "status": "File does not exist"
+        },
+        {
+          "link_text": "Scoring Strategies",
+          "original_target": "./scoring.md",
+          "expected_path": "book/src/scoring.md",
+          "current_file": "book/src/functional-analysis.md",
+          "status": "File does not exist (found scoring-strategies.md instead)",
+          "suggested_fix": "Change link to './scoring-strategies.md'"
+        },
+        {
+          "link_text": "God Object Detection",
+          "original_target": "./god-objects.md",
+          "expected_path": "book/src/god-objects.md",
+          "current_file": "book/src/functional-analysis.md",
+          "status": "File does not exist (found god-object-detection.md instead)",
+          "suggested_fix": "Change link to './god-object-detection.md'"
+        },
+        {
+          "link_text": "Refactoring",
+          "original_target": "refactoring-guide.md",
+          "expected_path": "book/src/refactoring-guide.md",
+          "current_file": "book/src/functional-analysis.md",
+          "status": "File does not exist"
+        }
+      ],
+      "fix_suggestion": "Update all cross-reference links to point to actual file names. Verify all linked chapters exist or remove references to non-existent chapters.",
+      "source_reference": "book/src/functional-analysis.md:921-927"
+    },
+    {
+      "type": "incorrect_reference",
+      "severity": "medium",
+      "section": "Integration with Risk Scoring",
+      "description": "References non-existent modules 'src/builders/unified_analysis.rs' and 'src/analysis/multi_signal_aggregation.rs'",
+      "current_content": "Multi-Signal Integration: Functional composition analysis is one of several signals aggregated in the unified analysis system (`src/builders/unified_analysis.rs` and `src/analysis/multi_signal_aggregation.rs`)",
+      "should_be": "Remove or update references to actual integration modules",
+      "fix_suggestion": "Verify the actual integration architecture and update references to existing modules. If unified analysis system doesn't exist yet, remove this claim or mark as planned feature.",
+      "source_reference": "book/src/functional-analysis.md:584"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Purity Analysis",
+      "description": "Documentation mentions two different purity systems but doesn't explain why or how they interact",
+      "current_content": "Note: Debtmap has two purity analysis systems serving different purposes:\n1. PurityLevel (three levels) - Used for god object scoring with weight multipliers (this section)\n2. PurityLevel (four levels) - Used in src/analysis/purity_analysis.rs for detailed responsibility classification",
+      "fix_suggestion": "Explain the relationship between the two systems more clearly. Why are there two? When is each used? Consider adding a cross-reference to documentation about the four-level system or integrating them better.",
+      "source_reference": "book/src/functional-analysis.md:280-284"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "CLI Usage",
+      "description": "Missing documentation for FunctionalAnalysisProfile enum values in CLI",
+      "feature_reference": "functional_analysis.analysis_profiles",
+      "fix_suggestion": "Document the actual CLI enum values. Verify that CLI accepts 'strict', 'balanced', 'lenient' as shown in examples by checking src/cli.rs FunctionalAnalysisProfile enum definition.",
+      "source_reference": "src/cli.rs:296-297"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of AST-based functional pattern detection features",
+    "Accurate implementation details matching src/analysis/functional_composition.rs",
+    "Excellent code examples demonstrating pure vs impure functions",
+    "Clear explanation of pipeline detection stages and terminal operations",
+    "Detailed scoring formulas and thresholds documented",
+    "Good practical examples showing imperative vs functional refactoring",
+    "Troubleshooting section addresses common user issues",
+    "Profile system (strict/balanced/lenient) is well explained with use cases",
+    "Purity metrics and weight multipliers accurately documented from source code",
+    "Side effect classification (Pure/Benign/Impure) explained clearly"
+  ],
+  "improvement_suggestions": [
+    "Fix all broken cross-reference links to point to actual chapter files",
+    "Verify and update references to integration modules (unified_analysis.rs, multi_signal_aggregation.rs)",
+    "Add section explaining the relationship between three-level and four-level purity systems",
+    "Consider adding flowchart or diagram showing how functional analysis integrates with overall debt scoring",
+    "Add more examples of nested pipelines and parallel pipeline patterns",
+    "Include performance benchmarks or overhead measurements per Spec 111 (<10% target)",
+    "Add examples showing builder pattern filtering to clarify what is NOT detected",
+    "Consider adding a 'Common Pitfalls' subsection under Best Practices"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:01:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "AST-based functional analysis",
+      "Pure function detection",
+      "Side effect detection",
+      "Composition pattern recognition",
+      "Purity profiles (strict, balanced, lenient)",
+      "Scoring and distribution analysis",
+      "Pipeline detection",
+      "Integration with god object scoring"
+    ],
+    "validation_focus": "Check that functional composition analysis features are documented",
+    "implementation_files_verified": [
+      "src/analysis/functional_composition.rs",
+      "src/organization/purity_analyzer.rs",
+      "src/cli.rs"
+    ]
+  }
+}
