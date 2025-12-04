@@ -5,6 +5,7 @@ category: optimization
 priority: high
 status: draft
 dependencies: []
+sub_specs: [181a, 181b, 181c, 181d, 181e, 181f, 181g, 181h, 181i]
 created: 2025-11-30
 updated: 2025-12-03
 ---
@@ -15,6 +16,36 @@ updated: 2025-12-03
 **Priority**: high
 **Status**: draft
 **Dependencies**: None
+
+---
+
+## IMPORTANT: This Spec Has Been Split for Automation
+
+This spec is **too large for single-run automation** (estimated 6-7 days). It has been split into **9 sub-specs** that can be executed independently:
+
+| Sub-Spec | Phase | Estimated Time | Description |
+|----------|-------|----------------|-------------|
+| **181a** | 1 | 1 day | Foundation & Analysis (read-only planning) |
+| **181b** | 2 | 0.5 day | Extract Types & Thresholds |
+| **181c** | 3 | 1 day | Extract Pure Scoring Functions |
+| **181d** | 4 | 0.5 day | Extract Pure Predicates |
+| **181e** | 5 | 1 day | Extract Classification Logic |
+| **181f** | 6 | 1 day | Extract Recommendation Logic |
+| **181g** | 7 | 1 day | Create Orchestration Layer |
+| **181h** | 8 | 0.5 day | Update Public API & Cleanup |
+| **181i** | 9 | 0.5 day | Delete Old Files (final) |
+
+**To implement this spec**, run each sub-spec sequentially:
+```bash
+prodigy run workflows/implement.yml -y --args 181a
+prodigy run workflows/implement.yml -y --args 181b
+prodigy run workflows/implement.yml -y --args 181c
+# ... and so on through 181i
+```
+
+**Completion criteria**: This spec is complete when all 9 sub-specs (181a through 181i) are marked as completed.
+
+---
 
 ## Context
 
