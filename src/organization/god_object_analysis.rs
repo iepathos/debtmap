@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use super::confidence::MINIMUM_CONFIDENCE;
 use super::god_object::thresholds::ensure_not_reserved;
 use super::god_object::types::*;
 
@@ -479,87 +478,8 @@ pub fn infer_responsibility_from_method(method_name: &str) -> String {
     category.display_name()
 }
 
-/// Classify method responsibility with confidence scoring (Spec 174).
-///
-/// This function replaces unconditional "utilities" fallback with confidence-based
-/// classification. It returns `None` for the category when confidence is too low,
-/// preventing poor decomposition recommendations.
-///
-/// # Arguments
-///
-/// * `method_name` - The name of the method to classify
-/// * `method_body` - Optional method body for deeper analysis
-///
-/// # Returns
-///
-/// A `ClassificationResult` with:
-/// - `category`: `Some(name)` if confidence ≥ threshold, `None` otherwise
-/// - `confidence`: Score from 0.0 to 1.0
-/// - `signals_used`: Which signals contributed to the classification
-///
-/// # Confidence Thresholds
-///
-/// - Recognized categories: 0.85 (high confidence)
-/// - Domain fallback: 0.45 (low confidence, rejected by MINIMUM_CONFIDENCE of 0.50)
-///
-/// # Examples
-///
-/// ```
-/// # use debtmap::organization::god_object_analysis::infer_responsibility_with_confidence;
-/// // High confidence classification
-/// let result = infer_responsibility_with_confidence("parse_json", None);
-/// assert!(result.category.is_some());
-/// assert!(result.confidence >= 0.50);
-///
-/// // Low confidence - refused classification
-/// let result = infer_responsibility_with_confidence("helper", None);
-/// // May return None if confidence too low
-/// ```
-///
-/// # Implementation
-///
-/// Currently uses name-based heuristics as the primary signal.
-/// Future enhancements will integrate:
-/// - I/O detection (weight: 0.40)
-/// - Call graph analysis (weight: 0.30)
-/// - Type signatures (weight: 0.15)
-/// - Purity analysis (weight: 0.10)
-pub fn infer_responsibility_with_confidence(
-    method_name: &str,
-    _method_body: Option<&str>,
-) -> ClassificationResult {
-    use crate::organization::BehavioralCategorizer;
-
-    let category = BehavioralCategorizer::categorize_method(method_name);
-    let category_name = category.display_name();
-
-    // Assign confidence based on category type
-    let confidence = match category {
-        crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
-        _ => 0.85, // High confidence for recognized patterns
-    };
-
-    // Apply confidence thresholds
-    if confidence < MINIMUM_CONFIDENCE {
-        log::debug!(
-            "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}",
-            method_name,
-            confidence,
-            MINIMUM_CONFIDENCE
-        );
-        return ClassificationResult {
-            category: None,
-            confidence,
-            signals_used: vec![SignalType::NameHeuristic],
-        };
-    }
-
-    ClassificationResult {
-        category: Some(category_name),
-        confidence,
-        signals_used: vec![SignalType::NameHeuristic],
-    }
-}
+// Re-export core classification function from classifier module
+pub use crate::organization::god_object::classifier::infer_responsibility_with_confidence;
 
 /// Map old category names to new names for backward compatibility.
 ///
@@ -1167,6 +1087,7 @@ pub fn suggest_splits_by_struct_grouping(
 
 #[cfg(test)]
 mod tests {
+    use super::super::confidence::MINIMUM_CONFIDENCE;
     use super::super::god_object::thresholds::is_reserved_keyword;
     use super::*;
 

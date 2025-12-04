@@ -9,9 +9,10 @@
 
 use std::collections::HashMap;
 
+use super::classification_types::{ClassificationResult, SignalType};
 use super::thresholds::GodObjectThresholds;
 use super::types::GodObjectConfidence;
-use crate::organization::god_object_analysis::infer_responsibility_with_confidence;
+use crate::organization::confidence::MINIMUM_CONFIDENCE;
 
 /// Determine confidence level from score and metrics.
 ///
@@ -75,6 +76,89 @@ pub fn determine_confidence(
         3..=4 => GodObjectConfidence::Probable,
         1..=2 => GodObjectConfidence::Possible,
         _ => GodObjectConfidence::NotGodObject,
+    }
+}
+
+/// Infer method responsibility domain from name and optional body.
+///
+/// This is a pure classification function that analyzes method names to determine
+/// their likely responsibility category. Returns `None` category if confidence
+/// is below the minimum threshold.
+///
+/// # Arguments
+///
+/// * `method_name` - The name of the method to classify
+/// * `method_body` - Optional method body for deeper analysis (currently unused)
+///
+/// # Returns
+///
+/// A `ClassificationResult` with:
+/// - `category`: `Some(name)` if confidence ≥ threshold, `None` otherwise
+/// - `confidence`: Score from 0.0 to 1.0
+/// - `signals_used`: Which signals contributed to the classification
+///
+/// # Confidence Thresholds
+///
+/// - Recognized categories: 0.85 (high confidence)
+/// - Domain fallback: 0.45 (low confidence, rejected by MINIMUM_CONFIDENCE of 0.50)
+///
+/// # Examples
+///
+/// ```
+/// use debtmap::organization::god_object::classifier::infer_responsibility_with_confidence;
+///
+/// // High confidence classification
+/// let result = infer_responsibility_with_confidence("parse_json", None);
+/// assert!(result.category.is_some());
+/// assert!(result.confidence >= 0.50);
+///
+/// // Low confidence - refused classification
+/// let result = infer_responsibility_with_confidence("helper", None);
+/// // May return None if confidence too low
+/// ```
+///
+/// # Implementation
+///
+/// Currently uses name-based heuristics as the primary signal.
+/// Future enhancements will integrate:
+/// - I/O detection (weight: 0.40)
+/// - Call graph analysis (weight: 0.30)
+/// - Type signatures (weight: 0.15)
+/// - Purity analysis (weight: 0.10)
+pub fn infer_responsibility_with_confidence(
+    method_name: &str,
+    _method_body: Option<&str>,
+) -> ClassificationResult {
+    use crate::organization::BehavioralCategorizer;
+
+    let category = BehavioralCategorizer::categorize_method(method_name);
+    let category_name = category.display_name();
+
+    // Assign confidence based on category type
+    let confidence = match category {
+        crate::organization::BehaviorCategory::Domain(_) => 0.45, // Below threshold
+        _ => 0.85, // High confidence for recognized patterns
+    };
+
+    // Apply confidence thresholds
+    if confidence < MINIMUM_CONFIDENCE {
+        log::debug!(
+            "Low confidence classification for method '{}': confidence {:.2} below minimum {:.2}",
+            method_name,
+            confidence,
+            MINIMUM_CONFIDENCE
+        );
+        return ClassificationResult {
+            category: None,
+            confidence,
+            signals_used: vec![SignalType::NameHeuristic],
+        };
+    }
+
+    ClassificationResult {
+        category: Some(category_name),
+        confidence,
+        signals_used: vec![SignalType::NameHeuristic],
     }
 }
 
@@ -454,29 +538,84 @@ mod tests {
         assert_eq!(calculate_struct_ratio(0, 10), 0.0);
     }
 
-    // Property tests for idempotence
-    #[test]
-    fn test_classification_idempotent() {
-        let method_name = "parse_json";
-        let r1 = infer_responsibility_with_confidence(method_name, None);
-        let r2 = infer_responsibility_with_confidence(method_name, None);
-        assert_eq!(r1.category, r2.category);
-        assert_eq!(r1.confidence, r2.confidence);
-    }
+    // Property-based tests using proptest
+    use proptest::prelude::*;
 
-    #[test]
-    fn test_struct_domain_classification_idempotent() {
-        let struct_name = "ThresholdConfig";
-        let d1 = classify_struct_domain(struct_name);
-        let d2 = classify_struct_domain(struct_name);
-        assert_eq!(d1, d2);
-    }
+    proptest! {
+        /// Verify classification is idempotent - same input always produces same output
+        #[test]
+        fn prop_classification_idempotent(method_name in "[a-z_]{1,20}") {
+            let r1 = infer_responsibility_with_confidence(&method_name, None);
+            let r2 = infer_responsibility_with_confidence(&method_name, None);
+            prop_assert_eq!(r1.category, r2.category);
+            prop_assert_eq!(r1.confidence, r2.confidence);
+            prop_assert_eq!(r1.signals_used, r2.signals_used);
+        }
 
-    #[test]
-    fn test_confidence_calculation_idempotent() {
-        let thresholds = GodObjectThresholds::default();
-        let c1 = determine_confidence(30, 20, 8, 1500, 300, &thresholds);
-        let c2 = determine_confidence(30, 20, 8, 1500, 300, &thresholds);
-        assert_eq!(c1, c2);
+        /// Verify struct domain classification is idempotent
+        #[test]
+        fn prop_struct_domain_classification_idempotent(struct_name in "[A-Z][a-zA-Z0-9_]{1,30}") {
+            let d1 = classify_struct_domain(&struct_name);
+            let d2 = classify_struct_domain(&struct_name);
+            prop_assert_eq!(d1, d2);
+        }
+
+        /// Verify confidence calculation is idempotent
+        #[test]
+        fn prop_confidence_calculation_idempotent(
+            method_count in 0usize..100,
+            field_count in 0usize..50,
+            responsibility_count in 0usize..20,
+            lines_of_code in 0usize..5000,
+            complexity_sum in 0u32..1000
+        ) {
+            let thresholds = GodObjectThresholds::default();
+            let c1 = determine_confidence(method_count, field_count, responsibility_count, lines_of_code, complexity_sum, &thresholds);
+            let c2 = determine_confidence(method_count, field_count, responsibility_count, lines_of_code, complexity_sum, &thresholds);
+            prop_assert_eq!(c1, c2);
+        }
+
+        /// Verify confidence levels map correctly based on violation count
+        #[test]
+        fn prop_confidence_violations_mapping(
+            method_count in 0usize..100,
+            field_count in 0usize..50,
+            responsibility_count in 0usize..20,
+            lines_of_code in 0usize..5000,
+            complexity_sum in 0u32..1000
+        ) {
+            let thresholds = GodObjectThresholds::default();
+            let confidence = determine_confidence(method_count, field_count, responsibility_count, lines_of_code, complexity_sum, &thresholds);
+
+            // Count violations
+            let mut violations = 0;
+            if method_count > thresholds.max_methods { violations += 1; }
+            if field_count > thresholds.max_fields { violations += 1; }
+            if responsibility_count > thresholds.max_traits { violations += 1; }
+            if lines_of_code > thresholds.max_lines { violations += 1; }
+            if complexity_sum > thresholds.max_complexity { violations += 1; }
+
+            // Verify mapping matches spec
+            match violations {
+                5 => prop_assert_eq!(confidence, GodObjectConfidence::Definite),
+                3..=4 => prop_assert_eq!(confidence, GodObjectConfidence::Probable),
+                1..=2 => prop_assert_eq!(confidence, GodObjectConfidence::Possible),
+                _ => prop_assert_eq!(confidence, GodObjectConfidence::NotGodObject),
+            }
+        }
+
+        /// Verify struct ratio calculation is always non-negative
+        #[test]
+        fn prop_struct_ratio_non_negative(struct_count in 0usize..100, total_functions in 0usize..200) {
+            let ratio = calculate_struct_ratio(struct_count, total_functions);
+            prop_assert!(ratio >= 0.0);
+        }
+
+        /// Verify struct ratio calculation handles zero functions gracefully
+        #[test]
+        fn prop_struct_ratio_zero_functions(struct_count in 0usize..100) {
+            let ratio = calculate_struct_ratio(struct_count, 0);
+            prop_assert_eq!(ratio, 0.0);
+        }
     }
 }
