@@ -1696,29 +1696,4 @@ mod tests {
             rec.primary_action
         );
     }
-
-    #[test]
-    fn test_generate_concise_recommendation_dispatcher_none_propagates() {
-        // Test that when generate_complexity_steps returns None (for clean dispatcher),
-        // generate_concise_recommendation also returns None
-
-        // This is tested indirectly through the dispatcher detection logic.
-        // When the pattern detector identifies a clean dispatcher (inline_logic_branches=0),
-        // generate_dispatcher_recommendation returns None, which propagates through
-        // generate_complexity_steps and generate_concise_recommendation.
-
-        // The key assertion is in test_clean_dispatcher_returns_none above,
-        // which verifies that generate_dispatcher_recommendation returns None
-        // when inline_logic_branches == 0.
-
-        // The propagation is guaranteed by the use of the `?` operator in
-        // generate_complexity_steps at line 322:
-        //     ComplexityPattern::Dispatcher { ... } => generate_dispatcher_recommendation(...)?,
-
-        // This test serves as documentation of this behavior.
-        assert!(
-            true,
-            "Propagation verified by code structure and test_clean_dispatcher_returns_none"
-        );
-    }
 }
