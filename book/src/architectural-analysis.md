@@ -84,6 +84,10 @@ pub struct CouplingMetrics {
 
 **Efferent coupling** is the number of modules this module depends on. High efferent coupling means this module has many dependencies.
 
+**Note on Abstractness:** The `abstractness` field in `CouplingMetrics` requires advanced type analysis to calculate properly. The current implementation uses a placeholder value (0.0) as full abstractness calculation would need semantic analysis of trait definitions, abstract types, and implementation ratios. This is similar to the cohesion analysis limitation documented below (see "Cohesion Analysis" section).
+
+**Source:** `src/debt/coupling.rs:44`
+
 ### Example Coupling Analysis
 
 ```
@@ -374,8 +378,10 @@ threshold_duplication = 50  # Default value
 ### Current Limitations
 
 - **Exact matching only** - Currently uses hash-based exact matching
-- **similarity_threshold parameter** - Defined but not implemented yet
-- **Future enhancement** - Fuzzy matching for near-duplicates
+- **similarity_threshold parameter** - Defined in function signature but not implemented yet
+- **Future enhancement** - Fuzzy matching for near-duplicates using similarity algorithms (e.g., Levenshtein distance, token-based similarity)
+
+The `similarity_threshold` parameter exists for future extensibility but is currently unused. All duplication detection uses exact hash matching. Track progress on fuzzy matching in the project's issue tracker or roadmap.
 
 ## Refactoring Recommendations
 
@@ -615,7 +621,7 @@ debtmap analyze . --threshold-duplication 50
 
 ### Hardcoded Thresholds
 
-**Note:** Most architectural thresholds are currently hardcoded in the implementation and cannot be configured:
+**Note:** Most architectural thresholds are currently hardcoded in the implementation and cannot be configured. These thresholds are based on industry-standard metrics from Robert C. Martin's research and empirical software engineering studies:
 
 - **Coupling threshold:** 5 (modules with >5 dependencies are flagged)
 - **Instability threshold:** 0.8 (for SDP violations)
@@ -628,7 +634,9 @@ debtmap analyze . --threshold-duplication 50
   - Abstractness > 0.8
   - Instability > 0.8
 
-**Source:** `src/debt/coupling.rs:70-76` (hardcoded threshold definitions)
+These values represent widely-accepted boundaries in software architecture literature. While they work well for most projects, configurable thresholds may be added in a future release to support domain-specific tuning.
+
+**Source:** `src/debt/coupling.rs:70-76, 130, 145` (hardcoded threshold definitions)
 
 See [Configuration](configuration.md) for complete options.
 
@@ -672,7 +680,7 @@ The architectural metrics in debtmap are based on:
 
 ### Related Topics
 
-- [Analysis Guide](analysis-guide.md) - Complete analysis workflow
+- [Analysis Guide](analysis-guide/index.md) - Complete analysis workflow
 - [Configuration](configuration.md) - Configuration options
 - [Entropy Analysis](entropy-analysis.md) - Complexity vs. entropy
 - [Scoring Strategies](scoring-strategies.md) - How debt is scored
