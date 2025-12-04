@@ -585,7 +585,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         plain,
         no_parallel,
         jobs,
-        multi_pass,
+        no_multi_pass,
         show_attribution,
         detail_level,
         aggregate_only,
@@ -668,7 +668,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             formatting_config,
             no_parallel,
             jobs,
-            multi_pass,
+            no_multi_pass,
             show_attribution,
             detail_level,
             aggregate_only,
@@ -825,7 +825,7 @@ fn build_analyze_config(
     formatting_config: FormattingConfig,
     no_parallel: bool,
     jobs: usize,
-    multi_pass: bool,
+    no_multi_pass: bool,
     show_attribution: bool,
     detail_level: Option<String>,
     aggregate_only: bool,
@@ -864,6 +864,12 @@ fn build_analyze_config(
         verbosity
     };
 
+    // Check for DEBTMAP_SINGLE_PASS environment variable (spec 202)
+    let single_pass_env = std::env::var("DEBTMAP_SINGLE_PASS")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok().or_else(|| Some(v == "1")))
+        .unwrap_or(false);
+
     debtmap::commands::analyze::AnalyzeConfig {
         path,
         format: convert_output_format(format),
@@ -891,7 +897,7 @@ fn build_analyze_config(
         _formatting_config: formatting_config,
         parallel: should_use_parallel(no_parallel),
         jobs: get_worker_count(jobs),
-        multi_pass,
+        multi_pass: !no_multi_pass && !single_pass_env,
         show_attribution,
         detail_level,
         aggregate_only,

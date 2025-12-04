@@ -168,9 +168,9 @@ pub enum Commands {
         #[arg(long = "jobs", short = 'j', default_value = "0")]
         jobs: usize,
 
-        /// Enable multi-pass analysis with attribution
-        #[arg(long = "multi-pass")]
-        multi_pass: bool,
+        /// Disable multi-pass analysis (use single-pass for performance)
+        #[arg(long = "no-multi-pass")]
+        no_multi_pass: bool,
 
         /// Show complexity attribution details
         #[arg(long = "attribution")]
@@ -674,6 +674,36 @@ mod tests {
                 // Success - the structure was created properly
             }
             _ => panic!("Expected Analyze command from test args"),
+        }
+    }
+
+    #[test]
+    fn test_no_multi_pass_flag() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "analyze", ".", "--no-multi-pass"];
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze { no_multi_pass, .. } => {
+                assert!(no_multi_pass);
+            }
+            _ => panic!("Expected Analyze command"),
+        }
+    }
+
+    #[test]
+    fn test_default_enables_multi_pass() {
+        use clap::Parser;
+
+        let args = vec!["debtmap", "analyze", "."];
+        let cli = Cli::parse_from(args);
+
+        match cli.command {
+            Commands::Analyze { no_multi_pass, .. } => {
+                assert!(!no_multi_pass); // multi-pass is default (flag not set)
+            }
+            _ => panic!("Expected Analyze command"),
         }
     }
 }
