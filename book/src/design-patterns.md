@@ -456,28 +456,40 @@ impl Visitor for ComplexityVisitor {
 
 ## Configuration
 
-### CLI Options
+### Current Implementation Status
 
-Enable or configure pattern detection using command-line flags:
+Pattern detection is currently **internal-only** and used for analysis adjustments. The CLI flags for pattern detection exist in the codebase but are not yet fully integrated into the analysis pipeline.
+
+**Status Summary**:
+- ✅ Pattern detection logic implemented (7 user-facing patterns)
+- ✅ CLI flags defined (`--no-pattern-detection`, `--patterns`, `--pattern-threshold`, `--show-pattern-warnings`)
+- ⚠️ CLI flags not yet wired to analysis pipeline
+- ⚠️ Pattern detection results not currently exposed in output formats
+
+Pattern detection is primarily used internally for:
+- Adjusting complexity scores to avoid false positives
+- Informing god object detection (Builder pattern)
+- Normalizing exhaustive pattern matching complexity (Visitor pattern)
+
+### CLI Options (Defined but Not Yet Active)
+
+The following CLI flags are defined in the codebase (`src/cli.rs:228-241`) but are not yet fully integrated:
 
 ```bash
-# Disable all pattern detection
+# Disable all pattern detection (planned)
 debtmap analyze --no-pattern-detection
 
-# Enable only specific patterns (all 7 available patterns shown)
+# Enable only specific patterns (planned)
 debtmap analyze --patterns observer,singleton,factory,strategy,callback,template_method,dependency_injection
 
-# Enable a subset of patterns
-debtmap analyze --patterns observer,singleton,factory
-
-# Set confidence threshold (0.0-1.0)
+# Set confidence threshold (planned)
 debtmap analyze --pattern-threshold 0.8
 
-# Show warnings for uncertain pattern detections
+# Show warnings for uncertain pattern detections (planned)
 debtmap analyze --show-pattern-warnings
 ```
 
-**Available Patterns for `--patterns` Flag**:
+**Planned Patterns for `--patterns` Flag** (when integration is complete):
 - `observer` - Observer pattern detection
 - `singleton` - Singleton pattern detection
 - `factory` - Factory pattern detection
@@ -486,13 +498,13 @@ debtmap analyze --show-pattern-warnings
 - `template_method` - Template method pattern detection
 - `dependency_injection` - Dependency injection detection
 
-**Note**: Builder and Visitor patterns are detected internally but are **not available** via the `--patterns` flag. See [Internal Pattern Detection](#internal-pattern-detection) for details.
+**Note**: Builder and Visitor patterns are detected internally but will not be available via the `--patterns` flag. See [Internal Pattern Detection](#internal-pattern-detection) for details.
 
-### Pattern Detection Output
+### Roadmap: Pattern Detection Output
 
-Pattern detection results are integrated into debtmap's output in different formats:
+When fully integrated, pattern detection results will appear in debtmap's output formats:
 
-**Terminal Format**: Detected patterns are shown in a dedicated section of the analysis output:
+**Planned Terminal Format**:
 ```
 Design Patterns Detected:
   Observer Pattern (confidence: 0.88)
@@ -500,7 +512,7 @@ Design Patterns Detected:
     Implementations: AuditLogger, SessionManager
 ```
 
-**JSON Format**: Pattern results are included in the `pattern_instances` field:
+**Planned JSON Format**:
 ```json
 {
   "pattern_instances": [
@@ -514,17 +526,10 @@ Design Patterns Detected:
 }
 ```
 
-**Markdown Format**: Patterns are documented in a dedicated section with cross-references to source files.
-
-**Using `--show-pattern-warnings`**: This flag reveals low-confidence detections (below the threshold) that might indicate:
-- Incomplete pattern implementations
-- Patterns in development
-- False positives to review
-
-Use this flag during initial analysis to understand what patterns debtmap sees:
-```bash
-debtmap analyze --show-pattern-warnings --pattern-threshold 0.7
-```
+**Current Workaround**: Pattern detection is used internally during analysis to improve accuracy. To see the effects of pattern detection:
+1. Run analysis with and without `--no-pattern-detection` (when implemented)
+2. Compare complexity scores and god object detection results
+3. Patterns are being detected, but not explicitly reported in output
 
 ## Confidence Scoring
 
@@ -691,41 +696,15 @@ visitor_complexity = log2(match_arms) * average_arm_complexity
 This prevents exhaustive pattern matching from being flagged as overly complex. See [Visitor Pattern (Internal Use Only)](#visitor-pattern-internal-use-only) for more details.
 
 **See Also**:
-- [Complexity Analysis](./complexity-metrics.md) - How complexity is calculated
+- [Complexity Analysis](./analysis-guide/complexity-metrics.md) - How complexity is calculated
 - [Scoring Strategies](./scoring-strategies.md) - Complexity adjustments and multipliers
 
 ## Practical Examples
 
-### Example 1: Analyzing a Web Framework
+### Example 1: Observer Pattern Code Structure
 
-Analyzing a Flask application with callback patterns:
+Pattern detection identifies Observer implementations even though results are not yet shown in output:
 
-```bash
-debtmap analyze --patterns callback --show-pattern-warnings myapp/
-```
-
-Output excerpt:
-```
-Design Patterns Detected:
-  Callback Pattern (15 instances, confidence: 0.85-0.92)
-    - @app.route decorators: 12
-    - @app.before_request decorators: 2
-    - @app.errorhandler decorators: 1
-
-Complexity Adjustments:
-  - Route handlers: -40% complexity (pattern boilerplate)
-  - Error handlers: -50% complexity (expected pattern)
-```
-
-### Example 2: Detecting Observer Pattern
-
-Analyzing a codebase with event-driven architecture:
-
-```bash
-debtmap analyze --patterns observer --pattern-threshold 0.75
-```
-
-Code:
 ```python
 # event_system.py
 from abc import ABC, abstractmethod
@@ -755,120 +734,229 @@ class EventDispatcher:
             listener.on_user_login(user)
 ```
 
-Output:
+**Current Behavior**: Debtmap internally detects this Observer pattern (confidence ~0.88) and uses it to adjust complexity scoring. The pattern structure is recognized but not reported in output.
+
+**Source**: Pattern detection logic in `src/analysis/patterns/observer.rs`
+
+### Example 2: Factory Pattern Detection Criteria
+
+Debtmap detects factory patterns based on naming and structure:
+
+```python
+def create_logger(log_type: str):
+    """Factory function - detected by 'create_' prefix"""
+    if log_type == "file":
+        return FileLogger()
+    elif log_type == "console":
+        return ConsoleLogger()
+    else:
+        return NetworkLogger()
 ```
-Design Patterns:
-  Observer Pattern (confidence: 0.88)
-    Interface: EventListener (event_system.py:4)
-    Implementations:
-      - AuditLogger (event_system.py:9)
-      - SessionManager (event_system.py:13)
-    Registration: add_listener (event_system.py:21)
-    Notification: notify_login (event_system.py:24)
+
+**Current Behavior**: The factory pattern detector (in `src/analysis/patterns/factory.rs`) identifies this as a Factory pattern with medium-high confidence (~0.75-0.85) based on:
+- Function name contains `create_`
+- Returns different types based on parameter
+- Multiple instantiation paths
+
+This information is used internally to adjust complexity scores for factory functions.
+
+### Example 3: Impact on Complexity Analysis
+
+While pattern detection results aren't directly shown, their effect can be observed:
+
+```bash
+# Run standard analysis
+debtmap analyze myapp/
+
+# When --no-pattern-detection is fully integrated, compare results
+# (currently this flag exists but isn't fully wired)
 ```
+
+**Expected Differences**:
+- Factory functions: Lower complexity scores with pattern detection
+- Observer implementations: Adjusted scores for callback registration
+- Template methods: Reduced penalty for abstract method patterns
+- Builder classes: Not flagged as god objects despite many methods
 
 ## Use Cases
 
-### 1. False Positive Reduction
+### 1. False Positive Reduction (Active)
 
 **Problem**: Complex factory functions flagged as too complex
-**Solution**: Enable factory pattern detection to apply appropriate complexity adjustments
+**Solution**: Pattern detection automatically adjusts complexity scores for recognized factory patterns
 
+**Current Behavior**:
 ```bash
-debtmap analyze --patterns factory --pattern-threshold 0.7
+debtmap analyze myapp/
 ```
 
-### 2. Architecture Documentation
+Factory functions are automatically detected and receive adjusted complexity scores. This happens internally without requiring specific flags.
+
+**Source**: `src/analysis/patterns/factory.rs` applies multipliers to factory function complexity
+
+### 2. Builder Pattern God Object Prevention (Active)
+
+**Problem**: Builder classes flagged as god objects due to many chaining methods
+**Solution**: Builder pattern detection automatically excludes builder classes from god object analysis
+
+**Current Behavior**:
+```rust
+// This builder class is automatically recognized
+pub struct HttpClientBuilder {
+    // Many fields and methods
+    pub fn base_url(mut self, url: String) -> Self { /* ... */ }
+    pub fn timeout(mut self, duration: Duration) -> Self { /* ... */ }
+    pub fn build(self) -> HttpClient { /* ... */ }
+}
+```
+
+Debtmap detects the builder pattern (chaining methods returning `Self`, final `build()` method) and adjusts scoring accordingly.
+
+**Source**: `src/organization/builder_pattern.rs` for god object detection adjustment
+
+### 3. Future Use Case: Architecture Documentation (Planned)
 
 **Problem**: Undocumented design patterns in legacy codebase
-**Solution**: Run pattern detection to automatically identify architectural patterns
+**Solution**: When pattern output is integrated, users will be able to generate architectural pattern reports
 
+**Planned Command**:
 ```bash
-debtmap analyze --show-pattern-warnings > architecture-report.txt
+debtmap analyze --show-pattern-warnings --output-format json > architecture-report.json
 ```
 
-### 3. Pattern Consistency Validation
+**Current Workaround**: Review complexity adjustments and god object scoring to infer where patterns are detected
+
+### 4. Future Use Case: Pattern Consistency Validation (Planned)
 
 **Problem**: Inconsistent Observer implementations across the codebase
-**Solution**: Use pattern detection to identify all Observer instances and compare their structure
+**Solution**: When integrated, users can filter analysis to specific pattern types
 
+**Planned Command**:
 ```bash
 debtmap analyze --patterns observer --output-format json > observers.json
 ```
 
-### 4. Refactoring Guidance
-
-**Problem**: Code smells that might be incomplete pattern implementations
-**Solution**: Detect partial patterns with lower confidence thresholds
-
-```bash
-debtmap analyze --pattern-threshold 0.5 --show-pattern-warnings
-```
+**Current Status**: Pattern detection logic exists and works internally, but results aren't yet exposed in output
 
 ## Troubleshooting
 
-### Pattern Not Detected
+### Pattern Detection Not Visible in Output
 
-**Symptoms**: Expected pattern not appearing in output
+**Symptoms**: Cannot see detected patterns in analysis output
 
-**Possible Causes**:
-1. Confidence below threshold
-   - Solution: Lower `--pattern-threshold` or use `--show-pattern-warnings`
-2. Pattern disabled
-   - Solution: Check `--patterns` flag and `.debtmap.toml` config
-3. Implementation doesn't match detection criteria
-   - Solution: Review pattern-specific criteria above or add custom rule
+**Explanation**: Pattern detection is currently **internal-only**. Patterns are detected and used to adjust complexity scoring, but results are not exposed in terminal, JSON, or markdown output.
+
+**Current Behavior**:
+- Patterns ARE being detected (see `src/analysis/patterns/mod.rs`)
+- Detection results affect complexity scores and god object analysis
+- Pattern information is not included in output formatting
+
+**Solution**: To benefit from pattern detection:
+1. Run standard analysis - patterns are automatically detected
+2. Check if complexity scores seem adjusted for factory/callback patterns
+3. Verify builder classes aren't flagged as god objects
+
+**Future Integration**: CLI flags and output formatting will be connected when pattern output integration is complete.
+
+### CLI Flags Have No Effect
+
+**Symptoms**: Using `--patterns`, `--pattern-threshold`, or `--show-pattern-warnings` doesn't change results
+
+**Explanation**: These CLI flags are defined in `src/cli.rs:228-241` but are not yet fully wired to the analysis pipeline.
+
+**Current Status**:
+- ✅ CLI argument parsing works
+- ⚠️ Values not passed to pattern detector
+- ⚠️ Pattern detection runs with default settings regardless of flags
+
+**Workaround**: Pattern detection runs automatically with default settings (threshold 0.7, all 7 patterns enabled).
 
 ### Builder or Visitor Pattern Not Available via CLI
 
-**Symptoms**: Using `--patterns builder` or `--patterns visitor` has no effect
+**Symptoms**: Cannot specify `--patterns builder` or `--patterns visitor`
 
-**Explanation**: Builder and Visitor patterns are detected **internally only** and are not available as user-facing pattern detection features:
-- **Builder**: Used internally during god object detection to adjust scores for builder classes
-- **Visitor**: Used internally for complexity analysis to apply logarithmic scaling to exhaustive match expressions
+**Explanation**: Builder and Visitor patterns are **intentionally internal-only** and will not be available as user-facing pattern detection features:
+- **Builder**: Used during god object detection to adjust scores for builder classes (see `src/organization/builder_pattern.rs`)
+- **Visitor**: Used for complexity analysis to apply logarithmic scaling to exhaustive match expressions (see `src/complexity/visitor_detector.rs`)
 
-**Solution**: These patterns are detected automatically when needed for internal analyses. They don't require manual enablement and won't appear in pattern detection output. See [Internal Pattern Detection](#internal-pattern-detection) for details.
+**Solution**: These patterns are automatically detected when needed for internal analyses. They won't appear in the `--patterns` flag even when that feature is fully integrated.
 
 **Available user-facing patterns**: `observer`, `singleton`, `factory`, `strategy`, `callback`, `template_method`, `dependency_injection`
 
-### False Positive Detection
+### False Positive Complexity Adjustments
 
-**Symptoms**: Pattern detected incorrectly
-
-**Possible Causes**:
-1. Naming collision (e.g., `create_` function that isn't a factory)
-   - Solution: Increase `--pattern-threshold` to require stronger evidence
-2. Coincidental structural match
-   - Solution: Add exclusion rules in configuration (if supported)
-
-### Incomplete Cross-File Detection
-
-**Symptoms**: Pattern implementations in other files not linked to interface
+**Symptoms**: Function with `create_` prefix gets lower complexity score but isn't actually a factory
 
 **Possible Causes**:
-1. Dynamic imports not tracked
-   - Solution: Use static imports where possible
-2. Interface not explicitly imported
-   - Solution: Add explicit import even if not type-checking
+1. Naming collision (e.g., `create_session()` that doesn't create objects)
+2. Overly broad pattern matching heuristics
+
+**Current Workaround**: Pattern detection cannot currently be disabled or tuned per-file. The `--no-pattern-detection` flag exists but isn't yet wired to the detector.
+
+**Future Solution**: When CLI integration is complete:
+```bash
+debtmap analyze --no-pattern-detection  # Disable all pattern detection
+debtmap analyze --pattern-threshold 0.9  # Require very high confidence
+```
 
 ## Best Practices
 
-1. **Start with defaults**: The default 0.7 threshold works well for most projects
+### Current Recommendations
+
+1. **Trust automatic detection**: Pattern detection runs automatically with sensible defaults (threshold 0.7, all 7 patterns enabled)
+2. **Review complexity scores**: Lower-than-expected complexity for factory/callback functions indicates pattern detection is working
+3. **Check builder classes**: If builder classes aren't flagged as god objects, builder pattern detection is working correctly
+4. **Follow pattern idioms**: Use standard naming conventions (`create_`, `make_`, `@abstractmethod`, etc.) to ensure patterns are recognized
+5. **Structure code clearly**: Well-structured patterns (clear base classes, explicit implementations) have higher confidence scores
+
+### When CLI Integration is Complete
+
+Future best practices when CLI flags are fully wired:
+
+1. **Start with defaults**: The default 0.7 threshold will work well for most projects
 2. **Use `--show-pattern-warnings`** during initial analysis to see borderline detections
-3. **Configure per-pattern**: Adjust detection criteria for patterns most relevant to your project
-4. **Define custom rules**: Add project-specific patterns to reduce false positives
-5. **Combine with complexity analysis**: Use pattern detection to understand complexity adjustments
-6. **Review low-confidence detections**: They may indicate incomplete implementations worth refactoring
+3. **Tune thresholds per-project**: Adjust `--pattern-threshold` based on your codebase's idioms
+4. **Disable selectively**: Use `--no-pattern-detection` to compare scores with/without adjustments
+5. **Review pattern reports**: Examine detected patterns to understand architectural decisions
 
 ## Summary
 
-Debtmap's design pattern detection provides:
-- **7 user-facing patterns** covering common OOP and functional patterns (Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection)
-- **2 internal patterns** (Builder, Visitor) used for god object detection and complexity normalization
-- **Configurable confidence thresholds** for precision vs. recall tradeoff
-- **Custom pattern rules** for project-specific patterns
-- **Cross-file detection** for patterns spanning multiple modules
-- **Rust trait support** for idiomatic Rust pattern detection
-- **Complexity integration** to reduce false positives in analysis
+### Current State
 
-Pattern detection improves the accuracy of technical debt analysis by recognizing idiomatic code patterns and applying appropriate complexity adjustments. Internal pattern detection helps prevent false positives in god object and complexity analyses without exposing implementation details to users.
+Debtmap's design pattern detection **exists and works internally** with the following characteristics:
+
+**Implemented Features**:
+- ✅ **7 user-facing patterns**: Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection
+- ✅ **2 internal patterns**: Builder (for god object detection), Visitor (for complexity normalization)
+- ✅ **Pattern detection logic**: Fully implemented in `src/analysis/patterns/`
+- ✅ **Confidence scoring**: 0.0-1.0 scale with holistic assessment
+- ✅ **Cross-file detection**: Tracks imports and interfaces across modules
+- ✅ **Rust trait support**: Leverages trait system for pattern detection
+- ✅ **Complexity integration**: Automatically adjusts scores to reduce false positives
+
+**Partially Implemented**:
+- ⚠️ **CLI flags**: Defined in `src/cli.rs` but not wired to pattern detector
+- ⚠️ **Output formatting**: `PatternInstance` type exists but not exposed in output
+
+**Not Yet Implemented**:
+- ❌ **Pattern output in terminal/JSON/markdown**: Detection results not shown to users
+- ❌ **User configuration**: Cannot currently control pattern detection via CLI or config file
+- ❌ **Pattern-specific reports**: Cannot filter or focus on specific pattern types
+
+### Impact
+
+Pattern detection **significantly improves analysis accuracy** even without visible output:
+- **Reduces false positives**: Factory functions, callbacks, and template methods get appropriate complexity scores
+- **Prevents god object misclassification**: Builder classes recognized and excluded from god object detection
+- **Normalizes exhaustive matching**: Visitor pattern detection applies logarithmic scaling to pattern matching
+- **Supports multiple languages**: Works across Python, JavaScript, TypeScript, and Rust
+
+### Future Integration
+
+When CLI and output integration is complete, users will be able to:
+- View detected patterns in analysis output
+- Control pattern detection via `--patterns`, `--pattern-threshold`, and `--show-pattern-warnings` flags
+- Generate architectural documentation from pattern detection results
+- Validate pattern consistency across codebases
+
+The foundation is solid - pattern detection works correctly and provides value. The remaining work is connecting the detection logic to user-facing configuration and output.
