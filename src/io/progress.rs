@@ -13,8 +13,8 @@
 //! ✓ 2/4 Analyzing complexity...     511/511 (100%) - 2s
 //! → 3/4 Building call graph...      511/511 (100%) - 1s
 //! ✓ 3/4 Building call graph...      511/511 (100%) - 1s
-//! → 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
-//! ✓ 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
+//! → 4/4 Refining analysis...   148769/148769 (100%) - 3s
+//! ✓ 4/4 Refining analysis...   148769/148769 (100%) - 3s
 //!
 //! Analysis complete in 6.2s
 //! ```
@@ -71,7 +71,7 @@ impl AnalysisProgress {
                 AnalysisPhase::new("Discovering files", PhaseProgress::Indeterminate),
                 AnalysisPhase::new("Analyzing complexity", PhaseProgress::Indeterminate),
                 AnalysisPhase::new("Building call graph", PhaseProgress::Indeterminate),
-                AnalysisPhase::new("Resolving dependencies", PhaseProgress::Indeterminate),
+                AnalysisPhase::new("Refining analysis", PhaseProgress::Indeterminate),
             ],
             current_phase: 0,
             start_time: Instant::now(),
