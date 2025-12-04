@@ -298,10 +298,16 @@ mod tests {
     fn test_format_score_header() {
         use colored::Color;
 
+        // Disable colors for test to check plain text output
+        colored::control::set_override(false);
+
         let header = format_score_header(1, 85.5, " [WARN]", "HIGH", Color::Red);
         assert!(header.contains("#1"));
         assert!(header.contains("SCORE:"));
         assert!(header.contains("[HIGH]"));
+
+        // Re-enable colors
+        colored::control::unset_override();
     }
 
     #[test]
