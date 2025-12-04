@@ -18,6 +18,14 @@ Debtmap detects pure functions - those without side effects that always return t
 - May be `None` for some functions or languages where detection is not available
 - Rust has the most comprehensive purity detection support
 
+**Three-level purity classification:**
+The `purity_level` field provides a more nuanced classification than the binary `is_pure`:
+- **Pure**: No side effects detected, deterministic output
+- **ProbablyPure**: Mostly pure with minor suspicious patterns
+- **Impure**: Clear side effects or non-deterministic behavior
+
+This three-level classification (available in `src/core/mod.rs:91`) complements the confidence scoring for more precise analysis.
+
 **Confidence scoring (when available):**
 - **0.9-1.0**: Very confident (no side effects detected)
 - **0.7-0.8**: Likely pure (minimal suspicious patterns)
@@ -92,7 +100,6 @@ pub struct DataFlowGraph {
 - Local variables accessed in function body
 - Function parameters
 - Captured variables (closures)
-- Mutable vs immutable references
 
 **Benefits:**
 - Identify functions coupled through shared state
@@ -239,21 +246,15 @@ pub struct ModificationImpact {
 {
   "function": "validate_payment_method",
   "modification_impact": {
-    "affected_functions": [
-      "process_payment",
-      "refund_payment",
-      "update_payment_method",
-      "validate_subscription"
-    ],
-    "affected_count": 4,
+    "affected_functions": 4,
     "dependency_count": 8,
     "has_side_effects": true,
-    "io_operations": ["DatabaseRead", "NetworkCall"],
-    "risk_level": "High",
-    "recommendation": "Comprehensive testing required - 4 functions depend on this, performs I/O"
+    "risk_level": "High"
   }
 }
 ```
+
+**Note**: The `affected_functions` field contains the count of upstream callers. The actual function names can be obtained from the `upstream_callers` field in the function metadata.
 
 **Using modification impact:**
 ```bash
@@ -396,7 +397,7 @@ pub struct CacheStats {
     pub misses: usize,
     pub evictions: usize,
     pub hit_rate: f64,
-    pub memory_bytes: usize,
+    pub memory_usage: usize,
 }
 ```
 
@@ -408,7 +409,7 @@ pub struct CacheStats {
     "misses": 1573,
     "evictions": 573,
     "hit_rate": 0.685,
-    "memory_bytes": 128000
+    "memory_usage": 128000
   }
 }
 ```
