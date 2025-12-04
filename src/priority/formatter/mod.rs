@@ -175,8 +175,7 @@ pub fn format_file_priority_item_with_verbosity(
         "├─ IMPACT:".bright_blue(),
         format!(
             "-{:.0} complexity, -{:.1} maintainability improvement",
-            item.impact.complexity_reduction,
-            item.impact.maintainability_improvement
+            item.impact.complexity_reduction, item.impact.maintainability_improvement
         )
         .bright_cyan()
     )
@@ -207,7 +206,12 @@ pub fn format_file_priority_item_with_verbosity(
         .unwrap();
 
         // Show recommended splits if available
-        if !item.metrics.god_object_indicators.recommended_splits.is_empty() {
+        if !item
+            .metrics
+            .god_object_indicators
+            .recommended_splits
+            .is_empty()
+        {
             writeln!(
                 output,
                 "   {} {} recommended module splits",
@@ -233,7 +237,7 @@ pub fn format_file_priority_item_with_verbosity(
         output,
         "{} {}",
         "└─ WHY THIS MATTERS:".bright_blue(),
-        rationale.dimmed()
+        rationale
     )
     .unwrap();
 }
@@ -274,6 +278,7 @@ fn format_file_rationale(item: &crate::priority::FileDebtItem) -> String {
             item.metrics.function_count
         )
     } else {
-        "File-level refactoring will improve overall code organization and maintainability.".to_string()
+        "File-level refactoring will improve overall code organization and maintainability."
+            .to_string()
     }
 }
