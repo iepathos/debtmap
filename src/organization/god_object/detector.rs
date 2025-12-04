@@ -270,14 +270,17 @@ impl GodObjectDetector {
         // Step 3: Count methods (exclude tests for GodClass, include for GodFile/GodModule)
         let (method_count, method_names) = match detection_type {
             DetectionType::GodClass => {
-                // Production methods only
-                let prod_methods: Vec<_> = visitor
+                // For GodClass: only count impl methods, not standalone functions (Spec 118)
+                // This prevents false positives for functional/procedural modules
+                let standalone_set: std::collections::HashSet<_> =
+                    visitor.standalone_functions.iter().collect();
+                let impl_methods: Vec<_> = visitor
                     .function_complexity
                     .iter()
-                    .filter(|fc| !fc.is_test)
+                    .filter(|fc| !fc.is_test && !standalone_set.contains(&fc.name))
                     .map(|fc| fc.name.clone())
                     .collect();
-                (prod_methods.len(), prod_methods)
+                (impl_methods.len(), impl_methods)
             }
             DetectionType::GodFile | DetectionType::GodModule => {
                 // All functions
