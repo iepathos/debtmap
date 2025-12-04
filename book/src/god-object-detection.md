@@ -155,10 +155,13 @@ base_score = method_factor × field_factor × responsibility_factor × size_fact
 
 **Score Enforcement:**
 
-- If `violation_count > 0`: `final_score = max(base_score × 50 × violation_count, 100)`
+- If `violation_count > 0`: `final_score = max(base_score × 20 × violation_count, min_score)`
+  - Where `min_score` is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations → 70.0
 - Else: `final_score = base_score × 10`
 
-The minimum score of 100 ensures that any god object receives sufficient priority in the technical debt analysis.
+**Source**: src/organization/god_object/scoring.rs:44-90
+
+The graduated minimum scores ensure that severity matches the number of violations while preventing over-flagging of moderate files.
 
 ### Complexity-Weighted Scoring
 
@@ -179,12 +182,14 @@ Additionally, a **complexity factor** is applied:
 The final score becomes:
 
 ```
-final_score = max(base_score × 50 × complexity_factor × violation_count, 100)
+final_score = max(base_score × 20 × complexity_factor × violation_count, min_score)
 ```
 
-This approach better reflects the true maintainability burden of a large module.
+Where `min_score` is: 1 violation → 30.0, 2 violations → 50.0, 3+ violations → 70.0
 
-See `src/organization/god_object_analysis.rs:142-209`.
+This approach better reflects the true maintainability burden of a large module while using conservative scaling to prevent small files from being over-flagged.
+
+**Source**: src/organization/god_object/scoring.rs:118-178
 
 ### Purity-Weighted Scoring (Advanced)
 
@@ -229,24 +234,29 @@ See `src/organization/god_object_detector.rs:196-258` and `src/organization/puri
 
 ## Responsibility Detection
 
-Responsibilities are inferred from method names using common prefixes. Debtmap recognizes the following categories:
+Responsibilities are inferred from method names using behavioral heuristics. Debtmap recognizes the following categories based on the `BehaviorCategory` enum (src/organization/behavioral_decomposition.rs:10-41):
 
-| Prefix(es) | Responsibility Category |
-|------------|------------------------|
-| `format`, `render`, `write`, `print` | Formatting & Output |
-| `parse`, `read`, `extract` | Parsing & Input |
-| `filter`, `select`, `find` | Filtering & Selection |
-| `transform`, `convert`, `map`, `apply` | Transformation |
-| `get`, `set` | Data Access |
-| `validate`, `check`, `verify`, `is` | Validation |
-| `calculate`, `compute` | Computation |
-| `create`, `build`, `new` | Construction |
-| `save`, `load`, `store` | Persistence |
-| `process`, `handle` | Processing |
-| `send`, `receive` | Communication |
-| *(no prefix match)* | Utilities |
+| Category | Method Patterns | Examples |
+|----------|----------------|----------|
+| **Lifecycle** | `new`, `init`, `setup`, `destroy`, `cleanup` | Initialization and teardown |
+| **State Management** | `update_*`, `mutate_*`, `*_state` | State transitions and mutations |
+| **Rendering** | `render`, `draw`, `paint`, `display`, `format` | Display and formatting |
+| **Event Handling** | `handle_*`, `on_*` | Event dispatchers and handlers |
+| **Persistence** | `save`, `load`, `serialize`, `deserialize` | Data storage and retrieval |
+| **Validation** | `validate_*`, `check_*`, `verify_*`, `ensure_*`, `is_*` | Data validation |
+| **Computation** | `calculate`, `compute`, `evaluate` | Pure deterministic calculations |
+| **Parsing** | `parse`, `read`, `extract`, `decode`, `unmarshal`, `scan` | Data parsing and reading |
+| **Filtering** | `filter`, `select`, `find`, `search`, `query`, `lookup`, `match` | Search and filtering |
+| **Transformation** | `transform`, `convert`, `map`, `apply`, `adapt` | Data transformation |
+| **Data Access** | `get`, `set`, `fetch`, `retrieve`, `access` | Getter/setter methods |
+| **Construction** | `create`, `build`, `make`, `construct` | Object construction |
+| **Processing** | `process`, `handle`, `execute`, `run` | General processing |
+| **Communication** | `send`, `receive`, `transmit`, `broadcast`, `notify` | Inter-process communication |
+| **Domain** | *(no match)* | Domain-specific with custom name |
 
-**Note:** `Utilities` serves as both a category in the responsibility list and the fallback when no prefix matches. In the implementation, `Utilities` is included in `RESPONSIBILITY_CATEGORIES` with an empty prefixes array (`prefixes: &[]`), making it the catch-all category returned by `infer_responsibility_from_method` when no other category matches.
+**Note:** The `Domain` category serves as the fallback when no behavioral pattern matches. It extracts a domain name from the method's first word to provide context-specific categorization.
+
+**Classification Order**: More specific categories are checked first (Construction before Lifecycle, Validation before Rendering) to ensure accurate categorization. See `BehavioralCategorizer::categorize_method()` in src/organization/behavioral_decomposition.rs:151-249.
 
 **Distinct Responsibility Counting:** Debtmap counts the number of **unique** responsibility categories used by a struct/module's methods. A high responsibility count (e.g., >5) indicates the module is handling too many different concerns, violating the Single Responsibility Principle.
 
@@ -255,7 +265,7 @@ Responsibility count directly affects:
 - Refactoring recommendations (methods grouped by responsibility for suggested splits)
 - Detection confidence (counted as one of the five violation criteria)
 
-See `src/organization/god_object_analysis.rs:318-388` for the `infer_responsibility_from_method` function.
+See `BehavioralCategorizer::categorize_method()` in src/organization/behavioral_decomposition.rs:151-249 and `infer_responsibility_with_confidence()` in src/organization/god_object/classifier.rs:128-163.
 
 ## Examples and Case Studies
 
@@ -552,7 +562,7 @@ This multiplier means:
 - God objects surface in the "top 10 most problematic" lists
 - Architectural debt is weighted appropriately alongside function-level complexity
 
-See file-level scoring documentation for complete details on how this multiplier integrates into the overall debt calculation.
+See the [Scoring Strategies](./scoring-strategies.md#file-level-scoring) documentation for complete details on how this multiplier integrates into the overall debt calculation.
 
 ## Metrics Tracking (Advanced)
 
@@ -637,7 +647,7 @@ To avoid god objects:
 
 ## Related Documentation
 
-- [File-Level Scoring](./file-level-scoring.md) - How god objects affect overall file scores
+- [Scoring Strategies](./scoring-strategies.md) - How god objects affect overall file scores
 - [Configuration](./configuration.md) - Complete `.debtmap.toml` reference
 - [CLI Reference](./cli-reference.md) - All command-line options
 - [Tiered Prioritization](./tiered-prioritization.md) - How god objects are prioritized
