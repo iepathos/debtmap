@@ -144,7 +144,9 @@ fn perform_unified_analysis_computation(
 
     // Progress tracking
     let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
-    // Progress will be shown by the parallel builder itself
+
+    // Phase 3: Building call graph (spec 195)
+    crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(2));
 
     // Time call graph building
     let call_graph_start = std::time::Instant::now();
@@ -160,11 +162,30 @@ fn perform_unified_analysis_computation(
     };
     let call_graph_time = call_graph_start.elapsed();
 
+    crate::io::progress::AnalysisProgress::with_global(|p| {
+        p.update_progress(crate::io::progress::PhaseProgress::Progress {
+            current: call_graph.node_count(),
+            total: call_graph.node_count(),
+        });
+        p.complete_phase();
+    });
+
+    // Phase 4: Resolving dependencies (trait resolution) (spec 195)
+    crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(3));
+
     // Integrate trait resolution to reduce false positives
     let trait_resolution_start = std::time::Instant::now();
     let trait_resolution_stats =
         integrate_trait_resolution(project_path, &mut call_graph, verbose_macro_warnings)?;
     let trait_resolution_time = trait_resolution_start.elapsed();
+
+    crate::io::progress::AnalysisProgress::with_global(|p| {
+        p.update_progress(crate::io::progress::PhaseProgress::Progress {
+            current: trait_resolution_stats.resolved_calls,
+            total: trait_resolution_stats.resolved_calls,
+        });
+        p.complete_phase();
+    });
 
     // Display trait resolution statistics in verbose mode
     if !quiet_mode && verbose_macro_warnings {

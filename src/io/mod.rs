@@ -2,6 +2,7 @@ pub mod destinations;
 pub mod effects;
 pub mod output;
 pub mod pattern_output;
+pub mod progress;
 pub mod real;
 pub mod traits;
 pub mod walker;

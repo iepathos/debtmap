@@ -121,6 +121,8 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config._formatting_config,
     )?;
 
+    // Note: Phase 3 (Building call graph) and Phase 4 (Resolving dependencies)
+    // are tracked inside perform_unified_analysis_with_options
     let mut unified_analysis = unified_analysis::perform_unified_analysis_with_options(
         unified_analysis::UnifiedAnalysisOptions {
             results: &results,
@@ -191,6 +193,9 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         config.coverage_file.as_ref(),
     )?;
 
+    // Show total analysis time (spec 195)
+    io::progress::AnalysisProgress::with_global(|p| p.finish());
+
     Ok(())
 }
 
@@ -230,21 +235,39 @@ pub fn analyze_project(
     }
     let config = config::get_config();
 
-    // Create progress spinner for file discovery
-    let discovery_progress = ProgressManager::global()
-        .map(|pm| pm.create_spinner("Discovering project files"))
-        .unwrap_or_else(indicatif::ProgressBar::hidden);
+    // Initialize global unified progress tracker (spec 195)
+    let quiet_mode = std::env::var("DEBTMAP_QUIET").is_ok();
+    if !quiet_mode {
+        io::progress::AnalysisProgress::init_global();
+    }
+
+    // Phase 1: Discovering files
+    io::progress::AnalysisProgress::with_global(|p| p.start_phase(0));
 
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
 
-    discovery_progress.finish_with_message(format!("Found {} files to analyze", files.len()));
+    io::progress::AnalysisProgress::with_global(|p| {
+        p.update_progress(io::progress::PhaseProgress::Count(files.len()));
+        p.complete_phase();
+    });
 
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
 
+    // Phase 2: Analyzing complexity
+    io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
+
     // Collect file metrics directly without caching
     let file_metrics = analysis_utils::collect_file_metrics(&files);
+
+    io::progress::AnalysisProgress::with_global(|p| {
+        p.update_progress(io::progress::PhaseProgress::Progress {
+            current: files.len(),
+            total: files.len(),
+        });
+        p.complete_phase();
+    });
 
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);

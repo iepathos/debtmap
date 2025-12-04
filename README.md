@@ -69,6 +69,43 @@ debtmap analyze . --format html > report.html
 ```
 
 ### Review Results
+
+#### Progress Display
+
+Debtmap provides clear, phase-based progress tracking during analysis. You'll see exactly what's happening through 4 distinct phases:
+
+```
+→ 1/4 Discovering files...        511 found
+✓ 1/4 Discovering files...        511 found - 0s
+→ 2/4 Analyzing complexity...     511/511 (100%) - 2s
+✓ 2/4 Analyzing complexity...     511/511 (100%) - 2s
+→ 3/4 Building call graph...      511/511 (100%) - 1s
+✓ 3/4 Building call graph...      511/511 (100%) - 1s
+→ 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
+✓ 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
+
+Analysis complete in 6.2s
+```
+
+**Analysis Phases:**
+
+1. **Discovering files** - Scans your codebase and reports how many files will be analyzed
+2. **Analyzing complexity** - Parses each file and calculates complexity metrics
+3. **Building call graph** - Analyzes function relationships and dependencies
+4. **Resolving dependencies** - Links function calls across files
+
+Each phase shows:
+- Phase number and name (e.g., "1/4 Discovering files")
+- Progress indicator (→ for in-progress, ✓ for complete)
+- Count or percentage of work completed
+- Duration in seconds after completion
+
+The progress display adapts to your environment:
+- **Interactive terminals**: Live updates with overwriting lines
+- **CI/CD environments**: Line-by-line output for logs
+
+#### Analysis Results
+
 Debtmap shows you exactly what to fix first with actionable recommendations:
 
 ```
