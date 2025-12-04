@@ -1,0 +1,111 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "interpreting-results",
+  "subsection_title": "Interpreting Results",
+  "subsection_file": "book/src/analysis-guide/interpreting-results.md",
+  "feature_mappings": [
+    "output_formats",
+    "complexity_analysis",
+    "risk_assessment",
+    "coverage_integration"
+  ],
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Subsection is comprehensive and mostly accurate, but contains misleading information about unified JSON format availability and categorized debt serialization. Content is well-structured with good examples, but needs corrections for implementation accuracy.",
+  "issues": [
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "JSON Output Format Variants",
+      "description": "Documentation states unified format note but creates misleading expectation",
+      "current_content": "The unified format is currently an internal representation and is **not available** as a user-facing CLI option.",
+      "should_be": "While the note is technically correct, the preceding context about 'two JSON output format variants' implies both are available. Should clarify upfront that only legacy format is available.",
+      "fix_suggestion": "Restructure section to clearly state 'Debtmap currently supports only the legacy JSON format' before explaining the unified format exists internally. Remove the 'two variants' framing which implies user choice.",
+      "source_reference": "src/io/writers/json.rs (only legacy serialization implemented)"
+    },
+    {
+      "type": "misleading_content",
+      "severity": "medium",
+      "section": "Categorized Debt Analysis",
+      "description": "Documentation shows complete CategorizedDebt structure and usage examples, but this data is NOT serialized to JSON output",
+      "current_content": "Detailed examples showing how to query categorized_debt from JSON output using jq commands",
+      "should_be": "Clarify that CategorizedDebt structures are defined internally but not included in JSON output. Update examples to reflect actual JSON structure.",
+      "fix_suggestion": "Add prominent note that CategorizedDebt is an internal structure not yet exposed in JSON output. Remove or update jq examples that query '.categorized_debt' as this path doesn't exist in actual JSON.",
+      "source_reference": "src/priority/mod.rs:409 (CategorySummary defined but not in UnifiedAnalysis serialization)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "JSON Structure",
+      "description": "Example JSON structure shows nested 'complexity' and 'technical_debt' objects, but actual UnifiedAnalysis structure is flatter",
+      "current_content": "Shows structure with 'complexity.metrics' and 'technical_debt.items' nesting",
+      "should_be": "Actual JSON has 'items' and 'file_items' at top level with UnifiedAnalysis structure",
+      "fix_suggestion": "Update example JSON to match actual UnifiedAnalysis serialization: use 'items' (not 'technical_debt.items'), include 'debt_density', 'total_debt_score', 'overall_coverage', etc. at top level",
+      "source_reference": "src/priority/mod.rs:46 (UnifiedAnalysis struct definition)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Reading Function Metrics",
+      "description": "Missing explanation of 'detected_patterns' field values and meanings",
+      "fix_suggestion": "Add section explaining what patterns can appear in 'detected_patterns' array (e.g., 'validation_pattern', 'error_handling_pattern', 'state_machine_pattern') and their implications for complexity adjustment",
+      "source_reference": "src/complexity/entropy_analysis.rs (pattern detection implementation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Tiered Prioritization",
+      "description": "Documentation mentions TieredDisplay and batch recommendations, but unclear if this is actually used in output",
+      "fix_suggestion": "Clarify whether TieredDisplay.batch_recommendations actually appears in JSON output or is only used internally for terminal display. If not in JSON, update documentation accordingly.",
+      "source_reference": "src/priority/mod.rs:515 (TieredDisplay defined but usage unclear)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Prioritizing Work - By Risk Category",
+      "description": "Section describes '--min-priority high' as 'legacy compatibility' but doesn't explain relationship to unified scoring clearly",
+      "fix_suggestion": "Better explain how legacy risk categories (CRITICAL, HIGH, MEDIUM, LOW) map to unified score ranges (0-10 scale), or if they use completely different calculation paths",
+      "source_reference": "src/priority/unified_scorer.rs (unified scoring), src/risk/ (legacy risk calculation)"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of all output formats with clear examples",
+    "Excellent explanation of unified scoring system (0-10 scale) with practical guidance",
+    "Well-structured sections progressing from basic output to advanced prioritization",
+    "Good use of tables for tier thresholds and debt density interpretation",
+    "Detailed entropy score interpretation guidance matching implementation",
+    "Clear 'Common Patterns to Recognize' section with actionable insights",
+    "Accurate documentation of EntropyScore fields (token_entropy, pattern_repetition, branch_similarity, effective_complexity)",
+    "Correct formula for debt_density: (total_debt_score / total_lines_of_code) × 1000",
+    "Accurate Tier enum threshold documentation (Critical ≥ 90, High 70-89.9, etc.)",
+    "Good examples of strategic planning workflows"
+  ],
+  "improvement_suggestions": [
+    "Restructure 'JSON Output Format Variants' to eliminate confusion about unified format availability",
+    "Update example JSON structure to match actual UnifiedAnalysis serialization",
+    "Add clear note about CategorizedDebt internal-only status before showing examples",
+    "Include actual JSON output example from running 'debtmap analyze --format json' to ground documentation in reality",
+    "Add cross-reference to CLI reference for all command-line flags mentioned (--top, --min-priority, --filter, etc.)",
+    "Consider adding troubleshooting section for common JSON parsing issues",
+    "Clarify whether 'by_type' grouping shown in example JSON is actually in output",
+    "Add version compatibility notes if JSON structure changes between releases",
+    "Include schema or TypeScript type definitions for JSON structure to help integrations"
+  ],
+  "cross_references": [
+    "cli-reference.md (for detailed flag documentation)",
+    "workflow-examples.md (for complete CI/CD integration examples)",
+    "configuration.md (for threshold configuration details)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Output formats",
+      "JSON structure",
+      "Prioritization strategies",
+      "Actionable insights"
+    ],
+    "validation_focus": "Verify result interpretation guidance is comprehensive"
+  }
+}
