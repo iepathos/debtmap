@@ -275,13 +275,24 @@ Debtmap analyzes functions to determine their purity level - whether they have s
 
 ### Purity Levels
 
-Functions are classified into three purity levels for god object weighting (defined in `src/organization/purity_analyzer.rs`):
+Functions are classified into three purity levels for god object weighting (defined in `src/organization/purity_analyzer.rs:19-26`):
 
 > **Note:** Debtmap has two purity analysis systems serving different purposes:
-> 1. **PurityLevel** (three levels) - Used for god object scoring with weight multipliers (this section)
-> 2. **PurityLevel** (four levels) - Used in `src/analysis/purity_analysis.rs` for detailed responsibility classification (Strictly Pure, Locally Pure, Read-Only, Impure)
 >
-> This chapter focuses on the three-level system for god object integration.
+> 1. **Three-level system** (this section) - Used for god object scoring with weight multipliers:
+>    - Defined in `src/organization/purity_analyzer.rs`
+>    - Categories: Pure, ProbablyPure, Impure
+>    - Purpose: Dampen god object scores for pure functions via weight multipliers (0.3, 0.5, 1.0)
+>
+> 2. **Four-level system** - Used for detailed responsibility classification:
+>    - Defined in `src/core/mod.rs:47-60` and `src/analysis/purity_analysis.rs:34-43`
+>    - Categories: StrictlyPure, LocallyPure, ReadOnly, Impure
+>    - Purpose: Fine-grained analysis of function behavior and side effects
+>    - Used in responsibility analysis and technical debt assessment
+>
+> The three-level system provides a simplified classification optimized for god object detection. The four-level system offers more granular distinctions (e.g., builder patterns with local mutations vs. read-only accessors).
+>
+> This chapter focuses on the three-level system used for god object integration. For detailed responsibility classification, see [Responsibility Analysis](./responsibility-analysis.md).
 
 #### Pure (Weight 0.3)
 Guaranteed no side effects:
@@ -919,12 +930,11 @@ debtmap analyze . --ast-functional-analysis --functional-analysis-profile balanc
 
 ## Related Chapters
 
-- [Analysis Guide](analysis-guide.md) - Understanding analysis types
-- [Complexity Analysis](./complexity-analysis.md) - How functional patterns affect complexity metrics
-- [Scoring Strategies](./scoring.md) - Integration with overall technical debt scoring
-- [God Object Detection](./god-objects.md) - How purity weights reduce false positives
+- [Analysis Guide](analysis-guide/index.md) - Understanding analysis types and methodologies
+- [Complexity Metrics](analysis-guide/complexity-metrics.md) - How functional patterns affect complexity metrics
+- [Scoring Strategies](./scoring-strategies.md) - Integration with overall technical debt scoring
+- [God Object Detection](./god-object-detection.md) - How purity weights reduce false positives
 - [Configuration](./configuration.md) - Advanced functional analysis configuration options
-- [Refactoring](refactoring-guide.md) - Extracting pure functions
 
 ## Summary
 
