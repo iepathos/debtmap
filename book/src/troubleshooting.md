@@ -6,7 +6,7 @@ Common issues and solutions for using debtmap effectively.
 
 If you're experiencing problems, try these first:
 
-1. **Analysis is slow**: Adjust threads with `--jobs` or use `--semantic-off` for faster fallback mode
+1. **Analysis is slow**: Adjust threads with `--jobs`, use `--no-multi-pass` for faster single-pass analysis, or use `--semantic-off` for faster fallback mode
 2. **Parse errors**: Use `--semantic-off` for faster fallback mode or exclude problematic files
 3. **No output**: Increase verbosity with `-v` or lower `--min-priority`
 4. **Inconsistent results**: Check if coverage file changed or context providers are enabled
@@ -63,11 +63,17 @@ debtmap path/to/subset
 # Use all available CPU cores
 debtmap --jobs 0
 
+# Disable multi-pass analysis for faster single-pass (slightly less detailed)
+debtmap --no-multi-pass
+
 # Try faster fallback mode (less accurate)
 debtmap --semantic-off
 
 # Use plain output for faster terminal rendering
 debtmap --plain
+
+# Or set environment variable to disable multi-pass globally
+export DEBTMAP_SINGLE_PASS=1
 ```
 
 See [Performance Tips](#performance-tips) for detailed optimization strategies.
@@ -294,6 +300,9 @@ debtmap --no-parallel
 ### Analysis Optimizations
 
 ```bash
+# Faster: disable multi-pass analysis (single-pass mode)
+debtmap --no-multi-pass
+
 # Fast mode: disable semantic analysis
 debtmap --semantic-off
 
@@ -314,7 +323,8 @@ debtmap --min-priority 4 --top 20
 
 | Configuration | Speed | Accuracy |
 |--------------|-------|----------|
-| Default | Fast | High |
+| Default (multi-pass) | Fast | Highest |
+| `--no-multi-pass` | Faster | High |
 | `--semantic-off` | Fastest | Medium |
 | `--no-parallel` | Slowest | High |
 | `--jobs 4` | Medium | High |
@@ -538,22 +548,25 @@ Advanced CLI flags for specialized analysis scenarios.
 
 ### Multi-Pass Analysis
 
-**Flag**: `--multi-pass`
-
-Multi-pass analysis performs multiple iterations to refine results.
+Multi-pass analysis is **enabled by default** and performs two iterations (raw and normalized) to distinguish logical complexity from formatting artifacts.
 
 ```bash
-# Enable multi-pass analysis
-debtmap --multi-pass
+# Multi-pass analysis runs by default
+debtmap analyze .
 
-# Useful for complex projects with intricate dependencies
-# May increase analysis time but improve accuracy
+# Disable for performance-critical scenarios
+debtmap --no-multi-pass
+
+# Or use environment variable
+export DEBTMAP_SINGLE_PASS=1
+debtmap analyze .
 ```
 
-**When to use**:
-- Complex dependency graphs
-- Large codebases with deep nesting
-- When single-pass results seem incomplete
+**When to disable (`--no-multi-pass`)**:
+- Performance-critical CI/CD pipelines
+- Very large codebases (>100k LOC)
+- Quick complexity checks during development
+- When formatting is already standardized
 
 ### Attribution Output
 
@@ -1139,14 +1152,14 @@ debtmap path/to/file.rs -vv
 ### Combining Advanced Flags
 
 ```bash
-# Comprehensive analysis with all features
-debtmap --multi-pass --attribution --context -vv
+# Comprehensive analysis with all features (multi-pass is default)
+debtmap --attribution --context -vv
 
 # Minimal filtering for exploration
 debtmap --min-problematic 1 --min-priority 0 --no-god-object
 
-# Performance-focused advanced analysis
-debtmap --multi-pass --jobs 8
+# Performance-focused analysis (disable multi-pass)
+debtmap --no-multi-pass --jobs 8
 
 # Summary view with aggregated scores
 debtmap --detail-level summary --aggregate-only
@@ -2016,6 +2029,9 @@ A: Check several factors:
 ```bash
 # Use all CPU cores
 debtmap --jobs 0
+
+# Disable multi-pass for faster single-pass analysis
+debtmap --no-multi-pass
 
 # Try faster fallback mode
 debtmap --semantic-off

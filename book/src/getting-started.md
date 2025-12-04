@@ -212,7 +212,7 @@ These advanced options are available for power users and specialized use cases:
 # Analysis behavior
 --semantic-off              # Disable semantic analysis
 --no-context-aware          # Disable context-aware analysis
---multi-pass                # Enable multi-pass analysis for deeper insights
+--no-multi-pass             # Disable multi-pass analysis (for performance-critical scenarios)
 --validate-loc              # Validate lines of code calculations
 
 # Rust-specific options
