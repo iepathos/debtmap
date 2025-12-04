@@ -13,11 +13,13 @@
 //! - `predicates`: Pure boolean detection predicates (Phase 4)
 //! - `scoring`: Pure scoring functions (Phase 3)
 //! - `recommender`: Recommendation generation
+//! - `detector`: Orchestration layer (Phase 7)
 
 pub mod ast_visitor;
 pub mod classification_types;
 pub mod classifier;
 pub mod core_types;
+pub mod detector;
 pub mod metrics;
 pub mod metrics_types;
 pub mod predicates;
@@ -31,6 +33,7 @@ pub mod types;
 pub use classification_types::*;
 pub use classifier::*;
 pub use core_types::*;
+pub use detector::GodObjectDetector;
 pub use metrics_types::*;
 pub use predicates::*;
 pub use recommender::*;

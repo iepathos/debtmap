@@ -341,7 +341,7 @@ mod primitive_obsession_detector;
 mod struct_init_detector;
 
 pub use feature_envy_detector::FeatureEnvyDetector;
-pub use god_object::types::GodObjectDetector;
+pub use god_object::GodObjectDetector;
 pub use magic_value_detector::MagicValueDetector;
 pub use parameter_analyzer::ParameterAnalyzer;
 pub use primitive_obsession_detector::PrimitiveObsessionDetector;

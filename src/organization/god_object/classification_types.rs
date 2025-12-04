@@ -69,27 +69,6 @@ pub struct StructWithMethods {
     pub line_span: (usize, usize),
 }
 
-/// Main god object detector
-pub struct GodObjectDetector {
-    pub(crate) max_methods: usize,
-    pub(crate) max_fields: usize,
-    pub(crate) max_responsibilities: usize,
-    pub(crate) location_extractor: Option<crate::common::UnifiedLocationExtractor>,
-    pub(crate) source_content: Option<String>,
-}
-
-impl Default for GodObjectDetector {
-    fn default() -> Self {
-        Self {
-            max_methods: 15,
-            max_fields: 10,
-            max_responsibilities: 3,
-            location_extractor: None,
-            source_content: None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassificationResult {
     /// The classified responsibility category, or `None` if confidence is too low

@@ -5,7 +5,7 @@ use super::{
     calculate_god_object_score, determine_confidence,
     god_object::{metrics, TypeAnalysis, TypeVisitor},
     group_methods_by_responsibility, suggest_module_splits_by_domain, MaintainabilityImpact,
-    OrganizationAntiPattern, OrganizationDetector, ResponsibilityGroup,
+    OrganizationAntiPattern, ResponsibilityGroup,
 };
 use crate::common::{SourceLocation, UnifiedLocationExtractor};
 use std::collections::{HashMap, HashSet};
@@ -104,12 +104,39 @@ struct DomainAnalysisParams<'a> {
     ast: &'a syn::File,
 }
 
-impl GodObjectDetector {
-    pub fn new() -> Self {
-        Self::default()
+/// Temporary internal struct to hold detector configuration during transition
+struct DetectorImpl {
+    max_methods: usize,
+    max_fields: usize,
+    max_responsibilities: usize,
+    location_extractor: Option<UnifiedLocationExtractor>,
+    source_content: Option<String>,
+}
+
+impl DetectorImpl {
+    fn from_detector(detector: &super::god_object::GodObjectDetector) -> Self {
+        Self {
+            max_methods: detector.max_methods,
+            max_fields: detector.max_fields,
+            max_responsibilities: detector.max_responsibilities,
+            location_extractor: detector.location_extractor.clone(),
+            source_content: detector.source_content.clone(),
+        }
     }
 
-    pub fn with_source_content(source_content: &str) -> Self {
+    #[cfg(test)]
+    fn new() -> Self {
+        Self {
+            max_methods: 15,
+            max_fields: 10,
+            max_responsibilities: 3,
+            location_extractor: None,
+            source_content: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_source_content(source_content: &str) -> Self {
         Self {
             max_methods: 15,
             max_fields: 10,
@@ -119,8 +146,8 @@ impl GodObjectDetector {
         }
     }
 
-    /// Analyze with per-struct detail and god class vs god module distinction
-    pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
+    /// Analyze with per-struct detail and god class vs god module distinction.
+    fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
         let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
         visitor.visit_file(ast);
 
@@ -2230,6 +2257,7 @@ impl GodObjectDetector {
     ///
     /// Applies type-based clustering, data flow analysis, anti-pattern detection,
     /// and hidden type extraction to produce coherent, non-conflicting recommendations.
+    #[allow(dead_code)]
     pub fn analyze_with_integrated_architecture(
         &self,
         path: &Path,
@@ -2268,6 +2296,7 @@ impl GodObjectDetector {
     }
 
     /// Build a simple call graph from AST for data flow analysis
+    #[allow(dead_code)]
     fn build_call_graph(&self, ast: &syn::File) -> HashMap<String, Vec<String>> {
         use syn::visit::Visit;
 
@@ -2369,8 +2398,9 @@ impl GodObjectDetector {
         }
     }
 
-    /// Classify the maintainability impact based on method and field counts
-    fn classify_god_object_impact(
+    /// Classify the maintainability impact based on method and field counts.
+    /// This is called from the orchestration layer in detector.rs.
+    pub fn classify_god_object_impact(
         method_count: usize,
         field_count: usize,
     ) -> MaintainabilityImpact {
@@ -2538,6 +2568,7 @@ impl GodObjectDetector {
     /// A tuple of (improved_splits, quality_report) where:
     /// - improved_splits: Splits without critical anti-patterns
     /// - quality_report: Detailed analysis of all detected anti-patterns
+    #[allow(dead_code)]
     pub fn validate_and_improve_splits(
         splits: Vec<ModuleSplit>,
         signatures: &[crate::analyzers::type_registry::MethodSignature],
@@ -2830,7 +2861,8 @@ impl GodObjectDetector {
     }
 }
 
-impl OrganizationDetector for GodObjectDetector {
+impl DetectorImpl {
+    /// Implementation of detect_anti_patterns called from detector.rs orchestration layer.
     fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
         let mut patterns = Vec::new();
         let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
@@ -2854,24 +2886,43 @@ impl OrganizationDetector for GodObjectDetector {
 
         patterns
     }
+}
 
-    fn detector_name(&self) -> &'static str {
-        "GodObjectDetector"
-    }
+/// Public wrapper function for analyze_enhanced, called from detector.rs
+pub fn analyze_enhanced_for_detector(
+    detector: &super::god_object::GodObjectDetector,
+    path: &Path,
+    ast: &syn::File,
+) -> EnhancedGodObjectAnalysis {
+    let impl_detector = DetectorImpl::from_detector(detector);
+    impl_detector.analyze_enhanced(path, ast)
+}
 
-    fn estimate_maintainability_impact(
-        &self,
-        pattern: &OrganizationAntiPattern,
-    ) -> MaintainabilityImpact {
-        match pattern {
-            OrganizationAntiPattern::GodObject {
-                method_count,
-                field_count,
-                ..
-            } => GodObjectDetector::classify_god_object_impact(*method_count, *field_count),
-            _ => MaintainabilityImpact::Low,
-        }
-    }
+/// Public wrapper function for detect_anti_patterns, called from detector.rs
+pub fn detect_anti_patterns_for_detector(
+    detector: &super::god_object::GodObjectDetector,
+    file: &syn::File,
+) -> Vec<OrganizationAntiPattern> {
+    let impl_detector = DetectorImpl::from_detector(detector);
+    impl_detector.detect_anti_patterns(file)
+}
+
+/// Public function for classify_god_object_impact, called from detector.rs
+pub fn classify_god_object_impact(
+    method_count: usize,
+    field_count: usize,
+) -> MaintainabilityImpact {
+    DetectorImpl::classify_god_object_impact(method_count, field_count)
+}
+
+/// Public wrapper function for analyze_comprehensive, called from enhanced_analyzer.rs
+pub fn analyze_comprehensive_for_detector(
+    detector: &super::god_object::GodObjectDetector,
+    path: &Path,
+    ast: &syn::File,
+) -> GodObjectAnalysis {
+    let impl_detector = DetectorImpl::from_detector(detector);
+    impl_detector.analyze_comprehensive(path, ast)
 }
 
 #[cfg(test)]
@@ -2882,7 +2933,7 @@ mod tests {
     #[test]
     fn test_find_matching_prefix_with_get() {
         assert_eq!(
-            GodObjectDetector::find_matching_prefix("get_value"),
+            DetectorImpl::find_matching_prefix("get_value"),
             Some("get".to_string())
         );
     }
@@ -2890,7 +2941,7 @@ mod tests {
     #[test]
     fn test_find_matching_prefix_with_set() {
         assert_eq!(
-            GodObjectDetector::find_matching_prefix("setValue"),
+            DetectorImpl::find_matching_prefix("setValue"),
             Some("set".to_string())
         );
     }
@@ -2898,7 +2949,7 @@ mod tests {
     #[test]
     fn test_find_matching_prefix_with_validate() {
         assert_eq!(
-            GodObjectDetector::find_matching_prefix("validate_input"),
+            DetectorImpl::find_matching_prefix("validate_input"),
             Some("validate".to_string())
         );
     }
@@ -2906,20 +2957,20 @@ mod tests {
     #[test]
     fn test_find_matching_prefix_case_insensitive() {
         assert_eq!(
-            GodObjectDetector::find_matching_prefix("CREATE_INSTANCE"),
+            DetectorImpl::find_matching_prefix("CREATE_INSTANCE"),
             Some("create".to_string())
         );
     }
 
     #[test]
     fn test_find_matching_prefix_no_match() {
-        assert_eq!(GodObjectDetector::find_matching_prefix("foo_bar"), None);
+        assert_eq!(DetectorImpl::find_matching_prefix("foo_bar"), None);
     }
 
     #[test]
     fn test_extract_first_word_with_underscore() {
         assert_eq!(
-            GodObjectDetector::extract_first_word("custom_method_name"),
+            DetectorImpl::extract_first_word("custom_method_name"),
             "custom".to_string()
         );
     }
@@ -2927,7 +2978,7 @@ mod tests {
     #[test]
     fn test_extract_first_word_no_underscore() {
         assert_eq!(
-            GodObjectDetector::extract_first_word("singleword"),
+            DetectorImpl::extract_first_word("singleword"),
             "singleword".to_string()
         );
     }
@@ -2935,11 +2986,11 @@ mod tests {
     #[test]
     fn test_classify_responsibility_data_access() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("get"),
+            DetectorImpl::classify_responsibility("get"),
             "data_access".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("set"),
+            DetectorImpl::classify_responsibility("set"),
             "data_access".to_string()
         );
     }
@@ -2947,11 +2998,11 @@ mod tests {
     #[test]
     fn test_classify_responsibility_computation() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("calculate"),
+            DetectorImpl::classify_responsibility("calculate"),
             "computation".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("compute"),
+            DetectorImpl::classify_responsibility("compute"),
             "computation".to_string()
         );
     }
@@ -2959,15 +3010,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_validation() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("validate"),
+            DetectorImpl::classify_responsibility("validate"),
             "validation".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("check"),
+            DetectorImpl::classify_responsibility("check"),
             "validation".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("verify"),
+            DetectorImpl::classify_responsibility("verify"),
             "validation".to_string()
         );
     }
@@ -2976,15 +3027,15 @@ mod tests {
     fn test_classify_god_object_impact_critical() {
         // Critical: method_count > 30 or field_count > 20
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(31, 10),
+            DetectorImpl::classify_god_object_impact(31, 10),
             MaintainabilityImpact::Critical
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(15, 21),
+            DetectorImpl::classify_god_object_impact(15, 21),
             MaintainabilityImpact::Critical
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(35, 25),
+            DetectorImpl::classify_god_object_impact(35, 25),
             MaintainabilityImpact::Critical
         );
     }
@@ -2993,15 +3044,15 @@ mod tests {
     fn test_classify_god_object_impact_high() {
         // High: method_count > 20 or field_count > 15 (but not critical)
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(21, 10),
+            DetectorImpl::classify_god_object_impact(21, 10),
             MaintainabilityImpact::High
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(15, 16),
+            DetectorImpl::classify_god_object_impact(15, 16),
             MaintainabilityImpact::High
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(25, 14),
+            DetectorImpl::classify_god_object_impact(25, 14),
             MaintainabilityImpact::High
         );
     }
@@ -3010,15 +3061,15 @@ mod tests {
     fn test_classify_god_object_impact_medium() {
         // Medium: everything else
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(10, 10),
+            DetectorImpl::classify_god_object_impact(10, 10),
             MaintainabilityImpact::Medium
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(20, 15),
+            DetectorImpl::classify_god_object_impact(20, 15),
             MaintainabilityImpact::Medium
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(5, 5),
+            DetectorImpl::classify_god_object_impact(5, 5),
             MaintainabilityImpact::Medium
         );
     }
@@ -3027,27 +3078,27 @@ mod tests {
     fn test_classify_god_object_impact_boundary_conditions() {
         // Test exact boundary values
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(30, 20),
+            DetectorImpl::classify_god_object_impact(30, 20),
             MaintainabilityImpact::High
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(31, 20),
+            DetectorImpl::classify_god_object_impact(31, 20),
             MaintainabilityImpact::Critical
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(30, 21),
+            DetectorImpl::classify_god_object_impact(30, 21),
             MaintainabilityImpact::Critical
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(20, 15),
+            DetectorImpl::classify_god_object_impact(20, 15),
             MaintainabilityImpact::Medium
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(21, 15),
+            DetectorImpl::classify_god_object_impact(21, 15),
             MaintainabilityImpact::High
         );
         assert_eq!(
-            GodObjectDetector::classify_god_object_impact(20, 16),
+            DetectorImpl::classify_god_object_impact(20, 16),
             MaintainabilityImpact::High
         );
     }
@@ -3055,15 +3106,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_persistence() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("save"),
+            DetectorImpl::classify_responsibility("save"),
             "persistence".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("load"),
+            DetectorImpl::classify_responsibility("load"),
             "persistence".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("fetch"),
+            DetectorImpl::classify_responsibility("fetch"),
             "persistence".to_string()
         );
     }
@@ -3071,15 +3122,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_construction() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("create"),
+            DetectorImpl::classify_responsibility("create"),
             "construction".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("build"),
+            DetectorImpl::classify_responsibility("build"),
             "construction".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("new"),
+            DetectorImpl::classify_responsibility("new"),
             "construction".to_string()
         );
     }
@@ -3087,15 +3138,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_communication() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("send"),
+            DetectorImpl::classify_responsibility("send"),
             "communication".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("receive"),
+            DetectorImpl::classify_responsibility("receive"),
             "communication".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("handle"),
+            DetectorImpl::classify_responsibility("handle"),
             "communication".to_string()
         );
     }
@@ -3103,15 +3154,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_modification() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("update"),
+            DetectorImpl::classify_responsibility("update"),
             "modification".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("modify"),
+            DetectorImpl::classify_responsibility("modify"),
             "modification".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("change"),
+            DetectorImpl::classify_responsibility("change"),
             "modification".to_string()
         );
     }
@@ -3119,15 +3170,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_deletion() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("delete"),
+            DetectorImpl::classify_responsibility("delete"),
             "deletion".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("remove"),
+            DetectorImpl::classify_responsibility("remove"),
             "deletion".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("clear"),
+            DetectorImpl::classify_responsibility("clear"),
             "deletion".to_string()
         );
     }
@@ -3135,15 +3186,15 @@ mod tests {
     #[test]
     fn test_classify_responsibility_state_query() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("is"),
+            DetectorImpl::classify_responsibility("is"),
             "state_query".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("has"),
+            DetectorImpl::classify_responsibility("has"),
             "state_query".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("can"),
+            DetectorImpl::classify_responsibility("can"),
             "state_query".to_string()
         );
     }
@@ -3151,11 +3202,11 @@ mod tests {
     #[test]
     fn test_classify_responsibility_processing() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("process"),
+            DetectorImpl::classify_responsibility("process"),
             "processing".to_string()
         );
         assert_eq!(
-            GodObjectDetector::classify_responsibility("transform"),
+            DetectorImpl::classify_responsibility("transform"),
             "processing".to_string()
         );
     }
@@ -3163,7 +3214,7 @@ mod tests {
     #[test]
     fn test_classify_responsibility_default() {
         assert_eq!(
-            GodObjectDetector::classify_responsibility("custom"),
+            DetectorImpl::classify_responsibility("custom"),
             "custom_operations".to_string()
         );
     }
@@ -3353,7 +3404,7 @@ mod tests {
 
     #[test]
     fn test_create_responsibility_group() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let methods = vec!["get_value".to_string(), "get_name".to_string()];
 
         let group = detector.create_responsibility_group("get".to_string(), methods.clone());
@@ -3366,7 +3417,7 @@ mod tests {
 
     #[test]
     fn test_create_responsibility_group_with_spaces() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let methods = vec!["validate_input".to_string()];
 
         let group = detector.create_responsibility_group("validate".to_string(), methods.clone());
@@ -3378,7 +3429,7 @@ mod tests {
 
     #[test]
     fn test_create_default_responsibility_group() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let analysis = TypeAnalysis {
             name: "TestClass".to_string(),
             method_count: 5,
@@ -3400,7 +3451,7 @@ mod tests {
 
     #[test]
     fn test_suggest_responsibility_split_with_method_groups() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let analysis = TypeAnalysis {
             name: "TestClass".to_string(),
             method_count: 8,
@@ -3432,7 +3483,7 @@ mod tests {
 
     #[test]
     fn test_suggest_responsibility_split_with_no_groups_below_threshold() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let analysis = TypeAnalysis {
             name: "SmallClass".to_string(),
             method_count: 10, // Below max_methods (15)
@@ -3453,7 +3504,7 @@ mod tests {
 
     #[test]
     fn test_suggest_responsibility_split_with_no_groups_above_threshold() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let analysis = TypeAnalysis {
             name: "LargeClass".to_string(),
             method_count: 20, // Above max_methods (15)
@@ -3474,7 +3525,7 @@ mod tests {
 
     #[test]
     fn test_suggest_responsibility_split_empty_methods_above_threshold() {
-        let detector = GodObjectDetector::new();
+        let detector = DetectorImpl::new();
         let analysis = TypeAnalysis {
             name: "EmptyClass".to_string(),
             method_count: 20, // Above max_methods (15)
@@ -3515,7 +3566,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_enhanced(path, &ast);
 
@@ -3583,7 +3634,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("config.rs");
         let analysis = detector.analyze_enhanced(path, &ast);
 
@@ -3724,7 +3775,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("editor.rs");
         let analysis = detector.analyze_enhanced(path, &ast);
 
@@ -3841,7 +3892,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("config.rs");
         let analysis = detector.analyze_enhanced(path, &ast);
 
@@ -3905,7 +3956,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_enhanced(path, &ast);
 
@@ -3930,7 +3981,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let mut visitor = TypeVisitor::with_location_extractor(detector.location_extractor.clone());
         visitor.visit_file(&ast);
 
@@ -3999,7 +4050,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4032,7 +4083,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4059,7 +4110,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4089,7 +4140,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4130,7 +4181,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4168,7 +4219,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
@@ -4205,7 +4256,7 @@ mod tests {
         "#;
 
         let ast: syn::File = syn::parse_str(code).unwrap();
-        let detector = GodObjectDetector::with_source_content(code);
+        let detector = DetectorImpl::with_source_content(code);
         let path = std::path::Path::new("test.rs");
         let analysis = detector.analyze_comprehensive(path, &ast);
 
