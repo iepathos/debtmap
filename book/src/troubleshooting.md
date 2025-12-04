@@ -128,6 +128,143 @@ debtmap --coverage-file path/to/coverage.info -v
 # Coverage paths are relative to project root
 ```
 
+### Debugging Coverage Matching with explain-coverage
+
+The `explain-coverage` command helps diagnose coverage file parsing and function name matching issues.
+
+**Use cases**:
+- Coverage data not being applied to functions
+- Function name mismatches between coverage and source
+- Verifying coverage file format is correct
+- Understanding which functions have coverage data
+
+**Basic Usage**:
+```bash
+# Debug coverage data parsing for a specific function
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file"
+
+# See detailed function matching diagnostics
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  -v
+
+# Narrow search to specific file
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "calculate_score" \
+  --file src/scoring.rs
+
+# Get JSON output for automation
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  --format json
+```
+
+**Output Format**:
+
+The command shows:
+- Whether coverage was found for the function
+- Which matching strategy succeeded (exact_match, suffix_match, method_name_match, etc.)
+- Coverage percentage if found
+- All attempted matching strategies (with `-v`)
+- Available functions in coverage file that partially match your query
+
+**Example Output**:
+```
+Coverage Detection Explanation
+==============================
+
+Function: process_file
+File: src/processor.rs
+
+✓ Coverage Found!
+  Strategy: suffix_match
+  Coverage: 87.5%
+
+Matching Attempts:
+------------------
+  ✗ exact_match
+  ✓ suffix_match
+      File: src/processor.rs
+      Function: process_file
+      Coverage: 87.5%
+```
+
+**Common Issues Diagnosed**:
+
+**Q: Function not found in coverage data?**
+
+A: The explain-coverage command will show available functions:
+```bash
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "my_function" \
+  -v
+
+# Output shows:
+#   Available Functions in LCOV (143 total):
+#   --------------------------------------
+#     Functions containing 'my_function':
+#       - src/module.rs::my_function_impl
+#       - src/other.rs::my_function_v2
+```
+
+**Q: Path mismatches between source and coverage?**
+
+A: Use `-v` to see all path matching strategies:
+```bash
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "process_file" \
+  --file src/processor.rs \
+  -v
+
+# Shows which strategies were tried:
+#   ✗ exact_match (src/processor.rs)
+#   ✓ suffix_match (./src/processor.rs)
+#   - normalized_path_match
+```
+
+**Q: Function names don't match between coverage and source?**
+
+A: The command tries multiple matching strategies:
+- **exact_match**: Exact function name and file path
+- **suffix_match**: File path suffix matching
+- **method_name_match**: Method name without module prefix
+- **normalized_path_match**: Normalized path comparison
+- **global_function_name_match**: Search across all files
+- **global_method_name_match**: Method name search across all files
+
+```bash
+# See which strategy would work
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "MyStruct::method_name" \
+  -v
+```
+
+**Integration with Analysis**:
+
+After diagnosing issues with explain-coverage, fix them and re-run analysis:
+```bash
+# Diagnose coverage issues
+debtmap explain-coverage . \
+  --coverage-file coverage.lcov \
+  --function "problematic_function" \
+  -v
+
+# Fix coverage paths or function names based on output
+
+# Run full analysis with coverage
+debtmap --coverage-file coverage.lcov -v
+```
+
+See [CLI Reference - explain-coverage](./cli-reference.md#explain-coverage-debugging) for complete flag documentation.
+
 ### Threshold and Preset Confusion
 
 **Problem**: Unexpected filtering or priority levels
@@ -182,7 +319,7 @@ debtmap --format json | jq .
 debtmap --format json --output results.json
 ```
 
-See the [Configuration/Output Formats](./configuration.md#output-formats) chapter for detailed JSON structure documentation.
+See the [Output Formats](./output-formats.md) chapter for detailed JSON structure documentation.
 
 ### Context Provider Errors
 
@@ -243,7 +380,12 @@ debtmap --semantic-off
 debtmap --validate-loc
 ```
 
-**Note**: The `--explain-score` flag is deprecated and hidden. Use `-v`, `-vv`, or `-vvv` for verbosity levels instead to see score breakdowns.
+**Note**: The `--explain-score` flag has been deprecated in favor of granular verbosity levels (`-v`, `-vv`, `-vvv`). The new verbosity system provides:
+- Better control over output detail level
+- Consistent debugging across all commands
+- Progressive information disclosure (level 1 → 2 → 3)
+
+Use `-v` for score breakdowns, `-vv` for detailed calculations, and `-vvv` for full debug output.
 
 ### Debugging Score Calculations
 
@@ -2390,7 +2532,7 @@ File a bug report when:
 
 - **[Configuration Guide](./configuration.md)**: Configure debtmap behavior
 - **[CLI Reference](./cli-reference.md)**: Complete CLI flag documentation
-- **[Analysis Guide](./analysis-guide.md)**: Understanding analysis results
+- **[Analysis Guide](./analysis-guide/index.md)**: Understanding analysis results
 - **[Examples](./examples.md)**: Practical usage examples
 - **[API Documentation](./api/index.html)**: Rust API documentation
 
