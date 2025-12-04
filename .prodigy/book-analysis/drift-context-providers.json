@@ -1,0 +1,87 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "context-providers",
+  "chapter_title": "Context Providers",
+  "chapter_file": "book/src/context-providers.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "The chapter provides comprehensive coverage of context providers with accurate implementation details, but contains broken links and could benefit from clarifying the configuration limitation more prominently",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "See Also",
+      "description": "Found 2 broken internal link(s) to non-existent file 'analysis-guide.md'",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "analysis-guide.md",
+          "current_file": "book/src/context-providers.md",
+          "line_context": "See Also section - link to Analysis Guide"
+        },
+        {
+          "link_text": "Risk Assessment",
+          "original_target": "analysis-guide.md#risk-assessment",
+          "current_file": "book/src/context-providers.md",
+          "line_context": "See Also section - link to Risk Assessment"
+        }
+      ],
+      "fix_suggestion": "The 'analysis-guide.md' file does not exist. Possible alternatives:\n1. If the content was split into multiple files, update links to point to the appropriate specialized analysis files (e.g., 'scoring-strategies.md' for risk assessment)\n2. If the file was renamed, find the new location and update links\n3. If the content was removed, remove these references or point to 'getting-started.md'",
+      "source_reference": "book/src/context-providers.md lines 908-912"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "The configuration limitation warning could be more prominent",
+      "current_content": "Configuration section has a warning block (line 628-629) stating TOML configuration is not yet implemented, but this limitation could be highlighted earlier in the chapter",
+      "fix_suggestion": "Add a prominent callout box or note near the beginning of the chapter (after Overview section) to set expectations that provider-specific TOML configuration is planned but not yet available. The current placement at line 628 is too late in the document.",
+      "source_reference": "book/src/context-providers.md lines 628-629"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Advanced Usage - Custom Provider Implementation",
+      "description": "GitHub URL placeholder in custom provider implementation example",
+      "current_content": "See [src/risk/context/mod.rs](https://github.com/your-repo/debtmap/blob/main/src/risk/context/mod.rs)",
+      "should_be": "Replace placeholder 'your-repo' with actual repository URL or use a relative path",
+      "fix_suggestion": "Update the GitHub URL to the actual repository location, or better yet, use a relative file path since this is internal documentation",
+      "source_reference": "book/src/context-providers.md line 870"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent detailed coverage of all three context providers (CriticalPath, Dependency, GitHistory)",
+    "Accurate implementation details matching the actual codebase (entry point weights, blast radius thresholds, risk propagation formulas)",
+    "Comprehensive practical examples showing how context providers change scoring",
+    "Clear explanation of the mathematical formulas used for risk calculation",
+    "Good troubleshooting section with actionable solutions",
+    "Accurate description of convergence parameters and iterative algorithms",
+    "Entry point detection logic is correctly documented with AND conditions for API endpoints",
+    "Stability status classifications are accurately documented",
+    "Configuration warning about TOML limitations is present and accurate"
+  ],
+  "improvement_suggestions": [
+    "Fix broken links to 'analysis-guide.md' by identifying the correct target file",
+    "Add a prominent callout box near the start of the chapter about TOML configuration limitations",
+    "Replace GitHub URL placeholder with actual repository URL or relative path",
+    "Consider adding a table of contents at the beginning given the chapter's length (27KB)",
+    "Add cross-references to related configuration options in the Configuration chapter",
+    "Consider adding a quick reference card summarizing provider weights and thresholds"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:03:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Critical path detection",
+      "Dependency analysis",
+      "Git history integration",
+      "Change frequency analysis",
+      "Context-aware risk adjustment",
+      "Enabling and disabling providers"
+    ],
+    "validation_focus": "Check that all context providers are documented with configuration and use cases",
+    "total_internal_links": 6,
+    "broken_internal_links": 2,
+    "valid_internal_links": 4
+  }
+}
