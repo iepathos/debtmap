@@ -285,8 +285,8 @@ Configure analysis behavior, thresholds, and language selection.
 **Analysis Modes:**
 - `--semantic-off` - Disable semantic analysis (fallback mode)
 - `--no-context-aware` - Disable context-aware false positive reduction (enabled by default)
-- `--multi-pass` - Enable multi-pass analysis with attribution
-- `--attribution` - Show complexity attribution details
+- `--no-multi-pass` - Disable multi-pass analysis (use single-pass for performance)
+- `--attribution` - Show complexity attribution details (requires multi-pass, which is the default)
 
 **Functional Programming Analysis:**
 - `--ast-functional-analysis` - Enable AST-based functional composition analysis (spec 111)
@@ -408,6 +408,12 @@ debtmap init --force
   - Example: `export DEBTMAP_JOBS=8  # Same as --jobs 8`
   - Use `0` to utilize all available CPU cores
   - Controls thread pool size for parallel call graph construction
+
+- `DEBTMAP_SINGLE_PASS` - Disable multi-pass analysis globally (same as `--no-multi-pass` flag)
+  - Example: `export DEBTMAP_SINGLE_PASS=1  # Disable multi-pass analysis`
+  - Set to `1` or `true` to disable multi-pass analysis by default
+  - Useful for CI/CD environments where performance is critical
+  - Can be overridden by command-line flags
 
 ### Getting Help
 

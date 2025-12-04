@@ -1,6 +1,6 @@
 # Multi-Pass Analysis
 
-Multi-pass analysis is an advanced feature that performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.
+Multi-pass analysis is enabled by default in debtmap. It performs two separate complexity analyses on your code to distinguish between genuine logical complexity and complexity artifacts introduced by code formatting. By comparing raw and normalized versions of your code, debtmap can attribute complexity to specific sources and provide actionable insights for refactoring.
 
 ## Overview
 
@@ -68,32 +68,35 @@ The difference between raw and normalized complexity reveals how much "complexit
 
 ## CLI Usage
 
-Enable multi-pass analysis with the `--multi-pass` flag:
+Multi-pass analysis runs by default. You can disable it if needed for performance-constrained scenarios:
 
 ```bash
-# Basic multi-pass analysis
-debtmap analyze . --multi-pass
+# Basic analysis (multi-pass enabled by default)
+debtmap analyze .
 
 # Multi-pass with detailed attribution breakdown
-debtmap analyze . --multi-pass --attribution
+debtmap analyze . --attribution
 
 # Control detail level
-debtmap analyze . --multi-pass --attribution --detail-level comprehensive
+debtmap analyze . --attribution --detail-level comprehensive
 
 # Output as JSON for tooling integration
-debtmap analyze . --multi-pass --attribution --json
+debtmap analyze . --attribution --json
+
+# Disable multi-pass for faster single-pass analysis
+debtmap analyze . --no-multi-pass
 ```
 
 ### Available Flags
 
 | Flag | Description |
 |------|-------------|
-| `--multi-pass` | Enable two-pass analysis (raw + normalized) |
-| `--attribution` | Show detailed complexity attribution breakdown (requires `--multi-pass`) |
+| `--no-multi-pass` | Disable multi-pass analysis (use single-pass for performance) |
+| `--attribution` | Show detailed complexity attribution breakdown (requires multi-pass) |
 | `--detail-level <level>` | Set output detail: `summary`, `standard`, `comprehensive`, `debug` |
 | `--json` | Output results in JSON format |
 
-> **Note**: The `--attribution` flag requires `--multi-pass` to be enabled, as attribution depends on comparing raw and normalized analyses.
+> **Note**: The `--attribution` flag requires multi-pass analysis to be enabled (the default), as attribution depends on comparing raw and normalized analyses. Use `--no-multi-pass` only when performance is critical.
 
 ## Attribution Engine
 
@@ -596,7 +599,9 @@ let analyzer = MultiPassAnalyzer::new(options);
 
 ## Use Cases
 
-### When to Use Multi-Pass Analysis
+### When to Use Multi-Pass Analysis (Default)
+
+Multi-pass analysis is the default because it provides the most valuable insights:
 
 **Refactoring Validation**
 - Compare before/after complexity to validate refactoring
@@ -623,17 +628,23 @@ let analyzer = MultiPassAnalyzer::new(options);
 - Separate signal (logic) from noise (formatting)
 - Identify complexity hotspots for architectural review
 
-### When to Use Standard Analysis
+### When to Disable Multi-Pass (--no-multi-pass)
 
-**Quick Feedback**
+Use `--no-multi-pass` for single-pass analysis only when:
+
+**Performance is Critical**
 - Fast complexity checks during development
-- CI/CD gates that need speed
-- Large codebases where overhead matters
+- CI/CD gates where every second matters
+- Very large codebases (>100k LOC) where overhead is significant
 
-**Sufficient Metrics**
+**Simple Use Cases**
 - When overall complexity trends are enough
 - No need for detailed attribution
 - Formatting is already standardized
+
+**Resource Constraints**
+- Limited CPU or memory available
+- Running on CI infrastructure with strict time limits
 
 ## Future Enhancements
 
@@ -683,7 +694,7 @@ This will enable:
 
 ## Summary
 
-Multi-pass analysis provides deep insights into your code's complexity by:
+Multi-pass analysis (enabled by default) provides deep insights into your code's complexity by:
 
 1. **Separating signal from noise** - Distinguishing logical complexity from formatting artifacts
 2. **Attributing complexity sources** - Identifying what contributes to complexity and why
@@ -691,9 +702,9 @@ Multi-pass analysis provides deep insights into your code's complexity by:
 4. **Validating refactoring** - Comparing before/after to prove complexity reduction
 5. **Monitoring performance** - Ensuring overhead stays within acceptable bounds
 
-Use `--multi-pass --attribution` when you need detailed complexity analysis and targeted refactoring guidance. The overhead (typically 15-25%) is worthwhile when you need to understand *why* code is complex and *how* to improve it.
+Multi-pass analysis runs by default, providing the most valuable insights out of the box. The overhead (typically 15-25%) is worthwhile for understanding *why* code is complex and *how* to improve it.
 
-For quick complexity checks and CI/CD integration, standard single-pass analysis is usually sufficient. Save multi-pass analysis for deep dives, refactoring validation, and complexity investigations.
+For performance-critical scenarios or very large codebases, use `--no-multi-pass` to disable multi-pass analysis and run faster single-pass analysis instead. You can also use the `DEBTMAP_SINGLE_PASS=1` environment variable to disable multi-pass analysis globally.
 
 ---
 
