@@ -1,0 +1,134 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "configuration",
+  "chapter_title": "Configuration",
+  "chapter_file": "book/src/configuration.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Comprehensive and well-structured configuration documentation with minor drift issues. Primary concerns are a broken link to Analysis Guide, documentation field name inconsistency (max_file_length vs max_file_lines), and missing coverage of newer configuration options. The documentation provides extensive examples and explanations that accurately reflect most of the implementation.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 1 broken internal link that needs updating",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "target_path": "./analysis-guide.md",
+          "expected_file": "book/src/analysis-guide.md",
+          "current_file": "book/src/configuration.md",
+          "line_number": 1135,
+          "reason": "File does not exist - Analysis Guide migrated to multi-subsection structure",
+          "suggested_fix": "./analysis-guide/index.md"
+        }
+      ],
+      "fix_suggestion": "Update link from './analysis-guide.md' to './analysis-guide/index.md' at line 1135. The Analysis Guide chapter was migrated to a multi-subsection structure with an index file.",
+      "source_reference": "book/src/SUMMARY.md:10"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "medium",
+      "section": "Thresholds Configuration - Basic Thresholds",
+      "description": "Documentation uses field name 'max_file_length' but explains it maps to 'max_file_lines' in the struct. This creates confusion about which name to use in TOML config.",
+      "current_content": "[thresholds]\nmax_file_length = 500                # Maximum lines per file",
+      "should_be": "Either standardize on 'max_file_length' throughout (preferred for user-facing TOML) OR clarify that both names are accepted",
+      "fix_suggestion": "The documentation mentions this aliasing in a note at line 304: 'The TOML configuration accepts max_file_length (shown above), which maps to the internal struct field max_file_lines.' However, this could be clearer. Consider adding a comment in the example itself or documenting this in a 'Field Name Aliases' section.",
+      "source_reference": "src/config/thresholds.rs:86 (field is max_file_length in TOML deserialization)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Advanced Configuration",
+      "description": "Missing documentation for several advanced configuration sections that exist in the codebase",
+      "missing_items": [
+        {
+          "config_section": "batch_analysis",
+          "description": "Batch analysis configuration for parallel processing (spec 203)",
+          "source": "src/config/core.rs:133-134",
+          "feature_reference": "parallel_processing"
+        },
+        {
+          "config_section": "retry",
+          "description": "Retry configuration for resilient operations (spec 205)",
+          "source": "src/config/core.rs:137-138",
+          "feature_reference": "configuration"
+        },
+        {
+          "config_section": "analysis",
+          "description": "Advanced analysis settings including trait method resolution, function pointer tracking, framework pattern detection, cross-module analysis, and max analysis depth (spec 207)",
+          "source": "src/config/core.rs:142",
+          "feature_reference": "call_graph_analysis"
+        },
+        {
+          "config_section": "state_detection",
+          "description": "State field detection configuration (spec 202)",
+          "source": "src/config/core.rs:145-146",
+          "feature_reference": "functional_analysis"
+        },
+        {
+          "config_section": "coverage_expectations",
+          "description": "Role-based coverage expectations (spec 119)",
+          "source": "src/config/core.rs:108-109",
+          "feature_reference": "coverage_integration"
+        }
+      ],
+      "fix_suggestion": "Add subsections documenting these advanced configuration options under 'Additional Advanced Options'. Each should include: purpose, default values, when to adjust, and example TOML configuration. These are all opt-in features so they don't need prominent placement, but should be documented for advanced users.",
+      "source_reference": "src/config/core.rs:133-146"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Role Multipliers",
+      "description": "Default values in documentation don't match implementation after spec 119 updates",
+      "current_content": "pure_logic = 1.2        # Prioritize pure computation (default: 1.2)\norchestrator = 0.8      # Reduce for delegation functions (default: 0.8)\nio_wrapper = 0.7        # Reduce for I/O wrappers (default: 0.7)\nentry_point = 0.9       # Slight reduction for main/CLI (default: 0.9)\npattern_match = 0.6     # Reduce for pattern matching (default: 0.6)",
+      "should_be": "These match the current implementation defaults, so this is actually CORRECT. Documentation accurately reflects src/config/scoring.rs default functions.",
+      "fix_suggestion": "No fix needed - verification shows documentation is correct",
+      "source_reference": "src/config/scoring.rs:193-211"
+    }
+  ],
+  "positive_aspects": [
+    "Extremely comprehensive coverage of configuration options with detailed explanations",
+    "Excellent examples showing complete TOML configurations for different use cases (strict quality, legacy codebases, open source libraries)",
+    "Clear documentation of scoring weights, thresholds, and advanced features",
+    "Good explanation of role-based adjustments with rationale tables",
+    "Helpful troubleshooting section addressing common configuration issues",
+    "Proper documentation of deprecated validation thresholds with migration guidance",
+    "Accurate reflection of the multi-source configuration system (CLI > config file > defaults)",
+    "Well-organized with logical sections and clear headings",
+    "Examples use correct TOML syntax with appropriate comments",
+    "Includes validation rules and normalization behavior",
+    "Documents both basic and advanced configuration scenarios"
+  ],
+  "improvement_suggestions": [
+    "Fix the broken link to Analysis Guide (change to analysis-guide/index.md)",
+    "Add documentation for the 5 missing advanced configuration sections (batch_analysis, retry, analysis, state_detection, coverage_expectations)",
+    "Consider adding a 'Configuration Field Reference' table listing all top-level config sections with brief descriptions and links to details",
+    "The max_file_length aliasing note could be more prominent or included in the example comment",
+    "Add cross-reference to Parallel Processing chapter when documenting batch_analysis config",
+    "Consider adding a 'Quick Start' section showing minimal config for common scenarios before diving into comprehensive options",
+    "The role_multiplier_config section (lines 158-209) could benefit from a diagram showing the two-stage process flow",
+    "Add examples of how CLI flags override config file settings in the 'CLI Integration' section"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:04:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Config files",
+      "Scoring weights",
+      "Thresholds",
+      "Language configuration",
+      "Exclusion patterns",
+      "Display and output configuration",
+      "Advanced analysis features",
+      "Validation thresholds",
+      "CLI integration",
+      "Configuration best practices"
+    ],
+    "validation_focus": "Check config options match implementation in src/config/",
+    "total_internal_links": 4,
+    "broken_links": 1,
+    "config_sections_documented": 25,
+    "config_sections_missing": 5
+  }
+}
