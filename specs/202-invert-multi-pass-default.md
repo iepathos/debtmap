@@ -1,5 +1,5 @@
 ---
-number: 201
+number: 202
 title: Invert Multi-Pass Analysis Default Behavior
 category: optimization
 priority: medium
@@ -8,7 +8,7 @@ dependencies: []
 created: 2025-12-03
 ---
 
-# Specification 201: Invert Multi-Pass Analysis Default Behavior
+# Specification 202: Invert Multi-Pass Analysis Default Behavior
 
 **Category**: optimization
 **Priority**: medium
