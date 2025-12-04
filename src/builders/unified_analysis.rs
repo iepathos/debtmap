@@ -139,7 +139,14 @@ fn perform_unified_analysis_computation(
 
     // Perform multi-pass analysis if enabled
     if multi_pass {
+        // Show spinner for multi-pass analysis (spec 201)
+        let spinner = crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Analyzing code patterns"))
+            .unwrap_or_else(indicatif::ProgressBar::hidden);
+
         perform_multi_pass_analysis(results, show_attribution)?;
+
+        spinner.finish_and_clear();
     }
 
     // Progress tracking
@@ -170,7 +177,7 @@ fn perform_unified_analysis_computation(
         p.complete_phase();
     });
 
-    // Phase 4: Resolving dependencies (trait resolution) (spec 195)
+    // Phase 4: Refining analysis (trait resolution) (spec 195, spec 201)
     crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(3));
 
     // Integrate trait resolution to reduce false positives
@@ -180,9 +187,10 @@ fn perform_unified_analysis_computation(
     let trait_resolution_time = trait_resolution_start.elapsed();
 
     crate::io::progress::AnalysisProgress::with_global(|p| {
+        // Show meaningful progress: resolved/total_examined (spec 201)
         p.update_progress(crate::io::progress::PhaseProgress::Progress {
             current: trait_resolution_stats.resolved_calls,
-            total: trait_resolution_stats.resolved_calls,
+            total: trait_resolution_stats.total_calls_examined,
         });
         p.complete_phase();
     });
@@ -200,7 +208,21 @@ fn perform_unified_analysis_computation(
     }
 
     let coverage_loading_start = std::time::Instant::now();
+
+    // Show spinner for coverage loading if coverage file provided (spec 201)
+    let spinner = if coverage_file.is_some() {
+        crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Loading coverage data"))
+    } else {
+        None
+    };
+
     let coverage_data = load_coverage_data(coverage_file.cloned())?;
+
+    if let Some(pb) = spinner {
+        pb.finish_and_clear();
+    }
+
     let coverage_loading_time = coverage_loading_start.elapsed();
 
     // Emit warning if no coverage data provided (spec 108)
@@ -1108,11 +1130,12 @@ fn create_file_debt_item(file_data: ProcessedFileData) -> FileDebtItem {
     )
 }
 
-/// Statistics about trait resolution
+/// Statistics about trait resolution (spec 201)
 #[derive(Debug, Clone, Default)]
 struct TraitResolutionStats {
-    resolved_calls: usize,
-    marked_implementations: usize,
+    total_calls_examined: usize,   // Total trait method calls found
+    resolved_calls: usize,         // Successfully resolved calls
+    marked_implementations: usize, // Trait impls marked as callable
 }
 
 /// Integrate trait resolution into the call graph to reduce false positives
@@ -1129,7 +1152,10 @@ fn integrate_trait_resolution(
     // Detect common trait patterns (Default, Clone, etc.) and mark them as entry points
     trait_registry.detect_common_trait_patterns(call_graph);
 
-    // Suppress spinner - unified progress system already shows "4/4 Resolving dependencies"
+    // Get total calls before resolving (spec 201)
+    let total_examined = trait_registry.count_trait_method_calls(call_graph);
+
+    // Suppress spinner - unified progress system already shows "4/4 Refining analysis"
     let progress = indicatif::ProgressBar::hidden();
 
     // Resolve trait method calls to concrete implementations
@@ -1140,6 +1166,7 @@ fn integrate_trait_resolution(
     let trait_stats = trait_registry.get_statistics();
 
     Ok(TraitResolutionStats {
+        total_calls_examined: total_examined,
         resolved_calls: resolved_count,
         marked_implementations: trait_stats.total_implementations,
     })

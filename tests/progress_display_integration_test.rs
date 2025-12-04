@@ -50,8 +50,8 @@ fn test_progress_display_shows_all_phases() {
         "Phase 3 'Building call graph' should appear in output"
     );
     assert!(
-        stderr.contains("4/4 Resolving dependencies"),
-        "Phase 4 'Resolving dependencies' should appear in output"
+        stderr.contains("4/4 Refining analysis"),
+        "Phase 4 'Refining analysis' should appear in output"
     );
 
     // Verify completion message appears

@@ -12,8 +12,6 @@ use std::thread;
 use std::time::Duration;
 
 pub fn collect_file_metrics(files: &[PathBuf]) -> Vec<FileMetrics> {
-    use indicatif::ParallelProgressIterator;
-
     // Only apply file limit if explicitly set by user
     let (total_files, files_to_process) = match std::env::var("DEBTMAP_MAX_FILES")
         .ok()

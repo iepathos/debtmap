@@ -44,7 +44,7 @@ pub fn extract_call_graph_multi_file(files: &[(syn::File, PathBuf)]) -> CallGrap
     let total_files = files.len();
 
     // Update unified progress as files are processed
-    for (_idx, (file, path)) in files.iter().enumerate() {
+    for (file, path) in files.iter() {
         let mut extractor = CallGraphExtractor::new(path.clone());
         // Extract functions and collect unresolved calls
         extractor.extract_phase1(file);
