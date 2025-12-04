@@ -28,26 +28,25 @@ setup:
   # Note: May not commit if features haven't changed since last analysis
   - claude: "/prodigy-analyze-features-for-book --project $PROJECT_NAME --config $PROJECT_CONFIG"
 
-  # Step 2: Detect documentation gaps for missing features
-  # Ensures all major features have documentation chapters
-  # Generates flattened-items.json for map phase (single-file chapters + subsections with parent metadata)
+  # Step 2: Detect documentation gaps and create missing chapters/subsections
+  # Also generates flattened-items.json for map phase (single-file chapters + subsections with parent metadata)
   # Note: May not commit if no gaps found, which is a successful outcome
   - claude: "/prodigy-detect-documentation-gaps --project $PROJECT_NAME --config $PROJECT_CONFIG --features $FEATURES_PATH --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
 
   # Step 3: Analyze chapter sizes and structural complexity
   # Identifies oversized chapters that should be split into subsections
   # Generates structure-report.json with recommendations
-  # Note: This is analysis-only, no files are modified
   - claude: "/prodigy-analyze-chapter-structure --project $PROJECT_NAME --book-dir $BOOK_DIR --chapters $CHAPTERS_FILE --output $ANALYSIS_DIR/structure-report.json"
 
-  # Step 4: Review and optionally migrate oversized chapters to subsections
-  # This is a manual decision point - the workflow pauses for review
-  # To migrate a chapter: /prodigy-create-chapter-subsections --project $PROJECT_NAME --chapter <chapter-id> --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR
-  # After migration, re-run /prodigy-detect-documentation-gaps to regenerate flattened-items.json
-  # For now, this step is commented out (manual intervention required)
-  # Uncomment and specify chapters to migrate:
-  # - claude: "/prodigy-create-chapter-subsections --project $PROJECT_NAME --chapter configuration --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
-  # - claude: "/prodigy-detect-documentation-gaps --project $PROJECT_NAME --config $PROJECT_CONFIG --features $FEATURES_PATH --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
+  # Step 4: Automatically split all oversized chapters into subsections
+  # This runs BEFORE map phase so agents process optimally-sized chapters
+  # Reads structure-report.json and orchestrates splitting of high-priority chapters
+  - claude: "/prodigy-split-oversized-chapters --project $PROJECT_NAME --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR --structure-report $ANALYSIS_DIR/structure-report.json"
+    commit_required: true
+
+  # Step 5: Regenerate flattened-items.json after structure changes
+  # This ensures map phase processes all chapters (including newly split subsections)
+  - claude: "/prodigy-detect-documentation-gaps --project $PROJECT_NAME --config $PROJECT_CONFIG --features $FEATURES_PATH --chapters $CHAPTERS_FILE --book-dir $BOOK_DIR"
 
 # Map phase: Analyze and fix each book chapter/subsection for drift
 map:
@@ -87,8 +86,8 @@ reduce:
   - claude: "/prodigy-validate-book-holistically --project $PROJECT_NAME --book-dir $BOOK_DIR --output $ANALYSIS_DIR/validation.json --auto-fix true"
     commit_required: true
 
-  # Clean up temporary analysis files (keep structure-report.json and validation.json for review)
-  - shell: "rm -rf ${ANALYSIS_DIR}/features.json ${ANALYSIS_DIR}/flattened-items.json ${ANALYSIS_DIR}/drift-*.json ${ANALYSIS_DIR}/gap-report.json"
+  # Clean up temporary analysis files (keep validation report for review)
+  - shell: "rm -rf ${ANALYSIS_DIR}/features.json ${ANALYSIS_DIR}/flattened-items.json ${ANALYSIS_DIR}/drift-*.json"
   - shell: "git add -A && git commit -m 'chore: remove temporary book analysis files for ${PROJECT_NAME}' || true"
  
 
