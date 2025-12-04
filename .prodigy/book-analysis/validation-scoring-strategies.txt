@@ -1,0 +1,71 @@
+# Validation Summary for Scoring Strategies
+
+## Content Metrics
+- Lines of content: 1574 (minimum: 100) ✓
+- Headings: 45+ (minimum: 5) ✓
+- Code examples: 50+ (minimum: 3) ✓
+- Source references: Multiple CLI and config references ✓
+
+## Drift Issues Resolved
+- Critical: 0/0 ✓
+- High: 0/0 ✓
+- Medium: 1/1 ✓ (Broken links fixed)
+- Low: 4/4 ✓ (All outdated/incomplete content updated)
+
+## Link Validation
+- All internal links verified against actual files
+- All referenced files exist:
+  ✓ book/src/configuration.md
+  ✓ book/src/analysis-guide/index.md
+  ✓ ARCHITECTURE.md
+
+## Fixes Applied
+
+### 1. Fixed Broken Links (Medium Severity)
+- Removed references to non-existent files:
+  - migration-guide.md (removed from See Also)
+  - file-classification.md (removed from See Also)
+  - tiered-prioritization.md (removed from See Also)
+- Updated ARCHITECTURE.md link path: ../ARCHITECTURE.md → ../../ARCHITECTURE.md
+- Updated analysis-guide.md link: ./analysis-guide.md → ./analysis-guide/index.md
+
+### 2. Clarified CLI Flag Syntax (Low Severity)
+- Line 84: Updated --aggregate-only documentation
+- Before: "a boolean flag—no value needed"
+- After: "no argument required: use `debtmap analyze . --aggregate-only`"
+- Provides exact CLI usage example
+
+### 3. Added Config Filename Explanation (Low Severity)
+- Line 199: Expanded .debtmap.toml explanation
+- Added: "Debtmap searches for `.debtmap.toml` in the current directory, or you can specify an alternate path with `--config path/to/config.toml`."
+- Clarifies search behavior and --config flag usage
+
+### 4. Documented Aggregation Method CLI Flag (Low Severity)
+- Line 125: Clarified "Or via configuration" → "Or via configuration file"
+- CLI flag --aggregation-method already documented at line 122
+- Issue was minor wording clarity, now resolved
+
+### 5. Clarified Rebalanced Scoring Activation (Low Severity)
+- Line 986: Simplified activation explanation
+- Line 1236: Removed incorrect --legacy-scoring flag reference
+- Added note: "There is no `--legacy-scoring` CLI flag. Switch between algorithms by modifying your configuration file"
+- Updated migration steps to reflect config-only approach
+
+## Code Validation
+- All CLI flags verified against src/cli.rs:
+  ✓ --aggregate-only (line 184)
+  ✓ --aggregation-method (line 192)
+  ✓ --config (global flag, line 45)
+- No --legacy-scoring flag exists (correctly removed from docs)
+
+## Quality Gates
+✓ Meets minimum content requirements (1574 lines >> 100)
+✓ All critical issues resolved (0 issues)
+✓ All high severity issues resolved (0 issues)
+✓ All medium severity issues resolved (1/1 fixed)
+✓ All low severity issues resolved (4/4 fixed)
+✓ All links point to valid files
+✓ All CLI flags verified against source code
+✓ All formulas and examples retained from positive aspects
+
+Status: READY TO COMMIT
