@@ -48,6 +48,34 @@ end_of_record
 - `LH:` - Lines hit
 - `LF:` - Lines found (total)
 
+### Rust Name Demangling
+
+For Rust projects, Debtmap includes sophisticated name demangling to correlate LCOV coverage with analyzed functions. The demangling system handles:
+
+**Mangling Schemes**:
+- **v0 scheme**: Starts with `_RNv` (modern Rust, default since 1.38)
+- **Legacy scheme**: Starts with `_ZN` (older Rust versions)
+
+**Normalization Process** (see `src/risk/lcov.rs:demangle_function_name` and `normalize_demangled_name`):
+
+1. **Demangle**: Convert mangled symbols to human-readable names
+2. **Strip crate hashes**: Remove build-specific hash IDs (e.g., `debtmap[71f4b4990cdcf1ab]` → `debtmap`)
+3. **Strip generic parameters**: Remove type parameters (e.g., `HashMap<K,V>::insert` → `HashMap::insert`)
+4. **Extract method names**: Store both full path and method name for flexible matching
+
+**Examples**:
+
+| Original (in LCOV) | After Demangling | Normalized Full Path | Method Name |
+|-------------------|------------------|---------------------|-------------|
+| `_RNvXs0_14debtmap...visit_expr` | `<debtmap[hash]::Type>::visit_expr` | `debtmap::Type::visit_expr` | `visit_expr` |
+| `Type::method::<T>` | `Type::method::<T>` | `Type::method` | `method` |
+| `std::vec::Vec<T>::push` | `std::vec::Vec<T>::push` | `std::vec::Vec::push` | `push` |
+
+This normalization enables Debtmap to match coverage data even when:
+- Crate hashes change between builds
+- Multiple monomorphizations of generic functions exist
+- LCOV stores simplified names while Debtmap uses qualified names
+
 ## Generating Coverage Data
 
 ### Rust: cargo-tarpaulin
@@ -120,6 +148,78 @@ gocover-cobertura < coverage.out > coverage.xml
 ```
 
 **Note**: Go's native coverage format requires conversion. Most CI systems support LCOV conversion plugins.
+
+## Role-Based Coverage Expectations
+
+Not all functions need the same level of test coverage. Debtmap uses a **role-based coverage expectation system** to adjust scoring based on function purpose (see `src/priority/scoring/coverage_expectations.rs` and `src/risk/evidence/coverage_analyzer.rs`).
+
+### Function Roles and Coverage Targets
+
+| Role | Coverage Range | Rationale | Role Weight |
+|------|---------------|-----------|-------------|
+| **PureLogic** | 90-95% | Business logic requires comprehensive testing | 1.0 |
+| **EntryPoint** | 70-80% | Better tested with integration tests | 0.9 |
+| **Orchestrator** | 60-80% | Coordinates other functions, moderate complexity | 0.6 |
+| **IOWrapper** | 40-60% | Thin I/O layer, often integration-tested | 0.4 |
+| **PatternMatch** | 50-70% | Simple pattern matching, lower complexity | 0.3 |
+| **Debug** | 20-30% | Diagnostic functions, low priority | 0.2 |
+| **Unknown** | 70-90% | Default for unclassified functions | 0.8 |
+
+**Source**: See `src/priority/semantic_classifier/mod.rs:25-32` for role definitions and `src/risk/evidence/coverage_analyzer.rs:63-73` for role weight calculation.
+
+### Coverage Gap Severity Classification
+
+Debtmap classifies coverage gaps into 4 severity levels (see `src/priority/scoring/coverage_expectations.rs:GapSeverity`):
+
+| Severity | Condition | Impact on Score | Visual |
+|----------|-----------|----------------|--------|
+| **None** | Coverage ≥ target | No penalty | 🟢 |
+| **Minor** | Coverage between min and target | Small penalty | 🟡 |
+| **Moderate** | Coverage between 50% of min and min | Medium penalty | 🟠 |
+| **Critical** | Coverage < 50% of min | High penalty | 🔴 |
+
+**Example**: For `PureLogic` (target: 95%, min: 90%):
+- 96% coverage → None (🟢)
+- 92% coverage → Minor (🟡)
+- 75% coverage → Moderate (🟠)
+- 40% coverage → Critical (🔴)
+
+### Test Quality Classification
+
+Coverage is classified into quality tiers based on both percentage and complexity (see `src/risk/evidence/coverage_analyzer.rs:44-52`):
+
+```rust
+fn classify_test_quality(coverage: f64, complexity: u32) -> TestQuality {
+    match () {
+        _ if coverage >= 90.0 && complexity <= 5 => TestQuality::Excellent,
+        _ if coverage >= 80.0 => TestQuality::Good,
+        _ if coverage >= 60.0 => TestQuality::Adequate,
+        _ if coverage > 0.0 => TestQuality::Poor,
+        _ => TestQuality::Missing,
+    }
+}
+```
+
+**Quality Levels**:
+- **Excellent**: ≥90% coverage AND complexity ≤5 (simple, well-tested)
+- **Good**: ≥80% coverage (comprehensive testing)
+- **Adequate**: ≥60% coverage (basic testing)
+- **Poor**: >0% but <60% coverage (incomplete testing)
+- **Missing**: 0% coverage (no tests)
+
+### How Roles Affect Scoring
+
+Role weights adjust the coverage penalty applied to functions (see `src/risk/evidence/coverage_analyzer.rs:63-73`):
+
+**Example**: A function with 50% coverage:
+- **PureLogic** (weight: 1.0): Full penalty, high urgency
+- **Orchestrator** (weight: 0.6): 60% of full penalty
+- **Debug** (weight: 0.2): Only 20% of full penalty, low urgency
+
+This ensures that:
+1. Business logic functions are prioritized for testing
+2. Entry points rely more on integration tests
+3. Diagnostic/debug functions don't create noise
 
 ## How Coverage Affects Scoring
 
@@ -223,20 +323,129 @@ fn process_request(input: String) -> Result<()> {
 
 **Effect**: `validate_input` has reduced urgency because it's only reachable through well-tested code paths.
 
+### Generic Function Coverage (Monomorphization)
+
+**Challenge**: Generic functions in Rust get monomorphized into multiple versions, each appearing as a separate function in LCOV with different coverage.
+
+For example, `execute::<T>()` might appear as:
+- `execute::<WorkflowExecutor>` - 70% coverage, uncovered: [10, 20, 30]
+- `execute::<MockExecutor>` - 80% coverage, uncovered: [20, 40]
+
+**Debtmap's Solution** (see `src/risk/coverage_index.rs:merge_coverage`):
+
+1. **Base Function Index**: Maps base names to all monomorphized versions
+   - `(file, "execute")` → `["execute::<WorkflowExecutor>", "execute::<MockExecutor>"]`
+
+2. **Intersection Merge Strategy**: A line is uncovered ONLY if ALL versions leave it uncovered
+   - Coverage percentage: Average across all versions (75% in example)
+   - Uncovered lines: Intersection of uncovered sets ([20] in example)
+
+3. **Conservative Approach**: Ensures we don't claim coverage that doesn't exist in all code paths
+
+**Example Aggregation**:
+
+| Version | Coverage | Uncovered Lines |
+|---------|----------|----------------|
+| `execute::<WorkflowExecutor>` | 70% | [10, 20, 30] |
+| `execute::<MockExecutor>` | 80% | [20, 40] |
+| **Aggregated Result** | **75%** | **[20]** |
+
+Line 20 is uncovered in BOTH versions, so it's risky. Lines 10, 30, 40 are covered in at least one version, so they're considered safer.
+
+**Implementation**: See `src/risk/coverage_index.rs:AggregateCoverage` and `merge_coverage` (lines 50-139).
+
+### Trait Method Coverage Matching
+
+**Challenge**: LCOV files may store trait method implementations with simplified names while Debtmap tracks fully qualified names.
+
+**Example Mismatch**:
+- **LCOV stores**: `visit_expr` (demangled method name)
+- **Debtmap queries**: `RecursiveMatchDetector::visit_expr` (fully qualified)
+
+**Debtmap's Solution** (see `src/risk/coverage_index.rs:generate_name_variants` and `method_name_index`):
+
+1. **Name Variant Generation**: Extract method name from qualified paths
+   - `RecursiveMatchDetector::visit_expr` → generates variant `visit_expr`
+
+2. **Method Name Index**: O(1) lookup from method name to all implementations
+   - `(file, "visit_expr")` → `["RecursiveMatchDetector::visit_expr", "_RNvXs0_...visit_expr"]`
+
+3. **Multi-Strategy Matching**: Try variants if exact match fails
+   - First: Exact qualified name match
+   - Second: Method name variant match
+   - Third: Line-based fallback
+
+**Implementation**: See `src/risk/coverage_index.rs:192` (method_name_index) and `generate_name_variants` (lines 12-48).
+
 ## Performance Characteristics
 
-Coverage integration is highly optimized for large codebases:
+Coverage integration is highly optimized for large codebases using a multi-strategy lookup system.
+
+### Coverage Index Structure
+
+The coverage index uses nested HashMaps plus supporting indexes for O(1) lookups (see `src/risk/coverage_index.rs:172-196`):
+
+1. **by_file**: `HashMap<PathBuf, HashMap<String, FunctionCoverage>>` - Primary nested index
+2. **by_line**: `HashMap<PathBuf, BTreeMap<usize, FunctionCoverage>>` - Line-based range queries
+3. **base_function_index**: Maps base names to monomorphized versions (generic handling)
+4. **method_name_index**: Maps method names to full qualified names (trait methods)
+
+### Lookup Strategy Waterfall
+
+Debtmap tries 5 strategies in order, stopping at the first match (see `src/risk/coverage_index.rs:get_function_coverage_with_line`):
+
+| Strategy | Complexity | When It Matches | Typical Latency |
+|----------|-----------|----------------|-----------------|
+| **1. Exact Match** | O(1) | File path and function name exactly match LCOV | ~0.5μs |
+| **2. Suffix Matching** | O(files) | Query path ends with LCOV file path, then O(1) function lookup | ~5-8μs |
+| **3. Reverse Suffix** | O(files) | LCOV file path ends with query path, then O(1) function lookup | ~5-8μs |
+| **4. Normalized Equality** | O(files) | Paths equal after normalizing `./` prefix, then O(1) function lookup | ~5-8μs |
+| **5. Line-Based Fallback** | O(log n) | Match by line number ±2 tolerance using BTreeMap range query | ~10-15μs |
+
+**Strategy Optimizations**:
+- Path strategies iterate over FILES (typically ~375) not functions (~1,500+), providing 4x-50x speedup
+- Each path strategy tries 3 name matching techniques per file:
+  1. Exact name match
+  2. Function name suffix match (handles qualified vs short names)
+  3. Method name match (handles trait implementations)
+
+### Performance Benchmarks
 
 - **Index Build**: O(n), ~20-30ms for 5,000 functions
 - **Exact Lookup**: O(1), ~0.5μs per lookup
-- **Fallback Lookup**: O(files) iteration with O(1) per-file lookup, ~5-8μs when exact match fails. Uses suffix matching and normalized path equality strategies
+- **Path Strategy Fallback**: O(files) × O(1), ~5-8μs when exact match fails
+- **Line-Based Fallback**: O(log n), ~10-15μs when all path strategies fail
 - **Memory Usage**: ~200 bytes per record (~2MB for 5,000 functions)
 - **Thread Safety**: Lock-free parallel access via `Arc<CoverageIndex>`
 - **Analysis Overhead**: ~2.5x baseline (target: ≤3x)
 
 **Result**: Coverage integration adds minimal overhead even on projects with thousands of functions.
 
-**Implementation**: See `src/risk/coverage_index.rs:13-38` for the CoverageIndex struct and performance documentation.
+### Debugging Lookup Performance
+
+The coverage index tracks detailed statistics for performance analysis (see `src/risk/coverage_index.rs:CoverageIndexStats`):
+
+```rust
+pub struct CoverageIndexStats {
+    pub total_files: usize,
+    pub total_records: usize,
+    pub index_build_time: Duration,
+    pub estimated_memory_bytes: usize,
+}
+```
+
+Enable verbose logging to see which strategy matched:
+```bash
+debtmap analyze . --lcov coverage.info -vv
+```
+
+Output shows strategy attempts:
+```
+Looking up coverage for function 'visit_expr' in file 'src/detector.rs'
+Strategy 1: Suffix matching...
+  Found path match: 'src/detector.rs'
+  ✓ Matched method name 'visit_expr' -> 'RecursiveMatchDetector::visit_expr': 85%
+```
 
 ## CLI Options Reference
 
@@ -308,13 +517,62 @@ Coverage file paths must be relative to project root:
 # Bad:  SF:/home/user/project/src/analyzer.rs
 ```
 
-3. **Enable Verbose Logging**:
+3. **Use explain-coverage Command**:
+```bash
+debtmap explain-coverage . --lcov coverage.info \
+  --function validate_input \
+  --file src/validator.rs \
+  --format json
+```
+
+The `explain-coverage` command provides detailed diagnostics:
+
+**JSON Output Structure** (see `src/commands/explain_coverage.rs:ExplainCoverageResult`):
+```json
+{
+  "function_name": "validate_input",
+  "file_path": "src/validator.rs",
+  "coverage_found": true,
+  "coverage_percentage": 85.0,
+  "matched_by_strategy": "Suffix Matching",
+  "attempts": [
+    {
+      "strategy": "Exact Match",
+      "success": false,
+      "matched_function": null,
+      "coverage_percentage": null
+    },
+    {
+      "strategy": "Suffix Matching",
+      "success": true,
+      "matched_function": "validator::validate_input",
+      "matched_file": "src/validator.rs",
+      "coverage_percentage": 85.0
+    }
+  ],
+  "available_functions": [
+    "src/validator.rs::validate_input",
+    "src/processor.rs::process_request"
+  ],
+  "available_files": [
+    "src/validator.rs",
+    "src/processor.rs"
+  ]
+}
+```
+
+**Key Fields**:
+- `attempts[]`: Shows all 5 strategies tried and which succeeded
+- `available_functions[]`: All functions found in LCOV (helps identify naming mismatches)
+- `available_files[]`: All files in LCOV (helps debug path issues)
+
+4. **Enable Verbose Logging**:
 ```bash
 debtmap analyze . --lcov coverage.info -vv
 ```
-This shows coverage lookup details for each function.
+This shows coverage lookup details for each function during analysis.
 
-4. **Verify Coverage Tool Output**:
+5. **Verify Coverage Tool Output**:
 ```bash
 # Ensure your coverage tool generated line data (DA: records)
 grep "^DA:" coverage.info | head
