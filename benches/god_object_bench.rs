@@ -8,7 +8,7 @@
 //! - Module split recommendation generation
 //! - Full analysis pipeline orchestration
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use debtmap::organization::{
     calculate_god_object_score, calculate_god_object_score_weighted, determine_confidence,
     group_methods_by_responsibility, recommend_module_splits, GodObjectDetector,
@@ -16,6 +16,7 @@ use debtmap::organization::{
 };
 use std::collections::HashMap;
 use std::fs;
+use std::hint::black_box;
 use std::path::Path;
 
 /// Benchmark god object score calculation (pure function)

@@ -420,12 +420,15 @@ mod property_tests {
             loc in 500..2000usize
         ) {
             let thresholds = GodObjectThresholds::default();
+            // Use avg_complexity values that map to different categories:
+            // 2.0 < 3.0 -> 0.7x multiplier (low complexity)
+            // 15.0 > 10.0 -> 1.5x multiplier (high complexity)
             let low_complexity = calculate_god_object_score_weighted(
                 weighted_count,
                 field_count,
                 resp_count,
                 loc,
-                2.0,
+                2.0, // Low complexity: 0.7x
                 &thresholds
             );
             let high_complexity = calculate_god_object_score_weighted(
@@ -433,11 +436,18 @@ mod property_tests {
                 field_count,
                 resp_count,
                 loc,
-                15.0,
+                15.0, // High complexity: 1.5x
                 &thresholds
             );
-            // High complexity should always score worse (higher) than low complexity
-            prop_assert!(high_complexity > low_complexity);
+            // Property: High complexity (15.0) should score at least as high as low complexity (2.0)
+            // The complexity factors are: low=0.7x, high=1.5x (ratio ~2.14)
+            //
+            // Note: Due to minimum score thresholds (30.0, 50.0, 70.0 based on violation count),
+            // the actual scores might be clamped, which can reduce or eliminate the difference.
+            // However, the high complexity should NEVER score lower than low complexity.
+            prop_assert!(high_complexity >= low_complexity,
+                "High complexity ({}) should be >= low complexity ({})",
+                high_complexity, low_complexity);
         }
     }
 }
