@@ -1,0 +1,88 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "god-object-detection",
+  "chapter_title": "God Object Detection",
+  "chapter_file": "book/src/god-object-detection.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and accurate but has broken cross-references and a few minor inaccuracies in implementation details",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Related Documentation",
+      "description": "Found 1 broken internal link in the Related Documentation section",
+      "broken_links": [
+        {
+          "link_text": "File-Level Scoring",
+          "target_path": "./file-level-scoring.md",
+          "current_file": "book/src/god-object-detection.md",
+          "reason": "File does not exist",
+          "suggested_fix": "Change to './scoring-strategies.md' (file exists and covers scoring topics)"
+        }
+      ],
+      "fix_suggestion": "Update the 'File-Level Scoring' link to point to 'scoring-strategies.md' which exists and covers related scoring topics. Verify other cross-references are accurate.",
+      "source_reference": "book/src/god-object-detection.md:640"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "low",
+      "section": "Scoring Algorithms > Simple Scoring",
+      "description": "Documentation states minimum score enforcement but implementation uses different multipliers",
+      "current_content": "base_score = base_score × 50 × violation_count",
+      "should_be": "base_score = base_score × 20 × violation_count (per src/organization/god_object/scoring.rs:85)",
+      "fix_suggestion": "Update the scoring formula documentation to reflect the actual implementation which uses a multiplier of 20.0, not 50.0. The code comment states 'Reduced multiplier from 50.0 to 20.0 for more conservative scoring'.",
+      "source_reference": "src/organization/god_object/scoring.rs:72-89"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Responsibility Detection",
+      "description": "Documentation doesn't mention the confidence-based filtering system for responsibility classification",
+      "feature_reference": "god_object_detection.analysis_capabilities.responsibility_inference",
+      "fix_suggestion": "Add a note explaining that responsibility classification uses a confidence threshold (MINIMUM_CONFIDENCE = 0.50) and low-confidence classifications (like generic 'Domain' categories at 0.45 confidence) are filtered out. This is important for understanding why some methods may not be categorized.",
+      "source_reference": "src/organization/god_object/classifier.rs:128-150"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Detection Criteria > God Module Criteria",
+      "description": "Documentation mentions complexity estimation formula that may not match implementation",
+      "current_content": "Complexity Sum - Combined cyclomatic complexity (estimated as `function_count × 5`)",
+      "should_be": "The actual complexity is summed from visitor.function_complexity, not estimated",
+      "fix_suggestion": "Clarify that for GodFile/GodModule detection, the complexity is calculated by summing the actual cyclomatic complexity values from parsed functions, not by estimation. The estimation formula may be a legacy description.",
+      "source_reference": "src/organization/god_object/detector.rs:305-310"
+    }
+  ],
+  "positive_aspects": [
+    "Extremely comprehensive coverage of god object detection algorithm",
+    "Excellent code examples showing refactoring patterns",
+    "Clear explanation of the three-level purity classification system",
+    "Good troubleshooting section addressing common questions",
+    "Accurate documentation of thresholds across all supported languages",
+    "Well-explained confidence level classification (5 violations = Definite, etc.)",
+    "Configuration examples are complete and accurate",
+    "Detection type distinction (GodClass vs GodModule) is well explained"
+  ],
+  "improvement_suggestions": [
+    "Fix the broken link to 'file-level-scoring.md' by updating to 'scoring-strategies.md'",
+    "Update the scoring multiplier from 50 to 20 to match current implementation",
+    "Add explanation of confidence-based responsibility filtering",
+    "Clarify that complexity is summed from actual parsed values, not estimated",
+    "Consider adding a diagram showing the detection pipeline flow",
+    "Add examples showing the difference between weighted_method_count and raw method_count in scoring"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Detection criteria (method count, field count, responsibilities)",
+      "God object scoring algorithm",
+      "Thresholds and configuration",
+      "File-level aggregation",
+      "Refactoring recommendations",
+      "Examples and case studies"
+    ],
+    "validation_focus": "Check that god object detection algorithm, scoring, and configuration options are documented"
+  }
+}
