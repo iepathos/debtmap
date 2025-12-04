@@ -82,22 +82,6 @@ impl MultiPassAnalyzer {
             memory_used_mb: memory_used,
         };
 
-        // Validate performance requirements (25% overhead limit)
-        let single_pass_estimate = raw_time; // Estimate single-pass time as raw analysis time
-        let overhead_percentage = if single_pass_estimate > 0 {
-            ((total_time as f64 - single_pass_estimate as f64) / single_pass_estimate as f64)
-                * 100.0
-        } else {
-            0.0
-        };
-
-        if overhead_percentage > 25.0 {
-            eprintln!(
-                "Warning: Multi-pass analysis overhead ({:.1}%) exceeds 25% limit",
-                overhead_percentage
-            );
-        }
-
         Ok(MultiPassResult {
             raw_complexity: raw_result,
             normalized_complexity: normalized_result,
