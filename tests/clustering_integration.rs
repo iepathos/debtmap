@@ -6,19 +6,19 @@
 use debtmap::organization::GodObjectDetector;
 use std::path::Path;
 
-/// Test that clustering achieves <5% unclustered rate on god_object_detector.rs itself
+/// Test that clustering achieves <5% unclustered rate on behavioral_decomposition.rs itself
 ///
-/// Spec 192 requires: "god_object_detector.rs should have ≤1 unclustered method warning"
+/// Spec 192 requires: "behavioral_decomposition.rs should have ≤1 unclustered method warning"
 /// which translates to <5% unclustered rate for a file with 20+ methods.
 #[test]
 fn test_clustering_on_god_object_detector() {
-    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
-        .expect("Failed to read god_object_detector.rs");
+    let source_code = std::fs::read_to_string("src/organization/behavioral_decomposition.rs")
+        .expect("Failed to read behavioral_decomposition.rs");
 
-    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+    let ast = syn::parse_file(&source_code).expect("Failed to parse behavioral_decomposition.rs");
 
     let detector = GodObjectDetector::with_source_content(&source_code);
-    let path = Path::new("src/organization/god_object_detector.rs");
+    let path = Path::new("src/organization/behavioral_decomposition.rs");
     let analysis = detector.analyze_enhanced(path, &ast);
 
     // Count total methods in all splits
@@ -64,7 +64,7 @@ fn test_clustering_on_god_object_detector() {
         0.0
     };
 
-    println!("Clustering results for god_object_detector.rs:");
+    println!("Clustering results for behavioral_decomposition.rs:");
     println!("  Total methods in splits: {}", total_split_methods);
     println!("  Unclustered methods: {}", unclustered_methods);
     println!("  Unclustered rate: {:.1}%", unclustered_rate * 100.0);
@@ -111,13 +111,13 @@ fn test_clustering_on_god_object_detector() {
 /// Test that all clusters have acceptable quality metrics
 #[test]
 fn test_cluster_quality_metrics() {
-    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
-        .expect("Failed to read god_object_detector.rs");
+    let source_code = std::fs::read_to_string("src/organization/behavioral_decomposition.rs")
+        .expect("Failed to read behavioral_decomposition.rs");
 
-    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+    let ast = syn::parse_file(&source_code).expect("Failed to parse behavioral_decomposition.rs");
 
     let detector = GodObjectDetector::with_source_content(&source_code);
-    let path = Path::new("src/organization/god_object_detector.rs");
+    let path = Path::new("src/organization/behavioral_decomposition.rs");
     let analysis = detector.analyze_enhanced(path, &ast);
 
     if analysis.file_metrics.recommended_splits.is_empty() {
@@ -200,13 +200,13 @@ fn test_cluster_quality_metrics() {
 #[test]
 #[ignore = "Flaky test due to hierarchical clustering non-determinism - see FIXME comment"]
 fn test_clustering_determinism() {
-    let source_code = std::fs::read_to_string("src/organization/god_object_detector.rs")
-        .expect("Failed to read god_object_detector.rs");
+    let source_code = std::fs::read_to_string("src/organization/behavioral_decomposition.rs")
+        .expect("Failed to read behavioral_decomposition.rs");
 
-    let ast = syn::parse_file(&source_code).expect("Failed to parse god_object_detector.rs");
+    let ast = syn::parse_file(&source_code).expect("Failed to parse behavioral_decomposition.rs");
 
     let detector = GodObjectDetector::with_source_content(&source_code);
-    let path = Path::new("src/organization/god_object_detector.rs");
+    let path = Path::new("src/organization/behavioral_decomposition.rs");
 
     // Run clustering twice
     let analysis1 = detector.analyze_enhanced(path, &ast);
