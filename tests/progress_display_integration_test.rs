@@ -86,7 +86,9 @@ fn test_progress_display_shows_completion_indicators() {
 
     // Verify completion checkmarks (✓) appear for completed phases
     assert!(
-        stderr.contains("✓ 1/4") || stderr.contains("✓ 2/4") || stderr.contains("✓ 3/4")
+        stderr.contains("✓ 1/4")
+            || stderr.contains("✓ 2/4")
+            || stderr.contains("✓ 3/4")
             || stderr.contains("✓ 4/4"),
         "Completion indicators (✓) should appear for completed phases"
     );
