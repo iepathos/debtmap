@@ -1,0 +1,131 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "scoring-strategies",
+  "chapter_title": "Scoring Strategies",
+  "chapter_file": "book/src/scoring-strategies.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter provides comprehensive coverage of scoring strategies with accurate formulas and examples. Main issues are broken cross-reference links and some outdated CLI flag documentation. The core technical content (formulas, weights, algorithms) aligns well with implementation.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 4 broken internal documentation links",
+      "broken_links": [
+        {
+          "link_text": "Migration Guide",
+          "original_target": "./migration-guide.md",
+          "expected_path": "book/src/migration-guide.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "exists": false,
+          "suggested_fix": "Create migration-guide.md or update link if content was moved"
+        },
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "./analysis-guide.md",
+          "expected_path": "book/src/analysis-guide.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "exists": false,
+          "suggested_fix": "Create analysis-guide.md or update link if content was moved"
+        },
+        {
+          "link_text": "File Classification",
+          "original_target": "./file-classification.md",
+          "expected_path": "book/src/file-classification.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "exists": false,
+          "suggested_fix": "Create file-classification.md or update link if content was moved"
+        },
+        {
+          "link_text": "ARCHITECTURE.md",
+          "original_target": "../ARCHITECTURE.md",
+          "expected_path": "book/ARCHITECTURE.md",
+          "current_file": "book/src/scoring-strategies.md",
+          "exists": false,
+          "suggested_fix": "Update link to point to correct ARCHITECTURE.md location in repo root (../../ARCHITECTURE.md)"
+        }
+      ],
+      "fix_suggestion": "Update broken links to point to current file locations. ARCHITECTURE.md likely exists at repo root, requiring path adjustment. Other files may need creation or link removal."
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "File-Level Scoring (line 84)",
+      "description": "Documentation describes --aggregate-only as 'a boolean flag—no value needed', but doesn't clarify the exact CLI syntax",
+      "current_content": "**Note**: File-level scoring is enabled with the `--aggregate-only` flag (a boolean flag—no value needed), which changes output to show only file-level metrics instead of function-level details.",
+      "should_be": "**Note**: File-level scoring is enabled with the `--aggregate-only` flag (no argument required: use `debtmap analyze . --aggregate-only`), which changes output to show only file-level metrics instead of function-level details.",
+      "fix_suggestion": "Clarify that boolean flags don't require values and show exact CLI usage",
+      "source_reference": "CLI argument parsing in src/main.rs or clap configuration"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration (line 199)",
+      "description": "Multiple references to '.debtmap.toml' as the required config filename, but no explanation of why this specific name is required or if alternatives exist",
+      "current_content": "> **IMPORTANT**: The configuration file must be named **`.debtmap.toml`** (not `debtmap.yml` or other variants) and placed in your project root directory.",
+      "fix_suggestion": "Add brief explanation: 'Debtmap searches for `.debtmap.toml` in the current directory or uses --config to specify alternate path'",
+      "source_reference": "src/config/multi_source.rs config file loading logic"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Aggregation Methods (line 113-196)",
+      "description": "Documentation describes aggregation methods but doesn't show what the actual CLI flag name is for selecting method",
+      "current_content": "Shows config file examples only: [aggregation] method = \"weighted_sum\"",
+      "should_include": "CLI flag example: `debtmap analyze . --aggregation-method weighted_sum` (if supported)",
+      "fix_suggestion": "Add CLI usage example if flag exists, or clarify that aggregation method is config-file-only",
+      "source_reference": "CLI args in src/commands/ or main.rs"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Rebalanced Scoring activation (line 986-995)",
+      "description": "States rebalanced scoring is 'enabled through config file, not via CLI flags' but doesn't explain why or if there's a --legacy-scoring flag mentioned later",
+      "current_content": "Line 986 says 'enabled through config file, not via CLI flags' but line 1230 shows '--legacy-scoring' flag",
+      "fix_suggestion": "Clarify that --legacy-scoring is for comparison purposes, and normal activation is config-only. Explain the design decision.",
+      "source_reference": "CLI argument definitions and config loading in src/config/"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of both file-level and function-level scoring strategies",
+    "Accurate formulas with clear mathematical notation and examples",
+    "Excellent real-world examples showing score calculations with actual numbers",
+    "Clear use case guidance for when to use each scoring approach",
+    "Well-documented configuration options with TOML examples",
+    "Good explanation of constructor detection (Spec 117) with code examples",
+    "Detailed coverage of role-based adjustments and coverage weighting",
+    "Extensive documentation of exponential scaling (Spec 171) with practical examples",
+    "Clear comparison tables showing different presets and their trade-offs"
+  ],
+  "improvement_suggestions": [
+    "Fix all broken cross-reference links to restore navigation",
+    "Add troubleshooting section for common scoring configuration mistakes",
+    "Include visual diagram showing scoring pipeline stages",
+    "Add FAQ section addressing common questions about weight tuning",
+    "Expand CLI usage examples to complement config file examples",
+    "Add section on interpreting score ranges (what does score 50 vs 500 mean in practice?)",
+    "Include migration guide snippet inline or clarify where migration content lives"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "File-level scoring",
+      "Function-level scoring",
+      "When to use each approach",
+      "Aggregation methods",
+      "Score normalization",
+      "Use case comparison",
+      "Constructor detection",
+      "Role-based adjustments",
+      "Exponential scaling",
+      "Rebalanced scoring"
+    ],
+    "validation_focus": "Check that file-level and function-level scoring differences are explained with use cases",
+    "validation_passed": true,
+    "internal_links_found": 6,
+    "broken_links_count": 4,
+    "working_links_count": 2
+  }
+}
