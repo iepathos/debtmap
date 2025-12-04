@@ -1,0 +1,93 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "complexity-metrics",
+  "subsection_title": "Complexity Metrics",
+  "subsection_file": "book/src/analysis-guide/complexity-metrics.md",
+  "feature_mappings": ["complexity_analysis"],
+  "drift_detected": true,
+  "severity": "low",
+  "quality_assessment": "Documentation is well-structured and accurate. Minor improvements needed for completeness and clarity on some technical details.",
+  "issues": [
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Entropy-Based Complexity Analysis",
+      "description": "Documentation mentions 'Token Classification' as a feature with weighted importance, but does not explain what token types exist or how weighting works",
+      "current_content": "Token Classification: Categorizes tokens by type with weighted importance\n- Variables, methods, literals weighted differently\n- Focuses on structural complexity over superficial differences",
+      "should_be": "Add explanation of token categories (Keyword, Operator, Identifier, Literal, ControlFlow, FunctionCall) and how they are weighted in the entropy calculation",
+      "fix_suggestion": "Add a subsection explaining the TokenCategory enum and how different token types contribute to entropy scoring",
+      "source_reference": "src/complexity/entropy_core.rs:44-54 (TokenCategory enum)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Entropy-Based Complexity Analysis",
+      "description": "Documentation mentions 'effective_complexity' in the formula but does not explain it is a composite metric distinct from token_entropy",
+      "current_content": "effective_complexity = entropy × pattern_factor × similarity_factor",
+      "should_be": "Clarify that effective_complexity is a composite metric combining multiple factors, not the same as token_entropy which is used for pattern detection",
+      "fix_suggestion": "Add note explaining: 'effective_complexity is the final adjusted score accounting for dampening, distinct from token_entropy which measures unpredictability'",
+      "source_reference": "src/complexity/entropy_core.rs:28-32 (EntropyScore struct documentation)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Entropy-Based Complexity Analysis",
+      "description": "EntropyScore output fields documented (unique_variables, max_nesting, dampening_applied) but PatternMetrics is not mentioned",
+      "feature_reference": "complexity_analysis.metrics.estimated_metrics",
+      "fix_suggestion": "Consider adding a brief mention of PatternMetrics (total_patterns, unique_patterns, repetition_ratio) as an intermediate calculation step",
+      "source_reference": "src/complexity/entropy_core.rs:56-85 (PatternMetrics struct)"
+    },
+    {
+      "type": "unclear_content",
+      "severity": "low",
+      "section": "Cognitive Complexity",
+      "description": "Example shows cognitive complexity calculation but the nesting weight multipliers are not explicitly stated",
+      "current_content": "for item in items { // +1 cognitive\n  if item.is_valid() { // +2 (nested in loop)\n    match item.type { // +3 (nested 2 levels)",
+      "should_be": "Clarify that each nesting level increases the weight (e.g., base level = 1, nested once = 2, nested twice = 3)",
+      "fix_suggestion": "Add a brief explanation before the example: 'Each nesting level increases the weight linearly (base = 1, first nesting = 2, second nesting = 3, etc.)'",
+      "source_reference": "src/complexity/cognitive.rs (cognitive complexity calculation with nesting tracking)"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent progressive structure from simple (cyclomatic) to advanced (entropy) metrics",
+    "Clear threshold tables with practical interpretation guidance",
+    "Strong examples showing before/after refactoring patterns",
+    "Good distinction between cyclomatic and cognitive complexity explained",
+    "Entropy dampening logic is well explained with concrete formula",
+    "Constructor detection section is comprehensive with AST vs name-based detection comparison",
+    "Configuration example for entropy analysis is accurate and complete",
+    "All code examples are syntactically correct and illustrative",
+    "Nesting depth and function length sections provide actionable guidance",
+    "No broken internal links detected"
+  ],
+  "improvement_suggestions": [
+    "Add brief explanation of TokenCategory types and their weighting in entropy analysis",
+    "Clarify distinction between token_entropy (unpredictability measure) and effective_complexity (composite adjusted score)",
+    "Consider adding a diagram showing the relationship between different entropy metrics",
+    "Explain nesting weight multipliers more explicitly in cognitive complexity section",
+    "Consider adding cross-reference to 'advanced-features' subsection for semantic normalization (mentioned in code but not documented)",
+    "Add note about pattern-based complexity adjustments (PatternMatchRecognizer) as an advanced feature"
+  ],
+  "cross_references": [
+    "overview",
+    "debt-patterns",
+    "interpreting-results",
+    "advanced-features"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:02:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Cyclomatic complexity",
+      "Cognitive complexity",
+      "Entropy analysis",
+      "Constructor detection",
+      "Nesting depth",
+      "Function length"
+    ],
+    "validation_focus": "Verify all complexity metric types are documented with examples",
+    "internal_links_checked": 0,
+    "broken_links_found": 0
+  }
+}
