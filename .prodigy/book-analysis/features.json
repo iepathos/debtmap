@@ -1,0 +1,637 @@
+{
+  "cli_interface": {
+    "type": "major_feature",
+    "description": "Command-line interface for analyzing code complexity and technical debt",
+    "commands": {
+      "analyze": {
+        "description": "Primary command for analyzing code complexity and technical debt",
+        "capabilities": [
+          "Multi-language code analysis (Rust, Python)",
+          "Complexity threshold configuration",
+          "Multiple output formats (JSON, Markdown, HTML, Terminal)",
+          "Coverage integration via LCOV files",
+          "Top/tail filtering for priority items",
+          "Summary and compact output modes",
+          "Parallel and multi-pass analysis control",
+          "God object detection and split recommendations",
+          "Pattern detection and boilerplate analysis",
+          "Call graph debugging and validation",
+          "Functional composition analysis"
+        ]
+      },
+      "validate": {
+        "description": "Validate code against configurable thresholds",
+        "capabilities": [
+          "Threshold-based validation",
+          "Debt density limits",
+          "Coverage-aware validation",
+          "Exit code for CI/CD integration"
+        ]
+      },
+      "compare": {
+        "description": "Compare analysis results between before/after states",
+        "capabilities": [
+          "Diff generation between analysis runs",
+          "Target location tracking from implementation plans",
+          "Regression detection",
+          "Improvement measurement"
+        ]
+      },
+      "validate_improvement": {
+        "description": "Validate that technical debt improvements meet thresholds",
+        "capabilities": [
+          "Comparison-based validation",
+          "Progress tracking across iterations",
+          "Configurable improvement thresholds",
+          "Machine-parseable validation output"
+        ]
+      },
+      "explain_coverage": {
+        "description": "Debug coverage data parsing and matching",
+        "capabilities": [
+          "Coverage file parsing diagnostics",
+          "Function name matching verification",
+          "Verbose debugging output"
+        ]
+      },
+      "init": {
+        "description": "Initialize configuration file",
+        "capabilities": [
+          "Generate default configuration",
+          "Force overwrite existing config"
+        ]
+      }
+    }
+  },
+  "complexity_analysis": {
+    "type": "major_feature",
+    "description": "Multi-dimensional complexity metric calculation",
+    "metrics": {
+      "measured_metrics": {
+        "description": "Directly computed from AST with precise values",
+        "types": [
+          "Cyclomatic complexity (control flow branching)",
+          "Cognitive complexity (human comprehension difficulty)",
+          "Nesting depth (maximum control structure levels)",
+          "Lines of code (LOC)",
+          "Parameter count"
+        ]
+      },
+      "estimated_metrics": {
+        "description": "Heuristic-based estimates for test planning",
+        "types": [
+          "Estimated branches (test cases needed for coverage)",
+          "Halstead metrics (vocabulary and volume)"
+        ]
+      }
+    },
+    "capabilities": [
+      "AST-based metric extraction",
+      "Configurable complexity thresholds",
+      "Threshold presets (strict, balanced, lenient)",
+      "Attribution details showing complexity sources",
+      "Metric explanation and formula documentation"
+    ]
+  },
+  "debt_detection": {
+    "type": "major_feature",
+    "description": "Pattern-based technical debt identification",
+    "detection_categories": {
+      "code_smells": {
+        "description": "Function and module-level anti-patterns",
+        "patterns": [
+          "Long methods (excessive function length)",
+          "Deep nesting (excessive control structure depth)",
+          "Long parameter lists",
+          "TODOs and FIXMEs",
+          "Magic numbers and duplicate strings",
+          "Dead code detection"
+        ]
+      },
+      "error_handling": {
+        "description": "Error handling anti-patterns",
+        "patterns": [
+          "Error swallowing (ignored Result types)",
+          "Panic patterns (unwrap, expect without context)",
+          "Async error handling issues",
+          "Missing error context"
+        ]
+      },
+      "architecture": {
+        "description": "Structural and architectural issues",
+        "patterns": [
+          "Circular dependencies",
+          "Tight coupling between modules",
+          "God objects (classes with too many responsibilities)",
+          "Feature envy (methods accessing other classes excessively)",
+          "Primitive obsession"
+        ]
+      },
+      "organization": {
+        "description": "Code organization and maintainability issues",
+        "patterns": [
+          "Single Responsibility Principle violations",
+          "Boilerplate detection (repetitive trait implementations)",
+          "Pattern recognition (observer, singleton, factory, strategy)",
+          "Public API detection for unused code analysis"
+        ]
+      }
+    },
+    "capabilities": [
+      "Suppression comment support",
+      "Context-aware false positive reduction",
+      "Configurable detection thresholds",
+      "Confidence scoring for detections",
+      "Pattern-specific recommendations"
+    ]
+  },
+  "risk_assessment": {
+    "type": "major_feature",
+    "description": "Multi-factor risk scoring and prioritization",
+    "risk_factors": {
+      "complexity_coverage_correlation": {
+        "description": "Primary risk indicator combining complexity with test coverage",
+        "formula": "High complexity + Low coverage = Critical risk"
+      },
+      "context_aware_factors": {
+        "description": "Optional context providers for enhanced risk assessment",
+        "providers": [
+          "Critical path analysis (frequently called functions)",
+          "Dependency analysis (high fan-in/fan-out)",
+          "Git history analysis (frequently changed code)"
+        ]
+      },
+      "evidence_based_scoring": {
+        "description": "Multi-evidence risk calculation",
+        "evidence_types": [
+          "Complexity evidence",
+          "Coverage evidence",
+          "Change frequency evidence",
+          "Coupling evidence"
+        ]
+      }
+    },
+    "prioritization": {
+      "description": "Multi-stage priority calculation pipeline",
+      "stages": [
+        "Evidence collection",
+        "Context enrichment",
+        "Baseline scoring",
+        "ROI calculation (return on investment)",
+        "Final priority assignment"
+      ],
+      "tiers": [
+        "Critical (immediate action required)",
+        "High (address soon)",
+        "Medium (planned refactoring)",
+        "Low (optional improvement)"
+      ]
+    },
+    "capabilities": [
+      "Coverage dampening (well-tested code scores lower)",
+      "Transitive coverage calculation",
+      "Risk insights generation",
+      "Actionable recommendations with impact metrics",
+      "Minimum score thresholds for filtering"
+    ]
+  },
+  "coverage_integration": {
+    "type": "major_feature",
+    "description": "Test coverage data integration and analysis",
+    "capabilities": [
+      "LCOV format parsing",
+      "Function-level coverage matching",
+      "Coverage gap identification",
+      "Coverage-complexity correlation",
+      "Transitive coverage propagation through call graph",
+      "Coverage debugging and diagnostics"
+    ],
+    "supported_tools": [
+      "cargo-llvm-cov (Rust)",
+      "cargo-tarpaulin (Rust)",
+      "pytest-cov (Python)",
+      "coverage.py (Python)",
+      "jest (JavaScript)",
+      "nyc (JavaScript)"
+    ]
+  },
+  "call_graph_analysis": {
+    "type": "major_feature",
+    "description": "Function call relationship tracking and analysis",
+    "capabilities": [
+      "AST-based call graph construction",
+      "Trait method resolution",
+      "Macro expansion tracking",
+      "Import and module path resolution",
+      "Caller/callee relationship tracking",
+      "Critical path identification",
+      "Circular dependency detection",
+      "Call graph validation and debugging",
+      "Parallel call graph construction",
+      "External crate call filtering"
+    ],
+    "visualization": [
+      "Dependency display in output",
+      "Configurable caller/callee limits",
+      "Standard library call filtering",
+      "External call display options"
+    ]
+  },
+  "god_object_detection": {
+    "type": "major_feature",
+    "description": "Detection and decomposition recommendations for god objects",
+    "detection_criteria": {
+      "quantitative": [
+        "Method count threshold",
+        "Field count threshold",
+        "Lines of code threshold",
+        "Responsibility count"
+      ],
+      "qualitative": [
+        "Low cohesion between methods",
+        "Multiple distinct responsibilities",
+        "Feature clusters",
+        "Domain diversity"
+      ]
+    },
+    "analysis_capabilities": [
+      "Responsibility inference from method signatures",
+      "Method categorization by responsibility",
+      "Clustering analysis for module boundaries",
+      "Field access tracking for data cohesion",
+      "Call graph-based cohesion calculation"
+    ],
+    "recommendations": {
+      "split_suggestions": {
+        "description": "Concrete module split recommendations",
+        "criteria": [
+          "Minimum methods per split",
+          "Minimum lines per split",
+          "Responsibility-based grouping",
+          "Cohesion-driven boundaries"
+        ]
+      },
+      "refactoring_guidance": [
+        "Extract modules by responsibility",
+        "Create focused traits",
+        "Separate concerns",
+        "Reduce coupling"
+      ]
+    }
+  },
+  "boilerplate_detection": {
+    "type": "major_feature",
+    "description": "Identification of repetitive patterns suitable for macro-ification",
+    "detection_criteria": [
+      "Multiple similar trait implementations",
+      "Low complexity repetitive code",
+      "High method uniformity across implementations",
+      "Trait pattern analysis"
+    ],
+    "pattern_types": [
+      "Trait implementation boilerplate",
+      "Builder pattern candidates",
+      "State machine patterns",
+      "Registry patterns",
+      "Delegation patterns"
+    ],
+    "recommendations": {
+      "macro_suggestions": [
+        "Derive macro candidates",
+        "Declarative macro patterns",
+        "Procedural macro opportunities"
+      ],
+      "alternatives": [
+        "Code generation",
+        "Generic abstractions",
+        "Trait object patterns"
+      ]
+    }
+  },
+  "functional_analysis": {
+    "type": "major_feature",
+    "description": "Functional programming pattern detection and purity analysis",
+    "capabilities": [
+      "Purity detection (functions without side effects)",
+      "Effect tracking (I/O, mutation, panic)",
+      "Closure analysis",
+      "State machine pattern detection",
+      "Validation pattern detection",
+      "Higher-order function identification"
+    ],
+    "analysis_profiles": [
+      "Strict (functional-first codebases)",
+      "Balanced (typical Rust codebases)",
+      "Lenient (imperative-heavy codebases)"
+    ]
+  },
+  "output_formats": {
+    "type": "major_feature",
+    "description": "Multiple output format support for different use cases",
+    "formats": {
+      "terminal": {
+        "description": "Human-readable colored terminal output",
+        "features": [
+          "Color-coded severity levels",
+          "Box-drawing characters",
+          "Progress indicators",
+          "Plain mode for machine parsing"
+        ]
+      },
+      "json": {
+        "description": "Structured JSON for programmatic analysis",
+        "features": [
+          "Complete analysis data",
+          "Machine-parseable",
+          "Suitable for CI/CD integration",
+          "Comparison input format"
+        ]
+      },
+      "markdown": {
+        "description": "Documentation-friendly markdown reports",
+        "features": [
+          "Executive summary",
+          "Risk prioritization tables",
+          "Code health metrics",
+          "Recommendations with rationale",
+          "Visualization-friendly format"
+        ]
+      },
+      "html": {
+        "description": "Web-viewable HTML reports",
+        "features": [
+          "Interactive navigation",
+          "Visual complexity indicators",
+          "Embedded documentation"
+        ]
+      }
+    },
+    "display_options": [
+      "Verbosity levels (-v, -vv, -vvv)",
+      "Compact mode",
+      "Summary mode with tiered display",
+      "Group by category",
+      "Filter by priority or score",
+      "Top/tail item limiting",
+      "Show/hide dependencies",
+      "Attribution details"
+    ]
+  },
+  "configuration": {
+    "type": "major_feature",
+    "description": "Flexible multi-source configuration system",
+    "configuration_sources": {
+      "priority_order": [
+        "Command-line arguments (highest priority)",
+        "Environment variables",
+        "Project config file (debtmap.toml)",
+        "Global config file (~/.config/debtmap/config.toml)",
+        "Default values (lowest priority)"
+      ]
+    },
+    "config_categories": {
+      "thresholds": [
+        "Complexity thresholds",
+        "Duplication thresholds",
+        "God object thresholds",
+        "Pattern detection thresholds"
+      ],
+      "analysis": [
+        "Language selection",
+        "Semantic analysis toggle",
+        "Context provider selection",
+        "Detection feature toggles"
+      ],
+      "performance": [
+        "Parallel processing",
+        "Thread pool size",
+        "Multi-pass analysis",
+        "File count limits"
+      ],
+      "scoring": [
+        "Minimum score thresholds",
+        "Priority calculation weights",
+        "Evidence scoring factors"
+      ],
+      "display": [
+        "Color mode",
+        "Formatting preferences",
+        "Detail level",
+        "Caller/callee display limits"
+      ]
+    },
+    "capabilities": [
+      "Config file initialization (debtmap init)",
+      "Config source tracing (--show-config-sources)",
+      "Validation with helpful error messages",
+      "Environment variable support",
+      "Per-project overrides"
+    ]
+  },
+  "parallel_processing": {
+    "type": "major_feature",
+    "description": "Multi-threaded analysis for performance",
+    "capabilities": [
+      "Parallel file discovery and parsing",
+      "Parallel call graph construction",
+      "Parallel complexity calculation",
+      "Configurable thread pool size",
+      "Automatic core detection",
+      "Performance timing metrics"
+    ],
+    "performance_benefits": [
+      "70-90% speedup on multi-core systems",
+      "10-100x faster than Java/Python competitors",
+      "Lock-free concurrent data structures (dashmap)",
+      "Rayon-based data parallelism"
+    ]
+  },
+  "comparison_workflow": {
+    "type": "major_feature",
+    "description": "Before/after analysis comparison for tracking improvements",
+    "workflow_stages": {
+      "analyze_before": {
+        "description": "Generate baseline analysis",
+        "output": "JSON report of current state"
+      },
+      "make_changes": {
+        "description": "Implement refactoring or improvements",
+        "tracked_changes": "Code modifications"
+      },
+      "analyze_after": {
+        "description": "Generate post-change analysis",
+        "output": "JSON report of improved state"
+      },
+      "compare": {
+        "description": "Generate comparison report",
+        "capabilities": [
+          "Target item tracking",
+          "Overall debt trend analysis",
+          "Regression detection",
+          "Improvement quantification"
+        ]
+      },
+      "validate_improvement": {
+        "description": "Verify improvements meet thresholds",
+        "validation_criteria": [
+          "Minimum improvement percentage",
+          "No new critical items",
+          "Overall debt trend",
+          "Target item resolution"
+        ]
+      }
+    },
+    "metrics_tracked": [
+      "Debt score changes",
+      "Complexity reduction",
+      "Coverage improvement",
+      "Function length reduction",
+      "Critical item count"
+    ]
+  },
+  "meta_content": {
+    "type": "meta",
+    "description": "Cross-cutting guidance embedded in feature documentation",
+    "best_practices": {
+      "workflow": [
+        "Run analysis before refactoring to establish baseline",
+        "Use coverage integration for risk-based prioritization",
+        "Validate improvements with comparison workflow",
+        "Integrate with CI/CD for continuous monitoring"
+      ],
+      "configuration": [
+        "Start with balanced presets, adjust based on results",
+        "Use project-specific config files for team consistency",
+        "Enable context-aware analysis for large codebases",
+        "Tune minimum score thresholds to reduce noise"
+      ],
+      "interpretation": [
+        "Prioritize high-complexity, low-coverage functions",
+        "Use debt density for project-wide health tracking",
+        "Consider god object splits for large modules",
+        "Investigate boilerplate for macro opportunities"
+      ],
+      "performance": [
+        "Enable parallel processing for large projects",
+        "Use --max-files for quick spot checks",
+        "Disable multi-pass for faster initial analysis",
+        "Cache analysis results for comparison workflows"
+      ]
+    },
+    "common_patterns": [
+      {
+        "name": "Coverage-Driven Testing",
+        "description": "Identify untested complex code for maximum risk reduction",
+        "command": "debtmap analyze . --coverage-file coverage.lcov --top 10"
+      },
+      {
+        "name": "Refactoring Candidates",
+        "description": "Find high-complexity functions suitable for refactoring",
+        "command": "debtmap analyze . --threshold-complexity 15 --group-by-category"
+      },
+      {
+        "name": "God Object Decomposition",
+        "description": "Identify and plan module splits for god objects",
+        "command": "debtmap analyze . --show-splits --min-split-methods 10"
+      },
+      {
+        "name": "CI/CD Integration",
+        "description": "Validate code quality in continuous integration",
+        "command": "debtmap validate . --config .debtmap.toml --format json"
+      },
+      {
+        "name": "Improvement Tracking",
+        "description": "Track technical debt reduction over time",
+        "workflow": [
+          "debtmap analyze . -f json -o before.json",
+          "# Make changes",
+          "debtmap analyze . -f json -o after.json",
+          "debtmap compare --before before.json --after after.json"
+        ]
+      }
+    ],
+    "troubleshooting": {
+      "common_issues": [
+        {
+          "issue": "Coverage data not matching functions",
+          "solution": "Use debtmap explain-coverage to debug function name matching"
+        },
+        {
+          "issue": "Too many low-priority warnings",
+          "solution": "Increase --min-score threshold or use --threshold-preset strict"
+        },
+        {
+          "issue": "Slow analysis on large codebases",
+          "solution": "Ensure parallel processing is enabled, increase --jobs count"
+        },
+        {
+          "issue": "False positives from pattern detection",
+          "solution": "Enable context-aware analysis or adjust --pattern-threshold"
+        },
+        {
+          "issue": "Call graph resolution failures",
+          "solution": "Use --debug-call-graph for diagnostics, may need semantic analysis"
+        }
+      ]
+    },
+    "faq": [
+      {
+        "question": "What's the difference between cyclomatic and cognitive complexity?",
+        "answer": "Cyclomatic counts decision points (branches), cognitive measures human comprehension difficulty (nested structures, breaks in flow)"
+      },
+      {
+        "question": "How does coverage dampening work?",
+        "answer": "Well-tested code gets lower debt scores (multiplier = 1.0 - coverage), surfacing untested complex functions as higher priority"
+      },
+      {
+        "question": "When should I use god object detection vs boilerplate detection?",
+        "answer": "God object for large complex classes needing module splits; boilerplate for repetitive low-complexity code needing macros"
+      },
+      {
+        "question": "What are measured vs estimated metrics?",
+        "answer": "Measured metrics (cyclomatic, cognitive) are precise AST counts; estimated metrics (branches) are heuristic approximations for test planning"
+      }
+    ]
+  },
+  "architecture": {
+    "type": "meta",
+    "description": "System design and data flow architecture",
+    "layers": {
+      "input_layer": {
+        "description": "File discovery, content reading, coverage parsing",
+        "boundary": "I/O operations"
+      },
+      "parser_layer": {
+        "description": "Language detection, AST generation, symbol extraction",
+        "boundary": "Pure transformations"
+      },
+      "analysis_layer": {
+        "description": "Complexity calculation, debt detection, risk assessment",
+        "boundary": "Pure functions"
+      },
+      "aggregation_layer": {
+        "description": "Result combination, priority scoring, recommendation generation",
+        "boundary": "Functional composition"
+      },
+      "output_layer": {
+        "description": "Format selection, report generation, file writing",
+        "boundary": "I/O operations"
+      }
+    },
+    "design_principles": [
+      "Pure core, imperative shell",
+      "I/O at boundaries",
+      "Immutable data structures (im crate)",
+      "Functional composition",
+      "Parallel processing with rayon",
+      "Dependency injection for testability"
+    ]
+  },
+  "version_info": {
+    "analyzed_version": "0.9.0",
+    "analysis_date": "2025-12-04",
+    "feature_count": 12,
+    "command_count": 6,
+    "detection_pattern_count": 30
+  }
+}
