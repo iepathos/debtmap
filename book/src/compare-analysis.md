@@ -7,7 +7,7 @@ The `compare` command enables you to track technical debt changes over time by c
 **All Features Available Now**:
 - ✅ Target location tracking with intelligent fuzzy matching
 - ✅ Detailed improvement percentage calculations (per-item)
-- ✅ Multiple output formats (JSON, Markdown, Terminal)
+- ✅ Multiple output formats (JSON, Markdown, Terminal, HTML)
 - ✅ Implementation plan parsing for target extraction
 - ✅ Four match strategies (Exact, FunctionLevel, ApproximateName, FileLevel)
 - ✅ Resolved items tracking (debt eliminated)
@@ -47,7 +47,7 @@ debtmap compare \
 | `--output FILE` | No | Output file path (default: stdout) |
 | `--plan FILE` | No | Implementation plan to extract target location |
 | `--target-location LOCATION` | No | Manual target location (format: `file:function:line`) |
-| `--format FORMAT` | No | Output format: `json`, `markdown`, or `terminal` (default: json) |
+| `--format FORMAT` | No | Output format: `json`, `markdown`, `terminal`, or `html` (default: json) |
 
 All comparison features are available now, including target location tracking, fuzzy matching, and multiple output formats.
 
@@ -243,12 +243,14 @@ The compare command tracks improvements as a list of `ImprovementItem` objects w
 
 ### Improvement Types
 
-The `improvement_type` field indicates the kind of improvement:
+The `ImprovementType` enum (src/comparison/types.rs:120-126) defines four improvement categories:
 
-- **Resolved** - Debt item completely eliminated (no longer in after analysis)
-- **ScoreReduced** - Overall debt score reduced significantly (≥ 30% reduction)
-- **ComplexityReduced** - Cyclomatic or cognitive complexity decreased
-- **CoverageImproved** - Test coverage increased
+- **Resolved** - Debt item completely eliminated (no longer in after analysis) ✓ *Auto-detected*
+- **ScoreReduced** - Overall debt score reduced significantly (≥ 30% reduction) ✓ *Auto-detected*
+- **ComplexityReduced** - Cyclomatic or cognitive complexity decreased (defined but not auto-classified)
+- **CoverageImproved** - Test coverage increased (defined but not auto-classified)
+
+**Note**: Currently, the comparator automatically detects and classifies `Resolved` and `ScoreReduced` improvements (src/comparison/comparator.rs:134-191). The `ComplexityReduced` and `CoverageImproved` types are defined in the type system but not yet auto-assigned during comparison. Future versions may extend auto-detection to classify complexity and coverage improvements.
 
 ### Improvement Items Structure
 
@@ -387,12 +389,12 @@ The default JSON format provides complete comparison results:
 debtmap compare --before before.json --after after.json --output result.json
 ```
 
-The `ComparisonResult` JSON output includes:
-- `metadata` - Comparison metadata (date, file paths, target location)
+The `ComparisonResult` JSON output (src/comparison/types.rs:3-22) includes:
+- `metadata` - Comparison metadata (timestamp, file paths, target location)
 - `target_item` - Target item comparison with before/after metrics (if specified)
 - `project_health` - Project-wide health metrics comparison
-- `regressions` - List of new critical items
-- `improvements` - List of improved/resolved items
+- `regressions` - List of new critical items (score ≥ 60.0)
+- `improvements` - List of improved/resolved items (≥30% score reduction or resolved)
 - `summary` - Summary statistics and overall debt trend
 
 Example output:
@@ -427,6 +429,8 @@ Generate human-readable markdown reports for pull request comments:
 debtmap compare --before before.json --after after.json --format markdown
 ```
 
+**Implementation**: src/io/writers/markdown/mod.rs, src/main.rs:1027-1072
+
 The markdown output is suitable for:
 - Pull request comments
 - Documentation
@@ -441,11 +445,28 @@ Display colorized output directly in the terminal:
 debtmap compare --before before.json --after after.json --format terminal
 ```
 
+**Implementation**: src/io/writers/terminal.rs, src/main.rs:1011
+
 The terminal format provides:
 - Color-coded status indicators
 - Formatted tables for metrics
 - Human-readable summaries
 - Easy scanning of results
+
+### HTML Format
+
+Generate HTML reports with structured styling:
+
+```bash
+debtmap compare --before before.json --after after.json --format html
+```
+
+**Implementation**: src/io/writers/html.rs
+
+The HTML format is suitable for:
+- Web-based dashboards
+- Archived reports
+- Integration with documentation sites
 
 ## CI/CD Integration
 
@@ -946,24 +967,26 @@ No changes detected - either no code changes or changes were neutral to debt.
 
 ## Related Documentation
 
-- [Validation Command](validation.md) - Validate implementation plans match analysis
-- [Prodigy Integration](prodigy-integration.md) - Automated refactoring workflows
-- [Output Formats](output-formats.md) - Understanding analysis JSON structure
-- [Scoring Strategies](scoring-strategies.md) - How debt scores are calculated
-- [CI/CD Integration](ci-cd.md) - Advanced pipeline configurations
+- [Validation Gates](validation-gates.md) - Quality gate thresholds and validation strategies
+- [Prodigy Integration](prodigy-integration.md) - Automated refactoring workflows with compare validation
+- [Output Formats](output-formats.md) - Understanding analysis JSON structure and formatters
+- [Scoring Strategies](scoring-strategies.md) - How debt scores are calculated (critical ≥ 60.0, high priority ≥ 40.0)
+- [Threshold Configuration](threshold-configuration.md) - Configuring severity thresholds for your project
 
 ## Summary
 
 The compare command provides validation for refactoring efforts:
 
 **Current Capabilities:**
-- ✅ Target location tracking with intelligent fuzzy matching
+- ✅ Target location tracking with intelligent fuzzy matching (4 strategies: Exact, FunctionLevel, ApproximateName, FileLevel)
 - ✅ Detect regressions (new critical items with score ≥ 60.0)
-- ✅ Track resolved items and improvements (≥30% score reduction)
+- ✅ Track resolved items and improvements (≥30% score reduction, auto-detected)
 - ✅ Detailed per-item improvement metrics with before/after scores
-- ✅ Multiple output formats (JSON, Markdown, Terminal)
-- ✅ Implementation plan parsing for target extraction
+- ✅ Multiple output formats (JSON, Markdown, Terminal, HTML)
+- ✅ Implementation plan parsing for target extraction (via `--plan` flag)
 - ✅ Project-wide health metrics and debt trends
 - ✅ Automate quality gates in CI/CD pipelines
+
+**Note**: The compare command is fully implemented with all features available. For improvement classification, `Resolved` and `ScoreReduced` types are automatically detected; `ComplexityReduced` and `CoverageImproved` are defined for future use.
 
 Use the compare command regularly to maintain visibility into your codebase's technical health and ensure continuous improvement. All features are fully implemented and ready for production use.
