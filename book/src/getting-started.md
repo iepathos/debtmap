@@ -399,18 +399,11 @@ Debtmap supports multiple output formats:
 
 Example JSON output:
 ```bash
-# By default, JSON uses legacy format
+# JSON output uses unified format with consistent structure
 debtmap analyze . --format json --output report.json
-
-# For the new unified format (with consistent structure and type field):
-debtmap analyze . --format json --output-format unified --output report.json
 ```
 
-**JSON Format Options:**
-- **legacy** (default): Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tools
-- **unified**: New format (spec 108) with consistent structure and `type` field for all items
-
-Recommendation: Use `unified` for new integrations, `legacy` only for compatibility with existing tooling.
+The JSON format uses a unified structure with a `type` field for all items, providing consistent parsing for CI/CD integrations.
 
 Example Markdown output:
 ```bash

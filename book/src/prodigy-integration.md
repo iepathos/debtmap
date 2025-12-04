@@ -135,7 +135,7 @@ Create a workflow file `workflows/debtmap.yml`:
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
@@ -477,15 +477,10 @@ Executes the implementation plan.
 
 Validates that the implementation successfully addressed the debt item.
 
-> **Note**: This slash command now wraps the `debtmap validate-improvement` subcommand. You can use either approach:
-> - Claude slash command: `/prodigy-validate-debtmap-improvement` (recommended for Prodigy workflows)
-> - Direct subcommand: `debtmap validate-improvement` (recommended for shell scripts)
+> **Note**: In practice, workflows use the `debtmap validate-improvement` shell command directly. While a Claude slash command wrapper exists, both the sequential workflow (workflows/debtmap.yml:31) and MapReduce workflow (workflows/debtmap-reduce.yml:44) use the shell command for consistency.
 
 ```yaml
-# Using Claude slash command (recommended for workflows)
-- claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
-
-# Or using shell command directly
+# Standard approach (used in actual workflows)
 - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
 ```
 
@@ -500,13 +495,14 @@ Validates that the implementation successfully addressed the debt item.
 Completes a partial fix based on validation gaps.
 
 ```yaml
-- claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+- claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
   commit_required: true
 ```
 
 **Parameters:**
 - `--gaps`: Validation gaps to address
 - `--plan`: Original implementation plan
+- `--attempt`: Current retry attempt number (from ${validation.attempt_number})
 
 ### Testing and Quality Commands
 
@@ -639,7 +635,7 @@ map:
         threshold: 75
         on_incomplete:
           commands:
-            - claude: "/prodigy-complete-debtmap-fix --plan .prodigy/plan-${item_id}.md --validation .prodigy/debtmap-validation-${item_id}.json --attempt ${validation.attempt_number}"
+            - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/plan-${item_id}.md --attempt ${validation.attempt_number}"
               commit_required: true
             - shell: "just coverage-lcov"
             - shell: "debtmap analyze src --lcov target/coverage/lcov.info --output .prodigy/debtmap-after-${item_id}.json --format json"
@@ -665,8 +661,10 @@ map:
   max_parallel: 5  # Run up to 5 agents in parallel
 
   # Filter and sort items
+  # Note: NULLS LAST ensures File items (with null Function.unified_score.final_score)
+  # and Function items (with null File.score) sort correctly
   filter: "File.score >= 10 OR Function.unified_score.final_score >= 10"
-  sort_by: "File.score DESC, Function.unified_score.final_score DESC"
+  sort_by: "File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST"
   max_items: 10  # Limit to 10 items per run
 
 # Reduce phase: Aggregate results and verify overall improvements
@@ -748,7 +746,7 @@ prodigy run workflows/debtmap-reduce.yml -y
 
 | Variable | Available In | Type | Description |
 |----------|--------------|------|-------------|
-| `${item}` | map phase | JSON | The full JSON object for current item |
+| `${item}` | map phase | JSON | The full JSON object for current item (File or Function type) |
 | `${item_id}` | map phase | string | Unique ID for current item (auto-generated) |
 | `${validation.gaps}` | map phase | array | List of validation gaps from failed validation |
 | `${validation.attempt_number}` | map phase | number | Current retry attempt number (1, 2, 3, etc.) |
@@ -757,6 +755,15 @@ prodigy run workflows/debtmap-reduce.yml -y
 | `${map.successful}` | reduce phase | number | Count of successful map agents |
 | `${map.failed}` | reduce phase | number | Count of failed map agents |
 | `${map.total}` | reduce phase | number | Total number of map agents |
+
+**Understanding ${item} Structure:**
+
+The `${item}` variable contains different fields depending on whether it's a File or Function debt item:
+
+- **File items**: Have a `File.score` field (non-null) and `Function.unified_score.final_score` is null
+- **Function items**: Have a `Function.unified_score.final_score` field (non-null) and `File.score` is null
+
+This distinction matters when filtering and sorting items in MapReduce workflows. See the filter/sort_by examples below for proper handling of both types.
 
 ### MapReduce Architecture
 
@@ -900,12 +907,12 @@ Validation is attached to specific workflow steps:
     commands:
       - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"
       - shell: "debtmap compare --before .prodigy/debtmap-before.json --after .prodigy/debtmap-after.json --plan .prodigy/IMPLEMENTATION_PLAN.md --output .prodigy/comparison.json --format json"
-      - claude: "/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
+      - shell: "debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json"
     result_file: ".prodigy/debtmap-validation.json"
     threshold: 75
     on_incomplete:
       commands:
-        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md"
+        - claude: "/prodigy-complete-debtmap-fix --gaps ${validation.gaps} --plan .prodigy/IMPLEMENTATION_PLAN.md --attempt ${validation.attempt_number}"
           commit_required: true
         - shell: "just coverage-lcov"
         - shell: "debtmap analyze . --lcov target/coverage/lcov.info --output .prodigy/debtmap-after.json --format json"

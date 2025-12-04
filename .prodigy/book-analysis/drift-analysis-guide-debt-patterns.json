@@ -1,0 +1,127 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "debt-patterns",
+  "subsection_title": "Debt Patterns",
+  "subsection_file": "book/src/analysis-guide/debt-patterns.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Documentation has several inaccuracies: incorrect count (claims 25 types, actually 27), incorrect category mappings, and missing debt types from implementation",
+  "issues": [
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "Introduction",
+      "description": "Documentation claims 25 debt types exist, but implementation has 27 debt types",
+      "current_content": "Debtmap detects 25 types of technical debt",
+      "should_be": "Debtmap detects 27 types of technical debt",
+      "fix_suggestion": "Update count to 27 and add missing debt types: ScatteredType, OrphanedFunctions, UtilitiesSprawl",
+      "source_reference": "src/priority/mod.rs:158-288 (DebtType enum)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debt Type Enum",
+      "description": "Missing documentation for ScatteredType debt pattern (type organization)",
+      "fix_suggestion": "Add ScatteredType to Architecture Debt section: detects types with methods scattered across multiple files",
+      "source_reference": "src/priority/mod.rs:273-278"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debt Type Enum",
+      "description": "Missing documentation for OrphanedFunctions debt pattern (type organization)",
+      "fix_suggestion": "Add OrphanedFunctions to Architecture Debt section: detects functions that should be methods on a type",
+      "source_reference": "src/priority/mod.rs:279-283"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Debt Type Enum",
+      "description": "Missing documentation for UtilitiesSprawl debt pattern (type organization)",
+      "fix_suggestion": "Add UtilitiesSprawl to Architecture Debt section: detects utility modules with poor cohesion",
+      "source_reference": "src/priority/mod.rs:284-288"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Category Mapping",
+      "description": "Category mapping table shows incorrect mappings for some debt types",
+      "current_content": "ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues → Architecture",
+      "should_be": "ComplexityHotspot and DeadCode map to CodeQuality, not Architecture. MagicValues also maps to CodeQuality",
+      "fix_suggestion": "Update category mapping table to match implementation in src/priority/mod.rs:309-347",
+      "source_reference": "src/priority/mod.rs:340-345"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Debt Categories",
+      "description": "DebtCategory enum shown in docs doesn't match implementation structure",
+      "current_content": "Shows 4 categories: Architecture, Testing, Performance, CodeQuality",
+      "should_be": "Correct, but the mapping from debt types to categories is wrong in the table",
+      "fix_suggestion": "Fix the category mapping table to reflect actual implementation",
+      "source_reference": "src/priority/mod.rs:290-296"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Architecture Debt Examples",
+      "description": "MagicValues example shown under Architecture Debt, but it's actually categorized as CodeQuality",
+      "fix_suggestion": "Move MagicValues example to Code Quality Debt section to match implementation",
+      "source_reference": "src/priority/mod.rs:345"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Examples by Category",
+      "description": "No examples provided for the three new type organization debt patterns",
+      "fix_suggestion": "Add code examples showing ScatteredType, OrphanedFunctions, and UtilitiesSprawl detection scenarios",
+      "source_reference": "src/priority/mod.rs:273-288"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Debt Type Enum",
+      "description": "Each DebtType variant has structured fields (not just unit variants), but this isn't clearly explained",
+      "fix_suggestion": "Add note that debt types carry diagnostic data (e.g., ComplexityHotspot includes cyclomatic, cognitive, adjusted_cyclomatic fields)",
+      "source_reference": "src/priority/mod.rs:164-171"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent detailed explanation of complexity-weighted god object detection with formula and examples",
+    "Good code examples showing bad vs good patterns for most debt types",
+    "Clear explanation of debt scoring formula with priority weights",
+    "Well-organized by category with strategic focus guidance",
+    "Good coverage of detection criteria for most documented types"
+  ],
+  "improvement_suggestions": [
+    "Add subsection for Type Organization Debt (ScatteredType, OrphanedFunctions, UtilitiesSprawl)",
+    "Create accurate category mapping table that matches src/priority/mod.rs implementation",
+    "Reorganize examples to match actual category mappings (move MagicValues, ComplexityHotspot, DeadCode to CodeQuality section)",
+    "Consider adding a cross-reference table showing DebtType → DebtCategory mappings with line numbers from implementation",
+    "Add note about how DebtType variants carry structured diagnostic data for each detection",
+    "Expand validation note to clarify what 'detection criteria' means for each type"
+  ],
+  "cross_references": [],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Debt types",
+      "Debt categories",
+      "Detection criteria",
+      "Examples by category"
+    ],
+    "validation_focus": "Ensure all 27 debt types are documented with detection criteria",
+    "actual_debt_type_count": 27,
+    "documented_debt_type_count": 25,
+    "missing_debt_types": [
+      "ScatteredType",
+      "OrphanedFunctions",
+      "UtilitiesSprawl"
+    ],
+    "category_mapping_source": "src/priority/mod.rs:309-347",
+    "debt_type_enum_source": "src/priority/mod.rs:158-288"
+  }
+}

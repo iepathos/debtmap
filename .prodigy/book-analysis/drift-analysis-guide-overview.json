@@ -1,0 +1,200 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "overview",
+  "subsection_title": "Overview",
+  "subsection_file": "book/src/analysis-guide/overview.md",
+  "feature_mappings": null,
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Subsection provides good high-level framing but is critically incomplete. Missing essential information about actual analysis capabilities, methodology, and technical depth that users need to understand debtmap's approach.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Complexity Metrics",
+      "description": "States 'Quantifies how difficult code is to understand and test' but does not explain WHAT metrics are calculated",
+      "current_content": "- **Complexity Metrics** - Quantifies how difficult code is to understand and test",
+      "should_include": [
+        "Cyclomatic complexity (control flow branching)",
+        "Cognitive complexity (human comprehension difficulty)",
+        "Nesting depth",
+        "Function length",
+        "Parameter count",
+        "Halstead metrics (vocabulary and volume)"
+      ],
+      "fix_suggestion": "Expand to list the specific metrics calculated: 'Calculates cyclomatic complexity (control flow paths), cognitive complexity (comprehension difficulty), nesting depth, function length, and parameter count'",
+      "source_reference": "features.json:complexity_analysis.metrics"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "Debt Patterns",
+      "description": "Claims '13 types of technical debt' but features.json shows 14+ debt types across multiple categories",
+      "current_content": "- **Debt Patterns** - Identifies 13 types of technical debt requiring attention",
+      "actual_count": {
+        "debt_types": [
+          "Todo",
+          "Fixme",
+          "CodeSmell",
+          "Duplication",
+          "Complexity",
+          "Dependency",
+          "ErrorSwallowing",
+          "ResourceManagement",
+          "CodeOrganization",
+          "TestComplexity",
+          "TestTodo",
+          "TestDuplication",
+          "TestQuality"
+        ],
+        "total": 13,
+        "note": "Count is technically correct for primary types, but doesn't mention sub-categories"
+      },
+      "should_be": "Documents not just the count but the CATEGORIES of debt detected",
+      "fix_suggestion": "Expand to show debt categories: 'Identifies 13 types of technical debt across 4 categories: code quality issues (long methods, deep nesting, complexity), error handling anti-patterns (swallowed errors, panic patterns), architectural issues (god objects, circular dependencies, tight coupling), and test quality issues (complex tests, test duplication)'",
+      "source_reference": "features.json:debt_detection.detection_categories"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Risk Scoring",
+      "description": "Mentions coverage correlation but doesn't explain HOW risk scoring actually works",
+      "current_content": "- **Risk Scoring** - Correlates complexity with test coverage to find truly risky code",
+      "should_include": [
+        "Multi-factor risk model combining complexity, coverage, coupling, and change frequency",
+        "4 risk categories: Critical, High, Medium, Low",
+        "Coverage penalty calculation (2.0x for untested, 1.5x for partial)",
+        "Evidence-based scoring from multiple signals",
+        "Context-aware risk assessment"
+      ],
+      "fix_suggestion": "Add detail on risk calculation: 'Combines complexity, test coverage, coupling, and change frequency through a multi-factor risk model. Assigns risk categories (Critical/High/Medium/Low) using evidence-based scoring with coverage penalties for untested code'",
+      "source_reference": "features.json:risk_assessment"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Prioritization",
+      "description": "Mentions ranking but doesn't explain the prioritization methodology",
+      "current_content": "- **Prioritization** - Ranks findings by impact to guide refactoring efforts",
+      "should_include": [
+        "Multi-stage pipeline: evidence collection → context enrichment → baseline scoring → ROI calculation → final priority",
+        "4 priority tiers with weights",
+        "Return on investment (ROI) calculation for test writing",
+        "Risk reduction impact estimation"
+      ],
+      "fix_suggestion": "Expand prioritization explanation: 'Uses a multi-stage pipeline (evidence collection, context enrichment, baseline scoring, ROI calculation) to assign priority tiers and estimate test writing impact'",
+      "source_reference": "features.json:risk_assessment.prioritization"
+    },
+    {
+      "type": "missing_content",
+      "severity": "high",
+      "section": "Analysis Approach",
+      "description": "Completely missing explanation of HOW debtmap analyzes code - the actual methodology",
+      "should_include": [
+        "Multi-layered functional architecture (Parser → Analysis → Aggregation → Output)",
+        "Pure analysis core with I/O at boundaries",
+        "AST-based metric extraction",
+        "Multi-pass analysis (raw vs normalized complexity)",
+        "Pattern-based complexity adjustment",
+        "Parallel processing for performance"
+      ],
+      "fix_suggestion": "Add new section 'Analysis Approach' or 'How It Works' explaining: 'Debtmap uses a multi-layered functional architecture that parses code into ASTs, calculates metrics through pure analysis functions, and aggregates results with parallel processing. A multi-pass system compares raw vs normalized complexity to identify pattern-based complexity attribution'",
+      "source_reference": "features.json:architecture"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Key Differentiators",
+      "description": "Missing information about what makes debtmap unique or effective",
+      "should_include": [
+        "Pattern-based complexity adjustment (reduces false positives)",
+        "Coverage-risk correlation (finds genuinely risky code)",
+        "Multi-pass analysis (raw vs normalized)",
+        "Functional purity tracking",
+        "Context-aware detection"
+      ],
+      "fix_suggestion": "Add brief mention of key capabilities that differentiate debtmap: 'Key innovations include pattern-based complexity adjustment to reduce false positives, multi-pass analysis for accurate attribution, and functional purity tracking'",
+      "source_reference": "features.json:meta_content.best_practices"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Overall Goal Statement",
+      "description": "Goal statement is good but could be more specific about the methodology",
+      "current_content": "The goal is to move beyond simple 'here are your problems' to 'here's what to fix first and why.'",
+      "should_also_mention": [
+        "Evidence-based prioritization",
+        "ROI-driven recommendations",
+        "Multi-signal risk assessment",
+        "Actionable insights with impact metrics"
+      ],
+      "fix_suggestion": "Strengthen goal statement: 'The goal is to move beyond simple problem identification to evidence-based prioritization - showing what to fix first based on risk scores, test coverage gaps, and ROI calculations, with actionable recommendations backed by impact metrics'",
+      "source_reference": "features.json:risk_assessment.capabilities"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Supported Languages",
+      "description": "Doesn't mention which languages are supported for analysis",
+      "should_include": [
+        "Rust (full support)",
+        "Python (partial support)",
+        "Future language extensibility"
+      ],
+      "fix_suggestion": "Add brief mention: 'Supports Rust (full analysis) and Python (partial support)'",
+      "source_reference": "features.json:cli_interface.commands.analyze.capabilities"
+    }
+  ],
+  "positive_aspects": [
+    "Clear four-point structure (Complexity, Debt, Risk, Prioritization) that matches implementation",
+    "Good high-level framing of the analysis philosophy",
+    "Concise and scannable bullet format",
+    "Strong goal statement emphasizing prioritization over raw detection",
+    "Appropriate level of abstraction for an overview section"
+  ],
+  "improvement_suggestions": [
+    {
+      "category": "Structure",
+      "suggestion": "Add a 'How It Works' subsection explaining the analysis pipeline briefly",
+      "rationale": "Users need to understand the methodology, not just what outputs they get"
+    },
+    {
+      "category": "Detail Level",
+      "suggestion": "Expand each bullet point with 1-2 sub-bullets showing concrete examples",
+      "rationale": "Current bullets are too high-level to be actionable. For example, under Complexity Metrics, list 'Cyclomatic, Cognitive, Nesting Depth'"
+    },
+    {
+      "category": "Technical Depth",
+      "suggestion": "Add brief technical context for key concepts (e.g., 'Cyclomatic complexity measures linearly independent paths')",
+      "rationale": "Helps users understand WHAT these metrics mean, not just that they exist"
+    },
+    {
+      "category": "Cross-References",
+      "suggestion": "Link to other subsections for detailed explanations (e.g., 'See [Complexity Metrics](complexity-metrics.md) for details')",
+      "rationale": "Overview should orient and direct readers to detailed content"
+    },
+    {
+      "category": "Architecture Overview",
+      "suggestion": "Add a simple diagram or description of the analysis flow: Input → Parse → Analyze → Aggregate → Output",
+      "rationale": "Visual or conceptual flow helps orient new users to the system"
+    }
+  ],
+  "cross_references": [
+    "complexity-metrics",
+    "debt-patterns",
+    "risk-scoring",
+    "prioritization"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:01:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Analysis capabilities",
+      "Overall approach"
+    ],
+    "validation_focus": "Check introduction covers analysis fundamentals",
+    "internal_links_found": 0,
+    "internal_links_broken": 0
+  }
+}

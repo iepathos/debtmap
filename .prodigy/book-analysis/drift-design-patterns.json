@@ -1,0 +1,141 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "design-patterns",
+  "chapter_title": "Design Pattern Detection",
+  "chapter_file": "book/src/design-patterns.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter documents 7 user-facing design patterns accurately, but contains critical errors: (1) Claims 8 patterns in validation requirement but only documents 7, (2) Documents non-existent CLI flags (--patterns, --no-pattern-detection, --pattern-threshold, --show-pattern-warnings) that don't exist in the codebase, (3) Claims pattern detection results appear in output but no evidence of output integration, (4) Broken link to complexity-metrics.md. The core pattern detection implementation exists and matches documentation, but the user-facing CLI and output integration documented here appears to be aspirational rather than implemented.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "critical",
+      "section": "Overview",
+      "description": "Chapter claims 8 design patterns exist but only documents 7",
+      "current_content": "validation: 'Check that all 8 design patterns are documented with detection criteria and examples'",
+      "should_be": "Should validate 7 patterns (Observer, Singleton, Factory, Strategy, Callback, Template Method, Dependency Injection) as documented in the chapter",
+      "fix_suggestion": "Update validation requirement to check for 7 patterns, or add missing 8th pattern to both documentation and code",
+      "source_reference": "src/analysis/patterns/mod.rs:34-41 defines exactly 7 PatternType variants"
+    },
+    {
+      "type": "missing_implementation",
+      "severity": "critical",
+      "section": "CLI Options",
+      "description": "Documents CLI flags that don't exist in the actual implementation",
+      "current_content": "debtmap analyze --no-pattern-detection\ndebtmap analyze --patterns observer,singleton,factory\ndebtmap analyze --pattern-threshold 0.8\ndebtmap analyze --show-pattern-warnings",
+      "should_be": "These CLI flags are not implemented in src/cli.rs. Pattern detection appears to be internal-only, not user-configurable.",
+      "fix_suggestion": "Either: (1) Remove CLI configuration section entirely and clarify pattern detection is automatic/internal, OR (2) Implement these CLI flags in src/cli.rs and wire them through the analysis pipeline",
+      "source_reference": "src/cli.rs:52-300 - No pattern detection flags present in AnalyzeCommand struct"
+    },
+    {
+      "type": "missing_implementation",
+      "severity": "high",
+      "section": "Pattern Detection Output",
+      "description": "Claims patterns appear in terminal/JSON/markdown output but no evidence of integration",
+      "current_content": "Pattern detection results are integrated into debtmap's output in different formats:\n\n**Terminal Format**: Detected patterns are shown in a dedicated section...\n**JSON Format**: Pattern results are included in the `pattern_instances` field...",
+      "should_be": "Pattern detection exists internally (src/analysis/patterns/) but there's no evidence of output integration. PatternDetector is instantiated but results may not be displayed to users.",
+      "fix_suggestion": "Either: (1) Remove output format examples if patterns aren't user-facing, OR (2) Integrate pattern detection results into output formatters in src/io/",
+      "source_reference": "No grep matches for 'pattern_instances' in output code; src/io/pattern_output.rs and src/output/pattern_formatter.rs exist but unclear if used"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Overview table",
+      "description": "Table shows pattern count of 7 but documentation refers to 8 patterns elsewhere",
+      "current_content": "Overview table lists 7 patterns correctly but validation requirement says 8",
+      "should_be": "Consistent count of 7 patterns throughout",
+      "fix_suggestion": "Update validation requirement from '8 design patterns' to '7 design patterns'",
+      "source_reference": "book/src/design-patterns.md:7-17 - Table correctly shows 7 patterns"
+    },
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Link to complexity-metrics.md is broken",
+      "broken_links": [
+        {
+          "link_text": "Complexity Analysis",
+          "target_path": "./complexity-metrics.md",
+          "expected_location": "book/src/complexity-metrics.md",
+          "current_file": "book/src/design-patterns.md",
+          "exists": false
+        }
+      ],
+      "fix_suggestion": "Check if 'complexity-metrics.md' was renamed or moved. Possibly should link to a different chapter or section. File may have been migrated to multi-subsection structure.",
+      "source_reference": "book/src/design-patterns.md:695"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Integration with Complexity Analysis",
+      "description": "Section explains design pattern detection is separate from complexity adjustments but doesn't clarify the relationship fully",
+      "current_content": "Currently, these are **independent systems**:\n- Design pattern detection focuses on architectural patterns\n- Complexity adjustments focus on implementation patterns",
+      "should_be": "Should clarify whether design pattern detection results are currently exposed to users or only used internally for analysis",
+      "fix_suggestion": "Add clarity about whether pattern detection is user-facing or internal-only, and explain the roadmap for integration if applicable",
+      "source_reference": "book/src/design-patterns.md:649-682"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive documentation of 7 design patterns with clear detection criteria",
+    "Excellent code examples for each pattern in Python and Rust",
+    "Clear explanation of confidence scoring (0.0-1.0 scale)",
+    "Accurate documentation of Builder and Visitor as internal-only patterns",
+    "Good explanation of cross-file pattern detection mechanisms",
+    "Well-structured pattern-specific sections with criteria, examples, and confidence levels",
+    "Helpful troubleshooting section for common issues",
+    "Clear distinction between user-facing patterns and internal patterns"
+  ],
+  "improvement_suggestions": [
+    "Clarify whether pattern detection is currently user-facing or internal-only",
+    "If CLI flags aren't implemented, move them to a 'Future Features' or 'Roadmap' section",
+    "Add a 'Current Status' section explaining what's implemented vs. planned",
+    "Verify and fix the broken link to complexity-metrics.md",
+    "Resolve discrepancy between 7 patterns (code) and 8 patterns (validation requirement)",
+    "Add implementation status badges or notes to each feature (Implemented/Planned/Internal)",
+    "Consider adding a comparison table showing user-facing vs internal patterns",
+    "Add examples of actual debtmap output showing pattern detection (if it exists) or remove output examples if not user-facing"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Observer pattern detection",
+      "Singleton pattern detection",
+      "Factory pattern detection",
+      "Strategy pattern detection",
+      "Callback pattern detection",
+      "Template method pattern detection",
+      "Dependency injection detection",
+      "Builder pattern (internal)",
+      "Visitor pattern (internal)",
+      "Pattern confidence thresholds",
+      "Configuration options (documented but not implemented)"
+    ],
+    "validation_focus": "Check that all 8 design patterns are documented with detection criteria and examples",
+    "validation_result": "FAILED - Only 7 patterns exist in code and documentation, contradicting requirement for 8",
+    "source_files_verified": [
+      "src/analysis/patterns/mod.rs",
+      "src/analysis/patterns/observer.rs",
+      "src/analysis/patterns/singleton.rs",
+      "src/analysis/patterns/factory.rs",
+      "src/analysis/patterns/strategy.rs",
+      "src/analysis/patterns/callback.rs",
+      "src/analysis/patterns/template_method.rs",
+      "src/analysis/patterns/dependency_injection.rs",
+      "src/organization/builder_pattern.rs",
+      "src/complexity/visitor_detector.rs",
+      "src/cli.rs",
+      "tests/pattern_detection_integration.rs"
+    ],
+    "cli_flags_checked": [
+      "--no-pattern-detection (NOT FOUND)",
+      "--patterns (NOT FOUND)",
+      "--pattern-threshold (NOT FOUND)",
+      "--show-pattern-warnings (NOT FOUND)"
+    ],
+    "broken_link_count": 1,
+    "total_internal_links": 2,
+    "validation_links_ok": 1,
+    "validation_links_broken": 1
+  }
+}

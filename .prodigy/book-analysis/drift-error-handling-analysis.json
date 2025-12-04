@@ -1,0 +1,136 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "error-handling-analysis",
+  "chapter_title": "Error Handling Analysis",
+  "chapter_file": "book/src/error-handling-analysis.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter contains significant drift: Python/JavaScript error handling is documented but not implemented. Several documented patterns exist only as empty detection stubs. All internal cross-references are valid.",
+  "issues": [
+    {
+      "type": "missing_implementation",
+      "severity": "critical",
+      "section": "Python Error Handling Analysis",
+      "description": "Extensive Python error handling documentation (bare except, contextlib.suppress, exception flow) but no actual Python analyzer implementation found in codebase",
+      "current_content": "Lines 296-441 document Python patterns: BareExceptClause, OverlyBroadException, SilentException, ContextlibSuppress",
+      "should_be": "Either implement Python error pattern detection or clearly mark as 'Planned Feature' with current limitations",
+      "fix_suggestion": "Add prominent notice at start of Python section: '⚠️ Python error handling detection is planned but not yet implemented. Currently only Rust error patterns are fully supported.'",
+      "source_reference": "No Python analyzer found in src/. No BareExceptClause, OverlyBroadException, or ContextlibSuppress enum variants exist."
+    },
+    {
+      "type": "missing_implementation",
+      "severity": "high",
+      "section": "Async Error Handling (JavaScript/TypeScript)",
+      "description": "Documentation claims JavaScript/TypeScript async error detection, but implementation shows only Rust async patterns",
+      "current_content": "Lines 445-493 document unhandled promise rejections and missing await for JS/TS",
+      "should_be": "Clearly state that async error detection is Rust-only, with JS/TS support being limited/planned",
+      "fix_suggestion": "The table at lines 449-457 correctly notes limited JS/TS support. Move this disclaimer to the start of the Async Error Handling section (line 443) and remove detailed JS/TS examples that suggest full implementation.",
+      "source_reference": "src/debt/async_errors.rs only detects Rust tokio patterns (DroppedFuture, UnhandledJoinHandle, etc.)"
+    },
+    {
+      "type": "incomplete_implementation",
+      "severity": "high",
+      "section": "Error Context Loss Detection",
+      "description": "Context loss analyzer exists but uses heuristics marked as simplified/incomplete in implementation comments",
+      "current_content": "Lines 90-122 document error propagation analysis and context loss detection as if fully implemented",
+      "should_be": "Acknowledge that context loss detection uses heuristics and may have false positives/negatives",
+      "fix_suggestion": "Add note in Error Propagation Analysis section: 'Context loss detection uses AST-based heuristics. Type information would improve accuracy.'",
+      "source_reference": "src/debt/error_context.rs lines 92-98, 136-144: Comments indicate simplified checks without full type information"
+    },
+    {
+      "type": "incomplete_implementation",
+      "severity": "medium",
+      "section": "Async Error Pattern Detection",
+      "description": "Async error detector implementation has acknowledged limitations with select! macro and future dropping heuristics",
+      "current_content": "Lines 609-649 present async patterns as fully detected",
+      "should_be": "Note that select! detection and future dropping use heuristics without full semantic analysis",
+      "fix_suggestion": "Add caveat: 'Async error detection uses pattern matching on tokio APIs. Some patterns may require manual review.'",
+      "source_reference": "src/debt/async_errors.rs line 118: 'Simplified check - would need to parse the macro content'; line 133: 'This is a heuristic - we'd need type info for accuracy'"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "medium",
+      "section": "Configuration Section",
+      "description": "Documentation emphasizes disabling patterns, but implementation shows all patterns enabled by default as intended",
+      "current_content": "Lines 715-736 present configuration as if users need to enable features",
+      "should_be": "Emphasize that all detection is enabled by default, configuration is for selective disabling",
+      "fix_suggestion": "The bold text at line 718 'By default, all error handling detection is fully enabled' is correct. Remove or de-emphasize the TOML examples showing how to disable features, or frame them as 'gradual adoption' scenarios.",
+      "source_reference": "src/config/detection.rs lines 321-341: All default_detect_* functions return true"
+    },
+    {
+      "type": "missing_examples",
+      "severity": "low",
+      "section": "Python Best Practices",
+      "description": "Python best practices section provides examples, but without implementation they cannot be validated",
+      "current_content": "Lines 853-878 show Python error handling best practices",
+      "should_be": "Either implement Python detection to validate these examples, or mark as 'recommended patterns for future implementation'",
+      "fix_suggestion": "Add note: 'Python error handling detection is planned. These best practices represent intended future behavior.'",
+      "source_reference": "No Python analyzer implementation"
+    },
+    {
+      "type": "validation_gap",
+      "severity": "medium",
+      "section": "Detection Examples",
+      "description": "What Gets Detected vs Not Detected section includes Python examples that cannot be validated",
+      "current_content": "Lines 769-796 mix Rust and Python examples as if both are implemented",
+      "should_be": "Separate implemented (Rust) from planned (Python) examples, or remove Python examples",
+      "fix_suggestion": "Split examples into 'Rust (Implemented)' and 'Python (Planned)' subsections",
+      "source_reference": "Only Rust patterns are implemented in src/debt/"
+    },
+    {
+      "type": "incomplete_feature_coverage",
+      "severity": "low",
+      "section": "Exception Flow Analysis (Python)",
+      "description": "Python exception flow analysis is documented (lines 410-441) but not implemented",
+      "current_content": "Describes tracking exception propagation through Python codebases",
+      "should_be": "Mark as planned feature or remove from current documentation",
+      "fix_suggestion": "Add '(Planned)' to subsection header: '### Exception Flow Analysis (Planned)'",
+      "source_reference": "No Python call graph or exception tracking implementation found"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive documentation of Rust error handling patterns with accurate implementation details",
+    "All seven error swallowing patterns are correctly documented and match implementation",
+    "Panic pattern detection documentation accurately reflects PanicPattern enum variants",
+    "Async error patterns documentation matches AsyncErrorPattern implementation",
+    "Test code priority lowering is correctly documented and implemented",
+    "Suppression pattern support is correctly documented",
+    "Risk scoring integration is accurately explained",
+    "All internal cross-references are valid - all six linked files exist",
+    "Configuration section correctly notes all patterns enabled by default",
+    "Language support comparison table (lines 449-457) accurately shows implementation status"
+  ],
+  "improvement_suggestions": [
+    "Add prominent 'Implementation Status' section at top of chapter showing Rust (Full), Python (Planned), JS/TS (Limited)",
+    "Consider splitting into separate chapters: 'Rust Error Handling Analysis' and 'Future: Multi-Language Error Detection'",
+    "Move Python and JS/TS content to a 'Planned Features' or 'Roadmap' section",
+    "Add more examples of context loss detection edge cases and limitations",
+    "Include troubleshooting section for false positives from heuristic-based detection",
+    "Document which async patterns require manual review due to macro parsing limitations",
+    "Add migration guide for projects adopting error handling analysis incrementally",
+    "Include performance notes on analyzing large codebases with many error patterns"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:15:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Error swallowing detection",
+      "Error propagation patterns",
+      "Panic pattern detection",
+      "Python error handling patterns (NOT IMPLEMENTED)",
+      "JavaScript/TypeScript async errors (LIMITED)",
+      "Best practices",
+      "Severity levels",
+      "Recommendations"
+    ],
+    "validation_focus": "Check that all error handling patterns are documented with detection criteria",
+    "internal_links_validated": true,
+    "broken_links": [],
+    "implementation_gaps": [
+      "Python error handling detection (bare except, contextlib.suppress, exception flow)",
+      "JavaScript/TypeScript async error detection (promise rejections, missing await)",
+      "Full semantic analysis for context loss (currently heuristic-based)",
+      "Complete select! macro parsing for Rust async patterns"
+    ]
+  }
+}

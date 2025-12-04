@@ -1,0 +1,97 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "tiered-prioritization",
+  "chapter_title": "Tiered Prioritization",
+  "chapter_file": "book/src/tiered-prioritization.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is generally accurate and well-structured. The main issues are: (1) incorrect score threshold for Critical tier in JSON output example, (2) broken link to analysis-guide.md, and (3) minor inconsistencies in tier classification criteria descriptions. Overall quality is good with clear explanations and helpful examples.",
+  "issues": [
+    {
+      "type": "incorrect_example",
+      "severity": "high",
+      "section": "JSON Output",
+      "description": "JSON output example shows incorrect score threshold for Critical tier",
+      "current_content": "The `priority` field is derived from the `score` field using these thresholds:\n- `critical`: score >= 100.0\n- `high`: score >= 50.0\n- `medium`: score >= 20.0\n- `low`: score < 20.0",
+      "should_be": "- `critical`: score >= 90.0 (not 100.0)\n- `high`: score >= 70.0 (not 50.0)\n- `moderate`: score >= 50.0 (not medium >= 20.0)\n- `low`: score < 50.0 (not < 20.0)",
+      "fix_suggestion": "Update the JSON output priority thresholds to match the actual implementation in src/priority/mod.rs:478-484",
+      "source_reference": "src/priority/mod.rs:478-484"
+    },
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "See Also",
+      "description": "Link to analysis-guide.md is broken - file does not exist",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "target_path": "./analysis-guide.md",
+          "expected_file": "book/src/analysis-guide.md",
+          "current_file": "book/src/tiered-prioritization.md"
+        }
+      ],
+      "fix_suggestion": "The link [Analysis Guide](./analysis-guide.md) points to a non-existent file. Possible alternatives found: architectural-analysis.md, coverage-analysis.md, entropy-analysis.md, error-handling-analysis.md, functional-analysis.md. Either create analysis-guide.md or change the link to point to the most appropriate existing file (likely architectural-analysis.md or one of the specific analysis guides).",
+      "source_reference": "book/src/tiered-prioritization.md:351"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Tier 1: Critical Architecture",
+      "description": "Documentation states 'ComplexityHotspot debt items with cyclomatic complexity > 50' but implementation uses more sophisticated criteria",
+      "current_content": "ComplexityHotspot debt items with cyclomatic complexity > 50 (extreme complexity requiring architectural redesign)",
+      "should_be": "The implementation uses multiple sophisticated signals for Tier 1 classification including: final_score > 10.0, effective_cyclomatic > 50 (after entropy dampening), cognitive >= 20, nesting_depth >= 5, or complexity_factor > 5.0 (weighted: 30% cyclo + 70% cognitive)",
+      "fix_suggestion": "Expand the Tier 1 criteria explanation to reflect the multi-factor analysis approach used in the implementation, not just raw cyclomatic complexity",
+      "source_reference": "src/priority/tiers.rs:183-216"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Tier 2: Complex Untested",
+      "description": "Documentation describes Tier 2 qualification criteria but omits moderate complexity hotspot classification path",
+      "current_content": "Items qualify for Tier 2 if they meet ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or are entry point functions with any coverage gap.",
+      "should_be": "Items qualify for Tier 2 if they are either: (1) Testing gaps meeting ANY of: cyclomatic complexity ≥ 15, total dependencies ≥ 10, or entry point functions with any coverage gap, OR (2) Complexity hotspots with meaningful complexity (complexity_factor >= 2.0, cognitive >= 12, nesting >= 3, or adjusted cyclomatic 8-50)",
+      "fix_suggestion": "Add explanation of the moderate complexity hotspot classification path that uses sophisticated metrics (weighted complexity, cognitive load, nesting depth, entropy-dampened cyclomatic)",
+      "source_reference": "src/priority/tiers.rs:257-302"
+    },
+    {
+      "type": "incorrect_example",
+      "severity": "low",
+      "section": "Terminal Output",
+      "description": "Terminal output example shows score thresholds that don't match implementation",
+      "current_content": "Critical (score >= 90)\nHigh (score 70-89.9)\nModerate (score 50-69.9)\nLow (score < 50)",
+      "should_be": "The actual thresholds are correct, but the enum variant names in output are 'Critical', 'High', 'Moderate', 'Low' (not 'Medium')",
+      "fix_suggestion": "Verify that terminal output examples use the correct tier labels matching the Tier enum in src/priority/mod.rs:469-475",
+      "source_reference": "src/priority/mod.rs:469-475, src/priority/mod.rs:487-494"
+    }
+  ],
+  "positive_aspects": [
+    "Clear explanation of the two-tier system distinction (RecommendationTier vs Display Tier)",
+    "Comprehensive tier descriptions with priority, weight, and examples for each tier",
+    "Good examples showing both TOML configuration and command-line usage",
+    "Helpful use case sections (Sprint Planning, Code Review Focus, Refactoring Strategy)",
+    "Well-documented tier presets (Balanced, Strict, Lenient) with both TOML and programmatic access",
+    "Practical troubleshooting section addressing common issues",
+    "Good cross-references to related documentation (mostly working links)"
+  ],
+  "improvement_suggestions": [
+    "Add a detailed explanation of how tier weights affect final scores in the scoring pipeline",
+    "Include a flowchart or decision tree showing how items are classified into tiers",
+    "Provide more concrete examples of the sophisticated metrics used in tier classification (complexity_factor, cognitive load, entropy dampening)",
+    "Add a section explaining the relationship between RecommendationTier classification and final score-based display tiers",
+    "Consider adding examples showing how the same item might be classified differently under Balanced vs Strict vs Lenient presets",
+    "Link to or embed examples of actual debtmap output showing tiered prioritization in action"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Tier 1: Critical Architecture",
+      "Tier 2: Complex Untested",
+      "Tier 3: Testing Gaps",
+      "Tier 4: Maintenance",
+      "Tier weights and configuration",
+      "Customizing tier thresholds"
+    ],
+    "validation_focus": "Check that tier strategy, weights, and configuration options are documented with examples"
+  }
+}

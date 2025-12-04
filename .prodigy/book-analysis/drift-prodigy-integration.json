@@ -1,0 +1,97 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "prodigy-integration",
+  "chapter_title": "Prodigy Integration",
+  "chapter_file": "book/src/prodigy-integration.md",
+  "drift_detected": true,
+  "severity": "low",
+  "quality_assessment": "Chapter accurately documents Prodigy integration with current workflow examples. Minor inconsistencies in validate-improvement command usage and some workflow variable examples could be clearer.",
+  "issues": [
+    {
+      "type": "inconsistent_information",
+      "severity": "low",
+      "section": "Claude Slash Commands > /prodigy-validate-debtmap-improvement",
+      "description": "Documentation shows both shell and claude command for validate-improvement, but actual workflow uses only shell command",
+      "current_content": "```yaml\n# Using Claude slash command (recommended for workflows)\n- claude: \"/prodigy-validate-debtmap-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json\"\n\n# Or using shell command directly\n- shell: \"debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json\"\n```",
+      "should_be": "Remove the claude command example since actual workflows (debtmap.yml line 31, debtmap-reduce.yml line 44) use shell command for validate-improvement",
+      "fix_suggestion": "Update documentation to reflect that validate-improvement is always used as a shell command in both sequential and MapReduce workflows. The slash command wrapper may exist but is not used in practice.",
+      "source_reference": "workflows/debtmap.yml:31, workflows/debtmap-reduce.yml:44"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "MapReduce-Specific Variables",
+      "description": "Variable table shows ${item} contains 'The full JSON object for current item' but doesn't explain item structure varies by type (File vs Function)",
+      "feature_reference": "workflows/debtmap-reduce.yml:75-81",
+      "fix_suggestion": "Add explanation that items can be either File or Function types with different score fields (File.score vs Function.unified_score.final_score), as documented in the workflow filter/sort configuration",
+      "source_reference": "workflows/debtmap-reduce.yml:75-81 (filter and sort_by comments)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "MapReduce Example > filter/sort_by",
+      "description": "MapReduce example shows simplified filter/sort without NULLS LAST handling for File vs Function items",
+      "current_content": "filter: \"File.score >= 10 OR Function.unified_score.final_score >= 10\"\nsort_by: \"File.score DESC, Function.unified_score.final_score DESC\"",
+      "should_be": "sort_by: \"File.score DESC NULLS LAST, Function.unified_score.final_score DESC NULLS LAST\"",
+      "fix_suggestion": "Update the MapReduce example to include NULLS LAST handling as shown in actual workflow, and explain why this is necessary (Files have non-null File.score, Functions have null File.score)",
+      "source_reference": "workflows/debtmap-reduce.yml:80"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Claude Slash Commands > Implementation Commands",
+      "description": "Documentation doesn't mention --attempt parameter used in actual workflow",
+      "feature_reference": "workflows/debtmap.yml:36, workflows/debtmap-reduce.yml:49",
+      "fix_suggestion": "Add --attempt parameter to /prodigy-complete-debtmap-fix documentation showing it receives ${validation.attempt_number}",
+      "source_reference": "workflows/debtmap.yml:36, workflows/debtmap-reduce.yml:49"
+    },
+    {
+      "type": "inconsistent_information",
+      "severity": "low",
+      "section": "Quick Start > workflow example",
+      "description": "Documentation shows MapReduce workflow using shell command for validate-improvement while sequential workflow uses claude command, creating inconsistency",
+      "current_content": "Line 637 shows: shell: \"debtmap validate-improvement --comparison .prodigy/comparison-${item_id}.json --output .prodigy/debtmap-validation-${item_id}.json\"",
+      "should_be": "Line 133 shows: shell: \"debtmap validate-improvement --comparison .prodigy/comparison.json --output .prodigy/debtmap-validation.json\"",
+      "fix_suggestion": "Update Quick Start example (line 133) to use shell command for validate-improvement to match both actual workflows and the MapReduce example later in the chapter",
+      "source_reference": "workflows/debtmap.yml:31 uses shell command, not claude command"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive workflow examples showing both sequential and MapReduce patterns",
+    "Clear explanation of iteration strategy and how -n flag works",
+    "Excellent troubleshooting section with MapReduce-specific guidance",
+    "Good command reference for monitoring progress, DLQ management, and session cleanup",
+    "Accurate documentation of workflow step types (shell vs claude commands)",
+    "Valid internal links - all cross-references verified to exist",
+    "Clear prerequisites checklist at the beginning",
+    "Helpful visual diagram of MapReduce architecture"
+  ],
+  "improvement_suggestions": [
+    "Clarify that validate-improvement is used as shell command in production workflows",
+    "Add more details about item structure (File vs Function types) to MapReduce variables section",
+    "Include NULLS LAST explanation in MapReduce filter/sort examples",
+    "Document the --attempt parameter for completion commands",
+    "Consider adding example showing how to debug item structure using ${item} variable",
+    "Add note about --previous-validation parameter usage in validate-improvement command"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:20:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "What is Prodigy",
+      "Automated debt reduction",
+      "Map-reduce workflows",
+      "Setting up Prodigy",
+      "Running debtmap workflows",
+      "Iterative improvement",
+      "Validation and testing"
+    ],
+    "validation_focus": "Check that Prodigy workflow integration is documented with workflow file examples",
+    "workflow_files_validated": [
+      "workflows/debtmap.yml",
+      "workflows/debtmap-reduce.yml"
+    ],
+    "internal_links_validated": 4,
+    "broken_links": []
+  }
+}

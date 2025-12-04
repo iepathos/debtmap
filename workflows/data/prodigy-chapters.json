@@ -42,7 +42,8 @@
     {
       "id": "analysis-guide",
       "title": "Analysis Guide",
-      "file": "book/src/analysis-guide.md",
+      "type": "multi-subsection",
+      "index_file": "book/src/analysis-guide/index.md",
       "topics": [
         "Complexity metrics",
         "Debt patterns",
@@ -50,7 +51,65 @@
         "Interpreting results"
       ],
       "validation": "Ensure all analyzer types and metrics are explained",
-      "auto_generated": false
+      "auto_generated": false,
+      "subsections": [
+        {
+          "id": "overview",
+          "title": "Overview",
+          "file": "book/src/analysis-guide/overview.md",
+          "topics": ["Analysis capabilities", "Overall approach"],
+          "validation": "Check introduction covers analysis fundamentals"
+        },
+        {
+          "id": "complexity-metrics",
+          "title": "Complexity Metrics",
+          "file": "book/src/analysis-guide/complexity-metrics.md",
+          "topics": ["Cyclomatic complexity", "Cognitive complexity", "Entropy analysis", "Constructor detection"],
+          "validation": "Verify all complexity metric types are documented with examples"
+        },
+        {
+          "id": "debt-patterns",
+          "title": "Debt Patterns",
+          "file": "book/src/analysis-guide/debt-patterns.md",
+          "topics": ["Debt types", "Debt categories", "Detection criteria", "Examples by category"],
+          "validation": "Ensure all 25 debt types are documented with detection criteria"
+        },
+        {
+          "id": "risk-scoring",
+          "title": "Risk Scoring",
+          "file": "book/src/analysis-guide/risk-scoring.md",
+          "topics": ["Unified scoring system", "Risk categories", "Coverage propagation", "ROI calculation"],
+          "validation": "Check risk scoring formulas and prioritization strategies"
+        },
+        {
+          "id": "interpreting-results",
+          "title": "Interpreting Results",
+          "file": "book/src/analysis-guide/interpreting-results.md",
+          "topics": ["Output formats", "JSON structure", "Prioritization strategies", "Actionable insights"],
+          "validation": "Verify result interpretation guidance is comprehensive"
+        },
+        {
+          "id": "analyzer-types",
+          "title": "Analyzer Types",
+          "file": "book/src/analysis-guide/analyzer-types.md",
+          "topics": ["Supported languages", "Language detection", "Analyzer capabilities"],
+          "validation": "Check analyzer type documentation is current"
+        },
+        {
+          "id": "advanced-features",
+          "title": "Advanced Features",
+          "file": "book/src/analysis-guide/advanced-features.md",
+          "topics": ["Purity detection", "Data flow analysis", "Entropy caching", "Context-aware analysis"],
+          "validation": "Ensure advanced features are fully documented"
+        },
+        {
+          "id": "example-outputs",
+          "title": "Example Outputs",
+          "file": "book/src/analysis-guide/example-outputs.md",
+          "topics": ["Terminal output examples", "JSON output examples", "Before/after comparisons"],
+          "validation": "Verify examples are realistic and helpful"
+        }
+      ]
     },
     {
       "id": "configuration",
@@ -400,6 +459,46 @@
       "validation": "Check that dead code analysis and public API detection are documented",
       "auto_generated": true,
       "source_feature": "dead_code_analysis"
+    },
+    {
+      "id": "call-graph-analysis",
+      "title": "Call Graph Analysis",
+      "file": "book/src/call-graph-analysis.md",
+      "topics": [
+        "AST-based call graph construction",
+        "Trait method resolution",
+        "Macro expansion tracking",
+        "Import and module path resolution",
+        "Caller/callee relationship tracking",
+        "Critical path identification",
+        "Circular dependency detection",
+        "Call graph validation and debugging",
+        "Parallel call graph construction",
+        "External crate call filtering",
+        "Dependency display in output",
+        "Configurable caller/callee limits"
+      ],
+      "validation": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
+      "auto_generated": true,
+      "source_feature": "call_graph_analysis"
+    },
+    {
+      "id": "boilerplate-detection",
+      "title": "Boilerplate Detection",
+      "file": "book/src/boilerplate-detection.md",
+      "topics": [
+        "Detection criteria for repetitive patterns",
+        "Trait implementation analysis",
+        "Method uniformity calculation",
+        "Pattern types (trait implementations, builders, state machines)",
+        "Boilerplate scoring algorithm",
+        "Macro-ification recommendations",
+        "Configuration and thresholds",
+        "Alternative approaches (code generation, generics)"
+      ],
+      "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
+      "auto_generated": true,
+      "source_feature": "boilerplate_detection"
     }
   ]
 }

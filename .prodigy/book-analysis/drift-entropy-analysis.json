@@ -1,0 +1,93 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "entropy-analysis",
+  "chapter_title": "Entropy Analysis",
+  "chapter_file": "book/src/entropy-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Documentation is comprehensive and mostly accurate but contains one broken internal link. Configuration parameters are correctly documented with proper reference to source code. Algorithm explanation matches implementation. Some minor clarifications needed for hardcoded vs configurable thresholds.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "See Also",
+      "description": "Link to 'analysis-guide.md' is broken - file was migrated to multi-subsection structure",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "analysis-guide.md",
+          "current_file": "book/src/entropy-analysis.md",
+          "expected_path": "book/src/analysis-guide.md",
+          "suggested_fix": "analysis-guide/index.md",
+          "reason": "The analysis-guide chapter was converted from single-file to multi-subsection structure"
+        }
+      ],
+      "fix_suggestion": "Update the link from 'analysis-guide.md' to 'analysis-guide/index.md'",
+      "source_reference": "book/src/entropy-analysis.md:529"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration - Important Notes",
+      "description": "Documentation mentions 'entropy factor threshold: 0.4' is hardcoded but doesn't explain why it's hardcoded while others are configurable",
+      "current_content": "**Entropy factor threshold: 0.4** - Hardcoded internally (not configurable)",
+      "should_include": "Brief explanation of why this threshold is hardcoded (e.g., 'based on empirical testing' or 'optimal value determined through analysis')",
+      "fix_suggestion": "Add brief rationale for why entropy threshold is hardcoded while branch_threshold is configurable",
+      "source_reference": "book/src/entropy-analysis.md:338"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Configuration Examples",
+      "description": "Missing example showing how to check current entropy configuration from running system",
+      "feature_reference": "entropy_based_analysis.configuration",
+      "fix_suggestion": "Add CLI example showing how to view current entropy config (e.g., 'debtmap --show-config' or similar if such command exists)",
+      "source_reference": "Configuration section (lines 301-388)"
+    }
+  ],
+  "positive_aspects": [
+    "Excellent explanation of Shannon entropy formula and concepts",
+    "Clear language-agnostic examples showing same pattern across Rust, Python, TypeScript",
+    "Accurate documentation of graduated dampening formula matching implementation (src/complexity/entropy.rs:179-195)",
+    "Correct documentation of all configurable parameters with proper defaults",
+    "Good examples showing effective complexity calculations with step-by-step math",
+    "Historical context provided for Spec 68 and evolution of algorithm",
+    "Comprehensive configuration tuning examples (strict, lenient, disabled modes)",
+    "Clear output format explanation showing how to interpret entropy-adjusted results",
+    "Practical 'Verifying Correctness' section with commands to test entropy impact"
+  ],
+  "improvement_suggestions": [
+    "Fix broken link to analysis-guide by updating to 'analysis-guide/index.md'",
+    "Add brief rationale for hardcoded entropy threshold value (0.4)",
+    "Consider adding a 'Quick Reference' table mapping config parameters to their effects",
+    "Add cross-reference to complexity-metrics.md which also discusses entropy (found at book/src/analysis-guide/complexity-metrics.md:157-163)",
+    "Consider adding troubleshooting entry for 'entropy dampening seems too aggressive/conservative'"
+  ],
+  "cross_references": [
+    "why-debtmap.md",
+    "analysis-guide/index.md",
+    "configuration.md",
+    "analysis-guide/complexity-metrics.md",
+    "troubleshooting.md"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:15:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Shannon entropy calculation",
+      "Pattern repetition detection",
+      "Branch similarity analysis",
+      "Token classification",
+      "Effective complexity adjustment",
+      "Configuration options",
+      "False positive reduction"
+    ],
+    "validation_focus": "Check that entropy analysis algorithm, components, and configuration are documented with examples",
+    "source_code_verified": [
+      "src/complexity/entropy.rs:179-195 (dampening formula)",
+      "src/complexity/entropy.rs:429-453 (graduated dampening)",
+      "src/config/languages.rs:65-109 (EntropyConfig struct)",
+      "src/config/mod.rs:452-455 (default values)"
+    ]
+  }
+}

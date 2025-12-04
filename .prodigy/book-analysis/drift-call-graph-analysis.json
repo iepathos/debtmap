@@ -1,0 +1,186 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "call-graph-analysis",
+  "chapter_title": "Call Graph Analysis",
+  "chapter_file": "book/src/call-graph-analysis.md",
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Chapter covers core concepts well but has significant configuration and CLI documentation inaccuracies. The TOML config section documented doesn't exist in the codebase, and several CLI flags are incorrectly documented or missing entirely. Debug capabilities are under-documented given the comprehensive implementation.",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Configuration",
+      "description": "Documented TOML section [call_graph] does not exist in actual configuration implementation",
+      "current_content": "[call_graph]\nparallel = true\nshow_external_calls = false\nmax_display_edges = 10\ndebug = false",
+      "should_be": "Configuration is split across [analysis] and [classification] sections with different field names",
+      "fix_suggestion": "Replace the [call_graph] section with actual configuration sections: [analysis] for enable_trait_analysis/enable_function_pointer_tracking/enable_framework_patterns/enable_cross_module_analysis/max_analysis_depth, and [classification.caller_callee] for max_callers/max_callees/show_external/show_std_lib",
+      "source_reference": "src/config/core.rs:AnalysisSettings, src/config/classification.rs:CallerCalleeConfig"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "high",
+      "section": "Filtering External Calls",
+      "description": "Documented CLI flag --no-external-calls does not exist; actual flag has opposite logic",
+      "current_content": "debtmap analyze . --no-external-calls",
+      "should_be": "debtmap analyze . (external calls hidden by default, use --show-external-calls to enable)",
+      "fix_suggestion": "Remove the --no-external-calls example. Explain that external calls are hidden by default, and document --show-external-calls flag to enable them explicitly",
+      "source_reference": "src/cli.rs:284 (--show-external-calls flag)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Missing documentation for max_callers and max_callees configuration options",
+      "feature_reference": "call_graph_analysis.visualization.max_callers",
+      "fix_suggestion": "Document --max-callers and --max-callees CLI flags (default: 5 each) that control how many caller/callee relationships are displayed per function",
+      "source_reference": "src/cli.rs:276-280, src/config/classification.rs:CallerCalleeConfig"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Usage",
+      "description": "Missing documentation for call graph validation and statistics flags",
+      "feature_reference": "call_graph_analysis.capabilities.call_graph_validation",
+      "fix_suggestion": "Add section documenting --validate-call-graph and --call-graph-stats flags for debugging and performance analysis",
+      "source_reference": "src/cli.rs:257-265"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Filtering External Calls",
+      "description": "Missing documentation for standard library call filtering",
+      "feature_reference": "call_graph_analysis.visualization.standard_library_filtering",
+      "fix_suggestion": "Document --show-std-lib-calls flag and explain the distinction between external crate calls and standard library calls. Note that both are filtered by default.",
+      "source_reference": "src/cli.rs:289, src/priority/formatter/dependencies.rs:is_standard_library_call"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Call Graph Construction",
+      "description": "Documentation mentions parallel construction but doesn't explain how to control it",
+      "feature_reference": "call_graph_analysis.capabilities.parallel_call_graph_construction",
+      "fix_suggestion": "Explain that parallel processing is enabled by default and can be disabled with --no-parallel flag for debugging. Note that this affects overall analysis, not just call graph.",
+      "source_reference": "src/cli.rs:163 (--no-parallel flag)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Missing documentation for advanced analysis feature toggles",
+      "feature_reference": "call_graph_analysis.capabilities",
+      "fix_suggestion": "Document the [analysis] configuration options: enable_trait_analysis (default: true), enable_function_pointer_tracking (default: true), enable_framework_patterns (default: true), enable_cross_module_analysis (default: true), max_analysis_depth",
+      "source_reference": "src/config/core.rs:AnalysisSettings"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Call Graph Construction",
+      "description": "Documentation doesn't explain multi-phase construction approach",
+      "feature_reference": "call_graph_analysis.capabilities.ast_based_construction",
+      "fix_suggestion": "Add brief explanation of the three-phase construction: (1) Extract functions and collect unresolved calls, (2) Resolve calls using CallResolver and PathResolver, (3) Final cross-file resolution. This helps users understand resolution errors.",
+      "source_reference": "src/builders/call_graph.rs:RustCallGraphBuilder"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "Debug section is too generic; doesn't detail available debug features",
+      "feature_reference": "call_graph_analysis.capabilities.call_graph_debugging",
+      "fix_suggestion": "Expand debug section to document: (1) Text vs JSON output formats (--debug-format), (2) Selective function tracing (--trace-functions), (3) Resolution statistics with percentiles (p50, p95, p99), (4) Resolution strategy tracking",
+      "source_reference": "src/analyzers/call_graph/debug.rs:DebugConfig, ResolutionStatistics"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Visualization",
+      "description": "Output example doesn't show actual format with tree-style rendering",
+      "feature_reference": "call_graph_analysis.visualization.dependency_display",
+      "fix_suggestion": "Update visualization example to show actual tree-style output format with Unicode box-drawing characters: '├─ DEPENDENCIES:', '|  |- Called by (N):', '|  |     * function_name()', '|  +- Calls (N):'",
+      "source_reference": "src/priority/formatter/sections.rs:240-329"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Filtering External Calls",
+      "description": "Doesn't explain when filtering happens (display time vs construction time)",
+      "fix_suggestion": "Clarify that external call filtering happens at display time, not during graph construction. The call graph contains all edges; filtering only affects which are shown in output. This is important for understanding why --debug-call-graph may show more calls than regular output.",
+      "source_reference": "src/priority/formatter/dependencies.rs:filter_dependencies"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Resolution Mechanisms",
+      "description": "Macro expansion tracking is mentioned but not explained in detail",
+      "feature_reference": "call_graph_analysis.capabilities.macro_expansion_tracking",
+      "fix_suggestion": "Add brief explanation of macro classification (collection macros, formatting macros, assertion macros, logging macros) and note that macro expansion statistics are available via --call-graph-stats",
+      "source_reference": "src/analyzers/call_graph/macro_expansion.rs:MacroExpander"
+    }
+  ],
+  "positive_aspects": [
+    "Clear overview of call graph benefits (critical path, circular deps, transitive coverage)",
+    "Good conceptual explanation of call edge tracking",
+    "Correctly documents AST-based construction approach",
+    "Accurately lists resolution mechanisms (trait methods, macros, module paths)",
+    "See Also section provides appropriate cross-references",
+    "Basic usage examples follow correct command structure"
+  ],
+  "improvement_suggestions": [
+    "Add a 'Configuration Reference' section with complete table of all config options and their defaults",
+    "Include a 'CLI Reference' section documenting all call-graph-related flags",
+    "Add troubleshooting section for common call resolution issues",
+    "Include example of debug output to help users understand what --debug-call-graph provides",
+    "Add performance tuning guidance (when to disable parallel, how to control analysis depth)",
+    "Document the difference between show_external (external crates) and show_std_lib (Rust std library)",
+    "Explain how to interpret unresolved calls in debug output",
+    "Add example showing path simplification in output (e.g., 'helper::read_file' instead of full path)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:02:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "AST-based call graph construction",
+      "Trait method resolution",
+      "Macro expansion tracking",
+      "Import and module path resolution",
+      "Caller/callee relationship tracking",
+      "Critical path identification",
+      "Circular dependency detection",
+      "Call graph validation and debugging",
+      "Parallel call graph construction",
+      "External crate call filtering",
+      "Dependency display in output",
+      "Configurable caller/callee limits"
+    ],
+    "validation_focus": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
+    "implementation_files_reviewed": [
+      "src/builders/call_graph.rs",
+      "src/analyzers/rust_call_graph.rs",
+      "src/analyzers/call_graph/trait_handling.rs",
+      "src/analyzers/call_graph/macro_expansion.rs",
+      "src/analyzers/call_graph/path_resolver.rs",
+      "src/analyzers/call_graph/module_tree.rs",
+      "src/analyzers/call_graph/import_map.rs",
+      "src/analyzers/call_graph/call_resolution.rs",
+      "src/analyzers/call_graph/debug.rs",
+      "src/config/core.rs",
+      "src/config/classification.rs",
+      "src/cli.rs",
+      "src/priority/formatter/sections.rs",
+      "src/priority/formatter/dependencies.rs"
+    ],
+    "test_coverage_verified": [
+      "tests/call_graph_closure_test.rs",
+      "tests/call_graph_comprehensive_test.rs",
+      "tests/call_graph_cross_file_resolution_test.rs",
+      "tests/call_graph_debug_output_test.rs",
+      "tests/call_graph_disambiguation_test.rs",
+      "tests/call_graph_extraction_test.rs",
+      "tests/call_graph_improved_test.rs",
+      "tests/call_graph_resolution_test.rs",
+      "tests/call_graph_struct_literal_test.rs"
+    ],
+    "cross_references_validated": true,
+    "broken_links": []
+  }
+}

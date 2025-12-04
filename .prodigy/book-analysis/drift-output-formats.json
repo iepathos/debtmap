@@ -1,0 +1,111 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "output-formats",
+  "chapter_title": "Output Formats",
+  "chapter_file": "book/src/output-formats.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "The chapter is comprehensive and well-structured but contains several inaccuracies and one broken link that need correction. The documentation accurately covers most output formats and their usage, but misrepresents HTML format availability and documents a non-existent --output-format flag.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 1 broken internal link: reference to analysis-guide.md which has been migrated to multi-subsection structure",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "original_target": "./analysis-guide.md",
+          "current_file": "book/src/output-formats.md",
+          "line": 136,
+          "suggested_fix": "./analysis-guide/index.md",
+          "reason": "Chapter has been migrated to multi-subsection format at analysis-guide/"
+        }
+      ],
+      "fix_suggestion": "Update link from './analysis-guide.md' to './analysis-guide/index.md'. Verify other links at lines 1255-1257 remain valid."
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "medium",
+      "section": "Format Selection (line 20-26)",
+      "description": "Documentation states HTML is 'not exposed as a CLI option' but it is actually available",
+      "current_content": "> **Note:** The codebase also includes an `Html` format variant in `src/core/types.rs` and `src/analysis/diagnostics/`, but this is only available internally for diagnostic reporting and is not exposed as a CLI option.",
+      "should_be": "HTML format is available as a CLI option via `--format html`",
+      "fix_suggestion": "Remove or revise the note on line 25. HTML is a valid OutputFormat enum variant (src/cli.rs:492) and is fully supported via the CLI --format flag. Update the available formats list to include 'html'.",
+      "source_reference": "src/cli.rs:488-493 (OutputFormat enum includes Html), src/cli.rs:517-520 (Html variant conversion), src/output/mod.rs:130-145 (Html format handling)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Format Selection",
+      "description": "HTML format is not documented in the available formats list but is supported",
+      "current_content": "Available formats:\n- **terminal** (default): Interactive output with colors, emoji, and formatting\n- **json**: Structured data for programmatic processing\n- **markdown**: Reports suitable for documentation and PR comments",
+      "should_be": "Should include:\n- **html**: Web-viewable HTML reports with interactive navigation",
+      "fix_suggestion": "Add HTML to the available formats list on line 20-23, and add a dedicated '## HTML Output' section documenting its features and usage. Reference the implementation in src/io/writers/html.rs.",
+      "source_reference": "src/cli.rs:492, src/io/writers/html.rs, src/output/mod.rs:130-145"
+    },
+    {
+      "type": "incorrect_information",
+      "severity": "high",
+      "section": "JSON Format Variants (lines 504-544)",
+      "description": "Documentation describes --output-format flag and legacy/unified format variants that don't exist in the codebase",
+      "current_content": "Debtmap supports two JSON output formats:\n\n```bash\n# Legacy format (default) - backward compatible\ndebtmap analyze . --format json --output-format legacy\n\n# Unified format - new consistent structure\ndebtmap analyze . --format json --output-format unified\n```",
+      "should_be": "No --output-format flag exists. JSON output uses serde_json::to_string_pretty with the AnalysisResults structure directly",
+      "fix_suggestion": "Remove the entire 'JSON Format Variants' section (lines 504-596) including subsections about legacy vs unified formats, format comparison, structural differences, and migration strategy. The current JSON implementation uses a single format via serde serialization without format variants.",
+      "source_reference": "src/io/writers/json.rs:1-30 (JsonWriter implementation with no format variants), src/cli.rs (no --output-format flag defined)"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Best Practices - Quick Reference Table (line 1176-1182)",
+      "description": "HTML format missing from the comparison table",
+      "current_content": "Table only includes Terminal, JSON, and Markdown formats",
+      "should_be": "Should include HTML format row",
+      "fix_suggestion": "Add HTML row to the quick reference table:\n| HTML | Visualization | Partially | Yes | .html |",
+      "source_reference": "src/io/writers/html.rs"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive coverage of terminal, JSON, and markdown output formats",
+    "Excellent examples for CI/CD integration (GitHub Actions, GitLab CI, Jenkins)",
+    "Detailed jq query examples for JSON analysis",
+    "Clear documentation of verbosity levels and their effects",
+    "Good explanation of risk analysis output and color coding",
+    "Thorough editor integration examples (VS Code)",
+    "Helpful webhook integration patterns",
+    "Well-structured sections with clear progression from basic to advanced usage",
+    "Accurate documentation of filtering and output limiting options",
+    "Good troubleshooting section covering common issues"
+  ],
+  "improvement_suggestions": [
+    "Add dedicated section documenting HTML output format features and usage",
+    "Include more examples of HTML output generation and rendering",
+    "Update the 'See Also' section links to use index.md for multi-subsection chapters",
+    "Consider adding examples of how to customize HTML output styling",
+    "Add guidance on when to use HTML vs Markdown for reports",
+    "Include performance comparison between different output formats",
+    "Add examples of parsing unified JSON structure in common languages (Python, TypeScript)",
+    "Document the actual JSON schema produced by AnalysisResults serialization"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:26:52Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "JSON output",
+      "Text reports",
+      "Integration with tools",
+      "Custom formatting"
+    ],
+    "validation_focus": "Verify output format documentation matches src/io/ implementation",
+    "internal_links_checked": 4,
+    "broken_links_found": 1,
+    "codebase_references_verified": [
+      "src/cli.rs:488-493",
+      "src/io/writers/json.rs",
+      "src/io/writers/html.rs",
+      "src/io/writers/terminal.rs",
+      "src/io/writers/markdown/core.rs",
+      "src/output/mod.rs"
+    ]
+  }
+}

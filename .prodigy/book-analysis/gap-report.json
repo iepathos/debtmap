@@ -1,0 +1,12 @@
+{
+  "analysis_date": "2025-12-04T13:59:08.808354",
+  "features_analyzed": 13,
+  "meta_features_excluded": [
+    "meta_content",
+    "architecture"
+  ],
+  "documented_topics": 28,
+  "gaps_found": 0,
+  "gaps": [],
+  "actions_taken": []
+}

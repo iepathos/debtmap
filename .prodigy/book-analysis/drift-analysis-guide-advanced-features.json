@@ -1,0 +1,87 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "advanced-features",
+  "subsection_title": "Advanced Features",
+  "subsection_file": "book/src/analysis-guide/advanced-features.md",
+  "feature_mappings": [],
+  "drift_detected": false,
+  "severity": "low",
+  "quality_assessment": "Excellent documentation with comprehensive coverage of advanced features. All documented features are accurately implemented in the codebase.",
+  "issues": [
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Data Flow Analysis > Variable Dependency Tracking",
+      "description": "Documentation mentions 'Mutable vs immutable references' tracking, but this is not explicitly implemented in DataFlowGraph",
+      "current_content": "variable_dependencies: HashMap<String, HashSet<String>> - tracks variable names only",
+      "should_be": "Track distinction between mutable and immutable variable usage",
+      "fix_suggestion": "Either remove the claim about tracking mutable vs immutable references, or document this as a future enhancement",
+      "source_reference": "src/data_flow.rs:116 - HashSet<String> doesn't distinguish mutability"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Data Flow Analysis > Modification Impact Analysis",
+      "description": "Documentation shows detailed JSON output with 'io_operations' field, but ModificationImpact struct doesn't include this field",
+      "current_content": "ModificationImpact has: affected_functions, dependency_count, has_side_effects, risk_level",
+      "should_be": "Add io_operations field to ModificationImpact or update documentation example",
+      "fix_suggestion": "Update example JSON to match actual ModificationImpact struct fields or enhance struct to include io_operations details",
+      "source_reference": "src/data_flow.rs:299 - ModificationImpact struct definition"
+    },
+    {
+      "type": "minor_inaccuracy",
+      "severity": "low",
+      "section": "Purity Detection",
+      "description": "Documentation shows 'is_pure' and 'purity_confidence' as Option types, which is correct, but doesn't mention the newer 'purity_level' field that provides three-level classification",
+      "fix_suggestion": "Add brief mention that purity detection now includes a three-level classification (Pure/ProbablyPure/Impure) via purity_level field for more nuanced analysis",
+      "source_reference": "src/core/mod.rs:76-77 (is_pure, purity_confidence) and src/core/mod.rs:91 (purity_level)"
+    },
+    {
+      "type": "documentation_enhancement",
+      "severity": "low",
+      "section": "Entropy Analysis Caching",
+      "description": "Cache statistics structure documented as having 'memory_bytes' field, but actual implementation uses 'memory_usage'",
+      "current_content": "CacheStats { hits, misses, evictions, hit_rate, miss_rate, memory_usage }",
+      "should_be": "Update documentation example to use 'memory_usage' instead of 'memory_bytes'",
+      "fix_suggestion": "Change 'memory_bytes' to 'memory_usage' in the example JSON output",
+      "source_reference": "src/complexity/entropy.rs:20 - CacheStats struct definition"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive documentation of all major advanced features",
+    "Accurate implementation details with correct struct definitions",
+    "Excellent examples showing real-world usage patterns",
+    "Clear explanations of entropy-based complexity dampening with formulas",
+    "Detailed coverage integration documentation with performance characteristics",
+    "DataFlowGraph implementation matches documented API closely",
+    "Entropy analyzer caching is accurately documented with performance metrics",
+    "Purity detection explanation is clear and matches implementation",
+    "Context-aware analysis patterns are well documented",
+    "Integration with unified scoring system is clearly explained"
+  ],
+  "improvement_suggestions": [
+    "Clarify variable dependency tracking capabilities (whether mutability is tracked)",
+    "Align ModificationImpact JSON examples with actual struct fields",
+    "Add note about three-level purity classification (purity_level field)",
+    "Fix field name in cache statistics example (memory_bytes → memory_usage)",
+    "Consider adding more examples of DataFlowGraph usage in real analysis workflows",
+    "Document relationship between DataFlowGraph and CallGraph more explicitly"
+  ],
+  "cross_references": [],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Purity detection",
+      "Data flow analysis",
+      "Entropy caching",
+      "Context-aware analysis",
+      "Coverage integration",
+      "Modification impact analysis"
+    ],
+    "validation_focus": "Ensure advanced features are fully documented",
+    "internal_links_checked": 0,
+    "broken_links_found": 0
+  }
+}

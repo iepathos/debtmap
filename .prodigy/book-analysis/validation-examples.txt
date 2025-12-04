@@ -1,0 +1,44 @@
+# Validation Summary for Examples
+
+## Content Metrics
+- Lines of content: 1342 (minimum for chapter: 100) ✓
+- Level-2 headings: 195+ (minimum: 5) ✓
+- Code examples: 100+ (minimum: 3) ✓
+- Source references: Multiple verified (minimum: 2) ✓
+
+## Drift Issues Resolved
+- Critical: 0/0
+- High: 1/1 (removed incorrect --output-format documentation)
+- Medium: 2/2 (fixed broken link, corrected threshold preset table)
+- Low: 2/2 (added --show-splits and --no-multi-pass examples)
+
+## Code Validation
+- All CLI flags verified against src/cli.rs:488-493 ✓
+- Threshold values verified against src/complexity/threshold_manager.rs:120-148 ✓
+- --show-splits verified in src/cli.rs:299-303 ✓
+- --no-multi-pass verified in src/cli.rs:171-173 ✓
+- All examples use current syntax ✓
+
+## Link Validation
+- Total internal links: 4
+- All links validated and working ✓
+- Fixed: analysis-guide.md → analysis-guide/index.md
+
+## Changes Made
+1. Fixed broken link to analysis-guide chapter (multi-subsection structure)
+2. Removed entire "Understanding Output Formats" section (--output-format doesn't exist)
+3. Updated threshold preset table with actual values from source code
+4. Added --show-splits example in god object detection section
+5. Added comprehensive --no-multi-pass documentation in multi-pass section
+
+## Quality Gates
+✓ Meets minimum content requirements (1342 lines)
+✓ All critical issues resolved (0 critical issues)
+✓ All high severity issues resolved (1/1)
+✓ All medium severity issues resolved (2/2)
+✓ All low severity issues resolved (2/2)
+✓ All examples grounded in codebase
+✓ All source references validated
+✓ All internal links working
+
+Status: READY TO COMMIT

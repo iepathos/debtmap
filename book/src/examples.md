@@ -94,11 +94,15 @@ debtmap analyze . --threshold-preset lenient   # Lenient for legacy code
 
 **Preset Threshold Values:**
 
-| Preset | Complexity | Duplication | Max Function Lines | Max Nesting Depth |
-|--------|-----------|-------------|-------------------|-------------------|
-| Strict | 8 | 30 | 30 | 3 |
-| Balanced | 10 | 50 | 50 | 4 |
-| Lenient | 15 | 75 | 80 | 5 |
+These presets control the minimum complexity levels that trigger debt flagging. Source: `src/complexity/threshold_manager.rs:120-148`
+
+| Preset | Min Cyclomatic | Min Cognitive | Min Function Lines |
+|--------|----------------|---------------|-------------------|
+| Strict | 3 | 7 | 15 |
+| Balanced | 5 | 10 | 20 |
+| Lenient | 10 | 20 | 50 |
+
+**Note**: These are minimum thresholds for flagging functions. Functions below these thresholds are considered simple and won't appear in debt reports.
 
 ### God Object Detection
 
@@ -110,6 +114,9 @@ debtmap analyze .
 
 # Disable god object detection for specific run
 debtmap analyze . --no-god-object
+
+# Show detailed module split recommendations (experimental)
+debtmap analyze . --show-splits
 ```
 
 God objects are flagged with detailed metrics:
@@ -117,6 +124,14 @@ God objects are flagged with detailed metrics:
 - Responsibility count (grouped by naming patterns)
 - God object score (0-100%)
 - Recommendations for splitting
+
+**The `--show-splits` option provides experimental decomposition suggestions:**
+```bash
+# Get detailed recommendations for breaking up large modules
+debtmap analyze . --show-splits
+```
+
+This shows suggested module boundaries, responsibility groupings, and how to decompose large files into smaller, focused modules.
 
 #### Purity-Weighted God Object Scoring
 
@@ -690,54 +705,6 @@ debtmap analyze . --format markdown --detail-level debug --output DEBUG.md
 
 Great for documentation or PR comments.
 
-### Understanding Output Formats
-
-> **Note**: `--format` selects the output type (json/markdown/terminal), while `--output-format` selects the JSON structure variant (unified/legacy). They serve different purposes and can be used together.
-
-```bash
-# JSON output (default is legacy format)
-debtmap analyze . --format json
-
-# Unified JSON format (alternative to legacy)
-debtmap analyze . --format json --output-format unified
-
-# Legacy JSON format (default, for backward compatibility)
-debtmap analyze . --format json --output-format legacy
-
-# Output format options: terminal, json, markdown
-debtmap analyze . --format terminal
-```
-
-**Unified vs Legacy JSON Formats:**
-
-The unified format provides a consistent structure with a `type` field to distinguish between different item types, replacing the File/Function wrapper objects used in legacy format.
-
-**Legacy format (default):**
-```json
-{
-  "items": [
-    {"File": {"path": "src/main.rs", "score": 45.2}},
-    {"Function": {"name": "process", "complexity": 12}}
-  ]
-}
-```
-
-**Unified format:**
-```json
-{
-  "items": [
-    {"type": "file", "path": "src/main.rs", "score": 45.2},
-    {"type": "function", "name": "process", "complexity": 12}
-  ]
-}
-```
-
-**Key differences:**
-- **Unified format**: Consistent structure with `type` discriminator field, easier to parse programmatically, better for new integrations
-- **Legacy format**: Uses wrapper objects for backward compatibility with existing tooling and scripts
-
-Use unified format for new integrations and tools. Use legacy format when working with existing debtmap analysis pipelines.
-
 ## Advanced Usage
 
 ### Design Pattern Detection
@@ -839,12 +806,34 @@ debtmap analyze . --context --disable-context git_history
 
 ### Multi-Pass Analysis
 
-```bash
-# Multi-pass with attribution tracking
-debtmap analyze . --multi-pass --attribution
+Multi-pass analysis is enabled by default for deeper analysis with context awareness:
 
-# Shows which functions contribute to which patterns
+```bash
+# Multi-pass analysis is default behavior (no flag needed)
+debtmap analyze .
+
+# Multi-pass with attribution tracking
+debtmap analyze . --attribution
+
+# Disable multi-pass for single-pass performance mode
+debtmap analyze . --no-multi-pass
 ```
+
+**When to use `--no-multi-pass`:**
+- **Performance-critical CI environments**: Faster analysis for large codebases
+- **Quick validation**: When you need fast feedback
+- **Single-file analysis**: When deep context isn't needed
+
+**Performance comparison example:**
+```bash
+# Fast single-pass (skip context analysis)
+time debtmap analyze . --no-multi-pass
+
+# Default multi-pass (includes context analysis)
+time debtmap analyze .
+```
+
+Multi-pass analysis provides better prioritization by analyzing dependencies and relationships across files, but single-pass mode can be 2-3x faster for large codebases.
 
 ### Aggregation Methods
 
@@ -1349,5 +1338,5 @@ debtmap compare \
 ## Next Steps
 
 - [CLI Reference](cli-reference.md) - Complete CLI documentation
-- [Analysis Guide](analysis-guide.md) - Understanding analysis results
+- [Analysis Guide](analysis-guide/index.md) - Understanding analysis results
 - [Configuration](configuration.md) - Advanced configuration options

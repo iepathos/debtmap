@@ -1,18 +1,29 @@
 # Error Handling Analysis
 
-Debtmap provides comprehensive error handling analysis across all supported languages (Rust, Python, JavaScript, TypeScript), detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.
+Debtmap provides comprehensive error handling analysis for Rust codebases, detecting anti-patterns that lead to silent failures, production panics, and difficult-to-debug issues.
+
+## Implementation Status
+
+| Language | Error Swallowing | Panic Patterns | Async Errors | Context Loss | Propagation Analysis |
+|----------|------------------|----------------|--------------|--------------|----------------------|
+| **Rust** | ✅ Full (7 patterns) | ✅ Full (6 patterns) | ✅ Full (5 patterns) | ✅ Full (5 patterns) | ✅ Full (4 patterns) |
+| **Python** | ⚠️ Planned | ⚠️ Planned | N/A | ⚠️ Planned | ⚠️ Planned |
+| **JavaScript/TypeScript** | ⚠️ Limited | ⚠️ Limited | ⚠️ Planned | ❌ Not yet | ❌ Not yet |
+
+**Current Focus:** Rust error handling analysis is fully implemented and production-ready. Python and JavaScript/TypeScript support is limited or planned for future releases.
 
 ## Overview
 
-Error handling issues are classified as **ErrorSwallowing** debt with **Major severity** (weight 4), reflecting their significant impact on code reliability and debuggability. Debtmap detects:
+Error handling issues are classified as **ErrorSwallowing** debt with **Major severity** (weight 4), reflecting their significant impact on code reliability and debuggability.
 
-- **Error swallowing**: Exception handlers that silently catch errors without logging or re-raising
-- **Panic patterns**: Rust code that can panic in production (unwrap, expect, panic!)
-- **Error propagation issues**: Missing error context in Result chains
-- **Async error handling**: Unhandled promise rejections, dropped futures, missing await
-- **Python-specific patterns**: Bare except clauses, silent exception handling
+**Fully Implemented for Rust:**
+- **Error swallowing** (7 patterns): Exception handlers that silently catch errors without logging or re-raising
+- **Panic patterns** (6 patterns): Code that can panic in production (unwrap, expect, panic!)
+- **Error propagation issues** (4 patterns): Missing error context in Result chains
+- **Async error handling** (5 patterns): Dropped futures, unhandled JoinHandles, silent task panics
+- **Context loss detection** (5 patterns): Error propagation without meaningful context
 
-All error handling patterns are filtered intelligently - code detected in test modules (e.g., `#[cfg(test)]`, `test_` prefixes) receives lower priority or is excluded entirely.
+All error handling patterns are filtered intelligently - code detected in test modules (e.g., `#[cfg(test)]`, `#[test]` attributes) receives lower priority or is excluded entirely.
 
 ## Rust Error Handling Analysis
 
@@ -89,7 +100,9 @@ Debtmap detects `#[cfg(test)]` attributes and test function contexts, automatica
 
 ### Error Propagation Analysis
 
-Debtmap detects missing error context in Result chains:
+Debtmap detects missing error context in Result chains.
+
+**Note:** Context loss detection uses AST-based heuristics without full type information. This means some edge cases may produce false positives or negatives. Type information would improve accuracy but would require a full compilation environment.
 
 ```rust
 // ❌ Missing context - which file failed? What was the error?
@@ -292,9 +305,15 @@ fn load_settings() -> Settings {
 
 All these patterns are detected at **Medium to High priority** depending on context, as they represent lost error information that makes debugging difficult.
 
-## Python Error Handling Analysis
+**Source:** Error swallowing patterns are defined in `src/debt/error_swallowing.rs:229-238` and comprehensively tested in `tests/error_swallowing_test.rs`.
 
-### Bare Except Clause Detection
+## Python Error Handling Analysis (Planned)
+
+⚠️ **Python error handling detection is planned but not yet implemented. Currently only Rust error patterns are fully supported.**
+
+The patterns described below represent the intended future behavior once Python analysis is implemented.
+
+### Bare Except Clause Detection (Planned)
 
 Python's bare `except:` catches all exceptions, including system exits and keyboard interrupts:
 
@@ -339,7 +358,7 @@ def process_file(path):
 - Never use bare `except:` in production code
 - Log exceptions with full context before suppressing
 
-### Silent Exception Handling
+### Silent Exception Handling (Planned)
 
 ```python
 # ❌ Silent exception handling
@@ -363,7 +382,7 @@ def get_user_age(user_id):
         raise  # Re-raise for caller to handle
 ```
 
-### Contextlib Suppress Detection
+### Contextlib Suppress Detection (Planned)
 
 Python's `contextlib.suppress()` intentionally silences exceptions, which can hide errors:
 
@@ -407,9 +426,9 @@ def best_effort_cleanup(paths):
 - Operations where partial failure should be noticed
 - Any case where debugging might be needed later
 
-### Exception Flow Analysis
+### Exception Flow Analysis (Planned)
 
-Debtmap tracks exception propagation through Python codebases to identify functions that can raise exceptions without proper handling. This analysis helps ensure that exceptions are either caught at appropriate levels or documented in the function's interface.
+Python exception flow analysis is planned for future implementation. This would track exception propagation through Python codebases to identify functions that can raise exceptions without proper handling.
 
 ```python
 # Potential issue: Exceptions may propagate unhandled
@@ -442,26 +461,16 @@ def process_batch(items):
 
 ## Async Error Handling
 
-### Unhandled Promise Rejections (JavaScript/TypeScript)
+### JavaScript/TypeScript Async Patterns (Planned)
 
-**Note:** JavaScript and TypeScript support in debtmap currently focuses on complexity analysis and basic error patterns. Advanced async error handling detection (unhandled promise rejections, missing await) is primarily implemented for Rust async code.
+⚠️ **JavaScript and TypeScript async error detection is planned but not yet fully implemented.**
 
-**Current Language Support Comparison:**
+**Current Status:**
+- JavaScript/TypeScript support focuses on complexity analysis and basic error patterns
+- Async error handling detection (unhandled promise rejections, missing await) is **fully implemented for Rust only**
+- Enhanced JavaScript/TypeScript async error detection is planned for future releases
 
-| Feature | Rust | Python | JavaScript/TypeScript |
-|---------|------|--------|----------------------|
-| Basic error swallowing | ✅ Full | ✅ Full | ✅ Basic |
-| Panic/exception patterns | ✅ Full | ✅ Full | ⚠️ Limited |
-| Async error detection | ✅ Full | N/A | ⚠️ Limited |
-| Error propagation analysis | ✅ Full | ✅ Basic | ❌ Not yet |
-| Context loss detection | ✅ Full | ⚠️ Limited | ❌ Not yet |
-
-Current JavaScript/TypeScript detection includes:
-- Basic try/catch without error handling
-- Some promise rejection patterns
-- Complexity analysis
-
-Enhanced JavaScript/TypeScript async error detection is planned for future releases.
+The examples below show intended future behavior:
 
 ```javascript
 // ❌ CRITICAL: Unhandled promise rejection
@@ -492,7 +501,7 @@ loadUserData(123).catch(err => {
 });
 ```
 
-### Missing Await Detection
+### Missing Await Detection (Planned)
 
 ```javascript
 // ❌ HIGH: Missing await - promise dropped
@@ -511,7 +520,9 @@ async function saveAndNotify(data) {
 
 ### Async Rust Error Handling
 
-Debtmap detects five async-specific error handling patterns in Rust:
+Debtmap detects five async-specific error handling patterns in Rust.
+
+**Note:** Async error detection uses pattern matching on tokio APIs and AST-based heuristics. Some patterns (particularly `select!` macro handling and future dropping) may require manual review, as full semantic analysis would require type information.
 
 #### 1. DroppedFuture - Future dropped without awaiting
 
@@ -649,6 +660,8 @@ async fn process_with_timeout(data: Data) -> Result<()> {
 
 All async error patterns emphasize the importance of properly handling errors in concurrent Rust code, where failures can easily go unnoticed.
 
+**Source:** Async error patterns are defined in `src/debt/async_errors.rs:205-212` and tested with tokio-specific patterns.
+
 ## Severity Levels and Prioritization
 
 Error handling issues are assigned severity based on their impact:
@@ -715,30 +728,39 @@ This function would be flagged as **Priority 1** in Debtmap's output due to:
 
 ### Error Handling Configuration Options
 
-**By default, all error handling detection is fully enabled.** The configuration options below are primarily used to selectively disable specific patterns during gradual adoption or for specific project needs.
+**All Rust error handling detection is enabled by default.** You typically don't need to configure anything - Debtmap will automatically detect all error patterns in your Rust code.
+
+**When to Use Configuration:**
+- **Gradual adoption**: Disable some patterns while fixing others
+- **Project-specific needs**: Turn off patterns that don't apply to your codebase
+- **Performance tuning**: Disable expensive analyzers if not needed
 
 Configure error handling analysis in `.debtmap.toml`:
 
 ```toml
 [error_handling]
-# All detection patterns are enabled by default (all default to true)
-detect_panic_patterns = true     # Rust unwrap/expect/panic detection
-detect_swallowing = true         # Silent exception handling
-detect_async_errors = true       # Unhandled promises, dropped futures
-detect_context_loss = true       # Error propagation without context
-detect_propagation = true        # Error propagation analysis
+# All patterns enabled by default - only add config to DISABLE patterns
+# detect_panic_patterns = true     # Default: enabled
+# detect_swallowing = true          # Default: enabled
+# detect_async_errors = true        # Default: enabled
+# detect_context_loss = true        # Default: enabled
+# detect_propagation = true         # Default: enabled
 
-# Disable specific patterns for gradual adoption
-# detect_async_errors = false
+# Example: Gradual adoption - start with just panic patterns
+detect_panic_patterns = true       # Keep enabled
+detect_swallowing = false          # Disable initially
+detect_async_errors = false        # Disable initially
+detect_context_loss = false        # Disable initially
 ```
 
-All error handling patterns are detected by default with the `ErrorSwallowing` debt category (weight 4). The configuration is fully implemented and functional - use it primarily to disable specific patterns when needed.
+**Default Behavior (No Configuration):**
+All error handling patterns are detected with the `ErrorSwallowing` debt category (weight 4). Test code automatically receives lower priority.
 
 ## Detection Examples
 
 ### What Gets Detected vs. Not Detected
 
-**Rust examples:**
+#### Rust Examples (Fully Implemented)
 
 ```rust
 // ❌ Detected: unwrap() in production code
@@ -766,7 +788,7 @@ let value = map.get("key")
     .expect("Configuration must contain 'key' field");
 ```
 
-**Python examples:**
+#### Python Examples (Planned - Not Yet Implemented)
 
 ```python
 # ❌ Detected: bare except
@@ -849,7 +871,9 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
    map.get(key).ok_or_else(|| anyhow!("Missing key: {}", key))?
    ```
 
-### Python Error Handling
+### Python Error Handling (Planned - Future Implementation)
+
+**Note:** Python error handling detection is planned. These best practices represent intended future behavior.
 
 1. **Always use specific exception types**
    ```python
@@ -877,7 +901,9 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
        process(f)
    ```
 
-### JavaScript/TypeScript Error Handling
+### JavaScript/TypeScript Error Handling (Planned - Limited Implementation)
+
+**Note:** JavaScript/TypeScript async error detection is planned. Currently only basic patterns are supported.
 
 1. **Always handle promise rejections**
    ```javascript
@@ -903,7 +929,7 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
    await asyncOperation();  // Don't drop promises
    ```
 
-## Improving Error Handling Based on Debtmap Reports
+## Improving Rust Error Handling Based on Debtmap Reports
 
 ### Workflow
 
@@ -911,6 +937,8 @@ See [Suppression Patterns](suppression-patterns.md) for complete syntax and usag
    ```bash
    debtmap analyze --filter-categories ErrorSwallowing
    ```
+
+   Note: This analyzes Rust error patterns. Python and JavaScript/TypeScript support is limited or planned.
 
 2. **Review priority issues first**
    - Address CRITICAL (panic in production, bare except) immediately

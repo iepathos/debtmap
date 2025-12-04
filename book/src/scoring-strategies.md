@@ -81,7 +81,7 @@ Use when:
 - Prioritizing architectural improvements
 - Allocating team resources
 
-**Note**: File-level scoring is enabled with the `--aggregate-only` flag (a boolean flag—no value needed), which changes output to show only file-level metrics instead of function-level details.
+**Note**: File-level scoring is enabled with the `--aggregate-only` flag (no argument required: use `debtmap analyze . --aggregate-only`), which changes output to show only file-level metrics instead of function-level details.
 
 **2. Identifying Architectural Issues**
 
@@ -122,7 +122,7 @@ Debtmap supports multiple aggregation methods for file-level scores, configurabl
 debtmap analyze . --aggregation-method weighted_sum
 ```
 
-Or via configuration:
+Or via configuration file:
 ```toml
 [aggregation]
 method = "weighted_sum"
@@ -196,7 +196,7 @@ method = "max_plus_average"
 
 ### Configuration
 
-> **IMPORTANT**: The configuration file must be named **`.debtmap.toml`** (not `debtmap.yml` or other variants) and placed in your project root directory.
+> **IMPORTANT**: The configuration file must be named **`.debtmap.toml`** (not `debtmap.yml` or other variants) and placed in your project root directory. Debtmap searches for `.debtmap.toml` in the current directory, or you can specify an alternate path with `--config path/to/config.toml`.
 
 ```toml
 [aggregation]
@@ -983,7 +983,7 @@ Debtmap now includes an advanced **rebalanced scoring algorithm** that prioritiz
 
 ### Enabling Rebalanced Scoring
 
-> **IMPORTANT**: Rebalanced scoring is enabled through your `.debtmap.toml` configuration file, **not via CLI flags**. Add the `[scoring_rebalanced]` section to activate it.
+> **IMPORTANT**: Rebalanced scoring is enabled through your `.debtmap.toml` configuration file by adding the `[scoring_rebalanced]` section. This activates the rebalanced algorithm described below.
 
 **Default Behavior**: By default, debtmap uses the standard scoring algorithm described earlier in this chapter. To use rebalanced scoring, add the `[scoring_rebalanced]` section to your config:
 
@@ -1227,12 +1227,13 @@ preset = "size-focused"
 ```
 
 **Gradual Migration**:
-1. Run analysis with both algorithms: `debtmap analyze . --legacy-scoring`
-2. Compare results to understand impact
-3. Adjust team priorities based on new rankings
-4. Switch to rebalanced scoring after validation
+1. Run analysis with standard scoring first (no config changes)
+2. Create a test config with `[scoring_rebalanced]` section
+3. Compare results between standard and rebalanced scoring
+4. Adjust team priorities based on new rankings
+5. Switch to rebalanced scoring after validation
 
-See [Migration Guide](./migration-guide.md) for detailed migration instructions.
+**Note**: There is no `--legacy-scoring` CLI flag. Switch between algorithms by modifying your configuration file (add or remove the `[scoring_rebalanced]` section).
 
 ### Configuration Reference
 
@@ -1567,8 +1568,6 @@ Exponential scaling has negligible performance impact:
 
 ### See Also
 
-- [Tiered Prioritization](./tiered-prioritization.md) - Understanding tier-based classification
 - [Configuration](./configuration.md) - Scoring and aggregation configuration
-- [Analysis Guide](./analysis-guide.md) - Detailed metric explanations
-- [File Classification](./file-classification.md) - Context-aware file size thresholds (Spec 135)
-- [ARCHITECTURE.md](../ARCHITECTURE.md) - Technical details of exponential scaling implementation
+- [Analysis Guide](./analysis-guide/index.md) - Detailed metric explanations
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - Technical details of exponential scaling implementation

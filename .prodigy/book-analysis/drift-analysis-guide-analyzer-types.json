@@ -1,0 +1,94 @@
+{
+  "item_type": "subsection",
+  "chapter_id": "analysis-guide",
+  "subsection_id": "analyzer-types",
+  "subsection_title": "Analyzer Types",
+  "subsection_file": "book/src/analysis-guide/analyzer-types.md",
+  "feature_mappings": [],
+  "drift_detected": true,
+  "severity": "high",
+  "quality_assessment": "Documentation contains significant outdated information about language support and incorrect trait signatures. Claims support for Python, JavaScript, TypeScript when only Rust is actually supported (per spec 191).",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Supported Languages",
+      "description": "Documentation incorrectly states Python, JavaScript, TypeScript are supported with varying capabilities",
+      "current_content": "Documentation describes full support for Rust and mentions Python/JavaScript/TypeScript as having limited or planned support",
+      "should_be": "Only Rust is supported. All other languages were removed in spec 191.",
+      "fix_suggestion": "Remove all references to Python, JavaScript, TypeScript support. Update 'Unsupported Languages' section to clarify that debtmap is a Rust-only analyzer.",
+      "source_reference": "src/core/mod.rs:376-377 (comment states 'After spec 191, only Rust is supported'), src/core/mod.rs:368-372 (Language enum has Rust, Python, Unknown but Python is not actually supported)"
+    },
+    {
+      "type": "incorrect_examples",
+      "severity": "medium",
+      "section": "Extensibility",
+      "description": "Analyzer trait signature in documentation does not match actual implementation",
+      "current_content": "pub trait Analyzer: Send + Sync {\n    fn parse(&self, content: &str, path: PathBuf) -> Result<Ast>;\n    fn analyze(&self, ast: &Ast) -> FileMetrics;\n    fn language(&self) -> Language;\n}",
+      "should_be": "The actual trait in src/analyzers/mod.rs:39-43 matches this signature, but there's also a more complex generic Analyzer trait in src/core/traits.rs:11-16 with associated types",
+      "fix_suggestion": "Clarify which Analyzer trait is the public extension point. The documentation shows the simpler trait from src/analyzers/mod.rs which appears to be the correct one for language analyzers.",
+      "source_reference": "src/analyzers/mod.rs:39-43 (simpler trait), src/core/traits.rs:11-16 (generic trait with associated types)"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Language Detection",
+      "description": "Language detection logic description is incomplete",
+      "current_content": "Shows code snippet for Language::from_path but doesn't explain Unknown language handling or filtering",
+      "should_be": "Explain that unknown languages (non-.rs files) are filtered during file discovery and never reach analysis stage",
+      "fix_suggestion": "Add explanation of the Unknown language variant and how it's used for filtering during discovery phase (see src/core/mod.rs:386-391)",
+      "source_reference": "src/core/mod.rs:368-372 (Language enum with Unknown variant), src/core/mod.rs:386-391 (from_path implementation)"
+    },
+    {
+      "type": "confusing_content",
+      "severity": "medium",
+      "section": "Unsupported Languages",
+      "description": "The 'Unsupported Languages' section contradicts earlier content",
+      "current_content": "States 'Debtmap currently supports only Rust' but earlier sections describe Python/JS/TS support",
+      "should_be": "Consistent messaging throughout that only Rust is supported",
+      "fix_suggestion": "Remove contradictory content. Start subsection by clearly stating Rust-only support, then explain architecture allows future language support via Analyzer trait.",
+      "source_reference": "src/core/mod.rs:376-377"
+    },
+    {
+      "type": "outdated_information",
+      "severity": "low",
+      "section": "Semantic Classification",
+      "description": "Semantic classification description is accurate but could clarify it's Rust-specific",
+      "current_content": "Describes semantic classification features without explicitly stating it's Rust-only",
+      "should_be": "Clarify this is part of Rust analyzer capabilities",
+      "fix_suggestion": "Add prefix: 'The Rust analyzer includes semantic classification...'",
+      "source_reference": "Features inventory confirms semantic classification is Rust-specific"
+    }
+  ],
+  "positive_aspects": [
+    "Accurate description of Rust analyzer capabilities (macro expansion, purity detection, call graph)",
+    "Clear explanation of semantic classification categories and their purpose",
+    "Good extensibility section showing how to add new language support",
+    "Visibility tracking and test module detection are accurately documented"
+  ],
+  "improvement_suggestions": [
+    "Restructure to lead with 'Rust-only support' messaging upfront",
+    "Remove all Python/JavaScript/TypeScript references or move to a 'Future Extensibility' section",
+    "Add clarification that Language enum's Python/Unknown variants exist for architecture but aren't actively used",
+    "Include note about spec 191 decision to focus on Rust-only support",
+    "Add reference to src/analyzers/rust.rs as the canonical example implementation",
+    "Clarify the file discovery filtering mechanism that prevents non-Rust files from reaching analysis"
+  ],
+  "cross_references": [
+    "overview",
+    "complexity-metrics",
+    "risk-scoring"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Supported languages",
+      "Language detection",
+      "Analyzer capabilities",
+      "Rust-specific features",
+      "Extensibility"
+    ],
+    "validation_focus": "Check analyzer type documentation is current"
+  }
+}

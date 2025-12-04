@@ -1,0 +1,103 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "architectural-analysis",
+  "chapter_title": "Architectural Analysis",
+  "chapter_file": "book/src/architectural-analysis.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Good comprehensive coverage with accurate implementation details, but has one broken link and minor documentation gaps around abstractness calculation and configuration limitations",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Cross-References",
+      "description": "Found 1 broken internal link",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "target_path": "analysis-guide.md",
+          "expected_file": "book/src/analysis-guide.md",
+          "current_file": "book/src/architectural-analysis.md",
+          "fix_suggestion": "The file 'analysis-guide.md' does not exist. Consider creating a general analysis guide chapter or link to an existing related guide (e.g., 'getting-started.md' or a specific analysis type)"
+        }
+      ],
+      "fix_suggestion": "Update or remove the broken link to 'analysis-guide.md'. All other cross-reference links are valid."
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Coupling Metrics - Abstractness",
+      "description": "Documentation states abstractness is a 'ratio of abstract types to total types' but implementation sets it to 0.0 with comment '// Would need type analysis to calculate properly'",
+      "current_content": "pub abstractness: f64, // Ratio of abstract types to total types",
+      "should_be": "Documentation should clarify that abstractness calculation requires type analysis and may not be fully implemented or may be placeholder values in current version",
+      "fix_suggestion": "Add a note explaining that abstractness calculation requires advanced type analysis and the current implementation uses placeholder/estimated values. Reference the cohesion analysis note (lines 582-596) as a model for documenting incomplete features.",
+      "source_reference": "src/debt/coupling.rs:12,44"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration - Threshold Customization",
+      "description": "Documentation mentions hardcoded thresholds cannot be configured but doesn't explain why or future plans",
+      "current_content": "Note: Most architectural thresholds are currently hardcoded in the implementation and cannot be configured",
+      "should_be": "Explain whether this is a design decision or temporary limitation, and whether configuration will be added in the future",
+      "fix_suggestion": "Add brief explanation of why thresholds are hardcoded (e.g., 'based on industry standard metrics from Robert C. Martin's research') or note if configuration is planned for future releases."
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Duplication Detection - Similarity Threshold",
+      "description": "Documentation mentions similarity_threshold parameter exists but is 'Currently unused' - could explain planned future use",
+      "current_content": "similarity_threshold parameter - Defined but not implemented yet\nFuture enhancement - Fuzzy matching for near-duplicates",
+      "should_be": "Provide more context on when fuzzy matching will be implemented or how users can track this feature request",
+      "fix_suggestion": "Consider adding a link to a GitHub issue or roadmap item for the fuzzy matching feature, or note if this is deferred indefinitely."
+    }
+  ],
+  "positive_aspects": [
+    "Excellent implementation references with specific file paths and line numbers (e.g., 'src/debt/circular.rs:44-66')",
+    "Accurate code examples that match actual implementation",
+    "Comprehensive coverage of all architectural analysis topics from features.json",
+    "Clear explanations of algorithms (DFS for circular dependencies, hash-based duplication)",
+    "Good use of visual diagrams (main sequence chart, decision flowchart)",
+    "Accurate documentation of hardcoded thresholds with specific values and source locations",
+    "Honest documentation of limitations (cohesion analysis placeholder, abstractness calculation)",
+    "Practical refactoring recommendations for each architectural issue type",
+    "Well-organized troubleshooting section with realistic scenarios",
+    "Integration section correctly maps to DebtType enum without inventing non-existent variants"
+  ],
+  "improvement_suggestions": [
+    "Fix the broken link to 'analysis-guide.md' or create that guide chapter",
+    "Add more detail on abstractness calculation limitations in the Coupling Metrics section",
+    "Consider adding a 'Roadmap' or 'Future Enhancements' section for incomplete features",
+    "Add cross-reference to god_object_detection feature (mentioned in features.json) if it relates to architectural analysis",
+    "Consider adding examples of suppression patterns for architectural checks",
+    "Could add more real-world case studies beyond the examples provided"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Circular dependency detection",
+      "Coupling metrics (afferent, efferent)",
+      "Bidirectional dependencies",
+      "Stable dependencies principle",
+      "Zone of pain detection",
+      "Zone of uselessness detection",
+      "Code duplication detection",
+      "Refactoring recommendations"
+    ],
+    "validation_focus": "Check that architectural pattern detection and coupling analysis are documented",
+    "validated_features": [
+      "debt_detection.detection_categories.architecture.patterns.Circular dependencies",
+      "debt_detection.detection_categories.architecture.patterns.Tight coupling between modules"
+    ],
+    "implementation_files_validated": [
+      "src/debt/circular.rs",
+      "src/debt/coupling.rs",
+      "src/debt/duplication.rs",
+      "src/core/mod.rs"
+    ],
+    "internal_links_checked": 6,
+    "broken_links_found": 1,
+    "valid_links": 5
+  }
+}

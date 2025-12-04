@@ -1,0 +1,119 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "troubleshooting",
+  "chapter_title": "Troubleshooting",
+  "chapter_file": "book/src/troubleshooting.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Comprehensive troubleshooting guide with strong coverage of common issues. Primary drift involves broken internal link and missing coverage debugging documentation. Overall structure and content are solid.",
+  "issues": [
+    {
+      "type": "broken_links",
+      "severity": "medium",
+      "section": "Related Documentation",
+      "description": "Found 1 broken internal link",
+      "broken_links": [
+        {
+          "link_text": "Analysis Guide",
+          "target": "./analysis-guide.md",
+          "current_file": "book/src/troubleshooting.md",
+          "reason": "File does not exist at this path",
+          "suggested_fix": "analysis-guide/index.md",
+          "explanation": "The Analysis Guide chapter was migrated to a multi-subsection structure. The link should point to analysis-guide/index.md instead of analysis-guide.md"
+        }
+      ],
+      "fix_suggestion": "Update the broken link to point to the correct location:\n- Change `[Analysis Guide](./analysis-guide.md)` to `[Analysis Guide](./analysis-guide/index.md)`",
+      "source_reference": "book/src/troubleshooting.md:2393"
+    },
+    {
+      "type": "broken_anchor",
+      "severity": "low",
+      "section": "JSON Format Issues",
+      "description": "Anchor link to non-existent section in configuration.md",
+      "current_content": "[Configuration/Output Formats](./configuration.md#output-formats)",
+      "should_be": "Link to a page that actually contains Output Formats section (e.g., examples.md or getting-started.md)",
+      "fix_suggestion": "The 'Output Formats' section does not exist in configuration.md. Either:\n1. Add the Output Formats section to configuration.md, or\n2. Change the link to point to a file that has this section (e.g., getting-started.md#output-formats or examples.md)",
+      "source_reference": "book/src/troubleshooting.md:185"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Coverage File Issues",
+      "description": "Missing documentation for explain-coverage command",
+      "feature_reference": "cli_interface.commands.explain_coverage",
+      "fix_suggestion": "Add a dedicated subsection for the `debtmap explain-coverage` command:\n\n### Debugging Coverage Matching with explain-coverage\n\nThe `explain-coverage` command helps diagnose coverage file parsing and function name matching issues.\n\n```bash\n# Debug coverage data parsing\ndebtmap explain-coverage --coverage-file coverage.lcov\n\n# See detailed function matching diagnostics\ndebtmap explain-coverage --coverage-file coverage.lcov -v\n```\n\n**Use cases**:\n- Coverage data not being applied to functions\n- Function name mismatches between coverage and source\n- Verifying coverage file format is correct\n- Understanding which functions have coverage data",
+      "source_reference": "features.json:cli_interface.commands.explain_coverage"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Coverage File Issues",
+      "description": "Coverage troubleshooting mentions explain-coverage in features.json but doesn't document how to use it",
+      "current_content": "The troubleshooting section has general coverage file debugging but lacks specific guidance on using the explain-coverage command",
+      "fix_suggestion": "Expand the 'Coverage File Issues' section to include the explain-coverage command with examples of how to interpret its output and resolve common coverage matching problems",
+      "source_reference": "book/src/troubleshooting.md:110-129"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Debug Mode",
+      "description": "Missing explanation of --explain-score deprecation context",
+      "current_content": "**Note**: The `--explain-score` flag is deprecated and hidden. Use `-v`, `-vv`, or `-vvv` for verbosity levels instead to see score breakdowns.",
+      "should_include": "Brief context on why --explain-score was deprecated and what replaced it (the verbosity levels provide more granular control)",
+      "fix_suggestion": "Expand the note to explain the transition:\n\n**Note**: The `--explain-score` flag has been deprecated in favor of granular verbosity levels (`-v`, `-vv`, `-vvv`). The new verbosity system provides:\n- Better control over output detail level\n- Consistent debugging across all commands\n- Progressive information disclosure (level 1 → 2 → 3)\n\nUse `-v` for score breakdowns, `-vv` for detailed calculations, and `-vvv` for full debug output.",
+      "source_reference": "book/src/troubleshooting.md:246"
+    }
+  ],
+  "positive_aspects": [
+    "Extremely comprehensive coverage of common issues and edge cases",
+    "Well-organized with clear hierarchical structure (Quick Fixes → Common Issues → Advanced)",
+    "Excellent use of code examples and command-line snippets",
+    "Strong troubleshooting checklist at the end",
+    "Good coverage of language-specific issues (Rust, Python, JavaScript/TypeScript)",
+    "Detailed explanations of complex topics like tiered prioritization and scoring formulas",
+    "Environment variable documentation is thorough",
+    "Context provider troubleshooting is well-documented",
+    "Advanced analysis troubleshooting section covers specialized flags effectively",
+    "FAQ section addresses common user questions with detailed answers"
+  ],
+  "improvement_suggestions": [
+    "Add the missing explain-coverage command documentation with examples",
+    "Fix the broken link to analysis-guide/index.md",
+    "Fix or remove the broken anchor link to configuration.md#output-formats",
+    "Consider adding a 'Quick Start Troubleshooting' section at the very beginning for users who just want to solve their immediate problem",
+    "Add cross-references to related troubleshooting sections (e.g., link from Coverage File Issues to explain-coverage debugging)",
+    "Consider adding a troubleshooting decision tree or flowchart for common problem diagnosis",
+    "Add examples of actual error messages users might see for each common issue category",
+    "Consider adding a 'Most Common Issues' top-3 list at the very beginning"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Common issues",
+      "Debug mode",
+      "Performance tips",
+      "FAQ",
+      "Parse errors",
+      "Coverage debugging",
+      "Context providers",
+      "Advanced analysis flags",
+      "Environment variables",
+      "Output formatting",
+      "Command-specific troubleshooting"
+    ],
+    "validation_focus": "Check troubleshooting covers common user issues",
+    "total_internal_links": 5,
+    "broken_links": 1,
+    "broken_anchors": 1,
+    "commands_documented": [
+      "analyze",
+      "validate",
+      "compare",
+      "validate-improvement"
+    ],
+    "commands_missing": [
+      "explain-coverage"
+    ]
+  }
+}

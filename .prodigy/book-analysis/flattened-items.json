@@ -1,0 +1,573 @@
+[
+  {
+    "id": "introduction",
+    "title": "Introduction",
+    "file": "book/src/introduction.md",
+    "topics": [
+      "What is Debtmap",
+      "Why use it",
+      "Key features",
+      "Target audience"
+    ],
+    "validation": "Ensure introduction covers project purpose and main features",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "getting-started",
+    "title": "Getting Started",
+    "file": "book/src/getting-started.md",
+    "topics": [
+      "Installation",
+      "Quick start",
+      "First analysis",
+      "Basic usage"
+    ],
+    "validation": "Check installation instructions and quick start examples are current",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "cli-reference",
+    "title": "CLI Reference",
+    "file": "book/src/cli-reference.md",
+    "topics": [
+      "Commands",
+      "Arguments",
+      "Options",
+      "Configuration"
+    ],
+    "validation": "Verify all CLI commands from src/cli/ are documented with current options",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "overview",
+    "title": "Overview",
+    "file": "book/src/analysis-guide/overview.md",
+    "topics": [
+      "Analysis capabilities",
+      "Overall approach"
+    ],
+    "validation": "Check introduction covers analysis fundamentals",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "complexity-metrics",
+    "title": "Complexity Metrics",
+    "file": "book/src/analysis-guide/complexity-metrics.md",
+    "topics": [
+      "Cyclomatic complexity",
+      "Cognitive complexity",
+      "Entropy analysis",
+      "Constructor detection"
+    ],
+    "validation": "Verify all complexity metric types are documented with examples",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "debt-patterns",
+    "title": "Debt Patterns",
+    "file": "book/src/analysis-guide/debt-patterns.md",
+    "topics": [
+      "Debt types",
+      "Debt categories",
+      "Detection criteria",
+      "Examples by category"
+    ],
+    "validation": "Ensure all 25 debt types are documented with detection criteria",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "risk-scoring",
+    "title": "Risk Scoring",
+    "file": "book/src/analysis-guide/risk-scoring.md",
+    "topics": [
+      "Unified scoring system",
+      "Risk categories",
+      "Coverage propagation",
+      "ROI calculation"
+    ],
+    "validation": "Check risk scoring formulas and prioritization strategies",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "interpreting-results",
+    "title": "Interpreting Results",
+    "file": "book/src/analysis-guide/interpreting-results.md",
+    "topics": [
+      "Output formats",
+      "JSON structure",
+      "Prioritization strategies",
+      "Actionable insights"
+    ],
+    "validation": "Verify result interpretation guidance is comprehensive",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "analyzer-types",
+    "title": "Analyzer Types",
+    "file": "book/src/analysis-guide/analyzer-types.md",
+    "topics": [
+      "Supported languages",
+      "Language detection",
+      "Analyzer capabilities"
+    ],
+    "validation": "Check analyzer type documentation is current",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "advanced-features",
+    "title": "Advanced Features",
+    "file": "book/src/analysis-guide/advanced-features.md",
+    "topics": [
+      "Purity detection",
+      "Data flow analysis",
+      "Entropy caching",
+      "Context-aware analysis"
+    ],
+    "validation": "Ensure advanced features are fully documented",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "example-outputs",
+    "title": "Example Outputs",
+    "file": "book/src/analysis-guide/example-outputs.md",
+    "topics": [
+      "Terminal output examples",
+      "JSON output examples",
+      "Before/after comparisons"
+    ],
+    "validation": "Verify examples are realistic and helpful",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "configuration",
+    "title": "Configuration",
+    "file": "book/src/configuration.md",
+    "topics": [
+      "Config files",
+      "Options reference",
+      "Exclusion patterns",
+      "Customization"
+    ],
+    "validation": "Check config options match implementation in src/config/",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "output-formats",
+    "title": "Output Formats",
+    "file": "book/src/output-formats.md",
+    "topics": [
+      "JSON output",
+      "Text reports",
+      "Integration with tools",
+      "Custom formatting"
+    ],
+    "validation": "Verify output format documentation matches src/io/ implementation",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "examples",
+    "title": "Examples",
+    "file": "book/src/examples.md",
+    "topics": [
+      "Analyzing Rust projects",
+      "Python analysis",
+      "JavaScript/TypeScript",
+      "CI integration"
+    ],
+    "validation": "Ensure examples use current CLI syntax and options",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "troubleshooting",
+    "title": "Troubleshooting",
+    "file": "book/src/troubleshooting.md",
+    "topics": [
+      "Common issues",
+      "Debug mode",
+      "Performance tips",
+      "FAQ"
+    ],
+    "validation": "Check troubleshooting covers common user issues",
+    "type": "single-file",
+    "auto_generated": false
+  },
+  {
+    "id": "tiered-prioritization",
+    "title": "Tiered Prioritization",
+    "file": "book/src/tiered-prioritization.md",
+    "topics": [
+      "Tier 1: Critical Architecture",
+      "Tier 2: Complex Untested",
+      "Tier 3: Testing Gaps",
+      "Tier 4: Maintenance",
+      "Tier weights and configuration",
+      "Customizing tier thresholds"
+    ],
+    "validation": "Check that tier strategy, weights, and configuration options are documented with examples",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "tiered_prioritization"
+  },
+  {
+    "id": "scoring-strategies",
+    "title": "Scoring Strategies",
+    "file": "book/src/scoring-strategies.md",
+    "topics": [
+      "File-level scoring",
+      "Function-level scoring",
+      "When to use each approach",
+      "Aggregation methods",
+      "Score normalization",
+      "Use case comparison"
+    ],
+    "validation": "Check that file-level and function-level scoring differences are explained with use cases",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "scoring_comparison"
+  },
+  {
+    "id": "prodigy-integration",
+    "title": "Prodigy Integration",
+    "file": "book/src/prodigy-integration.md",
+    "topics": [
+      "What is Prodigy",
+      "Automated debt reduction",
+      "Map-reduce workflows",
+      "Setting up Prodigy",
+      "Running debtmap workflows",
+      "Iterative improvement",
+      "Validation and testing"
+    ],
+    "validation": "Check that Prodigy workflow integration is documented with workflow file examples",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "prodigy_workflows"
+  },
+  {
+    "id": "parallel-processing",
+    "title": "Parallel Processing",
+    "file": "book/src/parallel-processing.md",
+    "topics": [
+      "Rayon parallel iterators",
+      "Thread pool configuration",
+      "Worker thread tuning",
+      "Lock-free concurrent access with DashMap",
+      "Performance benchmarks",
+      "Scaling strategies"
+    ],
+    "validation": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "parallel_processing"
+  },
+  {
+    "id": "entropy-analysis",
+    "title": "Entropy Analysis",
+    "file": "book/src/entropy-analysis.md",
+    "topics": [
+      "Shannon entropy calculation",
+      "Pattern repetition detection",
+      "Branch similarity analysis",
+      "Token classification",
+      "Effective complexity adjustment",
+      "Configuration options",
+      "False positive reduction"
+    ],
+    "validation": "Check that entropy analysis algorithm, components, and configuration are documented with examples",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "entropy_based_analysis"
+  },
+  {
+    "id": "coverage-integration",
+    "title": "Coverage Integration",
+    "file": "book/src/coverage-integration.md",
+    "topics": [
+      "LCOV format support",
+      "Generating coverage with cargo-tarpaulin",
+      "Coverage for other languages (pytest, jest, go test)",
+      "Coverage index performance",
+      "Transitive coverage propagation",
+      "Troubleshooting coverage correlation",
+      "Best practices"
+    ],
+    "validation": "Check that coverage setup, tool integration, and troubleshooting are documented for all supported languages",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "coverage_integration"
+  },
+  {
+    "id": "god-object-detection",
+    "title": "God Object Detection",
+    "file": "book/src/god-object-detection.md",
+    "topics": [
+      "Detection criteria (method count, field count, responsibilities)",
+      "God object scoring algorithm",
+      "Thresholds and configuration",
+      "File-level aggregation",
+      "Refactoring recommendations",
+      "Examples and case studies"
+    ],
+    "validation": "Check that god object detection algorithm, scoring, and configuration options are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "god_object_detection"
+  },
+  {
+    "id": "suppression-patterns",
+    "title": "Suppression Patterns",
+    "file": "book/src/suppression-patterns.md",
+    "topics": [
+      "Inline comment suppression",
+      "Suppression formats (ignore, ignore-next-line, ignore blocks)",
+      "Type-specific suppression",
+      "Config file exclusion patterns",
+      "Glob pattern syntax",
+      "Best practices for suppression"
+    ],
+    "validation": "Check that all suppression formats and config patterns are documented with examples",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "suppression"
+  },
+  {
+    "id": "context-providers",
+    "title": "Context Providers",
+    "file": "book/src/context-providers.md",
+    "topics": [
+      "Critical path detection",
+      "Dependency analysis",
+      "Git history integration",
+      "Change frequency analysis",
+      "Context-aware risk adjustment",
+      "Enabling and disabling providers"
+    ],
+    "validation": "Check that all context providers are documented with configuration and use cases",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "context_providers"
+  },
+  {
+    "id": "design-patterns",
+    "title": "Design Pattern Detection",
+    "file": "book/src/design-patterns.md",
+    "topics": [
+      "Observer pattern detection",
+      "Singleton pattern detection",
+      "Factory pattern detection",
+      "Strategy pattern detection",
+      "Callback pattern detection",
+      "Template method pattern detection",
+      "Dependency injection detection",
+      "Builder pattern detection",
+      "Pattern confidence thresholds",
+      "Configuration options"
+    ],
+    "validation": "Check that all 8 design patterns are documented with detection criteria and examples",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "design_patterns_detected"
+  },
+  {
+    "id": "compare-analysis",
+    "title": "Compare Analysis",
+    "file": "book/src/compare-analysis.md",
+    "topics": [
+      "Compare command usage",
+      "Target location tracking",
+      "Project health trends",
+      "Regression detection",
+      "Before/after metrics comparison",
+      "Improvement percentage calculations",
+      "Integration with CI/CD"
+    ],
+    "validation": "Check that compare command features and workflow integration are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "compare_command"
+  },
+  {
+    "id": "validation-gates",
+    "title": "Validation and Quality Gates",
+    "file": "book/src/validation-gates.md",
+    "topics": [
+      "Validate command usage",
+      "Debt density thresholds",
+      "Quality gate configuration",
+      "CI/CD integration",
+      "Exit codes and automation",
+      "Custom validation rules"
+    ],
+    "validation": "Check that validate command and quality gate configuration are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "validate_command"
+  },
+  {
+    "id": "error-handling-analysis",
+    "title": "Error Handling Analysis",
+    "file": "book/src/error-handling-analysis.md",
+    "topics": [
+      "Error swallowing detection",
+      "Error propagation patterns",
+      "Panic pattern detection",
+      "Python error handling patterns",
+      "Best practices",
+      "Severity levels",
+      "Recommendations"
+    ],
+    "validation": "Check that all error handling patterns are documented with detection criteria",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "error_handling_patterns"
+  },
+  {
+    "id": "architectural-analysis",
+    "title": "Architectural Analysis",
+    "file": "book/src/architectural-analysis.md",
+    "topics": [
+      "Circular dependency detection",
+      "Coupling metrics (afferent, efferent)",
+      "Bidirectional dependencies",
+      "Stable dependencies principle",
+      "Zone of pain detection",
+      "Zone of uselessness detection",
+      "Code duplication detection",
+      "Refactoring recommendations"
+    ],
+    "validation": "Check that architectural pattern detection and coupling analysis are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "architectural_patterns"
+  },
+  {
+    "id": "multi-pass-analysis",
+    "title": "Multi-Pass Analysis",
+    "file": "book/src/multi-pass-analysis.md",
+    "topics": [
+      "Multi-pass analysis overview",
+      "Complexity attribution",
+      "Attribution display options",
+      "Configuration and usage",
+      "Performance considerations"
+    ],
+    "validation": "Check that multi-pass analysis and attribution features are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "multi_pass_analysis"
+  },
+  {
+    "id": "functional-analysis",
+    "title": "Functional Composition Analysis",
+    "file": "book/src/functional-analysis.md",
+    "topics": [
+      "AST-based functional analysis",
+      "Pure function detection",
+      "Side effect detection",
+      "Composition pattern recognition",
+      "Purity profiles (strict, balanced, lenient)",
+      "Scoring and distribution analysis"
+    ],
+    "validation": "Check that functional composition analysis features are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "functional_composition"
+  },
+  {
+    "id": "threshold-configuration",
+    "title": "Threshold Configuration",
+    "file": "book/src/threshold-configuration.md",
+    "topics": [
+      "Threshold presets (strict, balanced, lenient)",
+      "Custom threshold configuration",
+      "Language-specific thresholds",
+      "Cyclomatic complexity thresholds",
+      "God object thresholds",
+      "Tuning guidelines"
+    ],
+    "validation": "Check that all threshold presets and configuration options are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "threshold_presets"
+  },
+  {
+    "id": "dead-code-analysis",
+    "title": "Dead Code Analysis",
+    "file": "book/src/dead-code-analysis.md",
+    "topics": [
+      "Public API detection heuristics",
+      "Confidence thresholds",
+      "Dead code identification",
+      "Configuration options",
+      "Best practices"
+    ],
+    "validation": "Check that dead code analysis and public API detection are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "dead_code_analysis"
+  },
+  {
+    "id": "call-graph-analysis",
+    "title": "Call Graph Analysis",
+    "file": "book/src/call-graph-analysis.md",
+    "topics": [
+      "AST-based call graph construction",
+      "Trait method resolution",
+      "Macro expansion tracking",
+      "Import and module path resolution",
+      "Caller/callee relationship tracking",
+      "Critical path identification",
+      "Circular dependency detection",
+      "Call graph validation and debugging",
+      "Parallel call graph construction",
+      "External crate call filtering",
+      "Dependency display in output",
+      "Configurable caller/callee limits"
+    ],
+    "validation": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "call_graph_analysis"
+  },
+  {
+    "id": "boilerplate-detection",
+    "title": "Boilerplate Detection",
+    "file": "book/src/boilerplate-detection.md",
+    "topics": [
+      "Detection criteria for repetitive patterns",
+      "Trait implementation analysis",
+      "Method uniformity calculation",
+      "Pattern types (trait implementations, builders, state machines)",
+      "Boilerplate scoring algorithm",
+      "Macro-ification recommendations",
+      "Configuration and thresholds",
+      "Alternative approaches (code generation, generics)"
+    ],
+    "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
+    "type": "single-file",
+    "auto_generated": true,
+    "source_feature": "boilerplate_detection"
+  }
+]

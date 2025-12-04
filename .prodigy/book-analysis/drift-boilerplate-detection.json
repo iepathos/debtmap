@@ -1,0 +1,130 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "boilerplate-detection",
+  "chapter_title": "Boilerplate Detection",
+  "chapter_file": "book/src/boilerplate-detection.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter covers core concepts well but missing implementation details and actual CLI flags that don't exist",
+  "issues": [
+    {
+      "type": "incorrect_examples",
+      "severity": "high",
+      "section": "Usage",
+      "description": "Documented CLI flags do not exist in actual implementation",
+      "current_content": "debtmap analyze . --detect-boilerplate\ndebtmap analyze . --show-macro-suggestions",
+      "should_be": "Boilerplate detection runs automatically when enabled in config. No specific CLI flags exist for it.",
+      "fix_suggestion": "Remove the non-existent CLI flags. Explain that boilerplate detection is integrated into the god object analysis pipeline and controlled via configuration file only.",
+      "source_reference": "src/cli.rs (no --detect-boilerplate or --show-macro-suggestions flags exist)"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Configuration",
+      "description": "Configuration section missing several actual config fields documented in code",
+      "current_content": "Shows min_similar_implementations, max_complexity, min_uniformity",
+      "should_be": "min_impl_blocks, method_uniformity_threshold, max_avg_complexity, confidence_threshold, detect_trait_impls, detect_builders, detect_test_boilerplate",
+      "fix_suggestion": "Update configuration section to match actual BoilerplateDetectionConfig struct fields with correct names and defaults (min_impl_blocks=20, method_uniformity_threshold=0.7, max_avg_complexity=2.0, confidence_threshold=0.7)",
+      "source_reference": "src/organization/boilerplate_detector.rs:256-322"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Boilerplate Scoring Algorithm",
+      "description": "Chapter doesn't explain the confidence scoring algorithm used to detect boilerplate",
+      "fix_suggestion": "Add section explaining the weighted confidence calculation: 30% for impl count, 25% for method uniformity, 20% for low complexity, 15% for low complexity variance, 10% for single dominant trait. Mention the threshold of 0.7 (70%) confidence required for detection.",
+      "source_reference": "src/organization/boilerplate_detector.rs:124-161"
+    },
+    {
+      "type": "missing_content",
+      "severity": "medium",
+      "section": "Pattern Types",
+      "description": "Missing details about TestBoilerplate pattern type",
+      "fix_suggestion": "Add subsection for TestBoilerplate pattern with details about detecting repetitive test functions with shared structure. Currently only TraitImplementation and BuilderPattern are documented with examples.",
+      "source_reference": "src/organization/boilerplate_detector.rs:238-243"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "medium",
+      "section": "Detection Criteria",
+      "description": "Missing explanation of trait pattern analysis metrics",
+      "fix_suggestion": "Explain how TraitPatternAnalyzer computes: impl_block_count, unique_traits, most_common_trait, method_uniformity (ratio of most common method appearance to total impls), shared_methods (methods in 50%+ of impls), avg_method_complexity, complexity_variance, avg_method_lines.",
+      "source_reference": "src/organization/trait_pattern_analyzer.rs:158-176"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Integration with God Object Detection",
+      "description": "Chapter doesn't explain how boilerplate detection integrates with god object analysis",
+      "fix_suggestion": "Add section explaining that boilerplate detection runs as part of god object analysis pipeline. When a file has many impl blocks, it's classified as either: true god object (complex, needs splitting), builder pattern (intentional fluent API), or boilerplate pattern (low complexity, needs macro-ification). This distinction prevents false positives where repetitive low-complexity code is misclassified as god objects.",
+      "source_reference": "src/organization/god_object/classification_types.rs:45-50, src/analyzers/file_analyzer.rs:366-372"
+    },
+    {
+      "type": "missing_content",
+      "severity": "low",
+      "section": "Detection Signals",
+      "description": "Missing explanation of detection signals that contribute to confidence",
+      "fix_suggestion": "Document the DetectionSignal enum values: HighImplCount, HighMethodUniformity, LowAvgComplexity, HighStructDensity, LowComplexityVariance. Explain how these signals are extracted and used in the confidence calculation.",
+      "source_reference": "src/organization/boilerplate_detector.rs:246-253, 164-190"
+    },
+    {
+      "type": "incomplete_explanation",
+      "severity": "low",
+      "section": "Configuration",
+      "description": "Default values in documentation don't match actual defaults",
+      "current_content": "min_similar_implementations = 3, max_complexity = 5, min_uniformity = 0.7",
+      "should_be": "min_impl_blocks = 20, max_avg_complexity = 2.0, method_uniformity_threshold = 0.7, confidence_threshold = 0.7",
+      "fix_suggestion": "Correct all default values and field names to match implementation",
+      "source_reference": "src/organization/boilerplate_detector.rs:48-57, 310-322"
+    }
+  ],
+  "positive_aspects": [
+    "Clear overview of the feature's purpose and benefits",
+    "Good examples of trait implementation and builder pattern boilerplate",
+    "Helpful example transformation showing before/after with macro approach",
+    "Well-structured with logical sections",
+    "Accurate cross-references to related chapters (links are valid)"
+  ],
+  "improvement_suggestions": [
+    "Add a section on how boilerplate detection fits into the overall analysis workflow",
+    "Include real-world example output showing what debtmap displays when boilerplate is detected",
+    "Add troubleshooting section for common issues (e.g., why boilerplate might not be detected)",
+    "Explain the relationship between god object detection and boilerplate detection more clearly",
+    "Add performance notes about when to enable/disable different pattern detection types",
+    "Include example of actual recommendation output from MacroRecommendationEngine",
+    "Document the BuilderPattern and TestBoilerplate detection (currently only TraitImplementation is well-documented)"
+  ],
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:15:00Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Detection criteria for repetitive patterns",
+      "Trait implementation analysis",
+      "Method uniformity calculation",
+      "Pattern types (trait implementations, builders)",
+      "Macro-ification recommendations",
+      "Configuration",
+      "Alternative approaches"
+    ],
+    "validation_focus": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
+    "link_validation": {
+      "total_links": 2,
+      "broken_links": 0,
+      "all_valid": true,
+      "checked_links": [
+        {
+          "text": "Design Pattern Detection",
+          "target": "design-patterns.md",
+          "resolved": "book/src/design-patterns.md",
+          "exists": true
+        },
+        {
+          "text": "God Object Detection",
+          "target": "god-object-detection.md",
+          "resolved": "book/src/god-object-detection.md",
+          "exists": true
+        }
+      ]
+    }
+  }
+}

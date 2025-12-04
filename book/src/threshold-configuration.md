@@ -61,7 +61,7 @@ debtmap analyze . --threshold-preset lenient
 
 ## Understanding Complexity Thresholds
 
-Debtmap tracks multiple complexity metrics. A function must exceed **ALL** thresholds to be flagged:
+Debtmap tracks multiple complexity metrics and uses **conjunction logic**: a function must exceed **ALL** thresholds to be flagged as technical debt.
 
 ### Cyclomatic Complexity
 
@@ -102,27 +102,32 @@ Additional metrics for specific patterns:
 - **Match arms**: Flags large match/switch statements (default: 4)
 - **If-else chains**: Flags long conditional chains (default: 3)
 
-**Important**: Functions are flagged when they meet ALL of these conditions simultaneously:
+**Critical**: Debtmap uses **conjunction logic** - functions are flagged only when they meet **ALL** of these conditions simultaneously:
 - Cyclomatic complexity >= adjusted cyclomatic threshold
 - Cognitive complexity >= adjusted cognitive threshold
 - Function length >= minimum function length
 - Total complexity (cyclomatic + cognitive) >= adjusted total threshold
 
-The thresholds are first adjusted by role-based multipliers, then all four checks must pass for the function to be flagged. This is a conjunction (AND) of individual threshold checks.
+The thresholds are first adjusted by role-based multipliers, then all four checks must pass for the function to be flagged.
 
 ### Threshold Validation
 
-All threshold configurations are validated to ensure they are positive (non-zero) values. The following validation rules apply:
+Debtmap validates critical thresholds to prevent misconfiguration. The following validation rules apply (src/complexity/threshold_manager.rs:191-217):
 
+**Core Complexity Metrics** (must not be zero):
 - `minimum_total_complexity` > 0
 - `minimum_cyclomatic_complexity` > 0
 - `minimum_cognitive_complexity` > 0
-- `minimum_match_arms` > 0
-- `minimum_if_else_chain` > 0
-- `minimum_function_length` > 0
-- All role multipliers > 0
 
-If any threshold is set to zero or a negative value, Debtmap will reject the configuration and use default values instead. This ensures that thresholds are always meaningful and prevent misconfiguration.
+**Role Multipliers** (must be positive):
+- `entry_point_multiplier` > 0
+- `core_logic_multiplier` > 0
+- `utility_multiplier` > 0
+- `test_function_multiplier` > 0
+
+**Note**: Structural thresholds (`minimum_match_arms`, `minimum_if_else_chain`, `minimum_function_length`) are not validated and can be set to any value including zero. Zero values effectively disable those checks.
+
+If any validated field fails validation, Debtmap will reject the configuration with an error message and use default values instead.
 
 ## Role-Based Multipliers
 
@@ -239,7 +244,7 @@ test_function_multiplier = 2.0      # Unit tests, integration tests
 
 **Note**: The multipliers are applied to thresholds before comparison. For example, with `entry_point_multiplier = 1.5` and `minimum_cyclomatic_complexity = 5`, an entry point function would be flagged at cyclomatic complexity 7.5 (5 × 1.5).
 
-**Validation**: All threshold values must be positive (> 0). Zero or negative values will cause validation errors and Debtmap will use default values instead. This ensures that thresholds are always meaningful and prevents misconfiguration.
+**Validation**: Core complexity metrics (`minimum_total_complexity`, `minimum_cyclomatic_complexity`, `minimum_cognitive_complexity`) and all role multipliers must be positive (> 0). Zero or negative values for these fields will cause validation errors and Debtmap will use default values. Structural thresholds (`minimum_match_arms`, `minimum_if_else_chain`, `minimum_function_length`) are not validated and can be set to zero to disable those checks.
 
 ### Complete Example
 

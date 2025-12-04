@@ -30,6 +30,8 @@ Where `context_contribution` is the weighted sum of all provider contributions:
 context_contribution = Σ(provider.contribution × provider.weight)
 ```
 
+> **Configuration Note**: Provider-specific TOML configuration (like `[context.critical_path]`) is a planned feature not yet implemented. All providers currently use hard-coded defaults from the implementation. Use CLI flags (`--context`, `--context-providers`, `--disable-context`) to control providers. See the [Enabling Context Providers](#enabling-context-providers) section for working examples.
+
 ## Critical Path Provider
 
 The Critical Path provider identifies functions that lie on critical execution paths through your application. Functions on these paths have elevated risk because failures directly impact user-facing functionality.
@@ -867,7 +869,7 @@ pub trait ContextProvider: Send + Sync {
 }
 ```
 
-See [src/risk/context/mod.rs](https://github.com/your-repo/debtmap/blob/main/src/risk/context/mod.rs) for implementation examples.
+See `src/risk/context/mod.rs` for the trait definition and `src/risk/context/` for built-in provider implementations.
 
 ## Future Enhancements
 
@@ -905,8 +907,9 @@ You gain actionable insights for prioritizing technical debt and refactoring eff
 
 ## See Also
 
-- [Analysis Guide](analysis-guide.md) - Core analysis concepts
-- [Risk Assessment](analysis-guide.md#risk-assessment) - Risk scoring methodology
+- [Analysis Guide](analysis-guide/index.md) - Core analysis concepts
+- [Risk Scoring](analysis-guide/risk-scoring.md) - Risk scoring methodology
+- [Scoring Strategies](scoring-strategies.md) - File-level and function-level scoring
 - [Configuration](configuration.md) - Complete configuration reference
 - [Parallel Processing](parallel-processing.md) - Performance optimization
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
