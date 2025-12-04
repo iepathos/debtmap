@@ -44,7 +44,11 @@ Measures how difficult code is to understand by considering nesting depth and co
 
 **Calculation:**
 - Each structure (if, loop, match) gets a base score
-- Nesting multiplies the weight (nested structures = harder to understand)
+- **Nesting increases weight linearly**: Each nesting level adds to the complexity score
+  - Base level (no nesting): weight = 1
+  - First nesting level: weight = 2
+  - Second nesting level: weight = 3
+  - Formula: `complexity = 1 + nesting_level` (from src/complexity/cognitive.rs:151)
 - Break/continue/return in middle of function adds cognitive load
 
 **Example:**
@@ -95,19 +99,38 @@ Uses information theory to distinguish genuinely complex code from pattern-based
    - High similarity (0.8+): Branches do similar things (consistent handling)
    - Low similarity: Each branch has unique logic
 
-4. **Token Classification**: Categorizes tokens by type with weighted importance
-   - Variables, methods, literals weighted differently
-   - Focuses on structural complexity over superficial differences
+4. **Token Classification**: Categorizes tokens by type with weighted importance (src/complexity/entropy_core.rs:44-54)
+   - **Token categories and weights** (from src/complexity/entropy_traits.rs:24-44):
+     - `ControlFlow` (1.2): if, match, for, while - highest weight for control structures
+     - `Keyword` (1.0): language keywords like fn, let, pub
+     - `FunctionCall` (0.9): method calls and API usage
+     - `Operator` (0.8): +, -, *, ==, etc.
+     - `Identifier` (0.5): variable and function names
+     - `Literal` (0.3): string, number, boolean literals - lowest weight
+   - Higher weights emphasize structural complexity over superficial differences
+   - Focuses entropy calculation on control flow and logic rather than data values
 
 **Dampening logic:** Dampening is applied when multiple factors indicate repetitive patterns:
 - Low token entropy (< 0.4) indicates simple, repetitive patterns
-- High pattern repetition (> 0.6) shows similar code blocks
+- High pattern repetition (> 0.6) shows similar code blocks (measured via PatternMetrics)
 - High branch similarity (> 0.7) indicates consistent branching logic
+
+**Pattern detection** (src/complexity/entropy_core.rs:56-85):
+- `PatternMetrics` tracks intermediate calculations:
+  - `total_patterns`: Total number of code patterns detected
+  - `unique_patterns`: Count of distinct patterns
+  - `repetition_ratio`: Calculated as `1.0 - (unique_patterns / total_patterns)`
+- High repetition ratio indicates validation functions, dispatchers, and configuration parsers
 
 When these conditions are met:
 ```
 effective_complexity = entropy × pattern_factor × similarity_factor
 ```
+
+**Note on metrics** (src/complexity/entropy_core.rs:28-32):
+- `token_entropy`: Measures unpredictability of code tokens (0.0-1.0), used for pattern detection
+- `effective_complexity`: Final composite score after applying dampening adjustments
+- These are distinct metrics - `effective_complexity` combines multiple factors, while `token_entropy` is a single entropy measurement
 
 **Dampening cap:** The dampening factor has a minimum of 0.7, ensuring no more than 30% reduction in complexity scores. This prevents over-correction of pattern-based code and maintains a baseline complexity floor for functions that still require understanding and maintenance.
 
