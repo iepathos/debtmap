@@ -10,8 +10,8 @@
       "Target audience"
     ],
     "validation": "Ensure introduction covers project purpose and main features",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "getting-started",
@@ -24,8 +24,8 @@
       "Basic usage"
     ],
     "validation": "Check installation instructions and quick start examples are current",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "cli-reference",
@@ -38,22 +38,124 @@
       "Configuration"
     ],
     "validation": "Verify all CLI commands from src/cli/ are documented with current options",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
-    "id": "analysis-guide",
-    "title": "Analysis Guide",
-    "file": "book/src/analysis-guide.md",
+    "id": "overview",
+    "title": "Overview",
+    "file": "book/src/analysis-guide/overview.md",
     "topics": [
-      "Complexity metrics",
-      "Debt patterns",
-      "Risk scoring",
-      "Interpreting results"
+      "Analysis capabilities",
+      "Overall approach"
     ],
-    "validation": "Ensure all analyzer types and metrics are explained",
-    "auto_generated": false,
-    "type": "single-file"
+    "validation": "Check introduction covers analysis fundamentals",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "complexity-metrics",
+    "title": "Complexity Metrics",
+    "file": "book/src/analysis-guide/complexity-metrics.md",
+    "topics": [
+      "Cyclomatic complexity",
+      "Cognitive complexity",
+      "Entropy analysis",
+      "Constructor detection"
+    ],
+    "validation": "Verify all complexity metric types are documented with examples",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "debt-patterns",
+    "title": "Debt Patterns",
+    "file": "book/src/analysis-guide/debt-patterns.md",
+    "topics": [
+      "Debt types",
+      "Debt categories",
+      "Detection criteria",
+      "Examples by category"
+    ],
+    "validation": "Ensure all 25 debt types are documented with detection criteria",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "risk-scoring",
+    "title": "Risk Scoring",
+    "file": "book/src/analysis-guide/risk-scoring.md",
+    "topics": [
+      "Unified scoring system",
+      "Risk categories",
+      "Coverage propagation",
+      "ROI calculation"
+    ],
+    "validation": "Check risk scoring formulas and prioritization strategies",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "interpreting-results",
+    "title": "Interpreting Results",
+    "file": "book/src/analysis-guide/interpreting-results.md",
+    "topics": [
+      "Output formats",
+      "JSON structure",
+      "Prioritization strategies",
+      "Actionable insights"
+    ],
+    "validation": "Verify result interpretation guidance is comprehensive",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "analyzer-types",
+    "title": "Analyzer Types",
+    "file": "book/src/analysis-guide/analyzer-types.md",
+    "topics": [
+      "Supported languages",
+      "Language detection",
+      "Analyzer capabilities"
+    ],
+    "validation": "Check analyzer type documentation is current",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "advanced-features",
+    "title": "Advanced Features",
+    "file": "book/src/analysis-guide/advanced-features.md",
+    "topics": [
+      "Purity detection",
+      "Data flow analysis",
+      "Entropy caching",
+      "Context-aware analysis"
+    ],
+    "validation": "Ensure advanced features are fully documented",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
+  },
+  {
+    "id": "example-outputs",
+    "title": "Example Outputs",
+    "file": "book/src/analysis-guide/example-outputs.md",
+    "topics": [
+      "Terminal output examples",
+      "JSON output examples",
+      "Before/after comparisons"
+    ],
+    "validation": "Verify examples are realistic and helpful",
+    "type": "subsection",
+    "parent_chapter_id": "analysis-guide",
+    "parent_chapter_title": "Analysis Guide"
   },
   {
     "id": "configuration",
@@ -66,8 +168,8 @@
       "Customization"
     ],
     "validation": "Check config options match implementation in src/config/",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "output-formats",
@@ -80,8 +182,8 @@
       "Custom formatting"
     ],
     "validation": "Verify output format documentation matches src/io/ implementation",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "examples",
@@ -94,8 +196,8 @@
       "CI integration"
     ],
     "validation": "Ensure examples use current CLI syntax and options",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "troubleshooting",
@@ -108,8 +210,8 @@
       "FAQ"
     ],
     "validation": "Check troubleshooting covers common user issues",
-    "auto_generated": false,
-    "type": "single-file"
+    "type": "single-file",
+    "auto_generated": false
   },
   {
     "id": "tiered-prioritization",
@@ -124,9 +226,9 @@
       "Customizing tier thresholds"
     ],
     "validation": "Check that tier strategy, weights, and configuration options are documented with examples",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "tiered_prioritization",
-    "type": "single-file"
+    "source_feature": "tiered_prioritization"
   },
   {
     "id": "scoring-strategies",
@@ -141,9 +243,9 @@
       "Use case comparison"
     ],
     "validation": "Check that file-level and function-level scoring differences are explained with use cases",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "scoring_comparison",
-    "type": "single-file"
+    "source_feature": "scoring_comparison"
   },
   {
     "id": "prodigy-integration",
@@ -159,9 +261,9 @@
       "Validation and testing"
     ],
     "validation": "Check that Prodigy workflow integration is documented with workflow file examples",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "prodigy_workflows",
-    "type": "single-file"
+    "source_feature": "prodigy_workflows"
   },
   {
     "id": "parallel-processing",
@@ -176,9 +278,9 @@
       "Scaling strategies"
     ],
     "validation": "Check that parallel processing features, thread configuration, and performance characteristics are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "parallel_processing",
-    "type": "single-file"
+    "source_feature": "parallel_processing"
   },
   {
     "id": "entropy-analysis",
@@ -194,9 +296,9 @@
       "False positive reduction"
     ],
     "validation": "Check that entropy analysis algorithm, components, and configuration are documented with examples",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "entropy_based_analysis",
-    "type": "single-file"
+    "source_feature": "entropy_based_analysis"
   },
   {
     "id": "coverage-integration",
@@ -212,9 +314,9 @@
       "Best practices"
     ],
     "validation": "Check that coverage setup, tool integration, and troubleshooting are documented for all supported languages",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "coverage_integration",
-    "type": "single-file"
+    "source_feature": "coverage_integration"
   },
   {
     "id": "god-object-detection",
@@ -229,9 +331,9 @@
       "Examples and case studies"
     ],
     "validation": "Check that god object detection algorithm, scoring, and configuration options are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "god_object_detection",
-    "type": "single-file"
+    "source_feature": "god_object_detection"
   },
   {
     "id": "suppression-patterns",
@@ -246,9 +348,9 @@
       "Best practices for suppression"
     ],
     "validation": "Check that all suppression formats and config patterns are documented with examples",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "suppression",
-    "type": "single-file"
+    "source_feature": "suppression"
   },
   {
     "id": "context-providers",
@@ -263,9 +365,9 @@
       "Enabling and disabling providers"
     ],
     "validation": "Check that all context providers are documented with configuration and use cases",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "context_providers",
-    "type": "single-file"
+    "source_feature": "context_providers"
   },
   {
     "id": "design-patterns",
@@ -284,9 +386,9 @@
       "Configuration options"
     ],
     "validation": "Check that all 8 design patterns are documented with detection criteria and examples",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "design_patterns_detected",
-    "type": "single-file"
+    "source_feature": "design_patterns_detected"
   },
   {
     "id": "compare-analysis",
@@ -302,9 +404,9 @@
       "Integration with CI/CD"
     ],
     "validation": "Check that compare command features and workflow integration are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "compare_command",
-    "type": "single-file"
+    "source_feature": "compare_command"
   },
   {
     "id": "validation-gates",
@@ -319,9 +421,9 @@
       "Custom validation rules"
     ],
     "validation": "Check that validate command and quality gate configuration are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "validate_command",
-    "type": "single-file"
+    "source_feature": "validate_command"
   },
   {
     "id": "error-handling-analysis",
@@ -337,9 +439,9 @@
       "Recommendations"
     ],
     "validation": "Check that all error handling patterns are documented with detection criteria",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "error_handling_patterns",
-    "type": "single-file"
+    "source_feature": "error_handling_patterns"
   },
   {
     "id": "architectural-analysis",
@@ -356,9 +458,9 @@
       "Refactoring recommendations"
     ],
     "validation": "Check that architectural pattern detection and coupling analysis are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "architectural_patterns",
-    "type": "single-file"
+    "source_feature": "architectural_patterns"
   },
   {
     "id": "multi-pass-analysis",
@@ -372,9 +474,9 @@
       "Performance considerations"
     ],
     "validation": "Check that multi-pass analysis and attribution features are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "multi_pass_analysis",
-    "type": "single-file"
+    "source_feature": "multi_pass_analysis"
   },
   {
     "id": "functional-analysis",
@@ -389,9 +491,9 @@
       "Scoring and distribution analysis"
     ],
     "validation": "Check that functional composition analysis features are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "functional_composition",
-    "type": "single-file"
+    "source_feature": "functional_composition"
   },
   {
     "id": "threshold-configuration",
@@ -406,9 +508,9 @@
       "Tuning guidelines"
     ],
     "validation": "Check that all threshold presets and configuration options are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "threshold_presets",
-    "type": "single-file"
+    "source_feature": "threshold_presets"
   },
   {
     "id": "dead-code-analysis",
@@ -422,9 +524,9 @@
       "Best practices"
     ],
     "validation": "Check that dead code analysis and public API detection are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "dead_code_analysis",
-    "type": "single-file"
+    "source_feature": "dead_code_analysis"
   },
   {
     "id": "call-graph-analysis",
@@ -445,9 +547,9 @@
       "Configurable caller/callee limits"
     ],
     "validation": "Check that call graph construction, resolution mechanisms, and visualization options are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "call_graph_analysis",
-    "type": "single-file"
+    "source_feature": "call_graph_analysis"
   },
   {
     "id": "boilerplate-detection",
@@ -464,8 +566,8 @@
       "Alternative approaches (code generation, generics)"
     ],
     "validation": "Check that boilerplate detection criteria, pattern types, and macro recommendations are documented",
+    "type": "single-file",
     "auto_generated": true,
-    "source_feature": "boilerplate_detection",
-    "type": "single-file"
+    "source_feature": "boilerplate_detection"
   }
 ]
