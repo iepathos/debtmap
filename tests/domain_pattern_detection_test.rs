@@ -1,14 +1,7 @@
 //! Integration tests for domain pattern detection (Spec 175)
-#![allow(deprecated)]
 
-use debtmap::organization::{
-    cluster_methods_by_domain, group_methods_by_responsibility_with_domain_patterns, DomainPattern,
-    DomainPatternDetector,
-};
-use debtmap::{
-    analysis::io_detection::Language,
-    organization::domain_patterns::{FileContext, MethodInfo},
-};
+use debtmap::organization::domain_patterns::{FileContext, MethodInfo};
+use debtmap::organization::{cluster_methods_by_domain, DomainPattern, DomainPatternDetector};
 use std::collections::HashSet;
 
 #[test]
@@ -104,61 +97,66 @@ fn test_callback_pattern_detection() {
 
 #[test]
 fn test_domain_pattern_integration_with_responsibility_classification() {
-    // Test that domain pattern detection integrates correctly with responsibility classification
+    // Test that domain pattern detection integrates correctly with domain clustering
+    let detector = DomainPatternDetector::new();
 
-    let methods = vec![
-        // Observer pattern methods
-        (
-            "register_observer".to_string(),
-            Some("self.observer_registry.register(obs)".to_string()),
-        ),
-        (
-            "notify_observers".to_string(),
-            Some("self.observer_registry.notify_all()".to_string()),
-        ),
-        (
-            "unregister_observer".to_string(),
-            Some("self.observer_registry.remove(obs)".to_string()),
-        ),
-        // Non-pattern method
-        (
-            "format_output".to_string(),
-            Some("format!(\"{}\", data)".to_string()),
-        ),
-        (
-            "parse_input".to_string(),
-            Some("parse(input_str)".to_string()),
-        ),
+    // Observer pattern methods
+    let method_infos = vec![
+        MethodInfo {
+            name: "register_observer".to_string(),
+            body: "self.observer_registry.register(obs)".to_string(),
+            doc_comment: None,
+        },
+        MethodInfo {
+            name: "notify_observers".to_string(),
+            body: "self.observer_registry.notify_all()".to_string(),
+            doc_comment: None,
+        },
+        MethodInfo {
+            name: "unregister_observer".to_string(),
+            body: "self.observer_registry.remove(obs)".to_string(),
+            doc_comment: None,
+        },
+        // Non-pattern methods
+        MethodInfo {
+            name: "format_output".to_string(),
+            body: "format!(\"{}\", data)".to_string(),
+            doc_comment: None,
+        },
+        MethodInfo {
+            name: "parse_input".to_string(),
+            body: "parse(input_str)".to_string(),
+            doc_comment: None,
+        },
     ];
 
-    let structures = vec!["ObserverRegistry".to_string()];
+    let context = FileContext {
+        methods: method_infos.clone(),
+        structures: ["ObserverRegistry".to_string()].into_iter().collect(),
+        call_edges: vec![],
+    };
 
-    let (groups, _evidence) =
-        group_methods_by_responsibility_with_domain_patterns(&methods, Language::Rust, &structures);
+    let clusters = cluster_methods_by_domain(&method_infos, &context, &detector);
 
-    // Should have observer pattern group
+    // Should have observer pattern cluster
     assert!(
-        groups.contains_key("Observer Pattern Detection"),
-        "Should have Observer Pattern Detection group. Groups: {:?}",
-        groups.keys().collect::<Vec<_>>()
+        clusters.contains_key(&DomainPattern::ObserverPattern),
+        "Should have Observer Pattern cluster. Clusters: {:?}",
+        clusters.keys().collect::<Vec<_>>()
     );
 
-    let observer_group = &groups["Observer Pattern Detection"];
+    let observer_cluster = &clusters[&DomainPattern::ObserverPattern];
     assert_eq!(
-        observer_group.len(),
+        observer_cluster.len(),
         3,
-        "Observer pattern group should have 3 methods"
+        "Observer pattern cluster should have 3 methods"
     );
 
-    // Non-pattern methods should be classified separately
-    assert!(
-        groups.contains_key("Formatting") || groups.contains_key("Formatting/Serialization"),
-        "Should have formatting group"
-    );
-    assert!(
-        groups.contains_key("Parsing") || groups.contains_key("Parsing/Deserialization"),
-        "Should have parsing group"
-    );
+    // Verify the observer methods are in the cluster
+    let observer_names: Vec<&str> = observer_cluster.iter().map(|m| m.name.as_str()).collect();
+    assert!(observer_names.contains(&"register_observer"));
+    assert!(observer_names.contains(&"notify_observers"));
+    assert!(observer_names.contains(&"unregister_observer"));
 }
 
 #[test]
