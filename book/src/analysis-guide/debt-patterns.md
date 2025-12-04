@@ -2,11 +2,17 @@
 
 ## Debt Patterns
 
-Debtmap detects 25 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
+Debtmap detects 27 types of technical debt, organized into 4 strategic categories. Each debt type is mapped to a category that guides prioritization and remediation strategies.
+
+**Source**: All debt types and category mappings verified from src/priority/mod.rs:158-347
 
 ### Debt Type Enum
 
-The `DebtType` enum defines all specific debt patterns that Debtmap can detect:
+The `DebtType` enum defines all specific debt patterns that Debtmap can detect.
+
+**Note**: Each `DebtType` variant carries structured diagnostic data specific to that pattern. For example, `ComplexityHotspot` includes `cyclomatic`, `cognitive`, and `adjusted_cyclomatic` (entropy-adjusted) fields that provide detailed metrics for the detected issue. This structured data enables precise prioritization and actionable recommendations.
+
+**Source**: DebtType structure defined in src/priority/mod.rs:158-288
 
 **Testing Debt:**
 - `TestingGap` - Functions with insufficient test coverage
@@ -18,13 +24,13 @@ The `DebtType` enum defines all specific debt patterns that Debtmap can detect:
 - `FlakyTestPattern` - Non-deterministic test behavior
 
 **Architecture Debt:**
-- `ComplexityHotspot` - Functions exceeding complexity thresholds
-- `DeadCode` - Unreachable or unused code
 - `GodObject` - Classes with too many responsibilities
 - `GodModule` - Modules with too many responsibilities
 - `FeatureEnvy` - Using more data from other objects than own
 - `PrimitiveObsession` - Overusing basic types instead of domain objects
-- `MagicValues` - Unexplained literal values
+- `ScatteredType` - Types with methods scattered across multiple files
+- `OrphanedFunctions` - Functions that should be methods on a type
+- `UtilitiesSprawl` - Utility modules with poor cohesion
 
 **Performance Debt:**
 - `AllocationInefficiency` - Inefficient memory allocations
@@ -37,6 +43,9 @@ The `DebtType` enum defines all specific debt patterns that Debtmap can detect:
 - `CollectionInefficiency` - Inefficient collection operations
 
 **Code Quality Debt:**
+- `ComplexityHotspot` - Functions exceeding complexity thresholds
+- `DeadCode` - Unreachable or unused code
+- `MagicValues` - Unexplained literal values
 - `Risk` - High-risk code (complex + poorly tested)
 - `Duplication` - Duplicated code blocks
 - `ErrorSwallowing` - Errors caught but ignored
@@ -56,12 +65,14 @@ pub enum DebtCategory {
 
 **Category Mapping:**
 
+**Source**: Verified from src/priority/mod.rs:309-347
+
 | Debt Type | Category | Strategic Focus |
 |-----------|----------|-----------------|
-| ComplexityHotspot, DeadCode, GodObject, GodModule, FeatureEnvy, PrimitiveObsession, MagicValues | Architecture | Structural improvements, design patterns |
+| GodObject, GodModule, FeatureEnvy, PrimitiveObsession, ScatteredType, OrphanedFunctions, UtilitiesSprawl | Architecture | Structural improvements, design patterns, type organization |
 | TestingGap, TestTodo, TestComplexity, TestDuplication, TestComplexityHotspot, AssertionComplexity, FlakyTestPattern | Testing | Test coverage, test quality |
 | AllocationInefficiency, StringConcatenation, NestedLoops, BlockingIO, SuboptimalDataStructure, AsyncMisuse, ResourceLeak, CollectionInefficiency | Performance | Runtime efficiency, resource usage |
-| Risk, Duplication, ErrorSwallowing | CodeQuality | Maintainability, reliability |
+| ComplexityHotspot, DeadCode, MagicValues, Risk, Duplication, ErrorSwallowing | CodeQuality | Maintainability, reliability, code clarity |
 
 **Language-Specific Debt Patterns:**
 
@@ -75,20 +86,6 @@ Debtmap automatically applies only the relevant debt patterns during analysis.
 ### Examples by Category
 
 #### Architecture Debt
-
-**ComplexityHotspot**: Functions exceeding complexity thresholds
-```rust
-// Cyclomatic: 22, Cognitive: 35
-fn process_transaction(tx: Transaction, account: &mut Account) -> Result<Receipt> {
-    if tx.amount <= 0 {
-        return Err(Error::InvalidAmount);
-    }
-    // ... deeply nested logic with many branches
-    Ok(receipt)
-}
-```
-**When detected**: Cyclomatic > 10 OR Cognitive > 15 (configurable)
-**Action**: Break into smaller functions, extract validation, simplify control flow
 
 **GodObject / GodModule**: Too many responsibilities
 ```rust
@@ -180,20 +177,96 @@ When Debtmap detects a god object, the output includes:
 - God object score
 - Recommended module splits based on responsibility clustering
 
-**MagicValues**: Unexplained literals
+#### Type Organization Debt
+
+**Source**: Type organization patterns defined in src/priority/mod.rs:273-288, detection logic in src/organization/codebase_type_analyzer.rs
+
+These patterns detect issues with how types and their associated functions are organized across the codebase.
+
+**ScatteredType**: Type with methods scattered across multiple files
+
 ```rust
-// Bad: Magic numbers
-fn calculate_price(quantity: u32) -> f64 {
-    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+// Type definition in types/user.rs
+pub struct User {
+    id: UserId,
+    name: String,
 }
 
-// Good: Named constants
-const UNIT_PRICE: f64 = 19.99;
-const SHIPPING_COST: f64 = 5.0;
-fn calculate_price(quantity: u32) -> f64 {
-    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+// Methods scattered across files:
+// In modules/auth.rs:
+impl User {
+    fn authenticate(&self) -> Result<Session> { /* ... */ }
+}
+
+// In modules/validation.rs:
+impl User {
+    fn validate_email(&self) -> Result<()> { /* ... */ }
+}
+
+// In modules/persistence.rs:
+impl User {
+    fn save(&self) -> Result<()> { /* ... */ }
+}
+
+// Problem: User methods spread across 4+ files!
+```
+
+**When detected**: Type has methods in 2+ files (severity: Low=2 files, Medium=3-5 files, High=6+ files)
+**Action**: Consolidate methods into primary file or create focused trait implementations
+**Source**: Detection criteria from src/organization/codebase_type_analyzer.rs:46-47
+
+**OrphanedFunctions**: Functions that should be methods on a type
+
+```rust
+// Bad: Orphaned functions operating on User
+fn validate_user_email(user: &User) -> Result<()> {
+    // Email validation logic
+}
+
+fn calculate_user_age(user: &User) -> u32 {
+    // Age calculation from birthdate
+}
+
+fn format_user_display(user: &User) -> String {
+    // Display formatting
+}
+
+// Good: Functions converted to methods
+impl User {
+    fn validate_email(&self) -> Result<()> { /* ... */ }
+    fn age(&self) -> u32 { /* ... */ }
+    fn display(&self) -> String { /* ... */ }
 }
 ```
+
+**When detected**: Multiple functions with shared type parameter pattern (e.g., all take `&User`)
+**Action**: Convert functions to methods on the target type
+**Source**: Detection in src/organization/codebase_type_analyzer.rs:58-71
+
+**UtilitiesSprawl**: Utility module with poor cohesion
+
+```rust
+// Bad: utils.rs with mixed responsibilities
+mod utils {
+    fn parse_date(s: &str) -> Date { /* ... */ }
+    fn validate_email(s: &str) -> bool { /* ... */ }
+    fn calculate_hash(data: &[u8]) -> Hash { /* ... */ }
+    fn format_currency(amount: f64) -> String { /* ... */ }
+    fn send_notification(msg: &str) { /* ... */ }
+    // ... 20+ more unrelated functions
+}
+
+// Good: Focused modules
+mod date_utils { fn parse(s: &str) -> Date { /* ... */ } }
+mod validators { fn email(s: &str) -> bool { /* ... */ } }
+mod crypto { fn hash(data: &[u8]) -> Hash { /* ... */ } }
+mod formatters { fn currency(amount: f64) -> String { /* ... */ } }
+mod notifications { fn send(msg: &str) { /* ... */ } }
+```
+
+**When detected**: Utility module has many functions operating on diverse types with low cohesion
+**Action**: Split into focused modules based on domain or responsibility
+**Source**: Detection in src/organization/codebase_type_analyzer.rs:74-80
 
 #### Testing Debt
 
@@ -294,6 +367,75 @@ fn find_duplicates(items: &[Item]) -> Vec<Item> {
 ```
 
 #### Code Quality Debt
+
+**ComplexityHotspot**: Functions exceeding complexity thresholds
+
+**Source**: Categorized as CodeQuality in src/priority/mod.rs:340
+
+```rust
+// Cyclomatic: 22, Cognitive: 35
+fn process_transaction(tx: Transaction, account: &mut Account) -> Result<Receipt> {
+    if tx.amount <= 0 {
+        return Err(Error::InvalidAmount);
+    }
+    if account.balance < tx.amount {
+        if account.overdraft_enabled {
+            if account.overdraft_limit >= tx.amount {
+                // More nested branches...
+            }
+        } else {
+            return Err(Error::InsufficientFunds);
+        }
+    }
+    // ... deeply nested logic with many branches
+    Ok(receipt)
+}
+```
+
+**When detected**: Cyclomatic > 10 OR Cognitive > 15 (configurable)
+**Action**: Break into smaller functions, extract validation, simplify control flow
+**Note**: Includes entropy-adjusted complexity (adjusted_cyclomatic) when available
+
+**DeadCode**: Unreachable or unused code
+
+**Source**: Categorized as CodeQuality in src/priority/mod.rs:341
+
+```rust
+// Private function never called within module
+fn obsolete_calculation(x: i32) -> i32 {
+    x * 2 + 5  // Dead code - no callers
+}
+
+// Public function but no external usage
+pub fn deprecated_api(data: &str) -> Result<()> {
+    // Unreachable in practice
+    Ok(())
+}
+```
+
+**When detected**: Function visibility analysis + call graph shows no callers
+**Action**: Remove dead code or document if intentionally kept for future use
+
+**MagicValues**: Unexplained literal values
+
+**Source**: Categorized as CodeQuality in src/priority/mod.rs:345
+
+```rust
+// Bad: Magic numbers
+fn calculate_price(quantity: u32) -> f64 {
+    quantity as f64 * 19.99 + 5.0  // What are these numbers?
+}
+
+// Good: Named constants
+const UNIT_PRICE: f64 = 19.99;
+const SHIPPING_COST: f64 = 5.0;
+fn calculate_price(quantity: u32) -> f64 {
+    quantity as f64 * UNIT_PRICE + SHIPPING_COST
+}
+```
+
+**When detected**: Numeric or string literals without clear context (excludes 0, 1, common patterns)
+**Action**: Extract to named constants or configuration
 
 **Duplication**: Duplicated code blocks
 ```rust
