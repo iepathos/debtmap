@@ -56,10 +56,9 @@ pub use god_object_analysis::{
 
 pub use god_object::types::{
     ClassificationResult, DetectionType, EnhancedGodObjectAnalysis, FunctionVisibilityBreakdown,
-    GodObjectAnalysis, GodObjectConfidence, GodObjectType, InterfaceEstimate,
-    MergeRecord, MetricInconsistency, ModuleSplit, Priority, PurityDistribution,
-    RecommendationSeverity, SignalType, SplitAnalysisMethod, StageType, StructMetrics,
-    StructWithMethods,
+    GodObjectAnalysis, GodObjectConfidence, GodObjectType, InterfaceEstimate, MergeRecord,
+    MetricInconsistency, ModuleSplit, Priority, PurityDistribution, RecommendationSeverity,
+    SignalType, SplitAnalysisMethod, StageType, StructMetrics, StructWithMethods,
 };
 
 pub use god_object::thresholds::GodObjectThresholds;

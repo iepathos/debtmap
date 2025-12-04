@@ -578,7 +578,7 @@ pub fn group_methods_by_responsibility_with_domain_patterns(
 /// # Examples
 ///
 /// ```
-/// # use debtmap::organization::god_object_analysis::{ClassificationResult, SignalType};
+/// # use debtmap::organization::god_object::{ClassificationResult, SignalType};
 /// let result = ClassificationResult {
 ///     category: Some("parsing".to_string()),
 ///     confidence: 0.85,
