@@ -15,14 +15,16 @@ debtmap analyze . --format json
 
 # Markdown output - documentation and reports
 debtmap analyze . --format markdown
+
+# HTML output - interactive web dashboard
+debtmap analyze . --format html
 ```
 
 Available formats:
 - **terminal** (default): Interactive output with colors, emoji, and formatting
 - **json**: Structured data for programmatic processing
 - **markdown**: Reports suitable for documentation and PR comments
-
-> **Note:** The codebase also includes an `Html` format variant in `src/core/types.rs` and `src/analysis/diagnostics/`, but this is only available internally for diagnostic reporting and is not exposed as a CLI option. For HTML output, convert markdown reports using tools like pandoc (see [Rendering to HTML/PDF](#rendering-to-htmlpdf)).
+- **html**: Web-viewable HTML reports with interactive dashboard
 
 ### Writing to Files
 
@@ -133,7 +135,7 @@ Guidance levels:
 - **High** (11-15): Extract 3-5 pure functions using decompose-then-transform strategy
 - **Severe** (>15): Extract 5+ pure functions into modules with functional core/imperative shell
 
-See the [Analysis Guide](./analysis-guide.md) for metric explanations.
+See the [Analysis Guide](./analysis-guide/index.md) for metric explanations.
 
 ### Plain Terminal Mode
 
@@ -500,100 +502,6 @@ Here's a complete annotated JSON output example:
 - `TestDuplication`: Duplicated test code
 - `TestQuality`: Test quality issues
 
-### JSON Format Variants
-
-Debtmap supports two JSON output formats:
-
-```bash
-# Legacy format (default) - backward compatible
-debtmap analyze . --format json --output-format legacy
-
-# Unified format - new consistent structure
-debtmap analyze . --format json --output-format unified
-```
-
-> **Note:** The `--output-format` flag only applies when using `--format json`. It has no effect with markdown or terminal formats.
-
-#### Format Comparison
-
-**Legacy format:** Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tooling.
-
-**Unified format:** Consistent structure with a `type` field, making parsing simpler and more predictable. Recommended for new integrations.
-
-**When to use each format:**
-
-- **Use legacy format if:**
-  - You have existing tooling that expects the old structure
-  - You need backward compatibility with version 1.x parsers
-  - You're integrating with third-party tools expecting the legacy format
-
-- **Use unified format for:**
-  - All new integrations and tooling
-  - Cleaner, more predictable JSON parsing
-  - Future-proof implementations
-  - Simpler type discrimination in statically-typed languages
-
-**Migration strategy:**
-
-The legacy format will be maintained for backward compatibility, but unified is the recommended format going forward. If you're starting a new integration, use unified format from the beginning. If migrating existing tooling:
-
-1. Test unified format with a subset of your codebase
-2. Update parsers to handle the `type` field instead of key-based discrimination
-3. Validate results match between legacy and unified formats
-4. Switch to unified format once validation passes
-
-#### Structural Differences
-
-**Legacy format example:**
-```json
-{
-  "complexity": {
-    "metrics": [
-      {
-        "File": {
-          "path": "src/main.rs",
-          "functions": 12,
-          "average_complexity": 5.3
-        }
-      },
-      {
-        "Function": {
-          "name": "calculate_score",
-          "file": "src/scoring.rs",
-          "line": 42,
-          "cyclomatic": 8
-        }
-      }
-    ]
-  }
-}
-```
-
-**Unified format example:**
-```json
-{
-  "complexity": {
-    "metrics": [
-      {
-        "type": "File",
-        "path": "src/main.rs",
-        "functions": 12,
-        "average_complexity": 5.3
-      },
-      {
-        "type": "Function",
-        "name": "calculate_score",
-        "file": "src/scoring.rs",
-        "line": 42,
-        "cyclomatic": 8
-      }
-    ]
-  }
-}
-```
-
-**Key difference:** Legacy uses `{File: {...}}` wrapper objects, while unified uses a flat structure with `"type": "File"` field. This makes unified format easier to parse in most programming languages.
-
 ### Risk Insights JSON
 
 When coverage data is provided via `--lcov`, risk insights are included as part of the analysis output. The `write_risk_insights` method (found in `src/io/writers/json.rs`, `terminal.rs`, and `markdown/core.rs`) outputs risk analysis data in the following JSON structure:
@@ -797,6 +705,90 @@ pandoc report.md -o report.html --standalone --css style.css
 # Convert to PDF
 pandoc report.md -o report.pdf --pdf-engine=xelatex
 ```
+
+## HTML Output
+
+HTML format generates an interactive web dashboard with visual metrics and navigation. This format is ideal for viewing analysis results in a browser and sharing reports with stakeholders.
+
+**Source:** `src/io/writers/html.rs`, `src/cli.rs:492`
+
+### Basic Usage
+
+```bash
+# Generate HTML dashboard
+debtmap analyze . --format html
+
+# Save to file
+debtmap analyze . --format html -o dashboard.html
+
+# Open in browser
+debtmap analyze . --format html -o dashboard.html && open dashboard.html
+```
+
+### Dashboard Features
+
+The HTML output provides an interactive dashboard with:
+
+1. **Executive Summary** - High-level metrics with visual indicators
+2. **Debt Score Dashboard** - Priority distribution (Critical, High, Medium, Low)
+3. **Complexity Metrics** - Average complexity and function counts
+4. **Debt Density** - Technical debt per function ratio
+5. **Interactive Data** - Full analysis results embedded as JSON
+
+### Dashboard Structure
+
+The HTML dashboard uses an embedded template (`src/io/writers/templates/dashboard.html`) that includes:
+
+- **Metrics Cards** - Visual representation of key metrics
+- **Priority Breakdown** - Count of items by priority level
+- **Health Indicators** - Color-coded status based on thresholds
+- **Raw Data Access** - Complete JSON analysis results in the page
+
+### Example Output
+
+When you generate an HTML dashboard, it displays:
+
+```
+┌─────────────────────────────────────┐
+│     Debtmap Analysis Dashboard      │
+├─────────────────────────────────────┤
+│                                     │
+│  Total Items: 156                   │
+│  Critical: 5  High: 12              │
+│  Medium: 45   Low: 94               │
+│                                     │
+│  Total Functions: 287               │
+│  Avg Complexity: 6.3                │
+│  Debt Density: 0.54                 │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+### When to Use HTML Format
+
+**Use HTML Format When:**
+- Sharing reports with non-technical stakeholders
+- Creating dashboards for team visibility
+- Generating reports for management review
+- Viewing analysis results in a browser
+- Embedding reports in internal documentation sites
+- Publishing analysis results to a web server
+
+**HTML vs Markdown:**
+- **HTML**: Interactive, visual dashboard with embedded data
+- **Markdown**: Text-based, suitable for conversion to multiple formats
+- **HTML**: Better for standalone viewing in browsers
+- **Markdown**: Better for version control and text processing
+
+### Customization
+
+The HTML output uses a built-in template. For custom styling, you can:
+
+1. Generate the HTML file
+2. Extract and modify the CSS within the file
+3. Serve with custom stylesheets
+
+> **Note:** Direct template customization requires modifying `src/io/writers/templates/dashboard.html` in the debtmap source code.
 
 ## Tool Integration
 
@@ -1172,6 +1164,13 @@ debtmap analyze . --summary --min-priority medium
 - Archiving analysis results
 - Producing executive summaries
 
+**Use HTML Format When:**
+- Viewing analysis in a web browser
+- Sharing visual dashboards with stakeholders
+- Publishing reports to internal documentation sites
+- Creating interactive reports for management review
+- Embedding analysis results in web applications
+
 ### Quick Reference Table
 
 | Format | Best For | Machine Readable | Human Readable | File Extension |
@@ -1179,6 +1178,7 @@ debtmap analyze . --summary --min-priority medium
 | Terminal | Development | No | Yes | .txt |
 | JSON | Automation | Yes | No | .json |
 | Markdown | Documentation | Partially | Yes | .md |
+| HTML | Visualization | Partially | Yes | .html |
 
 ### Combining Formats
 
@@ -1253,5 +1253,5 @@ fi
 ## See Also
 
 - [Getting Started](./getting-started.md) - Basic usage and examples
-- [Analysis Guide](./analysis-guide.md) - Understanding metrics and scores
+- [Analysis Guide](./analysis-guide/index.md) - Understanding metrics and scores
 - [Configuration](./configuration.md) - Customizing analysis behavior
