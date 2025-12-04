@@ -1,4 +1,5 @@
 //! Integration tests for domain pattern detection (Spec 175)
+#![allow(deprecated)]
 
 use debtmap::organization::{
     cluster_methods_by_domain, group_methods_by_responsibility_with_domain_patterns, DomainPattern,

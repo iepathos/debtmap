@@ -1,3 +1,10 @@
+#![deprecated(
+    since = "0.8.0",
+    note = "Use src/organization/god_object/{scoring,classifier,recommender}.rs instead. \
+            This file will be removed in 0.9.0"
+)]
+#![allow(deprecated)]
+
 use std::collections::HashMap;
 
 use super::god_object::types::*;

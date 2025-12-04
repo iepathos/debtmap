@@ -1,47 +1,58 @@
-//! God Object Detection Modules
+//! God Object Detection Module
 //!
-//! This module contains specialized components for detecting and analyzing god objects:
-//! - `core_types`: Fundamental types (GodObjectAnalysis, DetectionType, etc.)
-//! - `classification_types`: GodObjectType, EnhancedGodObjectAnalysis, ClassificationResult
-//! - `split_types`: ModuleSplit and recommendation types
-//! - `metrics_types`: PurityDistribution and metrics
-//! - `types`: Re-exports all types for backward compatibility
-//! - `thresholds`: Detection constants and configuration
-//! - `ast_visitor`: AST traversal and data collection
-//! - `metrics`: Scoring and metric calculations
-//! - `classifier`: Pattern detection and classification (Phase 5)
-//! - `predicates`: Pure boolean detection predicates (Phase 4)
-//! - `scoring`: Pure scoring functions (Phase 3)
-//! - `recommender`: Recommendation generation
-//! - `detector`: Orchestration layer (Phase 7)
+//! Refactored following Stillwater principles (Pure Core, Imperative Shell).
+//!
+//! ## Architecture
+//!
+//! **Pure Core** (business logic):
+//! - `types` - Data structures (re-exports from sub-modules)
+//! - `thresholds` - Configuration
+//! - `predicates` - Detection predicates
+//! - `scoring` - Scoring algorithms
+//! - `classifier` - Classification logic
+//! - `recommender` - Recommendation generation
+//!
+//! **Orchestration**:
+//! - `detector` - Composes pure functions into pipeline
+//!
+//! **I/O Shell**:
+//! - `ast_visitor` - AST traversal
 
-pub mod ast_visitor;
+// Sub-modules for type organization (need to be public for types.rs to re-export)
 pub mod classification_types;
-pub mod classifier;
 pub mod core_types;
-pub mod detector;
-pub mod metrics;
 pub mod metrics_types;
+pub mod split_types;
+
+// Main modules
+pub mod ast_visitor;
+pub mod classifier;
+pub mod detector;
 pub mod predicates;
 pub mod recommender;
 pub mod scoring;
-pub mod split_types;
 pub mod thresholds;
 pub mod types;
 
-// Re-export all types and thresholds for backward compatibility
-pub use classification_types::*;
-pub use classifier::*;
-pub use core_types::*;
-pub use detector::GodObjectDetector;
-pub use metrics_types::*;
-pub use predicates::*;
-pub use recommender::*;
-pub use scoring::*;
-pub use split_types::*;
-pub use thresholds::*;
+// Legacy compatibility - kept for one release cycle
+pub mod metrics;
 
+// Re-exports for public API
 pub use ast_visitor::{
     FunctionParameter, FunctionWeight, ModuleFunctionInfo, Responsibility, TypeAnalysis,
     TypeVisitor,
 };
+pub use classifier::{
+    calculate_struct_ratio, classify_struct_domain, count_distinct_domains, determine_confidence,
+    extract_domain_from_name, group_methods_by_responsibility,
+    infer_responsibility_with_confidence,
+};
+pub use detector::GodObjectDetector;
+pub use recommender::{
+    determine_cross_domain_severity, ensure_unique_name, recommend_module_splits,
+    recommend_module_splits_enhanced, recommend_module_splits_enhanced_with_evidence,
+    recommend_module_splits_with_evidence, sanitize_module_name, suggest_module_splits_by_domain,
+};
+pub use scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
+pub use thresholds::*;
+pub use types::*;

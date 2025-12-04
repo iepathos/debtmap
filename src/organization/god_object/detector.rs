@@ -127,6 +127,7 @@ impl GodObjectDetector {
     ///
     /// For now, this uses the comprehensive implementation from god_object_detector.rs module.
     /// This will be further refactored in Phase 8 to compose pure functions directly.
+    #[allow(deprecated)]
     pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
         // Import the comprehensive analysis from the legacy god_object_detector module
         // This avoids circular dependencies during the transition
@@ -152,6 +153,7 @@ impl GodObjectDetector {
     /// Comprehensive analysis returning GodObjectAnalysis.
     ///
     /// This is a simpler analysis compared to analyze_enhanced, used by enhanced_analyzer.
+    #[allow(deprecated)]
     pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
         use crate::organization::god_object_detector as legacy;
         legacy::analyze_comprehensive_for_detector(self, path, ast)
@@ -159,6 +161,7 @@ impl GodObjectDetector {
 }
 
 impl OrganizationDetector for GodObjectDetector {
+    #[allow(deprecated)]
     fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
         // Import the comprehensive analysis from the legacy god_object_detector module
         use crate::organization::god_object_detector as legacy;
@@ -169,6 +172,7 @@ impl OrganizationDetector for GodObjectDetector {
         "GodObjectDetector"
     }
 
+    #[allow(deprecated)]
     fn estimate_maintainability_impact(
         &self,
         pattern: &OrganizationAntiPattern,

@@ -1,3 +1,10 @@
+#![deprecated(
+    since = "0.8.0",
+    note = "Use src/organization/god_object/detector.rs instead. \
+            This file will be removed in 0.9.0"
+)]
+#![allow(deprecated)]
+
 use super::god_object::thresholds::*;
 use super::god_object::types::*;
 use super::semantic_naming::SemanticNameGenerator;
@@ -318,6 +325,7 @@ impl DetectorImpl {
                     });
 
                 // Use enhanced struct ownership analysis if available, otherwise use module function classifier
+                #[allow(deprecated)]
                 let suggested_splits = if params.ownership.is_some() {
                     crate::organization::suggest_splits_by_struct_grouping(
                         params.per_struct_metrics,
