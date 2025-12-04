@@ -346,7 +346,6 @@ pub mod debt;
 pub mod effects;
 pub mod env;
 pub mod errors;
-pub mod example_debt;
 pub mod extraction_patterns;
 pub mod formatting;
 pub mod io;
@@ -364,11 +363,6 @@ pub mod testing;
 pub mod testkit;
 pub mod transformers;
 pub mod utils;
-
-#[cfg(test)]
-mod example_complex_function;
-#[cfg(test)]
-mod example_refactor;
 
 // Re-export commonly used types
 pub use crate::core::{
