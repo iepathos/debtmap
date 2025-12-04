@@ -1,14 +1,15 @@
 ---
 number: 181
-title: Split god_object_detector.rs into Focused Submodules
+title: Refactor God Object Detection Module (Stillwater Compliant)
 category: optimization
 priority: high
 status: draft
 dependencies: []
 created: 2025-11-30
+updated: 2025-12-03
 ---
 
-# Specification 181: Split god_object_detector.rs into Focused Submodules
+# Specification 181: Refactor God Object Detection Module (Stillwater Compliant)
 
 **Category**: optimization
 **Priority**: high
@@ -17,522 +18,1069 @@ created: 2025-11-30
 
 ## Context
 
-The `src/god_object_detector.rs` file has grown to 4,363 lines, violating the Stillwater philosophy principle of "Composition Over Complexity" and the project's guideline of keeping files under 200 lines. This massive file contains multiple responsibilities:
+The god object detection system has grown to 8,033 lines across three files, violating both the Stillwater philosophy and project guidelines:
 
-- Detection logic for identifying god objects
-- Classification of god object types
-- Recommendation generation
-- Scoring algorithms
-- Output formatting
+- `src/organization/god_object_detector.rs` - 4,362 lines (detection + orchestration)
+- `src/organization/god_object_analysis.rs` - 3,304 lines (analysis + scoring)
+- `src/organization/god_object_metrics.rs` - 367 lines (metric tracking)
 
-According to STILLWATER_EVALUATION.md, this file should be split into focused submodules, each with a single responsibility. Large files make it difficult to:
+Additionally, partial modularization exists in `src/organization/god_object/`:
+- `ast_visitor.rs` - 365 lines (AST traversal and data collection)
+- `metrics.rs` - 349 lines (metric calculations)
+- `mod.rs` - 15 lines (module exports)
 
-- Understand the code structure
-- Navigate and maintain the codebase
-- Test individual components
-- Apply functional programming principles
-- Collaborate effectively (merge conflicts)
+### Stillwater Philosophy Violations
+
+According to `../stillwater/PHILOSOPHY.md`, this code violates:
+
+1. **Pure Core, Imperative Shell** - Mixed I/O with business logic throughout
+2. **Composition Over Complexity** - Monolithic functions instead of composable pieces
+3. **Types Guide, Don't Restrict** - Unclear boundaries and responsibilities
+4. **Pragmatism Over Purity** - Fighting modularity instead of embracing it
+
+### Project Guideline Violations
+
+From `CLAUDE.md`:
+- Files should be under 200 lines (target), max 300 lines acceptable
+- Functions should be under 20 lines
+- Maximum cyclomatic complexity of 5
+- Pure functions separated from I/O operations
+
+### Problems Created
+
+Large, mixed-responsibility files make it difficult to:
+- **Test** - Heavy coupling requires complex test setups
+- **Understand** - Multiple concerns interwoven across 4000+ lines
+- **Refactor** - Fear of breaking hidden dependencies
+- **Collaborate** - Frequent merge conflicts
+- **Maintain** - Cannot isolate changes to single concern
 
 ## Objective
 
-Refactor `src/god_object_detector.rs` (4,363 lines) into a modular structure under `src/god_object/` with clear separation of concerns:
+Refactor the god object detection system following **Stillwater principles**:
 
-- **detector.rs** - Pure detection logic (identifies god objects from metrics)
-- **classifier.rs** - Pure classification logic (categorizes god object types)
-- **recommender.rs** - Pure recommendation generation (suggests fixes)
-- **scoring.rs** - Pure scoring algorithms (calculates god object severity)
-- **types.rs** - Data structures and type definitions
-- **mod.rs** - Public API and composition
+**Pure Core** (business logic):
+- Detection predicates (pure functions)
+- Classification algorithms (pure transformations)
+- Scoring calculations (deterministic math)
+- Recommendation generators (pure decision trees)
 
-Each module should be under 500 lines and follow functional programming principles with pure core functions and I/O at boundaries.
+**Imperative Shell** (I/O boundary):
+- AST traversal (already separated in `ast_visitor.rs`)
+- File system operations (in callers)
+- Output formatting (in io module)
+
+**Module Structure** under `src/organization/god_object/`:
+- Each module **< 200 lines** (300 line absolute maximum)
+- Clear, acyclic dependency graph
+- Single responsibility per module
+- Composable, testable functions
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Module Structure**
-   - Create `src/god_object/` directory
-   - Split functionality into 6 focused modules
-   - Each module has single responsibility
-   - No module exceeds 500 lines
+1. **Stillwater Architecture**
+   - **Pure Core**: All detection, classification, scoring logic is pure
+   - **I/O Shell**: AST traversal isolated to `ast_visitor.rs` (already done)
+   - **Composability**: Small functions that compose into pipelines
+   - **Testability**: 100% unit test coverage for pure functions
 
-2. **Pure Core Implementation**
-   - Detection logic operates on parsed metrics (no I/O)
-   - Classification uses pure pattern matching
-   - Recommendations are pure transformations
-   - Scoring calculations are deterministic
+2. **Module Structure**
+   - Refactor under `src/organization/god_object/` directory
+   - Each module < 200 lines (strict), < 300 lines (absolute max)
+   - Single responsibility per module
+   - Acyclic dependency graph
 
-3. **Public API**
-   - Preserve existing public API in `mod.rs`
-   - Re-export necessary types and functions
-   - Maintain backward compatibility
-   - Clear documentation of module boundaries
+3. **Integration with Existing Modules**
+   - Preserve existing `ast_visitor.rs` (365 lines - AST data collection)
+   - Audit existing `metrics.rs` (349 lines) - may need splitting
+   - Merge `god_object_analysis.rs` functions into appropriate modules
+   - Delete `god_object_detector.rs` and `god_object_analysis.rs` when complete
 
-4. **Dependency Direction**
-   - `types.rs` has no internal dependencies (foundation)
-   - `detector.rs` depends only on `types.rs`
-   - `classifier.rs` depends on `types.rs` and `detector.rs`
-   - `recommender.rs` depends on `types.rs` and `classifier.rs`
-   - `scoring.rs` depends on `types.rs`
-   - `mod.rs` composes all modules
+4. **Public API Compatibility**
+   - Preserve all public exports from `mod.rs` (line 30-57)
+   - Maintain `GodObjectDetector` struct and `OrganizationDetector` trait impl
+   - No breaking changes to consumers
+   - Clear deprecation warnings if needed
+
+5. **Dependency Direction (Acyclic)**
+   ```
+   types.rs (foundation)
+     ↑
+     ├── thresholds.rs
+     ├── predicates.rs
+     ├── scoring.rs
+     │     ↑
+     ├── classifier.rs
+     │     ↑
+     ├── recommender.rs
+     │     ↑
+     └── detector.rs (orchestration)
+           ↑
+         mod.rs (public API)
+
+   ast_visitor.rs (I/O shell - parallel, no core deps)
+   ```
 
 ### Non-Functional Requirements
 
 1. **Performance**
-   - No performance regression from refactoring
+   - No performance regression (< 5% overhead acceptable)
    - Maintain parallel processing capabilities
-   - Zero additional heap allocations
+   - Zero additional heap allocations in hot paths
+   - Benchmark critical paths before/after
 
 2. **Maintainability**
    - Each module independently testable
-   - Clear boundaries between concerns
-   - Comprehensive module-level documentation
+   - Clear, documented boundaries between concerns
+   - Functions < 20 lines, cyclomatic complexity < 5
+   - Comprehensive module-level documentation with examples
 
 3. **Testability**
-   - Existing tests continue to pass
-   - New tests added for individual modules
-   - Unit tests for pure functions
+   - All 6 existing test files continue to pass
+   - Unit tests for every pure function
+   - Property tests for invariants
+   - Integration tests for composition
+
+4. **Incremental Migration**
+   - Work proceeds in small, testable stages
+   - Each stage compiles and passes tests
+   - No "big bang" switchover
+   - Gradual deprecation of old modules
 
 ## Acceptance Criteria
 
-- [ ] Directory `src/god_object/` created with 6 module files
-- [ ] `detector.rs` contains only detection logic (<500 lines)
-- [ ] `classifier.rs` contains only classification logic (<500 lines)
-- [ ] `recommender.rs` contains only recommendation logic (<500 lines)
-- [ ] `scoring.rs` contains only scoring algorithms (<500 lines)
-- [ ] `types.rs` contains shared data structures (<300 lines)
-- [ ] `mod.rs` provides public API and composition (<200 lines)
-- [ ] Original `god_object_detector.rs` deleted
-- [ ] All existing tests pass without modification
-- [ ] Each module has module-level documentation
-- [ ] Pure functions separated from I/O operations
-- [ ] No circular dependencies between modules
-- [ ] `cargo clippy` passes with no warnings
+### Architecture
+- [ ] All modules under `src/organization/god_object/`
+- [ ] Each module < 200 lines (300 absolute max)
+- [ ] Pure core functions separated from I/O shell
+- [ ] No circular dependencies (verified with `cargo-depgraph`)
+- [ ] Clear dependency hierarchy (types → utils → domain → orchestration)
+
+### Modules Created/Updated
+- [ ] `types.rs` - Data structures (< 200 lines)
+- [ ] `thresholds.rs` - Configuration and constants (< 150 lines)
+- [ ] `predicates.rs` - Pure detection predicates (< 200 lines)
+- [ ] `scoring.rs` - Pure scoring algorithms (< 200 lines)
+- [ ] `classifier.rs` - Pure classification logic (< 200 lines)
+- [ ] `recommender.rs` - Pure recommendation generation (< 250 lines)
+- [ ] `detector.rs` - Orchestration layer (< 250 lines)
+- [ ] `mod.rs` - Public API and re-exports (< 150 lines)
+- [ ] `ast_visitor.rs` - PRESERVED as-is (I/O shell)
+- [ ] Existing `metrics.rs` - AUDITED and possibly split
+
+### Cleanup
+- [ ] `god_object_detector.rs` deleted
+- [ ] `god_object_analysis.rs` deleted
+- [ ] All functionality preserved in new modules
+- [ ] Deprecated re-exports removed after 1 release
+
+### Quality
+- [ ] All 6 test files pass (`tests/god_object_*.rs`)
+- [ ] No test modifications required (backward compatible)
+- [ ] Unit tests added for all pure functions
+- [ ] Module-level documentation with examples
+- [ ] `cargo clippy --all-targets -- -D warnings` passes
 - [ ] `cargo test` passes with no failures
+- [ ] `cargo bench` shows < 5% regression
+
+### Public API
+- [ ] `GodObjectDetector` struct preserved
+- [ ] `OrganizationDetector` trait implementation preserved
+- [ ] All public functions re-exported from `mod.rs`
+- [ ] No breaking changes to external consumers
+- [ ] Documentation updated for module organization
 
 ## Technical Details
 
-### Implementation Approach
+### Implementation Approach (Incremental)
 
-**Phase 1: Analysis**
-1. Read `src/god_object_detector.rs` in full
-2. Identify all public API functions
-3. Map dependencies between functions
-4. Group related functions by responsibility
-5. Identify pure vs impure functions
+Following **Stillwater principle**: "Incremental progress over big bangs"
 
-**Phase 2: Module Creation**
-1. Create `src/god_object/` directory
-2. Create `types.rs` with shared data structures
-3. Extract detection logic to `detector.rs`
-4. Extract classification logic to `classifier.rs`
-5. Extract recommendation logic to `recommender.rs`
-6. Extract scoring algorithms to `scoring.rs`
-7. Create `mod.rs` with public API
+**Phase 1: Foundation & Analysis** (1 day)
+1. Audit existing `god_object/` modules (`ast_visitor.rs`, `metrics.rs`)
+2. Map all public API exports from current files
+3. Create dependency graph of all functions
+4. Identify pure vs impure functions in both files
+5. Group functions by responsibility (types, scoring, detection, etc.)
+6. Write benchmarks for critical paths
 
-**Phase 3: Integration**
-1. Update imports throughout codebase
-2. Re-export public types from `mod.rs`
-3. Ensure backward compatibility
-4. Update Cargo.toml if needed
+**Deliverable**: `REFACTORING_PLAN.md` with function-to-module mapping
 
-**Phase 4: Validation**
-1. Run full test suite
-2. Run clippy checks
-3. Verify no performance regression
-4. Review module boundaries
+**Phase 2: Extract Types & Thresholds** (0.5 day)
+1. Create `types.rs` with all data structures from both files
+2. Create `thresholds.rs` with constants and configuration
+3. Update both old files to use new modules
+4. Run tests (should pass)
+5. Commit: "refactor: extract god object types and thresholds"
+
+**Deliverable**: Compiling code, passing tests, reduced duplication
+
+**Phase 3: Extract Pure Scoring Functions** (1 day)
+1. Create `scoring.rs` with pure scoring algorithms
+2. Move `calculate_god_object_score*` functions
+3. Move purity and complexity weighting
+4. Add unit tests for determinism
+5. Update old files to import from `scoring`
+6. Run tests
+7. Commit: "refactor: extract pure scoring functions"
+
+**Deliverable**: ~200 line `scoring.rs`, all tests pass
+
+**Phase 4: Extract Pure Predicates** (0.5 day)
+1. Create `predicates.rs` with detection predicates
+2. Move `is_god_object`, threshold checks, etc.
+3. Make all functions pure (take values, not refs to state)
+4. Add unit tests
+5. Commit: "refactor: extract detection predicates"
+
+**Deliverable**: ~150 line `predicates.rs`, increased testability
+
+**Phase 5: Extract Classification Logic** (1 day)
+1. Create `classifier.rs` with classification functions
+2. Move `classify_god_object`, type detection
+3. Move responsibility grouping and inference
+4. Ensure all are pure transformations
+5. Add unit tests with property testing
+6. Commit: "refactor: extract classification logic"
+
+**Deliverable**: ~200 line `classifier.rs`, pure functions
+
+**Phase 6: Extract Recommendation Logic** (1 day)
+1. Create `recommender.rs` with recommendation generation
+2. Move `suggest_module_splits*` functions
+3. Move domain analysis for recommendations
+4. Ensure pure (no I/O, just data transformation)
+5. Add unit tests
+6. Commit: "refactor: extract recommendation logic"
+
+**Deliverable**: ~250 line `recommender.rs`, tested
+
+**Phase 7: Create Orchestration Layer** (1 day)
+1. Create `detector.rs` with orchestration
+2. Move `GodObjectDetector` struct
+3. Move `OrganizationDetector` trait implementation
+4. Compose pure functions into analysis pipeline
+5. Keep adapters for clustering integration
+6. Add integration tests
+7. Commit: "refactor: create god object detector orchestration"
+
+**Deliverable**: ~250 line `detector.rs`, working end-to-end
+
+**Phase 8: Update Public API & Cleanup** (0.5 day)
+1. Update `mod.rs` with all re-exports
+2. Mark old files as deprecated
+3. Verify all 6 test files pass
+4. Run full clippy check
+5. Commit: "refactor: update god object public API"
+
+**Deliverable**: Clean public API, all tests green
+
+**Phase 9: Delete Old Files** (0.5 day)
+1. Delete `god_object_detector.rs`
+2. Delete `god_object_analysis.rs`
+3. Audit `god_object_metrics.rs` - keep or merge into `types.rs`
+4. Remove deprecated warnings
+5. Run full test suite
+6. Run benchmarks (verify < 5% regression)
+7. Commit: "refactor: complete god object modularization (spec 181)"
+
+**Deliverable**: Clean module structure, all tests pass, benchmarks good
+
+**Total Estimated Time**: 6-7 days
 
 ### Module Responsibilities
 
-**types.rs** (Foundation)
+**types.rs** (Foundation - Pure Data)
 ```rust
-// Shared data structures
-pub struct GodObject { ... }
-pub struct GodObjectMetrics { ... }
-pub enum GodObjectType { ... }
-pub struct Recommendation { ... }
+// Data structures from god_object_analysis.rs and god_object_detector.rs
+pub struct GodObjectAnalysis { ... }
+pub struct EnhancedGodObjectAnalysis { ... }
+pub enum DetectionType { GodClass, GodFile, GodModule }
+pub struct ModuleSplit { ... }
+pub struct StructMetrics { ... }
+pub enum GodObjectConfidence { ... }
+pub struct PurityDistribution { ... }
+pub struct FunctionVisibilityBreakdown { ... }
+// etc.
 ```
 
-**detector.rs** (Detection Logic)
+**thresholds.rs** (Configuration - Pure Constants)
 ```rust
-// Pure detection functions
-pub fn detect_god_objects(metrics: &[FileMetrics]) -> Vec<GodObject>
-pub fn is_god_object(metrics: &ComplexityMetrics) -> bool
-fn calculate_method_count(metrics: &ComplexityMetrics) -> usize
-```
-
-**classifier.rs** (Classification Logic)
-```rust
-// Pure classification functions
-pub fn classify_god_object(god_obj: &GodObject) -> GodObjectType
-fn detect_data_class(god_obj: &GodObject) -> bool
-fn detect_service_class(god_obj: &GodObject) -> bool
-```
-
-**recommender.rs** (Recommendation Generation)
-```rust
-// Pure recommendation functions
-pub fn generate_recommendations(god_obj: &GodObject) -> Vec<Recommendation>
-fn suggest_extraction(god_obj: &GodObject) -> Option<Recommendation>
-fn suggest_splitting(god_obj: &GodObject) -> Option<Recommendation>
-```
-
-**scoring.rs** (Scoring Algorithms)
-```rust
-// Pure scoring functions
-pub fn calculate_severity_score(god_obj: &GodObject) -> f64
-fn complexity_weight(complexity: u32) -> f64
-fn size_weight(lines: usize) -> f64
-```
-
-**mod.rs** (Public API)
-```rust
-// Re-exports and composition
-pub use detector::detect_god_objects;
-pub use classifier::{classify_god_object, GodObjectType};
-pub use recommender::generate_recommendations;
-pub use scoring::calculate_severity_score;
-pub use types::*;
-
-// High-level API functions
-pub fn analyze_god_objects(files: &[FileMetrics]) -> AnalysisReport {
-    let detected = detect_god_objects(files);
-    let classified = detected.iter().map(classify_god_object);
-    let recommendations = detected.iter().flat_map(generate_recommendations);
-    AnalysisReport { detected, classified, recommendations }
+// Pure constants and configuration
+pub struct GodObjectThresholds {
+    pub method_count_threshold: usize,
+    pub field_count_threshold: usize,
+    // ...
 }
+
+pub const HYBRID_STANDALONE_THRESHOLD: usize = 50;
+pub const HYBRID_DOMINANCE_RATIO: usize = 3;
+// etc.
+```
+
+**predicates.rs** (Detection Predicates - Pure Functions)
+```rust
+// Pure boolean predicates
+pub fn exceeds_method_threshold(count: usize, threshold: usize) -> bool
+pub fn exceeds_field_threshold(count: usize, threshold: usize) -> bool
+pub fn is_hybrid_god_module(standalone: usize, impl_methods: usize) -> bool
+pub fn should_recommend_split(score: f64, confidence: GodObjectConfidence) -> bool
+```
+
+**scoring.rs** (Scoring Algorithms - Pure Math)
+```rust
+// Pure scoring calculations (from god_object_analysis.rs)
+pub fn calculate_god_object_score(
+    method_count: usize,
+    responsibility_count: usize,
+    thresholds: &GodObjectThresholds,
+) -> f64
+
+pub fn calculate_god_object_score_weighted(
+    weighted_method_count: f64,
+    responsibility_count: usize,
+    thresholds: &GodObjectThresholds,
+) -> f64
+
+pub fn calculate_complexity_weight(complexity: u32) -> f64
+pub fn calculate_purity_weight(purity: PurityLevel) -> f64
+```
+
+**classifier.rs** (Classification - Pure Transformations)
+```rust
+// Pure classification logic (from god_object_analysis.rs)
+pub fn determine_confidence(
+    score: f64,
+    method_count: usize,
+    responsibility_count: usize,
+) -> GodObjectConfidence
+
+pub fn group_methods_by_responsibility(
+    methods: &[String]
+) -> HashMap<String, Vec<String>>
+
+pub fn infer_responsibility_with_confidence(
+    method_name: &str
+) -> ClassificationResult
+
+pub fn classify_detection_type(
+    struct_count: usize,
+    standalone_count: usize,
+    impl_method_count: usize,
+) -> DetectionType
+```
+
+**recommender.rs** (Recommendations - Pure Generation)
+```rust
+// Pure recommendation generation (from god_object_detector.rs)
+pub fn suggest_module_splits_by_domain(
+    metrics: &[StructMetrics]
+) -> Vec<ModuleSplit>
+
+pub fn recommend_module_splits_enhanced(
+    analysis: &GodObjectAnalysis,
+    metrics: &[StructMetrics],
+) -> Vec<ModuleSplit>
+
+fn generate_split_rationale(split: &ModuleSplit) -> String
+```
+
+**detector.rs** (Orchestration - Composition)
+```rust
+// Orchestration layer (from god_object_detector.rs)
+pub struct GodObjectDetector {
+    thresholds: GodObjectThresholds,
+}
+
+impl GodObjectDetector {
+    // Composes pure functions into analysis pipeline
+    pub fn analyze(&self, visitor: &TypeVisitor) -> EnhancedGodObjectAnalysis {
+        let metrics = build_per_struct_metrics(visitor);
+        let score = scoring::calculate_god_object_score(...);
+        let confidence = classifier::determine_confidence(...);
+        let splits = recommender::suggest_module_splits_by_domain(&metrics);
+        // ... compose results
+    }
+}
+
+impl OrganizationDetector for GodObjectDetector {
+    fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
+        // Adapter: I/O → Pure Core → I/O
+    }
+}
+```
+
+**ast_visitor.rs** (I/O Shell - Preserved)
+```rust
+// AST traversal and data collection (EXISTING)
+// This is the I/O boundary - not part of pure core
+pub struct TypeVisitor { ... }
+impl Visit for TypeVisitor { ... }
+```
+
+**mod.rs** (Public API - Re-exports)
+```rust
+// Re-exports for backward compatibility
+pub use types::*;
+pub use thresholds::GodObjectThresholds;
+pub use scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
+pub use classifier::{determine_confidence, group_methods_by_responsibility};
+pub use recommender::{suggest_module_splits_by_domain, recommend_module_splits_enhanced};
+pub use detector::GodObjectDetector;
+pub use ast_visitor::TypeVisitor;
 ```
 
 ### Architecture Changes
 
-**Before:**
+**Before (8,033 lines total):**
 ```
-src/
-  god_object_detector.rs (4,363 lines)
-```
-
-**After:**
-```
-src/
+src/organization/
+  god_object_detector.rs (4,362 lines) - mixed concerns
+  god_object_analysis.rs (3,304 lines) - mixed concerns
+  god_object_metrics.rs  (367 lines)   - tracking
   god_object/
-    mod.rs         (~200 lines - public API)
-    types.rs       (~300 lines - data structures)
-    detector.rs    (~500 lines - detection logic)
-    classifier.rs  (~500 lines - classification)
-    recommender.rs (~500 lines - recommendations)
-    scoring.rs     (~300 lines - scoring algorithms)
+    ast_visitor.rs (365 lines)         - I/O shell
+    metrics.rs     (349 lines)         - calculations
+    mod.rs         (15 lines)          - minimal exports
 ```
 
-### Data Structures
+**After (estimated 3,000-3,500 lines total):**
+```
+src/organization/
+  god_object/
+    # Pure Core (business logic)
+    types.rs       (~200 lines - data structures)
+    thresholds.rs  (~100 lines - constants)
+    predicates.rs  (~150 lines - detection predicates)
+    scoring.rs     (~200 lines - scoring algorithms)
+    classifier.rs  (~200 lines - classification logic)
+    recommender.rs (~250 lines - recommendation generation)
+    detector.rs    (~250 lines - orchestration)
 
-No new data structures needed. Existing types moved to `types.rs`:
+    # I/O Shell (existing, preserved)
+    ast_visitor.rs (365 lines - AST traversal)
+
+    # Public API
+    mod.rs         (~150 lines - re-exports, composition)
+
+    # Optional (if metrics.rs needs splitting)
+    metrics/
+      calculations.rs (~200 lines - metric math)
+      tracking.rs     (~150 lines - history tracking)
+```
+
+**Key Improvements:**
+- 60% reduction in total lines (through deduplication and clarity)
+- Clear separation: Pure Core (1,350 lines) vs I/O Shell (365 lines)
+- Each module < 300 lines (most < 200)
+- Acyclic dependencies
+- 100% testable pure functions
+
+### Data Structures (Moved to types.rs)
+
+All existing types from `god_object_analysis.rs` and `god_object_detector.rs`:
 
 ```rust
-// types.rs
-pub struct GodObject {
-    pub name: String,
-    pub path: PathBuf,
-    pub metrics: GodObjectMetrics,
-    pub classification: Option<GodObjectType>,
-}
+// From god_object_analysis.rs
+pub struct GodObjectAnalysis { ... }
+pub struct EnhancedGodObjectAnalysis { ... }
+pub enum DetectionType { GodClass, GodFile, GodModule }
+pub struct ModuleSplit { ... }
+pub struct StructMetrics { ... }
+pub enum GodObjectConfidence { High, Medium, Low }
+pub struct PurityDistribution { ... }
+pub struct FunctionVisibilityBreakdown { ... }
+pub enum Priority { Critical, High, Medium, Low }
+pub enum SplitAnalysisMethod { ... }
+pub enum RecommendationSeverity { ... }
+pub struct GodObjectThresholds { ... }
+pub struct ClassificationResult { ... }
+pub enum SignalType { ... }
 
-pub struct GodObjectMetrics {
-    pub method_count: usize,
-    pub field_count: usize,
-    pub complexity: u32,
-    pub lines_of_code: usize,
-}
+// From god_object_detector.rs
+pub struct GodObjectClassificationParams<'a> { ... }
+pub struct DomainAnalysisParams<'a> { ... }
 
-pub enum GodObjectType {
-    DataClass,
-    ServiceClass,
-    UtilityClass,
-    ManagerClass,
-}
-
-pub struct Recommendation {
-    pub description: String,
-    pub priority: Priority,
-    pub suggested_refactoring: RefactoringType,
-}
+// Adapters (may stay in detector.rs)
+struct CallGraphAdapter { ... }
+struct FieldAccessAdapter<'a> { ... }
 ```
+
+**Stillwater Pattern**: Types are pure data with no behavior. Methods belong in modules, not on structs.
 
 ### APIs and Interfaces
 
-**Public API (preserved in mod.rs):**
+**Public API (preserved in mod.rs) - Re-exported from current files:**
 
 ```rust
-// Main entry point
-pub fn detect_god_objects(metrics: &[FileMetrics]) -> Vec<GodObject>;
+// From current mod.rs exports (lines 30-57)
+pub use god_object_analysis::{
+    calculate_god_object_score,
+    calculate_god_object_score_weighted,
+    determine_confidence,
+    group_methods_by_responsibility,
+    recommend_module_splits,
+    recommend_module_splits_enhanced,
+    suggest_module_splits_by_domain,
+    DetectionType,
+    EnhancedGodObjectAnalysis,
+    GodObjectAnalysis,
+    GodObjectConfidence,
+    GodObjectThresholds,
+    GodObjectType,
+    ModuleSplit,
+    Priority,
+    // ... etc
+};
 
-// Classification
-pub fn classify_god_object(god_obj: &GodObject) -> GodObjectType;
-
-// Recommendations
-pub fn generate_recommendations(god_obj: &GodObject) -> Vec<Recommendation>;
-
-// Scoring
-pub fn calculate_severity_score(god_obj: &GodObject) -> f64;
-
-// High-level analysis
-pub fn analyze_god_objects(files: &[FileMetrics]) -> AnalysisReport;
+pub use god_object::TypeVisitor;  // ast_visitor
+pub use GodObjectDetector;        // detector
 ```
 
-**Internal Module APIs:**
+**After Refactoring - Same exports, different sources:**
 
-Each module exports focused functionality:
-- `detector` - detection predicates and metrics extraction
-- `classifier` - classification rules and type detection
-- `recommender` - recommendation strategies
-- `scoring` - scoring algorithms and weights
+```rust
+pub use types::*;                 // All data structures
+pub use thresholds::*;            // Thresholds and constants
+pub use scoring::*;               // Scoring functions
+pub use classifier::*;            // Classification functions
+pub use recommender::*;           // Recommendation functions
+pub use detector::GodObjectDetector;
+pub use ast_visitor::TypeVisitor;
+```
+
+**Stillwater Pattern**: Public API unchanged, internal implementation reorganized
 
 ## Dependencies
 
-- **Prerequisites**: None
-- **Affected Components**:
-  - `src/commands/analyze.rs` (imports god_object_detector)
-  - `src/debt/mod.rs` (may use god object detection)
-  - Any test files importing god_object_detector
-- **External Dependencies**: None (uses existing dependencies)
+### Prerequisites
+- None (internal refactoring only)
+
+### Affected Components
+- `src/organization/mod.rs` - Re-exports from god_object module (lines 30-57)
+- **Test files** (6 files, must continue to pass):
+  - `tests/god_object_metrics_test.rs`
+  - `tests/god_object_struct_recommendations.rs`
+  - `tests/god_object_type_based_clustering_test.rs`
+  - `tests/god_object_confidence_classification_test.rs`
+  - `tests/god_object_detection_test.rs`
+  - `tests/god_object_config_rs_test.rs`
+- Any consumers using `use debtmap::organization::god_object_analysis::*`
+- Any consumers using `use debtmap::organization::GodObjectDetector`
+
+### External Dependencies
+- No new dependencies required
+- Uses existing: `syn`, `serde`, standard library collections
+- May benefit from (optional):
+  - `proptest` - for property-based testing of pure functions
+  - `criterion` - for benchmarking
 
 ## Testing Strategy
 
-### Unit Tests
+### Stillwater Testing Principles
 
-**Per-Module Testing:**
+**Pure functions are 100% testable** - No mocks, no I/O, just inputs and outputs.
 
+### Unit Tests (Per Module)
+
+**predicates.rs** - Boolean logic tests
 ```rust
-// detector.rs
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_detect_god_objects_pure() {
-        let metrics = create_test_metrics();
-        let result1 = detect_god_objects(&metrics);
-        let result2 = detect_god_objects(&metrics);
-        assert_eq!(result1, result2); // Deterministic
+    fn test_exceeds_method_threshold_pure() {
+        assert!(exceeds_method_threshold(20, 15));
+        assert!(!exceeds_method_threshold(10, 15));
     }
 
     #[test]
-    fn test_is_god_object_threshold() {
-        let high_complexity = create_high_complexity_metrics();
-        assert!(is_god_object(&high_complexity));
+    fn test_is_hybrid_god_module_ratios() {
+        assert!(is_hybrid_god_module(60, 15));  // 60 > 15*3
+        assert!(!is_hybrid_god_module(60, 25)); // 60 < 25*3
     }
 }
+```
 
-// classifier.rs
+**scoring.rs** - Deterministic math tests
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn test_scoring_deterministic() {
+        let thresholds = GodObjectThresholds::default();
+        let score1 = calculate_god_object_score(20, 5, &thresholds);
+        let score2 = calculate_god_object_score(20, 5, &thresholds);
+        assert_eq!(score1, score2);
+    }
+
+    proptest! {
+        #[test]
+        fn score_never_negative(method_count in 0..1000usize, resp_count in 0..100usize) {
+            let thresholds = GodObjectThresholds::default();
+            let score = calculate_god_object_score(method_count, resp_count, &thresholds);
+            prop_assert!(score >= 0.0);
+        }
+    }
+}
+```
+
+**classifier.rs** - Classification invariants
+```rust
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_classify_data_class() {
-        let god_obj = create_data_class_example();
-        assert_eq!(classify_god_object(&god_obj), GodObjectType::DataClass);
+    fn test_confidence_mapping() {
+        assert_eq!(determine_confidence(2.5, 30, 6), GodObjectConfidence::High);
+        assert_eq!(determine_confidence(1.2, 18, 3), GodObjectConfidence::Medium);
+    }
+
+    #[test]
+    fn test_group_methods_pure() {
+        let methods = vec!["get_user".to_string(), "set_user".to_string()];
+        let groups = group_methods_by_responsibility(&methods);
+        assert!(!groups.is_empty());
     }
 }
 ```
 
-### Integration Tests
+### Integration Tests (Existing Tests Must Pass)
+
+All 6 existing test files must pass without modification:
 
 ```rust
-// tests/god_object_integration.rs
-#[test]
-fn test_full_god_object_analysis() {
-    let files = load_test_files();
-    let report = god_object::analyze_god_objects(&files);
+// tests/god_object_detection_test.rs
+// tests/god_object_metrics_test.rs
+// etc.
+// Should work unchanged due to backward-compatible API
+```
 
-    assert!(!report.detected.is_empty());
-    assert_eq!(report.detected.len(), report.recommendations.len());
-}
+### Property-Based Tests
 
-#[test]
-fn test_backward_compatibility() {
-    // Ensure existing API still works
-    let metrics = create_test_metrics();
-    let result = god_object::detect_god_objects(&metrics);
-    assert!(result.is_ok());
+```rust
+use proptest::prelude::*;
+
+proptest! {
+    #[test]
+    fn scoring_monotonic_in_method_count(
+        base_methods in 10..100usize,
+        delta in 1..50usize
+    ) {
+        let thresholds = GodObjectThresholds::default();
+        let score1 = calculate_god_object_score(base_methods, 5, &thresholds);
+        let score2 = calculate_god_object_score(base_methods + delta, 5, &thresholds);
+        prop_assert!(score2 >= score1); // More methods = higher score
+    }
+
+    #[test]
+    fn classification_idempotent(method_name: String) {
+        let result1 = infer_responsibility_with_confidence(&method_name);
+        let result2 = infer_responsibility_with_confidence(&method_name);
+        prop_assert_eq!(result1.category, result2.category);
+    }
 }
 ```
 
-### Performance Tests
+### Benchmark Tests
 
 ```rust
-#[test]
-fn benchmark_detection_performance() {
-    let large_dataset = create_large_test_dataset(1000);
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-    let start = Instant::now();
-    let result = detect_god_objects(&large_dataset);
-    let duration = start.elapsed();
-
-    // Ensure no performance regression
-    assert!(duration < Duration::from_secs(1));
+fn bench_god_object_scoring(c: &mut Criterion) {
+    let thresholds = GodObjectThresholds::default();
+    c.bench_function("calculate_god_object_score", |b| {
+        b.iter(|| {
+            calculate_god_object_score(
+                black_box(25),
+                black_box(6),
+                black_box(&thresholds)
+            )
+        })
+    });
 }
+
+criterion_group!(benches, bench_god_object_scoring);
+criterion_main!(benches);
 ```
 
 ## Documentation Requirements
 
-### Code Documentation
+### Module-Level Documentation (Required for Each Module)
 
-**Module-level docs for each file:**
+Following **Stillwater principles**: Document what makes it pure and composable.
 
 ```rust
-// detector.rs
-//! God Object Detection
+// scoring.rs
+//! # God Object Scoring (Pure Core)
 //!
-//! This module contains pure functions for detecting god objects in code metrics.
-//! All functions are deterministic and side-effect free.
+//! Pure functions for calculating god object scores and weights.
+//! All functions are:
+//! - **Deterministic**: Same inputs always produce same outputs
+//! - **Side-effect free**: No I/O, no mutations, no hidden state
+//! - **Composable**: Can be combined into pipelines
 //!
-//! # Examples
+//! ## Stillwater Architecture
 //!
-//! ```
-//! use debtmap::god_object::detector::detect_god_objects;
+//! This is part of the **Pure Core** - business logic separated from I/O.
+//! AST traversal (I/O) happens in `ast_visitor.rs`.
 //!
-//! let metrics = load_file_metrics();
-//! let god_objects = detect_god_objects(&metrics);
+//! ## Examples
+//!
+//! ```rust
+//! use debtmap::organization::god_object::scoring::*;
+//!
+//! let thresholds = GodObjectThresholds::default();
+//! let score = calculate_god_object_score(25, 6, &thresholds);
+//! assert!(score > 1.0); // Exceeds threshold
 //! ```
 
-// Each public function
-/// Detects god objects from file metrics.
+// classifier.rs
+//! # God Object Classification (Pure Transformations)
+//!
+//! Pure functions for classifying god objects and grouping methods.
+//!
+//! ## Purity Guarantees
+//!
+//! - Input: Method names, metrics, scores
+//! - Output: Classifications, confidence levels, groupings
+//! - No I/O, no external state
+//!
+//! ## Examples
+//!
+//! ```rust
+//! let methods = vec!["get_user", "set_user", "fetch_orders"];
+//! let groups = group_methods_by_responsibility(&methods);
+//! // Returns: {"data_access": ["get_user", "set_user"], ...}
+//! ```
+```
+
+### Function Documentation (Every Public Function)
+
+```rust
+/// Calculate god object score based on method and responsibility counts.
+///
+/// **Pure function** - deterministic, no side effects.
 ///
 /// # Arguments
 ///
-/// * `metrics` - Slice of file metrics to analyze
+/// * `method_count` - Number of methods in the type
+/// * `responsibility_count` - Number of distinct responsibilities
+/// * `thresholds` - Configuration thresholds
 ///
 /// # Returns
 ///
-/// Vector of detected god objects with their metrics
+/// Score as f64, where:
+/// - < 1.0: Not a god object
+/// - 1.0-2.0: Moderate god object
+/// - > 2.0: Severe god object
 ///
 /// # Examples
 ///
+/// ```rust
+/// let thresholds = GodObjectThresholds::default();
+/// let score = calculate_god_object_score(30, 7, &thresholds);
+/// assert!(score > 1.5);
 /// ```
-/// let detected = detect_god_objects(&metrics);
-/// assert!(detected.iter().all(|g| g.metrics.method_count > 20));
-/// ```
-pub fn detect_god_objects(metrics: &[FileMetrics]) -> Vec<GodObject> {
+///
+/// # Purity
+///
+/// This function is pure:
+/// - Same inputs always produce same output
+/// - No I/O operations
+/// - No mutations of input parameters
+/// - Testable without mocks
+pub fn calculate_god_object_score(
+    method_count: usize,
+    responsibility_count: usize,
+    thresholds: &GodObjectThresholds,
+) -> f64 {
     // ...
 }
 ```
 
-### User Documentation
+### Architecture Documentation
 
-No user-facing documentation changes needed (internal refactoring).
-
-### Architecture Updates
-
-Add section to `ARCHITECTURE.md`:
+Update `ARCHITECTURE.md` or `CLAUDE.md`:
 
 ```markdown
-## God Object Detection Module
+## God Object Detection Module (Stillwater Architecture)
 
-The god object detection system is organized as follows:
+Location: `src/organization/god_object/`
 
-- `god_object::detector` - Pure detection logic
-- `god_object::classifier` - Pure classification rules
-- `god_object::recommender` - Pure recommendation generation
-- `god_object::scoring` - Pure scoring algorithms
-- `god_object::types` - Shared data structures
+### Architecture Pattern: Pure Core, Imperative Shell
 
-All modules follow functional programming principles with pure core logic
-and no I/O operations.
+**Pure Core (Business Logic)**:
+- `types.rs` - Data structures
+- `thresholds.rs` - Configuration
+- `predicates.rs` - Detection predicates
+- `scoring.rs` - Scoring algorithms
+- `classifier.rs` - Classification logic
+- `recommender.rs` - Recommendation generation
+
+**Imperative Shell (I/O Boundary)**:
+- `ast_visitor.rs` - AST traversal and data collection
+- `detector.rs` - Orchestration (composes pure functions)
+
+**Public API**:
+- `mod.rs` - Re-exports for consumers
+
+### Dependency Flow
+
+```
+ast_visitor.rs (I/O) ──→ [data] ──→ Pure Core ──→ [results] ──→ consumers
+
+Pure Core hierarchy:
+  types.rs (foundation)
+    ↑
+    ├── thresholds.rs
+    ├── predicates.rs
+    ├── scoring.rs
+    │     ↑
+    ├── classifier.rs
+    │     ↑
+    └── recommender.rs
+```
+
+### Testing Strategy
+
+All pure functions have 100% unit test coverage without mocks.
+Property-based tests verify invariants.
+Integration tests verify composition.
 ```
 
 ## Implementation Notes
 
-### Refactoring Strategy
+### Stillwater Refactoring Strategy
 
-1. **Create new module structure** without deleting original
-2. **Copy functions** to appropriate modules (don't move yet)
-3. **Update imports** in new modules
-4. **Test each module** independently
-5. **Update public API** in mod.rs
-6. **Switch codebase** to use new modules
-7. **Delete original** file only after all tests pass
+**Core Principle**: Incremental extraction of pure functions, preserving I/O boundaries.
+
+1. **Identify Pure vs Impure**
+   - Pure: Takes data, returns data, no side effects
+   - Impure: Performs I/O, mutates state, talks to external systems
+
+2. **Extract Pure Functions First**
+   - Start with scoring (easiest - pure math)
+   - Then predicates (simple boolean logic)
+   - Then classification (pure transformations)
+   - Finally orchestration (composes pure functions)
+
+3. **Preserve I/O Shell**
+   - `ast_visitor.rs` stays as-is (it's already properly separated)
+   - Don't try to make I/O "pure" - keep it at boundaries
+
+4. **Test at Every Step**
+   - Extract module → write unit tests → verify integration tests pass
+   - Commit small, working changes
+   - Never leave codebase in non-compiling state
 
 ### Common Pitfalls
 
-1. **Circular dependencies** - Ensure dependency graph is acyclic
-2. **Lost functionality** - Verify all functions moved
-3. **Test breakage** - Update test imports
-4. **Performance regression** - Benchmark before/after
-
-### Pure Function Extraction
-
-When splitting, ensure functions remain pure:
-
+**Circular Dependencies**
 ```rust
-// ✓ Pure (good)
-fn is_god_object(metrics: &ComplexityMetrics) -> bool {
-    metrics.method_count > 20 && metrics.complexity > 50
+// ❌ BAD: Circular dependency
+// scoring.rs imports classifier
+// classifier.rs imports scoring
+// Solution: Extract shared types to types.rs
+
+// ✅ GOOD: Linear dependency
+types.rs ← scoring.rs ← classifier.rs
+```
+
+**Forgetting to Export from mod.rs**
+```rust
+// ❌ BAD: Internal module not re-exported
+// Users can't access new functions
+
+// ✅ GOOD: Re-export in mod.rs
+pub use scoring::calculate_god_object_score;
+```
+
+**Accidentally Making Pure Functions Impure**
+```rust
+// ❌ BAD: Added logging (side effect!)
+fn calculate_score(count: usize) -> f64 {
+    println!("Calculating score for {}", count); // I/O!
+    count as f64 * 1.5
 }
 
-// ✗ Impure (needs fixing)
-fn detect_god_objects_bad(path: &Path) -> Vec<GodObject> {
-    let content = std::fs::read_to_string(path)?; // I/O!
-    parse_and_detect(&content)
-}
-
-// ✓ I/O separated to boundary
-// In io module:
-fn load_metrics(path: &Path) -> Result<FileMetrics> {
-    let content = std::fs::read_to_string(path)?;
-    parse_metrics(&content)
-}
-
-// In detector module (pure):
-fn detect_god_objects(metrics: &FileMetrics) -> Vec<GodObject> {
-    // Pure logic only
+// ✅ GOOD: Pure, caller can log
+fn calculate_score(count: usize) -> f64 {
+    count as f64 * 1.5
 }
 ```
+
+### Pure Function Extraction Guide
+
+**Stillwater Pattern**: Separate "what to compute" from "how to execute".
+
+```rust
+// ❌ BEFORE: Mixed I/O and logic
+fn analyze_file_bad(path: &Path) -> Result<GodObjectAnalysis> {
+    let content = std::fs::read_to_string(path)?;  // I/O
+    let ast = syn::parse_file(&content)?;          // I/O
+    let mut visitor = TypeVisitor::new();
+    visitor.visit_file(&ast);                      // I/O
+
+    let score = calculate_score(&visitor);         // Pure logic
+    let confidence = determine_confidence(&score); // Pure logic
+
+    Ok(GodObjectAnalysis { score, confidence })
+}
+
+// ✅ AFTER: Stillwater separation
+// I/O Shell (ast_visitor.rs)
+pub fn collect_type_data(file: &syn::File) -> TypeVisitor {
+    let mut visitor = TypeVisitor::new();
+    visitor.visit_file(file);
+    visitor
+}
+
+// Pure Core (scoring.rs)
+pub fn calculate_score(visitor: &TypeVisitor) -> f64 {
+    let method_count = visitor.total_method_count();
+    let responsibility_count = visitor.responsibility_count();
+    (method_count as f64 / 15.0) * (responsibility_count as f64 / 3.0)
+}
+
+// Pure Core (classifier.rs)
+pub fn determine_confidence(score: f64) -> GodObjectConfidence {
+    if score > 2.0 { High } else if score > 1.0 { Medium } else { Low }
+}
+
+// Orchestration (detector.rs)
+impl GodObjectDetector {
+    pub fn analyze(&self, visitor: &TypeVisitor) -> GodObjectAnalysis {
+        // Compose pure functions
+        let score = scoring::calculate_score(visitor);
+        let confidence = classifier::determine_confidence(score);
+        GodObjectAnalysis { score, confidence }
+    }
+}
+```
+
+**Benefits**:
+- `calculate_score` and `determine_confidence` are 100% testable
+- No mocks needed for testing
+- Can refactor without breaking I/O
+- Clear boundaries
 
 ## Migration and Compatibility
 
 ### Breaking Changes
 
-**None** - This is an internal refactoring. Public API remains identical.
+**None** - Public API remains 100% backward compatible.
 
-### Migration Steps
+### Migration for Consumers
 
-1. **No user action required** - Internal change only
-2. **Developers** must update imports:
-   ```rust
-   // Before
-   use debtmap::god_object_detector::{detect_god_objects, GodObject};
+**No action required** - All imports continue to work:
 
-   // After
-   use debtmap::god_object::{detect_god_objects, GodObject};
-   ```
+```rust
+// These all continue to work unchanged
+use debtmap::organization::god_object_analysis::*;
+use debtmap::organization::GodObjectDetector;
+use debtmap::organization::{
+    calculate_god_object_score,
+    determine_confidence,
+    // ... etc
+};
+```
 
-### Compatibility Considerations
+### Internal Migration (For Contributors)
 
-- Maintain all existing public functions
-- Preserve function signatures
-- Keep same return types
-- No changes to CLI interface
+If directly importing from old files (not recommended but possible):
+
+```rust
+// Before (internal use)
+use crate::organization::god_object_detector::GodObjectDetector;
+use crate::organization::god_object_analysis::calculate_god_object_score;
+
+// After (updated paths)
+use crate::organization::god_object::detector::GodObjectDetector;
+use crate::organization::god_object::scoring::calculate_god_object_score;
+
+// But better: Use from mod.rs
+use crate::organization::god_object::{GodObjectDetector, calculate_god_object_score};
+```
 
 ### Rollback Plan
 
-If issues arise:
-1. Revert commit
-2. Restore original `god_object_detector.rs`
-3. Fix issues in new structure
-4. Re-attempt split
+Each phase is independently committable. If issues arise:
+
+1. **Phase-level rollback**: Revert last commit, fix issue, re-apply
+2. **Full rollback**: Keep old files until Phase 9, can abort at any time
+3. **Incremental fixes**: New modules coexist with old until Phase 9
+
+### Compatibility Guarantees
+
+- All 6 test files pass without modification
+- Public API signatures unchanged
+- Return types unchanged
+- Error handling unchanged
+- Performance characteristics maintained
 
 ## Success Metrics
 
-- ✅ 6 modules created, each under 500 lines
-- ✅ 100% of original functionality preserved
-- ✅ All tests pass
-- ✅ No clippy warnings
-- ✅ No performance regression (benchmark within 5%)
-- ✅ Module-level documentation complete
-- ✅ Clear separation of pure/impure functions
+### Quantitative Metrics
+
+- ✅ **Line Count**: 8,033 → ~3,500 lines (60% reduction)
+- ✅ **Module Count**: 3 files → 9 focused modules
+- ✅ **Module Size**: All < 300 lines (target: < 200)
+- ✅ **Pure Functions**: 90%+ of logic in pure functions
+- ✅ **Test Coverage**: 85%+ for pure functions
+- ✅ **Performance**: < 5% regression on benchmarks
+- ✅ **Build Time**: No increase
+
+### Qualitative Metrics
+
+- ✅ **Stillwater Compliance**: Clear pure core / I/O shell separation
+- ✅ **Testability**: Pure functions testable without mocks
+- ✅ **Maintainability**: Single responsibility per module
+- ✅ **Clarity**: Each module's purpose obvious from name
+- ✅ **Composition**: Functions easily composable into pipelines
+- ✅ **Documentation**: Every public function documented with purity guarantees
+
+### Verification Steps
+
+1. **All tests pass**
+   ```bash
+   cargo test --all-features
+   # All 6 god_object test files pass
+   ```
+
+2. **No clippy warnings**
+   ```bash
+   cargo clippy --all-targets --all-features -- -D warnings
+   ```
+
+3. **Benchmarks acceptable**
+   ```bash
+   cargo bench --bench god_object_bench
+   # < 5% regression vs baseline
+   ```
+
+4. **Documentation builds**
+   ```bash
+   cargo doc --no-deps --document-private-items
+   ```
+
+5. **Dependency graph acyclic**
+   ```bash
+   cargo depgraph --focus organization::god_object
+   # No cycles in dependency graph
+   ```
 
 ## References
 
-- **STILLWATER_EVALUATION.md** - Section "Composition Over Complexity"
-- **CLAUDE.md** - Module boundary guidelines
-- **Stillwater Philosophy** - Pure core, imperative shell pattern
+- **`../stillwater/PHILOSOPHY.md`** - Core architectural principles
+- **`CLAUDE.md`** - Project-specific guidelines
+- **`STILLWATER_EVALUATION.md`** - Original evaluation identifying this issue
+- **Functional Core, Imperative Shell** - Gary Bernhardt
+- **Parse, Don't Validate** - Alexis King
