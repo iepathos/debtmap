@@ -240,7 +240,7 @@ pub(super) fn generate_recommendation(
     debt_type: &DebtType,
     role: FunctionRole,
     _score: &UnifiedScore,
-) -> ActionableRecommendation {
+) -> Option<ActionableRecommendation> {
     generate_recommendation_with_data_flow(func, debt_type, role, _score, None)
 }
 
@@ -250,7 +250,7 @@ fn generate_recommendation_with_data_flow(
     role: FunctionRole,
     _score: &UnifiedScore,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> ActionableRecommendation {
+) -> Option<ActionableRecommendation> {
     generate_recommendation_with_coverage_and_data_flow(
         func, debt_type, role, _score, &None, data_flow,
     )
@@ -263,15 +263,15 @@ pub(super) fn generate_recommendation_with_coverage_and_data_flow(
     _score: &UnifiedScore,
     coverage: &Option<TransitiveCoverage>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> ActionableRecommendation {
-    // Try to use new concise recommendation format (spec 138a) for supported debt types
+) -> Option<ActionableRecommendation> {
+    // Try to use new concise recommendation format (spec 138a, spec 201) for supported debt types
     use super::concise_recommendation::generate_concise_recommendation;
 
     match debt_type {
         DebtType::TestingGap { .. }
         | DebtType::ComplexityHotspot { .. }
         | DebtType::DeadCode { .. } => {
-            // Use new concise recommendation format
+            // Use new concise recommendation format (spec 201: returns None for clean dispatchers)
             return generate_concise_recommendation(debt_type, func, role, coverage);
         }
         _ => {
@@ -290,7 +290,11 @@ pub(super) fn generate_recommendation_with_coverage_and_data_flow(
     let (primary_action, rationale, steps) =
         generate_context_aware_recommendation(recommendation_context, data_flow);
 
-    build_actionable_recommendation(primary_action, rationale, steps)
+    Some(build_actionable_recommendation(
+        primary_action,
+        rationale,
+        steps,
+    ))
 }
 
 // Pure function to create recommendation context

@@ -72,13 +72,14 @@ fn apply_context_multiplier_to_score(mut score: UnifiedScore, multiplier: f64) -
     score
 }
 
-/// Create a unified debt item with enhanced call graph analysis
+/// Create a unified debt item with enhanced call graph analysis (spec 201)
+/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 pub fn create_unified_debt_item_enhanced(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     _enhanced_call_graph: Option<()>, // Placeholder for future enhanced call graph
     coverage: Option<&LcovData>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Security factor removed per spec 64
@@ -100,7 +101,8 @@ pub fn create_unified_debt_item_enhanced(
     // Use enhanced debt type classification
     let debt_type = classify_debt_type_enhanced(func, call_graph, &func_id);
 
-    let recommendation = generate_recommendation(func, &debt_type, role, &unified_score);
+    // Generate recommendation (spec 201: may return None for clean dispatchers)
+    let recommendation = generate_recommendation(func, &debt_type, role, &unified_score)?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
     // Get caller and callee names
@@ -173,7 +175,7 @@ pub fn create_unified_debt_item_enhanced(
     };
 
     // Apply exponential scaling and risk boosting (spec 171)
-    apply_score_scaling(item)
+    Some(apply_score_scaling(item))
 }
 
 pub fn create_unified_debt_item_with_aggregator(
@@ -183,7 +185,7 @@ pub fn create_unified_debt_item_with_aggregator(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     create_unified_debt_item_with_aggregator_and_data_flow(
         func,
         call_graph,
@@ -226,7 +228,8 @@ struct DebtAnalysisContext {
     expected_impact: ImpactMetrics,
 }
 
-// Pure function: Perform debt analysis
+// Pure function: Perform debt analysis (spec 201)
+/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 #[allow(clippy::too_many_arguments)]
 fn analyze_debt(
     func: &FunctionMetrics,
@@ -237,7 +240,7 @@ fn analyze_debt(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> DebtAnalysisContext {
+) -> Option<DebtAnalysisContext> {
     // Calculate transitive coverage
     let transitive_coverage = calculate_coverage_data(func_id, func, call_graph, coverage);
 
@@ -265,7 +268,7 @@ fn analyze_debt(
     // Determine function role
     let function_role = classify_function_role(func, func_id, call_graph);
 
-    // Generate recommendation
+    // Generate recommendation (spec 201: may return None for clean dispatchers)
     let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
@@ -273,12 +276,12 @@ fn analyze_debt(
         &unified_score,
         &transitive_coverage,
         data_flow,
-    );
+    )?;
 
     // Calculate expected impact
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
-    DebtAnalysisContext {
+    Some(DebtAnalysisContext {
         func_id: func_id.clone(),
         debt_type,
         unified_score,
@@ -286,7 +289,7 @@ fn analyze_debt(
         transitive_coverage,
         recommendation,
         expected_impact,
-    }
+    })
 }
 
 // Pure function: Extract dependency metrics
@@ -399,7 +402,8 @@ fn build_unified_debt_item(
     }
 }
 
-// Main function using functional composition
+// Main function using functional composition (spec 201)
+/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
@@ -408,11 +412,11 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
     let func_id = create_function_id(func);
 
-    // Step 2: Analyze debt (pure)
+    // Step 2: Analyze debt (pure) - may return None for clean dispatchers (spec 201)
     let context = analyze_debt(
         func,
         &func_id,
@@ -422,7 +426,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
         function_pointer_used_functions,
         debt_aggregator,
         data_flow,
-    );
+    )?;
 
     // Step 3: Extract dependencies (pure)
     let deps = extract_dependency_metrics(&func_id, call_graph);
@@ -431,7 +435,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     let item = build_unified_debt_item(func, context, deps);
 
     // Step 5: Apply exponential scaling and risk boosting (spec 171)
-    apply_score_scaling(item)
+    Some(apply_score_scaling(item))
 }
 
 pub fn create_unified_debt_item_with_exclusions(
@@ -440,7 +444,7 @@ pub fn create_unified_debt_item_with_exclusions(
     coverage: Option<&LcovData>,
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     create_unified_debt_item_with_exclusions_and_data_flow(
         func,
         call_graph,
@@ -458,7 +462,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     framework_exclusions: &HashSet<FunctionId>,
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Calculate transitive coverage if direct coverage is available
@@ -494,7 +498,8 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     // Determine function role for more accurate analysis
     let function_role = classify_function_role(func, &func_id, call_graph);
 
-    // Generate contextual recommendation based on debt type and metrics
+    // Generate contextual recommendation based on debt type and metrics (spec 201)
+    // May return None for clean dispatchers
     let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
@@ -502,7 +507,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         &unified_score,
         &transitive_coverage,
         data_flow,
-    );
+    )?;
 
     // Calculate expected impact
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
@@ -532,7 +537,7 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
-    UnifiedDebtItem {
+    Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
             function: func.name.clone(),
@@ -567,15 +572,16 @@ pub fn create_unified_debt_item_with_exclusions_and_data_flow(
         context_type: Some(context_type),
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
-    }
+    })
 }
 
-/// Create a unified debt item for a function
+/// Create a unified debt item for a function (spec 201)
+/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 pub fn create_unified_debt_item(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     create_unified_debt_item_with_data_flow(func, call_graph, coverage, None)
 }
 
@@ -584,7 +590,7 @@ pub fn create_unified_debt_item_with_data_flow(
     call_graph: &CallGraph,
     coverage: Option<&LcovData>,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-) -> UnifiedDebtItem {
+) -> Option<UnifiedDebtItem> {
     let func_id = FunctionId::new(func.file.clone(), func.name.clone(), func.line);
 
     // Security factor removed per spec 64
@@ -604,6 +610,7 @@ pub fn create_unified_debt_item_with_data_flow(
         coverage.map(|cov| calculate_transitive_coverage(&func_id, call_graph, cov));
 
     let debt_type = determine_debt_type(func, &transitive_coverage, call_graph, &func_id);
+    // Generate recommendation (spec 201: may return None for clean dispatchers)
     let recommendation = generate_recommendation_with_coverage_and_data_flow(
         func,
         &debt_type,
@@ -611,7 +618,7 @@ pub fn create_unified_debt_item_with_data_flow(
         &unified_score,
         &transitive_coverage,
         data_flow,
-    );
+    )?;
     let expected_impact = calculate_expected_impact(func, &debt_type, &unified_score);
 
     // Get dependency counts and names from call graph
@@ -649,7 +656,7 @@ pub fn create_unified_debt_item_with_data_flow(
     let detected_pattern =
         crate::priority::detected_pattern::DetectedPattern::detect(&func.language_specific);
 
-    UnifiedDebtItem {
+    Some(UnifiedDebtItem {
         location: Location {
             file: func.file.clone(),
             function: func.name.clone(),
@@ -684,7 +691,7 @@ pub fn create_unified_debt_item_with_data_flow(
         context_type: Some(context_type),
         language_specific: func.language_specific.clone(), // State machine/coordinator signals (spec 190)
         detected_pattern,                                  // Detected complexity pattern (spec 204)
-    }
+    })
 }
 
 #[cfg(test)]

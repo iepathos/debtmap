@@ -86,7 +86,8 @@ fn test_blog_sample_reconcile_state_recommendation() {
         &metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     // Verify it's treated as moderate complexity
     assert!(
@@ -137,7 +138,8 @@ fn test_blog_sample_validate_config_recommendation() {
         &metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     // Verify it's treated as low complexity
     assert!(
@@ -209,7 +211,8 @@ fn test_blog_samples_complexity_tier_boundaries() {
         &low_metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     assert!(
         rec_low.primary_action.contains("Maintain"),
@@ -254,7 +257,8 @@ fn test_blog_samples_complexity_tier_boundaries() {
         &moderate_metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     assert!(
         rec_moderate.primary_action.contains("Optional")
@@ -279,7 +283,8 @@ fn test_blog_sample_recommendations_have_effort_estimates() {
         &reconcile_metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     let rec2 = generate_concise_recommendation(
         &DebtType::ComplexityHotspot {
@@ -290,7 +295,8 @@ fn test_blog_sample_recommendations_have_effort_estimates() {
         &validate_metrics,
         FunctionRole::PureLogic,
         &None,
-    );
+    )
+    .expect("Test should generate recommendation");
 
     assert!(
         rec1.estimated_effort_hours.is_some(),

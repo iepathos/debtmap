@@ -170,8 +170,9 @@ fn helper() {
     // Create FunctionMetrics for helper
     let helper_metrics = create_test_metrics("helper", path.clone(), 6);
 
-    // Create UnifiedDebtItem using the same function as production code
-    let debt_item = create_unified_debt_item_enhanced(&helper_metrics, &call_graph, None, None);
+    // Create UnifiedDebtItem using the same function as production code (spec 201)
+    let debt_item = create_unified_debt_item_enhanced(&helper_metrics, &call_graph, None, None)
+        .expect("Test function should generate a debt item");
 
     // Verify that the debt item has callers
     assert!(

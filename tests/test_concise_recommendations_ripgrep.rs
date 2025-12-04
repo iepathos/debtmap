@@ -57,7 +57,8 @@ fn test_complex_function_max_5_steps() {
         adjusted_cyclomatic: None,
     };
 
-    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None);
+    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None)
+        .expect("Test should generate recommendation");
 
     println!("\n=== COMPLEX FUNCTION RECOMMENDATION ===");
     println!(
@@ -136,7 +137,8 @@ fn test_testing_gap_conciseness() {
         cognitive: 30,
     };
 
-    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None);
+    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None)
+        .expect("Test should generate recommendation");
 
     println!("\n=== TESTING GAP RECOMMENDATION ===");
     println!(
@@ -194,7 +196,8 @@ fn test_dead_code_conciseness() {
         usage_hints: vec![],
     };
 
-    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::PureLogic, &None);
+    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::PureLogic, &None)
+        .expect("Test should generate recommendation");
 
     println!("\n=== DEAD CODE RECOMMENDATION ===");
     println!(
@@ -256,7 +259,8 @@ fn test_recommendation_with_transitive_coverage() {
     };
 
     let rec =
-        generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &coverage);
+        generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &coverage)
+            .expect("Test should generate recommendation");
 
     println!("\n=== RECOMMENDATION WITH TRANSITIVE COVERAGE ===");
     println!("Direct coverage: 40%, Transitive: 60%, Combined: 50%");
@@ -327,7 +331,8 @@ fn test_batch_recommendations_are_concise() {
     for (i, (debt, name)) in test_cases.iter().enumerate() {
         let metrics = create_complex_metrics(name, 20, 25, 100 + i * 50);
 
-        let rec = generate_concise_recommendation(debt, &metrics, FunctionRole::PureLogic, &None);
+        let rec = generate_concise_recommendation(debt, &metrics, FunctionRole::PureLogic, &None)
+            .expect("Test should generate recommendation");
 
         // Verify conciseness requirements
         if let Some(steps) = &rec.steps {
@@ -391,7 +396,8 @@ fn test_actual_ripgrep_file_if_available() {
         adjusted_cyclomatic: None,
     };
 
-    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None);
+    let rec = generate_concise_recommendation(&debt, &metrics, FunctionRole::Orchestrator, &None)
+        .expect("Test should generate recommendation");
 
     println!("Function: {}", metrics.name);
     println!("Complexity: {}/{}", metrics.cyclomatic, metrics.cognitive);

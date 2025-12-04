@@ -662,8 +662,8 @@ impl ParallelUnifiedAnalysisBuilder {
             return None;
         }
 
-        // Transform metric to debt item
-        Some(self.metric_to_debt_item(metric, context))
+        // Transform metric to debt item (spec 201: may return None for clean dispatchers)
+        self.metric_to_debt_item(metric, context)
     }
 
     /// Transform a metric into a debt item (pure transformation)
@@ -671,7 +671,8 @@ impl ParallelUnifiedAnalysisBuilder {
         &self,
         metric: &FunctionMetrics,
         context: &FunctionAnalysisContext,
-    ) -> UnifiedDebtItem {
+    ) -> Option<UnifiedDebtItem> {
+        // Returns None for clean dispatchers (spec 201)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
             context.call_graph,
