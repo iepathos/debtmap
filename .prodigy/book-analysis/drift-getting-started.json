@@ -1,0 +1,100 @@
+{
+  "item_type": "chapter",
+  "chapter_id": "getting-started",
+  "chapter_title": "Getting Started",
+  "chapter_file": "book/src/getting-started.md",
+  "drift_detected": true,
+  "severity": "medium",
+  "quality_assessment": "Chapter is comprehensive and well-structured, but contains outdated information about JSON output formats. The legacy/unified format distinction was removed in spec 202, but the documentation still describes it. All other installation instructions, commands, and examples are accurate.",
+  "issues": [
+    {
+      "type": "outdated_information",
+      "severity": "high",
+      "section": "Output Formats",
+      "description": "Documentation describes --output-format flag with legacy vs unified options, but this was removed in spec 202",
+      "current_content": "# By default, JSON uses legacy format\ndebtmap analyze . --format json --output report.json\n\n# For the new unified format (with consistent structure and type field):\ndebtmap analyze . --format json --output-format unified --output report.json\n\n**JSON Format Options:**\n- **legacy** (default): Uses `{File: {...}}` and `{Function: {...}}` wrappers for backward compatibility with existing tools\n- **unified**: New format (spec 108) with consistent structure and `type` field for all items\n\nRecommendation: Use `unified` for new integrations, `legacy` only for compatibility with existing tooling.",
+      "should_be": "JSON output now always uses the unified format (consistent structure with type field). The legacy format was removed in spec 202.\n\ndebtmap analyze . --format json --output report.json",
+      "fix_suggestion": "Remove the entire section about --output-format flag, legacy vs unified distinction, and the recommendation to choose between formats. Update the example to show only --format json without --output-format.",
+      "source_reference": "src/output/json.rs:32-34 (comment: 'Always use unified format (spec 202 - removed legacy format)')",
+      "lines": [
+        402,
+        403,
+        404,
+        405,
+        406,
+        407,
+        408,
+        409,
+        410,
+        411,
+        412,
+        413
+      ]
+    },
+    {
+      "type": "version_mismatch",
+      "severity": "low",
+      "section": "Version Information",
+      "description": "Documentation is for version 0.9.0, but debtmap --version shows 0.8.0",
+      "current_content": "The installed binary shows 0.8.0",
+      "should_be": "Documentation should match the installed version or note that it's for a newer version",
+      "fix_suggestion": "This is likely because the documentation is being prepared for the upcoming 0.9.0 release. Add a note if this is intentional, or verify that features described match 0.8.0 functionality.",
+      "source_reference": "Cargo.toml:3 (version = \"0.9.0\"), debtmap --version output (0.8.0)"
+    }
+  ],
+  "positive_aspects": [
+    "Comprehensive installation instructions covering multiple methods (quick install, cargo, from source)",
+    "Excellent troubleshooting section addressing common issues",
+    "Clear progression from installation to first analysis to advanced usage",
+    "Good coverage of command-line options with practical examples",
+    "Helpful explanation of output interpretation with priority levels and metrics",
+    "Internal cross-references to analysis-guide.md and output-formats.md are valid",
+    "Configuration file example is accurate and well-documented",
+    "Coverage integration examples are current and correct (--lcov alias works)",
+    "Advanced options section is comprehensive and matches current CLI",
+    "Example output accurately represents current debtmap output format"
+  ],
+  "improvement_suggestions": [
+    "Add a note about version compatibility if documenting features from 0.9.0 while 0.8.0 is released",
+    "Consider adding a 'What's New' section when documenting new releases",
+    "Could add more guidance on when to use coverage-based analysis vs without coverage",
+    "Consider adding troubleshooting for Windows-specific installation issues",
+    "Could expand on the difference between --context and --context-providers usage"
+  ],
+  "link_validation": {
+    "total_internal_links": 2,
+    "broken_links": 0,
+    "valid_links": [
+      {
+        "text": "Analysis Guide",
+        "target": "./analysis-guide.md",
+        "resolved_path": "book/src/analysis-guide.md",
+        "exists": true
+      },
+      {
+        "text": "Output Formats",
+        "target": "./output-formats.md",
+        "resolved_path": "book/src/output-formats.md",
+        "exists": true
+      }
+    ]
+  },
+  "metadata": {
+    "analyzed_at": "2025-12-04T22:00:26Z",
+    "feature_inventory": ".prodigy/book-analysis/features.json",
+    "topics_covered": [
+      "Installation",
+      "Quick start",
+      "First analysis",
+      "Basic usage",
+      "Advanced options",
+      "Output interpretation",
+      "Configuration",
+      "Troubleshooting"
+    ],
+    "validation_focus": "Check installation instructions and quick start examples are current",
+    "documented_version": "0.9.0",
+    "verified_against_version": "0.8.0",
+    "cli_verification_performed": true
+  }
+}
