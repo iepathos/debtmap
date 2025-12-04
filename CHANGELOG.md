@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-12-04
+
 ### Changed
 
-- **God Object Detector Refactoring** (Spec 181i - Phase 9)
+- **God Object Detector Refactoring** (Specs 181a-181i)
   - Completed migration of god object detection to pure functional architecture
   - Extracted pure functions for scoring, classification, and recommendation logic
   - Separated I/O operations (AST visiting) from pure computation
@@ -17,6 +19,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed legacy monolithic implementations (god_object_detector.rs, god_object_analysis.rs)
   - Improved testability and maintainability through functional composition
   - Updated ARCHITECTURE.md with new module structure documentation
+
+- **Formatter Refactoring** (Specs 203-207)
+  - Separated pure formatting logic from I/O operations (Spec 203)
+  - Consolidated pattern display system for consistent output (Spec 204)
+  - Broke up monolithic formatter into focused modules (Spec 205)
+  - Modularized formatter_markdown.rs for better maintainability (Spec 206)
+  - Modularized formatter_verbosity.rs into separate components (Spec 207)
+  - Improved code organization and testability of formatting layer
+
+### Added
+
+- **Enhanced Progress Feedback** (Spec 201)
+  - Complete progress feedback for all analysis phases
+  - Live updates during file discovery, parsing, and analysis
+  - Unified progress display across all operations
+  - Clear indication of call graph preparation and multi-pass analysis phases
+
+- **Output Quality Improvements** (Spec 201)
+  - Filter "no action needed" items from analysis output
+  - Only show actionable technical debt items
+  - Cleaner, more focused recommendations
+
+- **Unified Progress Flow Display** (Spec 195)
+  - Consistent progress indicators across all analysis stages
+  - Real-time feedback on long-running operations
+  - Improved user experience for large codebase analysis
+
+### Improved
+
+- **Analysis Architecture** (Specs 202, 208)
+  - Inverted multi-pass analysis default for better performance (Spec 202)
+  - Multi-pass analysis now explicitly enabled when needed
+  - Merged dual responsibility classification systems (Spec 208)
+  - Extracted severity and coverage classification for clarity (Spec 202)
+  - Simplified classification logic and reduced code duplication
+
+- **Data Flow Analysis** (Spec 201)
+  - Enhanced mutation tracking capabilities
+  - Better identification of state transition patterns
+  - Improved detection of mutable state usage
+
+### Fixed
+
+- Resolved test failures in formatter and coverage tests
+- Updated domain pattern tests to use new API
+- Completed implementation gaps in specs 181i and 201
+- Removed useless test with assert!(true) from concise_recommendation
+- Fixed file-level debt item formatting and display
+- Updated color validation tests after formatter refactoring
+- Fixed god_object_config_rs_test to reference existing files after refactoring
+
+### Internal
+
+- Applied automated code formatting across the codebase
+- Applied clippy fixes for better code quality
+- Removed completed spec files (181b, 181e, 181h, 206)
+- Removed misplaced example files from src/
 
 ## [0.7.0] - 2025-12-02
 
