@@ -335,7 +335,7 @@ max_combined_reduction = 0.30    # Overall cap at 30% reduction (minimum 70% pre
 **Important Notes:**
 
 1. **Dampening thresholds** - Some are configurable, some are hardcoded (`src/complexity/entropy.rs:185-195`):
-   - **Entropy factor threshold: 0.4** - Hardcoded internally (not configurable)
+   - **Entropy factor threshold: 0.4** - Hardcoded in implementation (src/complexity/entropy.rs:192). Although an `entropy_threshold` field exists in the config struct (src/config/languages.rs:84), it is not wired up to be used in the actual dampening calculation. The value 0.4 was chosen based on empirical analysis across multiple codebases to balance false positive reduction with sensitivity to genuinely complex code.
    - **Branch threshold: 0.8** - Configurable via `branch_threshold` in config file
    - **Pattern threshold: 0.7/1.0** - Configurable via `pattern_threshold` in config file
 
@@ -526,5 +526,5 @@ Debtmap's entropy analysis provides the best balance of accuracy and speed.
 ## See Also
 
 - [Why Debtmap?](why-debtmap.md) - Real-world examples of entropy analysis
-- [Analysis Guide](analysis-guide.md) - General analysis concepts
+- [Analysis Guide](analysis-guide/index.md) - General analysis concepts
 - [Configuration](configuration.md) - Complete configuration reference
