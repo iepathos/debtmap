@@ -125,14 +125,97 @@ impl GodObjectDetector {
 
     /// Main analysis pipeline - composes pure functions.
     ///
-    /// For now, this uses the comprehensive implementation from god_object_detector.rs module.
-    /// This will be further refactored in Phase 8 to compose pure functions directly.
-    #[allow(deprecated)]
+    /// Enhanced analysis that includes pattern detection and per-struct breakdown.
     pub fn analyze_enhanced(&self, path: &Path, ast: &syn::File) -> EnhancedGodObjectAnalysis {
-        // Import the comprehensive analysis from the legacy god_object_detector module
-        // This avoids circular dependencies during the transition
-        use crate::organization::god_object_detector as legacy;
-        legacy::analyze_enhanced_for_detector(self, path, ast)
+        use super::ast_visitor::TypeVisitor;
+        use super::classification_types::{EnhancedGodObjectAnalysis, GodObjectType};
+        use super::metrics;
+        use syn::visit::Visit;
+
+        // Step 1: Get comprehensive analysis
+        let file_metrics = self.analyze_comprehensive(path, ast);
+
+        // Step 2: Build per-struct metrics
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+        visitor.visit_file(ast);
+        let per_struct_metrics = metrics::build_per_struct_metrics(&visitor);
+
+        // Step 3: Classify the god object type
+        let classification = if file_metrics.is_god_object {
+            // Simple classification based on detection type
+            match file_metrics.detection_type {
+                super::core_types::DetectionType::GodClass => {
+                    let struct_name = per_struct_metrics
+                        .first()
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    GodObjectType::GodClass {
+                        struct_name,
+                        method_count: file_metrics.method_count,
+                        field_count: file_metrics.field_count,
+                        responsibilities: file_metrics.responsibility_count,
+                    }
+                }
+                super::core_types::DetectionType::GodModule
+                | super::core_types::DetectionType::GodFile => {
+                    let largest_struct = per_struct_metrics.first().cloned().unwrap_or_else(|| {
+                        super::core_types::StructMetrics {
+                            name: "Unknown".to_string(),
+                            method_count: file_metrics.method_count,
+                            field_count: file_metrics.field_count,
+                            responsibilities: vec![],
+                            line_span: (0, 0),
+                        }
+                    });
+                    GodObjectType::GodModule {
+                        total_structs: per_struct_metrics.len(),
+                        total_methods: file_metrics.method_count,
+                        largest_struct,
+                        suggested_splits: file_metrics.recommended_splits.clone(),
+                    }
+                }
+            }
+        } else {
+            GodObjectType::NotGodObject
+        };
+
+        // Step 4: Generate recommendation
+        let recommendation = match &classification {
+            GodObjectType::GodClass {
+                method_count,
+                field_count,
+                ..
+            } => {
+                format!(
+                    "God Class detected: {} methods, {} fields. Consider extracting responsibilities into separate modules.",
+                    method_count, field_count
+                )
+            }
+            GodObjectType::GodModule { total_methods, .. } => {
+                format!(
+                    "God Module detected: {} methods. Consider splitting into focused sub-modules by domain.",
+                    total_methods
+                )
+            }
+            GodObjectType::NotGodObject => {
+                if let Some(largest) = per_struct_metrics.first() {
+                    format!(
+                        "No god object detected. Largest struct: {} with {} methods.",
+                        largest.name, largest.method_count
+                    )
+                } else {
+                    "No god object detected.".to_string()
+                }
+            }
+            _ => "Analysis complete.".to_string(),
+        };
+
+        EnhancedGodObjectAnalysis {
+            file_metrics,
+            per_struct_metrics,
+            classification,
+            recommendation,
+        }
     }
 
     /// Get the max_methods threshold configured for this detector.
@@ -153,26 +236,205 @@ impl GodObjectDetector {
     /// Comprehensive analysis returning GodObjectAnalysis.
     ///
     /// This is a simpler analysis compared to analyze_enhanced, used by enhanced_analyzer.
-    #[allow(deprecated)]
     pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
-        use crate::organization::god_object_detector as legacy;
-        legacy::analyze_comprehensive_for_detector(self, path, ast)
+        use super::ast_visitor::TypeVisitor;
+        use super::classifier::{determine_confidence, group_methods_by_responsibility};
+        use super::core_types::{DetectionType, GodObjectAnalysis};
+        use super::metrics;
+        use super::recommender::recommend_module_splits;
+        use super::scoring::{calculate_god_object_score, calculate_god_object_score_weighted};
+        use super::thresholds::GodObjectThresholds;
+        use syn::visit::Visit;
+
+        // Step 1: Collect data from AST
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+        visitor.visit_file(ast);
+
+        let thresholds = GodObjectThresholds::default();
+
+        // Step 2: Determine detection type (GodClass vs GodFile vs GodModule)
+        let has_structs = !visitor.types.is_empty();
+        let standalone_count = visitor.standalone_functions.len();
+        let impl_method_count: usize = visitor.types.values().map(|t| t.method_count).sum();
+
+        let detection_type =
+            if has_structs && standalone_count > 50 && standalone_count > impl_method_count * 3 {
+                DetectionType::GodModule
+            } else if has_structs {
+                DetectionType::GodClass
+            } else {
+                DetectionType::GodFile
+            };
+
+        // Step 3: Count methods (exclude tests for GodClass, include for GodFile/GodModule)
+        let (method_count, method_names) = match detection_type {
+            DetectionType::GodClass => {
+                // Production methods only
+                let prod_methods: Vec<_> = visitor
+                    .function_complexity
+                    .iter()
+                    .filter(|fc| !fc.is_test)
+                    .map(|fc| fc.name.clone())
+                    .collect();
+                (prod_methods.len(), prod_methods)
+            }
+            DetectionType::GodFile | DetectionType::GodModule => {
+                // All functions
+                let all_methods: Vec<_> = visitor
+                    .function_complexity
+                    .iter()
+                    .map(|fc| fc.name.clone())
+                    .collect();
+                (all_methods.len(), all_methods)
+            }
+        };
+
+        // Step 4: Calculate metrics
+        let field_count: usize = visitor.types.values().map(|t| t.field_count).sum();
+
+        // Group methods by responsibility
+        let responsibility_groups = group_methods_by_responsibility(&method_names);
+        let responsibility_count = responsibility_groups.len();
+        let responsibilities: Vec<String> = responsibility_groups.keys().cloned().collect();
+
+        // Calculate complexity
+        let complexity_sum: u32 = visitor
+            .function_complexity
+            .iter()
+            .filter(|fc| method_names.contains(&fc.name))
+            .map(|fc| fc.cyclomatic_complexity)
+            .sum();
+
+        // Estimate lines of code
+        let lines_of_code = method_count * 15; // Simple estimate
+
+        // Step 5: Calculate weighted metrics
+        let (weighted_method_count, avg_complexity, _, purity_distribution) =
+            metrics::calculate_weighted_metrics(&visitor, &detection_type);
+
+        // Step 6: Calculate god object score
+        let god_object_score = if !visitor.function_complexity.is_empty() {
+            calculate_god_object_score_weighted(
+                weighted_method_count,
+                field_count,
+                responsibility_count,
+                lines_of_code,
+                avg_complexity,
+                &thresholds,
+            )
+        } else {
+            calculate_god_object_score(
+                method_count,
+                field_count,
+                responsibility_count,
+                lines_of_code,
+                &thresholds,
+            )
+        };
+
+        // Step 7: Determine confidence and if it's a god object
+        let confidence = determine_confidence(
+            method_count,
+            field_count,
+            responsibility_count,
+            lines_of_code,
+            complexity_sum,
+            &thresholds,
+        );
+
+        let is_god_object = god_object_score >= 70.0;
+
+        // Step 8: Generate recommendations
+        let type_name = visitor
+            .types
+            .keys()
+            .next()
+            .map(|s| s.as_str())
+            .unwrap_or("Module");
+        let recommended_splits =
+            recommend_module_splits(type_name, &method_names, &responsibility_groups);
+
+        // Step 9: Calculate visibility breakdown
+        let visibility_breakdown = Some(metrics::calculate_visibility_breakdown(
+            &visitor,
+            &method_names,
+        ));
+
+        GodObjectAnalysis {
+            is_god_object,
+            method_count,
+            field_count,
+            responsibility_count,
+            lines_of_code,
+            complexity_sum,
+            god_object_score,
+            recommended_splits,
+            confidence,
+            responsibilities,
+            purity_distribution,
+            module_structure: None,
+            detection_type,
+            visibility_breakdown,
+            domain_count: 0,
+            domain_diversity: 0.0,
+            struct_ratio: 0.0,
+            analysis_method: super::core_types::SplitAnalysisMethod::MethodBased,
+            cross_domain_severity: None,
+            domain_diversity_metrics: None,
+        }
     }
 }
 
 impl OrganizationDetector for GodObjectDetector {
-    #[allow(deprecated)]
     fn detect_anti_patterns(&self, file: &syn::File) -> Vec<OrganizationAntiPattern> {
-        // Import the comprehensive analysis from the legacy god_object_detector module
-        use crate::organization::god_object_detector as legacy;
-        legacy::detect_anti_patterns_for_detector(self, file)
+        use super::ast_visitor::TypeVisitor;
+        use super::classifier::group_methods_by_responsibility;
+        use crate::organization::ResponsibilityGroup;
+        use syn::visit::Visit;
+
+        let mut patterns = Vec::new();
+        let mut visitor = TypeVisitor::with_location_extractor(self.location_extractor.clone());
+        visitor.visit_file(file);
+
+        // Analyze each struct found
+        for (type_name, type_info) in visitor.types {
+            // Check if it's a god object using thresholds
+            let method_names = &type_info.methods;
+            let responsibilities = group_methods_by_responsibility(method_names);
+            let is_god = type_info.method_count > self.max_methods
+                || type_info.field_count > self.max_fields
+                || responsibilities.len() > self.max_responsibilities;
+
+            if is_god {
+                // Create responsibility groups
+                let suggested_split: Vec<ResponsibilityGroup> = responsibilities
+                    .into_iter()
+                    .map(|(responsibility, methods)| ResponsibilityGroup {
+                        name: responsibility.clone(),
+                        methods,
+                        fields: vec![], // Field grouping not implemented yet
+                        responsibility,
+                    })
+                    .collect();
+
+                patterns.push(OrganizationAntiPattern::GodObject {
+                    type_name: type_name.clone(),
+                    method_count: type_info.method_count,
+                    field_count: type_info.field_count,
+                    responsibility_count: suggested_split.len(),
+                    suggested_split,
+                    location: type_info.location,
+                });
+            }
+        }
+
+        patterns
     }
 
     fn detector_name(&self) -> &'static str {
         "GodObjectDetector"
     }
 
-    #[allow(deprecated)]
     fn estimate_maintainability_impact(
         &self,
         pattern: &OrganizationAntiPattern,
@@ -182,12 +444,24 @@ impl OrganizationDetector for GodObjectDetector {
                 method_count,
                 field_count,
                 ..
-            } => {
-                // Use the legacy implementation
-                use crate::organization::god_object_detector as legacy;
-                legacy::classify_god_object_impact(*method_count, *field_count)
-            }
+            } => Self::classify_god_object_impact(*method_count, *field_count),
             _ => MaintainabilityImpact::Low,
+        }
+    }
+}
+
+impl GodObjectDetector {
+    /// Classify maintainability impact based on method and field counts.
+    ///
+    /// Pure function that maps god object metrics to impact severity.
+    pub fn classify_god_object_impact(
+        method_count: usize,
+        field_count: usize,
+    ) -> MaintainabilityImpact {
+        match () {
+            _ if method_count > 30 || field_count > 20 => MaintainabilityImpact::Critical,
+            _ if method_count > 20 || field_count > 15 => MaintainabilityImpact::High,
+            _ => MaintainabilityImpact::Medium,
         }
     }
 }

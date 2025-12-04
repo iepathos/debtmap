@@ -35,6 +35,7 @@ pub mod thresholds;
 pub mod types;
 
 // Legacy compatibility - kept for one release cycle
+pub mod legacy_compat;
 pub mod metrics;
 
 // Re-exports for public API
