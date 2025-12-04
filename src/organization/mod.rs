@@ -28,7 +28,6 @@ pub mod domain_diversity;
 pub mod domain_patterns;
 pub mod file_classifier;
 pub mod god_object;
-pub mod god_object_analysis;
 pub mod god_object_metrics;
 pub mod hidden_type_extractor;
 pub mod integrated_analyzer;
@@ -368,7 +367,6 @@ pub enum MaintainabilityImpact {
 }
 
 mod feature_envy_detector;
-mod god_object_detector;
 mod magic_value_detector;
 mod parameter_analyzer;
 mod primitive_obsession_detector;

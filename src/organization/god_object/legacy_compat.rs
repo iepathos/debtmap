@@ -19,16 +19,14 @@ use std::collections::HashMap;
     note = "Use god_object classifier and recommender modules directly. This re-export will be removed in 0.9.0"
 )]
 pub fn group_methods_by_responsibility_with_domain_patterns(
-    methods: &[(String, Option<String>)],
-    language: crate::analysis::io_detection::Language,
-    structures: &[String],
+    _methods: &[(String, Option<String>)],
+    _language: crate::analysis::io_detection::Language,
+    _structures: &[String],
 ) -> (
     HashMap<String, Vec<String>>,
     HashMap<String, AggregatedClassification>,
 ) {
-    crate::organization::god_object_analysis::group_methods_by_responsibility_with_domain_patterns(
-        methods, language, structures,
-    )
+    panic!("This function has been removed. Use god_object::classifier and recommender modules directly.")
 }
 
 /// Re-export from the deprecated god_object_analysis module.
@@ -38,13 +36,10 @@ pub fn group_methods_by_responsibility_with_domain_patterns(
 )]
 #[allow(dead_code)]
 pub fn calculate_domain_diversity_from_structs(
-    structs: &[super::core_types::StructMetrics],
-    is_god_object: bool,
+    _structs: &[super::core_types::StructMetrics],
+    _is_god_object: bool,
 ) -> Result<crate::organization::DomainDiversityMetrics, anyhow::Error> {
-    crate::organization::god_object_analysis::calculate_domain_diversity_from_structs(
-        structs,
-        is_god_object,
-    )
+    panic!("This function has been removed. Use domain_diversity module directly.")
 }
 
 /// Re-export from the deprecated god_object_analysis module.
@@ -54,12 +49,10 @@ pub fn calculate_domain_diversity_from_structs(
 )]
 #[allow(dead_code)]
 pub fn suggest_splits_by_struct_grouping(
-    structs: &[super::core_types::StructMetrics],
-    ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
-    file_path: Option<&std::path::Path>,
-    ast: Option<&syn::File>,
+    _structs: &[super::core_types::StructMetrics],
+    _ownership: Option<&crate::organization::struct_ownership::StructOwnershipAnalyzer>,
+    _file_path: Option<&std::path::Path>,
+    _ast: Option<&syn::File>,
 ) -> Vec<super::split_types::ModuleSplit> {
-    crate::organization::god_object_analysis::suggest_splits_by_struct_grouping(
-        structs, ownership, file_path, ast,
-    )
+    panic!("This function has been removed. Use recommender module directly.")
 }

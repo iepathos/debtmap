@@ -91,6 +91,7 @@ pub struct GodObjectDetector {
     pub(crate) max_fields: usize,
     pub(crate) max_responsibilities: usize,
     pub(crate) location_extractor: Option<UnifiedLocationExtractor>,
+    #[allow(dead_code)]
     pub(crate) source_content: Option<String>,
 }
 
@@ -236,7 +237,7 @@ impl GodObjectDetector {
     /// Comprehensive analysis returning GodObjectAnalysis.
     ///
     /// This is a simpler analysis compared to analyze_enhanced, used by enhanced_analyzer.
-    pub fn analyze_comprehensive(&self, path: &Path, ast: &syn::File) -> GodObjectAnalysis {
+    pub fn analyze_comprehensive(&self, _path: &Path, ast: &syn::File) -> GodObjectAnalysis {
         use super::ast_visitor::TypeVisitor;
         use super::classifier::{determine_confidence, group_methods_by_responsibility};
         use super::core_types::{DetectionType, GodObjectAnalysis};
