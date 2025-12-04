@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::confidence::MINIMUM_CONFIDENCE;
-use super::god_object::thresholds::{ensure_not_reserved, GodObjectThresholds};
+use super::god_object::thresholds::ensure_not_reserved;
 use super::god_object::types::*;
 
 // Re-export scoring functions for backward compatibility
@@ -9,60 +9,11 @@ pub use super::god_object::scoring::{
     calculate_god_object_score, calculate_god_object_score_weighted,
 };
 
-pub fn determine_confidence(
-    method_count: usize,
-    field_count: usize,
-    responsibility_count: usize,
-    lines_of_code: usize,
-    complexity_sum: u32,
-    thresholds: &GodObjectThresholds,
-) -> GodObjectConfidence {
-    let mut violations = 0;
-
-    if method_count > thresholds.max_methods {
-        violations += 1;
-    }
-    if field_count > thresholds.max_fields {
-        violations += 1;
-    }
-    if responsibility_count > thresholds.max_traits {
-        violations += 1;
-    }
-    if lines_of_code > thresholds.max_lines {
-        violations += 1;
-    }
-    if complexity_sum > thresholds.max_complexity {
-        violations += 1;
-    }
-
-    match violations {
-        5 => GodObjectConfidence::Definite,
-        3..=4 => GodObjectConfidence::Probable,
-        1..=2 => GodObjectConfidence::Possible,
-        _ => GodObjectConfidence::NotGodObject,
-    }
-}
-
-pub fn group_methods_by_responsibility(methods: &[String]) -> HashMap<String, Vec<String>> {
-    let mut groups: HashMap<String, Vec<String>> = HashMap::new();
-
-    for method in methods {
-        let result = infer_responsibility_with_confidence(method, None);
-
-        // If confidence is too low (None category), keep method in original location
-        // by assigning it to "unclassified" group
-        let responsibility = result
-            .category
-            .unwrap_or_else(|| "unclassified".to_string());
-
-        groups
-            .entry(responsibility)
-            .or_default()
-            .push(method.clone());
-    }
-
-    groups
-}
+// Re-export classification functions for backward compatibility
+pub use super::god_object::classifier::{
+    calculate_struct_ratio, classify_struct_domain, count_distinct_domains, determine_confidence,
+    extract_domain_from_name, group_methods_by_responsibility,
+};
 
 /// Infer responsibility using both I/O detection and name-based heuristics.
 ///
@@ -884,24 +835,6 @@ pub fn recommend_module_splits_with_evidence(
     recommendations
 }
 
-/// Count distinct semantic domains in struct list
-pub fn count_distinct_domains(structs: &[StructMetrics]) -> usize {
-    use std::collections::HashSet;
-    let domains: HashSet<String> = structs
-        .iter()
-        .map(|s| classify_struct_domain(&s.name))
-        .collect();
-    domains.len()
-}
-
-/// Calculate struct-to-function ratio
-pub fn calculate_struct_ratio(struct_count: usize, total_functions: usize) -> f64 {
-    if total_functions == 0 {
-        return 0.0;
-    }
-    (struct_count as f64) / (total_functions as f64)
-}
-
 /// Determine severity of cross-domain mixing issue
 pub fn determine_cross_domain_severity(
     struct_count: usize,
@@ -1002,54 +935,6 @@ pub fn suggest_module_splits_by_domain(structs: &[StructMetrics]) -> Vec<ModuleS
             }
         })
         .collect()
-}
-
-/// Classify struct into a domain based on naming patterns
-pub fn classify_struct_domain(struct_name: &str) -> String {
-    let lower = struct_name.to_lowercase();
-
-    if lower.contains("weight")
-        || lower.contains("multiplier")
-        || lower.contains("factor")
-        || lower.contains("scoring")
-    {
-        "scoring".to_string()
-    } else if lower.contains("threshold") || lower.contains("limit") || lower.contains("bound") {
-        "thresholds".to_string()
-    } else if lower.contains("detection") || lower.contains("detector") || lower.contains("checker")
-    {
-        "detection".to_string()
-    } else if lower.contains("config") || lower.contains("settings") || lower.contains("options") {
-        "core_config".to_string()
-    } else if lower.contains("data") || lower.contains("info") || lower.contains("metrics") {
-        "data".to_string()
-    } else {
-        // Extract first meaningful word from struct name as domain
-        extract_domain_from_name(struct_name)
-    }
-}
-
-/// Extract domain name from struct/type name by taking first meaningful word
-fn extract_domain_from_name(name: &str) -> String {
-    // Handle camelCase and PascalCase
-    let mut domain = String::new();
-    for (i, c) in name.chars().enumerate() {
-        if i > 0 && c.is_uppercase() {
-            break;
-        }
-        domain.push(c);
-    }
-
-    if !domain.is_empty() {
-        domain
-    } else {
-        // Fallback to snake_case extraction
-        name.split('_')
-            .next()
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "Core".to_string())
-    }
 }
 
 /// Calculate domain diversity metrics from struct metrics (Spec 152).

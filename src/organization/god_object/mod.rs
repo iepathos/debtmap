@@ -9,11 +9,14 @@
 //! - `thresholds`: Detection constants and configuration
 //! - `ast_visitor`: AST traversal and data collection
 //! - `metrics`: Scoring and metric calculations
-//! - `classifier`: Pattern detection and classification
+//! - `classifier`: Pattern detection and classification (Phase 5)
+//! - `predicates`: Pure boolean detection predicates (Phase 4)
+//! - `scoring`: Pure scoring functions (Phase 3)
 //! - `recommender`: Recommendation generation
 
 pub mod ast_visitor;
 pub mod classification_types;
+pub mod classifier;
 pub mod core_types;
 pub mod metrics;
 pub mod metrics_types;
@@ -25,6 +28,7 @@ pub mod types;
 
 // Re-export all types and thresholds for backward compatibility
 pub use classification_types::*;
+pub use classifier::*;
 pub use core_types::*;
 pub use metrics_types::*;
 pub use predicates::*;
