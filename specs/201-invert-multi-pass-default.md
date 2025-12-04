@@ -42,13 +42,11 @@ debtmap analyze .
 
 # Users can opt-out if needed for performance
 debtmap analyze . --no-multi-pass
-# or
-debtmap analyze . --single-pass
 ```
 
 ## Objective
 
-Invert the multi-pass analysis flag logic so that multi-pass analysis runs by default, with users able to opt-out via `--no-multi-pass` or `--single-pass` flags when needed for performance or compatibility reasons.
+Invert the multi-pass analysis flag logic so that multi-pass analysis runs by default, with users able to opt-out via `--no-multi-pass` flag when needed for performance or compatibility reasons.
 
 ## Requirements
 
@@ -61,8 +59,6 @@ Invert the multi-pass analysis flag logic so that multi-pass analysis runs by de
 2. **CLI Flag Updates**
    - Remove the `--multi-pass` flag (or deprecate with a message)
    - Add `--no-multi-pass` flag to disable multi-pass analysis
-   - Add `--single-pass` as an alias for `--no-multi-pass`
-   - Both flags should be functionally equivalent
 
 3. **Backward Compatibility**
    - If `--multi-pass` is still present (deprecation path), it should be a no-op with a warning
@@ -94,20 +90,18 @@ Invert the multi-pass analysis flag logic so that multi-pass analysis runs by de
 3. **Testing**
    - All existing tests must pass with new default
    - Add tests for `--no-multi-pass` flag
-   - Add tests for `--single-pass` alias
    - Add tests for environment variable behavior
 
 ## Acceptance Criteria
 
 - [ ] `debtmap analyze .` runs multi-pass analysis by default
 - [ ] `--no-multi-pass` flag disables multi-pass analysis
-- [ ] `--single-pass` flag works as alias for `--no-multi-pass`
 - [ ] `DEBTMAP_SINGLE_PASS=1` environment variable disables multi-pass
 - [ ] `--multi-pass` flag either removed or deprecated with warning
 - [ ] CLI help text updated to reflect new behavior
 - [ ] All documentation updated (multi-pass-analysis.md, cli-reference.md, getting-started.md)
 - [ ] All existing tests pass with new default
-- [ ] New tests added for opt-out flags and environment variable
+- [ ] New tests added for opt-out flag and environment variable
 - [ ] Performance characteristics remain within acceptable bounds
 - [ ] Backward compatibility handled gracefully
 
@@ -127,7 +121,7 @@ multi_pass: bool,
 New:
 ```rust
 /// Disable multi-pass analysis (use single-pass for performance)
-#[arg(long = "no-multi-pass", visible_alias = "single-pass")]
+#[arg(long = "no-multi-pass")]
 no_multi_pass: bool,
 ```
 
@@ -184,7 +178,6 @@ No changes to existing data structures. The `AnalyzeConfig.multi_pass` field ret
 **CLI Interface Changes:**
 - Remove: `--multi-pass`
 - Add: `--no-multi-pass`
-- Add: `--single-pass` (alias)
 
 **Environment Variables:**
 - Add: `DEBTMAP_SINGLE_PASS`
@@ -215,18 +208,6 @@ No changes needed. Existing config files should continue to work.
 #[test]
 fn test_no_multi_pass_flag() {
     let args = vec!["debtmap", "analyze", ".", "--no-multi-pass"];
-    let cli = Cli::parse_from(args);
-    match cli.command {
-        Commands::Analyze { no_multi_pass, .. } => {
-            assert!(no_multi_pass);
-        }
-        _ => panic!("Expected Analyze command"),
-    }
-}
-
-#[test]
-fn test_single_pass_alias() {
-    let args = vec!["debtmap", "analyze", ".", "--single-pass"];
     let cli = Cli::parse_from(args);
     match cli.command {
         Commands::Analyze { no_multi_pass, .. } => {
@@ -314,7 +295,7 @@ debtmap analyze .
 
 **book/src/cli-reference.md:**
 - Remove `--multi-pass` flag documentation
-- Add `--no-multi-pass` and `--single-pass` documentation
+- Add `--no-multi-pass` documentation
 - Add `DEBTMAP_SINGLE_PASS` environment variable
 
 **book/src/getting-started.md:**
@@ -404,8 +385,6 @@ debtmap analyze .
 
 # If you need single-pass for performance:
 debtmap analyze . --no-multi-pass
-# or
-debtmap analyze . --single-pass
 ```
 
 **For CI/CD:**
