@@ -241,6 +241,8 @@ echo $?
 - **`0`** - Success: All thresholds passed
 - **Non-zero** - Failure: One or more thresholds exceeded or errors occurred
 
+**Implementation detail:** When validation fails, the command uses `anyhow::bail!("Validation failed")` to return a non-zero exit code. This ensures the failure propagates correctly to CI/CD systems (src/commands/validate.rs:166).
+
 ### Using Exit Codes in CI
 
 Exit codes integrate naturally with CI/CD systems:
@@ -272,61 +274,51 @@ fi
 
 ### Understanding Validation Output
 
+The validate command uses the actual validation output format from src/utils/validation_printer.rs.
+
 **Success output:**
 ```
-✅ Validation PASSED
+[OK] Validation PASSED
 
-Metrics:
-  Average Complexity: 7.2 / 10.0 ✓
-  Debt Density: 32.5 / 50.0 ✓
-  Codebase Risk: 5.8 / 7.0 ✓
-  Total Debt Score: 1250 / 10000 ✓
+  Primary Quality Metrics:
+    Debt Density: 32.5 per 1K LOC (threshold: 50.0)
+       └─ Using 65% of max density (35% headroom)
+    Average complexity: 7.2 (threshold: 10.0)
+    Codebase risk score: 5.8 (threshold: 7.0)
+
+  Codebase Statistics (informational):
+    High complexity functions: 8
+    Technical debt items: 42
+    Total debt score: 1250 (safety net threshold: 10000)
+
+  All validation checks passed
 ```
 
 **Failure output:**
 ```
-❌ Validation FAILED
+[ERROR] Validation FAILED - Some metrics exceed thresholds
 
-Metrics:
-  Average Complexity: 12.3 / 10.0 ✗ EXCEEDED
-  Debt Density: 65.8 / 50.0 ✗ EXCEEDED
-  Codebase Risk: 5.2 / 7.0 ✓
-  Total Debt Score: 2100 / 10000 ✓
+  Primary Quality Metrics:
+    Debt Density: 65.8 per 1K LOC (threshold: 50.0)
+       └─ Using 132% of max density (-32% headroom)
+    Average complexity: 12.3 (threshold: 10.0)
+    Codebase risk score: 5.2 (threshold: 7.0)
 
-Failed checks: 2
+  Codebase Statistics (informational):
+    High complexity functions: 25
+    Technical debt items: 87
+    Total debt score: 2100 (safety net threshold: 10000)
+
+  Failed checks:
+    [ERROR] Average complexity: 12.3 > 10.0
+    [ERROR] Debt density: 65.8 per 1K LOC > 50.0
 ```
 
-### Summary Output Format
-
-For compact output suitable for CI logs, use the `--summary` or `-s` flag:
-
-```bash
-debtmap validate . --summary
-# or
-debtmap validate . -s
-```
-
-**Summary format output:**
-```
-✅ Validation PASSED
-
-Priority Tiers:
-  P0 (Critical): 2 items
-  P1 (High): 8 items
-  P2 (Medium): 15 items
-  P3 (Low): 23 items
-
-Top Issues:
-  1. Complex authentication logic (complexity: 28)
-  2. Database connection pool (risk: 9.2)
-  3. Untested error handler (coverage: 0%)
-```
-
-The summary format provides:
-- Tiered priority counts instead of individual item details
-- Top violating functions for quick triage
-- Compact format ideal for CI/CD logs
-- Same pass/fail determination as standard format
+The output format emphasizes:
+- **Debt Density as the primary metric** - shown first with percentage usage
+- **Headroom visualization** - shows how much threshold capacity remains
+- **Clear failure indicators** - `[ERROR]` prefix for failed checks
+- **Informational statistics** - absolute counts shown as context, not validation criteria
 
 ## Coverage Integration
 
@@ -676,6 +668,12 @@ Shows which thresholds failed, by how much, and timing breakdown:
 - Coverage loading time
 - Individual analysis phase durations
 
+**Suppressing timing output:**
+```bash
+# Set DEBTMAP_QUIET to disable timing information (src/commands/validate.rs:406)
+DEBTMAP_QUIET=1 debtmap validate .
+```
+
 **Level 2: Detailed breakdown (`-vv`)**
 ```bash
 debtmap validate . -vv
@@ -713,12 +711,12 @@ debtmap validate . --top 10 -v
 
 **Issue: Output is too verbose for CI logs**
 ```bash
-# Solution: Use --summary flag for compact tiered output
-debtmap validate . --summary
-# or
-debtmap validate . -s
+# Solution: Use lower verbosity or filter output
+debtmap validate . --top 10   # Show only top 10 issues
+# or reduce output detail
+debtmap validate .            # Default verbosity (clean output)
 ```
-This provides a condensed view focused on priority tiers rather than individual items.
+At default verbosity (0), validation output is already concise and CI-friendly, showing only metrics and pass/fail status.
 
 **Issue: Validation passes locally but fails in CI**
 ```bash
