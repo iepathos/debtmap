@@ -528,60 +528,6 @@ pub struct StructWithMethods {
     pub line_span: (usize, usize),
 }
 
-/// Configuration thresholds for god object detection
-#[derive(Debug, Clone)]
-pub struct GodObjectThresholds {
-    pub max_methods: usize,
-    pub max_fields: usize,
-    pub max_traits: usize,
-    pub max_lines: usize,
-    pub max_complexity: u32,
-}
-
-impl Default for GodObjectThresholds {
-    fn default() -> Self {
-        Self {
-            max_methods: 20,
-            max_fields: 15,
-            max_traits: 5,
-            max_lines: 1000,
-            max_complexity: 200,
-        }
-    }
-}
-
-impl GodObjectThresholds {
-    pub fn for_rust() -> Self {
-        Self {
-            max_methods: 20,
-            max_fields: 15,
-            max_traits: 5,
-            max_lines: 1000,
-            max_complexity: 200,
-        }
-    }
-
-    pub fn for_python() -> Self {
-        Self {
-            max_methods: 15,
-            max_fields: 10,
-            max_traits: 3,
-            max_lines: 500,
-            max_complexity: 150,
-        }
-    }
-
-    pub fn for_javascript() -> Self {
-        Self {
-            max_methods: 15,
-            max_fields: 20,
-            max_traits: 3,
-            max_lines: 500,
-            max_complexity: 150,
-        }
-    }
-}
-
 /// Main god object detector
 pub struct GodObjectDetector {
     pub(crate) max_methods: usize,

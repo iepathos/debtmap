@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::confidence::MINIMUM_CONFIDENCE;
-use super::god_object::thresholds::ensure_not_reserved;
+use super::god_object::thresholds::{ensure_not_reserved, GodObjectThresholds};
 use super::god_object::types::*;
 
 pub fn calculate_god_object_score(
