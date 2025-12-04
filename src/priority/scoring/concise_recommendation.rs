@@ -110,14 +110,15 @@ fn calculate_target_complexity(current: u32, tier: RecommendationComplexityTier)
     }
 }
 
-/// Generate concise recommendation from debt type and metrics
+/// Generate concise recommendation from debt type and metrics (spec 201)
+/// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 pub fn generate_concise_recommendation(
     debt_type: &DebtType,
     metrics: &FunctionMetrics,
     role: FunctionRole,
     coverage: &Option<TransitiveCoverage>,
-) -> ActionableRecommendation {
-    match debt_type {
+) -> Option<ActionableRecommendation> {
+    Some(match debt_type {
         DebtType::TestingGap {
             coverage: cov,
             cyclomatic,
@@ -130,7 +131,7 @@ pub fn generate_concise_recommendation(
         } => {
             // Use adjusted complexity if available (spec 182)
             let effective_cyclomatic = adjusted_cyclomatic.unwrap_or(*cyclomatic);
-            generate_complexity_steps(effective_cyclomatic, *cognitive, metrics)
+            generate_complexity_steps(effective_cyclomatic, *cognitive, metrics)?
         }
         DebtType::DeadCode {
             visibility,
@@ -149,7 +150,7 @@ pub fn generate_concise_recommendation(
                 estimated_effort_hours: None,
             }
         }
-    }
+    })
 }
 
 /// Generate testing gap recommendation with max 5 steps (spec 183)
@@ -249,12 +250,13 @@ fn generate_testing_gap_steps(
     }
 }
 
-/// Generate complexity hotspot recommendation using pattern detection (spec 176)
+/// Generate complexity hotspot recommendation using pattern detection (spec 176, spec 201)
+/// Returns None if the complexity pattern doesn't warrant a recommendation (e.g., clean dispatcher)
 fn generate_complexity_steps(
     cyclomatic: u32,
     cognitive: u32,
     metrics: &FunctionMetrics,
-) -> ActionableRecommendation {
+) -> Option<ActionableRecommendation> {
     // Extract pattern signals from Rust-specific pattern data
     let (validation_signals, state_signals, coordinator_signals) = metrics
         .language_specific
@@ -283,7 +285,7 @@ fn generate_complexity_steps(
     let pattern = ComplexityPattern::detect(&complexity_metrics);
 
     // Generate pattern-specific recommendation
-    match pattern {
+    Some(match pattern {
         ComplexityPattern::StateMachine {
             state_transitions,
             match_expression_count,
@@ -317,7 +319,7 @@ fn generate_complexity_steps(
             cyclomatic,
             cognitive,
             metrics,
-        ),
+        )?,
         ComplexityPattern::RepetitiveValidation {
             validation_count,
             entropy,
@@ -350,7 +352,7 @@ fn generate_complexity_steps(
         ComplexityPattern::ModerateComplexity { .. } => {
             generate_moderate_recommendation(cyclomatic, cognitive, metrics)
         }
-    }
+    })
 }
 
 /// Generate recommendation for high nesting pattern
@@ -752,7 +754,8 @@ fn generate_coordinator_recommendation(
     }
 }
 
-/// Generate recommendation for dispatcher pattern (spec 189)
+/// Generate recommendation for dispatcher pattern (spec 189, spec 201)
+/// Returns None for clean dispatchers (no inline logic) to prevent generation of "no action needed" items
 fn generate_dispatcher_recommendation(
     branch_count: u32,
     cognitive_ratio: f64,
@@ -760,37 +763,13 @@ fn generate_dispatcher_recommendation(
     cyclomatic: u32,
     cognitive: u32,
     metrics: &FunctionMetrics,
-) -> ActionableRecommendation {
+) -> Option<ActionableRecommendation> {
     let language = crate::core::Language::from_path(&metrics.file);
 
-    // Clean dispatcher (no inline logic) gets Info-level recommendation
+    // Clean dispatcher (no inline logic) - don't generate recommendation (spec 201)
+    // This follows the Low Tier pattern (classification.rs:87-92)
     if inline_logic_branches == 0 {
-        let steps = vec![ActionStep {
-            description: "Monitor branch count if it exceeds 25 (maintainability concern)"
-                .to_string(),
-            impact: "Acceptable dispatcher complexity for router".to_string(),
-            difficulty: Difficulty::Easy,
-            commands: vec![
-                "# This is a clean dispatcher pattern".to_string(),
-                "# Each branch is simple delegation (1-2 lines)".to_string(),
-            ],
-        }];
-
-        return ActionableRecommendation {
-            primary_action: format!(
-                "Clean dispatcher pattern ({} branches, ratio: {:.2}) - no action needed",
-                branch_count, cognitive_ratio
-            ),
-            rationale: format!(
-                "Dispatcher pattern with {} branches and cognitive/cyclomatic ratio of {:.2}. \
-                 Low ratio confirms shallow branching. This is acceptable complexity for a router.",
-                branch_count, cognitive_ratio
-            ),
-            implementation_steps: vec![],
-            related_items: vec![],
-            steps: Some(steps),
-            estimated_effort_hours: Some(0.0),
-        };
+        return None;
     }
 
     // Dispatcher with inline logic - recommend extraction
@@ -846,7 +825,7 @@ fn generate_dispatcher_recommendation(
         _ => "High",
     };
 
-    ActionableRecommendation {
+    Some(ActionableRecommendation {
         primary_action: format!(
             "Extract inline logic from {} branches (dispatcher pattern)",
             inline_logic_branches
@@ -861,7 +840,7 @@ fn generate_dispatcher_recommendation(
         related_items: vec![],
         steps: Some(steps),
         estimated_effort_hours: Some(estimated_effort.max(0.5)),
-    }
+    })
 }
 
 /// Generate recommendation for repetitive validation pattern (spec 180)
@@ -1251,7 +1230,8 @@ mod tests {
             &metrics,
             FunctionRole::PureLogic,
             &None,
-        );
+        )
+        .expect("Test should generate recommendation");
 
         if let Some(steps) = &rec.steps {
             assert!(
@@ -1543,7 +1523,8 @@ mod tests {
         let mut metrics = create_test_metrics(10, 35);
         metrics.nesting = 5; // High nesting
 
-        let rec = generate_complexity_steps(10, 35, &metrics);
+        let rec = generate_complexity_steps(10, 35, &metrics)
+            .expect("Test should generate recommendation for high nesting");
 
         assert!(
             rec.primary_action.contains("nesting"),
@@ -1566,7 +1547,8 @@ mod tests {
         let mut metrics = create_test_metrics(25, 20);
         metrics.nesting = 2; // Low nesting, high branching
 
-        let rec = generate_complexity_steps(25, 20, &metrics);
+        let rec = generate_complexity_steps(25, 20, &metrics)
+            .expect("Test should generate recommendation for high branching");
 
         assert!(
             rec.primary_action.contains("Split") || rec.primary_action.contains("function"),
@@ -1583,7 +1565,8 @@ mod tests {
         let mut metrics = create_test_metrics(15, 45);
         metrics.nesting = 4; // Both high nesting and high branching
 
-        let rec = generate_complexity_steps(15, 45, &metrics);
+        let rec = generate_complexity_steps(15, 45, &metrics)
+            .expect("Test should generate recommendation for mixed complexity");
 
         assert!(
             rec.primary_action.contains("FIRST") || rec.primary_action.contains("phase"),
@@ -1616,7 +1599,8 @@ mod tests {
             dampening_applied: 0.0,
         });
 
-        let rec = generate_complexity_steps(20, 30, &metrics);
+        let rec = generate_complexity_steps(20, 30, &metrics)
+            .expect("Test should generate recommendation for chaotic structure");
 
         assert!(
             rec.primary_action.contains("Standardize")
@@ -1644,12 +1628,14 @@ mod tests {
         // High nesting pattern
         let mut nesting_metrics = create_test_metrics(10, 35);
         nesting_metrics.nesting = 5;
-        let nesting_rec = generate_complexity_steps(10, 35, &nesting_metrics);
+        let nesting_rec = generate_complexity_steps(10, 35, &nesting_metrics)
+            .expect("Test should generate recommendation for nesting");
         assert!(nesting_rec.primary_action.contains("nesting"));
 
         // High branching pattern
         let branching_metrics = create_test_metrics(25, 20);
-        let branching_rec = generate_complexity_steps(25, 20, &branching_metrics);
+        let branching_rec = generate_complexity_steps(25, 20, &branching_metrics)
+            .expect("Test should generate recommendation for branching");
         assert!(
             branching_rec.primary_action.contains("Split")
                 || branching_rec.primary_action.contains("function")
@@ -1657,11 +1643,57 @@ mod tests {
 
         // Moderate complexity pattern
         let moderate_metrics = create_test_metrics(10, 18);
-        let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics);
+        let moderate_rec = generate_complexity_steps(10, 18, &moderate_metrics)
+            .expect("Test should generate recommendation for moderate");
         assert!(
             moderate_rec.primary_action.contains("Reduce")
                 || moderate_rec.primary_action.contains("Optional")
                 || moderate_rec.primary_action.contains("Maintain")
+        );
+    }
+
+    // Tests for spec 201: Prevent "no action needed" items from being generated
+
+    #[test]
+    fn test_clean_dispatcher_returns_none() {
+        // Clean dispatcher with no inline logic should return None
+        let result = generate_dispatcher_recommendation(
+            10,  // branch_count
+            0.5, // cognitive_ratio
+            0,   // inline_logic_branches (clean dispatcher)
+            10,  // cyclomatic
+            5,   // cognitive
+            &create_test_metrics(10, 5),
+        );
+
+        assert!(
+            result.is_none(),
+            "Clean dispatcher (inline_logic_branches=0) should return None, preventing 'no action needed' items"
+        );
+    }
+
+    #[test]
+    fn test_dispatcher_with_inline_logic_returns_some() {
+        // Dispatcher with inline logic should return a recommendation
+        let result = generate_dispatcher_recommendation(
+            10,  // branch_count
+            0.5, // cognitive_ratio
+            3,   // inline_logic_branches (has inline logic)
+            15,  // cyclomatic
+            10,  // cognitive
+            &create_test_metrics(15, 10),
+        );
+
+        assert!(
+            result.is_some(),
+            "Dispatcher with inline logic should return a recommendation"
+        );
+
+        let rec = result.unwrap();
+        assert!(
+            rec.primary_action.contains("Extract inline logic"),
+            "Should recommend extracting inline logic, got: {}",
+            rec.primary_action
         );
     }
 }
