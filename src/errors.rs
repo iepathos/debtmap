@@ -385,6 +385,16 @@ impl From<io::Error> for AnalysisError {
     }
 }
 
+// Convert from std::convert::Infallible
+// This is needed for pipeline stages that can never fail (pure functions)
+impl From<std::convert::Infallible> for AnalysisError {
+    fn from(infallible: std::convert::Infallible) -> Self {
+        // This match is unreachable since Infallible can never be constructed,
+        // but it's required by the type system
+        match infallible {}
+    }
+}
+
 /// Format a list of errors for display.
 ///
 /// This is useful for displaying accumulated validation errors.
