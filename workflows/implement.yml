@@ -28,14 +28,3 @@ commands:
       claude: "/prodigy-lint ${shell.output}"
       max_attempts: 5
       fail_workflow: false
-
-# Custom merge workflow - ensures clean integration back to master
-merge:
-  # Step 1: Merge master into worktree
-  - claude: "/prodigy-merge-master"  # Handles merge conflicts if any
-
-  # Step 2: Run CI checks and fix any issues
-  - claude: "/prodigy-ci"
-
-  # Step 3: Merge worktree back to original branch
-  - claude: "/prodigy-merge-worktree ${merge.source_branch} ${merge.target_branch}"
