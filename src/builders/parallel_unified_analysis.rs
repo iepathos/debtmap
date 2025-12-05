@@ -672,6 +672,7 @@ impl ParallelUnifiedAnalysisBuilder {
         metric: &FunctionMetrics,
         context: &FunctionAnalysisContext,
     ) -> Option<UnifiedDebtItem> {
+        use std::path::Path;
         // Returns None for clean dispatchers (spec 201)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
@@ -681,6 +682,8 @@ impl ParallelUnifiedAnalysisBuilder {
             context.function_pointer_used_functions,
             context.debt_aggregator,
             Some(context.data_flow_graph),
+            None, // TODO spec 202: Add risk analyzer support to parallel mode
+            Path::new("."), // Default project path
         )
     }
 

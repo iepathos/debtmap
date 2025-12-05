@@ -74,6 +74,7 @@ fn create_untested_item() -> UnifiedDebtItem {
         context_type: None,
         language_specific: None, // spec 190
         detected_pattern: None,
+        contextual_risk: None,
     }
 }
 

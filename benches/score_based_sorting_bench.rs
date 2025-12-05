@@ -82,6 +82,7 @@ fn create_test_item(
         language_specific: None, // spec 190
         file_context: None,
         detected_pattern: None, // spec 204
+        contextual_risk: None,
     }
 }
 

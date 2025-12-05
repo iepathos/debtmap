@@ -82,6 +82,9 @@ fn benchmark_analysis_without_aggregation(c: &mut Criterion) {
                     no_god_object: false,
                     suppress_coverage_tip: false,
                     _formatting_config: Default::default(),
+                    enable_context: false,
+                    context_providers: None,
+                    disable_context: None,
                 },
             );
         });
@@ -121,6 +124,9 @@ fn benchmark_analysis_with_aggregation(c: &mut Criterion) {
                     no_god_object: false,
                     suppress_coverage_tip: false,
                     _formatting_config: Default::default(),
+                    enable_context: false,
+                    context_providers: None,
+                    disable_context: None,
                 },
             );
         });
@@ -163,6 +169,9 @@ fn benchmark_aggregation_methods(c: &mut Criterion) {
                         no_god_object: false,
                         suppress_coverage_tip: false,
                         _formatting_config: Default::default(),
+                        enable_context: false,
+                        context_providers: None,
+                        disable_context: None,
                     },
                 );
             });
