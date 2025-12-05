@@ -88,6 +88,7 @@ pub struct ProgressManager {
     multi: Arc<MultiProgress>,
     config: ProgressConfig,
     tui_manager: Arc<Mutex<Option<crate::tui::TuiManager>>>,
+    tui_active: Arc<Mutex<bool>>,
 }
 
 impl ProgressManager {
@@ -100,10 +101,13 @@ impl ProgressManager {
             None
         };
 
+        let tui_active = tui_manager.is_some();
+
         Self {
             multi: Arc::new(MultiProgress::new()),
             config,
             tui_manager: Arc::new(Mutex::new(tui_manager)),
+            tui_active: Arc::new(Mutex::new(tui_active)),
         }
     }
 
@@ -120,9 +124,10 @@ impl ProgressManager {
 
     /// Create a progress bar with the given length and template
     ///
-    /// Returns a hidden progress bar if progress should not be shown
+    /// Returns a hidden progress bar if progress should not be shown or if TUI is active
     pub fn create_bar(&self, len: u64, template: &str) -> ProgressBar {
-        if !self.config.should_show_progress() {
+        // Hide indicatif bars if TUI is active or if progress should not be shown
+        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
             return ProgressBar::hidden();
         }
 
@@ -138,9 +143,10 @@ impl ProgressManager {
 
     /// Create a spinner progress bar with the given message
     ///
-    /// Returns a hidden progress bar if progress should not be shown
+    /// Returns a hidden progress bar if progress should not be shown or if TUI is active
     pub fn create_spinner(&self, msg: &str) -> ProgressBar {
-        if !self.config.should_show_progress() {
+        // Hide indicatif spinners if TUI is active or if progress should not be shown
+        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
             return ProgressBar::hidden();
         }
 
@@ -158,7 +164,8 @@ impl ProgressManager {
 
     /// Create a progress bar that shows counts without a known total
     pub fn create_counter(&self, template: &str, msg: &str) -> ProgressBar {
-        if !self.config.should_show_progress() {
+        // Hide indicatif counters if TUI is active or if progress should not be shown
+        if !self.config.should_show_progress() || *self.tui_active.lock().unwrap() {
             return ProgressBar::hidden();
         }
 
@@ -177,6 +184,11 @@ impl ProgressManager {
     /// Get the verbosity level
     pub fn verbosity(&self) -> u8 {
         self.config.verbosity
+    }
+
+    /// Check if TUI is currently active
+    pub fn is_tui_active(&self) -> Option<bool> {
+        Some(*self.tui_active.lock().ok()?)
     }
 
     /// Clear all progress bars from the display
@@ -271,6 +283,8 @@ impl ProgressManager {
                 let _ = tui.cleanup();
             }
         }
+        // Mark TUI as inactive
+        *self.tui_active.lock().unwrap() = false;
     }
 }
 

@@ -163,6 +163,14 @@ impl AnalysisProgress {
             return;
         }
 
+        // Don't render if TUI is active (prevents interference)
+        if crate::progress::ProgressManager::global()
+            .and_then(|m| m.is_tui_active())
+            .unwrap_or(false)
+        {
+            return;
+        }
+
         let phase = &self.phases[self.current_phase];
         let phase_num = self.current_phase + 1;
         let total_phases = self.phases.len();

@@ -184,6 +184,15 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         filtered_analysis = filtered_analysis.filter_by_score_threshold(min_score);
     }
 
+    // Cleanup TUI BEFORE writing output (alternate screen would discard output)
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_set_progress(1.0);
+        manager.tui_cleanup();
+    }
+
+    // Show total analysis time (spec 195)
+    io::progress::AnalysisProgress::with_global(|p| p.finish());
+
     let output_config = output::OutputConfig {
         top: config.top,
         tail: config.tail,
@@ -200,15 +209,6 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
         &results,
         config.coverage_file.as_ref(),
     )?;
-
-    // Show total analysis time (spec 195)
-    io::progress::AnalysisProgress::with_global(|p| p.finish());
-
-    // Cleanup TUI if it was used
-    if let Some(manager) = ProgressManager::global() {
-        manager.tui_set_progress(1.0);
-        manager.tui_cleanup();
-    }
 
     Ok(())
 }

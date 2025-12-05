@@ -34,11 +34,14 @@ pub mod renderer;
 pub mod theme;
 
 use crossterm::{
+    event::{self, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use app::App;
 use layout::render_adaptive;
@@ -47,6 +50,7 @@ use layout::render_adaptive;
 pub struct TuiManager {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     app: App,
+    should_exit: Arc<AtomicBool>,
 }
 
 impl TuiManager {
@@ -59,9 +63,43 @@ impl TuiManager {
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
+        let should_exit = Arc::new(AtomicBool::new(false));
+
+        // Setup signal handlers for Ctrl+C and Ctrl+Z
+        let exit_flag = should_exit.clone();
+        std::thread::spawn(move || {
+            loop {
+                if exit_flag.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // Poll for events with a timeout
+                if event::poll(std::time::Duration::from_millis(100)).unwrap_or(false) {
+                    if let Ok(Event::Key(key)) = event::read() {
+                        // Handle Ctrl+C or Ctrl+Z
+                        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                            // Attempt cleanup before exiting
+                            let _ = disable_raw_mode();
+                            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+                            eprintln!("\nInterrupted by user");
+                            std::process::exit(130); // Standard exit code for Ctrl+C
+                        }
+                        if key.code == KeyCode::Char('z') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                            // Attempt cleanup before exiting
+                            let _ = disable_raw_mode();
+                            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+                            eprintln!("\nSuspended by user");
+                            std::process::exit(148); // Standard exit code for Ctrl+Z
+                        }
+                    }
+                }
+            }
+        });
+
         Ok(Self {
             terminal,
             app: App::new(),
+            should_exit,
         })
     }
 
@@ -84,6 +122,12 @@ impl TuiManager {
 
     /// Clean up and restore terminal
     pub fn cleanup(&mut self) -> io::Result<()> {
+        // Signal event thread to stop
+        self.should_exit.store(true, Ordering::Relaxed);
+
+        // Give the thread a moment to exit
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
         disable_raw_mode()?;
         execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
         self.terminal.show_cursor()?;
