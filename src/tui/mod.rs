@@ -77,14 +77,18 @@ impl TuiManager {
                 if event::poll(std::time::Duration::from_millis(100)).unwrap_or(false) {
                     if let Ok(Event::Key(key)) = event::read() {
                         // Handle Ctrl+C or Ctrl+Z
-                        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                        if key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)
+                        {
                             // Attempt cleanup before exiting
                             let _ = disable_raw_mode();
                             let _ = execute!(io::stdout(), LeaveAlternateScreen);
                             eprintln!("\nInterrupted by user");
                             std::process::exit(130); // Standard exit code for Ctrl+C
                         }
-                        if key.code == KeyCode::Char('z') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                        if key.code == KeyCode::Char('z')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)
+                        {
                             // Attempt cleanup before exiting
                             let _ = disable_raw_mode();
                             let _ = execute!(io::stdout(), LeaveAlternateScreen);
