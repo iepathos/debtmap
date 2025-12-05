@@ -216,9 +216,7 @@ impl BatchedGitHistory {
 
         for commit in commits {
             for file_change in &commit.files {
-                let history = file_histories
-                    .entry(file_change.path.clone())
-                    .or_default();
+                let history = file_histories.entry(file_change.path.clone()).or_default();
 
                 let file_churn = file_change.additions + file_change.deletions;
                 history.add_commit(&commit, file_churn);
