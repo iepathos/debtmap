@@ -1,7 +1,7 @@
-/// Core types for behavioral decomposition analysis.
-///
-/// This module contains the fundamental data structures used throughout
-/// the behavioral decomposition system.
+//! Core types for behavioral decomposition analysis.
+//!
+//! This module contains the fundamental data structures used throughout
+//! the behavioral decomposition system.
 
 /// Behavioral category for method clustering
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
