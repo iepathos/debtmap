@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-12-04
+
 ### Breaking Changes
 
 - **Legacy Code Cleanup for 1.0 Release** (Spec 201)
@@ -21,8 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Function behavior unchanged, name now accurately describes visitor-based implementation
   - **Impact**: External library users should migrate to modern equivalents
   - **Migration**: All modern replacements existed in v0.8.0+, no feature loss
-
-## [0.9.0] - 2025-12-04
 
 ### Changed
 
@@ -44,6 +44,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved code organization and testability of formatting layer
 
 ### Added
+
+- **Lock-Free Context Sharing for Parallel Risk Analysis** (Spec 204)
+  - Implemented lock-free context sharing using Arc-wrapped immutable structures
+  - Enables efficient parallel risk analysis without synchronization overhead
+  - Improved performance for multi-threaded analysis workflows
+  - Thread-safe access to shared context during risk assessment
+
+- **State Machine Arm-Level Analysis** (Spec 203)
+  - Deep analysis of state machine implementation patterns
+  - Detects complex state transitions and arm-level complexity
+  - Identifies potential issues in state machine design
+  - Enhanced detection of state transition anti-patterns
+
+- **Contextual Risk Integration for Priority Scoring** (Spec 202)
+  - Integrated contextual risk factors into priority scoring algorithm
+  - Risk scores now consider surrounding code context and dependencies
+  - More accurate prioritization of technical debt items
+  - Added contextual risk display to priority output for better insights
 
 - **Enhanced Progress Feedback** (Spec 201)
   - Complete progress feedback for all analysis phases
@@ -77,9 +95,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed parameters with leading underscore to follow Rust conventions
+- Resolved state machine pattern detector test failures
+- Fixed CI pipeline issues in contextual risk tests
 - Resolved test failures in formatter and coverage tests
 - Updated domain pattern tests to use new API
-- Completed implementation gaps in specs 181i and 201
+- Completed implementation gaps in specs 181i, 201, 202, 203, and 204
 - Removed useless test with assert!(true) from concise_recommendation
 - Fixed file-level debt item formatting and display
 - Updated color validation tests after formatter refactoring
@@ -91,6 +112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Applied clippy fixes for better code quality
 - Removed completed spec files (181b, 181e, 181h, 206)
 - Removed misplaced example files from src/
+- Updated comprehensive book documentation to fix drift across all chapters
+- Restructured analysis guide into multi-subsection format for better organization
+- Added missing chapters for call graph and boilerplate detection
 
 ## [0.7.0] - 2025-12-02
 
