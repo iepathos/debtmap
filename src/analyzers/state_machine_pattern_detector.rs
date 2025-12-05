@@ -22,7 +22,7 @@ use crate::analyzers::state_field_detector::{
 };
 use crate::priority::complexity_patterns::{CoordinatorSignals, StateMachineSignals};
 use syn::{
-    visit::Visit, Block, Expr, ExprBinary, ExprField, ExprMatch, ExprMethodCall, Pat,
+    visit::Visit, Arm, Block, Expr, ExprBinary, ExprField, ExprMatch, ExprMethodCall, Pat,
     PatTupleStruct, Stmt,
 };
 
@@ -76,7 +76,7 @@ impl StateMachinePatternDetector {
         }
     }
 
-    /// Detect state machine pattern from AST block (enhanced in spec 202)
+    /// Detect state machine pattern from AST block (enhanced in spec 202, spec 203)
     pub fn detect_state_machine(&self, block: &Block) -> Option<StateMachineSignals> {
         let mut visitor = StateMachineVisitor::new();
         visitor.visit_block(block);
@@ -115,6 +115,44 @@ impl StateMachinePatternDetector {
             return None;
         }
 
+        // NEW (spec 203): Classify arms
+        let mut primary = 0;
+        let mut nested = 0;
+        let mut delegated = 0;
+        let mut trivial = 0;
+        let mut complex = 0;
+        let mut total_lines = 0;
+
+        const TRIVIAL_THRESHOLD: u32 = 10;
+
+        for arm in &visitor.arm_metrics {
+            if arm.is_primary_match {
+                primary += 1;
+            } else {
+                nested += 1;
+            }
+
+            if arm.is_delegated {
+                delegated += 1;
+            } else if arm.inline_lines < TRIVIAL_THRESHOLD {
+                trivial += 1;
+            } else {
+                complex += 1;
+                total_lines += arm.inline_lines;
+            }
+        }
+
+        let avg_complexity = if !visitor.arm_metrics.is_empty() {
+            visitor
+                .arm_metrics
+                .iter()
+                .map(|a| a.inline_lines)
+                .sum::<u32>() as f32
+                / visitor.arm_metrics.len() as f32
+        } else {
+            0.0
+        };
+
         Some(StateMachineSignals {
             transition_count: visitor.enum_match_count + visitor.tuple_match_count,
             match_expression_count: visitor.match_expression_count,
@@ -122,6 +160,13 @@ impl StateMachinePatternDetector {
             has_state_comparison: !state_fields.is_empty(),
             action_dispatch_count: visitor.action_dispatch_count,
             confidence,
+            primary_match_arms: primary,
+            nested_match_arms: nested,
+            delegated_arms: delegated,
+            trivial_arms: trivial,
+            complex_inline_arms: complex,
+            total_inline_lines: total_lines,
+            avg_arm_complexity: avg_complexity,
         })
     }
 
@@ -300,6 +345,17 @@ fn calculate_enhanced_coordinator_confidence(
     confidence.min(1.0)
 }
 
+/// Metrics for a single match arm (spec 203)
+#[derive(Debug, Clone)]
+#[allow(dead_code)] // has_nested_match and arm_index reserved for future use
+struct ArmMetrics {
+    is_delegated: bool,     // Calls single function
+    inline_lines: u32,      // Estimated LOC
+    has_nested_match: bool, // Contains nested match
+    arm_index: usize,       // Position in match
+    is_primary_match: bool, // In primary vs nested match
+}
+
 /// Visitor to detect state machine patterns
 struct StateMachineVisitor {
     enum_match_count: u32,
@@ -310,6 +366,10 @@ struct StateMachineVisitor {
     has_enum_match: bool,
     /// NEW (spec 202): Collect field accesses for enhanced detection
     field_accesses: Vec<ExprField>,
+    /// NEW (spec 203): Arm-level metrics
+    arm_metrics: Vec<ArmMetrics>,
+    match_nesting_depth: u32,
+    in_primary_match: bool,
 }
 
 impl StateMachineVisitor {
@@ -322,6 +382,24 @@ impl StateMachineVisitor {
             match_expression_count: 0,
             has_enum_match: false,
             field_accesses: Vec::new(),
+            arm_metrics: Vec::new(),
+            match_nesting_depth: 0,
+            in_primary_match: false,
+        }
+    }
+
+    /// Analyze a match arm and collect metrics (spec 203)
+    fn analyze_arm(&self, arm: &Arm, index: usize) -> ArmMetrics {
+        let is_delegated = is_delegated_to_handler(&arm.body);
+        let inline_lines = estimate_arm_lines(&arm.body);
+        let has_nested_match = contains_nested_match(&arm.body);
+
+        ArmMetrics {
+            is_delegated,
+            inline_lines,
+            has_nested_match,
+            arm_index: index,
+            is_primary_match: self.in_primary_match,
         }
     }
 
@@ -361,6 +439,13 @@ impl StateMachineVisitor {
 
 impl<'ast> Visit<'ast> for StateMachineVisitor {
     fn visit_expr_match(&mut self, match_expr: &'ast ExprMatch) {
+        // Track match nesting depth (spec 203)
+        let was_in_primary = self.in_primary_match;
+        if self.match_nesting_depth == 0 {
+            self.in_primary_match = true;
+        }
+        self.match_nesting_depth += 1;
+
         // Count this match expression
         self.match_expression_count += 1;
 
@@ -375,8 +460,12 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
             self.state_comparison_count += 1;
         }
 
-        // Count enum/tuple patterns in arms
-        for arm in &match_expr.arms {
+        // Count enum/tuple patterns in arms and collect arm metrics (spec 203)
+        for (idx, arm) in match_expr.arms.iter().enumerate() {
+            // NEW (spec 203): Collect arm metrics
+            let metrics = self.analyze_arm(arm, idx);
+            self.arm_metrics.push(metrics);
+
             match &arm.pat {
                 Pat::TupleStruct(tuple) => {
                     self.tuple_match_count += 1;
@@ -410,6 +499,10 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
         }
 
         syn::visit::visit_expr_match(self, match_expr);
+
+        // Restore nesting state (spec 203)
+        self.match_nesting_depth -= 1;
+        self.in_primary_match = was_in_primary;
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
@@ -453,6 +546,80 @@ fn has_vec_push_or_call(expr: &Expr) -> bool {
         }),
         _ => false,
     }
+}
+
+/// Check if an arm body delegates to a handler function (spec 203)
+fn is_delegated_to_handler(body: &Expr) -> bool {
+    match body {
+        // Direct call: handle_foo()?
+        Expr::Try(try_expr) => matches!(*try_expr.expr, Expr::Call(_) | Expr::MethodCall(_)),
+        // Direct call without ?: handle_foo()
+        Expr::Call(_) | Expr::MethodCall(_) => true,
+        // Block with single statement that's a call
+        Expr::Block(block) if block.block.stmts.len() == 1 => {
+            matches!(
+                &block.block.stmts[0],
+                Stmt::Expr(Expr::Call(_), _)
+                    | Stmt::Expr(Expr::Try(_), _)
+                    | Stmt::Expr(Expr::MethodCall(_), _)
+            )
+        }
+        _ => false,
+    }
+}
+
+/// Estimate lines of code in an arm body (spec 203)
+fn estimate_arm_lines(body: &Expr) -> u32 {
+    let mut counter = LineCounter::new();
+    counter.visit_expr(body);
+    counter.estimated_lines
+}
+
+/// Visitor to count lines in an expression
+struct LineCounter {
+    estimated_lines: u32,
+}
+
+impl LineCounter {
+    fn new() -> Self {
+        Self { estimated_lines: 0 }
+    }
+}
+
+impl<'ast> Visit<'ast> for LineCounter {
+    fn visit_stmt(&mut self, stmt: &'ast Stmt) {
+        self.estimated_lines += 1;
+        syn::visit::visit_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'ast Expr) {
+        match expr {
+            Expr::Match(_) | Expr::If(_) | Expr::ForLoop(_) | Expr::While(_) => {
+                self.estimated_lines += 1;
+            }
+            Expr::Struct(struct_expr) => {
+                // Count field assignments in struct initialization
+                self.estimated_lines += struct_expr.fields.len() as u32;
+            }
+            _ => {}
+        }
+        syn::visit::visit_expr(self, expr);
+    }
+}
+
+/// Check if an expression contains nested match expressions (spec 203)
+fn contains_nested_match(body: &Expr) -> bool {
+    struct MatchFinder {
+        found: bool,
+    }
+    impl<'ast> Visit<'ast> for MatchFinder {
+        fn visit_expr_match(&mut self, _: &'ast ExprMatch) {
+            self.found = true;
+        }
+    }
+    let mut finder = MatchFinder { found: false };
+    finder.visit_expr(body);
+    finder.found
 }
 
 /// Check if a binary expression is a state-related comparison (spec 192)
@@ -1029,5 +1196,191 @@ mod tests {
             signals.is_some(),
             "Should detect state machine with *_state suffix"
         );
+    }
+
+    // Spec 203 tests - Arm-level analysis
+
+    #[test]
+    fn test_delegation_detection() {
+        use syn::parse_quote;
+
+        // Delegated: direct call with ?
+        let arm1: Expr = parse_quote! { handle_a()? };
+        assert!(is_delegated_to_handler(&arm1));
+
+        // Delegated: direct call
+        let arm2: Expr = parse_quote! { handle_b(x, y)? };
+        assert!(is_delegated_to_handler(&arm2));
+
+        // Delegated: method call
+        let arm3: Expr = parse_quote! { self.handle_c()? };
+        assert!(is_delegated_to_handler(&arm3));
+
+        // Not delegated: block with single call (but has wrapper)
+        let arm4: Expr = parse_quote! {
+            {
+                handle_d()
+            }
+        };
+        assert!(is_delegated_to_handler(&arm4));
+
+        // Not delegated: multi-statement block
+        let arm5: Expr = parse_quote! {
+            {
+                let cfg = build_config();
+                process(cfg)?;
+                Ok(())
+            }
+        };
+        assert!(!is_delegated_to_handler(&arm5));
+    }
+
+    #[test]
+    fn test_arm_complexity_estimation() {
+        use syn::parse_quote;
+
+        // Trivial arm (1 line)
+        let simple: Expr = parse_quote! { do_thing() };
+        let lines = estimate_arm_lines(&simple);
+        assert!(lines < 10, "Simple arm should be < 10 lines, got {}", lines);
+
+        // Complex arm with struct initialization
+        let complex: Expr = parse_quote! {
+            {
+                let validate_config = ValidateConfig {
+                    path: path,
+                    config: config,
+                    format: match format {
+                        Fmt::Json => Format::Json,
+                        Fmt::Markdown => Format::Markdown,
+                    },
+                    output: None,
+                    top: 10,
+                };
+                debtmap::commands::validate::validate_project(validate_config)?;
+                Ok(())
+            }
+        };
+        let lines = estimate_arm_lines(&complex);
+        assert!(
+            lines >= 10,
+            "Complex arm should be >= 10 lines, got {}",
+            lines
+        );
+    }
+
+    #[test]
+    fn test_primary_vs_nested_match_tracking() {
+        let block: Block = parse_quote! {
+            {
+                match cmd {
+                    Cmd::A => handle_a()?,
+                    Cmd::B => {
+                        let fmt = match format {
+                            Fmt::Json => json(),
+                            Fmt::Text => text(),
+                        };
+                        handle_b(fmt)?
+                    }
+                    Cmd::C => handle_c()?,
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block).unwrap();
+
+        assert_eq!(signals.primary_match_arms, 3, "Should have 3 primary arms");
+        assert_eq!(signals.nested_match_arms, 2, "Should have 2 nested arms");
+    }
+
+    #[test]
+    fn test_arm_classification() {
+        let block: Block = parse_quote! {
+            {
+                match command {
+                    // Delegated
+                    Commands::Analyze { .. } => handle_analyze_command(command)?,
+                    Commands::Compare { .. } => handle_compare_command(before, after)?,
+
+                    // Trivial
+                    Commands::Init { force } => {
+                        debtmap::commands::init::init_config(force)?;
+                        Ok(())
+                    }
+
+                    // Complex inline
+                    Commands::Validate { path, config } => {
+                        let validate_config = ValidateConfig {
+                            path: path,
+                            config: config,
+                            format: match format {
+                                Fmt::Json => Format::Json,
+                                Fmt::Markdown => Format::Markdown,
+                                Fmt::Text => Format::Text,
+                            },
+                            output: None,
+                            top: 10,
+                        };
+                        debtmap::commands::validate::validate_project(validate_config)?;
+                        Ok(())
+                    }
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block).unwrap();
+
+        assert_eq!(signals.primary_match_arms, 4);
+        assert_eq!(signals.delegated_arms, 2, "Analyze and Compare");
+        assert!(signals.trivial_arms >= 1, "Init is trivial");
+        assert!(signals.complex_inline_arms >= 1, "Validate is complex");
+        assert_eq!(signals.nested_match_arms, 3, "Format conversion match");
+    }
+
+    #[test]
+    fn test_clean_state_machine_no_complex_arms() {
+        let block: Block = parse_quote! {
+            {
+                match cmd {
+                    Command::Start => handle_start()?,
+                    Command::Stop => handle_stop()?,
+                    Command::Restart => handle_restart()?,
+                }
+            }
+        };
+
+        let detector = StateMachinePatternDetector::new();
+        let signals = detector.detect_state_machine(&block).unwrap();
+
+        assert_eq!(signals.complex_inline_arms, 0, "All arms delegated");
+        assert_eq!(signals.delegated_arms, 3, "Should have 3 delegated");
+    }
+
+    #[test]
+    fn test_contains_nested_match() {
+        use syn::parse_quote;
+
+        // Has nested match
+        let with_match: Expr = parse_quote! {
+            {
+                let fmt = match format {
+                    Fmt::Json => json(),
+                    Fmt::Text => text(),
+                };
+                process(fmt)
+            }
+        };
+        assert!(contains_nested_match(&with_match));
+
+        // No nested match
+        let without_match: Expr = parse_quote! {
+            {
+                let cfg = build_config();
+                process(cfg)
+            }
+        };
+        assert!(!contains_nested_match(&without_match));
     }
 }
