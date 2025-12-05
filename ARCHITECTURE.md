@@ -2311,8 +2311,7 @@ src/organization/god_object/
 ├── classifier.rs       # Domain classification and responsibility grouping
 ├── recommender.rs      # Recommendation generation (module splits, refactoring advice)
 ├── detector.rs         # Orchestration layer (coordinates pure functions)
-├── ast_visitor.rs      # I/O shell (AST traversal and data extraction)
-└── legacy_compat.rs    # Backward compatibility shims (deprecated)
+└── ast_visitor.rs      # I/O shell (AST traversal and data extraction)
 ```
 
 **Design Principles**:
@@ -3612,10 +3611,8 @@ writer::write_priority_item(&mut output, &formatted)?;
 ```rust
 use crate::priority::formatter;
 
-// Legacy: mixes logic with I/O
-let mut output = String::new();
-#[allow(deprecated)]
-formatter::format_priority_item_legacy(&mut output, rank, item, has_coverage_data);
+// Before refactoring: mixed logic with I/O
+// (Legacy approach has been removed in v1.0)
 ```
 
 ### Benefits
@@ -3686,8 +3683,7 @@ To migrate existing code:
    writer::write_priority_item(&mut output, &formatted)?;
    ```
 
-2. Use `format_priority_item_legacy` for temporary backward compatibility
-3. Update tests to use pure functions for better isolation
+2. Update tests to use pure functions for better isolation
 
 ### Formatter Module Structure (Spec 205)
 

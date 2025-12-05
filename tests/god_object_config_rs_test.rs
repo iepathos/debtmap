@@ -130,8 +130,10 @@ fn test_god_object_detection_on_config_rs() {
             && splits_to_check.iter().any(|s| {
                 let name_lower = s.suggested_name.to_lowercase();
                 let resp_lower = s.responsibility.to_lowercase();
-                name_lower.contains("unclassified") || name_lower.contains("utilities")
-                    || resp_lower.contains("unclassified") || resp_lower.contains("utilities")
+                name_lower.contains("unclassified")
+                    || name_lower.contains("utilities")
+                    || resp_lower.contains("unclassified")
+                    || resp_lower.contains("utilities")
             });
 
         assert!(
@@ -146,7 +148,15 @@ fn test_god_object_detection_on_config_rs() {
         // Note: For files with many utility functions, responsibilities may be less granular.
         // This is acceptable for well-organized code - "unclassified" is a valid responsibility
         // for utility functions that don't fit into specific behavioral clusters.
-        let potential_responsibilities = ["format", "output", "display", "render", "write", "unclassified", "utilities"];
+        let potential_responsibilities = [
+            "format",
+            "output",
+            "display",
+            "render",
+            "write",
+            "unclassified",
+            "utilities",
+        ];
 
         let found_count = potential_responsibilities
             .iter()

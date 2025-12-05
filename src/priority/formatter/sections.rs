@@ -3,8 +3,8 @@ use super::dependencies::{filter_dependencies, format_function_reference};
 use crate::formatting::{ColoredFormatter, FormattingConfig};
 use crate::priority::score_formatter;
 use colored::*;
-use std::fmt::Write;
 
+#[allow(dead_code)]
 pub(crate) struct FormattedSections {
     pub header: String,
     pub location: String,
@@ -359,72 +359,4 @@ fn format_rationale_section(context: &FormatContext) -> String {
         "├─ WHY THIS MATTERS:".bright_blue(),
         context.rationale
     )
-}
-
-/// Legacy I/O function - mixes formatting with output operations.
-///
-/// # Deprecated
-/// This function violates the Pure Core, Imperative Shell architecture by mixing
-/// I/O operations with the sections module. For new code, use:
-/// ```ignore
-/// use crate::priority::formatter::pure::format_priority_item;
-/// use crate::priority::formatter::writer::write_priority_item;
-///
-/// let formatted = pure::format_priority_item(rank, item, verbosity, config, has_coverage);
-/// write_priority_item(&mut output, &formatted)?;
-/// ```
-///
-/// This function remains for backward compatibility with existing code paths that
-/// use the old FormattedSections struct. It should be removed in a future refactoring
-/// when all call sites migrate to the new architecture.
-#[deprecated(
-    since = "0.1.0",
-    note = "Use pure::format_priority_item + writer::write_priority_item instead"
-)]
-pub(crate) fn apply_formatted_sections(output: &mut String, sections: FormattedSections) {
-    // Legacy I/O implementation - retained for backward compatibility
-    // Following spec 139: Header → Location → Context → Impact → Evidence → WHY → Action
-    writeln!(output, "{}", sections.header).unwrap();
-    writeln!(output, "{}", sections.location).unwrap();
-
-    // Context dampening section (spec 191) - show after location
-    if let Some(context) = sections.context_dampening {
-        writeln!(output, "{}", context).unwrap();
-    }
-
-    writeln!(output, "{}", sections.impact).unwrap();
-
-    // Evidence section (new) - metrics only
-    if let Some(evidence) = sections.evidence {
-        writeln!(output, "{}", evidence).unwrap();
-    }
-
-    // Keep legacy complexity for backward compatibility
-    if let Some(complexity) = sections.complexity {
-        writeln!(output, "{}", complexity).unwrap();
-    }
-
-    // Pattern section (spec 190) - show detected state machine/coordinator patterns
-    if let Some(pattern) = sections.pattern {
-        writeln!(output, "{}", pattern).unwrap();
-    }
-
-    // Coverage section (spec 180)
-    if let Some(coverage) = sections.coverage {
-        writeln!(output, "{}", coverage).unwrap();
-    }
-
-    // WHY section - rationale explaining why evidence matters
-    writeln!(output, "{}", sections.rationale).unwrap();
-
-    // Action comes after WHY (spec 139 ordering)
-    writeln!(output, "{}", sections.action).unwrap();
-
-    if let Some(dependencies) = sections.dependencies {
-        writeln!(output, "{}", dependencies).unwrap();
-    }
-
-    if let Some(debt_specific) = sections.debt_specific {
-        writeln!(output, "{}", debt_specific).unwrap();
-    }
 }

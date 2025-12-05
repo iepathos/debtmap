@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **Legacy Code Cleanup for 1.0 Release** (Spec 201)
+  - **Removed**: `src/organization/god_object/legacy_compat.rs` module
+    - This module provided backward compatibility shims that are no longer needed
+    - All functionality is available through modern replacements
+  - **Removed**: Deprecated formatter functions
+    - `format_priority_item_legacy()` - Use `format_priority_item()` instead (uses pure + writer pattern)
+    - `apply_formatted_sections()` - Functionality integrated into `format_priority_item()`
+  - **Renamed**: Cognitive complexity function for clarity
+    - `calculate_cognitive_legacy()` → `calculate_cognitive_visitor_based()`
+    - Function behavior unchanged, name now accurately describes visitor-based implementation
+  - **Impact**: External library users should migrate to modern equivalents
+  - **Migration**: All modern replacements existed in v0.8.0+, no feature loss
+
 ## [0.9.0] - 2025-12-04
 
 ### Changed

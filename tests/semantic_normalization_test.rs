@@ -1,4 +1,6 @@
-use debtmap::complexity::cognitive::{calculate_cognitive_legacy, calculate_cognitive_normalized};
+use debtmap::complexity::cognitive::{
+    calculate_cognitive_normalized, calculate_cognitive_visitor_based,
+};
 use syn::parse_quote;
 
 #[test]
@@ -211,13 +213,13 @@ fn test_legacy_vs_normalized_real_complexity() {
     };
 
     let normalized_complexity = calculate_cognitive_normalized(&complex_block);
-    let legacy_complexity = calculate_cognitive_legacy(&complex_block);
+    let visitor_complexity = calculate_cognitive_visitor_based(&complex_block);
 
     // Both should detect complexity
     // Note: Normalized complexity may be lower as it removes formatting artifacts
     println!(
-        "Normalized complexity: {}, Legacy complexity: {}",
-        normalized_complexity, legacy_complexity
+        "Normalized complexity: {}, Visitor-based complexity: {}",
+        normalized_complexity, visitor_complexity
     );
     assert!(
         normalized_complexity > 0,
@@ -225,17 +227,17 @@ fn test_legacy_vs_normalized_real_complexity() {
         normalized_complexity
     );
     assert!(
-        legacy_complexity > 5,
-        "Legacy should detect complexity: {}",
-        legacy_complexity
+        visitor_complexity > 5,
+        "Visitor-based should detect complexity: {}",
+        visitor_complexity
     );
 
-    // The key is that normalized doesn't exceed legacy and still detects real complexity
+    // The key is that normalized doesn't exceed visitor-based and still detects real complexity
     assert!(
-        normalized_complexity <= legacy_complexity,
-        "Normalized complexity ({}) should not exceed legacy ({}) for real complexity",
+        normalized_complexity <= visitor_complexity,
+        "Normalized complexity ({}) should not exceed visitor-based ({}) for real complexity",
         normalized_complexity,
-        legacy_complexity
+        visitor_complexity
     );
 }
 

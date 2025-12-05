@@ -135,7 +135,7 @@ fn test_trait_method_coverage_matching_integration() {
     // If coverage is a number, verify it's reasonable
     if let Some(cov_pct) = coverage_value.as_f64() {
         assert!(
-            cov_pct >= 0.0 && cov_pct <= 1.0,
+            (0.0..=1.0).contains(&cov_pct),
             "Coverage should be between 0 and 1 for {}, got {}",
             function_name,
             cov_pct
