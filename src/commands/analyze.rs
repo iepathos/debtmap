@@ -70,6 +70,7 @@ pub struct AnalyzeConfig {
     pub functional_analysis_profile: Option<crate::cli::FunctionalAnalysisProfile>,
     pub min_split_methods: usize,
     pub min_split_lines: usize,
+    pub no_tui: bool,
 }
 
 pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
@@ -193,24 +194,50 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     // Show total analysis time (spec 195)
     io::progress::AnalysisProgress::with_global(|p| p.finish());
 
-    let output_config = output::OutputConfig {
-        top: config.top,
-        tail: config.tail,
-        summary: config.summary,
-        verbosity: config.verbosity,
-        output_file: config.output,
-        output_format: Some(config.format),
-        formatting_config: config._formatting_config,
-    };
+    // Determine output mode: use interactive TUI or traditional output
+    if should_use_tui(&config) {
+        // Launch interactive TUI results explorer
+        use crate::tui::results::ResultsExplorer;
+        let mut explorer = ResultsExplorer::new(filtered_analysis)?;
+        explorer.run()?;
+    } else {
+        // Use traditional text/JSON/markdown output
+        let output_config = output::OutputConfig {
+            top: config.top,
+            tail: config.tail,
+            summary: config.summary,
+            verbosity: config.verbosity,
+            output_file: config.output,
+            output_format: Some(config.format),
+            formatting_config: config._formatting_config,
+        };
 
-    output::output_unified_priorities_with_config(
-        filtered_analysis,
-        output_config,
-        &results,
-        config.coverage_file.as_ref(),
-    )?;
+        output::output_unified_priorities_with_config(
+            filtered_analysis,
+            output_config,
+            &results,
+            config.coverage_file.as_ref(),
+        )?;
+    }
 
     Ok(())
+}
+
+/// Determine if interactive TUI should be used
+fn should_use_tui(config: &AnalyzeConfig) -> bool {
+    use std::io::IsTerminal;
+
+    // Don't use TUI if:
+    // 1. Explicitly disabled with --no-tui
+    // 2. Non-terminal format specified (JSON, Markdown, HTML)
+    // 3. Output file specified
+    // 4. stdout is not a terminal (piped/redirected)
+    // 5. CI environment detected
+    !config.no_tui
+        && matches!(config.format, cli::OutputFormat::Terminal)
+        && config.output.is_none()
+        && std::io::stdout().is_terminal()
+        && std::env::var("CI").is_err()
 }
 
 fn configure_output(config: &AnalyzeConfig) {

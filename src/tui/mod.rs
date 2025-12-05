@@ -31,6 +31,7 @@ pub mod animation;
 pub mod app;
 pub mod layout;
 pub mod renderer;
+pub mod results;
 pub mod theme;
 
 use crossterm::{

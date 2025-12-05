@@ -28,6 +28,16 @@ impl Theme {
         }
     }
 
+    /// Accent color (alias for primary)
+    pub fn accent(&self) -> Color {
+        self.primary
+    }
+
+    /// Secondary color (alias for success)
+    pub fn secondary(&self) -> Color {
+        self.success
+    }
+
     /// Style for completed stage markers (✓)
     pub fn completed_style(&self) -> Style {
         Style::default().fg(self.success)
@@ -84,6 +94,12 @@ impl Theme {
     /// Style for elapsed time
     pub fn time_style(&self) -> Style {
         Style::default().fg(self.muted)
+    }
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self::default_theme()
     }
 }
 

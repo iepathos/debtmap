@@ -618,7 +618,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         min_split_methods,
         min_split_lines,
         show_splits,
-        no_tui: _,
+        no_tui,
         quiet: _,
     } = command
     {
@@ -701,6 +701,7 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
             functional_analysis_profile,
             min_split_methods,
             min_split_lines,
+            no_tui,
         );
 
         Ok(debtmap::commands::analyze::handle_analyze(config))
@@ -858,6 +859,7 @@ fn build_analyze_config(
     functional_analysis_profile: Option<debtmap::cli::FunctionalAnalysisProfile>,
     min_split_methods: usize,
     min_split_lines: usize,
+    no_tui: bool,
 ) -> debtmap::commands::analyze::AnalyzeConfig {
     // Compute effective verbosity: compact mode sets verbosity to a special low value
     let effective_verbosity = if compact {
@@ -930,6 +932,7 @@ fn build_analyze_config(
         functional_analysis_profile,
         min_split_methods,
         min_split_lines,
+        no_tui,
     }
 }
 
