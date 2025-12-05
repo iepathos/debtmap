@@ -204,6 +204,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 8,
             confidence: 0.85,
+            ..Default::default()
         };
 
         let rust_data = RustPatternResult {
@@ -265,6 +266,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 1,
             confidence: 0.5, // Below threshold
+            ..Default::default()
         };
 
         let rust_data = RustPatternResult {
@@ -292,6 +294,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 8,
             confidence: 0.75,
+            ..Default::default()
         };
 
         let coord_signals = CoordinatorSignals {
@@ -330,6 +333,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 8,
             confidence: 0.85,
+            ..Default::default()
         };
 
         let rust_data = RustPatternResult {
@@ -396,6 +400,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 8,
             confidence: 0.85,
+            ..Default::default()
         };
 
         let info = PatternInfo::from_state_machine(&signals);

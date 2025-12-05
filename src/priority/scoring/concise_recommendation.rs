@@ -285,29 +285,36 @@ fn generate_complexity_steps(
     let pattern = ComplexityPattern::detect(&complexity_metrics);
 
     // Generate pattern-specific recommendation
-    Some(match pattern {
+    match pattern {
         ComplexityPattern::StateMachine {
             state_transitions,
             match_expression_count,
             cyclomatic: cyclo,
             cognitive: cog,
             nesting,
-        } => generate_state_machine_recommendation(
-            state_transitions,
-            match_expression_count,
-            cyclo,
-            cog,
-            nesting,
-            metrics,
-        ),
+        } => {
+            // Spec 203: Returns None for clean patterns
+            generate_state_machine_recommendation(
+                state_transitions,
+                match_expression_count,
+                cyclo,
+                cog,
+                nesting,
+                metrics,
+            )
+        }
         ComplexityPattern::Coordinator {
             action_count,
             comparison_count,
             cyclomatic: cyclo,
             cognitive: cog,
-        } => {
-            generate_coordinator_recommendation(action_count, comparison_count, cyclo, cog, metrics)
-        }
+        } => Some(generate_coordinator_recommendation(
+            action_count,
+            comparison_count,
+            cyclo,
+            cog,
+            metrics,
+        )),
         ComplexityPattern::Dispatcher {
             branch_count,
             cognitive_ratio,
@@ -319,40 +326,54 @@ fn generate_complexity_steps(
             cyclomatic,
             cognitive,
             metrics,
-        )?,
+        ),
         ComplexityPattern::RepetitiveValidation {
             validation_count,
             entropy,
             cyclomatic: cyclo,
             adjusted_cyclomatic,
-        } => generate_repetitive_validation_recommendation(
+        } => Some(generate_repetitive_validation_recommendation(
             validation_count,
             entropy,
             cyclo,
             adjusted_cyclomatic,
             metrics,
-        ),
+        )),
         ComplexityPattern::HighNesting {
             nesting_depth,
             cognitive_score,
             ratio,
-        } => generate_nesting_recommendation(nesting_depth, cognitive_score, ratio, metrics),
+        } => Some(generate_nesting_recommendation(
+            nesting_depth,
+            cognitive_score,
+            ratio,
+            metrics,
+        )),
         ComplexityPattern::HighBranching {
             branch_count,
             cyclomatic: _,
-        } => generate_branching_recommendation(branch_count, cyclomatic, metrics),
+        } => Some(generate_branching_recommendation(
+            branch_count,
+            cyclomatic,
+            metrics,
+        )),
         ComplexityPattern::MixedComplexity {
             nesting_depth,
             cyclomatic: cyclo,
             cognitive: cog,
-        } => generate_mixed_recommendation(nesting_depth, cyclo, cog, metrics),
-        ComplexityPattern::ChaoticStructure { entropy, .. } => {
-            generate_chaotic_recommendation(entropy, cyclomatic, cognitive, metrics)
-        }
-        ComplexityPattern::ModerateComplexity { .. } => {
-            generate_moderate_recommendation(cyclomatic, cognitive, metrics)
-        }
-    })
+        } => Some(generate_mixed_recommendation(
+            nesting_depth,
+            cyclo,
+            cog,
+            metrics,
+        )),
+        ComplexityPattern::ChaoticStructure { entropy, .. } => Some(
+            generate_chaotic_recommendation(entropy, cyclomatic, cognitive, metrics),
+        ),
+        ComplexityPattern::ModerateComplexity { .. } => Some(generate_moderate_recommendation(
+            cyclomatic, cognitive, metrics,
+        )),
+    }
 }
 
 /// Generate recommendation for high nesting pattern
@@ -610,84 +631,136 @@ fn generate_chaotic_recommendation(
     }
 }
 
-/// Generate recommendation for state machine pattern
+/// Generate recommendation for state machine pattern (spec 203: enhanced with arm-level analysis)
 fn generate_state_machine_recommendation(
-    transitions: u32,
-    match_expression_count: u32,
+    _transitions: u32,
+    _match_expression_count: u32,
     cyclomatic: u32,
     cognitive: u32,
-    nesting: u32,
+    _nesting: u32,
     metrics: &FunctionMetrics,
-) -> ActionableRecommendation {
-    let extraction_impact = RefactoringImpact::state_transition_extraction(transitions);
+) -> Option<ActionableRecommendation> {
+    // Extract signals from metrics (spec 203)
+    let signals = metrics
+        .language_specific
+        .as_ref()
+        .and_then(|lang| match lang {
+            crate::core::LanguageSpecificData::Rust(rust) => rust.state_machine_signals.as_ref(),
+        })?;
+
+    // Early return if no work needed (spec 203)
+    if signals.complex_inline_arms == 0 {
+        return None;
+    }
+
     let language = crate::core::Language::from_path(&metrics.file);
+
+    // Build state type description
+    let state_type = if metrics.name.contains("main") {
+        "commands"
+    } else if metrics.name.contains("handle") {
+        "states"
+    } else {
+        "transitions"
+    };
+
+    // Build breakdown explanation (spec 203)
+    let breakdown = if signals.primary_match_arms > 0 {
+        format!(
+            "{} {} ({} already extracted, {} trivial, {} need extraction)",
+            signals.primary_match_arms,
+            state_type,
+            signals.delegated_arms,
+            signals.trivial_arms,
+            signals.complex_inline_arms
+        )
+    } else {
+        format!("{} state transitions", signals.transition_count)
+    };
+
+    // Calculate realistic complexity reduction (spec 203)
+    let reduction_per_arm = 3;
+    let cognitive_reduction_per_arm = 5;
+
+    let total_cyclo_reduction = signals.complex_inline_arms * reduction_per_arm;
+    let total_cog_reduction = signals.complex_inline_arms * cognitive_reduction_per_arm;
+
+    let baseline_match = signals.primary_match_arms.saturating_sub(1);
+
+    let projected_cyclo = cyclomatic
+        .saturating_sub(total_cyclo_reduction)
+        .max(baseline_match);
+    let projected_cog = cognitive
+        .saturating_sub(total_cog_reduction)
+        .max(baseline_match * 2);
+
+    // Generate extraction impact
+    let extraction_impact =
+        RefactoringImpact::state_transition_extraction(signals.complex_inline_arms);
 
     let steps = vec![
         ActionStep {
-            description: "Extract each state transition into a named function".to_string(),
+            description: format!(
+                "Extract {} inline {} into handler functions",
+                signals.complex_inline_arms,
+                if signals.complex_inline_arms == 1 {
+                    "handler"
+                } else {
+                    "handlers"
+                }
+            ),
             impact: format!(
-                "-{} complexity ({} impact)",
-                extraction_impact.complexity_reduction,
+                "-{} complexity ({} inline LOC moved, {} impact)",
+                total_cyclo_reduction,
+                signals.total_inline_lines,
                 extraction_impact.confidence.as_str()
             ),
             difficulty: Difficulty::Medium,
             commands: vec![
-                "# Identify each state transition path".to_string(),
-                "# Extract into handle_X_to_Y() functions".to_string(),
-                format!("# Example: fn handle_online_to_offline(state: &State) -> Vec<Action>"),
+                "# Pattern: Commands::Foo { fields } => handle_foo_command(fields)?".to_string(),
+                "# Move config building into handle_foo_command()".to_string(),
             ],
         },
         ActionStep {
-            description: "Create transition map or lookup table".to_string(),
+            description: "Verify all command arms delegate to handlers".to_string(),
             impact: format!(
-                "-{} nesting (flatten conditionals)",
-                nesting.saturating_sub(1)
+                "Consistent pattern: {} of {} arms delegated",
+                signals.delegated_arms + signals.complex_inline_arms,
+                signals.primary_match_arms
             ),
-            difficulty: Difficulty::Medium,
-            commands: vec![
-                "# Replace nested if/match with transition table".to_string(),
-                "# Example: HashMap<(State, Event), Action>".to_string(),
-            ],
-        },
-        ActionStep {
-            description: "Verify state transitions with property tests".to_string(),
-            impact: "Ensure correctness of extracted logic".to_string(),
-            difficulty: Difficulty::Medium,
+            difficulty: Difficulty::Easy,
             commands: add_language_verification_commands(&language),
         },
     ];
 
-    let estimated_effort = (transitions as f32) * 0.75; // ~45min per transition
+    let estimated_effort = (signals.complex_inline_arms as f32) * 0.75;
 
-    // Create a clearer explanation of what's being counted
-    let explanation = if match_expression_count > 1 {
-        format!(
-            "{} enum pattern transitions across {} match expressions",
-            transitions, match_expression_count
-        )
-    } else {
-        format!("{} state transitions", transitions)
-    };
-
-    ActionableRecommendation {
+    Some(ActionableRecommendation {
         primary_action: format!(
-            "Extract {} state transitions into named functions",
-            transitions
+            "Extract {} inline {} (state machine cleanup)",
+            signals.complex_inline_arms,
+            if signals.complex_inline_arms == 1 {
+                "handler"
+            } else {
+                "handlers"
+            }
         ),
         rationale: format!(
-            "State machine pattern detected with {}. \
-             Extracting transitions will reduce complexity from {}/{} to ~{}/{}.",
-            explanation,
+            "State machine pattern with {}. \
+             Extracting {} inline handlers will reduce complexity from {}/{} to ~{}/{} \
+             and establish consistent delegation pattern.",
+            breakdown,
+            signals.complex_inline_arms,
             cyclomatic,
             cognitive,
-            cyclomatic.saturating_sub(extraction_impact.complexity_reduction / 2),
-            cognitive.saturating_sub(extraction_impact.complexity_reduction / 2)
+            projected_cyclo,
+            projected_cog
         ),
         implementation_steps: vec![],
         related_items: vec![],
         steps: Some(steps),
-        estimated_effort_hours: Some(estimated_effort),
-    }
+        estimated_effort_hours: Some(estimated_effort.max(0.5)),
+    })
 }
 
 /// Generate recommendation for coordinator pattern

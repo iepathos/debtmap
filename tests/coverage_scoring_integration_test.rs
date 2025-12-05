@@ -100,7 +100,7 @@ fn create_debt_item(
         context_type: None,
         language_specific: None, // spec 190
         detected_pattern: None,
-        contextual_risk: None,
+        contextual_risk: None, // spec 203
     }
 }
 
@@ -202,7 +202,7 @@ fn test_coverage_scoring_invariant_total_analysis() {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
-            contextual_risk: None,
+            contextual_risk: None, // spec 203
         };
         analysis_no_coverage.add_item(item);
     }

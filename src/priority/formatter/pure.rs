@@ -331,7 +331,7 @@ mod tests {
             context_type: None,
             language_specific: None,
             detected_pattern: None,
-            contextual_risk: None,
+            contextual_risk: None, // spec 203
         }
     }
 

@@ -76,14 +76,37 @@ pub enum ComplexityPattern {
 }
 
 /// Signals indicating state machine pattern
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct StateMachineSignals {
+    // Existing fields (unchanged)
+    #[serde(default)]
     pub transition_count: u32,
+    #[serde(default)]
     pub match_expression_count: u32,
+    #[serde(default)]
     pub has_enum_match: bool,
+    #[serde(default)]
     pub has_state_comparison: bool,
+    #[serde(default)]
     pub action_dispatch_count: u32,
+    #[serde(default)]
     pub confidence: f64,
+
+    // NEW (spec 203): Arm classification
+    #[serde(default)]
+    pub primary_match_arms: u32,
+    #[serde(default)]
+    pub nested_match_arms: u32,
+    #[serde(default)]
+    pub delegated_arms: u32,
+    #[serde(default)]
+    pub trivial_arms: u32,
+    #[serde(default)]
+    pub complex_inline_arms: u32,
+    #[serde(default)]
+    pub total_inline_lines: u32,
+    #[serde(default)]
+    pub avg_arm_complexity: f32,
 }
 
 /// Signals indicating coordinator pattern
@@ -552,6 +575,7 @@ mod tests {
                 has_state_comparison: true,
                 action_dispatch_count: 4,
                 confidence: 0.85,
+                ..Default::default()
             }),
             coordinator_signals: None,
             validation_signals: None,
@@ -605,6 +629,7 @@ mod tests {
                 has_state_comparison: true,
                 action_dispatch_count: 6,
                 confidence: 0.90,
+                ..Default::default()
             }),
             coordinator_signals: None,
             validation_signals: None,

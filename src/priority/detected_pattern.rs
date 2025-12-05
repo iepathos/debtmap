@@ -160,6 +160,7 @@ mod tests {
                 has_state_comparison: true,
                 action_dispatch_count: 8,
                 confidence: 0.85,
+                ..Default::default()
             }),
             coordinator_signals: None,
             validation_signals: None,
@@ -250,6 +251,7 @@ mod tests {
                 has_state_comparison: true,
                 action_dispatch_count: 8,
                 confidence: 0.75,
+                ..Default::default()
             }),
             coordinator_signals: Some(CoordinatorSignals {
                 actions: 4,
