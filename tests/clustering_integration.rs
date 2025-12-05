@@ -110,7 +110,9 @@ fn test_clustering_on_god_object_detector() {
         // If there's only 1 cluster and it's "unclassified", the file might not be a god object
         let name_lower = split.suggested_name.to_lowercase();
         if name_lower.contains("unclassified") || name_lower.contains("module") {
-            println!("File not classified as god object (single unclassified cluster) - test passes");
+            println!(
+                "File not classified as god object (single unclassified cluster) - test passes"
+            );
             return;
         }
     }
