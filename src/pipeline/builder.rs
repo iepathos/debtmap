@@ -143,11 +143,9 @@ impl<T: 'static> BuiltPipeline<T> {
                 }
             }
 
-            data = stage
-                .execute_any(data)
-                .map_err(|e| {
-                    AnalysisError::other(format!("Failed in stage '{}': {}", stage.name(), e))
-                })?;
+            data = stage.execute_any(data).map_err(|e| {
+                AnalysisError::other(format!("Failed in stage '{}': {}", stage.name(), e))
+            })?;
         }
 
         // Downcast final result
@@ -174,11 +172,9 @@ impl<T: 'static> BuiltPipeline<T> {
                 }
             }
 
-            data = stage
-                .execute_any(data)
-                .map_err(|e| {
-                    AnalysisError::other(format!("Failed in stage '{}': {}", stage.name(), e))
-                })?;
+            data = stage.execute_any(data).map_err(|e| {
+                AnalysisError::other(format!("Failed in stage '{}': {}", stage.name(), e))
+            })?;
 
             let elapsed = start.elapsed();
             timings.push(StageTiming {

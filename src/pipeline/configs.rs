@@ -111,8 +111,7 @@ pub fn standard_pipeline(
         builder = builder.stage(CoverageLoadingStage::new(coverage_path));
     }
 
-    builder = builder
-        .stage(PurityAnalysisStage::new());
+    builder = builder.stage(PurityAnalysisStage::new());
 
     // Conditionally add context stage
     if enable_context {
@@ -236,42 +235,28 @@ mod tests {
 
     #[test]
     fn test_standard_pipeline_builds() {
-        let pipeline = standard_pipeline(
-            Path::new("."),
-            &[Language::Rust],
-            None,
-            false,
-        );
+        let pipeline = standard_pipeline(Path::new("."), &[Language::Rust], None, false);
         // Should build without panicking
         assert!(pipeline.stage_count() >= 6);
     }
 
     #[test]
     fn test_fast_pipeline_builds() {
-        let pipeline = fast_pipeline(
-            Path::new("."),
-            &[Language::Rust],
-        );
+        let pipeline = fast_pipeline(Path::new("."), &[Language::Rust]);
         // Should have fewer stages than standard
         assert_eq!(pipeline.stage_count(), 6);
     }
 
     #[test]
     fn test_complexity_only_pipeline_builds() {
-        let pipeline = complexity_only_pipeline(
-            Path::new("."),
-            &[Language::Rust],
-        );
+        let pipeline = complexity_only_pipeline(Path::new("."), &[Language::Rust]);
         // Should have minimal stages
         assert_eq!(pipeline.stage_count(), 3);
     }
 
     #[test]
     fn test_call_graph_pipeline_builds() {
-        let pipeline = call_graph_pipeline(
-            Path::new("."),
-            &[Language::Rust],
-        );
+        let pipeline = call_graph_pipeline(Path::new("."), &[Language::Rust]);
         assert_eq!(pipeline.stage_count(), 5);
     }
 }

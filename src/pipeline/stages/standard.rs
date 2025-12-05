@@ -117,13 +117,13 @@ impl Stage for CallGraphStage {
 ///
 /// Resolves trait implementations and method calls for better call graph accuracy.
 pub struct TraitResolutionStage {
-    project_path: PathBuf,
+    _project_path: PathBuf,
 }
 
 impl TraitResolutionStage {
     pub fn new(project_path: &Path) -> Self {
         Self {
-            project_path: project_path.to_path_buf(),
+            _project_path: project_path.to_path_buf(),
         }
     }
 }
@@ -315,13 +315,13 @@ impl Stage for ScoringStage {
 
 // Helper functions
 
-fn discover_files(path: &Path, languages: &[Language]) -> Result<Vec<PathBuf>, AnalysisError> {
+fn discover_files(path: &Path, _languages: &[Language]) -> Result<Vec<PathBuf>, AnalysisError> {
     use walkdir::WalkDir;
 
     let mut files = Vec::new();
 
     // For now, only support Rust files
-    let extensions = vec!["rs"];
+    let extensions = ["rs"];
 
     for entry in WalkDir::new(path)
         .follow_links(true)
@@ -340,7 +340,6 @@ fn discover_files(path: &Path, languages: &[Language]) -> Result<Vec<PathBuf>, A
 
     Ok(files)
 }
-
 
 fn load_coverage_from_file(path: &Path) -> Result<CoverageData, AnalysisError> {
     let content = std::fs::read_to_string(path).map_err(|e| {
@@ -373,7 +372,9 @@ fn load_coverage_from_file(path: &Path) -> Result<CoverageData, AnalysisError> {
                     0.0
                 };
                 coverage.file_coverage.insert(file.clone(), coverage_pct);
-                coverage.line_coverage.insert(file.clone(), line_hits.clone());
+                coverage
+                    .line_coverage
+                    .insert(file.clone(), line_hits.clone());
             }
             current_file = None;
             line_hits.clear();
