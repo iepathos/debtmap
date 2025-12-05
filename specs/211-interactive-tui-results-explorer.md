@@ -13,7 +13,9 @@ created: 2025-12-05
 **Category**: foundation
 **Priority**: high
 **Status**: draft
-**Dependencies**: Spec 210 (Zen Minimalist TUI Progress Visualization)
+**Dependencies**: Existing TUI infrastructure (`src/tui/`)
+
+**Note**: This spec depends on the TUI foundation implemented in `src/tui/` (Theme, TuiManager, animation). While this was originally documented as "Spec 210", the implementation exists and is production-ready. See CHANGELOG.md for details on the zen minimalist TUI system.
 
 ## Context
 
@@ -103,10 +105,12 @@ Create an interactive TUI for exploring analysis results that:
 - ? - Help overlay
 
 **FR7: Actions**
-- c - Copy file path to clipboard (system clipboard)
-- e - Open in $EDITOR (respects environment variable)
+- c - Copy file path to clipboard (system clipboard, with graceful fallback on failure)
+- e - Open in $EDITOR (respects environment variable, falls back to VISUAL then vim)
 - o - Open file at line number in editor
 - Export selected items to file
+
+**Note on Clipboard**: If clipboard access fails (SSH, headless, permissions), show error message with the path so user can manually copy it.
 
 **FR8: Fallback Mode Detection**
 - Auto-detect non-interactive environments (CI/CD, pipes)
@@ -117,16 +121,25 @@ Create an interactive TUI for exploring analysis results that:
 ### Non-Functional Requirements
 
 **NFR1: Performance**
-- List view renders in <16ms (60 FPS)
-- Handle 10,000+ items without lag
+- List view renders in <16ms (60 FPS) target
+- Handle 10,000+ items without lag (requires virtual scrolling)
 - Instant search filtering (<100ms)
 - Smooth scrolling with no frame drops
+
+**Performance Note**: Targets validated on modern hardware (M1 Mac, iTerm2). Actual performance may vary by terminal emulator and system capabilities. Virtual scrolling (rendering only visible items) is essential for large result sets.
 
 **NFR2: Accessibility**
 - Screen reader compatible (text-based interface)
 - Configurable key bindings
 - High contrast mode support
-- Respect NO_COLOR environment variable
+- Respect NO_COLOR and TERM environment variables:
+  ```rust
+  fn should_use_color() -> bool {
+      std::env::var("NO_COLOR").is_err() &&
+      std::env::var("TERM").map(|t| t != "dumb").unwrap_or(true)
+  }
+  ```
+- When color is disabled, use text-only indicators (*, >, -, etc.)
 
 **NFR3: Terminal Compatibility**
 - Support terminals: iTerm2, Terminal.app, Alacritty, Kitty, Windows Terminal
@@ -159,8 +172,11 @@ Create an interactive TUI for exploring analysis results that:
 
 ### User Actions
 - [ ] Copy path (c) copies file path to system clipboard
+- [ ] Clipboard copy shows error message with path if clipboard unavailable
 - [ ] Open editor (e) launches $EDITOR with correct file
+- [ ] Editor action falls back to VISUAL, then vim if EDITOR unset
 - [ ] Open at line (o) launches editor at specific line number
+- [ ] Editor line number syntax correct for vim, VS Code, emacs, Sublime, Helix
 - [ ] Navigation (j/k/↑/↓) moves between items smoothly
 - [ ] Detail navigation (n/p) moves to next/previous item
 
@@ -169,8 +185,11 @@ Create an interactive TUI for exploring analysis results that:
 - [ ] `debtmap analyze . --markdown` outputs Markdown without TUI
 - [ ] `debtmap analyze . --html` outputs HTML without TUI
 - [ ] `debtmap analyze . --no-tui` outputs text without TUI
-- [ ] CI/CD environments auto-detect and use text output
+- [ ] `--no-tui` flag properly parsed and passed to AnalyzeConfig
+- [ ] CI/CD environments (CI=true) auto-detect and use text output
 - [ ] Piped output (e.g., `| grep`) auto-detects and uses text
+- [ ] Redirected output (e.g., `> file.txt`) auto-detects and uses text
+- [ ] SSH sessions without TTY use text output
 
 ### Performance
 - [ ] List view renders 60 FPS with 1000+ items
@@ -186,12 +205,15 @@ Create an interactive TUI for exploring analysis results that:
 - [ ] Help overlay (?) shows all keybindings clearly
 
 ### Edge Cases
-- [ ] Handles empty results gracefully (no items)
+- [ ] Handles empty results gracefully (no items) - shows helpful message
 - [ ] Handles single result without errors
 - [ ] Handles very long file paths (truncation/wrapping)
 - [ ] Handles very long function names
-- [ ] Handles terminal resize events
-- [ ] Handles invalid $EDITOR gracefully
+- [ ] Handles terminal resize events - recomputes layout
+- [ ] Handles invalid $EDITOR gracefully - shows error, doesn't crash
+- [ ] Handles clipboard access failure - shows path in error message
+- [ ] Handles SSH/headless environments - falls back to text mode
+- [ ] Handles narrow terminals (<80 cols) - degrades gracefully or shows warning
 
 ## Technical Details
 
@@ -289,7 +311,7 @@ pub struct TableRow {
     severity: Severity,
     location: String,      // Truncated path
     action: String,        // First line of recommendation
-    full_item: DebtItem,   // Reference to full data
+    item_index: usize,     // Index into full items vector (avoid cloning)
 }
 
 pub struct TableLayout {
@@ -298,6 +320,10 @@ pub struct TableLayout {
     header_height: u16,
     footer_height: u16,
 }
+
+// Note: Using item_index instead of cloning full_item reduces memory usage
+// significantly for large result sets (e.g., 10k items). The full DebtItem
+// can be accessed via app.items[row.item_index] when needed.
 ```
 
 **Filter System**
@@ -347,10 +373,10 @@ fn should_use_tui(config: &AnalyzeConfig) -> bool {
     // Auto-detect: Use TUI if interactive terminal and no explicit format
     use std::io::IsTerminal;
 
-    !config.no_tui                           // Not explicitly disabled
-        && config.output_format.is_none()    // No --json/--markdown/--html
-        && config.output.is_none()           // No output file specified
-        && std::io::stdout().is_terminal()   // Interactive terminal
+    !config.no_tui                                      // Not explicitly disabled
+        && config.format == OutputFormat::Terminal      // Terminal format (not JSON/Markdown/Html)
+        && config.output.is_none()                      // No output file specified
+        && std::io::stdout().is_terminal()              // Interactive terminal
 }
 ```
 
@@ -371,17 +397,22 @@ pub struct ResultsExplorer {
 ### Clipboard Integration
 
 ```rust
-use copypasta::{ClipboardContext, ClipboardProvider};
+use arboard::Clipboard;
 
 pub fn copy_to_clipboard(text: &str) -> Result<()> {
-    let mut ctx = ClipboardContext::new()
+    let mut clipboard = Clipboard::new()
         .context("Failed to access clipboard")?;
 
-    ctx.set_contents(text.to_string())
+    clipboard.set_text(text)
         .context("Failed to copy to clipboard")?;
 
     Ok(())
 }
+
+// Note: arboard provides better cross-platform support than copypasta:
+// - Works on macOS, Linux (X11/Wayland), Windows
+// - Better maintained and more reliable
+// - Gracefully handles headless/SSH environments
 ```
 
 ### Editor Integration
@@ -399,8 +430,12 @@ pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
     // Support common editor line number syntax
     match (editor.as_str(), line) {
         ("vim" | "nvim", Some(n)) => cmd.arg(format!("+{}", n)),
-        ("code" | "code-insiders", Some(n)) => cmd.arg("--goto").arg(format!("{}:{}", path.display(), n)),
+        ("code" | "code-insiders", Some(n)) => {
+            cmd.arg("--goto").arg(format!("{}:{}", path.display(), n))
+        }
         ("emacs", Some(n)) => cmd.arg(format!("+{}", n)),
+        ("subl" | "sublime", Some(n)) => cmd.arg(format!("{}:{}", path.display(), n)),
+        ("hx" | "helix", Some(n)) => cmd.arg(format!("{}:{}", path.display(), n)),
         _ => &mut cmd,
     };
 
@@ -410,18 +445,32 @@ pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
 
     Ok(())
 }
+
+// Supported editors:
+// - vim/nvim: +{line} {file}
+// - VS Code: --goto {file}:{line}
+// - emacs: +{line} {file}
+// - Sublime Text: {file}:{line}
+// - Helix: {file}:{line}
+// - Others: {file} (no line number support, fallback gracefully)
+//
+// Note: IntelliJ IDEA and JetBrains IDEs use different command-line tools per product
+// (idea, pycharm, rubymine, etc.) and are not auto-detected. Users can set EDITOR
+// explicitly if needed.
 ```
 
 ## Dependencies
 
 ### Prerequisites
-- **Spec 210**: Zen Minimalist TUI Progress Visualization
+- **Existing TUI Infrastructure** (`src/tui/`)
   - Provides foundation: `TuiManager`, `Theme`, terminal initialization
   - Establishes visual language and interaction patterns
   - Defines shared TUI components
+  - Already implemented and production-ready
 
 ### Affected Components
-- `src/commands/analyze.rs` - Add TUI vs text output decision logic
+- `src/commands/analyze.rs` - Add TUI vs text output decision logic, add `no_tui: bool` field to `AnalyzeConfig`
+- `src/cli.rs` - Add `--no-tui` flag to CLI argument parsing
 - `src/output/mod.rs` - Refactor to support both modes
 - `src/tui/mod.rs` - Extend with results explorer submodule
 
@@ -430,12 +479,12 @@ pub fn open_in_editor(path: &Path, line: Option<usize>) -> Result<()> {
 Add to `Cargo.toml`:
 ```toml
 [dependencies]
-# Existing TUI dependencies from spec 210
-ratatui = "0.25"
-crossterm = "0.27"
+# Existing TUI dependencies (already in Cargo.toml)
+# ratatui = "0.26"
+# crossterm = "0.27"
 
 # New dependencies for results explorer
-copypasta = "0.10"  # Clipboard access
+arboard = "3.3"  # Clipboard access (cross-platform, well-maintained)
 fuzzy-matcher = "0.3"  # Fuzzy search
 ```
 
@@ -739,37 +788,48 @@ Reuses TUI infrastructure from analysis progress visualization:
 
 ### Phased Rollout
 
-**Phase 1: Core Foundation** (Week 1)
+Implementation should be broken into logical phases to ensure incremental progress and testability:
+
+**Phase 1: Core Foundation**
 - Basic list view with scrolling
 - Simple detail view
 - Quit functionality
 - Auto-detection logic
 
-**Phase 2: Search & Filter** (Week 2)
+**Phase 2: Search & Filter**
 - Search implementation
 - Filter system
 - Sort capabilities
 - Status bar updates
 
-**Phase 3: Actions** (Week 3)
+**Phase 3: Actions**
 - Clipboard integration
 - Editor launching
 - Help overlay
 - Keybinding polish
 
-**Phase 4: Polish** (Week 4)
+**Phase 4: Polish**
 - Animation refinements
 - Theme consistency
 - Performance optimization
 - Comprehensive testing
 
+Each phase should be completed with full testing before moving to the next. Phases are designed to deliver incremental value - even Phase 1 alone provides a usable interactive interface.
+
 ### Performance Considerations
 
 **Large Lists**
-- Use virtual scrolling (render only visible items)
-- Lazy calculation of filtered indices
-- Incremental search with debouncing
-- Cache layout calculations
+- Use virtual scrolling (render only visible items):
+  ```rust
+  // Only render items within viewport
+  let visible_start = scroll_offset;
+  let visible_end = (scroll_offset + visible_rows).min(filtered_items.len());
+  let visible_items = &filtered_items[visible_start..visible_end];
+  ```
+- Lazy calculation of filtered indices (compute on-demand, not eagerly)
+- Incremental search with debouncing (wait 50-100ms after last keystroke)
+- Cache layout calculations (terminal size, column widths)
+- Use indices instead of cloning items (as specified in TableRow)
 
 **Memory Management**
 - Share UnifiedAnalysis data (don't clone)
@@ -846,12 +906,14 @@ If TUI causes issues:
 
 ### Future Enhancements
 
-**Post-MVP Features**:
+**Post-MVP Features** (explicitly out of scope for initial release):
 - Export filtered results to file
 - Mark items as reviewed/ignored (persistent state)
 - Side-by-side comparison of items
 - Customizable keybindings via config file
 - Theme customization
-- Mouse support (optional)
+- Mouse support (MVP is keyboard-only by design for accessibility and performance)
 - Integration with git (show blame, commit info inline)
 - Watch mode (re-run analysis on file changes)
+- Multi-select for batch operations
+- Bookmarking/favoriting specific items
