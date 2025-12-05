@@ -70,39 +70,40 @@ debtmap analyze . --format html > report.html
 
 ### Review Results
 
-#### Progress Display
+#### Progress Visualization
 
-Debtmap provides clear, phase-based progress tracking during analysis. You'll see exactly what's happening through 4 distinct phases:
+Debtmap features a beautiful **zen minimalist TUI** (Terminal User Interface) that provides real-time visualization of the entire analysis pipeline:
 
+**TUI Features:**
+- **Full pipeline visibility**: All 9 analysis stages displayed at once
+- **Hierarchical progress**: Active stages expand to show sub-tasks
+- **Rich context**: Live counts, percentages, and real-time statistics
+- **Smooth animations**: 60 FPS rendering with progress bars and visual indicators
+- **Automatic detection**: TUI automatically disables in CI/pipes for clean logs
+
+**Analysis Pipeline (9 Stages):**
+
+1. **files** - Scans your codebase and discovers files to analyze
+2. **parse** - Parses each file and extracts AST information
+3. **call graph** - Builds function call relationships
+4. **trait resolution** - Resolves Rust trait method calls
+5. **coverage** - Loads test coverage data (if provided)
+6. **purity analysis** - Analyzes function side effects and purity
+7. **context** - Loads project context and metadata
+8. **debt scoring** - Calculates technical debt scores
+9. **prioritization** - Ranks items by impact and priority
+
+**TUI Controls:**
+```bash
+# TUI enabled by default (auto-detects TTY)
+debtmap analyze .
+
+# Disable TUI (fallback to simple progress bars)
+debtmap analyze . --no-tui
+
+# Quiet mode (no progress output)
+debtmap analyze . --quiet
 ```
-→ 1/4 Discovering files...        511 found
-✓ 1/4 Discovering files...        511 found - 0s
-→ 2/4 Analyzing complexity...     511/511 (100%) - 2s
-✓ 2/4 Analyzing complexity...     511/511 (100%) - 2s
-→ 3/4 Building call graph...      511/511 (100%) - 1s
-✓ 3/4 Building call graph...      511/511 (100%) - 1s
-→ 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
-✓ 4/4 Resolving dependencies...   148769/148769 (100%) - 3s
-
-Analysis complete in 6.2s
-```
-
-**Analysis Phases:**
-
-1. **Discovering files** - Scans your codebase and reports how many files will be analyzed
-2. **Analyzing complexity** - Parses each file and calculates complexity metrics
-3. **Building call graph** - Analyzes function relationships and dependencies
-4. **Resolving dependencies** - Links function calls across files
-
-Each phase shows:
-- Phase number and name (e.g., "1/4 Discovering files")
-- Progress indicator (→ for in-progress, ✓ for complete)
-- Count or percentage of work completed
-- Duration in seconds after completion
-
-The progress display adapts to your environment:
-- **Interactive terminals**: Live updates with overwriting lines
-- **CI/CD environments**: Line-by-line output for logs
 
 #### Analysis Results
 

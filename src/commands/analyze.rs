@@ -76,10 +76,15 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     configure_output(&config);
     set_threshold_preset(config.threshold_preset);
 
-    // Initialize global progress manager
+    // Initialize global progress manager with TUI support
     let quiet = std::env::var("DEBTMAP_QUIET").is_ok();
     let progress_config = ProgressConfig::from_env(quiet, config.verbosity);
     ProgressManager::init_global(progress_config);
+
+    // Start TUI rendering if available
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_start_stage(0); // files stage
+    }
 
     // Set max files environment variable if specified
     if let Some(max_files) = config.max_files {
@@ -199,6 +204,12 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
     // Show total analysis time (spec 195)
     io::progress::AnalysisProgress::with_global(|p| p.finish());
 
+    // Cleanup TUI if it was used
+    if let Some(manager) = ProgressManager::global() {
+        manager.tui_set_progress(1.0);
+        manager.tui_cleanup();
+    }
+
     Ok(())
 }
 
@@ -246,6 +257,9 @@ pub fn analyze_project(
 
     // Phase 1: Discovering files
     io::progress::AnalysisProgress::with_global(|p| p.start_phase(0));
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(0);
+    }
 
     let files = io::walker::find_project_files_with_config(&path, languages.clone(), config)
         .context("Failed to find project files")?;
@@ -255,11 +269,19 @@ pub fn analyze_project(
         p.complete_phase();
     });
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(0, format!("{} files", files.len()));
+        manager.tui_set_progress(0.11); // ~1/9 stages complete
+    }
+
     // Analyze project size and apply graduated optimizations
     analyze_and_configure_project_size(&files, parallel_enabled, _formatting_config)?;
 
-    // Phase 2: Analyzing complexity
+    // Phase 2: Analyzing complexity (parsing)
     io::progress::AnalysisProgress::with_global(|p| p.start_phase(1));
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(1); // parse stage
+    }
 
     // Collect file metrics directly without caching
     let file_metrics = analysis_utils::collect_file_metrics(&files);
@@ -271,6 +293,11 @@ pub fn analyze_project(
         });
         p.complete_phase();
     });
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(1, format!("{} files parsed", files.len()));
+        manager.tui_set_progress(0.22); // ~2/9 stages complete
+    }
 
     let all_functions = analysis_utils::extract_all_functions(&file_metrics);
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);

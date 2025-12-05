@@ -87,14 +87,23 @@ static GLOBAL_PROGRESS: Lazy<Arc<Mutex<Option<ProgressManager>>>> =
 pub struct ProgressManager {
     multi: Arc<MultiProgress>,
     config: ProgressConfig,
+    tui_manager: Arc<Mutex<Option<crate::tui::TuiManager>>>,
 }
 
 impl ProgressManager {
     /// Create a new progress manager with the given configuration
     pub fn new(config: ProgressConfig) -> Self {
+        // Initialize TUI if terminal is interactive and not in quiet mode
+        let tui_manager = if config.should_show_progress() {
+            crate::tui::TuiManager::new().ok()
+        } else {
+            None
+        };
+
         Self {
             multi: Arc::new(MultiProgress::new()),
             config,
+            tui_manager: Arc::new(Mutex::new(tui_manager)),
         }
     }
 
@@ -176,6 +185,98 @@ impl ProgressManager {
     /// don't interfere with the terminal display.
     pub fn clear(&self) -> std::io::Result<()> {
         self.multi.clear()
+    }
+
+    /// Start a pipeline stage in TUI
+    pub fn tui_start_stage(&self, stage_index: usize) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut().start_stage(stage_index);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Complete a pipeline stage in TUI
+    pub fn tui_complete_stage(&self, stage_index: usize, metric: impl Into<String>) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut().complete_stage(stage_index, metric);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Update stage metric in TUI
+    pub fn tui_update_metric(&self, stage_index: usize, metric: impl Into<String>) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut().update_stage_metric(stage_index, metric);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Update subtask status in TUI
+    pub fn tui_update_subtask(
+        &self,
+        stage_index: usize,
+        subtask_index: usize,
+        status: crate::tui::app::StageStatus,
+        progress: Option<(usize, usize)>,
+    ) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut()
+                    .update_subtask(stage_index, subtask_index, status, progress);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Update overall progress in TUI
+    pub fn tui_set_progress(&self, progress: f64) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut().set_overall_progress(progress);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Update statistics in TUI
+    pub fn tui_update_stats(
+        &self,
+        functions: usize,
+        debt: usize,
+        coverage: f64,
+        threads: usize,
+    ) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                tui.app_mut()
+                    .update_stats(functions, debt, coverage, threads);
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Render a TUI frame (for periodic updates)
+    pub fn tui_render(&self) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Cleanup TUI on completion
+    pub fn tui_cleanup(&self) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                let _ = tui.cleanup();
+            }
+        }
     }
 }
 
