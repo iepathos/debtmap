@@ -23,6 +23,327 @@ DebtMap is a high-performance technical debt analyzer focused exclusively on Rus
 - **File Metrics**: Module-level aggregation
 - **Test Coverage**: Integration with lcov data via indexed lookups
 
+## Effect System (Spec 207)
+
+### Philosophy: Pure Core, Imperative Shell
+
+DebtMap uses the [Stillwater](https://crates.io/crates/stillwater) effects library to implement a **pure core, imperative shell** architecture. This pattern strictly separates:
+
+- **Pure Core**: Business logic functions that never perform I/O
+- **Imperative Shell**: I/O operations wrapped in effects at system boundaries
+- **Effect Composition**: Type-safe chains of operations with compile-time guarantees
+
+This enables:
+- **Testability**: Pure functions need no mocks or test infrastructure
+- **Reliability**: Deterministic computations with explicit side effects
+- **Composability**: Build complex pipelines from simple, reusable effects
+- **Maintainability**: Clear boundaries between logic and I/O
+
+### Core Types
+
+#### Effect Types
+
+```rust
+// Generic effect type for analysis operations
+pub type AnalysisEffect<T> = BoxedEffect<T, AnalysisError, RealEnv>;
+
+// Validation type that accumulates ALL errors instead of failing fast
+pub type AnalysisValidation<T> = Validation<T, NonEmptyVec<AnalysisError>>;
+
+// Error collection for comprehensive validation reporting
+pub type AnalysisErrors = NonEmptyVec<AnalysisError>;
+```
+
+#### Environment
+
+The `RealEnv` type provides I/O capabilities to effects:
+- File system access via `FileSystem` trait
+- Configuration via `AnalysisEnv` trait
+- Testable with `DebtmapTestEnv` for unit tests
+
+### Module Organization
+
+Effects are organized by domain:
+
+```
+src/
+├── effects.rs              # Core effect types and helpers
+├── io/effects.rs          # File system I/O effects
+├── analyzers/effects.rs   # Code analysis effects
+├── analysis/effects.rs    # Multi-pass analysis effects
+├── risk/effects.rs        # Risk assessment effects
+└── complexity/effects_wrappers.rs  # Complexity calculation effects
+```
+
+### I/O Effect Constructors
+
+**File Operations** (`src/io/effects.rs`):
+- `read_file_effect(path)` - Read file contents as string
+- `read_file_bytes_effect(path)` - Read file as bytes
+- `walk_dir_effect(path)` - Discover files recursively
+- `exists_effect(path)` - Check file existence
+
+**Analysis Operations** (`src/analyzers/effects.rs`):
+- `analyze_file_effect(path, content, language)` - Analyze single file
+- `analyze_files_effect(files)` - Batch file analysis
+- `analyze_file_auto_effect(path, content)` - Auto-detect language and analyze
+
+**Coverage Operations** (`src/risk/effects.rs`):
+- `load_coverage_effect(lcov_path)` - Load test coverage data
+- `parse_lcov_effect(content)` - Parse LCOV format
+
+### Effect Composition Patterns
+
+#### Basic Composition
+
+```rust
+use debtmap::effects::AnalysisEffect;
+use debtmap::io::effects::read_file_effect;
+use debtmap::analyzers::effects::analyze_file_auto_effect;
+
+// Chain effects with .and_then()
+fn analyze_path(path: PathBuf) -> AnalysisEffect<FileMetrics> {
+    read_file_effect(path.clone())
+        .and_then(move |content| analyze_file_auto_effect(path, content))
+}
+```
+
+#### Pure Transformations
+
+```rust
+// Inject pure functions with .map()
+read_file_effect(path)
+    .map(|content| content.lines().count())  // Pure transformation
+    .and_then(|line_count| validate_size(line_count))  // Back to effects
+```
+
+#### Parallel Execution
+
+```rust
+// Process multiple files concurrently
+use rayon::prelude::*;
+
+fn analyze_all(paths: Vec<PathBuf>) -> AnalysisEffect<Vec<FileMetrics>> {
+    effect_from_fn(|env| {
+        paths.par_iter()
+            .map(|p| analyze_path(p.clone()).run(env))
+            .collect()
+    })
+}
+```
+
+### Reader Pattern (Spec 199)
+
+The Reader pattern eliminates configuration parameter threading by providing config access through the environment:
+
+#### Config Access Helpers
+
+```rust
+use debtmap::effects::{asks_config, asks_thresholds, asks_scoring};
+
+// Query entire config
+let effect = asks_config(|config| config.get_ignore_patterns());
+
+// Query specific section
+let effect = asks_thresholds(|thresholds| {
+    thresholds.and_then(|t| t.complexity)
+});
+
+// Query scoring weights
+let effect = asks_scoring(|scoring| {
+    scoring.map(|s| s.coverage).unwrap_or(0.5)
+});
+```
+
+#### Local Config Override
+
+```rust
+use debtmap::effects::local_with_config;
+
+// Run analysis with temporarily modified config
+fn analyze_strict(path: PathBuf) -> AnalysisEffect<FileMetrics> {
+    local_with_config(
+        |config| {
+            let mut strict = config.clone();
+            if let Some(ref mut thresholds) = strict.thresholds {
+                thresholds.complexity = Some(thresholds.complexity.unwrap_or(10) / 2);
+            }
+            strict
+        },
+        analyze_file_effect(path)
+    )
+}
+```
+
+### Retry Pattern (Spec 205)
+
+Automatic retry of transient failures with configurable backoff:
+
+```rust
+use debtmap::effects::with_retry;
+use debtmap::config::RetryConfig;
+
+// Wrap effect with retry logic
+fn read_file_resilient(path: PathBuf) -> AnalysisEffect<String> {
+    let retry_config = RetryConfig {
+        max_retries: 3,
+        base_delay_ms: 100,
+        ..Default::default()
+    };
+
+    with_retry(
+        move || read_file_effect(path.clone()),
+        retry_config
+    )
+}
+```
+
+Only errors where `error.is_retryable()` returns `true` trigger retries. Non-retryable errors (parse errors, validation errors) cause immediate failure.
+
+### Validation Pattern
+
+Validation accumulates ALL errors instead of failing at the first one:
+
+```rust
+use debtmap::effects::{AnalysisValidation, validation_success, validation_failure};
+
+fn validate_thresholds(complexity: u32, lines: usize) -> AnalysisValidation<()> {
+    let v1 = if complexity <= 50 {
+        validation_success(())
+    } else {
+        validation_failure(AnalysisError::validation("Complexity too high"))
+    };
+
+    let v2 = if lines <= 1000 {
+        validation_success(())
+    } else {
+        validation_failure(AnalysisError::validation("File too long"))
+    };
+
+    // Combine validations - collects ALL errors
+    v1.and(v2)
+}
+```
+
+### Running Effects
+
+#### Synchronous Execution
+
+```rust
+use debtmap::effects::run_effect;
+use debtmap::config::DebtmapConfig;
+
+let config = DebtmapConfig::default();
+let result = run_effect(analyze_effect(), config)?;
+```
+
+#### Asynchronous Execution
+
+```rust
+use debtmap::effects::run_effect_async;
+
+let config = DebtmapConfig::default();
+let result = run_effect_async(analyze_effect(), config).await?;
+```
+
+#### With Custom Environment
+
+```rust
+use debtmap::effects::run_effect_with_env;
+use debtmap::testkit::DebtmapTestEnv;
+
+let env = DebtmapTestEnv::new();
+let result = run_effect_with_env(analyze_effect(), &env)?;
+```
+
+### Testing with Effects
+
+#### Pure Function Tests
+
+```rust
+// Pure functions are trivially testable - no effects needed
+#[test]
+fn test_pure_logic() {
+    let result = calculate_complexity(&ast);
+    assert_eq!(result, 42);
+}
+```
+
+#### Effect Tests with Mock Environment
+
+```rust
+use debtmap::testkit::DebtmapTestEnv;
+
+#[tokio::test]
+async fn test_file_analysis() {
+    let env = DebtmapTestEnv::new()
+        .with_file("test.rs", "fn main() {}");
+
+    let effect = analyze_path("test.rs".into());
+    let metrics = effect.run(&env).await.unwrap();
+
+    assert_eq!(metrics.functions.len(), 1);
+}
+```
+
+### Best Practices
+
+#### Do: Separate I/O from Logic
+
+```rust
+// Pure transformation
+fn calculate_score(metrics: &FileMetrics) -> f64 {
+    metrics.complexity as f64 * 0.5
+}
+
+// I/O wrapped in effect
+fn load_and_score(path: PathBuf) -> AnalysisEffect<f64> {
+    analyze_path(path)
+        .map(|metrics| calculate_score(&metrics))
+}
+```
+
+#### Don't: Mix I/O with Logic
+
+```rust
+// Bad: I/O mixed with calculation
+fn calculate_score_bad(path: PathBuf) -> f64 {
+    let content = std::fs::read_to_string(&path).unwrap();  // I/O!
+    let metrics = analyze(&content);
+    metrics.complexity as f64 * 0.5
+}
+```
+
+#### Do: Compose Effects Before Running
+
+```rust
+// Good: Build pipeline, execute once
+let pipeline = discover_files(&path, &langs)
+    .and_then(|files| analyze_files_effect(files))
+    .map(|metrics| aggregate_metrics(metrics));
+
+let result = run_effect(pipeline, config)?;
+```
+
+#### Don't: Execute Effects Eagerly
+
+```rust
+// Bad: Running effects too early
+let files = run_effect(discover_files(&path, &langs), config)?;
+let metrics = run_effect(analyze_files_effect(files), config)?;
+```
+
+### Migration Strategy
+
+The effect system allows gradual migration:
+
+1. **Phase 1**: Core effects infrastructure (✓ Complete)
+2. **Phase 2**: Migrate I/O operations to effects (✓ Complete)
+3. **Phase 3**: Extract pure analysis functions (Spec 208)
+4. **Phase 4**: Composable pipeline architecture (Spec 209)
+
+Existing code continues to work unchanged during migration via compatibility helpers like `run_effect`.
+
 ## Parallel Processing Architecture
 
 ### Overview
