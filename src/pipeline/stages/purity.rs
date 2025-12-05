@@ -107,6 +107,58 @@ fn refine_purity(
     }
 }
 
+/// Analyze purity for pipeline integration (adapter).
+///
+/// Wraps the purity analysis in a PipelineData-compatible function.
+pub fn analyze_purity(
+    metrics: &[FunctionMetrics],
+    call_graph: &CallGraph,
+) -> crate::pipeline::data::PurityScores {
+    use crate::pipeline::data::PurityScores;
+
+    // Build initial purity map from local analysis
+    let mut initial = HashMap::new();
+    let mut func_ids = Vec::new();
+
+    for metric in metrics {
+        let func_id = FunctionId::new(metric.file.clone(), metric.name.clone(), metric.line);
+        let category = analyze_local_purity(metric);
+        initial.insert(func_id.clone(), category);
+        func_ids.push((func_id, metric.name.clone()));
+    }
+
+    // Propagate purity through call graph
+    let propagated = propagate_purity(initial, call_graph, 10);
+
+    // Convert to PurityScores format
+    let mut scores = HashMap::new();
+    let mut pure_functions = Vec::new();
+    let mut io_functions = Vec::new();
+
+    for (func_id, name) in func_ids {
+        if let Some(category) = propagated.get(&func_id) {
+            let score = match category {
+                PurityCategory::Pure => 1.0,
+                PurityCategory::ImpureLocal => 0.5,
+                PurityCategory::Impure => 0.0,
+            };
+            scores.insert(name.clone(), score);
+
+            match category {
+                PurityCategory::Pure => pure_functions.push(name),
+                PurityCategory::Impure => io_functions.push(name),
+                PurityCategory::ImpureLocal => {}
+            }
+        }
+    }
+
+    PurityScores {
+        scores,
+        pure_functions,
+        io_functions,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

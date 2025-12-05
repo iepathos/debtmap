@@ -13,3 +13,10 @@ pub mod debt;
 pub mod filtering;
 pub mod purity;
 pub mod scoring;
+pub mod standard;
+
+// Re-export standard stages for convenience
+pub use standard::{
+    CallGraphStage, ContextLoadingStage, CoverageLoadingStage, DebtDetectionStage,
+    FileDiscoveryStage, ParsingStage, PurityAnalysisStage, ScoringStage, TraitResolutionStage,
+};

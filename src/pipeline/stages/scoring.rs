@@ -55,6 +55,20 @@ pub fn take_top_n(items: Vec<DebtItem>, n: usize) -> Vec<DebtItem> {
     items.into_iter().take(n).collect()
 }
 
+/// Score debt items for pipeline integration (adapter).
+///
+/// TODO: Full integration with scoring system.
+/// For now returns empty vector to allow compilation.
+pub fn score_debt_items(
+    _items: &[crate::priority::UnifiedDebtItem],
+    _call_graph: Option<&crate::priority::call_graph::CallGraph>,
+    _coverage: Option<&crate::pipeline::data::CoverageData>,
+    _purity: Option<&crate::pipeline::data::PurityScores>,
+) -> Vec<crate::pipeline::data::ScoredDebtItem> {
+    // TODO: Implement full scoring using existing unified scorer
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
