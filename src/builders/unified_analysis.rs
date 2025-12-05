@@ -338,6 +338,8 @@ fn perform_unified_analysis_computation(
         coverage_loading_time,
         risk_analyzer,
         project_path,
+        parallel,
+        jobs,
     );
 
     analysis_spinner.finish_and_clear();
@@ -443,6 +445,8 @@ pub fn create_unified_analysis_with_exclusions(
         Duration::from_secs(0),
         None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
+        false,          // Default to sequential (for compatibility)
+        0,              // Default jobs = 0 (auto-detect)
     )
 }
 
@@ -463,15 +467,22 @@ fn create_unified_analysis_with_exclusions_and_timing(
     coverage_loading_time: std::time::Duration,
     risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
+    parallel: bool,
+    jobs: usize,
 ) -> UnifiedAnalysis {
-    // Check if parallel mode is enabled
-    let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
+    // Use parallel mode based on function parameter (not environment variable)
+    // Environment variable fallback is for backward compatibility
+    let parallel_enabled = parallel || std::env::var("DEBTMAP_PARALLEL")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
 
-    let jobs = std::env::var("DEBTMAP_JOBS")
-        .ok()
-        .and_then(|v| v.parse::<usize>().ok());
+    let jobs_count = if jobs > 0 {
+        Some(jobs)
+    } else {
+        std::env::var("DEBTMAP_JOBS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+    };
 
     if parallel_enabled {
         return create_unified_analysis_parallel(
@@ -485,7 +496,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
             aggregation_method,
             min_problematic,
             no_god_object,
-            jobs,
+            jobs_count,
             call_graph_time,
             trait_resolution_time,
             coverage_loading_time,
