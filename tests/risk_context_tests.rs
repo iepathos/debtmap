@@ -52,7 +52,6 @@ fn test_context_aggregator_default() {
         line_range: (1, 10),
     };
 
-    let mut aggregator = aggregator;
     let context_map = aggregator.analyze(&target);
 
     // Default aggregator has no providers, so context map should be empty
@@ -69,7 +68,6 @@ fn test_context_aggregator_new() {
         line_range: (1, 10),
     };
 
-    let mut aggregator = aggregator;
     let context_map = aggregator.analyze(&target);
 
     // New aggregator has no providers, so context map should be empty
@@ -84,7 +82,7 @@ fn test_context_aggregator_with_provider() {
         should_fail: false,
     });
 
-    let mut aggregator = ContextAggregator::new().with_provider(provider);
+    let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
@@ -108,7 +106,7 @@ fn test_context_aggregator_with_failing_provider() {
         should_fail: true,
     });
 
-    let mut aggregator = ContextAggregator::new().with_provider(provider);
+    let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
@@ -132,7 +130,7 @@ fn test_context_aggregator_cache() {
         should_fail: false,
     });
 
-    let mut aggregator = ContextAggregator::new().with_provider(provider);
+    let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),
@@ -161,7 +159,7 @@ fn test_context_aggregator_clear_cache() {
         should_fail: false,
     });
 
-    let mut aggregator = ContextAggregator::new().with_provider(provider);
+    let aggregator = ContextAggregator::new().with_provider(provider);
 
     let target = AnalysisTarget {
         root_path: PathBuf::from("/test"),

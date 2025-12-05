@@ -95,21 +95,26 @@ pub struct RiskDistribution {
 
 use self::context::{AnalysisTarget, ContextAggregator, ContextualRisk};
 use self::strategy::{EnhancedRiskStrategy, RiskCalculator, RiskContext};
+use std::sync::Arc;
 
 pub struct RiskAnalyzer {
     strategy: Box<dyn RiskCalculator>,
     debt_score: Option<f64>,
     debt_threshold: Option<f64>,
-    context_aggregator: Option<ContextAggregator>,
+    context_aggregator: Option<Arc<ContextAggregator>>,
 }
 
 impl Clone for RiskAnalyzer {
+    /// Clone the risk analyzer, preserving context aggregator.
+    ///
+    /// The context aggregator is wrapped in Arc, so cloning is cheap (just
+    /// an atomic reference count increment) and preserves the shared cache.
     fn clone(&self) -> Self {
         Self {
             strategy: self.strategy.box_clone(),
             debt_score: self.debt_score,
             debt_threshold: self.debt_threshold,
-            context_aggregator: None, // Don't clone aggregator, recreate if needed
+            context_aggregator: self.context_aggregator.clone(), // Arc::clone is cheap!
         }
     }
 }
@@ -133,7 +138,7 @@ impl RiskAnalyzer {
     }
 
     pub fn with_context_aggregator(mut self, aggregator: ContextAggregator) -> Self {
-        self.context_aggregator = Some(aggregator);
+        self.context_aggregator = Some(Arc::new(aggregator));
         self
     }
 
@@ -169,7 +174,7 @@ impl RiskAnalyzer {
 
     #[allow(clippy::too_many_arguments)]
     pub fn analyze_function_with_context(
-        &mut self,
+        &self,
         file: PathBuf,
         function_name: String,
         line_range: (usize, usize),
@@ -187,7 +192,7 @@ impl RiskAnalyzer {
             is_test,
         );
 
-        let contextual_risk = if let Some(ref mut aggregator) = self.context_aggregator {
+        let contextual_risk = if let Some(ref aggregator) = self.context_aggregator {
             let target = AnalysisTarget {
                 root_path,
                 file_path: file,

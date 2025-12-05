@@ -3,9 +3,11 @@ pub mod dependency;
 pub mod git_history;
 
 use anyhow::Result;
+use dashmap::DashMap;
 use im::HashMap;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Trait for context providers that gather additional risk-relevant information
 pub trait ContextProvider: Send + Sync {
@@ -83,10 +85,19 @@ pub enum Impact {
     Compliance,
 }
 
-/// Aggregates context from multiple providers
+/// Thread-safe aggregator for context providers.
+///
+/// Uses lock-free DashMap for caching to enable safe concurrent access
+/// from parallel analysis workers. The aggregator itself is wrapped in
+/// Arc for cheap cloning across threads.
+///
+/// # Thread Safety
+///
+/// Safe to share across threads via Arc. The internal cache uses DashMap
+/// for lock-free concurrent access, avoiding contention in hot paths.
 pub struct ContextAggregator {
     providers: Vec<Box<dyn ContextProvider>>,
-    cache: HashMap<String, ContextMap>,
+    cache: Arc<DashMap<String, ContextMap>>,
 }
 
 impl Default for ContextAggregator {
@@ -99,7 +110,7 @@ impl ContextAggregator {
     pub fn new() -> Self {
         Self {
             providers: Vec::new(),
-            cache: HashMap::new(),
+            cache: Arc::new(DashMap::new()),
         }
     }
 
@@ -108,15 +119,20 @@ impl ContextAggregator {
         self
     }
 
-    pub fn analyze(&mut self, target: &AnalysisTarget) -> ContextMap {
+    /// Analyze the target and return context information.
+    ///
+    /// This method uses interior mutability via DashMap for lock-free caching,
+    /// so it can be called with &self from multiple threads safely.
+    pub fn analyze(&self, target: &AnalysisTarget) -> ContextMap {
         let cache_key = format!("{}:{}", target.file_path.display(), target.function_name);
 
+        // Check cache (lock-free read)
         if let Some(cached) = self.cache.get(&cache_key) {
             return cached.clone();
         }
 
+        // Gather context from providers
         let mut context_map = ContextMap::new();
-
         for provider in &self.providers {
             match provider.gather(target) {
                 Ok(context) => {
@@ -128,12 +144,22 @@ impl ContextAggregator {
             }
         }
 
+        // Insert into cache (lock-free write)
         self.cache.insert(cache_key, context_map.clone());
         context_map
     }
 
-    pub fn clear_cache(&mut self) {
+    pub fn clear_cache(&self) {
         self.cache.clear();
+    }
+}
+
+impl Clone for ContextAggregator {
+    fn clone(&self) -> Self {
+        Self {
+            providers: Vec::new(),          // Don't clone providers (they're heavy)
+            cache: Arc::clone(&self.cache), // Share cache via Arc
+        }
     }
 }
 

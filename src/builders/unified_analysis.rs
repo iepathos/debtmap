@@ -432,7 +432,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
     call_graph_time: std::time::Duration,
     trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
-    mut risk_analyzer: Option<risk::RiskAnalyzer>,
+    risk_analyzer: Option<risk::RiskAnalyzer>,
     project_path: &Path,
 ) -> UnifiedAnalysis {
     // Check if parallel mode is enabled
@@ -509,7 +509,7 @@ fn create_unified_analysis_with_exclusions_and_timing(
             function_pointer_used_functions,
             &debt_aggregator,
             Some(&unified.data_flow_graph),
-            risk_analyzer.as_mut(),
+            risk_analyzer.as_ref(),
             project_path,
         ) {
             unified.add_item(item);
@@ -693,7 +693,7 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-    risk_analyzer: Option<&mut risk::RiskAnalyzer>,
+    risk_analyzer: Option<&risk::RiskAnalyzer>,
     project_path: &Path,
 ) -> Option<UnifiedDebtItem> {
     // Use the unified debt item creation which already calculates the score correctly (spec 201)
