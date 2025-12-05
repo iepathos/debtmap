@@ -245,13 +245,7 @@ impl ProgressManager {
     }
 
     /// Update statistics in TUI
-    pub fn tui_update_stats(
-        &self,
-        functions: usize,
-        debt: usize,
-        coverage: f64,
-        threads: usize,
-    ) {
+    pub fn tui_update_stats(&self, functions: usize, debt: usize, coverage: f64, threads: usize) {
         if let Ok(mut guard) = self.tui_manager.lock() {
             if let Some(ref mut tui) = *guard {
                 tui.app_mut()

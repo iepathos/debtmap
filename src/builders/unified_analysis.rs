@@ -228,7 +228,10 @@ fn perform_unified_analysis_computation(
     });
 
     if let Some(manager) = crate::progress::ProgressManager::global() {
-        manager.tui_complete_stage(3, format!("{} traits resolved", trait_resolution_stats.resolved_calls));
+        manager.tui_complete_stage(
+            3,
+            format!("{} traits resolved", trait_resolution_stats.resolved_calls),
+        );
         manager.tui_set_progress(0.44); // ~4/9 stages complete
     }
 
