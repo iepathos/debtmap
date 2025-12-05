@@ -204,10 +204,15 @@ fn perform_unified_analysis_computation(
 
     crate::io::progress::AnalysisProgress::with_global(|p| {
         // Show meaningful progress: resolved/total_examined (spec 201)
-        p.update_progress(crate::io::progress::PhaseProgress::Progress {
-            current: trait_resolution_stats.resolved_calls,
-            total: trait_resolution_stats.total_calls_examined,
-        });
+        // Use indeterminate progress if there are no trait calls to examine
+        if trait_resolution_stats.total_calls_examined > 0 {
+            p.update_progress(crate::io::progress::PhaseProgress::Progress {
+                current: trait_resolution_stats.resolved_calls,
+                total: trait_resolution_stats.total_calls_examined,
+            });
+        } else {
+            p.update_progress(crate::io::progress::PhaseProgress::Indeterminate);
+        }
         p.complete_phase();
     });
 
@@ -264,13 +269,26 @@ fn perform_unified_analysis_computation(
     );
 
     // Run inter-procedural purity propagation (spec 156)
+    let purity_spinner = crate::progress::ProgressManager::global()
+        .map(|pm| pm.create_spinner("Analyzing function purity"))
+        .unwrap_or_else(indicatif::ProgressBar::hidden);
+
     let purity_propagation_start = std::time::Instant::now();
     enriched_metrics = run_purity_propagation(&enriched_metrics, &call_graph);
     let _purity_propagation_time = purity_propagation_start.elapsed();
 
+    purity_spinner.finish_and_clear();
+
     // Progress is already tracked by unified AnalysisProgress system
 
     // Create context aggregator and risk analyzer for priority scoring (spec 202)
+    let context_spinner = if enable_context {
+        crate::progress::ProgressManager::global()
+            .map(|pm| pm.create_spinner("Loading project context"))
+    } else {
+        None
+    };
+
     let risk_analyzer = if enable_context {
         let context_aggregator = build_context_aggregator(
             project_path,
@@ -295,6 +313,15 @@ fn perform_unified_analysis_computation(
         None
     };
 
+    if let Some(spinner) = context_spinner {
+        spinner.finish_and_clear();
+    }
+
+    // Show spinner for the main debt analysis computation
+    let analysis_spinner = crate::progress::ProgressManager::global()
+        .map(|pm| pm.create_spinner("Computing technical debt priorities"))
+        .unwrap_or_else(indicatif::ProgressBar::hidden);
+
     let result = create_unified_analysis_with_exclusions_and_timing(
         &enriched_metrics,
         &call_graph,
@@ -312,6 +339,8 @@ fn perform_unified_analysis_computation(
         risk_analyzer,
         project_path,
     );
+
+    analysis_spinner.finish_and_clear();
 
     Ok(result)
 }
