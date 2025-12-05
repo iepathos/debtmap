@@ -204,6 +204,7 @@ struct FunctionAnalysisContext<'a> {
     coverage_data: Option<&'a LcovData>,
     framework_exclusions: &'a HashSet<FunctionId>,
     function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
+    risk_analyzer: Option<&'a crate::risk::RiskAnalyzer>,
 }
 
 /// Optimized test detector with caching
@@ -325,6 +326,7 @@ pub struct ParallelUnifiedAnalysisBuilder {
     call_graph: Arc<CallGraph>,
     options: ParallelUnifiedAnalysisOptions,
     timings: AnalysisPhaseTimings,
+    risk_analyzer: Option<crate::risk::RiskAnalyzer>,
 }
 
 impl ParallelUnifiedAnalysisBuilder {
@@ -341,7 +343,14 @@ impl ParallelUnifiedAnalysisBuilder {
             call_graph: Arc::new(call_graph),
             options,
             timings: AnalysisPhaseTimings::default(),
+            risk_analyzer: None,
         }
+    }
+
+    /// Set the risk analyzer for contextual risk analysis
+    pub fn with_risk_analyzer(mut self, risk_analyzer: crate::risk::RiskAnalyzer) -> Self {
+        self.risk_analyzer = Some(risk_analyzer);
+        self
     }
 
     /// Set preliminary timing values (call graph, trait resolution, coverage loading)
@@ -603,6 +612,7 @@ impl ParallelUnifiedAnalysisBuilder {
             coverage_data,
             framework_exclusions,
             function_pointer_used_functions,
+            risk_analyzer: self.risk_analyzer.as_ref(),
         };
 
         // Functional pipeline for processing metrics with progress tracking
@@ -673,6 +683,8 @@ impl ParallelUnifiedAnalysisBuilder {
         context: &FunctionAnalysisContext,
     ) -> Option<UnifiedDebtItem> {
         use std::path::Path;
+        // Clone risk analyzer for thread-safe parallel execution
+        let mut risk_analyzer_clone = context.risk_analyzer.cloned();
         // Returns None for clean dispatchers (spec 201)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
@@ -682,7 +694,7 @@ impl ParallelUnifiedAnalysisBuilder {
             context.function_pointer_used_functions,
             context.debt_aggregator,
             Some(context.data_flow_graph),
-            None, // TODO spec 202: Add risk analyzer support to parallel mode
+            risk_analyzer_clone.as_mut(),
             Path::new("."), // Default project path
         )
     }

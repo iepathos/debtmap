@@ -157,6 +157,117 @@ fn format_item_body(
         has_coverage_data,
     );
 
+    // GIT HISTORY section (spec 202: show contextual risk from git history)
+    if let Some(ref contextual_risk) = item.contextual_risk {
+        // Find the git_history context provider data
+        if let Some(git_context) = contextual_risk
+            .contexts
+            .iter()
+            .find(|c| c.provider == "git_history")
+        {
+            use crate::risk::context::ContextDetails;
+            if let ContextDetails::Historical {
+                change_frequency,
+                bug_density,
+                age_days,
+                author_count,
+            } = &git_context.details
+            {
+                writeln!(
+                    output,
+                    "├─ {} {:.1} changes/month, {:.1}% bugs, {} days old, {} authors",
+                    "GIT HISTORY:".bright_blue(),
+                    change_frequency,
+                    bug_density * 100.0,
+                    age_days,
+                    author_count
+                )
+                .unwrap();
+
+                // Show risk impact comparison
+                let multiplier = contextual_risk.contextual_risk / contextual_risk.base_risk;
+                writeln!(
+                    output,
+                    "│  └─ {} base_risk={:.1} → contextual_risk={:.1} ({:.1}x multiplier)",
+                    "Risk Impact:".bright_cyan(),
+                    contextual_risk.base_risk,
+                    contextual_risk.contextual_risk,
+                    multiplier
+                )
+                .unwrap();
+            }
+        }
+
+        // CONTEXT PROVIDER CONTRIBUTIONS (verbose mode only - spec 202)
+        if verbosity >= 1 && !contextual_risk.contexts.is_empty() {
+            writeln!(
+                output,
+                "├─ {}",
+                "Context Provider Contributions:".bright_blue()
+            )
+            .unwrap();
+
+            for context in &contextual_risk.contexts {
+                use crate::risk::context::ContextDetails;
+                match &context.details {
+                    ContextDetails::Historical {
+                        change_frequency,
+                        bug_density,
+                        ..
+                    } => {
+                        let stability_desc = if *change_frequency > 5.0 {
+                            "highly unstable"
+                        } else if *change_frequency > 2.0 {
+                            "moderately unstable"
+                        } else {
+                            "stable"
+                        };
+                        let bug_desc = if *bug_density > 0.3 {
+                            "high"
+                        } else if *bug_density > 0.1 {
+                            "moderate"
+                        } else {
+                            "low"
+                        };
+                        writeln!(
+                            output,
+                            "│  └─ {}: +{:.1} impact (weight: {:.1})",
+                            context.provider.bright_cyan(),
+                            context.contribution,
+                            context.weight
+                        )
+                        .unwrap();
+                        writeln!(
+                            output,
+                            "│     - Change frequency: {:.1}/month ({})",
+                            change_frequency,
+                            stability_desc
+                        )
+                        .unwrap();
+                        writeln!(
+                            output,
+                            "│     - Bug density: {:.1}% ({})",
+                            bug_density * 100.0,
+                            bug_desc
+                        )
+                        .unwrap();
+                    }
+                    _ => {
+                        // For other context types, show basic info
+                        writeln!(
+                            output,
+                            "│  └─ {}: +{:.1} impact (weight: {:.1})",
+                            context.provider.bright_cyan(),
+                            context.contribution,
+                            context.weight
+                        )
+                        .unwrap();
+                    }
+                }
+            }
+        }
+    }
+
     // FILE CONTEXT section (spec 181: show non-production contexts in default mode)
     if verbosity == 0 {
         if let Some(ref context) = item.file_context {
