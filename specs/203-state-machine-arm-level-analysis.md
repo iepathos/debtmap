@@ -144,8 +144,8 @@ Enhance state machine pattern detection to provide **actionable, context-aware r
 
 1. **Tracking arm-level metrics** to distinguish:
    - Delegated arms (already extracted)
-   - Trivial arms (< 10 lines, simple logic)
-   - Complex inline arms (≥ 10 lines, needs extraction)
+   - Trivial arms (low complexity score, simple logic)
+   - Complex inline arms (high complexity score, needs extraction)
    - Nested match arms (not primary state transitions)
 
 2. **Generating accurate recommendations** that:

@@ -262,6 +262,40 @@ fn write_section(writer: &mut dyn Write, section: &FormattedSection) -> io::Resu
             writeln!(writer, "{} {}", "├─ DETAILS:".bright_blue(), text)?;
         }
 
+        FormattedSection::ContextualRisk {
+            base_risk,
+            contextual_risk,
+            multiplier,
+            providers,
+        } => {
+            writeln!(
+                writer,
+                "{} base: {:.1}, contextual: {:.1} ({:.2}x multiplier)",
+                "├─ CONTEXT RISK:".bright_blue(),
+                base_risk,
+                contextual_risk,
+                multiplier
+            )?;
+
+            for provider in providers {
+                if provider.impact > 0.1 {
+                    write!(
+                        writer,
+                        "   {} {} +{:.1} impact",
+                        "└─".dimmed(),
+                        provider.name.bright_cyan(),
+                        provider.impact
+                    )?;
+
+                    if let Some(ref details) = provider.details {
+                        writeln!(writer, " ({})", details.dimmed())?;
+                    } else {
+                        writeln!(writer)?;
+                    }
+                }
+            }
+        }
+
         FormattedSection::Rationale { text } => {
             writeln!(
                 writer,

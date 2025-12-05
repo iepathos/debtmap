@@ -205,6 +205,7 @@ struct FunctionAnalysisContext<'a> {
     framework_exclusions: &'a HashSet<FunctionId>,
     function_pointer_used_functions: Option<&'a HashSet<FunctionId>>,
     risk_analyzer: Option<&'a crate::risk::RiskAnalyzer>,
+    project_path: &'a Path,
 }
 
 /// Optimized test detector with caching
@@ -327,6 +328,7 @@ pub struct ParallelUnifiedAnalysisBuilder {
     options: ParallelUnifiedAnalysisOptions,
     timings: AnalysisPhaseTimings,
     risk_analyzer: Option<crate::risk::RiskAnalyzer>,
+    project_path: PathBuf,
 }
 
 impl ParallelUnifiedAnalysisBuilder {
@@ -344,12 +346,19 @@ impl ParallelUnifiedAnalysisBuilder {
             options,
             timings: AnalysisPhaseTimings::default(),
             risk_analyzer: None,
+            project_path: PathBuf::from("."),
         }
     }
 
     /// Set the risk analyzer for contextual risk analysis
     pub fn with_risk_analyzer(mut self, risk_analyzer: crate::risk::RiskAnalyzer) -> Self {
         self.risk_analyzer = Some(risk_analyzer);
+        self
+    }
+
+    /// Set the project path for contextual risk analysis
+    pub fn with_project_path(mut self, project_path: PathBuf) -> Self {
+        self.project_path = project_path;
         self
     }
 
@@ -613,6 +622,7 @@ impl ParallelUnifiedAnalysisBuilder {
             framework_exclusions,
             function_pointer_used_functions,
             risk_analyzer: self.risk_analyzer.as_ref(),
+            project_path: &self.project_path,
         };
 
         // Functional pipeline for processing metrics with progress tracking
@@ -682,7 +692,6 @@ impl ParallelUnifiedAnalysisBuilder {
         metric: &FunctionMetrics,
         context: &FunctionAnalysisContext,
     ) -> Option<UnifiedDebtItem> {
-        use std::path::Path;
         // Clone risk analyzer for thread-safe parallel execution
         let mut risk_analyzer_clone = context.risk_analyzer.cloned();
         // Returns None for clean dispatchers (spec 201)
@@ -695,7 +704,7 @@ impl ParallelUnifiedAnalysisBuilder {
             context.debt_aggregator,
             Some(context.data_flow_graph),
             risk_analyzer_clone.as_mut(),
-            Path::new("."), // Default project path
+            context.project_path,
         )
     }
 

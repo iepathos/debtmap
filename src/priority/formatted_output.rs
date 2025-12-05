@@ -103,6 +103,13 @@ pub enum FormattedSection {
     },
     /// Debt-specific information
     DebtSpecific { text: String },
+    /// Contextual risk information from context providers (spec 202)
+    ContextualRisk {
+        base_risk: f64,
+        contextual_risk: f64,
+        multiplier: f64,
+        providers: Vec<ContextProviderInfo>,
+    },
     /// Rationale for recommendation
     Rationale { text: String },
 }
@@ -119,6 +126,16 @@ pub struct CoverageTag {
 pub struct SeverityInfo {
     pub label: String,
     pub color: Color,
+}
+
+/// Context provider contribution information for display (spec 202)
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextProviderInfo {
+    pub name: String,
+    pub contribution: f64,
+    pub weight: f64,
+    pub impact: f64,
+    pub details: Option<String>,
 }
 
 impl FormattedPriorityItem {

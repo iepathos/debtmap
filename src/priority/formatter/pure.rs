@@ -181,6 +181,56 @@ pub fn format_priority_item(
         }
     }
 
+    // Contextual risk section (if available, spec 202)
+    if let Some(ref ctx_risk) = item.contextual_risk {
+        use crate::priority::formatted_output::ContextProviderInfo;
+        use crate::risk::context::ContextDetails;
+
+        let multiplier = if ctx_risk.base_risk > 0.1 {
+            ctx_risk.contextual_risk / ctx_risk.base_risk
+        } else {
+            1.0
+        };
+
+        let providers: Vec<ContextProviderInfo> = ctx_risk
+            .contexts
+            .iter()
+            .filter(|ctx| ctx.contribution > 0.05)
+            .map(|ctx| {
+                let details = match &ctx.details {
+                    ContextDetails::Historical {
+                        change_frequency,
+                        bug_density,
+                        age_days,
+                        author_count,
+                    } => Some(format!(
+                        "changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {}",
+                        change_frequency,
+                        bug_density * 100.0,
+                        age_days,
+                        author_count
+                    )),
+                    _ => None,
+                };
+
+                ContextProviderInfo {
+                    name: ctx.provider.clone(),
+                    contribution: ctx.contribution,
+                    weight: ctx.weight,
+                    impact: ctx.contribution * ctx.weight,
+                    details,
+                }
+            })
+            .collect();
+
+        sections.push(FormattedSection::ContextualRisk {
+            base_risk: ctx_risk.base_risk,
+            contextual_risk: ctx_risk.contextual_risk,
+            multiplier,
+            providers,
+        });
+    }
+
     // Dependencies section (if has dependencies)
     if context.dependency_info.has_dependencies {
         sections.push(FormattedSection::Dependencies {

@@ -580,8 +580,8 @@ fn create_unified_analysis_parallel(
     call_graph_time: std::time::Duration,
     trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
-    _risk_analyzer: Option<risk::RiskAnalyzer>,
-    _project_path: &Path,
+    risk_analyzer: Option<risk::RiskAnalyzer>,
+    project_path: &Path,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::{
         ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
@@ -594,7 +594,13 @@ fn create_unified_analysis_parallel(
         progress: std::env::var("DEBTMAP_QUIET").is_err(),
     };
 
-    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options);
+    let mut builder = ParallelUnifiedAnalysisBuilder::new(call_graph.clone(), options)
+        .with_project_path(project_path.to_path_buf());
+
+    // Add risk analyzer if provided (spec 202)
+    if let Some(analyzer) = risk_analyzer {
+        builder = builder.with_risk_analyzer(analyzer);
+    }
 
     // Set preliminary timing values from call graph building, trait resolution, and coverage loading
     builder.set_preliminary_timings(
