@@ -19,7 +19,26 @@ created: 2025-12-05
 
 ## Context
 
-Debtmap currently outputs analysis results as flat text to stdout. For large codebases with hundreds of debt items, this creates several UX problems:
+Debtmap currently outputs analysis results as **flat text to stdout**. For large codebases with hundreds of debt items, this creates several UX problems:
+
+**Current Text Output** (with `--no-tui` or in CI):
+```
+============================================
+    Debtmap v0.8.0
+============================================
+
+TOP 10 RECOMMENDATIONS
+
+#1 SCORE: 370 [CRITICAL] IMPACT: -16-31% complexity
+  └─ god_object_detector.rs · functions: 55, responsibilities: 8
+  └─ ACTION: Split by analysis phase (data → detect → score → report)
+
+#2 SCORE: 185 [HIGH] IMPACT: -12-18% complexity
+  └─ priority/formatter.rs · functions: 42, responsibilities: 6
+  └─ ACTION: Extract formatters by output type (JSON, Markdown, HTML)
+
+... (items #3-#10 continue scrolling off screen) ...
+```
 
 **Current Issues**:
 - **Information overload**: 386 recommendations dumped as scrolling text
@@ -35,6 +54,18 @@ Debtmap currently outputs analysis results as flat text to stdout. For large cod
 - "Can I jump directly to this file in my editor?"
 
 This flat output model doesn't scale with the zen minimalist philosophy of "show only what's needed."
+
+**Comparison: Text vs Interactive TUI**
+
+| Feature | Text Output (`--no-tui`) | Interactive TUI (new) |
+|---------|--------------------------|----------------------|
+| **Navigation** | Scroll terminal buffer | ↑↓ / jk keys, g/G shortcuts |
+| **Filtering** | Pipe to `grep` | Real-time `/` search + filters |
+| **Sorting** | Fixed (by score) | Sort by score, coverage, complexity |
+| **Details** | All shown or use -v flags | Press Enter to expand/collapse |
+| **Actions** | Copy path manually | `c` to clipboard, `e` to editor |
+| **Large results** | Scroll 386 items | Virtual scrolling, instant jump |
+| **Context** | Re-run with different flags | Switch views interactively |
 
 ## Objective
 
@@ -117,6 +148,45 @@ Create an interactive TUI for exploring analysis results that:
 - Fall back to text output when stdout is not a TTY
 - Support --no-tui flag to force text output
 - Maintain backward compatibility with existing scripts
+
+**Text Output Format** (when TUI is disabled):
+
+The fallback text output is a formatted, colored terminal report showing a ranked list of debt items:
+
+```
+============================================
+    Debtmap v0.8.0
+============================================
+
+TOP 10 RECOMMENDATIONS
+
+#1 SCORE: 370 [CRITICAL] IMPACT: -16-31% complexity
+  └─ god_object_detector.rs · functions: 55, responsibilities: 8
+  └─ ACTION: Split by analysis phase (data → detect → score → report)
+
+#2 SCORE: 185 [HIGH] IMPACT: -12-18% complexity
+  └─ priority/formatter.rs · functions: 42, responsibilities: 6
+  └─ ACTION: Extract formatters by output type (JSON, Markdown, HTML)
+
+...
+
+TOTAL DEBT SCORE: 1842
+DEBT DENSITY: 12.3 per 1K LOC (149,832 total LOC)
+OVERALL COVERAGE: 72.45%
+```
+
+This text format is:
+- **Scannable**: 3-4 lines per item by default
+- **Colored**: Uses terminal colors (respects NO_COLOR)
+- **Scrollable**: Users scroll terminal buffer to view all items
+- **Compact**: Summary mode for quick overview
+- **Detailed**: Verbose flags (-v, -vv) show more metrics
+
+The TUI improvement addresses pain points of this text format:
+- **No filtering/sorting** without piping to external tools
+- **No interactive exploration** of individual items
+- **Terminal buffer scrolling** required for 100+ items
+- **No drill-down** for detailed metrics without re-running
 
 ### Non-Functional Requirements
 
