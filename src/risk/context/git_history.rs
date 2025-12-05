@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod batched;
+
 /// File history information from Git
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileHistory {
@@ -50,6 +52,7 @@ impl HistoryCache {
 pub struct GitHistoryProvider {
     repo_root: PathBuf,
     cache: HistoryCache,
+    batched_history: Option<batched::BatchedGitHistory>,
 }
 
 impl GitHistoryProvider {
@@ -66,9 +69,13 @@ impl GitHistoryProvider {
             anyhow::bail!("Not a git repository: {}", repo_root.display());
         }
 
+        // Attempt to create batched history, but don't fail if it errors
+        let batched_history = batched::BatchedGitHistory::new(&repo_root).ok();
+
         Ok(Self {
             repo_root,
             cache: HistoryCache::new(),
+            batched_history,
         })
     }
 
@@ -77,6 +84,33 @@ impl GitHistoryProvider {
             return Ok(cached);
         }
 
+        // Try batched implementation first (fast path)
+        if let Some(ref batched) = self.batched_history {
+            if let Some((
+                change_frequency,
+                bug_fix_count,
+                last_modified,
+                author_count,
+                stability_score,
+                total_commits,
+                age_days,
+            )) = batched.calculate_metrics(path)
+            {
+                let history = FileHistory {
+                    change_frequency,
+                    bug_fix_count,
+                    last_modified,
+                    author_count,
+                    stability_score,
+                    total_commits,
+                    age_days,
+                };
+                self.cache.set(path.to_path_buf(), history.clone());
+                return Ok(history);
+            }
+        }
+
+        // Fallback to original implementation if batched fails
         let history = FileHistory {
             change_frequency: self.calculate_churn_rate(path)?,
             bug_fix_count: self.count_bug_fixes(path)?,
