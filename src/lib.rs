@@ -353,6 +353,7 @@ pub mod metrics;
 pub mod organization;
 pub mod output;
 pub mod patterns;
+pub mod pipeline;
 pub mod priority;
 pub mod progress;
 pub mod refactoring;
