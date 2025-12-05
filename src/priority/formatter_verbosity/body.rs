@@ -240,8 +240,7 @@ fn format_item_body(
                         writeln!(
                             output,
                             "│     - Change frequency: {:.1}/month ({})",
-                            change_frequency,
-                            stability_desc
+                            change_frequency, stability_desc
                         )
                         .unwrap();
                         writeln!(

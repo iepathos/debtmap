@@ -1,11 +1,10 @@
 /// Benchmark for contextual risk analysis performance (spec 202)
 /// Verifies that --context flag adds less than 10% overhead
-
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::CallGraph;
-use debtmap::risk::context::{AnalysisTarget, ContextAggregator};
 use debtmap::risk::context::git_history::GitHistoryProvider;
+use debtmap::risk::context::{AnalysisTarget, ContextAggregator};
 use debtmap::risk::RiskAnalyzer;
 use std::path::PathBuf;
 use std::process::Command;
@@ -107,9 +106,7 @@ fn benchmark_context_aggregator(c: &mut Criterion) {
     let mut group = c.benchmark_group("context_aggregator");
 
     // Create aggregator with git history provider
-    let provider = Box::new(
-        GitHistoryProvider::new(repo_path.to_path_buf()).unwrap()
-    );
+    let provider = Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
     let mut aggregator = ContextAggregator::new().with_provider(provider);
 
     group.bench_function("analyze_with_git_history", |b| {
@@ -162,9 +159,8 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
                 b.iter(|| {
                     // Simulate analysis with contextual risk
                     let call_graph = CallGraph::new();
-                    let provider = Box::new(
-                        GitHistoryProvider::new(repo_path.to_path_buf()).unwrap()
-                    );
+                    let provider =
+                        Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
                     let mut aggregator = ContextAggregator::new().with_provider(provider);
 
                     for metric in metrics {
@@ -193,15 +189,13 @@ fn benchmark_risk_analyzer_with_context(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("risk_analyzer_with_context");
 
-    let provider = Box::new(
-        GitHistoryProvider::new(repo_path.to_path_buf()).unwrap()
-    );
+    let provider = Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
     let aggregator = ContextAggregator::new().with_provider(provider);
 
     group.bench_function("risk_analyzer_initialization", |b| {
         b.iter(|| {
-            let analyzer = RiskAnalyzer::default()
-                .with_context_aggregator(black_box(aggregator.clone()));
+            let analyzer =
+                RiskAnalyzer::default().with_context_aggregator(black_box(aggregator.clone()));
             black_box(analyzer);
         })
     });

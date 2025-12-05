@@ -195,8 +195,8 @@ pub fn create_unified_debt_item_with_aggregator(
         framework_exclusions,
         function_pointer_used_functions,
         debt_aggregator,
-        None, // DataFlowGraph will be provided by the new function
-        None, // No risk analyzer in wrapper function
+        None,           // DataFlowGraph will be provided by the new function
+        None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
     )
 }

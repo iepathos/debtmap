@@ -412,7 +412,7 @@ pub fn create_unified_analysis_with_exclusions(
         Duration::from_secs(0),
         Duration::from_secs(0),
         Duration::from_secs(0),
-        None, // No risk analyzer in wrapper function
+        None,           // No risk analyzer in wrapper function
         Path::new("."), // Default project path
     )
 }

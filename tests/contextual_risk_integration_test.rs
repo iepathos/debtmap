@@ -1,6 +1,5 @@
 /// Integration test for contextual risk analysis (spec 202)
 /// Verifies that --context flag populates contextual_risk field with git history data
-
 use anyhow::Result;
 use std::fs;
 use std::process::Command;
@@ -125,10 +124,19 @@ fn test_context_flag_populates_contextual_risk() -> Result<()> {
 
     // Verify command succeeded
     if !output.status.success() {
-        eprintln!("Command failed with stderr: {}", String::from_utf8_lossy(&output.stderr));
-        eprintln!("Command stdout: {}", String::from_utf8_lossy(&output.stdout));
+        eprintln!(
+            "Command failed with stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        eprintln!(
+            "Command stdout: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
     }
-    assert!(output.status.success(), "debtmap analyze with --context should succeed");
+    assert!(
+        output.status.success(),
+        "debtmap analyze with --context should succeed"
+    );
 
     // Parse JSON output
     let stdout = String::from_utf8(output.stdout)?;
@@ -157,16 +165,14 @@ fn test_without_context_flag_no_contextual_risk() -> Result<()> {
 
     // Run debtmap analyze WITHOUT --context flag
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
-        .args(&[
-            "analyze",
-            repo_path.to_str().unwrap(),
-            "--format",
-            "json",
-        ])
+        .args(&["analyze", repo_path.to_str().unwrap(), "--format", "json"])
         .current_dir(repo_path)
         .output()?;
 
-    assert!(output.status.success(), "debtmap analyze without --context should succeed");
+    assert!(
+        output.status.success(),
+        "debtmap analyze without --context should succeed"
+    );
 
     // Parse JSON output - just verify it runs successfully
     let stdout = String::from_utf8(output.stdout)?;
@@ -185,15 +191,14 @@ fn test_context_flag_terminal_output() -> Result<()> {
 
     // Run debtmap analyze with --context flag (default terminal output)
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
-        .args(&[
-            "analyze",
-            repo_path.to_str().unwrap(),
-            "--context",
-        ])
+        .args(&["analyze", repo_path.to_str().unwrap(), "--context"])
         .current_dir(repo_path)
         .output()?;
 
-    assert!(output.status.success(), "debtmap analyze with --context should succeed");
+    assert!(
+        output.status.success(),
+        "debtmap analyze with --context should succeed"
+    );
 
     let stdout = String::from_utf8(output.stdout)?;
 
