@@ -9,24 +9,57 @@
 [![License](https://img.shields.io/badge/license-MIT)](LICENSE)
 [![Downloads](https://img.shields.io/crates/d/debtmap)](https://crates.io/crates/debtmap)
 
-Debtmap is a Rust code analyzer that combines coverage-risk correlation with multi-factor analysis (complexity, dependencies, call graphs) and entropy-adjusted scoring to reduce false positives and prioritize testing efforts effectively.
+**Stop wasting time on meaningless complexity metrics.** Debtmap identifies actual bug hotspots using multi-signal risk analysis: cognitive complexity with pattern recognition, test coverage gaps, git change frequency, bug frequency in related git commits, and entropy-based false positive reduction. Answers "what should I refactor first?" with data-driven prioritization. Fewer false positives than traditional static analysis tools with actionable recommendations to fix the issues.
 
 📚 **[Read the full documentation](https://iepathos.github.io/debtmap/)** for detailed guides, examples, and API reference.
 
 ## Why Debtmap?
 
-Debtmap answers two critical questions:
+Traditional code quality tools only measure static complexity—flagging everything with high cyclomatic complexity as "technical debt," including simple repetitive patterns that are easy to maintain. This creates overwhelming noise that obscures genuine problems.
 
-1. **"What should I refactor to reduce cognitive burden?"** - Identifies overly complex code that slows down development
-2. **"What should I test first to reduce the most risk?"** - Pinpoints untested complex code that threatens stability
+**Debtmap uses multi-signal analysis to identify *actual* risk:**
+
+### 1. Bug Hotspot Detection 🎯
+- **Combines multiple risk signals**: Git history (change frequency, bug fixes) + complexity + test coverage gaps
+- **Predicts where bugs will occur**: Frequently changed + complex + untested = highest priority
+- **Historical context**: Code that breaks repeatedly gets elevated priority, not just "complicated" code
+
+### 2. Pattern Recognition for 70% Fewer False Positives ✨
+
+**Five intelligent pattern systems eliminate noise:**
+
+- **Pure Mapping Detection** - 100-line enum→string match statement? Not flagged (40% complexity reduction applied)
+- **Entropy Analysis** - Repetitive validation chains with similar structure recognized as maintainable
+- **Complexity Pattern Classification** - State machines, coordinators, and dispatchers get context-aware scoring and tailored advice
+- **Framework Pattern Recognition** - Axum/Actix handlers, Tokio async patterns, Clap CLI code correctly identified
+- **Recursive Match Detection** - Deep AST analysis of nested patterns with context awareness (closures, async, nesting depth)
+
+**Result**: Deeply nested conditionals with side effects → flagged as critical. Simple exhaustive match with 50 arms → correctly ignored.
+
+### 3. Cognitive Complexity Focus 🧠
+- **Measures understanding difficulty**, not just control flow branches
+- **Research-backed**: Cognitive complexity correlates with bug density and maintenance time better than cyclomatic
+- **Weighted scoring**: 70% cognitive + 30% cyclomatic for accurate human-centric prioritization
+- **Pattern-adjusted**: Repetitive structures don't artificially inflate cognitive load
+
+### 4. Coverage-Risk Correlation 📊
+- **Risk-based prioritization**: Complex untested code > tested complex code > simple untested code
+- **Role-based expectations**: Pure functions need 90% coverage, debug code only 30%
+- **Quantified impact**: "Add 6 tests → -3.7 risk reduction" shows exactly what to do
+- **Focused testing**: Directs effort where it has maximum risk reduction
+
+### 5. Rust-Native Performance ⚡
+- **10-100x faster** than Java/Python-based tools
+- **Full AST understanding**: Macro expansion, trait resolution, lifetime analysis
+- **Parallel processing**: Multi-core analysis with lock-free caching
+- **Deep integration**: Rust-specific patterns (ownership, async, error handling)
 
 **Unique Capabilities:**
-- **Rust-First Design** - Deep Rust analysis with macro expansion, trait resolution, and lifetime awareness
-- **Coverage-Risk Correlation** - Combines complexity metrics with test coverage to identify genuinely risky code (high complexity + low coverage = critical risk)
-- **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuinely complex code from repetitive patterns, reducing false positives by up to 70%
-- **Actionable Recommendations** - Provides specific guidance with quantified impact metrics instead of generic warnings
-- **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive prioritization
-- **Fast & Open Source** - Written in Rust for 10-100x faster analysis, MIT licensed with no enterprise pricing
+- **Multi-signal risk scoring** - The only tool combining git history + complexity + coverage + entropy + patterns
+- **Context-aware analysis** - Framework patterns, test code, and repetitive structures handled intelligently
+- **Actionable recommendations** - Specific steps with quantified impact and effort estimates (not generic "fix this")
+- **Pattern-specific guidance** - State machines get different refactoring advice than coordinators or dispatchers
+- **Explainable decisions** - See exactly which signals triggered each classification and score
 
 📖 **Read more:** [Why Debtmap?](https://iepathos.github.io/debtmap/why-debtmap.html)
 
