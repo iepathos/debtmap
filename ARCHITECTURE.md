@@ -344,6 +344,172 @@ The effect system allows gradual migration:
 
 Existing code continues to work unchanged during migration via compatibility helpers like `run_effect`.
 
+## Composable Pipeline Architecture (Spec 209)
+
+### Overview
+
+The pipeline architecture provides a type-safe, composable framework for building analysis workflows. It enables flexible composition of analysis stages while maintaining compile-time type safety and runtime performance.
+
+**Location**: `src/pipeline/`
+
+### Core Concepts
+
+#### Pipeline Stages
+
+Stages are the building blocks of analysis pipelines. Each stage has:
+- An **input type**: What data it expects
+- An **output type**: What data it produces
+- An **error type**: How it can fail
+- A **name**: For progress reporting
+
+Two stage types are provided:
+
+**PureStage**: For transformations without side effects
+```rust
+let stage = PureStage::new("Calculate Metrics", |ast| {
+    calculate_complexity(&ast)
+});
+```
+
+**FallibleStage**: For operations that can fail
+```rust
+let stage = FallibleStage::new("Parse Source", |source| {
+    parse_source(&source)  // Returns Result<AST, ParseError>
+});
+```
+
+#### Pipeline Builder
+
+The builder provides a fluent API for composing stages:
+
+```rust
+use debtmap::pipeline::{PipelineBuilder, stage::PureStage};
+
+let pipeline = PipelineBuilder::new()
+    .stage(file_discovery)     // Output: Vec<PathBuf>
+    .stage(parsing)            // Input: Vec<PathBuf>, Output: Vec<FunctionMetrics>
+    .stage(call_graph)         // Input: Vec<FunctionMetrics>, Output: CallGraph
+    .when(config.coverage, |p| {
+        p.stage(coverage)      // Conditional stage
+    })
+    .with_progress()           // Enable progress reporting
+    .build();
+
+let result = pipeline.execute()?;
+```
+
+#### Type Safety
+
+The type system ensures stages can only be composed when their types align:
+
+```rust
+// This compiles - types match
+PipelineBuilder::new()
+    .stage(stage_a)  // Output: Vec<String>
+    .stage(stage_b)  // Input: Vec<String>, Output: i32
+    .build();
+
+// This won't compile - type mismatch
+PipelineBuilder::new()
+    .stage(stage_a)  // Output: Vec<String>
+    .stage(stage_c)  // Input: HashMap<String, i32> - ERROR!
+    .build();
+```
+
+### Pipeline Stages
+
+The `src/pipeline/stages/` module provides reusable analysis stages:
+
+#### Filtering Stages
+- `filter_by_complexity(threshold)`: Keep functions above complexity threshold
+- `filter_by_length(max_lines)`: Keep functions within length limit
+- `filter_test_functions()`: Remove test functions from analysis
+
+#### Aggregation Stages
+- `average_complexity()`: Calculate mean complexity across functions
+- `count_high_complexity(threshold)`: Count functions exceeding threshold
+- `group_by_file()`: Group function metrics by file
+
+#### Analysis Stages
+- `build_call_graph()`: Construct function call relationships
+- `propagate_purity()`: Determine pure vs impure functions
+- `detect_complexity_debt()`: Identify high-complexity debt items
+- `prioritize_debt()`: Score and rank debt items
+
+### Usage Examples
+
+#### Simple Pipeline
+
+```rust
+use debtmap::pipeline::{PipelineBuilder, stage::PureStage};
+
+let pipeline = PipelineBuilder::new()
+    .stage(PureStage::new("Generate", |()| vec![1, 2, 3]))
+    .stage(PureStage::new("Double", |nums: Vec<i32>| {
+        nums.into_iter().map(|n| n * 2).collect::<Vec<_>>()
+    }))
+    .stage(PureStage::new("Sum", |nums: Vec<i32>| {
+        nums.into_iter().sum::<i32>()
+    }))
+    .build();
+
+let result = pipeline.execute()?;  // Returns: 12
+```
+
+#### Conditional Stages
+
+```rust
+let pipeline = PipelineBuilder::new()
+    .stage(discover_files)
+    .stage(parse_metrics)
+    .when(config.enable_coverage, |p| {
+        p.stage(load_coverage)
+    })
+    .when(config.enable_context, |p| {
+        p.stage(load_project_context)
+    })
+    .stage(detect_debt)
+    .build();
+```
+
+#### Timing and Progress
+
+```rust
+let pipeline = PipelineBuilder::new()
+    .stage(stage1)
+    .stage(stage2)
+    .stage(stage3)
+    .with_progress()
+    .build();
+
+let (result, timings) = pipeline.execute_with_timing()?;
+
+// Print performance breakdown
+for timing in timings {
+    println!("{}", timing.format());  // "Stage Name: 0.42s"
+}
+```
+
+### Design Principles
+
+1. **Pure Functions First**: Stages should be pure transformations when possible
+2. **Type-Driven Composition**: Let the compiler guide correct stage ordering
+3. **Single Responsibility**: Each stage does one thing well
+4. **Immutable Data Flow**: Stages transform data without mutation
+5. **Reusable Components**: Build libraries of composable stages
+
+### Future Work
+
+The pipeline architecture is **foundational**. Future work will:
+
+1. **Migrate Existing Analysis**: Replace `perform_unified_analysis_computation` with pipeline
+2. **Add Effect Stages**: Integrate with Stillwater effects for I/O operations
+3. **Standard Configurations**: Provide `standard_pipeline()`, `fast_pipeline()`, etc.
+4. **Parallel Execution**: Support parallel stage execution where safe
+5. **Pipeline Visualization**: Show pipeline structure and data flow
+
+See `examples/pipeline_demo.rs` for comprehensive examples.
+
 ## Parallel Processing Architecture
 
 ### Overview
