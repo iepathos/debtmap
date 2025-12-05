@@ -301,6 +301,14 @@ pub enum Commands {
         /// smaller, focused modules. Hidden by default.
         #[arg(long = "show-splits")]
         show_splits: bool,
+
+        /// Disable TUI progress visualization (use simple progress bars)
+        #[arg(long = "no-tui")]
+        no_tui: bool,
+
+        /// Suppress progress output (quiet mode)
+        #[arg(long = "quiet", short = 'q')]
+        quiet: bool,
     },
 
     /// Initialize configuration file

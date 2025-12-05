@@ -618,6 +618,8 @@ fn handle_analyze_command(command: Commands) -> Result<Result<()>> {
         min_split_methods,
         min_split_lines,
         show_splits,
+        no_tui: _,
+        quiet: _,
     } = command
     {
         // Apply side effects first

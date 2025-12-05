@@ -363,6 +363,7 @@ pub mod risk;
 pub mod testing;
 pub mod testkit;
 pub mod transformers;
+pub mod tui;
 pub mod utils;
 
 // Re-export commonly used types

@@ -170,6 +170,9 @@ fn perform_unified_analysis_computation(
 
     // Phase 3: Building call graph (spec 195)
     crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(2));
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(2); // call graph stage
+    }
 
     // Time call graph building
     let call_graph_start = std::time::Instant::now();
@@ -193,8 +196,16 @@ fn perform_unified_analysis_computation(
         p.complete_phase();
     });
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(2, format!("{} functions", call_graph.node_count()));
+        manager.tui_set_progress(0.33); // ~3/9 stages complete
+    }
+
     // Phase 4: Refining analysis (trait resolution) (spec 195, spec 201)
     crate::io::progress::AnalysisProgress::with_global(|p| p.start_phase(3));
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(3); // trait resolution stage
+    }
 
     // Integrate trait resolution to reduce false positives
     let trait_resolution_start = std::time::Instant::now();
@@ -216,6 +227,14 @@ fn perform_unified_analysis_computation(
         p.complete_phase();
     });
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(
+            3,
+            format!("{} traits resolved", trait_resolution_stats.resolved_calls),
+        );
+        manager.tui_set_progress(0.44); // ~4/9 stages complete
+    }
+
     // Display trait resolution statistics in verbose mode
     if !quiet_mode && verbose_macro_warnings {
         log::debug!(
@@ -229,6 +248,11 @@ fn perform_unified_analysis_computation(
     }
 
     let coverage_loading_start = std::time::Instant::now();
+
+    // Stage 5: Coverage loading
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(4); // coverage stage
+    }
 
     // Show spinner for coverage loading if coverage file provided (spec 201)
     let spinner = if coverage_file.is_some() {
@@ -245,6 +269,16 @@ fn perform_unified_analysis_computation(
     }
 
     let coverage_loading_time = coverage_loading_start.elapsed();
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let metric = if coverage_data.is_some() {
+            "loaded".to_string()
+        } else {
+            "skipped".to_string()
+        };
+        manager.tui_complete_stage(4, metric);
+        manager.tui_set_progress(0.55); // ~5/9 stages complete
+    }
 
     // Emit warning if no coverage data provided (spec 108)
     // Suppress for validate command (spec 131)
@@ -269,6 +303,11 @@ fn perform_unified_analysis_computation(
     );
 
     // Run inter-procedural purity propagation (spec 156)
+    // Stage 6: Purity analysis
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(5); // purity analysis stage
+    }
+
     let purity_spinner = crate::progress::ProgressManager::global()
         .map(|pm| pm.create_spinner("Analyzing function purity"))
         .unwrap_or_else(indicatif::ProgressBar::hidden);
@@ -279,9 +318,19 @@ fn perform_unified_analysis_computation(
 
     purity_spinner.finish_and_clear();
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(5, format!("{} functions analyzed", enriched_metrics.len()));
+        manager.tui_set_progress(0.66); // ~6/9 stages complete
+    }
+
     // Progress is already tracked by unified AnalysisProgress system
 
     // Create context aggregator and risk analyzer for priority scoring (spec 202)
+    // Stage 7: Context loading
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(6); // context stage
+    }
+
     let context_spinner = if enable_context {
         crate::progress::ProgressManager::global()
             .map(|pm| pm.create_spinner("Loading project context"))
@@ -317,6 +366,17 @@ fn perform_unified_analysis_computation(
         spinner.finish_and_clear();
     }
 
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        let metric = if enable_context { "loaded" } else { "skipped" };
+        manager.tui_complete_stage(6, metric);
+        manager.tui_set_progress(0.77); // ~7/9 stages complete
+    }
+
+    // Stage 8: Debt scoring
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(7); // debt scoring stage
+    }
+
     // Show spinner for the main debt analysis computation
     let analysis_spinner = crate::progress::ProgressManager::global()
         .map(|pm| pm.create_spinner("Computing technical debt priorities"))
@@ -343,6 +403,18 @@ fn perform_unified_analysis_computation(
     );
 
     analysis_spinner.finish_and_clear();
+
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_complete_stage(7, format!("{} items scored", result.items.len()));
+        manager.tui_set_progress(0.88); // ~8/9 stages complete
+    }
+
+    // Stage 9: Prioritization (final stage)
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_start_stage(8); // prioritization stage
+        manager.tui_complete_stage(8, "complete");
+        manager.tui_set_progress(1.0); // 100% complete
+    }
 
     Ok(result)
 }
