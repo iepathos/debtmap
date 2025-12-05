@@ -102,6 +102,8 @@ ratatui = "0.26"
 crossterm = "0.27"
 unicode-width = "0.1"
 num_cpus = "1.16"
+arboard = "3.3"  # Clipboard access (cross-platform)
+fuzzy-matcher = "0.3"  # Fuzzy search for results explorer
 
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
