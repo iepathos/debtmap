@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.0] - 2025-12-04
+## [0.8.0] - 2025-12-05
 
 ### Breaking Changes
 
@@ -44,6 +44,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved code organization and testability of formatting layer
 
 ### Added
+
+- **Interactive TUI Results Explorer** (Spec 211)
+  - Specification added for keyboard-driven results exploration interface
+  - Progressive disclosure design to handle large result sets (386+ items)
+  - Planned features: search, filtering, sorting, and editor integration
+  - Addresses scalability issues with flat text output for large codebases
+
+- **Zen Minimalist TUI Progress Visualization** (Spec 210)
+  - Beautiful ratatui-based TUI for real-time analysis progress
+  - 9-stage pipeline visualization with smooth 60 FPS animations
+  - Responsive layout adapting to terminal size (minimal/compact/standard/full)
+  - Hierarchical progress with active stage expansion and rich statistics
+  - Pure functional rendering logic separated from state management
+  - Added `--no-tui` and `--quiet` flags for flexibility
+
+- **Composable Pipeline Architecture** (Spec 209)
+  - Type-safe composable pipeline system for analysis stages
+  - Stage trait with PureStage and FallibleStage implementations
+  - PipelineBuilder with fluent API for pipeline construction
+  - Conditional stage support via `.when()` method
+  - Automatic progress reporting and per-stage timing
+  - Foundation for replacing monolithic unified_analysis_computation
+
+- **Pure Function Extraction** (Spec 208)
+  - Extracted pure business logic into focused pipeline stage modules
+  - Created modules: call_graph, purity, debt, scoring, filtering, aggregation
+  - All functions pure, small (<20 lines), and well-documented
+  - Improved testability and composability of analysis logic
+
+- **Stillwater Effects Integration** (Spec 207)
+  - Comprehensive documentation for Stillwater effects system
+  - Effect system architecture added to ARCHITECTURE.md
+  - Examples demonstrating effect composition patterns
+  - Reader, Retry, and Validation pattern documentation
+  - Migration strategy for imperative to effect-based code
+
+- **Batched Git History Optimization** (Spec 206)
+  - Single comprehensive git log query replaces multiple per-file queries
+  - Pure parsing functions for git log output transformation
+  - HashMap-based lookups for O(1) access to git history
+  - 25x+ performance improvement: 260s → <10s for --context analysis
+  - Integrated with GitHistoryProvider as optimized fast path
+
+- **Behavioral Decomposition Refactoring**
+  - Extracted types module for core data structures
+  - Extracted behavioral categorization into separate module
+  - Extracted clustering algorithms module
+  - Extracted field analysis and recommendations module
+  - Improved code organization and maintainability
 
 - **Lock-Free Context Sharing for Parallel Risk Analysis** (Spec 204)
   - Implemented lock-free context sharing using Arc-wrapped immutable structures
@@ -95,6 +144,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed TUI display corruption and output loss issues
+- Fixed duplicate progress output in TUI statistics
+- Fixed clustering integration tests after behavioral_decomposition refactor
+- Fixed spec 210 implementation gaps for TUI system
+- Fixed spec 209 implementation gaps for pipeline architecture
+- Fixed spec 206 batched git history implementation
 - Fixed parameters with leading underscore to follow Rust conventions
 - Resolved state machine pattern detector test failures
 - Fixed CI pipeline issues in contextual risk tests
@@ -108,9 +163,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal
 
+- Added spec 211 for Interactive TUI Results Explorer
+- Added specs 207-209 for Stillwater pipeline refactoring
+- Added comprehensive module documentation for behavioral_decomposition
+- Added composable pipeline architecture documentation to ARCHITECTURE.md
+- Created example demonstrating effect composition patterns
 - Applied automated code formatting across the codebase
 - Applied clippy fixes for better code quality
-- Removed completed spec files (181b, 181e, 181h, 206)
+- Removed completed spec files (181b, 181e, 181h, 206, 210)
 - Removed misplaced example files from src/
 - Updated comprehensive book documentation to fix drift across all chapters
 - Restructured analysis guide into multi-subsection format for better organization
