@@ -123,15 +123,32 @@ impl GitHistoryProvider {
         }
     }
 
+    /// Counts bug fix commits for a file using word boundary matching
+    /// to reduce false positives from substring matches like "prefix" or "debug".
+    ///
+    /// Matches patterns:
+    /// - `\bfix\b`, `\bfixes\b`, `\bfixed\b`, `\bfixing\b` (matches "fix" but not "prefix")
+    /// - `\bbug\b` (matches "bug" but not "debug")
+    /// - `\bhotfix\b` (emergency fixes)
+    ///
+    /// Excludes non-bug commits via `is_excluded_commit` filter:
+    /// - Styling commits (style:, formatting, linting)
+    /// - Maintenance (chore:, whitespace, typo)
+    /// - Documentation (docs:)
+    /// - Tests (test:)
+    /// - Refactoring without bug mentions
     fn count_bug_fixes(&self, path: &Path) -> Result<usize> {
         let output = Command::new("git")
             .args([
                 "log",
                 "--oneline",
-                "--grep=fix",
-                "--grep=bug",
-                "--grep=Fix",
-                "--grep=Bug",
+                "--grep=\\bfix\\b",
+                "--grep=\\bfixes\\b",
+                "--grep=\\bfixed\\b",
+                "--grep=\\bfixing\\b",
+                "--grep=\\bbug\\b",
+                "--grep=\\bhotfix\\b",
+                "-i", // Case-insensitive matching
                 "--",
                 path.to_str().unwrap_or(""),
             ])
@@ -141,10 +158,72 @@ impl GitHistoryProvider {
 
         if output.status.success() {
             let lines = String::from_utf8_lossy(&output.stdout);
-            Ok(lines.lines().count())
+            let count = lines
+                .lines()
+                .filter(|line| !Self::is_excluded_commit(line))
+                .count();
+            Ok(count)
         } else {
             Ok(0)
         }
+    }
+
+    /// Determines if a commit message indicates a non-bug change that should
+    /// be excluded from bug fix counting.
+    ///
+    /// Excludes:
+    /// - Conventional commit types: style, chore, docs, test
+    /// - Maintenance keywords: formatting, linting, whitespace, typo
+    /// - Refactoring without bug mentions
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// assert!(is_excluded_commit("style: apply formatting fixes"));  // Excluded
+    /// assert!(is_excluded_commit("chore: update dependencies"));     // Excluded
+    /// assert!(!is_excluded_commit("fix: resolve login bug"));        // Not excluded
+    /// assert!(!is_excluded_commit("refactor: fix memory leak"));     // Not excluded (mentions fix)
+    /// ```
+    fn is_excluded_commit(commit_line: &str) -> bool {
+        let lowercase = commit_line.to_lowercase();
+
+        // Conventional commit type exclusions
+        if lowercase.contains("style:")
+            || lowercase.contains("chore:")
+            || lowercase.contains("docs:")
+            || lowercase.contains("test:")
+        {
+            return true;
+        }
+
+        // Maintenance keyword exclusions
+        let exclusion_keywords = ["formatting", "linting", "whitespace", "typo"];
+
+        for keyword in &exclusion_keywords {
+            if lowercase.contains(keyword) {
+                return true;
+            }
+        }
+
+        // Refactoring exclusion (unless it mentions bug-related keywords)
+        // Check for standalone words that indicate actual bug fixes
+        if lowercase.contains("refactor:") {
+            let words: Vec<&str> = lowercase.split(|c: char| !c.is_alphanumeric()).collect();
+
+            let has_bug_keyword = words.iter().any(|&word| {
+                matches!(
+                    word,
+                    "bug" | "fix" | "fixes" | "fixed" | "fixing" | "issue" | "hotfix"
+                )
+            });
+
+            // Exclude refactor commits that don't mention bug-related keywords
+            if !has_bug_keyword {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn get_last_modified(&self, path: &Path) -> Result<Option<DateTime<Utc>>> {
@@ -439,6 +518,83 @@ mod tests {
             .output()?;
 
         Ok(())
+    }
+
+    fn modify_and_commit(
+        repo_path: &Path,
+        file_name: &str,
+        content: &str,
+        message: &str,
+    ) -> Result<()> {
+        let file_path = repo_path.join(file_name);
+        std::fs::write(&file_path, content)?;
+
+        Command::new("git")
+            .args(["add", file_name])
+            .current_dir(repo_path)
+            .output()?;
+
+        commit_with_message(repo_path, message)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_excluded_commit() {
+        // Should exclude: conventional commit types
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "style: apply formatting fixes"
+        ));
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "chore: update dependencies"
+        ));
+        assert!(GitHistoryProvider::is_excluded_commit("docs: fix typo"));
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "test: add unit tests"
+        ));
+
+        // Should exclude: maintenance keywords
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "refactor: improve prefix handling"
+        ));
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "8c45a3c5 style: apply automated formatting"
+        ));
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "apply linting rules"
+        ));
+        assert!(GitHistoryProvider::is_excluded_commit("remove whitespace"));
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "fix: correct typo in documentation"
+        ));
+
+        // Should NOT exclude: genuine bug fixes
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "fix: resolve login bug"
+        ));
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "Fixed the payment issue"
+        ));
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "Bug fix for issue #123"
+        ));
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "hotfix: urgent fix"
+        ));
+
+        // Should NOT exclude: refactor that mentions bug/issue
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "refactor: fix memory leak"
+        ));
+        assert!(!GitHistoryProvider::is_excluded_commit(
+            "refactor: resolve issue #456"
+        ));
+
+        // Edge cases: case insensitivity
+        assert!(GitHistoryProvider::is_excluded_commit(
+            "STYLE: Apply Formatting"
+        ));
+        assert!(!GitHistoryProvider::is_excluded_commit("FIX: Resolve Bug"));
     }
 
     #[test]
@@ -920,6 +1076,100 @@ mod tests {
             .current_dir(&repo_path)
             .output()?;
         assert!(output.status.success());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bug_fix_detection_precision() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create initial test file and commit
+        create_test_file(&repo_path, "test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // True positives - these SHOULD be counted as bug fixes
+        modify_and_commit(&repo_path, "test.rs", "v2", "fix: resolve login bug")?;
+        modify_and_commit(&repo_path, "test.rs", "v3", "Fixed the payment issue")?;
+        modify_and_commit(&repo_path, "test.rs", "v4", "Bug fix for issue #123")?;
+
+        // False positives - these should NOT be counted (should be filtered out)
+        modify_and_commit(&repo_path, "test.rs", "v5", "style: apply formatting fixes")?;
+        modify_and_commit(
+            &repo_path,
+            "test.rs",
+            "v6",
+            "refactor: improve prefix handling",
+        )?;
+        modify_and_commit(&repo_path, "test.rs", "v7", "Add debugging tools")?;
+        modify_and_commit(&repo_path, "test.rs", "v8", "chore: fix linting issues")?;
+
+        let mut provider = GitHistoryProvider::new(repo_path)?;
+        let history = provider.analyze_file(Path::new("test.rs"))?;
+
+        // Should detect 3 bug fixes (true positives), not 7
+        assert_eq!(
+            history.bug_fix_count, 3,
+            "Expected 3 bug fixes, got {}",
+            history.bug_fix_count
+        );
+
+        // Total commits includes initial commit + 7 changes = 8
+        assert_eq!(
+            history.total_commits, 8,
+            "Expected 8 total commits, got {}",
+            history.total_commits
+        );
+
+        // Bug density should be 3/8 = 0.375, not 7/8 = 0.875
+        let bug_density =
+            GitHistoryProvider::calculate_bug_density(history.bug_fix_count, history.total_commits);
+        assert!(
+            bug_density > 0.35 && bug_density < 0.40,
+            "Expected bug density ~0.375, got {}",
+            bug_density
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_word_boundary_matching_precision() -> Result<()> {
+        let (_temp, repo_path) = setup_test_repo()?;
+
+        // Create initial test file and commit
+        create_test_file(&repo_path, "test.rs", "fn main() {}")?;
+        commit_with_message(&repo_path, "Initial commit")?;
+
+        // Commits with word boundary false positives (should NOT match with word boundaries)
+        modify_and_commit(
+            &repo_path,
+            "test.rs",
+            "v2",
+            "refactor: improve prefix handling logic",
+        )?;
+        modify_and_commit(
+            &repo_path,
+            "test.rs",
+            "v3",
+            "update: add fixture for testing",
+        )?;
+        modify_and_commit(&repo_path, "test.rs", "v4", "Add debugging utilities")?;
+
+        // Commits that should match (actual bug fixes)
+        modify_and_commit(&repo_path, "test.rs", "v5", "fix the authentication bug")?;
+        modify_and_commit(&repo_path, "test.rs", "v6", "fixes issue with validation")?;
+
+        let mut provider = GitHistoryProvider::new(repo_path)?;
+        let history = provider.analyze_file(Path::new("test.rs"))?;
+
+        // Should only detect 2 bug fixes (the ones with actual "fix"/"fixes" words)
+        // NOT the ones with "prefix", "fixture", or "debugging"
+        assert_eq!(
+            history.bug_fix_count, 2,
+            "Word boundary matching should find 2 bug fixes, got {}",
+            history.bug_fix_count
+        );
 
         Ok(())
     }
