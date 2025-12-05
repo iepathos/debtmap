@@ -1,10 +1,11 @@
 use super::{AnalysisTarget, Context, ContextDetails, ContextProvider};
 use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
-use im::HashMap;
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
 mod batched;
 
@@ -20,38 +21,10 @@ pub struct FileHistory {
     pub age_days: u32,
 }
 
-/// Cache for file history to avoid repeated Git calls
-#[derive(Debug, Clone)]
-pub struct HistoryCache {
-    entries: HashMap<PathBuf, FileHistory>,
-}
-
-impl Default for HistoryCache {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl HistoryCache {
-    pub fn new() -> Self {
-        Self {
-            entries: HashMap::new(),
-        }
-    }
-
-    pub fn get(&self, path: &Path) -> Option<FileHistory> {
-        self.entries.get(path).cloned()
-    }
-
-    pub fn set(&mut self, path: PathBuf, history: FileHistory) {
-        self.entries.insert(path, history);
-    }
-}
-
-/// Provider for Git history context
+/// Provider for Git history context with lock-free caching
 pub struct GitHistoryProvider {
     repo_root: PathBuf,
-    cache: HistoryCache,
+    cache: Arc<DashMap<PathBuf, FileHistory>>,
     batched_history: Option<batched::BatchedGitHistory>,
 }
 
@@ -69,22 +42,36 @@ impl GitHistoryProvider {
             anyhow::bail!("Not a git repository: {}", repo_root.display());
         }
 
-        // Attempt to create batched history, but don't fail if it errors
-        let batched_history = batched::BatchedGitHistory::new(&repo_root).ok();
+        // Create batched history (fetch all git data upfront)
+        let batched_history = match batched::BatchedGitHistory::new(&repo_root) {
+            Ok(history) => {
+                log::debug!("Batched git history loaded successfully");
+                Some(history)
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to load batched git history, will fall back to direct queries: {}",
+                    e
+                );
+                None
+            }
+        };
 
         Ok(Self {
             repo_root,
-            cache: HistoryCache::new(),
+            cache: Arc::new(DashMap::new()),
             batched_history,
         })
     }
 
-    pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
+    /// Get file history from cache or fetch it (immutable, thread-safe)
+    fn get_or_fetch_history(&self, path: &Path) -> Result<FileHistory> {
+        // Try cache first (lock-free read)
         if let Some(cached) = self.cache.get(path) {
-            return Ok(cached);
+            return Ok(cached.clone());
         }
 
-        // Try batched implementation first (fast path)
+        // Try batched history (fast O(1) HashMap lookup)
         if let Some(ref batched) = self.batched_history {
             if let Some((
                 change_frequency,
@@ -105,13 +92,21 @@ impl GitHistoryProvider {
                     total_commits,
                     age_days,
                 };
-                self.cache.set(path.to_path_buf(), history.clone());
+                // Cache for future lookups (lock-free write)
+                self.cache.insert(path.to_path_buf(), history.clone());
                 return Ok(history);
             }
         }
 
-        // Fallback to original implementation if batched fails
-        let history = FileHistory {
+        // Fallback to direct git queries (slow path)
+        let history = self.fetch_history_direct(path)?;
+        self.cache.insert(path.to_path_buf(), history.clone());
+        Ok(history)
+    }
+
+    /// Fetch file history directly via git commands (fallback when batched fails)
+    fn fetch_history_direct(&self, path: &Path) -> Result<FileHistory> {
+        Ok(FileHistory {
             change_frequency: self.calculate_churn_rate(path)?,
             bug_fix_count: self.count_bug_fixes(path)?,
             last_modified: self.get_last_modified(path)?,
@@ -119,10 +114,12 @@ impl GitHistoryProvider {
             stability_score: self.calculate_stability(path)?,
             total_commits: self.count_commits(path)?,
             age_days: self.get_file_age_days(path)?,
-        };
+        })
+    }
 
-        self.cache.set(path.to_path_buf(), history.clone());
-        Ok(history)
+    /// Legacy mutable API - kept for backward compatibility
+    pub fn analyze_file(&mut self, path: &Path) -> Result<FileHistory> {
+        self.get_or_fetch_history(path)
     }
 
     fn calculate_churn_rate(&self, path: &Path) -> Result<f64> {
@@ -367,8 +364,8 @@ impl ContextProvider for GitHistoryProvider {
     }
 
     fn gather(&self, target: &AnalysisTarget) -> Result<Context> {
-        let mut provider = GitHistoryProvider::new(self.repo_root.clone())?;
-        let history = provider.analyze_file(&target.file_path)?;
+        // Use cached/batched history (O(1) lookup, no git subprocess calls)
+        let history = self.get_or_fetch_history(&target.file_path)?;
 
         // Calculate contribution based on instability
         let _instability = 1.0 - history.stability_score;
@@ -636,7 +633,7 @@ mod tests {
         let (_temp, repo_path) = setup_test_repo()?;
 
         let provider = GitHistoryProvider::new(repo_path)?;
-        assert_eq!(provider.cache.entries.len(), 0);
+        assert_eq!(provider.cache.len(), 0);
 
         Ok(())
     }
