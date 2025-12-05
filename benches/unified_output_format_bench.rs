@@ -108,6 +108,9 @@ fn benchmark_unified_format_serialization(c: &mut Criterion) {
                 no_god_object: false,
                 suppress_coverage_tip: false,
                 _formatting_config: Default::default(),
+                enable_context: false,
+                context_providers: None,
+                disable_context: None,
             },
         )
         .unwrap();
@@ -171,6 +174,9 @@ fn benchmark_scaling_by_debt_items(c: &mut Criterion) {
                 no_god_object: false,
                 suppress_coverage_tip: false,
                 _formatting_config: Default::default(),
+                enable_context: false,
+                context_providers: None,
+                disable_context: None,
             },
         )
         .unwrap();

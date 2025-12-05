@@ -89,6 +89,9 @@ fn benchmark_sequential_analysis(c: &mut Criterion) {
                         no_god_object: false,
                         suppress_coverage_tip: false,
                         _formatting_config: Default::default(),
+                        enable_context: false,
+                        context_providers: None,
+                        disable_context: None,
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -133,6 +136,9 @@ fn benchmark_parallel_analysis(c: &mut Criterion) {
                         no_god_object: false,
                         suppress_coverage_tip: false,
                         _formatting_config: Default::default(),
+                        enable_context: false,
+                        context_providers: None,
+                        disable_context: None,
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -176,6 +182,9 @@ fn benchmark_parallel_with_job_counts(c: &mut Criterion) {
                         no_god_object: false,
                         suppress_coverage_tip: false,
                         _formatting_config: Default::default(),
+                        enable_context: false,
+                        context_providers: None,
+                        disable_context: None,
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);
@@ -220,6 +229,9 @@ fn benchmark_file_counts(c: &mut Criterion) {
                         no_god_object: false,
                         suppress_coverage_tip: false,
                         _formatting_config: Default::default(),
+                        enable_context: false,
+                        context_providers: None,
+                        disable_context: None,
                     };
                     let analysis = perform_unified_analysis_with_options(options).unwrap();
                     black_box(analysis);

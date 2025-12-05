@@ -120,7 +120,7 @@ pub fn analyze_risk_without_coverage(
     Ok(Some(insights))
 }
 
-fn build_context_aggregator(
+pub fn build_context_aggregator(
     project_path: &Path,
     enable_context: bool,
     context_providers: Option<Vec<String>>,

@@ -11,6 +11,7 @@ fn test_format_risk_function_with_coverage() {
         cognitive_complexity: 7,
         risk_score: 8.5,
         coverage_percentage: Some(0.75),
+        contextual_risk: None,
         test_effort: TestEffort {
             estimated_difficulty: Difficulty::Moderate,
             cognitive_load: 7,
@@ -43,6 +44,7 @@ fn test_format_risk_function_without_coverage() {
         cognitive_complexity: 7,
         risk_score: 10.0,
         coverage_percentage: None,
+        contextual_risk: None,
         test_effort: TestEffort {
             estimated_difficulty: Difficulty::Trivial,
             cognitive_load: 3,
@@ -73,6 +75,7 @@ fn test_format_risk_function_zero_coverage() {
         cognitive_complexity: 4,
         risk_score: 5.5,
         coverage_percentage: Some(0.0),
+        contextual_risk: None,
         test_effort: TestEffort {
             estimated_difficulty: Difficulty::Trivial,
             cognitive_load: 4,
@@ -103,6 +106,7 @@ fn test_format_risk_function_full_coverage() {
         cognitive_complexity: 15,
         risk_score: 1.2,
         coverage_percentage: Some(1.0),
+        contextual_risk: None,
         test_effort: TestEffort {
             estimated_difficulty: Difficulty::Moderate,
             cognitive_load: 15,

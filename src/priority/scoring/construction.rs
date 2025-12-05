@@ -187,6 +187,7 @@ pub fn create_unified_debt_item_with_aggregator(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
 ) -> Option<UnifiedDebtItem> {
+    use std::path::Path;
     create_unified_debt_item_with_aggregator_and_data_flow(
         func,
         call_graph,
@@ -194,7 +195,9 @@ pub fn create_unified_debt_item_with_aggregator(
         framework_exclusions,
         function_pointer_used_functions,
         debt_aggregator,
-        None, // DataFlowGraph will be provided by the new function
+        None,           // DataFlowGraph will be provided by the new function
+        None,           // No risk analyzer in wrapper function
+        Path::new("."), // Default project path
     )
 }
 
@@ -406,6 +409,7 @@ fn build_unified_debt_item(
 
 // Main function using functional composition (spec 201)
 /// Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
+#[allow(clippy::too_many_arguments)]
 pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     func: &FunctionMetrics,
     call_graph: &CallGraph,
@@ -414,6 +418,8 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
+    risk_analyzer: Option<&mut crate::risk::RiskAnalyzer>,
+    project_path: &Path,
 ) -> Option<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
     let func_id = create_function_id(func);
@@ -434,7 +440,27 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     let deps = extract_dependency_metrics(&func_id, call_graph);
 
     // Step 4: Build final item (pure)
-    let item = build_unified_debt_item(func, context, deps);
+    let mut item = build_unified_debt_item(func, context, deps);
+
+    // Step 4.5: Analyze contextual risk if risk analyzer is provided (spec 202)
+    if let Some(analyzer) = risk_analyzer {
+        let complexity_metrics = crate::core::ComplexityMetrics::from_function(func);
+        let func_coverage = coverage
+            .and_then(|cov| cov.get_function_coverage_with_line(&func.file, &func.name, func.line));
+
+        // Call analyze_function_with_context to get contextual risk
+        let (_, contextual_risk) = analyzer.analyze_function_with_context(
+            func.file.clone(),
+            func.name.clone(),
+            (func.line, func.line + func.length),
+            &complexity_metrics,
+            func_coverage,
+            func.is_test,
+            project_path.to_path_buf(),
+        );
+
+        item.contextual_risk = contextual_risk;
+    }
 
     // Step 5: Apply exponential scaling and risk boosting (spec 171)
     Some(apply_score_scaling(item))

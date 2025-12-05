@@ -382,6 +382,7 @@ mod tests {
                 cyclomatic_complexity: 15,
                 cognitive_complexity: 20,
                 coverage_percentage: Some(0.0),
+                contextual_risk: None,
                 test_effort: TestEffort {
                     estimated_difficulty: Difficulty::Complex,
                     cognitive_load: 20,

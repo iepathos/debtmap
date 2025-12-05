@@ -16,6 +16,7 @@ use crate::{
         UnifiedAnalysisUtils, UnifiedDebtItem, UnifiedScore,
     },
     risk,
+    utils::risk_analyzer::build_context_aggregator,
 };
 use anyhow::{Context, Result};
 use std::collections::HashSet;
@@ -269,6 +270,31 @@ fn perform_unified_analysis_computation(
 
     // Progress is already tracked by unified AnalysisProgress system
 
+    // Create context aggregator and risk analyzer for priority scoring (spec 202)
+    let risk_analyzer = if enable_context {
+        let context_aggregator = build_context_aggregator(
+            project_path,
+            enable_context,
+            context_providers,
+            disable_context,
+        );
+
+        if let Some(aggregator) = context_aggregator {
+            let debt_score = crate::debt::total_debt_score(&results.technical_debt.items) as f64;
+            let debt_threshold = 100.0;
+
+            Some(
+                risk::RiskAnalyzer::default()
+                    .with_debt_context(debt_score, debt_threshold)
+                    .with_context_aggregator(aggregator),
+            )
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let result = create_unified_analysis_with_exclusions_and_timing(
         &enriched_metrics,
         &call_graph,
@@ -283,6 +309,8 @@ fn perform_unified_analysis_computation(
         call_graph_time,
         trait_resolution_time,
         coverage_loading_time,
+        risk_analyzer,
+        project_path,
     );
 
     Ok(result)
@@ -384,6 +412,8 @@ pub fn create_unified_analysis_with_exclusions(
         Duration::from_secs(0),
         Duration::from_secs(0),
         Duration::from_secs(0),
+        None,           // No risk analyzer in wrapper function
+        Path::new("."), // Default project path
     )
 }
 
@@ -402,6 +432,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
     call_graph_time: std::time::Duration,
     trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
+    mut risk_analyzer: Option<risk::RiskAnalyzer>,
+    project_path: &Path,
 ) -> UnifiedAnalysis {
     // Check if parallel mode is enabled
     let parallel_enabled = std::env::var("DEBTMAP_PARALLEL")
@@ -428,6 +460,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
             call_graph_time,
             trait_resolution_time,
             coverage_loading_time,
+            risk_analyzer,
+            project_path,
         );
     }
     use std::time::Instant;
@@ -475,6 +509,8 @@ fn create_unified_analysis_with_exclusions_and_timing(
             function_pointer_used_functions,
             &debt_aggregator,
             Some(&unified.data_flow_graph),
+            risk_analyzer.as_mut(),
+            project_path,
         ) {
             unified.add_item(item);
         }
@@ -544,6 +580,8 @@ fn create_unified_analysis_parallel(
     call_graph_time: std::time::Duration,
     trait_resolution_time: std::time::Duration,
     coverage_loading_time: std::time::Duration,
+    _risk_analyzer: Option<risk::RiskAnalyzer>,
+    _project_path: &Path,
 ) -> UnifiedAnalysis {
     use parallel_unified_analysis::{
         ParallelUnifiedAnalysisBuilder, ParallelUnifiedAnalysisOptions,
@@ -640,6 +678,7 @@ fn should_skip_metric_for_debt_analysis(
     false
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn create_debt_item_from_metric_with_aggregator(
     metric: &FunctionMetrics,
     call_graph: &priority::CallGraph,
@@ -648,6 +687,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
     function_pointer_used_functions: Option<&HashSet<priority::call_graph::FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
+    risk_analyzer: Option<&mut risk::RiskAnalyzer>,
+    project_path: &Path,
 ) -> Option<UnifiedDebtItem> {
     // Use the unified debt item creation which already calculates the score correctly (spec 201)
     // Returns None if the debt pattern doesn't warrant a recommendation (e.g., clean dispatcher)
@@ -659,6 +700,8 @@ pub(super) fn create_debt_item_from_metric_with_aggregator(
         function_pointer_used_functions,
         debt_aggregator,
         data_flow,
+        risk_analyzer,
+        project_path,
     )
 }
 
