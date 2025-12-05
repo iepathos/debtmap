@@ -26,10 +26,19 @@ use super::semantic_normalizer::{
 };
 use syn::{visit::Visit, Block, Expr};
 
+/// Calculate cognitive complexity using the visitor-based algorithm.
+///
+/// This is the default implementation for debtmap, chosen for consistency
+/// with historical scoring and prioritization. For new analysis that benefits
+/// from semantic normalization (e.g., handling multiline formatting), use
+/// [`calculate_cognitive_normalized`] instead.
+///
+/// # Algorithm
+/// Uses AST visitor pattern to traverse code blocks and calculate complexity
+/// based on control flow constructs, with pattern-based adjustments for
+/// recursive structures and complex match expressions.
 pub fn calculate_cognitive(block: &Block) -> u32 {
-    // Use legacy calculation for now to maintain compatibility
-    // Switch to normalized when ready
-    calculate_cognitive_legacy(block)
+    calculate_cognitive_visitor_based(block)
 }
 
 /// Calculate cognitive complexity using semantic normalization
@@ -52,8 +61,15 @@ pub fn calculate_cognitive_normalized(block: &Block) -> u32 {
     }
 }
 
-/// Calculate cognitive complexity without normalization (legacy)
-pub fn calculate_cognitive_legacy(block: &Block) -> u32 {
+/// Calculate cognitive complexity using visitor-based AST traversal.
+///
+/// This is the historical algorithm used by debtmap for cognitive complexity
+/// calculation. It uses the visitor pattern to traverse the AST and accumulates
+/// complexity based on control flow constructs and nesting levels.
+///
+/// For most use cases, prefer [`calculate_cognitive`] which is an alias to this
+/// function. For semantic normalization features, use [`calculate_cognitive_normalized`].
+pub fn calculate_cognitive_visitor_based(block: &Block) -> u32 {
     let mut visitor = CognitiveVisitor {
         complexity: 0,
         nesting_level: 0,

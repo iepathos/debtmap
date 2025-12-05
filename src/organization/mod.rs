@@ -89,13 +89,6 @@ pub use god_object::{
     StructWithMethods,
 };
 
-// Legacy re-exports for backward compatibility (deprecated)
-#[allow(deprecated)]
-pub use god_object::legacy_compat::{
-    calculate_domain_diversity_from_structs, group_methods_by_responsibility_with_domain_patterns,
-    suggest_splits_by_struct_grouping,
-};
-
 pub use domain_classifier::classify_struct_domain_enhanced;
 pub use domain_diversity::{
     CrossDomainSeverity, DiversityScore, DomainDiversityMetrics, StructDomainClassification,
