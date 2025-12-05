@@ -3,7 +3,6 @@
 /// This module provides functionality to categorize methods based on their
 /// names and signatures, grouping them by behavioral patterns like lifecycle,
 /// validation, parsing, etc.
-
 use std::collections::HashMap;
 
 use super::types::{capitalize_first, BehaviorCategory};

@@ -7,7 +7,6 @@
 /// - **Community detection**: Groups methods by call graph connectivity
 /// - **Hybrid clustering**: Combines name-based categorization with call graph analysis
 /// - **Production-ready clustering**: Comprehensive pipeline with test filtering and size balancing
-
 use std::collections::{HashMap, HashSet};
 use syn::visit::Visit;
 
@@ -577,7 +576,6 @@ fn ensure_all_methods_clustered(
 
     clusters
 }
-
 
 /// Subdivide oversized Domain clusters using secondary heuristics
 fn subdivide_oversized_clusters(

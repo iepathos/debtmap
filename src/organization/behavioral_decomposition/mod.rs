@@ -2,7 +2,34 @@
 ///
 /// This module implements Spec 178: shifting from struct-based organization
 /// to behavioral method clustering for god object refactoring.
-
+///
+/// ## Module Organization
+///
+/// The behavioral decomposition system is organized into focused sub-modules:
+///
+/// - **[`types`]**: Core data structures (BehaviorCategory, MethodCluster, FieldAccessStats)
+/// - **[`categorization`]**: Method categorization by behavioral patterns
+/// - **[`clustering`]**: Clustering algorithms and call graph analysis
+/// - **[`analysis`]**: Field access tracking and refactoring recommendations
+///
+/// ## Usage Example
+///
+/// ```rust,ignore
+/// use debtmap::organization::behavioral_decomposition::*;
+///
+/// // Categorize methods by behavior
+/// let methods = vec!["parse_json".to_string(), "validate_input".to_string()];
+/// let clusters = cluster_methods_by_behavior(&methods);
+///
+/// // Apply hybrid clustering with call graph
+/// let adjacency = build_method_call_adjacency_matrix(&impl_blocks);
+/// let refined_clusters = apply_hybrid_clustering(&methods, &adjacency);
+///
+/// // Track field access patterns
+/// let mut tracker = FieldAccessTracker::new();
+/// tracker.analyze_impl(&impl_block);
+/// let fields = tracker.get_method_fields("some_method");
+/// ```
 // Internal modules
 mod analysis;
 mod categorization;
@@ -13,9 +40,7 @@ mod types;
 pub use types::{BehaviorCategory, FieldAccessStats, MethodCluster};
 
 // Re-export categorization functions
-pub use categorization::{
-    cluster_methods_by_behavior, is_test_method, BehavioralCategorizer,
-};
+pub use categorization::{cluster_methods_by_behavior, is_test_method, BehavioralCategorizer};
 
 // Re-export clustering functions
 pub use clustering::{
