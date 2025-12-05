@@ -98,7 +98,7 @@ debtmap analyze . --lcov target/coverage/lcov.info
 debtmap analyze . --format json --output report.json
 
 # Generate interactive HTML dashboard
-debtmap analyze . --format html > report.html
+debtmap analyze . --format html --output report.html
 ```
 
 ### Review Results
