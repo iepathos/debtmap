@@ -97,6 +97,12 @@ comfy-table = "7.1"
 # Progress feedback
 indicatif = { version = "0.18", features = ["rayon"] }
 
+# TUI framework
+ratatui = "0.26"
+crossterm = "0.27"
+unicode-width = "0.1"
+num_cpus = "1.16"
+
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
 
