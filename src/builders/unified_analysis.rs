@@ -146,9 +146,9 @@ fn perform_unified_analysis_computation(
     no_god_object: bool,
     suppress_coverage_tip: bool,
     _formatting_config: crate::formatting::FormattingConfig,
-    enable_context: bool,
-    context_providers: Option<Vec<String>>,
-    disable_context: Option<Vec<String>>,
+    _enable_context: bool,
+    _context_providers: Option<Vec<String>>,
+    _disable_context: Option<Vec<String>>,
 ) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 

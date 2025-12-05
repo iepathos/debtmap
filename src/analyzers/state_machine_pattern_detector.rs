@@ -441,9 +441,7 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
     fn visit_expr_match(&mut self, match_expr: &'ast ExprMatch) {
         // Track match nesting depth (spec 203)
         let was_in_primary = self.in_primary_match;
-        if self.match_nesting_depth == 0 {
-            self.in_primary_match = true;
-        }
+        self.in_primary_match = self.match_nesting_depth == 0;
         self.match_nesting_depth += 1;
 
         // Count this match expression
@@ -488,6 +486,7 @@ impl<'ast> Visit<'ast> for StateMachineVisitor {
                 _ => {
                     if self.is_enum_or_tuple_pattern(&arm.pat) {
                         self.enum_match_count += 1;
+                        self.has_enum_match = true;
                     }
                 }
             }
@@ -1253,9 +1252,11 @@ mod tests {
                     format: match format {
                         Fmt::Json => Format::Json,
                         Fmt::Markdown => Format::Markdown,
+                        Fmt::Text => Format::Text,
                     },
                     output: None,
                     top: 10,
+                    verbose: false,
                 };
                 debtmap::commands::validate::validate_project(validate_config)?;
                 Ok(())
@@ -1321,6 +1322,8 @@ mod tests {
                             },
                             output: None,
                             top: 10,
+                            verbose: false,
+                            filter: None,
                         };
                         debtmap::commands::validate::validate_project(validate_config)?;
                         Ok(())

@@ -84,6 +84,7 @@ fn create_test_item_with_state_machine() -> UnifiedDebtItem {
                 comparisons: None,
             },
         }),
+        contextual_risk: None, // spec 203
     }
 }
 
@@ -160,6 +161,7 @@ fn create_test_item_with_coordinator() -> UnifiedDebtItem {
                 comparisons: Some(2),
             },
         }),
+        contextual_risk: None, // spec 203
     }
 }
 

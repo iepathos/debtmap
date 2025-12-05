@@ -266,6 +266,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 1,
             confidence: 0.5, // Below threshold
+            ..Default::default()
         };
 
         let rust_data = RustPatternResult {
@@ -293,6 +294,7 @@ mod tests {
             has_state_comparison: true,
             action_dispatch_count: 8,
             confidence: 0.75,
+            ..Default::default()
         };
 
         let coord_signals = CoordinatorSignals {

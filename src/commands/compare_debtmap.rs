@@ -760,6 +760,7 @@ mod tests {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
+            contextual_risk: None, // spec 203
         }))
     }
 
@@ -833,6 +834,7 @@ mod tests {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
+            contextual_risk: None, // spec 203
         }))
     }
 
@@ -905,6 +907,7 @@ mod tests {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
+            contextual_risk: None, // spec 203
         }
     }
 

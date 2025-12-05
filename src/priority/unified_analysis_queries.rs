@@ -572,6 +572,7 @@ mod tests {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
+            contextual_risk: None, // spec 203
         }));
 
         let item2 = DebtItem::Function(Box::new(UnifiedDebtItem {
@@ -636,6 +637,7 @@ mod tests {
             context_type: None,
             language_specific: None, // spec 190
             detected_pattern: None,
+            contextual_risk: None, // spec 203
         }));
 
         let mut items = [item2.clone(), item1.clone()]; // Start with low score first
