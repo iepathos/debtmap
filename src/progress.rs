@@ -267,6 +267,29 @@ impl ProgressManager {
         }
     }
 
+    /// Update only function and debt counts in TUI
+    pub fn tui_update_counts(&self, functions: usize, debt: usize) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                let app = tui.app_mut();
+                app.functions_count = functions;
+                app.debt_count = debt;
+                let _ = tui.render();
+            }
+        }
+    }
+
+    /// Update only coverage percentage in TUI
+    pub fn tui_update_coverage(&self, coverage: f64) {
+        if let Ok(mut guard) = self.tui_manager.lock() {
+            if let Some(ref mut tui) = *guard {
+                let app = tui.app_mut();
+                app.coverage_percent = coverage;
+                let _ = tui.render();
+            }
+        }
+    }
+
     /// Render a TUI frame (for periodic updates)
     pub fn tui_render(&self) {
         if let Ok(mut guard) = self.tui_manager.lock() {

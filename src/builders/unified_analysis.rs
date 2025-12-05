@@ -270,6 +270,15 @@ fn perform_unified_analysis_computation(
 
     let coverage_loading_time = coverage_loading_start.elapsed();
 
+    // Calculate coverage percentage if data is available
+    let coverage_percent = coverage_data.as_ref().map_or(0.0, |data| {
+        if data.total_lines > 0 {
+            (data.lines_hit as f64 / data.total_lines as f64) * 100.0
+        } else {
+            0.0
+        }
+    });
+
     if let Some(manager) = crate::progress::ProgressManager::global() {
         let metric = if coverage_data.is_some() {
             "loaded".to_string()
@@ -278,6 +287,9 @@ fn perform_unified_analysis_computation(
         };
         manager.tui_complete_stage(4, metric);
         manager.tui_set_progress(0.55); // ~5/9 stages complete
+
+        // Update TUI stats with coverage percentage (preserves existing function/debt counts)
+        manager.tui_update_coverage(coverage_percent);
     }
 
     // Emit warning if no coverage data provided (spec 108)

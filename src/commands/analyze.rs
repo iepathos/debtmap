@@ -303,6 +303,11 @@ pub fn analyze_project(
     let all_debt_items = analysis_utils::extract_all_debt_items(&file_metrics);
     let duplications = analysis_helpers::detect_duplications(&files, duplication_threshold);
 
+    // Update TUI stats with function and debt counts
+    if let Some(manager) = crate::progress::ProgressManager::global() {
+        manager.tui_update_counts(all_functions.len(), all_debt_items.len());
+    }
+
     // Extract file contexts for test file detection (spec 166)
     let file_contexts = analysis_utils::extract_file_contexts(&file_metrics);
 

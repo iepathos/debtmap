@@ -43,6 +43,8 @@ struct AnalysisPhase {
     start_time: Option<Instant>,
     duration: Option<Duration>,
     progress: PhaseProgress,
+    /// Track if we've already printed the in-progress message (for CI/CD mode)
+    printed_start: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -110,6 +112,7 @@ impl AnalysisProgress {
         self.current_phase = phase_index;
         self.phases[phase_index].status = PhaseStatus::InProgress;
         self.phases[phase_index].start_time = Some(Instant::now());
+        self.phases[phase_index].printed_start = false; // Reset for new phase
         self.render();
     }
 
@@ -158,7 +161,7 @@ impl AnalysisProgress {
     }
 
     /// Render current progress state
-    fn render(&self) {
+    fn render(&mut self) {
         if self.current_phase >= self.phases.len() {
             return;
         }
@@ -171,7 +174,8 @@ impl AnalysisProgress {
             return;
         }
 
-        let phase = &self.phases[self.current_phase];
+        let phase_index = self.current_phase;
+        let phase = &self.phases[phase_index];
         let phase_num = self.current_phase + 1;
         let total_phases = self.phases.len();
 
@@ -215,11 +219,10 @@ impl AnalysisProgress {
                     );
                 }
                 PhaseStatus::InProgress => {
-                    // Only print on start, not every update
-                    if let Some(start) = phase.start_time {
-                        if start.elapsed().as_millis() < 100 {
-                            eprintln!("→ {}/{} {}...", phase_num, total_phases, phase.name);
-                        }
+                    // Only print once per phase, not on every update
+                    if !self.phases[phase_index].printed_start {
+                        eprintln!("→ {}/{} {}...", phase_num, total_phases, phase.name);
+                        self.phases[phase_index].printed_start = true;
                     }
                 }
                 _ => {}
@@ -242,6 +245,7 @@ impl AnalysisPhase {
             start_time: None,
             duration: None,
             progress,
+            printed_start: false,
         }
     }
 }
