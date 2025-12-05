@@ -247,3 +247,33 @@ impl ContextualRisk {
         parts.join(", ")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+
+    #[test]
+    fn test_context_aggregator_concurrent_access() {
+        let aggregator = Arc::new(ContextAggregator::new());
+        let handles: Vec<_> = (0..10)
+            .map(|i| {
+                let agg = Arc::clone(&aggregator);
+                thread::spawn(move || {
+                    let target = AnalysisTarget {
+                        root_path: PathBuf::from("/test"),
+                        file_path: PathBuf::from(format!("/test/file{}.rs", i)),
+                        function_name: format!("test_fn_{}", i),
+                        line_range: (1, 10),
+                    };
+                    agg.analyze(&target)
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+        // No panics = success
+    }
+}

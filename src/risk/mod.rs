@@ -274,3 +274,19 @@ impl RiskAnalyzer {
             .calculate_risk_reduction(current_risk, complexity, target_coverage)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_risk_analyzer_clone_preserves_context() {
+        let aggregator = ContextAggregator::new();
+
+        let analyzer = RiskAnalyzer::default().with_context_aggregator(aggregator);
+
+        let cloned = analyzer.clone();
+
+        assert!(cloned.has_context());
+    }
+}
