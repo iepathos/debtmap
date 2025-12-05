@@ -12,17 +12,17 @@ fn create_test_git_repo() -> Result<TempDir> {
 
     // Initialize git repo
     Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(repo_path)
         .output()?;
 
     Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(repo_path)
         .output()?;
 
     Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(repo_path)
         .output()?;
 
@@ -56,12 +56,12 @@ pub fn complex_function(a: i32, b: i32, c: i32, d: i32) -> i32 {
 
     // Make initial commit
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(repo_path)
         .output()?;
 
     Command::new("git")
-        .args(&["commit", "-m", "Initial commit"])
+        .args(["commit", "-m", "Initial commit"])
         .current_dir(repo_path)
         .output()?;
 
@@ -93,12 +93,12 @@ pub fn complex_function(a: i32, b: i32, c: i32, d: i32) -> i32 {
     )?;
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(repo_path)
         .output()?;
 
     Command::new("git")
-        .args(&["commit", "-m", "fix: handle negative numbers"])
+        .args(["commit", "-m", "fix: handle negative numbers"])
         .current_dir(repo_path)
         .output()?;
 
@@ -112,7 +112,7 @@ fn test_context_flag_populates_contextual_risk() -> Result<()> {
 
     // Run debtmap analyze with --context flag and JSON output
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
-        .args(&[
+        .args([
             "analyze",
             repo_path.to_str().unwrap(),
             "--context",
@@ -165,7 +165,7 @@ fn test_without_context_flag_no_contextual_risk() -> Result<()> {
 
     // Run debtmap analyze WITHOUT --context flag
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
-        .args(&["analyze", repo_path.to_str().unwrap(), "--format", "json"])
+        .args(["analyze", repo_path.to_str().unwrap(), "--format", "json"])
         .current_dir(repo_path)
         .output()?;
 
@@ -191,7 +191,7 @@ fn test_context_flag_terminal_output() -> Result<()> {
 
     // Run debtmap analyze with --context flag (default terminal output)
     let output = Command::new(env!("CARGO_BIN_EXE_debtmap"))
-        .args(&["analyze", repo_path.to_str().unwrap(), "--context"])
+        .args(["analyze", repo_path.to_str().unwrap(), "--context"])
         .current_dir(repo_path)
         .output()?;
 

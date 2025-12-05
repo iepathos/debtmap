@@ -1,11 +1,12 @@
 /// Benchmark for contextual risk analysis performance (spec 202)
 /// Verifies that --context flag adds less than 10% overhead
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use debtmap::core::FunctionMetrics;
 use debtmap::priority::call_graph::CallGraph;
 use debtmap::risk::context::git_history::GitHistoryProvider;
 use debtmap::risk::context::{AnalysisTarget, ContextAggregator};
 use debtmap::risk::RiskAnalyzer;
+use std::hint::black_box;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
@@ -17,19 +18,19 @@ fn create_test_git_repo() -> TempDir {
 
     // Initialize git repo
     Command::new("git")
-        .args(&["init"])
+        .args(["init"])
         .current_dir(repo_path)
         .output()
         .unwrap();
 
     Command::new("git")
-        .args(&["config", "user.email", "test@example.com"])
+        .args(["config", "user.email", "test@example.com"])
         .current_dir(repo_path)
         .output()
         .unwrap();
 
     Command::new("git")
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .current_dir(repo_path)
         .output()
         .unwrap();
@@ -39,13 +40,13 @@ fn create_test_git_repo() -> TempDir {
     std::fs::write(&test_file, "fn test() { println!(\"hello\"); }").unwrap();
 
     Command::new("git")
-        .args(&["add", "."])
+        .args(["add", "."])
         .current_dir(repo_path)
         .output()
         .unwrap();
 
     Command::new("git")
-        .args(&["commit", "-m", "Initial commit"])
+        .args(["commit", "-m", "Initial commit"])
         .current_dir(repo_path)
         .output()
         .unwrap();
@@ -63,11 +64,24 @@ fn create_test_metrics(count: usize) -> Vec<FunctionMetrics> {
             length: 10,
             cyclomatic: 5,
             cognitive: 8,
-            nesting_depth: 2,
+            nesting: 2,
             is_test: false,
             in_test_module: false,
             is_pure: Some(false),
-            language: debtmap::core::SupportedLanguage::Rust,
+            visibility: None,
+            is_trait_method: false,
+            entropy_score: None,
+            purity_confidence: None,
+            purity_reason: None,
+            call_dependencies: None,
+            detected_patterns: None,
+            upstream_callers: None,
+            downstream_callees: None,
+            mapping_pattern_result: None,
+            adjusted_complexity: None,
+            composition_metrics: None,
+            language_specific: None,
+            purity_level: None,
         })
         .collect()
 }
@@ -90,7 +104,7 @@ fn benchmark_git_history_provider(c: &mut Criterion) {
                 line_range: (1, 1),
             };
             let mut provider = provider;
-            let result = provider.analyze_file(black_box(&target.file_path));
+            let result = provider.analyze_file(black_box(&target.file_path)).unwrap();
             black_box(result);
         })
     });
@@ -189,13 +203,11 @@ fn benchmark_risk_analyzer_with_context(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("risk_analyzer_with_context");
 
-    let provider = Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
-    let aggregator = ContextAggregator::new().with_provider(provider);
-
     group.bench_function("risk_analyzer_initialization", |b| {
         b.iter(|| {
-            let analyzer =
-                RiskAnalyzer::default().with_context_aggregator(black_box(aggregator.clone()));
+            let provider = Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
+            let aggregator = ContextAggregator::new().with_provider(provider);
+            let analyzer = RiskAnalyzer::default().with_context_aggregator(black_box(aggregator));
             black_box(analyzer);
         })
     });
