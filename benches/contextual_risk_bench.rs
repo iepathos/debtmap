@@ -121,7 +121,7 @@ fn benchmark_context_aggregator(c: &mut Criterion) {
 
     // Create aggregator with git history provider
     let provider = Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
-    let mut aggregator = ContextAggregator::new().with_provider(provider);
+    let aggregator = ContextAggregator::new().with_provider(provider);
 
     group.bench_function("analyze_with_git_history", |b| {
         b.iter(|| {
@@ -175,7 +175,7 @@ fn benchmark_analysis_overhead(c: &mut Criterion) {
                     let call_graph = CallGraph::new();
                     let provider =
                         Box::new(GitHistoryProvider::new(repo_path.to_path_buf()).unwrap());
-                    let mut aggregator = ContextAggregator::new().with_provider(provider);
+                    let aggregator = ContextAggregator::new().with_provider(provider);
 
                     for metric in metrics {
                         let target = AnalysisTarget {

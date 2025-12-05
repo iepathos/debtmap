@@ -693,7 +693,7 @@ impl ParallelUnifiedAnalysisBuilder {
         context: &FunctionAnalysisContext,
     ) -> Option<UnifiedDebtItem> {
         // Clone risk analyzer for thread-safe parallel execution
-        let mut risk_analyzer_clone = context.risk_analyzer.cloned();
+        let risk_analyzer_clone = context.risk_analyzer.cloned();
         // Returns None for clean dispatchers (spec 201)
         crate::builders::unified_analysis::create_debt_item_from_metric_with_aggregator(
             metric,
@@ -703,7 +703,7 @@ impl ParallelUnifiedAnalysisBuilder {
             context.function_pointer_used_functions,
             context.debt_aggregator,
             Some(context.data_flow_graph),
-            risk_analyzer_clone.as_mut(),
+            risk_analyzer_clone.as_ref(),
             context.project_path,
         )
     }

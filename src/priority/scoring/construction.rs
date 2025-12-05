@@ -418,7 +418,7 @@ pub fn create_unified_debt_item_with_aggregator_and_data_flow(
     function_pointer_used_functions: Option<&HashSet<FunctionId>>,
     debt_aggregator: &DebtAggregator,
     data_flow: Option<&crate::data_flow::DataFlowGraph>,
-    risk_analyzer: Option<&mut crate::risk::RiskAnalyzer>,
+    risk_analyzer: Option<&crate::risk::RiskAnalyzer>,
     project_path: &Path,
 ) -> Option<UnifiedDebtItem> {
     // Step 1: Create function ID (pure)
