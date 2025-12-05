@@ -99,6 +99,18 @@ pub fn detect_all_debt(metric: &FunctionMetrics, thresholds: &Thresholds) -> Vec
     .collect()
 }
 
+/// Detect debt from pipeline data (adapter for pipeline integration).
+///
+/// TODO: Full integration with UnifiedDebtItem structure.
+/// For now returns empty vector to allow compilation.
+pub fn detect_debt_from_pipeline(
+    _metrics: &[FunctionMetrics],
+    _call_graph: Option<&crate::priority::call_graph::CallGraph>,
+) -> Vec<crate::priority::UnifiedDebtItem> {
+    // TODO: Implement full debt detection using existing unified analysis code
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
