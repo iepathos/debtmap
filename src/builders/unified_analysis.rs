@@ -472,9 +472,10 @@ fn create_unified_analysis_with_exclusions_and_timing(
 ) -> UnifiedAnalysis {
     // Use parallel mode based on function parameter (not environment variable)
     // Environment variable fallback is for backward compatibility
-    let parallel_enabled = parallel || std::env::var("DEBTMAP_PARALLEL")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false);
+    let parallel_enabled = parallel
+        || std::env::var("DEBTMAP_PARALLEL")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
 
     let jobs_count = if jobs > 0 {
         Some(jobs)
