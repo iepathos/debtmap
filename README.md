@@ -24,7 +24,7 @@ Traditional code quality tools only measure static complexity—flagging everyth
 - **Predicts where bugs will occur**: Frequently changed + complex + untested = highest priority
 - **Historical context**: Code that breaks repeatedly gets elevated priority, not just "complicated" code
 
-### 2. Pattern Recognition for 70% Fewer False Positives ✨
+### 2. Pattern Recognition for Fewer False Positives ✨
 
 **Five intelligent pattern systems eliminate noise:**
 
@@ -342,7 +342,7 @@ Fail builds when quality thresholds are exceeded:
 - **Rust-First Analysis** - Deep Rust analysis with macro expansion, trait resolution, and lifetime awareness
 - **Coverage-Risk Correlation** - Combines complexity with test coverage to prioritize genuinely risky code
 - **Multi-Factor Analysis** - Analyzes complexity, coverage, dependencies, and call graphs for comprehensive scoring
-- **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuine complexity from repetitive patterns (reduces false positives by up to 70%)
+- **Reduced False Positives** - Uses entropy analysis and pattern detection to distinguish genuine complexity from repetitive patterns
 - **Test File Detection** - Automatically identifies test files and applies context-aware scoring adjustments
 - **Actionable Recommendations** - Specific guidance with quantified impact metrics
 - **Fast Performance** - 10-100x faster than Java/Python-based competitors (written in Rust with parallel processing)
