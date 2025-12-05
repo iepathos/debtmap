@@ -79,6 +79,8 @@ pub struct UnifiedDebtItem {
     pub language_specific: Option<crate::core::LanguageSpecificData>, // Language-specific pattern detection (spec 190)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detected_pattern: Option<crate::priority::detected_pattern::DetectedPattern>, // Detected complexity pattern (spec 204)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contextual_risk: Option<crate::risk::context::ContextualRisk>, // Git history and context provider risk data
 }
 
 impl UnifiedDebtItem {

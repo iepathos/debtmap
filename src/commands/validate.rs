@@ -391,6 +391,9 @@ fn calculate_unified_analysis(
             no_god_object: false,
             suppress_coverage_tip: true, // Suppress coverage TIP for validate (spec 131)
             _formatting_config: Default::default(),
+            enable_context: false,
+            context_providers: None,
+            disable_context: None,
         },
     )
     .expect("Unified analysis failed");

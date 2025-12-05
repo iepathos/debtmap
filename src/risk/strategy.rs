@@ -98,6 +98,7 @@ impl RiskCalculator for EnhancedRiskStrategy {
             cognitive_complexity: context.complexity.cognitive_complexity,
             coverage_percentage: context.coverage,
             risk_score,
+            contextual_risk: None, // Populated later if context providers are enabled
             test_effort,
             risk_category,
             is_test_function: context.is_test,

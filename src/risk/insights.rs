@@ -46,6 +46,18 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
             "   Risk Score: {:.1} (CRITICAL)\n",
             risk.risk_score
         ));
+
+        // Show contextual risk breakdown if available
+        if let Some(ref ctx_risk) = risk.contextual_risk {
+            output.push_str(&format!(
+                "   Context: base_risk={:.1}, contextual_risk={:.1} ({:.1}x multiplier)\n",
+                ctx_risk.base_risk,
+                ctx_risk.contextual_risk,
+                ctx_risk.contextual_risk / ctx_risk.base_risk.max(0.1)
+            ));
+            output.push_str(&format_context_contributions(ctx_risk));
+        }
+
         output.push_str(&format!(
             "   Cyclomatic: {} | Cognitive: {} | Coverage: {}\n",
             risk.cyclomatic_complexity,
@@ -61,6 +73,45 @@ pub fn format_critical_risks(risks: &Vector<FunctionRisk>) -> String {
             risk.test_effort.recommended_test_cases + 2
         ));
         output.push('\n');
+    }
+
+    output
+}
+
+/// Format context provider contributions for display
+fn format_context_contributions(ctx_risk: &super::context::ContextualRisk) -> String {
+    use super::context::ContextDetails;
+
+    let mut output = String::new();
+
+    for context in &ctx_risk.contexts {
+        if context.contribution > 0.05 {
+            // Only show significant contributions
+            output.push_str(&format!(
+                "      └─ {}: +{:.1} impact\n",
+                context.provider,
+                context.contribution * context.weight
+            ));
+
+            // Show details for git_history provider
+            if context.provider == "git_history" {
+                if let ContextDetails::Historical {
+                    change_frequency,
+                    bug_density,
+                    age_days,
+                    author_count,
+                } = &context.details
+                {
+                    output.push_str(&format!(
+                        "         (changes/mo: {:.1}, bug density: {:.1}%, age: {}d, authors: {})\n",
+                        change_frequency,
+                        bug_density * 100.0,
+                        age_days,
+                        author_count
+                    ));
+                }
+            }
+        }
     }
 
     output

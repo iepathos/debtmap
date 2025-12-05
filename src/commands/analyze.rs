@@ -142,6 +142,9 @@ pub fn handle_analyze(config: AnalyzeConfig) -> Result<()> {
             no_god_object: config.no_god_object,
             suppress_coverage_tip: false, // Show coverage TIP for analyze command
             _formatting_config: config._formatting_config,
+            enable_context: config.enable_context,
+            context_providers: config.context_providers.clone(),
+            disable_context: config.disable_context.clone(),
         },
     )?;
 

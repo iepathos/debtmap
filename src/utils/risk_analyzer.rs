@@ -27,19 +27,34 @@ pub fn analyze_risk_with_coverage(
     }
 
     let mut function_risks = Vector::new();
+    let has_context = analyzer.has_context();
 
     for func in &results.complexity.metrics {
         let complexity_metrics = ComplexityMetrics::from_function(func);
         let coverage = lcov_data.get_function_coverage_with_line(&func.file, &func.name, func.line);
 
-        let risk = analyzer.analyze_function(
-            func.file.clone(),
-            func.name.clone(),
-            (func.line, func.line + func.length),
-            &complexity_metrics,
-            coverage,
-            func.is_test,
-        );
+        let risk = if has_context {
+            // Use context-aware analysis when context providers are enabled
+            let (risk_with_ctx, _) = analyzer.analyze_function_with_context(
+                func.file.clone(),
+                func.name.clone(),
+                (func.line, func.line + func.length),
+                &complexity_metrics,
+                coverage,
+                func.is_test,
+                project_path.to_path_buf(),
+            );
+            risk_with_ctx
+        } else {
+            analyzer.analyze_function(
+                func.file.clone(),
+                func.name.clone(),
+                (func.line, func.line + func.length),
+                &complexity_metrics,
+                coverage,
+                func.is_test,
+            )
+        };
 
         function_risks.push_back(risk);
     }
@@ -70,18 +85,33 @@ pub fn analyze_risk_without_coverage(
     }
 
     let mut function_risks = Vector::new();
+    let has_context = analyzer.has_context();
 
     for func in &results.complexity.metrics {
         let complexity_metrics = ComplexityMetrics::from_function(func);
 
-        let risk = analyzer.analyze_function(
-            func.file.clone(),
-            func.name.clone(),
-            (func.line, func.line + func.length),
-            &complexity_metrics,
-            None,
-            func.is_test,
-        );
+        let risk = if has_context {
+            // Use context-aware analysis when context providers are enabled
+            let (risk_with_ctx, _) = analyzer.analyze_function_with_context(
+                func.file.clone(),
+                func.name.clone(),
+                (func.line, func.line + func.length),
+                &complexity_metrics,
+                None,
+                func.is_test,
+                project_path.to_path_buf(),
+            );
+            risk_with_ctx
+        } else {
+            analyzer.analyze_function(
+                func.file.clone(),
+                func.name.clone(),
+                (func.line, func.line + func.length),
+                &complexity_metrics,
+                None,
+                func.is_test,
+            )
+        };
 
         function_risks.push_back(risk);
     }

@@ -40,6 +40,9 @@ pub struct UnifiedAnalysisOptions<'a> {
     pub no_god_object: bool,
     pub suppress_coverage_tip: bool,
     pub _formatting_config: crate::formatting::FormattingConfig,
+    pub enable_context: bool,
+    pub context_providers: Option<Vec<String>>,
+    pub disable_context: Option<Vec<String>>,
 }
 
 pub fn perform_unified_analysis(
@@ -68,6 +71,9 @@ pub fn perform_unified_analysis(
         no_god_object: false,
         suppress_coverage_tip: false,
         _formatting_config: crate::formatting::FormattingConfig::from_env(),
+        enable_context: false,
+        context_providers: None,
+        disable_context: None,
     })
 }
 
@@ -92,6 +98,9 @@ pub fn perform_unified_analysis_with_options(
         no_god_object,
         suppress_coverage_tip,
         _formatting_config,
+        enable_context,
+        context_providers,
+        disable_context,
     } = options;
 
     // Perform direct computation without caching
@@ -112,6 +121,9 @@ pub fn perform_unified_analysis_with_options(
         no_god_object,
         suppress_coverage_tip,
         _formatting_config,
+        enable_context,
+        context_providers,
+        disable_context,
     )
 }
 
@@ -134,6 +146,9 @@ fn perform_unified_analysis_computation(
     no_god_object: bool,
     suppress_coverage_tip: bool,
     _formatting_config: crate::formatting::FormattingConfig,
+    enable_context: bool,
+    context_providers: Option<Vec<String>>,
+    disable_context: Option<Vec<String>>,
 ) -> Result<UnifiedAnalysis> {
     let mut call_graph = call_graph::build_initial_call_graph(&results.complexity.metrics);
 
@@ -725,6 +740,7 @@ fn convert_error_swallowing_to_unified(
                 context_type: None,
                 language_specific: None, // No language-specific data for error swallowing items (spec 190)
                 detected_pattern: None, // No pattern detection for error swallowing items (spec 204)
+                contextual_risk: None,
             }
         })
         .collect()

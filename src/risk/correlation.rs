@@ -124,6 +124,7 @@ mod tests {
             cognitive_complexity: 5,
             coverage_percentage: Some(50.0),
             risk_score: 10.0,
+            contextual_risk: None,
             test_effort: TestEffort {
                 estimated_difficulty: Difficulty::Simple,
                 cognitive_load: 5,

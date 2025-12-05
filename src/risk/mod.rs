@@ -27,6 +27,8 @@ pub struct FunctionRisk {
     pub cognitive_complexity: u32,
     pub coverage_percentage: Option<f64>,
     pub risk_score: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contextual_risk: Option<context::ContextualRisk>,
     pub test_effort: TestEffort,
     pub risk_category: RiskCategory,
     pub is_test_function: bool,
@@ -135,6 +137,10 @@ impl RiskAnalyzer {
         self
     }
 
+    pub fn has_context(&self) -> bool {
+        self.context_aggregator.is_some()
+    }
+
     pub fn analyze_function(
         &self,
         file: PathBuf,
@@ -172,7 +178,7 @@ impl RiskAnalyzer {
         is_test: bool,
         root_path: PathBuf,
     ) -> (FunctionRisk, Option<ContextualRisk>) {
-        let base_risk = self.analyze_function(
+        let mut base_risk = self.analyze_function(
             file.clone(),
             function_name.clone(),
             line_range,
@@ -185,12 +191,40 @@ impl RiskAnalyzer {
             let target = AnalysisTarget {
                 root_path,
                 file_path: file,
-                function_name,
+                function_name: function_name.clone(),
                 line_range,
             };
 
             let context_map = aggregator.analyze(&target);
-            Some(ContextualRisk::new(base_risk.risk_score, &context_map))
+            let ctx_risk = ContextualRisk::new(base_risk.risk_score, &context_map);
+
+            // Update the FunctionRisk with contextual data
+            base_risk.contextual_risk = Some(ctx_risk.clone());
+            base_risk.risk_score = ctx_risk.contextual_risk;
+
+            // Verbose logging for context contributions
+            if log::log_enabled!(log::Level::Debug) {
+                log::debug!(
+                    "Context analysis for {}::{}: base_risk={:.1}, contextual_risk={:.1}, multiplier={:.2}x",
+                    base_risk.file.display(),
+                    function_name,
+                    ctx_risk.base_risk,
+                    ctx_risk.contextual_risk,
+                    ctx_risk.contextual_risk / ctx_risk.base_risk.max(0.1)
+                );
+
+                for context in &ctx_risk.contexts {
+                    log::debug!(
+                        "  └─ {}: contribution={:.2}, weight={:.1}, impact=+{:.1}",
+                        context.provider,
+                        context.contribution,
+                        context.weight,
+                        context.contribution * context.weight
+                    );
+                }
+            }
+
+            Some(ctx_risk)
         } else {
             None
         };
