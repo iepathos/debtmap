@@ -42,6 +42,40 @@ mod transformations {
             .map(|m| (m.name.clone(), m.is_pure.unwrap_or(false)))
             .collect()
     }
+
+    /// Extract full purity analysis for functions by re-analyzing
+    /// This is necessary because FunctionMetrics only stores boolean purity, not full CFG analysis
+    pub fn extract_purity_analysis(
+        metrics: &[FunctionMetrics],
+    ) -> HashMap<FunctionId, crate::analyzers::purity_detector::PurityAnalysis> {
+        use crate::analyzers::purity_detector::PurityDetector;
+        use std::fs;
+
+        metrics
+            .par_iter()
+            .filter_map(|m| {
+                // Read file and parse to get AST
+                let content = fs::read_to_string(&m.file).ok()?;
+                let file_ast = syn::parse_file(&content).ok()?;
+
+                // Find the function in the AST by name and line number
+                for item in &file_ast.items {
+                    if let syn::Item::Fn(item_fn) = item {
+                        if let Some(ident_span) = item_fn.sig.ident.span().start().line.checked_sub(1) {
+                            if ident_span == m.line {
+                                // Run purity analysis
+                                let mut detector = PurityDetector::new();
+                                let analysis = detector.is_pure_function(item_fn);
+                                let func_id = FunctionId::new(m.file.clone(), m.name.clone(), m.line);
+                                return Some((func_id, analysis));
+                            }
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
 }
 
 // Pure predicates module for filtering logic
@@ -504,6 +538,17 @@ impl ParallelUnifiedAnalysisBuilder {
             let start = Instant::now();
             let mut data_flow = DataFlowGraph::from_call_graph((*call_graph).clone());
 
+            // Extract full purity analysis to populate CFG data
+            progress.set_message("Extracting purity analysis data...");
+            let purity_results = transformations::extract_purity_analysis(&metrics);
+            for (func_id, purity) in &purity_results {
+                crate::data_flow::population::populate_from_purity_analysis(
+                    &mut data_flow,
+                    func_id,
+                    purity,
+                );
+            }
+
             // Populate I/O operations from metrics
             progress.set_message("Detecting I/O operations...");
             let io_count =
@@ -523,8 +568,10 @@ impl ParallelUnifiedAnalysisBuilder {
                 *r = Some(data_flow);
             }
             progress.finish_with_message(format!(
-                "Data flow complete: {} I/O ops, {} variable deps",
-                io_count, dep_count
+                "Data flow complete: {} purity, {} I/O ops, {} variable deps",
+                purity_results.len(),
+                io_count,
+                dep_count
             ));
         });
     }

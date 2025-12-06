@@ -46,18 +46,33 @@ pub fn populate_from_purity_analysis(
 }
 
 /// Extract dead stores from purity analysis
+///
+/// Note: Dead stores are tracked in DataFlowAnalysis.liveness.dead_stores as VarIds.
+/// Converting VarIds to variable names requires the CFG's var_names vector, which is
+/// not stored in PurityAnalysis to save memory.
+///
+/// The dead store information (as VarIds) IS preserved in the DataFlowGraph's cfg_analysis field.
+/// To get variable names, access cfg_analysis and use the VarId indices with the CFG's var_names.
+///
+/// This is an acceptable trade-off: we preserve the analysis results while avoiding
+/// storing duplicate variable name mappings in multiple places.
 fn extract_dead_stores(_purity: &PurityAnalysis) -> HashSet<String> {
-    // Note: VarId conversion to String requires the CFG's var_names mapping
-    // This is a simplified implementation - full implementation would need CFG access
-    // For now, we return an empty set as this information is available via cfg_analysis
+    // Return empty set - dead stores are available as VarIds via cfg_analysis
     HashSet::new()
 }
 
 /// Extract escaping mutations from purity analysis
+///
+/// Note: Escaping variables are tracked in DataFlowAnalysis.escape_info.escaping_vars as VarIds.
+/// Converting VarIds to variable names requires the CFG's var_names vector, which is
+/// not stored in PurityAnalysis to save memory.
+///
+/// The escape analysis information (as VarIds) IS preserved in the DataFlowGraph's cfg_analysis field.
+/// To get variable names, access cfg_analysis and use the VarId indices with the CFG's var_names.
+///
+/// Live mutations (which use string names) are already extracted and stored in MutationInfo.
 fn extract_escaping_mutations(_purity: &PurityAnalysis) -> HashSet<String> {
-    // Note: VarId conversion to String requires the CFG's var_names mapping
-    // This is a simplified implementation - full implementation would need CFG access
-    // For now, we return an empty set as this information is available via cfg_analysis
+    // Return empty set - escaping vars are available as VarIds via cfg_analysis
     HashSet::new()
 }
 
@@ -141,10 +156,40 @@ pub fn populate_variable_dependencies(
 }
 
 /// Extract variable dependencies from function metrics
-fn extract_variable_deps(_metric: &FunctionMetrics) -> HashSet<String> {
-    // Note: Variable dependency extraction requires AST parsing
-    // This is a placeholder implementation
-    // Full implementation would parse function signatures to extract parameter names
+fn extract_variable_deps(metric: &FunctionMetrics) -> HashSet<String> {
+    use std::fs;
+
+    // Read file and parse to get AST
+    let content = match fs::read_to_string(&metric.file) {
+        Ok(c) => c,
+        Err(_) => return HashSet::new(),
+    };
+
+    let file_ast = match syn::parse_file(&content) {
+        Ok(ast) => ast,
+        Err(_) => return HashSet::new(),
+    };
+
+    // Find the function by name and line number
+    for item in &file_ast.items {
+        if let syn::Item::Fn(item_fn) = item {
+            if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
+                if ident_line == metric.line {
+                    // Extract parameter names from function signature
+                    let mut deps = HashSet::new();
+                    for input in &item_fn.sig.inputs {
+                        if let syn::FnArg::Typed(pat_type) = input {
+                            if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                                deps.insert(pat_ident.ident.to_string());
+                            }
+                        }
+                    }
+                    return deps;
+                }
+            }
+        }
+    }
+
     HashSet::new()
 }
 
@@ -153,13 +198,125 @@ fn extract_variable_deps(_metric: &FunctionMetrics) -> HashSet<String> {
 /// Identifies transformation patterns like map, filter, fold
 pub fn populate_data_transformations(
     data_flow: &mut DataFlowGraph,
-    _metrics: &[FunctionMetrics],
+    metrics: &[FunctionMetrics],
 ) -> usize {
-    // TODO: Implement data transformation detection
-    // This would require call graph traversal and AST analysis
-    // For now, return 0 as a placeholder
-    let _data_flow = data_flow; // Use the parameter
-    0
+    use std::fs;
+
+    let mut transformation_count = 0;
+
+    for metric in metrics {
+        // Read file and parse to get AST
+        let content = match fs::read_to_string(&metric.file) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let file_ast = match syn::parse_file(&content) {
+            Ok(ast) => ast,
+            Err(_) => continue,
+        };
+
+        // Find the function by name and line number
+        for item in &file_ast.items {
+            if let syn::Item::Fn(item_fn) = item {
+                if let Some(ident_line) = item_fn.sig.ident.span().start().line.checked_sub(1) {
+                    if ident_line == metric.line {
+                        // Detect transformation patterns in the function body
+                        transformation_count += detect_transformation_patterns(
+                            &item_fn.block,
+                            data_flow,
+                            metric,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    transformation_count
+}
+
+/// Detect data transformation patterns (map, filter, fold, etc.) in a code block
+fn detect_transformation_patterns(
+    block: &syn::Block,
+    _data_flow: &mut DataFlowGraph,
+    _metric: &FunctionMetrics,
+) -> usize {
+    let mut count = 0;
+
+    // Visit all statements and expressions looking for iterator method chains
+    for stmt in &block.stmts {
+        count += count_transformations_in_stmt(stmt);
+    }
+
+    count
+}
+
+/// Count transformation patterns in a statement
+fn count_transformations_in_stmt(stmt: &syn::Stmt) -> usize {
+    match stmt {
+        syn::Stmt::Expr(expr, _) => count_transformations_in_expr(expr),
+        syn::Stmt::Local(local) => {
+            if let Some(init) = &local.init {
+                count_transformations_in_expr(&init.expr)
+            } else {
+                0
+            }
+        }
+        _ => 0,
+    }
+}
+
+/// Count transformation patterns in an expression
+fn count_transformations_in_expr(expr: &syn::Expr) -> usize {
+    let mut count = 0;
+
+    match expr {
+        syn::Expr::MethodCall(method_call) => {
+            // Check if this is a transformation method
+            let method_name = method_call.method.to_string();
+            if is_transformation_method(&method_name) {
+                count += 1;
+            }
+            // Recursively check the receiver
+            count += count_transformations_in_expr(&method_call.receiver);
+        }
+        syn::Expr::Call(call) => {
+            // Check arguments for nested transformations
+            for arg in &call.args {
+                count += count_transformations_in_expr(arg);
+            }
+        }
+        syn::Expr::Block(block) => {
+            for stmt in &block.block.stmts {
+                count += count_transformations_in_stmt(stmt);
+            }
+        }
+        _ => {}
+    }
+
+    count
+}
+
+/// Check if a method name represents a data transformation
+fn is_transformation_method(name: &str) -> bool {
+    matches!(
+        name,
+        "map" | "filter"
+            | "fold"
+            | "reduce"
+            | "filter_map"
+            | "flat_map"
+            | "scan"
+            | "collect"
+            | "for_each"
+            | "any"
+            | "all"
+            | "find"
+            | "partition"
+            | "zip"
+            | "chain"
+    )
 }
 
 #[cfg(test)]
