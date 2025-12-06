@@ -201,30 +201,33 @@ impl ProgressManager {
 
     /// Start a pipeline stage in TUI
     pub fn tui_start_stage(&self, stage_index: usize) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut().start_stage(stage_index);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.start_stage(stage_index);
+                }
             }
         }
     }
 
     /// Complete a pipeline stage in TUI
     pub fn tui_complete_stage(&self, stage_index: usize, metric: impl Into<String>) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut().complete_stage(stage_index, metric);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.complete_stage(stage_index, metric);
+                }
             }
         }
     }
 
     /// Update stage metric in TUI
     pub fn tui_update_metric(&self, stage_index: usize, metric: impl Into<String>) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut().update_stage_metric(stage_index, metric);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.update_stage_metric(stage_index, metric);
+                }
             }
         }
     }
@@ -237,66 +240,64 @@ impl ProgressManager {
         status: crate::tui::app::StageStatus,
         progress: Option<(usize, usize)>,
     ) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut()
-                    .update_subtask(stage_index, subtask_index, status, progress);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.update_subtask(stage_index, subtask_index, status, progress);
+                }
             }
         }
     }
 
     /// Update overall progress in TUI
     pub fn tui_set_progress(&self, progress: f64) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut().set_overall_progress(progress);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.set_overall_progress(progress);
+                }
             }
         }
     }
 
     /// Update statistics in TUI
     pub fn tui_update_stats(&self, functions: usize, debt: usize, coverage: f64, threads: usize) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                tui.app_mut()
-                    .update_stats(functions, debt, coverage, threads);
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.update_stats(functions, debt, coverage, threads);
+                }
             }
         }
     }
 
     /// Update only function and debt counts in TUI
     pub fn tui_update_counts(&self, functions: usize, debt: usize) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                let app = tui.app_mut();
-                app.functions_count = functions;
-                app.debt_count = debt;
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.functions_count = functions;
+                    app.debt_count = debt;
+                }
             }
         }
     }
 
     /// Update only coverage percentage in TUI
     pub fn tui_update_coverage(&self, coverage: f64) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                let app = tui.app_mut();
-                app.coverage_percent = coverage;
-                let _ = tui.render();
+        if let Ok(guard) = self.tui_manager.lock() {
+            if let Some(ref tui) = *guard {
+                if let Ok(mut app) = tui.app().lock() {
+                    app.coverage_percent = coverage;
+                }
             }
         }
     }
 
-    /// Render a TUI frame (for periodic updates)
+    /// Render a TUI frame (now no-op, background thread handles rendering at 60 FPS)
     pub fn tui_render(&self) {
-        if let Ok(mut guard) = self.tui_manager.lock() {
-            if let Some(ref mut tui) = *guard {
-                let _ = tui.render();
-            }
-        }
+        // Background render thread in TuiManager handles continuous rendering
+        // This method kept for backwards compatibility
     }
 
     /// Cleanup TUI on completion

@@ -49,9 +49,10 @@ use layout::render_adaptive;
 
 /// TUI manager for rendering the analysis progress interface
 pub struct TuiManager {
-    terminal: Terminal<CrosstermBackend<io::Stdout>>,
-    app: App,
+    terminal: Arc<std::sync::Mutex<Terminal<CrosstermBackend<io::Stdout>>>>,
+    app: Arc<std::sync::Mutex<App>>,
     should_exit: Arc<AtomicBool>,
+    render_thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl TuiManager {
@@ -65,6 +66,8 @@ impl TuiManager {
         let terminal = Terminal::new(backend)?;
 
         let should_exit = Arc::new(AtomicBool::new(false));
+        let terminal = Arc::new(std::sync::Mutex::new(terminal));
+        let app = Arc::new(std::sync::Mutex::new(App::new()));
 
         // Setup signal handlers for Ctrl+C and Ctrl+Z
         let exit_flag = should_exit.clone();
@@ -101,41 +104,73 @@ impl TuiManager {
             }
         });
 
+        // Start background render thread for smooth 60 FPS updates
+        let render_terminal = terminal.clone();
+        let render_app = app.clone();
+        let render_exit_flag = should_exit.clone();
+
+        let render_thread = std::thread::spawn(move || {
+            let frame_duration = std::time::Duration::from_millis(16); // ~60 FPS
+
+            loop {
+                if render_exit_flag.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // Render frame
+                if let (Ok(mut terminal), Ok(mut app)) = (render_terminal.lock(), render_app.lock())
+                {
+                    app.tick();
+                    let _ = terminal.draw(|f| render_adaptive(f, &app));
+                }
+
+                std::thread::sleep(frame_duration);
+            }
+        });
+
         Ok(Self {
             terminal,
-            app: App::new(),
+            app,
             should_exit,
+            render_thread: Some(render_thread),
         })
     }
 
-    /// Render the current frame
+    /// Render the current frame (now handled by background thread, kept for compatibility)
     pub fn render(&mut self) -> io::Result<()> {
-        self.app.tick();
-        self.terminal.draw(|f| render_adaptive(f, &self.app))?;
+        // Background render thread handles continuous rendering at 60 FPS
+        // This method is now a no-op but kept for API compatibility
         Ok(())
     }
 
     /// Get mutable reference to the application state
-    pub fn app_mut(&mut self) -> &mut App {
-        &mut self.app
+    pub fn app_mut(&mut self) -> std::sync::MutexGuard<'_, App> {
+        self.app.lock().unwrap()
     }
 
-    /// Get immutable reference to the application state
-    pub fn app(&self) -> &App {
-        &self.app
+    /// Get immutable reference to the application state (clone the Arc for read access)
+    pub fn app(&self) -> Arc<std::sync::Mutex<App>> {
+        self.app.clone()
     }
 
     /// Clean up and restore terminal
     pub fn cleanup(&mut self) -> io::Result<()> {
-        // Signal event thread to stop
+        // Signal all threads to stop
         self.should_exit.store(true, Ordering::Relaxed);
 
-        // Give the thread a moment to exit
+        // Wait for render thread to finish
+        if let Some(handle) = self.render_thread.take() {
+            let _ = handle.join();
+        }
+
+        // Give event thread a moment to exit
         std::thread::sleep(std::time::Duration::from_millis(50));
 
         disable_raw_mode()?;
-        execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
-        self.terminal.show_cursor()?;
+        if let Ok(mut terminal) = self.terminal.lock() {
+            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+            terminal.show_cursor()?;
+        }
         Ok(())
     }
 }
