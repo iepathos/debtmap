@@ -1,24 +1,24 @@
-/// Type-state pattern for validating configuration before execution
-///
-/// This module provides compile-time guarantees that configuration
-/// is validated before being executed. Using phantom types, we encode
-/// validation states in the type system itself.
-///
-/// # Example
-///
-/// ```rust
-/// use debtmap::commands::state::{AnalyzeConfig, Unvalidated, Validated};
-///
-/// // Create unvalidated config
-/// let config: AnalyzeConfig<Unvalidated> = AnalyzeConfig::new(path);
-///
-/// // This won't compile - unvalidated config cannot be executed:
-/// // config.execute(); // ERROR: method not found
-///
-/// // Must validate first:
-/// let validated = config.validate()?;
-/// validated.execute()?; // OK - validated config can execute
-/// ```
+//! Type-state pattern for validating configuration before execution
+//!
+//! This module provides compile-time guarantees that configuration
+//! is validated before being executed. Using phantom types, we encode
+//! validation states in the type system itself.
+//!
+//! # Example
+//!
+//! ```rust
+//! use debtmap::commands::state::{AnalyzeConfig, Unvalidated, Validated};
+//!
+//! // Create unvalidated config
+//! let config: AnalyzeConfig<Unvalidated> = AnalyzeConfig::new(path);
+//!
+//! // This won't compile - unvalidated config cannot be executed:
+//! // config.execute(); // ERROR: method not found
+//!
+//! // Must validate first:
+//! let validated = config.validate()?;
+//! validated.execute()?; // OK - validated config can execute
+//! ```
 
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -109,6 +109,7 @@ pub struct AnalyzeConfig<State = Unvalidated> {
 
 impl AnalyzeConfig<Unvalidated> {
     /// Create a new unvalidated configuration
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         path: PathBuf,
         format: cli::OutputFormat,
