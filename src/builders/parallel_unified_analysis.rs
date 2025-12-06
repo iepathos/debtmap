@@ -423,12 +423,31 @@ impl ParallelUnifiedAnalysisBuilder {
     ) {
         let start = Instant::now();
 
+        // Subtask 0: Initialize (data flow graph, purity, test detection) - PARALLEL
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Active, None);
+        }
+
         // Execute parallel initialization tasks
         let (data_flow, purity, test_funcs, debt_agg) =
             self.execute_phase1_tasks(metrics, debt_items);
 
         let phase1_time = start.elapsed();
         self.report_phase1_completion(phase1_time);
+
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(6, 0, crate::tui::app::StageStatus::Completed, None);
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+
+        // Subtask 1: Aggregate debt (included in phase 1)
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Active, None);
+        }
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(6, 1, crate::tui::app::StageStatus::Completed, None);
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
 
         (data_flow, purity, test_funcs, debt_agg)
     }
@@ -685,6 +704,17 @@ impl ParallelUnifiedAnalysisBuilder {
     ) -> Vec<UnifiedDebtItem> {
         let start = Instant::now();
 
+        // Subtask 2: Score functions (main computational loop with progress) - PARALLEL
+        let total_metrics = metrics.len();
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(
+                6,
+                2,
+                crate::tui::app::StageStatus::Active,
+                Some((0, total_metrics)),
+            );
+        }
+
         // Suppress old progress bar - unified system already shows "4/4 Resolving dependencies"
         let progress: Option<indicatif::ProgressBar> = None;
 
@@ -709,6 +739,16 @@ impl ParallelUnifiedAnalysisBuilder {
         );
 
         self.timings.function_analysis = start.elapsed();
+
+        if let Some(manager) = ProgressManager::global() {
+            manager.tui_update_subtask(
+                6,
+                2,
+                crate::tui::app::StageStatus::Completed,
+                Some((total_metrics, total_metrics)),
+            );
+            std::thread::sleep(std::time::Duration::from_millis(150));
+        }
 
         // Finish progress bar with completion message
         if let Some(pb) = progress {

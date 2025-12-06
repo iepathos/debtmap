@@ -163,7 +163,31 @@ impl App {
                     },
                 ],
             ),
-            PipelineStage::new("debt scoring"),
+            PipelineStage::with_subtasks(
+                "debt scoring",
+                vec![
+                    SubTask {
+                        name: "initialize".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "aggregate debt".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "score functions".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                    SubTask {
+                        name: "filter results".to_string(),
+                        status: StageStatus::Pending,
+                        progress: None,
+                    },
+                ],
+            ),
             PipelineStage::new("prioritization"),
         ]
     }
