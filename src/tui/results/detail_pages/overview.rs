@@ -141,17 +141,10 @@ pub fn render(
                     Span::raw("  Cognitive Reduction: "),
                     Span::styled(
                         format!(
-                            "{} → {} (cognitive)",
+                            "{} → {}",
                             entropy.original_complexity, entropy.adjusted_cognitive
                         ),
                         Style::default().fg(theme.primary),
-                    ),
-                ]));
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled(
-                        "(Cyclomatic unchanged - structural metric)",
-                        Style::default().fg(theme.muted),
                     ),
                 ]));
             }
