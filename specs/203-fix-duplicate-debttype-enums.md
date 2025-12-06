@@ -6,6 +6,7 @@ priority: critical
 status: draft
 dependencies: []
 created: 2025-12-06
+updated: 2025-12-06
 ---
 
 # Specification 203: Fix Duplicate DebtType Enum Definitions
@@ -17,10 +18,11 @@ created: 2025-12-06
 
 ## Context
 
-The codebase currently has **two different definitions** of the `DebtType` enum, causing error swallowing detection to fail silently:
+The codebase currently has **two different definitions** of the `DebtType` enum, creating parallel systems where detector outputs are orphaned and never reach users:
 
 1. **`src/core/mod.rs:219-234`** - Simple unit variants:
    ```rust
+   #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy)]
    pub enum DebtType {
        Todo,
        Fixme,
@@ -29,211 +31,439 @@ The codebase currently has **two different definitions** of the `DebtType` enum,
        Complexity,
        Dependency,
        ErrorSwallowing,  // ❌ Unit variant
-       // ...
+       ResourceManagement,
+       CodeOrganization,
+       TestComplexity,
+       TestTodo,
+       TestDuplication,
+       TestQuality,
    }
    ```
 
 2. **`src/priority/mod.rs:164-270`** - Rich struct variants with data:
    ```rust
+   #[derive(Debug, Clone, Serialize, Deserialize)]
    pub enum DebtType {
        TestingGap { coverage: f64, cyclomatic: u32, cognitive: u32 },
        ComplexityHotspot { cyclomatic: u32, cognitive: u32, ... },
        ErrorSwallowing { pattern: String, context: Option<String> },  // ✓ Struct variant
-       // ...
+       // ... 20+ more struct variants
    }
    ```
 
-### The Broken State
+### The Real Problem: Parallel Systems
 
-The error swallowing detector (`src/debt/error_swallowing.rs:48`) creates debt items using the **core enum**:
+The duplicate enums have created **two independent data flow pipelines** that never integrate:
 
+#### **System 1: Legacy Detector Path (Orphaned)**
+```
+Debt Detectors (error_swallowing, panic_patterns, etc.)
+    ↓
+Create core::DebtItem with core::DebtType (unit variants)
+    ↓
+Stored in FileMetrics.debt_items: Vec<DebtItem>
+    ↓
+[DEAD END - Never consumed by output pipeline]
+```
+
+**Location**: `src/debt/error_swallowing.rs:48`, `src/analyzers/rust.rs:321`
 ```rust
+use crate::core::{DebtItem, DebtType, Priority};
+
 self.items.push(DebtItem {
-    debt_type: DebtType::ErrorSwallowing,  // ❌ Uses core::DebtType (unit variant)
+    debt_type: DebtType::ErrorSwallowing,  // ❌ Unit variant from core
     // ...
 });
 ```
 
-But the rest of the system (priority scoring, TUI, output formatting) expects the **priority enum**:
-
-```rust
-DebtType::ErrorSwallowing { pattern, context }  // ✓ What's actually needed
+#### **System 2: Priority Scoring Path (Active)**
+```
+FunctionMetrics (from complexity analysis)
+    ↓
+create_unified_debt_item() in priority/scoring/construction.rs
+    ↓
+UnifiedDebtItem with priority::DebtType (struct variants)
+    ↓
+UnifiedAnalysis → Output formatters → User sees results ✓
 ```
 
-**Result**: Error swallowing detection creates incompatible `DebtItem`s that:
-1. Fail type checking somewhere downstream
-2. Get silently filtered out (likely via `.ok()` or pattern matching)
-3. Never appear in user output
+**Location**: `src/priority/scoring/construction.rs:407-484`
+```rust
+use crate::priority::DebtType;
 
-**Meta-irony**: The error swallowing detector is broken due to a type error that gets... error swallowed.
+UnifiedDebtItem {
+    debt_type: context.debt_type,  // ✓ Struct variant from priority
+    // ...
+}
+```
 
-### Why This Happened
+### Why This Happens
 
-Looking at the code history:
-- `src/core/mod.rs` contains a **legacy/deprecated** simple enum
-- `src/priority/mod.rs` contains the **current** rich enum with actual data
-- Error swallowing detector was written against the wrong enum
-- No compilation error because both enums have `ErrorSwallowing` variant
-- Runtime type mismatch gets silently swallowed
+The code **compiles successfully** because:
+1. Both enums are valid Rust code
+2. `DebtItem` uses `core::DebtType` - type checks ✓
+3. `UnifiedDebtItem` uses `priority::DebtType` - type checks ✓
+4. **They never interact**, so no type mismatch occurs
+
+But at runtime:
+1. Error swallowing detector creates `DebtItem`s → stored in `FileMetrics.debt_items`
+2. Unified analysis creates `UnifiedDebtItem`s directly from `FunctionMetrics` - **never looks at `FileMetrics.debt_items`**
+3. Output pipeline only shows `UnifiedDebtItem`s
+4. **Result**: Detector output is orphaned - built but never displayed
 
 ### Impact
 
-1. **Error swallowing detection completely broken** - 0 results despite ~95 instances in codebase
-2. **Silent failure** - No warning/error that detection failed
-3. **User confusion** - Feature appears to exist but doesn't work
-4. **False confidence** - Users trust output is complete when it's missing entire category
+1. **Error swallowing detection completely broken** - Detector runs, creates items, but users see 0 results
+2. **Silent failure** - No warning that detection failed, no indication of the problem
+3. **False confidence** - Feature appears to exist (has tests, code runs) but doesn't work for users
+4. **Wasted engineering effort** - Entire detection system built but never integrated
+5. **User confusion** - "Why doesn't debtmap detect error swallowing in my code?"
+
+**Meta-irony**: The error swallowing detector's output gets... error swallowed.
 
 ## Objective
 
-Eliminate the duplicate `DebtType` enum definitions and fix error swallowing detection:
+Eliminate the duplicate `DebtType` enum definitions and choose an architectural direction to properly integrate detection output into the user-facing pipeline.
 
-1. **Remove legacy enum** from `src/core/mod.rs`
-2. **Use rich enum** from `src/priority/mod.rs` everywhere
-3. **Fix error swallowing detector** to use correct variant with data
-4. **Update all references** throughout codebase
-5. **Verify detection works** by analyzing debtmap itself
+After this fix:
+1. Single `DebtType` enum definition (source of truth)
+2. Error swallowing detection integrated into output pipeline
+3. Running debtmap on itself produces visible error swallowing results
 
-After this fix, running debtmap on itself should report ~95 error swallowing instances.
+## Architectural Decision
+
+We must choose one of two approaches:
+
+### Option A: Eliminate Detector Path (RECOMMENDED)
+
+**Approach**: Remove legacy `DebtItem` creation, integrate detection into unified analysis.
+
+**Rationale**:
+- Cleaner single-pipeline architecture
+- Error swallowing is a function-level concern (like complexity)
+- Avoids conversion overhead between types
+- Matches existing pattern for complexity hotspots
+
+**Changes Required**:
+1. Error swallowing detector enriches `FunctionMetrics.language_specific` instead of creating `DebtItem`s
+2. Priority scoring reads enriched metrics and creates `UnifiedDebtItem`s with `priority::DebtType::ErrorSwallowing`
+3. Remove `detect_error_swallowing()` function, replace with metric enrichment
+4. Similar changes for other detectors (panic_patterns, async_errors, etc.)
+
+**Pros**:
+- Single data flow path
+- No type conversion needed
+- Consistent with complexity analysis approach
+- Easier to maintain long-term
+
+**Cons**:
+- Larger refactor scope
+- Affects multiple detector modules
+- Requires redesigning detector interface
+
+### Option B: Bridge the Two Systems
+
+**Approach**: Keep both systems, create conversion layer.
+
+**Rationale**:
+- Smaller initial change
+- Preserves existing detector architecture
+- Can be done incrementally
+
+**Changes Required**:
+1. Implement `From<core::DebtType> for priority::DebtType` conversion
+2. Create conversion function: `DebtItem → UnifiedDebtItem`
+3. Modify unified analysis to consume `FileMetrics.debt_items`
+4. Handle scoring for converted items
+
+**Pros**:
+- Smaller immediate scope
+- Less architectural disruption
+- Preserves detector abstraction
+
+**Cons**:
+- Two parallel systems long-term
+- Conversion overhead
+- More complex architecture
+- Duplicate enum definitions remain (requires careful trait management)
+
+### **Decision for This Spec: Option B** (with future Option A)
+
+We'll implement **Option B** initially because:
+1. Smaller, more manageable change
+2. Can be completed in single spec
+3. Proves integration works before larger refactor
+4. Option A can follow in spec 204 (detector architecture redesign)
+
+This spec focuses on:
+- Consolidating enum definitions
+- Creating conversion layer
+- Integrating `FileMetrics.debt_items` into output
+
+Future spec 204 will eliminate dual path entirely.
 
 ## Requirements
 
 ### Functional Requirements
 
-1. **Single Source of Truth**
-   - Only one `DebtType` enum definition in entire codebase
-   - Located in `src/priority/mod.rs` (already the rich version)
-   - All modules import from this location
-
-2. **Error Swallowing Detector Fix**
-   - Update `src/debt/error_swallowing.rs:48` to use struct variant:
-     ```rust
-     debt_type: DebtType::ErrorSwallowing {
-         pattern: pattern.to_string(),
-         context: Some(context.to_string()),
-     },
-     ```
-   - Pass pattern name to variant (e.g., "if let Ok without else")
-   - Pass contextual information where available
-
-3. **Import Updates**
-   - Replace all `use crate::core::DebtType` with `use crate::priority::DebtType`
-   - Or re-export from core if needed for API compatibility
-   - Ensure all references resolve to priority enum
-
-4. **Backward Compatibility**
-   - If `core::DebtType` is part of public API, create type alias:
+1. **Single DebtType Definition**
+   - Remove `core::DebtType` enum definition
+   - Re-export `priority::DebtType` from `core` for compatibility:
      ```rust
      // src/core/mod.rs
      pub use crate::priority::DebtType;
      ```
-   - This maintains API compatibility while using single definition
+   - All imports resolve to single definition
+
+2. **DebtItem Type Update**
+   - Change `DebtItem.debt_type` field from unit enum to struct enum:
+     ```rust
+     pub struct DebtItem {
+         pub debt_type: DebtType,  // Now uses priority::DebtType
+         // ...
+     }
+     ```
+
+3. **Pattern Matching Updates**
+   - Update all equality checks to use `matches!`:
+     ```rust
+     // Before (won't compile)
+     if item.debt_type == DebtType::ErrorSwallowing { ... }
+
+     // After
+     if matches!(item.debt_type, DebtType::ErrorSwallowing { .. }) { ... }
+     ```
+
+4. **Detector Updates**
+   - Update each detector to create struct variants:
+     ```rust
+     // src/debt/error_swallowing.rs
+     debt_type: DebtType::ErrorSwallowing {
+         pattern: pattern.to_string(),
+         context: Some(context.to_string()),
+     }
+     ```
+
+5. **Display Implementation**
+   - Add `Display` impl for `priority::DebtType` to handle all struct variants
+   - Add `Display` impl for `ErrorSwallowingPattern`
+
+6. **Integration into Output Pipeline**
+   - Modify unified analysis to consume `FileMetrics.debt_items`
+   - Create stub `UnifiedDebtItem`s for detector-sourced items
+   - Ensure all debt items appear in final output
 
 ### Non-Functional Requirements
 
 1. **Type Safety**
-   - All DebtType uses must type-check correctly
-   - No runtime type mismatches
-   - Pattern matching must be exhaustive
+   - All code compiles without warnings
+   - Exhaustive pattern matching enforced
+   - No `as` casts or unsafe conversions
 
-2. **Verification**
-   - Run debtmap on itself after fix
-   - Confirm error swallowing results appear in output
-   - Verify ~95 instances are detected
-
-3. **No Regressions**
-   - All existing tests must pass
-   - Other debt detection still works
+2. **Performance**
    - No performance degradation
+   - Minimal conversion overhead
 
-## Acceptance Criteria
+3. **Maintainability**
+   - Clear migration path for future detectors
+   - Documented architecture decision
 
-- [ ] `src/core/mod.rs` no longer contains `DebtType` enum definition
-- [ ] `DebtType` is only defined in `src/priority/mod.rs`
-- [ ] `src/core/mod.rs` re-exports `DebtType` from priority module (if needed for API)
-- [ ] All imports of `DebtType` resolve to priority module's definition
-- [ ] `src/debt/error_swallowing.rs` uses struct variant with pattern and context
-- [ ] Error swallowing detector tests updated to match new variant
-- [ ] All unit tests pass
-- [ ] All integration tests pass
-- [ ] Running debtmap on itself shows error swallowing results
-- [ ] Output contains 50+ error swallowing instances (validated against manual count)
-- [ ] No clippy warnings
-- [ ] No compilation errors or warnings
+## Breaking Changes
 
-## Technical Details
+### Internal Breaking Changes
 
-### Implementation Approach
+**This is NOT a minor change.** Affects 50+ files across the codebase.
 
-**Phase 1: Identify All DebtType References**
+1. **Pattern Matching (30+ files)**
+   ```rust
+   // All these patterns MUST change:
+   match item.debt_type {
+       DebtType::ErrorSwallowing => { ... }  // ❌ Won't compile
+   }
 
+   // To:
+   match item.debt_type {
+       DebtType::ErrorSwallowing { .. } => { ... }  // ✓ Required
+   }
+   ```
+
+2. **Equality Comparisons (20+ files)**
+   ```rust
+   // src/priority/debt_aggregator.rs:219 (test)
+   assert_eq!(categorize_debt_type(&DebtType::ErrorSwallowing), ...);
+
+   // Won't compile - ErrorSwallowing now requires fields
+   ```
+
+3. **categorize_debt_type Function**
+   - Location: `src/priority/debt_aggregator.rs:81-104`
+   - Currently matches unit variants
+   - Must update to match struct variants with `..` pattern
+
+4. **Suppression Logic**
+   - Location: `src/debt/suppression.rs`
+   - `is_suppressed()` compares `DebtType` for equality
+   - Must implement variant-only comparison (ignore field data)
+
+5. **Test Suite**
+   - All detector tests use `DebtType` equality assertions
+   - All pattern match tests need updating
+   - Integration tests need struct variant construction
+
+### Public API Changes
+
+**IF debtmap is used as a library** (current status unclear):
+
+- `core::DebtType` remains available (re-exported)
+- But behavior changes - now has struct variants instead of unit variants
+- **Semver: Major version bump required** if library usage exists
+
+### Migration Required
+
+Every module importing `DebtType` needs review:
+- ✓ Imports still work (re-export handles)
+- ⚠️ Pattern matches need updates
+- ⚠️ Equality checks need updates
+- ⚠️ Construction needs field data
+
+## Implementation Approach
+
+### Phase 1: Preparation and Analysis
+
+**Identify all affected code:**
 ```bash
-# Find all files using DebtType
-rg "DebtType::" --type rust -l > debttype_files.txt
+# Find all DebtType usages (expect 100+ matches)
+rg "DebtType::" --type rust -l
 
-# Find all imports
+# Find all pattern matches (expect 50+ matches)
+rg "match.*debt_type|=> DebtType::" --type rust -C 3
+
+# Find all equality checks (expect 30+ matches)
+rg "debt_type ==|== DebtType::" --type rust
+
+# Find all imports (expect 50+ files)
 rg "use.*DebtType" --type rust
-
-# Check for pattern matches
-rg "match.*debt_type|DebtType::" --type rust -C 3
 ```
 
-**Phase 2: Remove Legacy Enum from Core**
+### Phase 2: Add Display Implementations
 
-Current state (`src/core/mod.rs:219-234`):
+**Before any enum changes**, add required trait implementations:
+
+1. **ErrorSwallowingPattern Display**
+   ```rust
+   // src/debt/error_swallowing.rs
+   impl std::fmt::Display for ErrorSwallowingPattern {
+       fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+           write!(f, "{}", self.description())
+       }
+   }
+   ```
+
+2. **priority::DebtType Display**
+   ```rust
+   // src/priority/mod.rs
+   impl std::fmt::Display for DebtType {
+       fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+           match self {
+               DebtType::ErrorSwallowing { pattern, .. } =>
+                   write!(f, "Error Swallowing: {}", pattern),
+               DebtType::TestingGap { .. } => write!(f, "Testing Gap"),
+               DebtType::ComplexityHotspot { .. } => write!(f, "Complexity Hotspot"),
+               DebtType::DeadCode { .. } => write!(f, "Dead Code"),
+               DebtType::Duplication { .. } => write!(f, "Duplication"),
+               DebtType::Risk { .. } => write!(f, "Risk"),
+               // ... all 20+ variants
+           }
+       }
+   }
+   ```
+
+### Phase 3: Update core::DebtType Reference
+
+1. **Remove enum definition from src/core/mod.rs:218-234**
+2. **Add re-export**:
+   ```rust
+   // src/core/mod.rs (line 218)
+   // Re-export from priority module (spec 203)
+   pub use crate::priority::DebtType;
+   ```
+
+3. **Verify imports still resolve**:
+   ```bash
+   cargo check
+   # Should see errors about missing struct fields - expected!
+   ```
+
+### Phase 4: Update categorize_debt_type
+
+Critical function that many modules depend on:
+
 ```rust
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Copy, Ord, PartialOrd)]
-pub enum DebtType {
-    Todo,
-    Fixme,
-    CodeSmell,
-    Duplication,
-    Complexity,
-    Dependency,
-    ErrorSwallowing,
-    ResourceManagement,
-    CodeOrganization,
-    TestComplexity,
-    TestTodo,
-    TestDuplication,
-    TestQuality,
+// src/priority/debt_aggregator.rs:81
+pub fn categorize_debt_type(debt_type: &DebtType) -> DebtCategory {
+    match debt_type {
+        // Match variants, ignore data with ..
+        DebtType::Complexity { .. } => DebtCategory::Organization,
+
+        DebtType::Todo { .. } | DebtType::Fixme { .. } => DebtCategory::Organization,
+        DebtType::CodeOrganization { .. } => DebtCategory::Organization,
+        DebtType::CodeSmell { .. } => DebtCategory::Organization,
+        DebtType::Dependency { .. } => DebtCategory::Organization,
+
+        DebtType::TestComplexity { .. }
+        | DebtType::TestTodo { .. }
+        | DebtType::TestDuplication { .. } => DebtCategory::Testing,
+        DebtType::TestQuality { .. } => DebtCategory::Testing,
+
+        DebtType::ErrorSwallowing { .. } => DebtCategory::Resource,
+        DebtType::ResourceManagement { .. } => DebtCategory::Resource,
+
+        DebtType::Duplication { .. } => DebtCategory::Duplication,
+
+        // Add all priority::DebtType variants
+        DebtType::TestingGap { .. } => DebtCategory::Testing,
+        DebtType::ComplexityHotspot { .. } => DebtCategory::Organization,
+        DebtType::DeadCode { .. } => DebtCategory::Organization,
+        DebtType::Risk { .. } => DebtCategory::Resource,
+        DebtType::AllocationInefficiency { .. } => DebtCategory::Resource,
+        DebtType::StringConcatenation { .. } => DebtCategory::Resource,
+        DebtType::NestedLoops { .. } => DebtCategory::Resource,
+        DebtType::BlockingIO { .. } => DebtCategory::Resource,
+        DebtType::SuboptimalDataStructure { .. } => DebtCategory::Resource,
+        DebtType::GodObject { .. } => DebtCategory::Organization,
+        DebtType::GodModule { .. } => DebtCategory::Organization,
+        DebtType::FeatureEnvy { .. } => DebtCategory::Organization,
+        DebtType::PrimitiveObsession { .. } => DebtCategory::Organization,
+        DebtType::MagicValues { .. } => DebtCategory::Organization,
+        DebtType::AssertionComplexity { .. } => DebtCategory::Testing,
+        DebtType::FlakyTestPattern { .. } => DebtCategory::Testing,
+        DebtType::AsyncMisuse { .. } => DebtCategory::Resource,
+        DebtType::ResourceLeak { .. } => DebtCategory::Resource,
+        DebtType::CollectionInefficiency { .. } => DebtCategory::Resource,
+        DebtType::ScatteredType { .. } => DebtCategory::Organization,
+        // Add any other variants...
+    }
 }
-
-impl std::fmt::Display for DebtType { /* ... */ }
 ```
 
-Replace with re-export:
-```rust
-// Re-export from priority module for API compatibility
-pub use crate::priority::DebtType;
-```
+### Phase 5: Update Detectors to Create Struct Variants
 
-**Phase 3: Fix Error Swallowing Detector**
+For each detector in `src/debt/`:
 
-Current broken code (`src/debt/error_swallowing.rs:34-56`):
+**Example: error_swallowing.rs**
 ```rust
 fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, context: &str) {
-    // Check suppression...
-
-    let priority = self.determine_priority(&pattern);
-    let message = format!("{}: {}", pattern.description(), pattern.remediation());
-
-    self.items.push(DebtItem {
-        id: format!("error-swallow-{}-{}", self.current_file.display(), line),
-        debt_type: DebtType::ErrorSwallowing,  // ❌ Wrong variant
-        priority,
-        file: self.current_file.to_path_buf(),
-        line,
-        column: None,
-        message,
-        context: Some(context.to_string()),
-    });
-}
-```
-
-Fixed code:
-```rust
-fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, context: &str) {
-    // Check suppression...
+    // Check suppression
+    if let Some(checker) = self.suppression {
+        // Update suppression check to use struct variant
+        let debt_type_for_check = DebtType::ErrorSwallowing {
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
+        };
+        if checker.is_suppressed(line, &debt_type_for_check) {
+            return;
+        }
+    }
 
     let priority = self.determine_priority(&pattern);
     let message = format!("{}: {}", pattern.description(), pattern.remediation());
@@ -241,8 +471,8 @@ fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, contex
     self.items.push(DebtItem {
         id: format!("error-swallow-{}-{}", self.current_file.display(), line),
         debt_type: DebtType::ErrorSwallowing {
-            pattern: pattern.to_string(),  // ✓ Pattern name
-            context: Some(context.to_string()),  // ✓ Contextual info
+            pattern: pattern.to_string(),
+            context: Some(context.to_string()),
         },
         priority,
         file: self.current_file.to_path_buf(),
@@ -254,272 +484,235 @@ fn add_debt_item(&mut self, line: usize, pattern: ErrorSwallowingPattern, contex
 }
 ```
 
-**Phase 4: Add Display Implementation for ErrorSwallowingPattern**
+Repeat for:
+- `src/debt/panic_patterns.rs` → Create appropriate struct variants
+- `src/debt/async_errors.rs` → Create appropriate struct variants
+- `src/debt/error_context.rs` → Create appropriate struct variants
+- `src/debt/error_propagation.rs` → Create appropriate struct variants
+- `src/debt/patterns.rs` (TODO/FIXME) → Create appropriate struct variants
+- `src/debt/smells.rs` → Update to struct variants
+- `src/resource/mod.rs` → Update to struct variants
+- `src/testing/rust/mod.rs` → Update to struct variants
+
+**Note**: Some detectors may need new `priority::DebtType` variants added if they don't exist yet.
+
+### Phase 6: Update Suppression Logic
 
 ```rust
-impl std::fmt::Display for ErrorSwallowingPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.description())
+// src/debt/suppression.rs
+impl SuppressionContext {
+    pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
+        // Match on variant type only, ignore field data
+        let type_matches = match (debt_type, &self.suppressed_type) {
+            (DebtType::ErrorSwallowing { .. }, DebtType::ErrorSwallowing { .. }) => true,
+            (DebtType::TestingGap { .. }, DebtType::TestingGap { .. }) => true,
+            (DebtType::ComplexityHotspot { .. }, DebtType::ComplexityHotspot { .. }) => true,
+            // Add all variants...
+            _ => {
+                // Use std::mem::discriminant for exhaustive comparison
+                std::mem::discriminant(debt_type) == std::mem::discriminant(&self.suppressed_type)
+            }
+        };
+
+        type_matches && self.line_range.contains(&line)
     }
 }
 ```
 
-**Phase 5: Update Imports Throughout Codebase**
+### Phase 7: Update All Tests
 
-Replace:
+**Pattern match updates** (30+ test files):
 ```rust
-use crate::core::DebtType;
-```
+// Before
+assert_eq!(items[0].debt_type, DebtType::ErrorSwallowing);
 
-With:
-```rust
-use crate::priority::DebtType;
-```
+// After
+assert!(matches!(items[0].debt_type, DebtType::ErrorSwallowing { .. }));
 
-Or if core is preferred import location:
-```rust
-use crate::core::DebtType;  // Now re-exports from priority
-```
-
-**Phase 6: Update Suppression Checker**
-
-The suppression context checker likely expects simple variants. Update if needed:
-
-```rust
-// src/debt/suppression.rs (if applicable)
-pub fn is_suppressed(&self, line: usize, debt_type: &DebtType) -> bool {
-    // Match on the variant, ignoring data
-    let type_matches = match (debt_type, &self.suppressed_type) {
-        (DebtType::ErrorSwallowing { .. }, DebtType::ErrorSwallowing { .. }) => true,
-        (DebtType::Complexity { .. }, DebtType::Complexity { .. }) => true,
-        // ... other variants
-        _ => debt_type == self.suppressed_type,
-    };
-
-    type_matches && self.line_range.contains(&line)
-}
-```
-
-**Phase 7: Update Display Implementation in Priority Module**
-
-The priority module's `DebtType` may need `Display` impl if missing:
-
-```rust
-// src/priority/mod.rs
-impl std::fmt::Display for DebtType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DebtType::ErrorSwallowing { pattern, .. } => write!(f, "Error Swallowing: {}", pattern),
-            DebtType::TestingGap { .. } => write!(f, "Testing Gap"),
-            DebtType::ComplexityHotspot { .. } => write!(f, "Complexity Hotspot"),
-            // ... other variants
-        }
+// Or with field inspection:
+match &items[0].debt_type {
+    DebtType::ErrorSwallowing { pattern, context } => {
+        assert!(pattern.contains("expected text"));
+        assert!(context.is_some());
     }
+    _ => panic!("Expected ErrorSwallowing variant"),
 }
 ```
 
-### Architecture Changes
+**Test in each detector file**:
+- `src/debt/error_swallowing.rs` - 5+ tests
+- `src/debt/panic_patterns.rs` - 3+ tests
+- `src/debt/async_errors.rs` - 3+ tests
+- `tests/debt_grouping_tests.rs`
+- `tests/core_display_tests.rs`
+- And 20+ more integration tests...
 
-**Before (Broken):**
-```
-src/core/mod.rs
-  └─ DebtType enum (simple, unit variants)  ❌ Legacy
+### Phase 8: Run Full Test Suite
 
-src/priority/mod.rs
-  └─ DebtType enum (rich, struct variants)  ✓ Current
+```bash
+# Run all tests
+cargo test --all-features
 
-src/debt/error_swallowing.rs
-  └─ Uses core::DebtType  ❌ Wrong type
-  └─ Creates incompatible DebtItems
-  └─ Silently filtered out downstream
+# Fix compilation errors one by one
+# Most will be pattern matching errors - update with `{ .. }`
 
-Output: 0 error swallowing results
-```
+# Run clippy
+cargo clippy --all-targets --all-features -- -D warnings
 
-**After (Fixed):**
-```
-src/core/mod.rs
-  └─ pub use priority::DebtType;  ✓ Re-export
-
-src/priority/mod.rs
-  └─ DebtType enum (single source of truth)  ✓ Only definition
-
-src/debt/error_swallowing.rs
-  └─ Uses priority::DebtType  ✓ Correct type
-  └─ Creates compatible DebtItems with pattern data
-  └─ Flows through pipeline successfully
-
-Output: ~95 error swallowing results  ✓ Detection works!
+# Format code
+cargo fmt --all
 ```
 
-### Data Structures
+### Phase 9: Verify Integration (Critical!)
 
-**ErrorSwallowingPattern Enhancement**
+This phase ensures detector output reaches users:
 
-Add `Display` trait:
-```rust
-impl std::fmt::Display for ErrorSwallowingPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
-```
+1. **Check current state** - verify `FileMetrics.debt_items` is populated:
+   ```rust
+   // Add debug logging in src/analyzers/rust.rs
+   eprintln!("FileMetrics for {:?}: {} debt_items", path, debt_items.len());
+   ```
 
-This enables:
-```rust
-debt_type: DebtType::ErrorSwallowing {
-    pattern: pattern.to_string(),  // Converts ErrorSwallowingPattern to String
-    context: Some(context.to_string()),
-}
-```
+2. **Trace data flow** - verify items flow to output:
+   ```rust
+   // In src/builders/unified_analysis.rs or equivalent
+   // Find where FileMetrics is consumed
+   // Ensure debt_items are extracted and converted to UnifiedDebtItem
+   ```
 
-### APIs and Interfaces
+3. **Create integration** if missing:
+   ```rust
+   // In unified analysis construction
+   for file_metrics in results.files {
+       for debt_item in file_metrics.debt_items {
+           // Convert DebtItem → UnifiedDebtItem
+           // Add to unified_analysis.items
+       }
+   }
+   ```
 
-**Public API Compatibility**
+4. **Verify output**:
+   ```bash
+   cargo run -- analyze src/debt/error_swallowing.rs
+   # Should show error swallowing items in output
+   ```
 
-If `core::DebtType` is part of public API:
+## Acceptance Criteria
 
-```rust
-// src/core/mod.rs - Maintain backward compatibility
-pub use crate::priority::DebtType;
+Core requirements:
 
-// All existing code using core::DebtType continues to work
-// But now uses the correct definition
-```
+- [ ] Only one `pub enum DebtType` definition exists in codebase (in `src/priority/mod.rs`)
+- [ ] `src/core/mod.rs` re-exports `DebtType` from priority module
+- [ ] All 50+ files using `DebtType` compile without errors
+- [ ] All pattern matches use `{ .. }` syntax for struct variants
+- [ ] `categorize_debt_type()` handles all variants with struct syntax
+- [ ] All detectors create struct variants with appropriate field data
+- [ ] `Display` impl exists for `priority::DebtType` with all variants
+- [ ] `Display` impl exists for `ErrorSwallowingPattern`
+- [ ] Suppression logic compares variant types (ignores field data)
+- [ ] All unit tests pass (400+ tests)
+- [ ] All integration tests pass
+- [ ] No clippy warnings
+- [ ] No compilation warnings
 
-**Internal Consistency**
+Verification requirements:
 
-All internal modules should import from priority:
-```rust
-use crate::priority::DebtType;
-```
+- [ ] **Critical**: Error swallowing detector output appears in user-facing results
+- [ ] Run `cargo run -- analyze src/debt/error_swallowing.rs` shows error swallowing items
+- [ ] Run `cargo run -- analyze src/` produces debt items for all detector types
+- [ ] Verify `FileMetrics.debt_items` is consumed (not orphaned)
+- [ ] Verify unified analysis includes detector-sourced items
+- [ ] Manual inspection confirms detectors integrated into output pipeline
 
-## Dependencies
+Performance requirements:
 
-- **Prerequisites**: None (bug fix)
-- **Affected Components**:
-  - `src/core/mod.rs` - Remove enum, add re-export
-  - `src/priority/mod.rs` - Add Display impl if missing
-  - `src/debt/error_swallowing.rs` - Fix variant usage
-  - `src/debt/suppression.rs` - Update matching logic (if applicable)
-  - All files importing `DebtType` - Verify correct import
-- **External Dependencies**: None
+- [ ] No performance regression (run benchmarks if available)
+- [ ] Self-analysis completes in reasonable time (<2 minutes for codebase)
 
 ## Testing Strategy
 
 ### Unit Tests
 
-**Update Error Swallowing Tests**
+**Test each updated detector** (example for error_swallowing.rs):
 
 ```rust
-// src/debt/error_swallowing.rs tests need updating
-#[test]
-fn test_if_let_ok_no_else() {
-    let code = r#"
-        fn example() {
-            if let Ok(value) = some_function() {
-                println!("{}", value);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_str;
+
+    #[test]
+    fn test_if_let_ok_creates_struct_variant() {
+        let code = r#"
+            fn example() {
+                if let Ok(value) = some_function() {
+                    println!("{}", value);
+                }
             }
+        "#;
+
+        let file = parse_str::<File>(code).unwrap();
+        let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
+
+        assert_eq!(items.len(), 1);
+
+        // Verify struct variant with fields
+        match &items[0].debt_type {
+            DebtType::ErrorSwallowing { pattern, context } => {
+                assert!(pattern.contains("if let Ok"));
+                assert!(context.is_some());
+            }
+            _ => panic!("Expected ErrorSwallowing struct variant"),
         }
-    "#;
-
-    let file = parse_str::<File>(code).expect("Failed to parse test code");
-    let items = detect_error_swallowing(&file, Path::new("test.rs"), None);
-
-    assert_eq!(items.len(), 1);
-
-    // Update assertion to match struct variant
-    match &items[0].debt_type {
-        DebtType::ErrorSwallowing { pattern, context } => {
-            assert!(pattern.contains("if let Ok"));
-            assert!(context.is_some());
-        }
-        _ => panic!("Expected ErrorSwallowing variant"),
     }
 
-    assert!(items[0].message.contains("if let Ok"));
-    assert_eq!(items[0].line, 3);
-}
-```
+    #[test]
+    fn test_categorization_with_struct_variants() {
+        use crate::priority::debt_aggregator::{categorize_debt_type, DebtCategory};
 
-**Add Verification Tests**
+        let debt_type = DebtType::ErrorSwallowing {
+            pattern: "test".to_string(),
+            context: None,
+        };
 
-```rust
-#[test]
-fn test_debttype_is_struct_variant() {
-    // Ensure we're using the rich enum, not simple enum
-    let detector = ErrorSwallowingDetector::new(Path::new("test.rs"), None);
-    let pattern = ErrorSwallowingPattern::OkMethodDiscard;
-
-    detector.add_debt_item(10, pattern, "test context");
-
-    let items = detector.items;
-    assert_eq!(items.len(), 1);
-
-    // This should compile and match
-    match &items[0].debt_type {
-        DebtType::ErrorSwallowing { pattern, context } => {
-            assert_eq!(pattern, ".ok() discarding error information");
-            assert_eq!(context.as_deref(), Some("test context"));
-        }
-        _ => panic!("Wrong DebtType variant"),
+        assert_eq!(categorize_debt_type(&debt_type), DebtCategory::Resource);
     }
 }
 ```
 
 ### Integration Tests
 
-**Verify Error Swallowing Detection Works**
+**Verify end-to-end flow**:
 
 ```rust
 #[test]
-fn test_error_swallowing_detection_integration() {
-    // Create a temp file with error swallowing patterns
-    let test_code = r#"
-        fn has_error_swallowing() {
-            let result = risky_operation();
-            result.ok();  // Should be detected
+fn test_detector_output_reaches_users() {
+    use tempfile::tempdir;
+    use std::fs;
 
-            if let Ok(value) = another_operation() {
-                // Missing error handling - should be detected
-                println!("{}", value);
-            }
+    let dir = tempdir().unwrap();
+    let file_path = dir.path().join("test.rs");
 
-            let _ = yet_another_operation();  // Should be detected
+    fs::write(&file_path, r#"
+        fn has_errors() {
+            let _ = risky_operation();  // Error swallowing
+            result.ok();                // Error swallowing
         }
-    "#;
+    "#).unwrap();
 
-    let temp_file = create_temp_file("test.rs", test_code);
-    let results = analyze_file(&temp_file).unwrap();
+    // Run analysis
+    let results = analyze_project(dir.path()).unwrap();
 
-    // Should detect 3 error swallowing instances
-    let error_swallowing_count = results.debt_items.iter()
+    // Verify error swallowing items appear in output
+    let error_swallowing_items: Vec<_> = results
+        .all_items()
         .filter(|item| matches!(item.debt_type, DebtType::ErrorSwallowing { .. }))
-        .count();
+        .collect();
 
-    assert_eq!(error_swallowing_count, 3);
-}
-```
-
-### Self-Analysis Test
-
-```rust
-#[test]
-fn test_debtmap_self_analysis_finds_error_swallowing() {
-    // Run debtmap on its own codebase
-    let config = Config::default();
-    let results = analyze_project(".", &config).unwrap();
-
-    // Should find substantial error swallowing instances
-    let error_swallowing_count = results.all_debt_items()
-        .filter(|item| matches!(item.debt_type, DebtType::ErrorSwallowing { .. }))
-        .count();
-
-    // Based on manual analysis, we expect ~95 instances
     assert!(
-        error_swallowing_count >= 50,
-        "Expected at least 50 error swallowing instances, found {}",
-        error_swallowing_count
+        error_swallowing_items.len() >= 2,
+        "Expected at least 2 error swallowing detections, found {}",
+        error_swallowing_items.len()
     );
 }
 ```
@@ -529,219 +722,163 @@ fn test_debtmap_self_analysis_finds_error_swallowing() {
 After implementation:
 
 ```bash
-# Run debtmap on itself
-cargo run -- analyze . --output-format json > self_analysis.json
+# 1. Verify single enum definition
+rg "pub enum DebtType" --type rust
+# Should show only src/priority/mod.rs
 
-# Check for error swallowing results
-jq '.debt_items[] | select(.debt_type.ErrorSwallowing)' self_analysis.json | wc -l
+# 2. Analyze single file with known errors
+cargo run -- analyze src/debt/error_swallowing.rs
 
-# Should show 50+ instances
+# Expected: See error swallowing items in output
+# If not: detector output not integrated - CRITICAL BUG
+
+# 3. Self-analysis
+cargo run -- analyze src/ --output-format json > self_analysis.json
+
+# 4. Count error swallowing detections
+jq '[.items[] | select(.debt_type | has("ErrorSwallowing"))] | length' self_analysis.json
+
+# Expected: >0 (if 0, integration failed)
+
+# 5. Verify all detector types appear
+jq '[.items[].debt_type | keys[0]] | unique' self_analysis.json
+
+# Should include: ErrorSwallowing, and other detector types
 ```
 
-## Documentation Requirements
+## Migration and Compatibility
 
-### Code Documentation
+### For Internal Development
 
-```rust
-/// Detects error swallowing patterns in Rust code.
-///
-/// Creates DebtItems with the ErrorSwallowing variant, including:
-/// - `pattern`: Name of the error swallowing pattern detected
-/// - `context`: Additional context about where/why it occurred
-///
-/// # Returns
-///
-/// Vector of DebtItems with ErrorSwallowing debt_type.
-///
-/// # Examples
-///
-/// ```
-/// let file = parse_rust_file("src/main.rs")?;
-/// let items = detect_error_swallowing(&file, Path::new("src/main.rs"), None);
-///
-/// for item in items {
-///     match item.debt_type {
-///         DebtType::ErrorSwallowing { pattern, context } => {
-///             println!("Found {}: {:?}", pattern, context);
-///         }
-///         _ => unreachable!(),
-///     }
-/// }
-/// ```
-pub fn detect_error_swallowing(
-    file: &File,
-    file_path: &Path,
-    suppression: Option<&SuppressionContext>,
-) -> Vec<DebtItem> {
-    // ...
-}
-```
+No migration needed beyond this spec's implementation. After merge:
+- New code automatically uses struct variants (only option)
+- Import paths unchanged (`use crate::core::DebtType` still works)
 
-### Architecture Updates
+### For External Users (if library)
 
-Add to `ARCHITECTURE.md`:
+**Breaking change notice required:**
 
 ```markdown
-## DebtType Enum
+## Breaking Changes in v0.10.0
 
-The `DebtType` enum is the single source of truth for all technical debt categories.
+### DebtType Enum Consolidated
 
-### Location
+The `DebtType` enum has been consolidated from unit variants to struct variants:
 
-- **Defined in**: `src/priority/mod.rs`
-- **Re-exported from**: `src/core/mod.rs` (for API compatibility)
-
-### Design
-
-`DebtType` uses **struct variants with data** to capture rich information:
-
+**Before:**
 ```rust
-pub enum DebtType {
-    ErrorSwallowing {
-        pattern: String,        // Pattern name (e.g., ".ok() discarding error")
-        context: Option<String>, // Additional context
-    },
-    ComplexityHotspot {
-        cyclomatic: u32,
-        cognitive: u32,
-        adjusted_cyclomatic: Option<u32>,
-    },
-    // ... other variants
-}
+let debt = DebtType::ErrorSwallowing;  // Unit variant
 ```
 
-### Historical Context
-
-Previously, debtmap had **two different** DebtType enums:
-- `src/core/mod.rs` - Simple unit variants (legacy, **removed in spec 203**)
-- `src/priority/mod.rs` - Rich struct variants (current)
-
-This duplication caused error swallowing detection to fail silently due to type mismatches.
-
-### Usage
-
-Always import from core (which re-exports from priority):
-
+**After:**
 ```rust
-use crate::core::DebtType;
-
-// Or directly from priority:
-use crate::priority::DebtType;
+let debt = DebtType::ErrorSwallowing {
+    pattern: "pattern_name".to_string(),
+    context: Some("additional context".to_string()),
+};
 ```
 
-When creating DebtItems, use struct variants with data:
+**Migration:**
+- Pattern matches must use `{ .. }` syntax
+- Equality checks must use `matches!` macro or discriminant comparison
+- Construction requires field data
 
-```rust
-DebtItem {
-    debt_type: DebtType::ErrorSwallowing {
-        pattern: "if let Ok without else".to_string(),
-        context: Some("Missing error handling".to_string()),
-    },
-    // ...
-}
+See migration guide: docs/migration-0.10.md
 ```
-```
+
+## Success Metrics
+
+Upon completion:
+
+- ✅ Single `DebtType` enum definition (verified by grep)
+- ✅ All 400+ tests pass
+- ✅ No clippy warnings
+- ✅ Error swallowing detector output visible in user results
+- ✅ All detector types integrated into output pipeline
+- ✅ No orphaned `DebtItem`s in `FileMetrics`
+- ✅ Self-analysis produces detector results
+- ✅ API compatibility maintained through re-export
+
+## Follow-up Work
+
+After completing this spec:
+
+1. **Spec 204: Eliminate Dual Pipeline** (Architectural Improvement)
+   - Implement Option A: Remove detector path entirely
+   - Error swallowing enriches `FunctionMetrics.language_specific`
+   - Priority scoring creates all `UnifiedDebtItem`s
+   - Cleaner single-pipeline architecture
+
+2. **Spec 205: Enhanced Error Swallowing Detection**
+   - Add `.filter_map(Result::ok)` pattern
+   - Add `.collect::<Result<Vec<_>>>().ok()` pattern
+   - Improve pattern accuracy
+
+3. **All Other Detectors Review**
+   - Audit panic_patterns, async_errors, error_context, error_propagation
+   - Verify all create appropriate struct variants
+   - Check integration into output
 
 ## Implementation Notes
 
-### Refactoring Steps
+### Critical Success Factors
 
-1. **Verify current state**
-   ```bash
-   rg "pub enum DebtType" --type rust
-   # Should show two definitions - core and priority
-   ```
-
-2. **Update error swallowing detector first**
-   - Easier to test in isolation
-   - Validates the approach
-
-3. **Remove core enum definition**
-   - Replace with re-export
-   - Maintain API compatibility
-
-4. **Run tests incrementally**
-   - After each change, run tests
-   - Fix failures immediately
-
-5. **Self-analyze**
-   - Run debtmap on itself
-   - Verify results appear
+1. **Verify integration EARLY** - Don't assume detector output flows to users
+2. **Update tests incrementally** - Don't batch 100+ test updates
+3. **Use compiler as guide** - Compilation errors show what needs updating
+4. **Test after each phase** - Catch issues early
 
 ### Common Pitfalls
 
-1. **Breaking Public API** - Use re-export to maintain compatibility
-2. **Forgetting Display impl** - Add `Display` for `ErrorSwallowingPattern`
-3. **Pattern matching** - Update all match expressions to handle struct variants
-4. **Suppression logic** - Update to compare variant types, not full equality
+1. **Forgetting `..` in patterns**:
+   ```rust
+   // ❌ Won't compile
+   DebtType::ErrorSwallowing => { ... }
+
+   // ✓ Required
+   DebtType::ErrorSwallowing { .. } => { ... }
+   ```
+
+2. **Using equality on struct variants**:
+   ```rust
+   // ❌ Won't compile
+   if debt_type == DebtType::ErrorSwallowing { ... }
+
+   // ✓ Use matches!
+   if matches!(debt_type, DebtType::ErrorSwallowing { .. }) { ... }
+   ```
+
+3. **Assuming detector output is integrated**:
+   - **Must verify** `FileMetrics.debt_items` reaches output
+   - If not integrated, this entire spec only fixes compilation - users still see nothing!
+
+4. **Missing struct variant fields**:
+   ```rust
+   // ❌ Won't compile
+   DebtType::ErrorSwallowing
+
+   // ✓ Required
+   DebtType::ErrorSwallowing {
+       pattern: "...".to_string(),
+       context: Some("...".to_string()),
+   }
+   ```
 
 ### Verification Checklist
 
 After implementation:
 
-- [ ] Only one `pub enum DebtType` in codebase
-- [ ] All files compile without errors
-- [ ] All tests pass
-- [ ] `cargo clippy` shows no warnings
-- [ ] Self-analysis shows error swallowing results
-- [ ] Count matches expected ~95 instances
-
-## Migration and Compatibility
-
-### Breaking Changes
-
-**None** - Public API maintained through re-export.
-
-### Migration Steps
-
-**For External Users** (if debtmap is a library):
-
-No migration needed. `core::DebtType` still available via re-export.
-
-**For Internal Code**:
-
-1. Update imports if needed (re-export handles most cases)
-2. Update pattern matching to handle struct variants
-3. Update equality comparisons to match on variant type
-
-### Compatibility Considerations
-
-**Pattern Matching**:
-
-Old code (won't compile with struct variant):
-```rust
-if debt_item.debt_type == DebtType::ErrorSwallowing {
-    // ...
-}
-```
-
-New code:
-```rust
-if matches!(debt_item.debt_type, DebtType::ErrorSwallowing { .. }) {
-    // ...
-}
-```
-
-## Success Metrics
-
-- ✅ Single `DebtType` enum definition
-- ✅ All tests pass
-- ✅ Error swallowing detection produces results
-- ✅ Self-analysis finds 50+ error swallowing instances
-- ✅ No compilation errors or warnings
-- ✅ No clippy warnings
-- ✅ API compatibility maintained
-
-## Follow-up Work
-
-After this fix:
-- Spec 202: Improve error swallowing detection patterns (add `.filter_map(Result::ok)`)
-- Spec 203: Add error collection and reporting for batch operations
-- Review other debt detectors for similar type issues
+- [ ] Run: `rg "pub enum DebtType" --type rust` → Only 1 result
+- [ ] Run: `cargo test --all-features` → All pass
+- [ ] Run: `cargo clippy --all-targets` → No warnings
+- [ ] Run: `cargo run -- analyze src/debt/error_swallowing.rs` → See error swallowing in output
+- [ ] Check: `FileMetrics.debt_items` consumption verified in code
+- [ ] Verify: All detector types appear in self-analysis output
 
 ## References
 
-- **Meta-issue discovery**: 2025-12-06 debugging session
-- **Root cause**: Duplicate enum definitions causing silent type mismatch
-- **Manual analysis**: ~95 error swallowing instances found via grep
-- **Stillwater PHILOSOPHY.md**: "Errors Should Tell Stories" - detection failures should never be silent
+- **Discovery**: 2025-12-06 evaluation session
+- **Root cause**: Parallel data pipelines with orphaned detector output
+- **Affected files**: 50+ files import DebtType, 30+ files pattern match
+- **Architecture**: Two systems (detector → DebtItem, scoring → UnifiedDebtItem) never integrate
+- **Priority rationale**: Entire detection system built but never shown to users - critical waste and false confidence
